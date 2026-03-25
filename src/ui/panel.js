@@ -4,14 +4,14 @@
 export class Panel {
     constructor(elementId) {
         this.element =
-            typeof elementId === 'string' ? document.getElementById(elementId) : elementId
+            typeof elementId === 'string' ? document.getElementById(elementId) : elementId;
 
         if (!this.element) {
-            console.error(`Panel element not found: ${elementId}`)
+            console.error(`Panel element not found: ${elementId}`);
         }
 
         // Event system
-        this._eventListeners = {}
+        this._eventListeners = {};
     }
 
     /**
@@ -21,9 +21,9 @@ export class Panel {
      */
     on(eventName, callback) {
         if (!this._eventListeners[eventName]) {
-            this._eventListeners[eventName] = []
+            this._eventListeners[eventName] = [];
         }
-        this._eventListeners[eventName].push(callback)
+        this._eventListeners[eventName].push(callback);
     }
 
     /**
@@ -32,11 +32,11 @@ export class Panel {
      * @param {function} callback - Callback function to remove
      */
     off(eventName, callback) {
-        if (!this._eventListeners[eventName]) return
+        if (!this._eventListeners[eventName]) return;
 
         this._eventListeners[eventName] = this._eventListeners[eventName].filter(
-            (cb) => cb !== callback,
-        )
+            (cb) => cb !== callback
+        );
     }
 
     /**
@@ -45,32 +45,32 @@ export class Panel {
      * @param {any} data - Data to pass to callbacks
      */
     emit(eventName, data) {
-        if (!this._eventListeners[eventName]) return
+        if (!this._eventListeners[eventName]) return;
 
         this._eventListeners[eventName].forEach((callback) => {
             try {
-                callback(data)
+                callback(data);
             } catch (error) {
-                console.error(`Error in event listener for ${eventName}:`, error)
+                console.error(`Error in event listener for ${eventName}:`, error);
             }
-        })
+        });
     }
 
     show() {
         if (this.element) {
-            this.element.classList.add('visible')
+            this.element.classList.add('visible');
         }
     }
 
     hide() {
         if (this.element) {
-            this.element.classList.remove('visible')
+            this.element.classList.remove('visible');
         }
     }
 
     toggle() {
         if (this.element) {
-            this.element.classList.toggle('visible')
+            this.element.classList.toggle('visible');
         }
     }
 

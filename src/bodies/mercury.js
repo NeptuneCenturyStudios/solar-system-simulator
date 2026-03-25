@@ -1,15 +1,15 @@
-import * as THREE from '../vendors/three.module.js'
-import { calculateTrajectory } from '../physics/physics.js'
-import { MERCURY_DIST, MERCURY_MASS, SUN_MASS } from '../utilities/consts.js'
-import { BodyType } from '../utilities/utilities.js'
-import { loadSrgbTexture } from '../drawing/textures.js'
-import { CelestialBody } from './celestial-body.js'
+import * as THREE from '../vendors/three.module.js';
+import { calculateTrajectory } from '../physics/physics.js';
+import { MERCURY_DIST, MERCURY_MASS, SUN_MASS } from '../utilities/consts.js';
+import { BodyType } from '../utilities/utilities.js';
+import { loadSrgbTexture } from '../drawing/textures.js';
+import { CelestialBody } from './celestial-body.js';
 
-const mercuryTexture = loadSrgbTexture('./assets/textures/mercury.jpg')
+const mercuryTexture = loadSrgbTexture('./assets/textures/mercury.jpg');
 
 export class Mercury extends CelestialBody {
     constructor(dependencies, scene) {
-        const trajectory = calculateTrajectory(MERCURY_DIST, SUN_MASS)
+        const trajectory = calculateTrajectory(MERCURY_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: mercuryTexture,
@@ -18,7 +18,7 @@ export class Mercury extends CelestialBody {
             emissiveIntensity: 0,
             roughness: 0.7,
             metalness: 0.7,
-        })
+        });
 
         super(
             dependencies,
@@ -38,7 +38,7 @@ export class Mercury extends CelestialBody {
             false,
             { axis: [0, 1, 0], speed: 0.15 },
             null,
-            material,
-        )
+            material
+        );
     }
 }

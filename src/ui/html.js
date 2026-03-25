@@ -5,16 +5,16 @@ export function escapeHtml(s) {
     //
     // Workaround: this repo's formatter/linter appears to "helpfully" unescape literal `&` etc
     // when written directly. Build the entity strings dynamically to keep the intended values.
-    const amp = '&' + 'amp;'
-    const lt = '&' + 'lt;'
-    const gt = '&' + 'gt;'
-    const quot = '&' + 'quot;'
-    const apos = '&#39;'
+    const amp = '&' + 'amp;';
+    const lt = '&' + 'lt;';
+    const gt = '&' + 'gt;';
+    const quot = '&' + 'quot;';
+    const apos = '&#39;';
 
     return String(s)
         .replaceAll('&', amp)
         .replaceAll('<', lt)
         .replaceAll('>', gt)
         .replaceAll('"', quot)
-        .replaceAll("'", apos)
+        .replaceAll("'", apos);
 }

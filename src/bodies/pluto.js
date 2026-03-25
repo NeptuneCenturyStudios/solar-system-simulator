@@ -1,13 +1,13 @@
-import * as THREE from '../vendors/three.module.js'
+import * as THREE from '../vendors/three.module.js';
 
-import { CelestialBody } from './celestial-body.js'
-import { calculateTrajectory } from '../physics/physics.js'
-import { BodyType } from '../utilities/utilities.js'
-import { PLUTO_DIST, PLUTO_MASS, SUN_MASS, PLUTO_RADIUS } from '../utilities/consts.js'
+import { CelestialBody } from './celestial-body.js';
+import { calculateTrajectory } from '../physics/physics.js';
+import { BodyType } from '../utilities/utilities.js';
+import { PLUTO_DIST, PLUTO_MASS, SUN_MASS, PLUTO_RADIUS } from '../utilities/consts.js';
 
 export class Pluto extends CelestialBody {
     constructor(dependencies, scene, plutoTexture) {
-        const trajectory = calculateTrajectory(PLUTO_DIST, SUN_MASS)
+        const trajectory = calculateTrajectory(PLUTO_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: plutoTexture,
@@ -16,7 +16,7 @@ export class Pluto extends CelestialBody {
             emissiveIntensity: 0,
             roughness: 0.7,
             metalness: 0.95,
-        })
+        });
 
         super(
             dependencies,
@@ -36,7 +36,7 @@ export class Pluto extends CelestialBody {
             false,
             { axis: [0, 1, 0], speed: 0.08 },
             null,
-            material,
-        )
+            material
+        );
     }
 }

@@ -1,12 +1,12 @@
-import * as THREE from '../vendors/three.module.js'
-import { CelestialBody } from './celestial-body.js'
-import { calculateTrajectory } from '../physics/physics.js'
-import { BodyType } from '../utilities/utilities.js'
-import { SUN_MASS, URANUS_DIST, URANUS_MASS } from '../utilities/consts.js'
+import * as THREE from '../vendors/three.module.js';
+import { CelestialBody } from './celestial-body.js';
+import { calculateTrajectory } from '../physics/physics.js';
+import { BodyType } from '../utilities/utilities.js';
+import { SUN_MASS, URANUS_DIST, URANUS_MASS } from '../utilities/consts.js';
 
 export class Uranus extends CelestialBody {
     constructor(dependencies, scene, uranusTexture) {
-        const trajectory = calculateTrajectory(URANUS_DIST, SUN_MASS)
+        const trajectory = calculateTrajectory(URANUS_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: uranusTexture,
@@ -15,7 +15,7 @@ export class Uranus extends CelestialBody {
             emissiveIntensity: 0,
             roughness: 0.7,
             metalness: 0.7,
-        })
+        });
 
         super(
             dependencies,
@@ -35,7 +35,7 @@ export class Uranus extends CelestialBody {
             false,
             { axis: [0.99, 0.12, 0], speed: 0.42 },
             null,
-            material,
-        )
+            material
+        );
     }
 }
