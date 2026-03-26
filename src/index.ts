@@ -1,8 +1,8 @@
-import * as THREE from './vendors/three.module.js';
-import { OrbitControls } from './vendors/examples/jsm/controls/OrbitControls.js';
-import { Line2 } from './vendors/examples/jsm/lines/Line2.js';
-import { LineMaterial } from './vendors/examples/jsm/lines/LineMaterial.js';
-import { LineGeometry } from './vendors/examples/jsm/lines/LineGeometry.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 
 // Import all consts
 import {
@@ -12,19 +12,7 @@ import {
     SUN_RADIUS,
     ASTEROID_SPAWN_MIN_DIST,
     ASTEROID_SPAWN_MAX_DIST,
-    SHADOW_MAP_SIZE,
     MIN_STAR_MASS,
-    MARS_MASS,
-    MARS_DIST,
-    JUPITER_MASS,
-    JUPITER_DIST,
-    SATURN_MASS,
-    SATURN_DIST,
-    NEPTUNE_MASS,
-    NEPTUNE_DIST,
-    URANUS_MASS,
-    URANUS_DIST,
-    PLUTO_MASS,
     PLUTO_DIST,
     IO_MASS,
     IO_DIST_FROM_JUPITER,
@@ -63,10 +51,9 @@ import { CoordinateGizmo } from './gizmos/coordinate-gizmo.js';
 import { isBodyType, BodyType, pickRandom } from './utilities/utilities.js';
 import { calculateTrajectory } from './physics/physics.js';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
-import { triggerScreenFlash } from './effects/screen-flash.js';
 import { Supernova } from './effects/supernova.js';
-import { StarBirth } from './effects/star-birth.js';
-import { ParticleExplosion } from './particles/particle-explosion.js';
+import { StarBirth } from './effects/star-birth';
+import { ParticleExplosion } from './effects/particle-explosion.js';
 import { CelestialBody } from './bodies/celestial-body.js';
 import { Mercury } from './bodies/mercury.js';
 import { Venus } from './bodies/venus.js';
@@ -657,7 +644,7 @@ const MAX_EVENTS = 5;
 const EVENT_DISPLAY_TIME = 5000; // Show for 5 seconds
 const EVENT_FADE_START = 3000; // Start fading after 3 seconds
 
-function addEvent(message) {
+function addEvent(message: string) {
     eventLog.push({
         message: message,
         timestamp: performance.now(),
@@ -1254,8 +1241,8 @@ let activeAxis = null;
 let isChangingVelocity = false;
 let isMiddleMouseVelocity = false;
 let timeScale = 1.5;
-let cameraOffsetFromPlanet = new THREE.Vector3();
-let lastPlanetAngle = 0;
+const cameraOffsetFromPlanet = new THREE.Vector3();
+const lastPlanetAngle = 0;
 let isFreeCameraMode = false;
 let isMouseLookActive = false;
 let focusID = 'camSun';
@@ -1264,15 +1251,15 @@ const NONE_FOCUS_POSITION = new THREE.Vector3(0, 0, 0); // Center of solar syste
 let isPaused = false;
 let savedTimeScale = 1.5;
 let lastT = performance.now();
-let bodies = [];
-let explosions = [];
-let supernovas = []; // Track all supernova effects
+let bodies: Body[] = [];
+let explosions: ParticleExplosion[] = [];
+let supernovas: Supernova[] = []; // Track all supernova effects
 
-let isDragging = false;
-let dragTarget = null;
+const isDragging = false;
+const dragTarget = null;
 let wasRunningBeforeDrag = false;
-let dragCameraOffset = new THREE.Vector3();
-let dragPlane = new THREE.Plane();
+const dragCameraOffset = new THREE.Vector3();
+const dragPlane = new THREE.Plane();
 
 // Synchronize aliases with state objects
 Object.defineProperty(window, 'isRepositioning', {
@@ -1748,12 +1735,6 @@ function updatePositionIndicator(line, ring, position) {
 
     // Update ring position
     ring.position.set(position.x, gridY, position.z);
-}
-
-function updateGridCenterToTarget() {
-    // Deprecated: grid is now world-anchored.
-    // Kept as a no-op for safety in case any older call sites remain.
-    return;
 }
 
 function setIndicatorMode(mode) {
@@ -3717,7 +3698,7 @@ function animate() {
     for (let i = 0; i < steps; i++) {
         // Calculate accelerations for all bodies
         for (const body of bodies) {
-            let totalAcc = new THREE.Vector3(0, 0, 0);
+            const totalAcc = new THREE.Vector3(0, 0, 0);
 
             // Calculate pull from ALL OTHER bodies (n-body simulation)
             for (const other of bodies) {

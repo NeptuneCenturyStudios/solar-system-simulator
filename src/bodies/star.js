@@ -1,4 +1,4 @@
-import * as THREE from '../vendors/three.module.js';
+import * as THREE from 'three';
 import { SHADOW_MAP_SIZE, SUN_MASS, SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyType, isBodyType } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body.js';

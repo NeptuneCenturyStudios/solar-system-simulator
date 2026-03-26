@@ -1,4 +1,4 @@
-import * as THREE from '../vendors/three.module.js';
+import * as THREE from 'three';
 import { GIZMO_TUNING, GRAV_ARROW_SCALE } from '../utilities/consts.js';
 
 export class CoordinateGizmo {

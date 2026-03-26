@@ -1,4 +1,4 @@
-import * as THREE from '../vendors/three.module.js';
+import * as THREE from 'three';
 
 // Function to create text texture from canvas
 export function createTextTexture(text) {

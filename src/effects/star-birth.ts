@@ -1,4 +1,4 @@
-import * as THREE from '../vendors/three.module.js';
+import * as THREE from 'three';
 
 /**
  * StarBirth
@@ -13,7 +13,7 @@ export class StarBirth {
      * @param {THREE.Vector3} pos
      * @param {number} radius
      */
-    constructor(scene, pos, radius) {
+    constructor(scene: THREE.Scene, pos: THREE.Vector3, radius: number) {
         this.count = 1500; // Particles converging to form star
         this.geometry = new THREE.BufferGeometry();
         this.positions = new Float32Array(this.count * 3);

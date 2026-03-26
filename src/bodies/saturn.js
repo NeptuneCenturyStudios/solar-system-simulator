@@ -1,4 +1,4 @@
-import * as THREE from '../vendors/three.module.js';
+import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body.js';
 import { calculateTrajectory } from '../physics/physics.js';

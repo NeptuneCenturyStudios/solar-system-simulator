@@ -1,10 +1,10 @@
-import * as THREE from '../vendors/three.module.js';
+import * as THREE from 'three';
 import { Body } from './body.js';
 import { createTextTexture } from '../drawing/text-rendering.js';
 import { moonTexture, fictionalTextures } from '../drawing/textures.js';
 import { isBodyType, BodyType, pickRandom } from '../utilities/utilities.js';
 import { calculateTrajectory } from '../physics/physics.js';
-import { ParticleExplosion } from '../particles/particle-explosion.js';
+import { ParticleExplosion } from '../effects/particle-explosion.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 

@@ -1,4 +1,4 @@
-import * as THREE from '../vendors/three.module.js';
+import * as THREE from 'three';
 
 export class Supernova {
     constructor(scene, pos, radius, shouldCollapse = false) {

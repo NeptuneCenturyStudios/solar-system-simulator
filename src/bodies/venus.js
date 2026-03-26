@@ -1,4 +1,4 @@
-import * as THREE from '../vendors/three.module.js';
+import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, VENUS_DIST, VENUS_MASS } from '../utilities/consts.js';
 import { BodyType } from '../utilities/utilities.js';
