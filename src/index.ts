@@ -72,6 +72,7 @@ import { Comet } from './bodies/comet.js';
 import { MainPanel } from './ui/main-panel.js';
 import { ManagementPanel } from './ui/management-panel.js';
 import { StartupModal } from './ui/startup-modal.js';
+import { EventLogEntry } from './event-log/event-log.js';
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
 const uranusTexture = loadSrgbTexture('./assets/textures/uranus.jpg');
@@ -639,7 +640,7 @@ const uiCamera = new THREE.OrthographicCamera(
 uiCamera.position.z = 10;
 
 // Event log system for tracking body deaths
-const eventLog = [];
+const eventLog: EventLogEntry[] = [];
 const MAX_EVENTS = 5;
 const EVENT_DISPLAY_TIME = 5000; // Show for 5 seconds
 const EVENT_FADE_START = 3000; // Start fading after 3 seconds
@@ -783,8 +784,8 @@ const simulationState = {
     isPaused: false,
     savedTimeScale: 1.5,
     lastT: performance.now(),
-    bodies: [],
-    explosions: [],
+    bodies: [] as Body[],
+    explosions: [] as ParticleExplosion[],
 };
 
 let selectedBody = null; // Track selected body for stats/management panel
@@ -792,12 +793,12 @@ const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
 const dependencies = {
     gizmo: gizmo,
     addEvent: addEvent,
-    addExplosion: (explosion) => {
+    addExplosion: (explosion: ParticleExplosion) => {
         if (!explosion) return;
         // Push into the canonical explosions array that the main loop updates/filters
-        explosions.push(explosion);
+        simulationState.explosions.push(explosion);
     },
-    addBody: (body) => {
+    addBody: (body: CelestialBody) => {
         if (!body) return;
         bodies.push(body);
 
@@ -1252,7 +1253,6 @@ let isPaused = false;
 let savedTimeScale = 1.5;
 let lastT = performance.now();
 let bodies: Body[] = [];
-let explosions: ParticleExplosion[] = [];
 let supernovas: Supernova[] = []; // Track all supernova effects
 
 const isDragging = false;
@@ -1334,12 +1334,7 @@ Object.defineProperty(window, 'bodies', {
         simulationState.bodies = v;
     },
 });
-Object.defineProperty(window, 'explosions', {
-    get: () => simulationState.explosions,
-    set: (v) => {
-        simulationState.explosions = v;
-    },
-});
+
 Object.defineProperty(window, 'wasRunningBeforeDrag', {
     get: () => interactionState.wasRunningBeforeDrag,
     set: (v) => {
@@ -2490,7 +2485,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     }
 
     // Clean up any existing explosions first
-    explosions.forEach((explosion) => {
+    simulationState.explosions.forEach((explosion) => {
         if (explosion.points) {
             scene.remove(explosion.points);
             explosion.geometry?.dispose();
@@ -2502,7 +2497,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             explosion.flashSphere.material?.dispose();
         }
     });
-    explosions = [];
+    simulationState.explosions = [];
 
     // Clean up all supernova effects
     for (const supernova of supernovas) {
@@ -3882,7 +3877,7 @@ function animate() {
     }
 
     // Filter dead explosions
-    explosions = explosions.filter((exp) => {
+    simulationState.explosions = simulationState.explosions.filter((exp) => {
         exp.update(dtTotal);
         return exp.alive;
     });

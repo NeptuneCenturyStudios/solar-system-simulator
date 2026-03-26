@@ -8,10 +8,22 @@ import { ParticleExplosion } from '../effects/particle-explosion.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 
+function createSphereGeometry(radius: number) {
+    return new THREE.SphereGeometry(radius, 32, 32);
+}
+
 /**
  * This class represents a celestial body with physical properties, rendering capabilities, and optional features like rings, atmosphere, and tidal locking.
  */
 export class CelestialBody extends Body {
+    // private defaultMaterial = new THREE.MeshStandardMaterial({
+    //         color: this.color,
+    //         emissive: 0x000000,
+    //         emissiveIntensity: 0,
+    //         roughness: 0.7,
+    //         metalness: 0.7,
+    //     });
+
     constructor(
         deps = {},
         scene,
@@ -29,11 +41,25 @@ export class CelestialBody extends Body {
         hasAtmosphere = false,
         hasTail = false,
         rotation = { axis: [0, 1, 0], speed: 0 },
-        geometryFactory = null,
-        material = null,
+        geometryFactory: (radius: number) => THREE.BufferGeometry,
+        material: THREE.Material,
         tidalLock = null
     ) {
-        super();
+        const defaultMaterial = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.7,
+            metalness: 0.7,
+        });
+
+        // Default geometry is a sphere. Special bodies (e.g. Asteroids) can inject geometry via `geometryFactory`.
+        const geometry =
+            typeof geometryFactory === 'function'
+                ? geometryFactory(radius)
+                : new THREE.SphereGeometry(radius, 32, 32);
+
+        super(deps, scene, mass, pos, vel, geometry, material ?? defaultMaterial);
 
         // Set dependencies
         this.deps = deps || {};
@@ -78,30 +104,30 @@ export class CelestialBody extends Body {
             this._tidalLockConfigured = true;
         }
 
-        // Default geometry is a sphere. Special bodies (e.g. Asteroids) can inject geometry via `geometryFactory`.
-        const geometry =
-            typeof geometryFactory === 'function'
-                ? geometryFactory(radius, { mass, bodyType })
-                : new THREE.SphereGeometry(radius, 32, 32);
+        // // Default geometry is a sphere. Special bodies (e.g. Asteroids) can inject geometry via `geometryFactory`.
+        // const geometry =
+        //     typeof geometryFactory === 'function'
+        //         ? geometryFactory(radius, { mass, bodyType })
+        //         : new THREE.SphereGeometry(radius, 32, 32);
 
-        const defaultMaterial = new THREE.MeshStandardMaterial({
-            color: color,
-            emissive: 0x000000,
-            emissiveIntensity: 0,
-            roughness: 0.7,
-            metalness: 0.7,
-        });
+        // const defaultMaterial = new THREE.MeshStandardMaterial({
+        //     color: color,
+        //     emissive: 0x000000,
+        //     emissiveIntensity: 0,
+        //     roughness: 0.7,
+        //     metalness: 0.7,
+        // });
 
-        this.mesh = new THREE.Mesh(geometry, material || defaultMaterial);
+        // this.mesh = new THREE.Mesh(geometry, material || defaultMaterial);
 
-        // Store base color for distance-based brightness adjustment
+        // // Store base color for distance-based brightness adjustment
         this.baseColor = new THREE.Color(color);
 
-        this.mesh.position.set(...pos);
-        this.mesh.castShadow = !isBodyType(this, BodyType.Star);
-        this.mesh.receiveShadow = !isBodyType(this, BodyType.Star);
-        this.mesh.userData = { parentBody: this }; // Link mesh back to class for raycasting
-        scene.add(this.mesh);
+        // this.mesh.position.set(...pos);
+        // this.mesh.castShadow = !isBodyType(this, BodyType.Star);
+        // this.mesh.receiveShadow = !isBodyType(this, BodyType.Star);
+        // this.mesh.userData = { parentBody: this }; // Link mesh back to class for raycasting
+        // scene.add(this.mesh);
 
         // Create sprite-based label for this body
         const labelTexture = createTextTexture(this.name);
