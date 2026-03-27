@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Body } from './body.js';
-import { createTextTexture } from '../drawing/text-rendering.js';
 import { moonTexture, fictionalTextures } from '../drawing/textures.js';
 import { isBodyType, BodyType, pickRandom } from '../utilities/utilities.js';
 import { calculateTrajectory } from '../physics/physics.js';
@@ -95,66 +94,8 @@ export class CelestialBody extends Body {
             this._tidalLockConfigured = true;
         }
 
-        // const defaultMaterial = new THREE.MeshStandardMaterial({
-        //     color: color,
-        //     emissive: 0x000000,
-        //     emissiveIntensity: 0,
-        //     roughness: 0.7,
-        //     metalness: 0.7,
-        // });
-
-        // this.mesh = new THREE.Mesh(geometry, material || defaultMaterial);
-
-        // // Store base color for distance-based brightness adjustment
+        // Store base color for distance-based brightness adjustment
         this.baseColor = new THREE.Color(color);
-
-        // this.mesh.position.set(...pos);
-        // this.mesh.castShadow = !isBodyType(this, BodyType.Star);
-        // this.mesh.receiveShadow = !isBodyType(this, BodyType.Star);
-        // this.mesh.userData = { parentBody: this }; // Link mesh back to class for raycasting
-        // scene.add(this.mesh);
-
-        // Create sprite-based label for this body
-        const labelTexture = createTextTexture(this.name);
-        const labelMaterial = new THREE.SpriteMaterial({
-            map: labelTexture,
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        });
-        this.label = new THREE.Sprite(labelMaterial);
-
-        // Initial scale - will be updated each frame based on camera distance
-        this.label.scale.set(10, 4, 1);
-
-        // Position above the body
-        const labelHeight = this.radius * 3.5;
-        this.label.position.set(0, labelHeight, 0);
-        this.label.visible = false; // Hidden by default
-        this.mesh.add(this.label);
-
-        // Create line from body surface to label
-        const lineGeometry = new THREE.BufferGeometry();
-        const linePositions = new Float32Array([
-            0,
-            this.radius,
-            0, // Start at body surface
-            0,
-            labelHeight,
-            0, // End at label
-        ]);
-        lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
-        this.labelLine = new THREE.Line(
-            lineGeometry,
-            new THREE.LineBasicMaterial({
-                color: 0x00ffcc,
-                transparent: true,
-                opacity: 0.4,
-                depthTest: false,
-            })
-        );
-        this.labelLine.visible = false;
-        this.mesh.add(this.labelLine);
 
         // Atmosphere (old halo effect) removed.
         // Keep `hasAtmosphere` constructor flag for future use (e.g., manager-created planets).
