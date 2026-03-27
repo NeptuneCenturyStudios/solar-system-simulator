@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Body } from './body.js';
 import { moonTexture, fictionalTextures } from '../drawing/textures.js';
 import { isBodyType, BodyType, pickRandom } from '../utilities/utilities.js';
-import { calculateTrajectory } from '../physics/physics.js';
+import { calculateTrajectory, IRotation } from '../physics/physics.js';
 import { ParticleExplosion } from '../effects/particle-explosion.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
@@ -32,7 +32,7 @@ export class CelestialBody extends Body {
         hasRings = false,
         hasAtmosphere = false,
         hasTail = false,
-        rotation = { axis: [0, 1, 0], speed: 0 },
+        rotation: IRotation = { axis: [0, 1, 0], speed: 0 },
         geometryFactory: (radius: number) => THREE.BufferGeometry,
         material: THREE.Material,
         tidalLock = null

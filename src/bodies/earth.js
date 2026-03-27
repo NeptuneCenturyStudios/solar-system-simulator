@@ -31,7 +31,7 @@ export class Earth extends CelestialBody {
             earthTrajectory.pos.toArray(),
             earthTrajectory.vel.toArray(),
             EARTH_MASS, // Mass
-            'camEarth',
+            'earth',
             'Earth',
             BodyType.Planet,
             0x00ffff,
