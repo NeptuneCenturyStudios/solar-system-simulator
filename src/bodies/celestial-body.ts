@@ -16,21 +16,14 @@ function createSphereGeometry(radius: number) {
  * This class represents a celestial body with physical properties, rendering capabilities, and optional features like rings, atmosphere, and tidal locking.
  */
 export class CelestialBody extends Body {
-    // private defaultMaterial = new THREE.MeshStandardMaterial({
-    //         color: this.color,
-    //         emissive: 0x000000,
-    //         emissiveIntensity: 0,
-    //         roughness: 0.7,
-    //         metalness: 0.7,
-    //     });
 
     constructor(
         deps = {},
         scene,
         radius,
         color,
-        pos,
-        vel,
+        pos: THREE.Vector3,
+        vel: THREE.Vector3,
         mass,
         id,
         name,
@@ -59,7 +52,7 @@ export class CelestialBody extends Body {
                 ? geometryFactory(radius)
                 : new THREE.SphereGeometry(radius, 32, 32);
 
-        super(deps, scene, mass, pos, vel, geometry, material ?? defaultMaterial);
+        super(deps, scene, mass, pos, vel, geometry, material ?? defaultMaterial, id, name);
 
         // Set dependencies
         this.deps = deps || {};
@@ -67,10 +60,8 @@ export class CelestialBody extends Body {
         this.radius = radius;
         this.mass = mass;
         this.color = color;
-        this.id = id;
-        this.name = name;
         this.bodyType = bodyType;
-        this.velocity = new THREE.Vector3(...vel);
+        //this.velocity = new THREE.Vector3(...vel);
         this.hasTail = hasTail;
 
         // Axial rotation (spin). Uses simulation dt so it follows timeScale and reverses when time runs backwards.
@@ -103,12 +94,6 @@ export class CelestialBody extends Body {
             }
             this._tidalLockConfigured = true;
         }
-
-        // // Default geometry is a sphere. Special bodies (e.g. Asteroids) can inject geometry via `geometryFactory`.
-        // const geometry =
-        //     typeof geometryFactory === 'function'
-        //         ? geometryFactory(radius, { mass, bodyType })
-        //         : new THREE.SphereGeometry(radius, 32, 32);
 
         // const defaultMaterial = new THREE.MeshStandardMaterial({
         //     color: color,
@@ -279,18 +264,9 @@ export class CelestialBody extends Body {
     }
     die(skipExplosion = false) {
         if (this._isDisposed) return;
-        this._isDisposed = true;
+        
 
-        // Notify UI / systems that track live bodies
-        try {
-            window.dispatchEvent(
-                new CustomEvent('body:dead', {
-                    detail: { body: this, id: this.id, name: this.name },
-                })
-            );
-        } catch {
-            // ignore
-        }
+        super.die();
 
         // Log the death event
         if (typeof this.deps.addEvent !== 'undefined') {
@@ -423,40 +399,11 @@ export class CelestialBody extends Body {
             // ignore
         }
     }
-    update(acc, dt) {
+    update(acc: THREE.Vector3, dt: number) {
+        super.update(acc, dt);
+
         if (this._isDisposed) return;
-
-        // Defensive: some callers may invoke update without acceleration.
-        // Treat missing/invalid acceleration as zero so simulation doesn't crash.
-        if (
-            !acc ||
-            typeof acc.x !== 'number' ||
-            typeof acc.y !== 'number' ||
-            typeof acc.z !== 'number'
-        ) {
-            acc = new THREE.Vector3(0, 0, 0);
-        }
-
-        // Velocity Verlet integration
-        // v(t + dt/2) = v(t) + a(t) * dt/2
-        // x(t + dt) = x(t) + v(t + dt/2) * dt
-        // v(t + dt) = v(t + dt/2) + a(t) * dt * 0.5
-
-        // Update velocity by half step
-        this.velocity.x += acc.x * dt * 0.5;
-        this.velocity.y += acc.y * dt * 0.5;
-        this.velocity.z += acc.z * dt * 0.5;
-
-        // Update position
-        this.mesh.position.x += this.velocity.x * dt;
-        this.mesh.position.y += this.velocity.y * dt;
-        this.mesh.position.z += this.velocity.z * dt;
-
-        // Update velocity by another half step (will use same acceleration)
-        this.velocity.x += acc.x * dt * 0.5;
-        this.velocity.y += acc.y * dt * 0.5;
-        this.velocity.z += acc.z * dt * 0.5;
-
+        
         // Tidal lock: keep the same face pointed at the target (no orbit assumptions).
         // We still keep a "spawn angular speed" for when tidal lock isn't available later, but while enabled,
         // we correct orientation directly each frame to avoid visible drift.
