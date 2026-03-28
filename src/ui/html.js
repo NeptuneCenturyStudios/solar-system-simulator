@@ -9,7 +9,7 @@ export function escapeHtml(s) {
     const lt = '&' + 'lt;';
     const gt = '&' + 'gt;';
     const quot = '&' + 'quot;';
-    const apos = '&#39;';
+    const apos = '&' + 'apos;';
 
     return String(s)
         .replaceAll('&', amp)
@@ -17,4 +17,12 @@ export function escapeHtml(s) {
         .replaceAll('>', gt)
         .replaceAll('"', quot)
         .replaceAll("'", apos);
+}
+
+export function buildCreateBodyControls() {
+    return `
+        <div class="form-row form-row--actions" id="randomizeCreateRow" hidden>
+            <button type="button" id="randomizeCreateBtn">Randomize</button>
+        </div>
+    `;
 }

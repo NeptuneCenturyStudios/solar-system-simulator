@@ -34,6 +34,8 @@ export class ManagementPanel extends Panel {
         this.planetTypeGroup = null;
         this.hasAtmosphereRow = null;
         this.hasAtmosphereCheckbox = null;
+        this.randomizeCreateBtn = null;
+        this.randomizeCreateRow = null;
 
         // Create numeric inputs (custom planets/moons/stars)
         this.createMassGroup = null;
@@ -108,6 +110,8 @@ export class ManagementPanel extends Panel {
         this.planetTypeGroup = document.getElementById('planetTypeGroup');
         this.hasAtmosphereRow = document.getElementById('hasAtmosphereRow');
         this.hasAtmosphereCheckbox = document.getElementById('hasAtmosphere');
+        this.randomizeCreateBtn = document.getElementById('randomizeCreateBtn');
+        this.randomizeCreateRow = document.getElementById('randomizeCreateRow');
 
         // Create numeric inputs (custom planets/moons/stars)
         this.createMassGroup = document.getElementById('createMassGroup');
@@ -125,6 +129,7 @@ export class ManagementPanel extends Panel {
 
         this.createBodyBtn = document.getElementById('createBodyBtn');
         this.cancelCreateBtn = document.getElementById('cancelCreateBtn');
+        this.randomizeCreateRow = document.getElementById('randomizeCreateRow');
 
         this.editBodyBtn = document.getElementById('editBodyBtn');
         this.bodyEditForm = document.getElementById('bodyEditForm');
@@ -207,7 +212,6 @@ export class ManagementPanel extends Panel {
             return numberFormatter.format(value);
         };
 
-        // Expose for the rest of the panel methods that already call this helper.
         this.formatNumberForDisplay = formatNumberForDisplay;
 
         const formatMassForDisplay = (actualMass) => {
@@ -221,7 +225,6 @@ export class ManagementPanel extends Panel {
             return `${formatNumberForDisplay(value / 1000000)}M`;
         };
 
-        // Expose for other instance methods that run outside initialize()'s local scope.
         this.formatLightIntensityForDisplay = formatLightIntensityForDisplay;
 
         this.clampMassValue = (value) => {
@@ -235,14 +238,52 @@ export class ManagementPanel extends Panel {
             display.textContent = formatter(value);
         };
 
+        const updateCreateInputsForBodyType = () => {
+            const bodyType = this.getSelectedBodyType();
+            if (bodyType === 'sun') {
+                this.randomizeCustomStarValues(true);
+                return;
+            }
+
+            if (bodyType === 'planet') {
+                this.randomizeCreateBodyInputs('planet');
+                return;
+            }
+
+            if (bodyType === 'moon') {
+                this.randomizeCreateBodyInputs('moon');
+                return;
+            }
+
+            if (bodyType === 'asteroid') {
+                this.randomizeCreateBodyInputs('asteroid');
+                return;
+            }
+
+            if (bodyType === 'comet') {
+                this.randomizeCreateBodyInputs('comet');
+                return;
+            }
+
+            this.randomizeCreateBodyInputs(bodyType);
+        };
+
         const updateAddModeVisibility = () => {
             const mode = this.addModeSelect ? this.addModeSelect.value : 'preset';
             const isPreset = mode === 'preset';
+            const isCustom = !isPreset;
 
             if (this.presetBodyGroup)
                 this.presetBodyGroup.style.display = isPreset ? 'block' : 'none';
             if (this.customBodyGroup)
                 this.customBodyGroup.style.display = isPreset ? 'none' : 'block';
+            if (this.randomizeCreateRow) {
+                this.randomizeCreateRow.hidden = isPreset;
+                this.randomizeCreateRow.style.display = isCustom ? 'flex' : 'none';
+            } else if (this.randomizeCreateBtn?.parentElement) {
+                this.randomizeCreateBtn.parentElement.hidden = isPreset;
+                this.randomizeCreateBtn.parentElement.style.display = isCustom ? 'flex' : 'none';
+            }
 
             if (isPreset) {
                 if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'none';
@@ -291,7 +332,6 @@ export class ManagementPanel extends Panel {
 
                 this.validateMoonCreation();
             } else {
-                // Custom star: show the same inputs as star editing
                 [
                     this.createMassGroup,
                     this.createTemperatureGroup,
@@ -335,7 +375,10 @@ export class ManagementPanel extends Panel {
         }
 
         if (this.bodyTypeSelect) {
-            this.bodyTypeSelect.onchange = () => updateAddModeVisibility();
+            this.bodyTypeSelect.onchange = () => {
+                updateCreateInputsForBodyType();
+                updateAddModeVisibility();
+            };
         }
 
         const planetTypeRadios = document.querySelectorAll('input[name="planetType"]');
@@ -396,12 +439,23 @@ export class ManagementPanel extends Panel {
             };
         }
 
+        if (this.randomizeCreateBtn) {
+            this.randomizeCreateBtn.onclick = () => {
+                this.randomizeCreateBodyInputs(this.getSelectedBodyType());
+                updateAddModeVisibility();
+            };
+        }
+
+        updateAddModeVisibility();
+
         if (this.addBodyBtn) {
             this.addBodyBtn.onclick = () => {
                 const willOpen = !isCreationFormVisible();
                 if (willOpen) {
                     closeEditForm();
                     openCreationForm();
+                    updateCreateInputsForBodyType();
+                    updateAddModeVisibility();
                 } else {
                     closeCreationForm();
                 }
@@ -622,6 +676,96 @@ export class ManagementPanel extends Panel {
                 closeEditForm();
             };
         }
+    }
+
+    randomizeCreateBodyInputs(bodyType) {
+        const type = bodyType || this.getSelectedBodyType();
+
+        const setValue = (input, value) => {
+            if (!input) return;
+            input.value = String(value);
+            if (typeof input.oninput === 'function') {
+                input.oninput();
+            }
+        };
+
+        const rand = (min, max) => min + Math.random() * (max - min);
+        const randInt = (min, max) => Math.floor(rand(min, max + 1));
+        const randBool = () => Math.random() < 0.5;
+
+        if (this.orbitalAngleSlider) {
+            setValue(this.orbitalAngleSlider, randInt(0, 359));
+        }
+        if (this.inclinationSlider) {
+            setValue(this.inclinationSlider, randInt(0, 90));
+        }
+
+        if (type === 'sun') {
+            this.randomizeCustomStarValues(true);
+            return;
+        }
+
+        if (this.hasAtmosphereCheckbox && this.hasAtmosphereRow?.style.display !== 'none') {
+            this.hasAtmosphereCheckbox.checked = randBool();
+        }
+
+        if (type === 'planet') {
+            const planetType = this.getSelectedPlanetType();
+            const isGasOrIce = planetType === 'gas_giant' || planetType === 'ice_giant';
+            const mass = isGasOrIce ? rand(1e24, 3e27) : rand(1e22, 1e25);
+            const radius = isGasOrIce ? rand(20000, 80000) : rand(1000, 20000);
+            setValue(this.createMassInput, this.clampMassValue(mass));
+            setValue(this.createRadiusSlider, radius);
+            return;
+        }
+
+        if (type === 'moon') {
+            setValue(this.createMassInput, this.clampMassValue(rand(1e18, 1e24)));
+            setValue(this.createRadiusSlider, rand(50, 5000));
+            return;
+        }
+
+        if (type === 'asteroid') {
+            if (this.createMassInput) setValue(this.createMassInput, this.clampMassValue(rand(1e10, 1e18)));
+            if (this.createRadiusSlider) setValue(this.createRadiusSlider, rand(1, 500));
+            return;
+        }
+
+        if (type === 'comet') {
+            if (this.createMassInput) setValue(this.createMassInput, this.clampMassValue(rand(1e9, 1e16)));
+            if (this.createRadiusSlider) setValue(this.createRadiusSlider, rand(1, 100));
+            return;
+        }
+
+        this.randomizeCustomStarValues(false);
+    }
+
+    randomizeCustomStarValues(useStarlikeValues) {
+        const rand = (min, max) => min + Math.random() * (max - min);
+        const setValue = (input, value) => {
+            if (!input) return;
+            input.value = String(value);
+            if (typeof input.oninput === 'function') {
+                input.oninput();
+            }
+        };
+
+        const starMassMin = useStarlikeValues ? 0.5 * SUN_MASS : 1e29;
+        const starMassMax = useStarlikeValues ? 5 * SUN_MASS : 5e31;
+        const temperatureMin = useStarlikeValues ? 2500 : 1500;
+        const temperatureMax = useStarlikeValues ? 12000 : 40000;
+        const lightIntensityMin = useStarlikeValues ? 1000000 : 100000;
+        const lightIntensityMax = useStarlikeValues ? 5000000000 : 50000000000;
+        const radiusMin = useStarlikeValues ? 100000 : 10000;
+        const radiusMax = useStarlikeValues ? 2000000 : 5000000;
+
+        setValue(this.createMassInput, this.clampMassValue(rand(starMassMin, starMassMax)));
+        setValue(this.createTemperatureSlider, Math.round(rand(temperatureMin, temperatureMax)));
+        setValue(
+            this.createLightIntensitySlider,
+            Math.round(rand(lightIntensityMin, lightIntensityMax))
+        );
+        setValue(this.createRadiusSlider, Math.round(rand(radiusMin, radiusMax)));
     }
 
     toggleCreationForm() {
