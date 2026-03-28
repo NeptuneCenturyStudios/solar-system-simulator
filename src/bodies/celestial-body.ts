@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Body } from './body.js';
+import { Body, IBodyCreationOptions } from './body.js';
 import { moonTexture, fictionalTextures } from '../drawing/textures.js';
 import { isBodyType, BodyType, pickRandom } from '../utilities/utilities.js';
 import { calculateTrajectory, IRotation } from '../physics/physics.js';
@@ -7,8 +7,9 @@ import { ParticleExplosion } from '../effects/particle-explosion.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 
-function createSphereGeometry(radius: number) {
-    return new THREE.SphereGeometry(radius, 32, 32);
+
+export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
+    radius: number;
 }
 
 /**

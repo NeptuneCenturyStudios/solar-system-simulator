@@ -1,9 +1,18 @@
 import * as THREE from 'three';
 import { SHADOW_MAP_SIZE, SUN_MASS, SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyType, isBodyType } from '../utilities/utilities.js';
-import { CelestialBody } from './celestial-body.js';
+import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body.js';
 import { BlackHole } from './black-hole.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
+
+/**
+ * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.
+ */
+export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
+    temperature: number;
+    lightIntensity: number;
+    lightDistance: number;
+}
 
 /**
  * Star (e.g. Sun). Owns star-only visuals:
@@ -52,16 +61,17 @@ export class Star extends CelestialBody {
     constructor(
         dependencies,
         scene,
-        {
-            radius,
-            pos,
-            mass,
-            id = 'camSun',
-            name = 'Sun',
-            temperature = 5778,
-            lightIntensity = 500000000,
-            lightDistance = 524400,
-        },
+        options: IStarCreationOptions,
+        // {
+        //     radius,
+        //     pos,
+        //     mass,
+        //     id = 'camSun',
+        //     name = 'Sun',
+        //     temperature = 5778,
+        //     lightIntensity = 500000000,
+        //     lightDistance = 524400,
+        // },
         textures
     ) {
         if (!textures) {
@@ -69,7 +79,7 @@ export class Star extends CelestialBody {
         }
 
         // Surface color comes from temperature bins (used mostly for glow/light tint).
-        const color = Star.temperatureToColor(temperature);
+        const color = Star.temperatureToColor(options.temperature);
 
         // Star-specific material:
         // Use MeshPhongMaterial so emissive doesn't wash out map as aggressively as MeshStandardMaterial.
@@ -85,13 +95,13 @@ export class Star extends CelestialBody {
         super(
             dependencies,
             scene,
-            radius,
+            options.radius,
             color,
-            pos,
-            new THREE.Vector3(0,0,0),
-            mass,
-            id,
-            name,
+            options.pos,
+            new THREE.Vector3(0, 0, 0),
+            options.mass,
+            options.id,
+            options.name,
             BodyType.Star,
             0xffffff,
             500,
@@ -108,17 +118,17 @@ export class Star extends CelestialBody {
         this.textures = textures;
 
         // Preserve creation-time light intensity for edit-mode repopulation.
-        this.lightIntensity = lightIntensity;
-        this._lightIntensity = lightIntensity;
+        this.lightIntensity = options.lightIntensity;
+        this._lightIntensity = options.lightIntensity;
 
         // --- Stellar evolution (only stars) ---
-        this.initialMass = mass;
-        this.initialRadius = radius;
+        this.initialMass = options.mass;
+        this.initialRadius = options.radius;
         this.initialColor = new THREE.Color(color);
-        this.temperature = temperature;
+        this.temperature = options.temperature;
 
         // Fuel system: larger stars get more fuel but burn it faster
-        this.maxFuel = mass * 100000;
+        this.maxFuel = options.mass * 100000 * SCALE_FACTOR; // Tuned for interesting lifetimes across star sizes
         this.fuel = this.maxFuel;
 
         // White dwarf transformation state
@@ -131,9 +141,9 @@ export class Star extends CelestialBody {
         this.mesh.material.emissiveIntensity = 1.0;
 
         // Create corona + glow + light (all scene-owned)
-        this.corona = this.createCorona(radius + 1);
-        this.sunGlow = this.createGlow(radius, this.baseColor.getHex());
-        this.sunLight = this.createLight(pos, lightIntensity, lightDistance);
+        this.corona = this.createCorona(options.radius + 1);
+        this.sunGlow = this.createGlow(options.radius, this.baseColor.getHex());
+        this.sunLight = this.createLight(options.pos, options.lightIntensity, options.lightDistance);
 
         // Add ambient light (only once per Star instance)
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
@@ -144,7 +154,7 @@ export class Star extends CelestialBody {
         this.visualTime = 0;
 
         // Apply temperature binning after construction so map/glow/light match
-        this.setTemperature(temperature);
+        this.setTemperature(options.temperature);
 
         // Start "star birth" effect on every star creation (including initial Sun).
         this.birthEffect = null;
@@ -390,7 +400,7 @@ export class Star extends CelestialBody {
     }
 
     createLight(pos, intensity, distance) {
-        const light = new THREE.DirectionalLight(0xfffff0, Math.max(1.0, intensity / 100000000));
+        const light = new THREE.DirectionalLight(0xffffff, Math.max(1.0, intensity / 20000000));
         light.position.set(pos[0], pos[1], pos[2]);
 
         light.target = new THREE.Object3D();

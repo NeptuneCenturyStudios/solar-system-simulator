@@ -2508,6 +2508,8 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
                     id: createUniqueId('sun'),
                     name: 'Sun',
                     temperature: 5778,
+                    lightIntensity: 500000000,
+                    lightDistance: 524400,
                 },
                 {
                     sunTexture,
@@ -2554,7 +2556,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         earth.createMoon(scene, {
             distance: MOON_DIST_FROM_EARTH,
             radius: MOON_RADIUS, // 0.273 × Earth
-            color: 0xaaaaaa,
+            color: 0xffffff,
             mass: MOON_MASS,
             id: 'camMoon',
             name: 'Moon',

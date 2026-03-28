@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { createTextTexture } from '../drawing/text-rendering.js';
 
+export interface IBodyCreationOptions {
+    pos: THREE.Vector3;
+    mass: number;
+    id: string;
+    name: string;
+
+}
+
 /**
  * This class represents the basic body that has gravitational properties, update, and die methods.
  */
