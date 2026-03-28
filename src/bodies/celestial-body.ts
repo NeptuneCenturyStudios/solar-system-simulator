@@ -1,46 +1,56 @@
 import * as THREE from 'three';
 import { Body, IBodyCreationOptions } from './body.js';
 import { moonTexture, fictionalTextures } from '../drawing/textures.js';
-import { isBodyType, BodyType, pickRandom } from '../utilities/utilities.js';
+import { isBodyType, BodyType, pickRandom, BodyTypeEnum } from '../utilities/utilities.js';
 import { calculateTrajectory, IRotation } from '../physics/physics.js';
 import { ParticleExplosion } from '../effects/particle-explosion.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
+import { createTextTexture } from '../drawing/text-rendering.js';
 
 
 export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
     radius: number;
 }
 
+export interface ICelectialBodyDependencies {
+    addEvent: (message: string) => void;
+}
+
 /**
  * This class represents a celestial body with physical properties, rendering capabilities, and optional features like rings, atmosphere, and tidal locking.
  */
 export class CelestialBody extends Body {
-
+    deps: ICelectialBodyDependencies;
+    scene: THREE.Scene;
     radius: number;
-
+    //color: number;
+    hasTail: boolean;
+    rotationAxis: THREE.Vector3;
+    rotationSpeed: number;
+    baseColor: number;
 
     constructor(
-        deps = {},
-        scene,
-        radius,
-        color,
+        deps = {} as ICelectialBodyDependencies,
+        scene: THREE.Scene,
+        radius: number,
+        color: number,
         pos: THREE.Vector3,
         vel: THREE.Vector3,
-        mass,
-        id,
-        name,
-        bodyType = BodyType.None,
+        mass: number,
+        id: string,
+        name: string,
+        bodyType: BodyTypeEnum,
         trailColor = 0xffffff,
         maxTrail = 500,
         hasRings = false,
-        hasAtmosphere = false,
         hasTail = false,
-        rotation: IRotation = { axis: [0, 1, 0], speed: 0 },
+        rotation: IRotation = { axis: new THREE.Vector3(0, 1, 0), speed: 0 },
         geometryFactory: (radius: number) => THREE.BufferGeometry,
         material: THREE.Material,
         tidalLock = null
     ) {
+
         const defaultMaterial = new THREE.MeshStandardMaterial({
             color: color,
             emissive: 0x000000,
@@ -55,7 +65,7 @@ export class CelestialBody extends Body {
                 ? geometryFactory(radius)
                 : new THREE.SphereGeometry(radius, 32, 32);
 
-        super(deps, scene, mass, pos, vel, geometry, material ?? defaultMaterial, id, name);
+        super(deps, scene, mass, pos, vel, geometry, material ?? defaultMaterial, id, name, bodyType);
 
         // Set dependencies
         this.deps = deps || {};
@@ -209,7 +219,7 @@ export class CelestialBody extends Body {
     }
     die(skipExplosion = false) {
         if (this._isDisposed) return;
-        
+
 
         super.die();
 
@@ -348,7 +358,7 @@ export class CelestialBody extends Body {
         super.update(acc, dt);
 
         if (this._isDisposed) return;
-        
+
         // Tidal lock: keep the same face pointed at the target (no orbit assumptions).
         // We still keep a "spawn angular speed" for when tidal lock isn't available later, but while enabled,
         // we correct orientation directly each frame to avoid visible drift.
@@ -517,7 +527,7 @@ export class CelestialBody extends Body {
         this.trailGeo.setDrawRange(0, this.history.length);
     }
 
-    createMoon(scene, config) {
+    createMoon(scene: THREE.Scene, config) {
         // Calculate orbital trajectory based on parent's mass
         const trajectory = calculateTrajectory(config.distance, this.mass);
 
@@ -542,21 +552,21 @@ export class CelestialBody extends Body {
         const moonMaterial =
             moonName === 'Moon'
                 ? new THREE.MeshStandardMaterial({
-                      map: moonTexture,
-                      color: 0xffffff,
-                      emissive: 0x000000,
-                      emissiveIntensity: 0,
-                      roughness: 0.7,
-                      metalness: 0.7,
-                  })
+                    map: moonTexture,
+                    color: 0xffffff,
+                    emissive: 0x000000,
+                    emissiveIntensity: 0,
+                    roughness: 0.7,
+                    metalness: 0.7,
+                })
                 : new THREE.MeshStandardMaterial({
-                      map: pickRandom(fictionalTextures),
-                      color: 0xffffff, // keep texture untinted
-                      emissive: 0x000000,
-                      emissiveIntensity: 0,
-                      roughness: 0.7,
-                      metalness: 0.7,
-                  });
+                    map: pickRandom(fictionalTextures),
+                    color: 0xffffff, // keep texture untinted
+                    emissive: 0x000000,
+                    emissiveIntensity: 0,
+                    roughness: 0.7,
+                    metalness: 0.7,
+                });
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²
@@ -583,7 +593,7 @@ export class CelestialBody extends Body {
             false,
             false,
             false,
-            { axis: [0, 1, 0], speed: 0.15 + Math.random() * 0.35 },
+            { axis: new THREE.Vector3(0, 1, 0), speed: 0.15 + Math.random() * 0.35 },
             null,
             moonMaterial,
             {
@@ -602,7 +612,7 @@ export class CelestialBody extends Body {
         return moon;
     }
 
-    updateLabel(newName) {
+    updateLabel(newName: string) {
         // Update the body's name
         this.name = newName;
 
@@ -615,7 +625,7 @@ export class CelestialBody extends Body {
     }
 
     // Convert temperature (Kelvin) to RGB color using simplified blackbody radiation
-    temperatureToColor(temp) {
+    temperatureToColor(temp: number) {
         // Simplified color temperature conversion
         // Real stars: O(30000K-blue) B(10000K-blue-white) A(7500K-white) F(6000K-yellow-white)
         //             G(5500K-yellow) K(4000K-orange) M(3000K-red)

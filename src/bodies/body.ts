@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createTextTexture } from '../drawing/text-rendering.js';
+import { BodyTypeEnum } from '../utilities/utilities.js';
 
 export interface IBodyCreationOptions {
     pos: THREE.Vector3;
@@ -21,6 +22,7 @@ export class Body {
     mesh: THREE.Mesh;
     label: THREE.Sprite | null = null;
     labelLine: THREE.Line | null = null;
+    protected bodyType: BodyTypeEnum;
     protected labelHeight = 0;
 
     constructor(
@@ -32,12 +34,14 @@ export class Body {
         geometry: THREE.BufferGeometry,
         material: THREE.Material,
         id: string,
-        name: string
+        name: string,
+        bodyType: BodyTypeEnum
     ) {
         this.mass = mass;
         this.velocity = new THREE.Vector3(...velocity);
         this.id = id;
         this.name = name;
+        this.bodyType = bodyType;
 
         this.mesh = new THREE.Mesh(geometry, material);
 
