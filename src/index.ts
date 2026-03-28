@@ -48,12 +48,13 @@ import {
     HYGIEA_RADIUS,
 } from './utilities/consts.js';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo.js';
-import { isBodyType, BodyType, pickRandom } from './utilities/utilities.js';
+import { isBodyType, BodyType, pickRandom, createUniqueId } from './utilities/utilities.js';
 import { calculateTrajectory } from './physics/physics.js';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
 import { Supernova } from './effects/supernova.js';
 import { StarBirth } from './effects/star-birth';
 import { ParticleExplosion } from './effects/particle-explosion.js';
+import { Body } from './bodies/body.js';
 import { CelestialBody } from './bodies/celestial-body.js';
 import { Mercury } from './bodies/mercury.js';
 import { Venus } from './bodies/venus.js';
@@ -65,7 +66,7 @@ import { Uranus } from './bodies/uranus.js';
 import { Neptune } from './bodies/neptune.js';
 import { Pluto } from './bodies/pluto.js';
 import { BlackHole } from './bodies/black-hole.js';
-import { Star } from './bodies/star.js';
+import { Star } from './bodies/star';
 import { Asteroid } from './bodies/asteroid.js';
 import { Comet } from './bodies/comet.js';
 
@@ -245,8 +246,8 @@ function collisionScoreEscapeVelocity(body) {
         typeof body?.radius === 'number' && isFinite(body.radius) && body.radius > 0
             ? body.radius
             : typeof body?.eventHorizonRadius === 'number' && isFinite(body.eventHorizonRadius)
-              ? body.eventHorizonRadius
-              : 0;
+                ? body.eventHorizonRadius
+                : 0;
 
     const r = Math.max(1e-6, rawR);
 
@@ -522,7 +523,7 @@ function createStatsTexture(body, bodiesArray = []) {
         drawStat(
             'Temperature: ',
             formatNumber(body.temperature, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-                'K',
+            'K',
             y
         );
         y += lineHeight;
@@ -1799,12 +1800,12 @@ function syncPrimaryStarLightTarget() {
             : manuallySelectedBody &&
                 bodies.includes(manuallySelectedBody) &&
                 !manuallySelectedBody._isDisposed
-              ? manuallySelectedBody
-              : cameraState.focusBody &&
-                  bodies.includes(cameraState.focusBody) &&
-                  !cameraState.focusBody._isDisposed
-                ? cameraState.focusBody
-                : null) || null;
+                ? manuallySelectedBody
+                : cameraState.focusBody &&
+                    bodies.includes(cameraState.focusBody) &&
+                    !cameraState.focusBody._isDisposed
+                    ? cameraState.focusBody
+                    : null) || null;
 
     if (activeLightTarget && activeLightTarget.mesh) {
         primaryStar.sunLight.target.position.copy(activeLightTarget.mesh.position);
@@ -1867,26 +1868,24 @@ function applyOrbitalTransforms(trajectory, orbitalAngleDeg, inclinationDeg) {
     return { pos, vel };
 }
 
-function createUniqueId(prefix) {
-    return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
-}
+
 
 function getRandomStarSpawnPosition() {
     const hasAnyExistingStar = bodies.some(
         (b) => b && !b._isDisposed && isBodyType(b, BodyType.Star)
     );
 
-    if (!hasAnyExistingStar) return [0, 0, 0];
+    if (!hasAnyExistingStar) return new THREE.Vector3(0, 0, 0);
 
     const spawnRadius = 50000 * SCALE_FACTOR + Math.random() * (30000 * SCALE_FACTOR);
     const randomAngle = Math.random() * Math.PI * 2;
     const ySpread = 10000 * SCALE_FACTOR;
 
-    return [
+    return new THREE.Vector3(
         Math.cos(randomAngle) * spawnRadius,
         (Math.random() - 0.5) * ySpread,
         Math.sin(randomAngle) * spawnRadius,
-    ];
+    );
 }
 
 function createPresetBody(presetKey) {
@@ -1920,7 +1919,7 @@ function createPresetBody(presetKey) {
                     radius: SUN_RADIUS,
                     pos,
                     mass: SUN_MASS,
-                    id: null,
+                    id: createUniqueId('sun'),
                     name: 'Sun',
                     temperature: 5778,
                     lightIntensity: 500000000,
@@ -1935,76 +1934,68 @@ function createPresetBody(presetKey) {
                     whiteDwarfTexture,
                 }
             );
-            newBody.id = createUniqueId('camSun');
+
             break;
         }
         case 'mercury': {
             newBody = new Mercury(dependencies, scene);
-            // Unique ids so camera selections aren't ambiguous
-            newBody.id = createUniqueId('camMercury');
+
             break;
         }
         case 'venus': {
             newBody = new Venus(dependencies, scene);
-            // Unique ids so camera selections aren't ambiguous
-            newBody.id = createUniqueId('camVenus');
+
             break;
         }
         case 'earth': {
             newBody = new Earth(dependencies, scene);
-            newBody.id = createUniqueId('camEarth');
+
             break;
         }
         case 'earth_moon': {
             // Ensure Earth exists; create it if not.
-            let earth = ensureEarth();
+            let earth = ensureEarth() as Earth;
             if (!earth) {
                 earth = new Earth(dependencies, scene);
-                earth.id = createUniqueId('camEarth');
-                bodies.push(earth);
-            }
 
-            newBody = earth.createMoon(scene, {
-                distance: MOON_DIST_FROM_EARTH,
-                radius: MOON_RADIUS,
-                color: 0xaaaaaa,
-                mass: MOON_MASS,
-                id: createUniqueId('camMoon'),
-                name: 'Moon',
-                trailColor: 0xffffff,
-                maxTrail: 1500,
-                metalness: 0.95,
-            });
+                bodies.push(earth);
+
+                newBody = earth.createMoon(scene, {
+                    distance: MOON_DIST_FROM_EARTH,
+                    radius: MOON_RADIUS,
+                    color: 0xaaaaaa,
+                    mass: MOON_MASS,
+                    id: createUniqueId('moon'),
+                    name: 'Moon',
+                    trailColor: 0xffffff,
+                    maxTrail: 1500,
+                    metalness: 0.95,
+                });
+            }
             break;
         }
         case 'mars': {
             newBody = new Mars(dependencies, scene);
-            newBody.id = createUniqueId('camMars');
             break;
         }
         case 'jupiter': {
             newBody = new Jupiter(dependencies, scene, jupiterTexture);
-            newBody.id = createUniqueId('camJupiter');
             break;
         }
         case 'saturn': {
             newBody = new Saturn(dependencies, scene, saturnTexture);
-            newBody.id = createUniqueId('camSaturn');
             break;
         }
         case 'uranus': {
             newBody = new Uranus(dependencies, scene, uranusTexture);
-            newBody.id = createUniqueId('camUranus');
             break;
         }
         case 'neptune': {
             newBody = new Neptune(dependencies, scene, neptuneTexture);
-            newBody.id = createUniqueId('camNeptune');
             break;
         }
         case 'pluto': {
             newBody = new Pluto(dependencies, scene, plutoTexture);
-            newBody.id = createUniqueId('camPluto');
             break;
         }
         default:
@@ -2066,9 +2057,7 @@ function createNewBody(
     customRadius = null
 ) {
     let newBody;
-    // Convert degrees to radians
-    const angle = (orbitalAngle * Math.PI) / 180;
-
+    
     switch (bodyType) {
         case 'sun': {
             // Create a custom STAR.
@@ -2114,7 +2103,7 @@ function createNewBody(
                     radius: newStarRadius,
                     pos: starPos,
                     mass: newStarMass,
-                    id: null,
+                    id: createUniqueId('star'),
                     name: generateIAUName('star'),
                     temperature: newStarTemp,
                     lightIntensity:
@@ -2168,29 +2157,29 @@ function createNewBody(
                 typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
                     ? customRadius
                     : isSolidPlanet
-                      ? 5 + Math.random() * 10
-                      : 18 + Math.random() * 24;
+                        ? 5 + Math.random() * 10
+                        : 18 + Math.random() * 24;
 
             const planetMass =
                 typeof customMass === 'number' && isFinite(customMass) && customMass > 0
                     ? customMass
                     : isSolidPlanet
-                      ? 50 + Math.random() * 500
-                      : isGasGiant
-                        ? 4000 + Math.random() * 26000
-                        : 1200 + Math.random() * 7000;
+                        ? 50 + Math.random() * 500
+                        : isGasGiant
+                            ? 4000 + Math.random() * 26000
+                            : 1200 + Math.random() * 7000;
 
             const planetTexturePool = isGasGiant
                 ? fictionalGasTextures
                 : isIceGiant
-                  ? fictionalIceTextures
-                  : fictionalTextures;
+                    ? fictionalIceTextures
+                    : fictionalTextures;
 
             const customPlanetBodyType = isGasGiant
                 ? BodyType.GasGiant
                 : isIceGiant
-                  ? BodyType.IceGiant
-                  : BodyType.Planet;
+                    ? BodyType.IceGiant
+                    : BodyType.Planet;
 
             const planetMaterial = new THREE.MeshStandardMaterial({
                 map: pickRandom(planetTexturePool),
@@ -2355,7 +2344,7 @@ function createNewBody(
             const asteroidDistance =
                 ASTEROID_SPAWN_MIN_DIST * SCALE_FACTOR +
                 Math.random() *
-                    ((ASTEROID_SPAWN_MAX_DIST - ASTEROID_SPAWN_MIN_DIST) * SCALE_FACTOR);
+                ((ASTEROID_SPAWN_MAX_DIST - ASTEROID_SPAWN_MIN_DIST) * SCALE_FACTOR);
 
             // Use appropriate trajectory calculation based on orbit type
             let asteroidTrajectory;
@@ -2510,25 +2499,25 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         mode === SimulationStartMode.Empty
             ? null
             : new Star(
-                  dependencies,
-                  scene,
-                  {
-                      radius: SUN_RADIUS,
-                      pos: [0, 0, 0],
-                      mass: SUN_MASS,
-                      id: 'camSun',
-                      name: 'Sun',
-                      temperature: 5778,
-                  },
-                  {
-                      sunTexture,
-                      redStarTexture,
-                      orangeStarTexture,
-                      whiteStarTexture,
-                      blueStarTexture,
-                      whiteDwarfTexture,
-                  }
-              );
+                dependencies,
+                scene,
+                {
+                    radius: SUN_RADIUS,
+                    pos: new THREE.Vector3(0, 0, 0),
+                    mass: SUN_MASS,
+                    id: createUniqueId('sun'),
+                    name: 'Sun',
+                    temperature: 5778,
+                },
+                {
+                    sunTexture,
+                    redStarTexture,
+                    orangeStarTexture,
+                    whiteStarTexture,
+                    blueStarTexture,
+                    whiteDwarfTexture,
+                }
+            );
 
     // Reset bodies array depending on mode
     bodies = [];
@@ -3019,8 +3008,8 @@ function onMouseDown(event) {
             activeAxis === 'x'
                 ? new THREE.Vector3(1, 0, 0)
                 : activeAxis === 'y'
-                  ? new THREE.Vector3(0, 1, 0)
-                  : new THREE.Vector3(0, 0, 1);
+                    ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(0, 0, 1);
 
         // Camera direction (from camera into the scene)
         const cameraDirection = new THREE.Vector3();
@@ -3254,8 +3243,8 @@ function onMouseMove(event) {
             activeAxis === 'x'
                 ? new THREE.Vector3(1, 0, 0)
                 : activeAxis === 'y'
-                  ? new THREE.Vector3(0, 1, 0)
-                  : new THREE.Vector3(0, 0, 1);
+                    ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(0, 0, 1);
 
         const startI = interactionState.dragStartIntersection || intersection;
         const startPos = interactionState.dragStartPosition || gizmo.target.mesh.position.clone();
@@ -4104,10 +4093,6 @@ function setF(id) {
     focusID = id;
 }
 
-const pauseBtn = document.getElementById('pauseBtn');
-const timeScaleInput = document.getElementById('timeScale');
-const speedValDisplay = document.getElementById('speed-val');
-
 // --- UI PANEL INITIALIZATION ---
 
 // Create and initialize panels
@@ -4253,8 +4238,8 @@ function updateSurfaceButtonEnabled() {
             ? selectedBody
             : null) ||
         (manuallySelectedBody &&
-        bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
+            bodies.includes(manuallySelectedBody) &&
+            !manuallySelectedBody._isDisposed
             ? manuallySelectedBody
             : null);
 
@@ -4449,8 +4434,8 @@ mainPanel.on('surfaceCameraToggle', () => {
             ? selectedBody
             : null) ||
         (manuallySelectedBody &&
-        bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
+            bodies.includes(manuallySelectedBody) &&
+            !manuallySelectedBody._isDisposed
             ? manuallySelectedBody
             : null);
 
@@ -4479,8 +4464,8 @@ mainPanel.on('freeCameraToggle', () => {
             ? selectedBody
             : null) ||
         (manuallySelectedBody &&
-        bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
+            bodies.includes(manuallySelectedBody) &&
+            !manuallySelectedBody._isDisposed
             ? manuallySelectedBody
             : null);
 
@@ -4641,8 +4626,8 @@ mainPanel.on('targetToggle', () => {
             : manuallySelectedBody &&
                 bodies.includes(manuallySelectedBody) &&
                 !manuallySelectedBody._isDisposed
-              ? manuallySelectedBody
-              : null;
+                ? manuallySelectedBody
+                : null;
 
     if (turningOn) {
         if (b) {
@@ -4688,8 +4673,8 @@ mainPanel.on('lookAtToggle', () => {
                 : manuallySelectedBody &&
                     bodies.includes(manuallySelectedBody) &&
                     !manuallySelectedBody._isDisposed
-                  ? manuallySelectedBody
-                  : null;
+                    ? manuallySelectedBody
+                    : null;
 
         // Look-at mode requires OrbitControls, so exit free camera mode if active
         if (isFreeCameraMode) {
@@ -4744,8 +4729,8 @@ mainPanel.on('lookAtToggle', () => {
                     : manuallySelectedBody &&
                         bodies.includes(manuallySelectedBody) &&
                         !manuallySelectedBody._isDisposed
-                      ? manuallySelectedBody
-                      : null;
+                        ? manuallySelectedBody
+                        : null;
             if (b) gizmo.attach(b);
         }
     }
@@ -5202,8 +5187,8 @@ function handleBodyBecameInvalid(body) {
     // We still clear selection pointers for the dead body.
     const collisionHandoffTarget =
         cameraState?.pendingCollisionFocusBody &&
-        bodies.includes(cameraState.pendingCollisionFocusBody) &&
-        !cameraState.pendingCollisionFocusBody._isDisposed
+            bodies.includes(cameraState.pendingCollisionFocusBody) &&
+            !cameraState.pendingCollisionFocusBody._isDisposed
             ? cameraState.pendingCollisionFocusBody
             : null;
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, MARS_MASS, MARS_DIST, MARS_RADIUS } from '../utilities/consts.js';
-import { BodyType } from '../utilities/utilities.js';
+import { BodyType, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { CelestialBody } from './celestial-body.js';
 
@@ -28,7 +28,7 @@ export class Mars extends CelestialBody {
             trajectory.pos.toArray(),
             trajectory.vel.toArray(),
             MARS_MASS,
-            'camMars',
+            createUniqueId('mars'),
             'Mars',
             BodyType.Planet,
             0xff8888,

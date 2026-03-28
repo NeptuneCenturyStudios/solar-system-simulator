@@ -22,3 +22,7 @@ export function isBodyType(body, type) {
 export function pickRandom(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
+
+export function createUniqueId(prefix) {
+    return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
+}

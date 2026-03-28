@@ -32,9 +32,9 @@ export class Star extends CelestialBody {
     /**
      * @param {object} dependencies - same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
      * @param {THREE.Scene} scene
-     * @param {object} opti ons
+     * @param {object} options
      * @param {number} options.radius
-     * @param {THREE.Vector3} options.pos
+     * @param {number[]} options.pos
      * @param {number} options.mass
      * @param {string|null} [options.id]
      * @param {string} [options.name]
@@ -88,7 +88,7 @@ export class Star extends CelestialBody {
             radius,
             color,
             pos,
-            new THREE.Vector3(0, 0, 0), // Stars start static; initial velocity is zero
+            new THREE.Vector3(0,0,0),
             mass,
             id,
             name,
@@ -620,7 +620,7 @@ export class Star extends CelestialBody {
                 const newBlackHole = new BlackHole(
                     this.dependencies,
                     this.scene,
-                    this.mesh.position,
+                    this.mesh.position.toArray(),
                     blackHoleMass,
                     uniqueBHId,
                     'Black Hole'
@@ -1042,8 +1042,8 @@ export class Star extends CelestialBody {
 
         try {
             this._setBirthVisibility(false);
-            console.log(`Starting birth effect for star ${this.name}`);
-            const pos = this.mesh?.position?.clone?.() || new THREE.Vector3(0,0,0);
+
+            const pos = this.mesh?.position?.clone?.() || new THREE.Vector3();
             const radius = this.radius || 1;
             this.birthEffect = Star.createStarBirth(this.scene, pos, radius);
             this.isBirthing = !!this.birthEffect;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CelestialBody } from './celestial-body.js';
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyType } from '../utilities/utilities.js';
+import { BodyType, createUniqueId } from '../utilities/utilities.js';
 import { SUN_MASS, URANUS_DIST, URANUS_MASS } from '../utilities/consts.js';
 
 export class Uranus extends CelestialBody {
@@ -25,7 +25,7 @@ export class Uranus extends CelestialBody {
             trajectory.pos.toArray(),
             trajectory.vel.toArray(),
             URANUS_MASS,
-            'camUranus',
+            createUniqueId('uranus'),
             'Uranus',
             BodyType.IceGiant,
             0x88ddff,

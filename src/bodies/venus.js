@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, VENUS_DIST, VENUS_MASS } from '../utilities/consts.js';
-import { BodyType } from '../utilities/utilities.js';
+import { BodyType, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { CelestialBody } from './celestial-body.js';
 
@@ -29,7 +29,7 @@ export class Venus extends CelestialBody {
             trajectory.pos.toArray(),
             trajectory.vel.toArray(),
             VENUS_MASS,
-            'camVenus',
+            createUniqueId('venus'),
             'Venus',
             BodyType.Planet,
             0xffdd88,

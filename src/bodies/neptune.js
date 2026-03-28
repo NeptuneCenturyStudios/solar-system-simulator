@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body.js';
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyType } from '../utilities/utilities.js';
+import { BodyType, createUniqueId } from '../utilities/utilities.js';
 import { NEPTUNE_DIST, NEPTUNE_MASS, SUN_MASS, NEPTUNE_RADIUS } from '../utilities/consts.js';
 
 export class Neptune extends CelestialBody {
@@ -26,7 +26,7 @@ export class Neptune extends CelestialBody {
             trajectory.pos.toArray(),
             trajectory.vel.toArray(),
             NEPTUNE_MASS,
-            'camNeptune',
+           createUniqueId('neptune'),
             'Neptune',
             BodyType.IceGiant,
             0x6688ff,
