@@ -1,5 +1,15 @@
 import { Panel } from './panel.js';
-import { SUN_MASS } from '../utilities/consts.js';
+import {
+    EARTH_MASS,
+    EARTH_RADIUS,
+    JUPITER_MASS,
+    JUPITER_RADIUS,
+    MOON_MASS,
+    MOON_RADIUS,
+    NEPTUNE_MASS,
+    NEPTUNE_RADIUS,
+    SUN_MASS,
+} from '../utilities/consts.js';
 import { BodyType, isBodyType } from '../utilities/utilities.js';
 
 /**
@@ -96,6 +106,11 @@ export class ManagementPanel extends Panel {
         this.bodyCreationForm = document.getElementById('bodyCreationForm');
         this.bodyTypeSelect = document.getElementById('bodyType');
         this.addModeSelect = document.getElementById('addMode');
+        if (this.bodyTypeSelect) {
+            this.bodyTypeSelect.addEventListener('change', () => {
+                this.randomizeCreateBodyInputs(this.getSelectedBodyType());
+            });
+        }
         this.presetBodyGroup = document.getElementById('presetBodyGroup');
         this.presetBodySelect = document.getElementById('presetBody');
         this.customBodyGroup = document.getElementById('customBodyGroup');
@@ -202,6 +217,7 @@ export class ManagementPanel extends Panel {
         };
 
         this.MASS_MAX = 100000000000;
+        this.MASS_MIN = 0.001;
 
         const numberFormatter = new Intl.NumberFormat(undefined, {
             maximumFractionDigits: 2,
@@ -214,11 +230,9 @@ export class ManagementPanel extends Panel {
 
         this.formatNumberForDisplay = formatNumberForDisplay;
 
-        const formatMassForDisplay = (actualMass) => {
+        this.formatMassForDisplay = (actualMass) => {
             return formatNumberForDisplay(actualMass);
         };
-
-        this.formatMassForDisplay = formatMassForDisplay;
 
         const formatLightIntensityForDisplay = (value) => {
             if (!isFinite(value) || value <= 0) return '0M';
@@ -228,8 +242,9 @@ export class ManagementPanel extends Panel {
         this.formatLightIntensityForDisplay = formatLightIntensityForDisplay;
 
         this.clampMassValue = (value) => {
-            if (!isFinite(value)) return 0;
-            return Math.min(this.MASS_MAX, Math.max(0.001, value));
+            if (!isFinite(value)) return this.MASS_MIN;
+            const numericValue = Number(value);
+            return numericValue < this.MASS_MIN ? this.MASS_MIN : numericValue;
         };
 
         const syncCreateDisplay = (input, display, formatter) => {
@@ -342,7 +357,7 @@ export class ManagementPanel extends Panel {
                 });
 
                 syncCreateDisplay(this.createMassInput, this.createMassDisplay, (value) =>
-                    formatMassForDisplay(value)
+                    this.formatMassForDisplay(value)
                 );
                 syncCreateDisplay(
                     this.createTemperatureSlider,
@@ -387,13 +402,22 @@ export class ManagementPanel extends Panel {
         });
 
         if (this.createMassInput && this.createMassDisplay) {
-            this.createMassInput.max = String(this.MASS_MAX);
+            this.createMassInput.step = 'any';
+            this.createMassInput.min = String(this.MASS_MIN);
+            this.createMassInput.setAttribute('min', String(this.MASS_MIN));
+            this.createMassInput.setAttribute('step', 'any');
             this.createMassInput.oninput = () => {
-                const value = this.clampMassValue(parseFloat(this.createMassInput.value));
-                this.createMassDisplay.textContent = formatMassForDisplay(value);
+                const rawValue = parseFloat(this.createMassInput.value);
+                const value = this.clampMassValue(rawValue);
+                this.createMassDisplay.textContent = this.formatMassForDisplay(value);
             };
             if (this.bodyTypeSelect && this.bodyTypeSelect.value === 'sun') {
                 this.createMassInput.value = String(SUN_MASS);
+                this.createMassInput.max = String(this.MASS_MAX);
+                this.createMassInput.setAttribute('max', String(this.MASS_MAX));
+            } else {
+                this.createMassInput.removeAttribute('max');
+                this.createMassInput.max = '';
             }
             this.createMassInput.oninput();
         }
@@ -498,7 +522,7 @@ export class ManagementPanel extends Panel {
 
                 const customMass =
                     this.createMassInput && this.createMassGroup?.style.display !== 'none'
-                        ? this.clampMassValue(parseFloat(this.createMassInput.value))
+                        ? parseFloat(this.createMassInput.value)
                         : null;
                 const customTemperature =
                     this.createTemperatureSlider &&
@@ -558,9 +582,10 @@ export class ManagementPanel extends Panel {
 
         if (this.editMassInput) {
             this.editMassInput.max = String(this.MASS_MAX);
+            this.editMassInput.min = String(this.MASS_MIN);
             this.editMassInput.oninput = () => {
                 const value = this.clampMassValue(parseFloat(this.editMassInput.value));
-                this.editMassDisplay.textContent = formatMassForDisplay(value);
+                this.editMassDisplay.textContent = this.formatMassForDisplay(value);
             };
             this.editMassInput.min = '0.001';
             this.editMassInput.step = 'any';
@@ -622,6 +647,8 @@ export class ManagementPanel extends Panel {
                 this.editInclinationDisplay.textContent = value.toFixed(0) + '°';
             };
         }
+
+        updateAddModeVisibility();
 
         if (this.applyEditBtn) {
             this.applyEditBtn.onclick = () => {
@@ -711,28 +738,91 @@ export class ManagementPanel extends Panel {
 
         if (type === 'planet') {
             const planetType = this.getSelectedPlanetType();
-            const isGasOrIce = planetType === 'gas_giant' || planetType === 'ice_giant';
-            const mass = isGasOrIce ? rand(1e24, 3e27) : rand(1e22, 1e25);
-            const radius = isGasOrIce ? rand(20000, 80000) : rand(1000, 20000);
-            setValue(this.createMassInput, this.clampMassValue(mass));
+
+            let massMin;
+            let massMax;
+            let radiusMin;
+            let radiusMax;
+
+            if (planetType === 'gas_giant') {
+                massMin = JUPITER_MASS;
+                massMax = JUPITER_MASS * 1.8;
+                radiusMin = JUPITER_RADIUS * 0.7;
+                radiusMax = JUPITER_RADIUS * 1.8;
+            } else if (planetType === 'ice_giant') {
+                massMin = NEPTUNE_MASS;
+                massMax = NEPTUNE_MASS * 1.8;
+                radiusMin = NEPTUNE_RADIUS * 0.7;
+                radiusMax = NEPTUNE_RADIUS * 1.8;
+            } else {
+                massMin = EARTH_MASS;
+                massMax = EARTH_MASS * 5;
+                radiusMin = EARTH_RADIUS * 0.7;
+                radiusMax = EARTH_RADIUS * 1.8;
+            }
+
+            const mass = rand(massMin, massMax);
+            const radius = rand(radiusMin, radiusMax);
+            const massValue = this.clampMassValue(mass);
+
+            if (this.createMassInput) {
+                this.createMassInput.removeAttribute('max');
+                this.createMassInput.min = '0.001';
+                this.createMassInput.step = 'any';
+                this.createMassInput.value = String(massValue);
+                this.createMassInput.setAttribute('value', String(massValue));
+                this.createMassInput.defaultValue = String(massValue);
+                if (this.createMassDisplay) {
+                    this.createMassDisplay.textContent = this.formatMassForDisplay(massValue);
+                }
+                if (typeof this.createMassInput.oninput === 'function') {
+                    this.createMassInput.oninput();
+                }
+            }
+
             setValue(this.createRadiusSlider, radius);
             return;
         }
 
         if (type === 'moon') {
-            setValue(this.createMassInput, this.clampMassValue(rand(1e18, 1e24)));
-            setValue(this.createRadiusSlider, rand(50, 5000));
+            const moonMassMin = MOON_MASS * 0.5;
+            const moonMassMax = MOON_MASS * 1.8;
+            const mass = rand(moonMassMin, moonMassMax);
+            const massValue = this.clampMassValue(mass);
+            const radiusMin = MOON_RADIUS * 0.5;
+            const radiusMax = MOON_RADIUS * 1.8;
+
+            if (this.createMassInput) {
+                this.createMassInput.removeAttribute('max');
+                this.createMassInput.min = '0.001';
+                this.createMassInput.step = 'any';
+                this.createMassInput.value = String(massValue);
+                this.createMassInput.setAttribute('value', String(massValue));
+                this.createMassInput.defaultValue = String(massValue);
+                if (this.createMassDisplay) {
+                    this.createMassDisplay.textContent = this.formatMassForDisplay(massValue);
+                }
+                if (typeof this.createMassInput.oninput === 'function') {
+                    this.createMassInput.oninput();
+                }
+            }
+
+            setValue(this.createRadiusSlider, rand(radiusMin, radiusMax));
             return;
         }
 
         if (type === 'asteroid') {
-            if (this.createMassInput) setValue(this.createMassInput, this.clampMassValue(rand(1e10, 1e18)));
+            if (this.createMassInput) {
+                setValue(this.createMassInput, this.clampMassValue(rand(1e10, 1e18)));
+            }
             if (this.createRadiusSlider) setValue(this.createRadiusSlider, rand(1, 500));
             return;
         }
 
         if (type === 'comet') {
-            if (this.createMassInput) setValue(this.createMassInput, this.clampMassValue(rand(1e9, 1e16)));
+            if (this.createMassInput) {
+                setValue(this.createMassInput, this.clampMassValue(rand(1e9, 1e16)));
+            }
             if (this.createRadiusSlider) setValue(this.createRadiusSlider, rand(1, 100));
             return;
         }
@@ -756,8 +846,8 @@ export class ManagementPanel extends Panel {
         const temperatureMax = useStarlikeValues ? 12000 : 40000;
         const lightIntensityMin = useStarlikeValues ? 1000000 : 100000;
         const lightIntensityMax = useStarlikeValues ? 5000000000 : 50000000000;
-        const radiusMin = useStarlikeValues ? 100000 : 10000;
-        const radiusMax = useStarlikeValues ? 2000000 : 5000000;
+        const radiusMin = useStarlikeValues ? EARTH_RADIUS * 0.7 : MOON_RADIUS * 0.5;
+        const radiusMax = useStarlikeValues ? SUN_MASS ? 2000000 : 5000000 : MOON_RADIUS * 20;
 
         setValue(this.createMassInput, this.clampMassValue(rand(starMassMin, starMassMax)));
         setValue(this.createTemperatureSlider, Math.round(rand(temperatureMin, temperatureMax)));
@@ -945,7 +1035,7 @@ export class ManagementPanel extends Panel {
         }
 
         if (this.editMassInput && this.editMassDisplay) {
-            const mass = typeof body.mass === 'number' && isFinite(body.mass) ? body.mass : 0.001;
+            const mass = typeof body.mass === 'number' && isFinite(body.mass) ? body.mass : this.MASS_MIN;
             const clampedMass = this.clampMassValue(mass);
             this.editMassInput.value = String(clampedMass);
             this.editMassInput.min = '0.001';
@@ -958,12 +1048,13 @@ export class ManagementPanel extends Panel {
         }
 
         if (this.editVelocitySlider && this.editVelocityDisplay) {
-            const velocity =
-                typeof body.velocity?.length === 'function' ? body.velocity.length() : 0;
-            this.editVelocitySlider.value = velocity;
-            this.editVelocityDisplay.textContent = velocity.toLocaleString(undefined, {
-                maximumFractionDigits: 1,
-            });
+            this.editVelocitySlider.oninput = () => {
+                const value = parseFloat(this.editVelocitySlider.value);
+                this.editVelocityDisplay.textContent = value.toLocaleString(undefined, {
+                    maximumFractionDigits: 1,
+                });
+            };
+            this.editVelocitySlider.oninput();
         }
 
         if (this.editOrbitalAngleSlider && this.editOrbitalAngleDisplay) {
