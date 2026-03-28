@@ -17,6 +17,9 @@ export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
  */
 export class CelestialBody extends Body {
 
+    radius: number;
+
+
     constructor(
         deps = {},
         scene,

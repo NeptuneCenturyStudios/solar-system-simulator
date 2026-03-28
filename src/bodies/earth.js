@@ -34,7 +34,7 @@ export class Earth extends CelestialBody {
             createUniqueId('earth'),
             'Earth',
             BodyType.Planet,
-            0x00ffff,
+            0xffffff,
             4500,
             false,
             false,
@@ -58,6 +58,7 @@ export class Earth extends CelestialBody {
         const cloudsGeo = new THREE.SphereGeometry(this.radius * 1.03, 32, 32);
         this.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
         this.clouds.renderOrder = 2;
+        this.clouds.receiveShadow = true;
         // Make cloud sphere selectable (raycaster maps back to owning body)
         this.clouds.userData = { parentBody: this };
         this.mesh.add(this.clouds);
