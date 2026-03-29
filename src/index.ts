@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { Line2 } from 'three/addons/lines/Line2.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 
 // Import all consts
 import {
@@ -2364,8 +2364,8 @@ function createNewBody(
             });
             break;
 
-        case 'comet':
-            // Create a comet
+        case 'comet': {
+            // Create a comet using the dedicated Comet class so it gets nucleus + tail behavior.
             const cometDistance = 100000 + Math.random() * 500000;
 
             // Use appropriate trajectory calculation based on orbit type
@@ -2382,26 +2382,29 @@ function createNewBody(
 
             const cometRadius = 1 + Math.random() * 2;
             const cometMass = 0.5 + Math.random() * 3;
-            newBody = new CelestialBody(
+            const cometMaterial = new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                roughness: 0.7,
+                metalness: 0.6,
+            });
+
+            newBody = new Comet(
                 dependencies,
                 scene,
-                cometRadius,
-                0xaaaaaa,
-                cometTrajectory.pos.toArray(),
-                cometTrajectory.vel.toArray(),
-                cometMass,
-                null,
-                generateIAUName('comet'),
-                BodyType.Comet,
-                0xaaaaaa,
-                5000,
-                false,
-                false,
-                true, // hasTail = true
-                { axis: [0, 1, 0], speed: 0.2 + Math.random() * 0.4 }
+                {
+                    radius: cometRadius,
+                    pos: cometTrajectory.pos.toArray(),
+                    vel: cometTrajectory.vel.toArray(),
+                    mass: cometMass,
+                    id: createUniqueId('comet'),
+                    name: generateIAUName('comet'),
+                },
+                cometMaterial
             );
-            newBody.mesh.material.metalness = 0.6;
             break;
+        }
     }
 
     if (newBody) {
