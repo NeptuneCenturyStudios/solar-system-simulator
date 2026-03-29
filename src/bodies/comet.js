@@ -75,8 +75,7 @@ export class Comet extends CelestialBody {
             0xaaaaaa,
             5000,
             false,
-            false,
-            true, // hasTail = true
+            true,
             { axis: [0, 1, 0], speed: 0.35 },
             (r) => createRandomPolyhedron(r),
             material

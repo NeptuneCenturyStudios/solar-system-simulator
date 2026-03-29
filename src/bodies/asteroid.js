@@ -50,7 +50,7 @@ export class Asteroid extends CelestialBody {
             roughness: roughness,
             metalness: metalness,
         });
-
+        console.log(`Creating asteroid with radius ${radius.toFixed(2)}, mass ${mass.toFixed(3)}, color #${color.toString(16)}`);
         super(
             deps,
             scene,
@@ -64,7 +64,6 @@ export class Asteroid extends CelestialBody {
             BodyType.Asteroid,
             trailColor,
             maxTrail,
-            false,
             false,
             false,
             {

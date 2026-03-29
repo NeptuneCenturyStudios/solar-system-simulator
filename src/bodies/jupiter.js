@@ -32,8 +32,7 @@ export class Jupiter extends CelestialBody {
             0xffcc88,
             5000,
             false,
-            true,
-            false,
+            false,        
             { axis: [0, 1, 0], speed: 0.55 },
             null,
             material

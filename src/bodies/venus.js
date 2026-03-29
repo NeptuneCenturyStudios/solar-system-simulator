@@ -35,7 +35,6 @@ export class Venus extends CelestialBody {
             0xffdd88,
             3500,
             false,
-            true,
             false,
             { axis: [0, 1, 0], speed: -0.08 },
             null,

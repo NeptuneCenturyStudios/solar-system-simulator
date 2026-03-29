@@ -35,7 +35,6 @@ export class Mercury extends CelestialBody {
             2000,
             false,
             false,
-            false,
             { axis: [0, 1, 0], speed: 0.15 },
             null,
             material

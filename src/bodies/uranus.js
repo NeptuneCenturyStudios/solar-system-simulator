@@ -31,7 +31,6 @@ export class Uranus extends CelestialBody {
             0x88ddff,
             15000,
             false,
-            true,
             false,
             { axis: [0.99, 0.12, 0], speed: 0.42 },
             null,

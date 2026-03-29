@@ -8,7 +8,6 @@ import { triggerScreenFlash } from '../effects/screen-flash.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 import { createTextTexture } from '../drawing/text-rendering.js';
 
-
 export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
     radius: number;
 }
@@ -24,12 +23,29 @@ export class CelestialBody extends Body {
     deps: ICelectialBodyDependencies;
     scene: THREE.Scene;
     radius: number;
-    //color: number;
+    color: number;
     hasTail: boolean;
     rotationAxis: THREE.Vector3;
     rotationSpeed: number;
-    baseColor: number;
+    baseColor: THREE.Color;
+    maxTrail: number;
+    history: THREE.Vector3[];
+    trailGeo: THREE.BufferGeometry;
+    trailPositions: Float32Array;
+    trail: THREE.Line;
+    rings: THREE.Points | null = null;
+    clouds: THREE.Mesh | null = null;
+    cloudRotationSpeed: number = 0;
+    // Tidal lock properties
+    tidalLockEnabled: boolean;
+    tidalLockTarget: CelestialBody | null;
+    tidalLockSpinAxis: THREE.Vector3;
+    tidalLockFaceAxisLocal: THREE.Vector3;
+    tidalLockAngularSpeed: number;
+    _tidalLockConfigured: boolean;
+    _tidalLockOmegaInitialized: boolean = false;
 
+    
     constructor(
         deps = {} as ICelectialBodyDependencies,
         scene: THREE.Scene,
@@ -50,7 +66,6 @@ export class CelestialBody extends Body {
         material: THREE.Material,
         tidalLock = null
     ) {
-
         const defaultMaterial = new THREE.MeshStandardMaterial({
             color: color,
             emissive: 0x000000,
@@ -65,7 +80,18 @@ export class CelestialBody extends Body {
                 ? geometryFactory(radius)
                 : new THREE.SphereGeometry(radius, 32, 32);
 
-        super(deps, scene, mass, pos, vel, geometry, material ?? defaultMaterial, id, name, bodyType);
+        super(
+            deps,
+            scene,
+            mass,
+            pos,
+            vel,
+            geometry,
+            material ?? defaultMaterial,
+            id,
+            name,
+            bodyType
+        );
 
         // Set dependencies
         this.deps = deps || {};
@@ -110,10 +136,6 @@ export class CelestialBody extends Body {
 
         // Store base color for distance-based brightness adjustment
         this.baseColor = new THREE.Color(color);
-
-        // Atmosphere (old halo effect) removed.
-        // Keep `hasAtmosphere` constructor flag for future use (e.g., manager-created planets).
-        this.atmo = null;
 
         this.maxTrail = maxTrail;
         this.history = [];
@@ -219,7 +241,6 @@ export class CelestialBody extends Body {
     }
     die(skipExplosion = false) {
         if (this._isDisposed) return;
-
 
         super.die();
 
@@ -552,21 +573,21 @@ export class CelestialBody extends Body {
         const moonMaterial =
             moonName === 'Moon'
                 ? new THREE.MeshStandardMaterial({
-                    map: moonTexture,
-                    color: 0xffffff,
-                    emissive: 0x000000,
-                    emissiveIntensity: 0,
-                    roughness: 0.7,
-                    metalness: 0.7,
-                })
+                      map: moonTexture,
+                      color: 0xffffff,
+                      emissive: 0x000000,
+                      emissiveIntensity: 0,
+                      roughness: 0.7,
+                      metalness: 0.7,
+                  })
                 : new THREE.MeshStandardMaterial({
-                    map: pickRandom(fictionalTextures),
-                    color: 0xffffff, // keep texture untinted
-                    emissive: 0x000000,
-                    emissiveIntensity: 0,
-                    roughness: 0.7,
-                    metalness: 0.7,
-                });
+                      map: pickRandom(fictionalTextures),
+                      color: 0xffffff, // keep texture untinted
+                      emissive: 0x000000,
+                      emissiveIntensity: 0,
+                      roughness: 0.7,
+                      metalness: 0.7,
+                  });
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²

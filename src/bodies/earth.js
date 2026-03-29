@@ -38,7 +38,6 @@ export class Earth extends CelestialBody {
             4500,
             false,
             false,
-            false,
             { axis: [0, 1, 0], speed: 0.3 },
             null,
             material
