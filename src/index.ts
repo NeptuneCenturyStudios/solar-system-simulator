@@ -74,6 +74,7 @@ import { MainPanel } from './ui/main-panel.js';
 import { ManagementPanel } from './ui/management-panel.js';
 import { StartupModal } from './ui/startup-modal.js';
 import { EventLogEntry } from './event-log/event-log.js';
+import { Halley } from './bodies/halley.js';
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
 const uranusTexture = loadSrgbTexture('./assets/textures/uranus.jpg');
@@ -2746,7 +2747,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     bodies.push(new Pluto(dependencies, scene, plutoTexture));
 
     // Comet
-    bodies.push(new Comet(dependencies, scene));
+    bodies.push(new Halley(dependencies, scene));
 
     selectedBody = null;
 }

@@ -1,17 +1,21 @@
 import * as THREE from 'three';
 
 import {
-    G,
-    SUN_MASS,
-    COMET_PERIHELION_DIST,
-    COMET_APHELION_DIST,
     COMET_RADIUS,
 } from '../utilities/consts.js';
 import { BodyType } from '../utilities/utilities.js';
-import { CelestialBody } from './celestial-body.js';
+import {
+    CelestialBody,
+    ICelectialBodyDependencies,
+    ICelestialBodyCreationOptions,
+} from './celestial-body.js';
+
+//export interface ICometCreationOptions extends ICelestialBodyCreationOptions {
+//// Add any comet-specific options here if needed in the future
+//}
 
 // Helper function to create random polyhedron geometry (comet nucleus)
-function createRandomPolyhedron(radius) {
+function createRandomPolyhedron(radius: number) {
     // Start with an icosahedron and distort it for an irregular nucleus
     const geometry = new THREE.IcosahedronGeometry(radius, 0);
     const positions = geometry.attributes.position.array;
@@ -28,54 +32,43 @@ function createRandomPolyhedron(radius) {
     return geometry;
 }
 
+/**
+ * This class represents a comet, which is a type of celestial body with a nucleus and a tail. The tail is created using a particle system that emits particles in the opposite direction 
+ * of the comet's velocity. The comet's nucleus is represented as a distorted icosahedron to give it an irregular shape.
+ */
 export class Comet extends CelestialBody {
-    constructor(deps, scene) {
-        // Halley-like elliptical orbit
-        const perihelion = COMET_PERIHELION_DIST; // Just outside Mars (scaled)
-        const aphelion = COMET_APHELION_DIST; // Scaled
-        const semiMajorAxis = (perihelion + aphelion) / 2;
-
-        // Start at aphelion (farthest point)
-        const distance = aphelion;
-        const inclination = Math.PI / 6; // 30 degrees inclination
-
-        // Position at aphelion
-        const x = distance * Math.cos(Math.PI / 4);
-        const y = distance * Math.sin(inclination) * 0.5;
-        const z = distance * Math.sin(Math.PI / 4);
-
-        // Velocity perpendicular to position vector (for elliptical orbit)
-        // Using vis-viva equation: v = sqrt(G*M*(2/r - 1/a))
-        const speed = Math.sqrt(G * SUN_MASS * (2 / distance - 1 / semiMajorAxis));
-
-        // Velocity perpendicular to radius, inclined
-        const velX = -speed * Math.sin(Math.PI / 4) * Math.cos(inclination);
-        const velY = speed * Math.sin(inclination) * 0.3;
-        const velZ = speed * Math.cos(Math.PI / 4) * Math.cos(inclination);
-
-        const material = new THREE.MeshStandardMaterial({
-            color: 0x888888,
-            emissive: 0x000000,
-            emissiveIntensity: 0,
-            roughness: 0.7,
-            metalness: 0.6,
-        });
+    constructor(
+        deps: ICelectialBodyDependencies,
+        scene: THREE.Scene,
+        options: ICelestialBodyCreationOptions,
+        material: THREE.Material
+    ) {
+        // Create default material if none provided
+        if (!material) {
+            material = new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                roughness: 0.7,
+                metalness: 0.6,
+            });
+        }
 
         super(
             deps,
             scene,
-            COMET_RADIUS,
+            options.radius,
             0x888888,
-            [x, y, z],
-            [velX, velY, velZ],
-            0.01, // Very small mass
-            'camComet',
-            'Comet',
+            options.pos,
+            options.vel,
+            options.mass,
+            options.id,
+            options.name,
             BodyType.Comet,
             0xaaaaaa,
             5000,
             false,
-            { axis: [0, 1, 0], speed: 0.35 },
+            { axis: new THREE.Vector3(0, 1, 0), speed: 0.35 },
             (r) => createRandomPolyhedron(r),
             material
         );
@@ -92,7 +85,7 @@ export class Comet extends CelestialBody {
         this.initTail(scene);
     }
 
-    initTail(scene) {
+    initTail(scene: THREE.Scene) {
         const tailCount = this.tailCount || 400;
         this.tailPos = new Float32Array(tailCount * 3);
         this.tailOpacities = new Float32Array(tailCount);
@@ -117,7 +110,7 @@ export class Comet extends CelestialBody {
         scene.add(this.tailParticles);
     }
 
-    update(acc, dt) {
+    update(acc: THREE.Vector3, dt: number) {
         super.update(acc, dt);
         this.updateTail();
     }
@@ -132,7 +125,8 @@ export class Comet extends CelestialBody {
 
         const tailCount = this.tailCount || 400;
         const tailLength = Math.max(40, tailCount * 0.25);
-        const direction = speed > 1e-10 ? velocity.clone().normalize().negate() : new THREE.Vector3(1, 0, 0);
+        const direction =
+            speed > 1e-10 ? velocity.clone().normalize().negate() : new THREE.Vector3(1, 0, 0);
 
         this.tailIndex = (this.tailIndex + 1) % tailCount;
         const i3 = this.tailIndex * 3;

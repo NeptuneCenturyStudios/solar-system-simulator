@@ -4,6 +4,7 @@ import { BodyTypeEnum } from '../utilities/utilities.js';
 
 export interface IBodyCreationOptions {
     pos: THREE.Vector3;
+    vel: THREE.Vector3;
     mass: number;
     id: string;
     name: string;
