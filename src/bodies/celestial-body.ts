@@ -16,6 +16,13 @@ export interface ICelectialBodyDependencies {
     addEvent: (message: string) => void;
 }
 
+export interface ITidalLockOptions {
+    target: CelestialBody,
+    spinAxisWorld: THREE.Vector3,
+    faceAxisLocal: THREE.Vector3,
+    angularSpeed: number
+}
+
 /**
  * This class represents a celestial body with physical properties, rendering capabilities, and optional features like rings, atmosphere, and tidal locking.
  */
@@ -45,7 +52,7 @@ export class CelestialBody extends Body {
     _tidalLockConfigured: boolean;
     _tidalLockOmegaInitialized: boolean = false;
 
-    
+
     constructor(
         deps = {} as ICelectialBodyDependencies,
         scene: THREE.Scene,
@@ -64,7 +71,7 @@ export class CelestialBody extends Body {
         rotation: IRotation = { axis: new THREE.Vector3(0, 1, 0), speed: 0 },
         geometryFactory: (radius: number) => THREE.BufferGeometry,
         material: THREE.Material,
-        tidalLock = null
+        tidalLock?: ITidalLockOptions
     ) {
         const defaultMaterial = new THREE.MeshStandardMaterial({
             color: color,
@@ -121,16 +128,18 @@ export class CelestialBody extends Body {
             this.tidalLockEnabled = true;
             this.tidalLockTarget = tidalLock.target;
             if (tidalLock.spinAxisWorld) {
-                this.tidalLockSpinAxis = new THREE.Vector3(...tidalLock.spinAxisWorld).normalize();
+                if (Array.isArray(tidalLock.spinAxisWorld)) {
+                    this.tidalLockSpinAxis = new THREE.Vector3(...tidalLock.spinAxisWorld).normalize();
+                } else {
+                    this.tidalLockSpinAxis = new THREE.Vector3(tidalLock.spinAxisWorld.x, tidalLock.spinAxisWorld.y, tidalLock.spinAxisWorld.z).normalize()
+                }
             }
             if (tidalLock.faceAxisLocal) {
                 this.tidalLockFaceAxisLocal = new THREE.Vector3(
                     ...tidalLock.faceAxisLocal
                 ).normalize();
             }
-            if (typeof tidalLock.angularSpeed === 'number') {
-                this.tidalLockAngularSpeed = tidalLock.angularSpeed;
-            }
+            this.tidalLockAngularSpeed = tidalLock.angularSpeed;
             this._tidalLockConfigured = true;
         }
 
@@ -573,21 +582,21 @@ export class CelestialBody extends Body {
         const moonMaterial =
             moonName === 'Moon'
                 ? new THREE.MeshStandardMaterial({
-                      map: moonTexture,
-                      color: 0xffffff,
-                      emissive: 0x000000,
-                      emissiveIntensity: 0,
-                      roughness: 0.7,
-                      metalness: 0.7,
-                  })
+                    map: moonTexture,
+                    color: 0xffffff,
+                    emissive: 0x000000,
+                    emissiveIntensity: 0,
+                    roughness: 0.7,
+                    metalness: 0.7,
+                })
                 : new THREE.MeshStandardMaterial({
-                      map: pickRandom(fictionalTextures),
-                      color: 0xffffff, // keep texture untinted
-                      emissive: 0x000000,
-                      emissiveIntensity: 0,
-                      roughness: 0.7,
-                      metalness: 0.7,
-                  });
+                    map: pickRandom(fictionalTextures),
+                    color: 0xffffff, // keep texture untinted
+                    emissive: 0x000000,
+                    emissiveIntensity: 0,
+                    roughness: 0.7,
+                    metalness: 0.7,
+                });
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²
