@@ -2204,8 +2204,6 @@ function createNewBody(
                 0xaaaaaa,
                 3000,
                 false,
-                false,
-                false,
                 { axis: [0, 1, 0], speed: 0.1 + Math.random() * 0.4 },
                 null,
                 planetMaterial
@@ -2302,8 +2300,6 @@ function createNewBody(
                     BodyType.Moon,
                     0x666666,
                     1000,
-                    false,
-                    false,
                     false,
                     { axis: [0, 1, 0], speed: 0.15 + Math.random() * 0.35 },
                     null,

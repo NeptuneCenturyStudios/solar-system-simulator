@@ -34,7 +34,6 @@ export class Mars extends CelestialBody {
             0xff8888,
             3000,
             false,
-            false,
             { axis: [0, 1, 0], speed: 0.26 },
             null,
             material

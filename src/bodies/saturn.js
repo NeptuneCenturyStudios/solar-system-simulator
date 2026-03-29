@@ -32,7 +32,6 @@ export class Saturn extends CelestialBody {
             0xffeebb,
             12000,
             true,
-            false,
             { axis: [0, 1, 0], speed: 0.5 },
             null,
             material

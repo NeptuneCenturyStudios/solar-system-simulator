@@ -31,7 +31,6 @@ export class CelestialBody extends Body {
     scene: THREE.Scene;
     radius: number;
     color: number;
-    hasTail: boolean;
     rotationAxis: THREE.Vector3;
     rotationSpeed: number;
     baseColor: THREE.Color;
@@ -67,7 +66,6 @@ export class CelestialBody extends Body {
         trailColor = 0xffffff,
         maxTrail = 500,
         hasRings = false,
-        hasTail = false,
         rotation: IRotation = { axis: new THREE.Vector3(0, 1, 0), speed: 0 },
         geometryFactory: (radius: number) => THREE.BufferGeometry,
         material: THREE.Material,
@@ -107,8 +105,6 @@ export class CelestialBody extends Body {
         this.mass = mass;
         this.color = color;
         this.bodyType = bodyType;
-        //this.velocity = new THREE.Vector3(...vel);
-        this.hasTail = hasTail;
 
         // Axial rotation (spin). Uses simulation dt so it follows timeScale and reverses when time runs backwards.
         // rotation.speed is in radians per simulated second.
@@ -190,62 +186,6 @@ export class CelestialBody extends Body {
                 })
             );
             scene.add(this.rings);
-        }
-
-        // Comet tail
-        if (hasTail) {
-            this.tailCount = 800;
-            this.tailGeo = new THREE.BufferGeometry();
-            this.tailPos = new Float32Array(this.tailCount * 3);
-            this.tailOpacities = new Float32Array(this.tailCount);
-            this.tailVelocities = [];
-
-            // Direction away from sun for initial tail positioning
-            const awayFromSun = new THREE.Vector3(pos[0], pos[1], pos[2]).normalize();
-
-            for (let i = 0; i < this.tailCount; i++) {
-                // Initialize with random life values like corona does
-                const life = Math.random();
-
-                // Create velocity vector
-                const velVec = awayFromSun
-                    .clone()
-                    .multiplyScalar(0.3 + Math.random() * 0.4)
-                    .add(
-                        new THREE.Vector3(
-                            (Math.random() - 0.5) * 0.2,
-                            (Math.random() - 0.5) * 0.2,
-                            (Math.random() - 0.5) * 0.2
-                        )
-                    );
-
-                // Position particle along tail based on its life value
-                // Simulate where it would be if it had been traveling
-                const travelDistance = life * 200; // Approximate distance based on life
-                this.tailPos[i * 3] = pos[0] + velVec.x * travelDistance;
-                this.tailPos[i * 3 + 1] = pos[1] + velVec.y * travelDistance;
-                this.tailPos[i * 3 + 2] = pos[2] + velVec.z * travelDistance;
-
-                this.tailOpacities[i] = (1 - life) * 0.5; // Initial fade
-                this.tailVelocities[i] = { life: life, lifeIncrement: 0.001, vel: velVec };
-            }
-
-            this.tailGeo.setAttribute('position', new THREE.BufferAttribute(this.tailPos, 3));
-            this.tailMat = new THREE.PointsMaterial({
-                color: 0xffffff,
-                size: 2.5,
-                transparent: true,
-                opacity: 0.8,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                depthTest: true,
-            });
-            this.tailParticles = new THREE.Points(this.tailGeo, this.tailMat);
-            this.tailParticles.frustumCulled = false;
-            scene.add(this.tailParticles);
-            this.tailIndex = 0;
-        } else {
-            this.tailParticles = null;
         }
     }
     die(skipExplosion = false) {
@@ -357,16 +297,6 @@ export class CelestialBody extends Body {
             // ignore
         }
 
-        // Tail particles
-        try {
-            if (this.tailParticles) {
-                if (this.tailParticles.parent) this.tailParticles.parent.remove(this.tailParticles);
-                disposeObject3D(this.tailParticles);
-            }
-        } catch {
-            // ignore
-        }
-
         // Ensure any label bits are hidden (they should be disposed via traverse above)
         try {
             if (this.label) this.label.visible = false;
@@ -461,86 +391,6 @@ export class CelestialBody extends Body {
             this.rings.position.copy(this.mesh.position);
             this.rings.rotation.y += 0.001 * (dt * 60);
         }
-
-        // Update tail particles
-        if (this.tailParticles) {
-            // Calculate distance to sun (optimized with squared distance)
-            const distToSunSq =
-                this.mesh.position.x ** 2 + this.mesh.position.y ** 2 + this.mesh.position.z ** 2;
-            const distToSun = Math.sqrt(distToSunSq);
-
-            // Calculate comet's velocity magnitude (cached)
-            const cometSpeed = this.velocity.length();
-
-            // Scale tail intensity based on distance (closer = brighter/longer)
-            const maxDist = 25000; // Distance where tail is minimal (comet's aphelion)
-            const minDist = 3500; // Distance where tail is maximal (comet's perihelion)
-            let tailIntensity = Math.max(
-                0,
-                Math.min(1, (maxDist - distToSun) / (maxDist - minDist))
-            );
-
-            // Apply stronger falloff curve for more dramatic effect (computed once)
-            tailIntensity = tailIntensity * tailIntensity * Math.sqrt(tailIntensity); // Optimized pow(2.5)
-
-            // Direction away from sun (normalized once)
-            const invDistToSun = 1 / distToSun;
-            const awayFromSunX = this.mesh.position.x * invDistToSun;
-            const awayFromSunY = this.mesh.position.y * invDistToSun;
-            const awayFromSunZ = this.mesh.position.z * invDistToSun;
-
-            // Calculate desired tail length based on comet state (precompute constants)
-            const baseTailLength = 100;
-            const intensityBonus = tailIntensity * 400;
-            const velocityBonus = cometSpeed * 100;
-            const targetTailLength = baseTailLength + intensityBonus + velocityBonus;
-
-            // Convert tail length to life increment
-            const avgParticleSpeed = 0.35;
-            const lifeIncrement = (avgParticleSpeed * 60) / targetTailLength;
-
-            const dtScaled = dt * 60;
-            const spread = this.radius * 0.5;
-
-            // Update all particles
-            for (let i = 0; i < this.tailCount; i++) {
-                const vel = this.tailVelocities[i];
-
-                // Increment life using the current lifeIncrement
-                vel.life += vel.lifeIncrement * dt;
-
-                // Move particle
-                const idx = i * 3;
-                this.tailPos[idx] += vel.vel.x * dtScaled;
-                this.tailPos[idx + 1] += vel.vel.y * dtScaled;
-                this.tailPos[idx + 2] += vel.vel.z * dtScaled;
-
-                // If particle dies, reset it with NEW lifeIncrement (works in forward or reverse time)
-                if (vel.life >= 1.0 || vel.life <= 0.0) {
-                    this.tailPos[idx] = this.mesh.position.x + (Math.random() - 0.5) * spread;
-                    this.tailPos[idx + 1] = this.mesh.position.y + (Math.random() - 0.5) * spread;
-                    this.tailPos[idx + 2] = this.mesh.position.z + (Math.random() - 0.5) * spread;
-                    vel.life = vel.life >= 1.0 ? 0 : 1; // Reset to opposite end based on direction
-                    // Add randomness to lifeIncrement so particles don't all die at once
-                    vel.lifeIncrement = lifeIncrement * (0.7 + Math.random() * 0.6); // ±30% variation
-
-                    // Reuse awayFromSun calculation
-                    const baseSpeed = 0.3 + Math.random() * 0.4;
-                    vel.vel.x = awayFromSunX * baseSpeed + (Math.random() - 0.5) * 0.2;
-                    vel.vel.y = awayFromSunY * baseSpeed + (Math.random() - 0.5) * 0.2;
-                    vel.vel.z = awayFromSunZ * baseSpeed + (Math.random() - 0.5) * 0.2;
-                }
-
-                // Fade based on life ratio and intensity
-                this.tailOpacities[i] = (1 - vel.life) * tailIntensity;
-            }
-
-            this.tailGeo.attributes.position.needsUpdate = true;
-            // Make material opacity and size scale with distance
-            this.tailMat.opacity = 0.2 + tailIntensity * 0.8;
-            // Larger particles when closer to sun for denser appearance
-            this.tailMat.size = 2.5 + tailIntensity * 3.5;
-        }
     }
     updateTrail() {
         if (this._isDisposed) return;
@@ -620,8 +470,6 @@ export class CelestialBody extends Body {
             BodyType.Moon,
             config.trailColor || 0xffffff,
             config.maxTrail || 1500,
-            false,
-            false,
             false,
             { axis: new THREE.Vector3(0, 1, 0), speed: 0.15 + Math.random() * 0.35 },
             null,

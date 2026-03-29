@@ -75,10 +75,111 @@ export class Comet extends CelestialBody {
             0xaaaaaa,
             5000,
             false,
-            true,
             { axis: [0, 1, 0], speed: 0.35 },
             (r) => createRandomPolyhedron(r),
             material
         );
+
+        this.tailCount = 400;
+        this.tailIndex = 0;
+        this.tailParticles = null;
+        this.tailGeo = null;
+        this.tailMat = null;
+        this.tailPos = null;
+        this.tailOpacities = null;
+        this.tailVelocities = null;
+
+        this.initTail(scene);
+    }
+
+    initTail(scene) {
+        const tailCount = this.tailCount || 400;
+        this.tailPos = new Float32Array(tailCount * 3);
+        this.tailOpacities = new Float32Array(tailCount);
+        this.tailVelocities = new Float32Array(tailCount * 3);
+
+        this.tailGeo = new THREE.BufferGeometry();
+        this.tailGeo.setAttribute('position', new THREE.BufferAttribute(this.tailPos, 3));
+        this.tailGeo.setAttribute('opacity', new THREE.BufferAttribute(this.tailOpacities, 1));
+
+        this.tailMat = new THREE.PointsMaterial({
+            color: 0xddeeff,
+            size: 2.5,
+            transparent: true,
+            opacity: 0.75,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            sizeAttenuation: false,
+        });
+
+        this.tailParticles = new THREE.Points(this.tailGeo, this.tailMat);
+        this.tailParticles.visible = true;
+        scene.add(this.tailParticles);
+    }
+
+    update(acc, dt) {
+        super.update(acc, dt);
+        this.updateTail();
+    }
+
+    updateTail() {
+        if (!this.tailParticles || !this.tailGeo || !this.tailPos || !this.tailOpacities) return;
+        if (!this.mesh) return;
+
+        const position = this.mesh.position;
+        const velocity = this.velocity || new THREE.Vector3();
+        const speed = velocity.length();
+
+        const tailCount = this.tailCount || 400;
+        const tailLength = Math.max(40, tailCount * 0.25);
+        const direction = speed > 1e-10 ? velocity.clone().normalize().negate() : new THREE.Vector3(1, 0, 0);
+
+        this.tailIndex = (this.tailIndex + 1) % tailCount;
+        const i3 = this.tailIndex * 3;
+
+        this.tailPos[i3] = position.x;
+        this.tailPos[i3 + 1] = position.y;
+        this.tailPos[i3 + 2] = position.z;
+
+        this.tailVelocities[i3] = direction.x * tailLength;
+        this.tailVelocities[i3 + 1] = direction.y * tailLength;
+        this.tailVelocities[i3 + 2] = direction.z * tailLength;
+        this.tailOpacities[this.tailIndex] = 1;
+
+        for (let i = 0; i < tailCount; i++) {
+            const idx = i * 3;
+            const opacity = this.tailOpacities[i];
+            if (opacity <= 0) continue;
+
+            this.tailPos[idx] += this.tailVelocities[idx] * 0.01;
+            this.tailPos[idx + 1] += this.tailVelocities[idx + 1] * 0.01;
+            this.tailPos[idx + 2] += this.tailVelocities[idx + 2] * 0.01;
+            this.tailOpacities[i] = Math.max(0, opacity - 0.015);
+        }
+
+        const posAttr = this.tailGeo.getAttribute('position');
+        const opacityAttr = this.tailGeo.getAttribute('opacity');
+        if (posAttr) posAttr.needsUpdate = true;
+        if (opacityAttr) opacityAttr.needsUpdate = true;
+    }
+
+    die(skipEffects = false) {
+        this.disposeTail();
+        super.die(skipEffects);
+    }
+
+    disposeTail() {
+        if (this.tailParticles?.parent) {
+            this.tailParticles.parent.remove(this.tailParticles);
+        }
+        if (this.tailGeo) this.tailGeo.dispose();
+        if (this.tailMat) this.tailMat.dispose();
+
+        this.tailParticles = null;
+        this.tailGeo = null;
+        this.tailMat = null;
+        this.tailPos = null;
+        this.tailOpacities = null;
+        this.tailVelocities = null;
     }
 }

@@ -32,7 +32,6 @@ export class Neptune extends CelestialBody {
             0x6688ff,
             18000,
             false,
-            false,
             { axis: [0, 1, 0], speed: 0.4 },
             null,
             material

@@ -34,9 +34,7 @@ export class BlackHole extends CelestialBody {
             name,
             BodyType.BlackHole,
             0xffffff,
-            500,
-            false,
-            false
+            500
         );
 
         this.isBlackHole = true;

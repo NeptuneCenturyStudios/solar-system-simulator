@@ -32,7 +32,6 @@ export class Pluto extends CelestialBody {
             0xddbb99,
             20000,
             false,
-            false,
             { axis: [0, 1, 0], speed: 0.08 },
             null,
             material

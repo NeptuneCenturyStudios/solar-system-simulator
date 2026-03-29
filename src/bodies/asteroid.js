@@ -65,7 +65,6 @@ export class Asteroid extends CelestialBody {
             trailColor,
             maxTrail,
             false,
-            false,
             {
                 axis: [Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5],
                 speed: 0.6 + Math.random() * 1.2,
