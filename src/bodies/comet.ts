@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import {} from '../utilities/consts.js';
+import { SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyType } from '../utilities/utilities.js';
 import {
     CelestialBody,
@@ -115,8 +115,8 @@ export class Comet extends CelestialBody {
             this.tailPos[i * 3 + 1] = options.pos.y + velVec.y * travelDistance;
             this.tailPos[i * 3 + 2] = options.pos.z + velVec.z * travelDistance;
 
-            this.tailOpacities[i] = (1 - life) * 0.5; // Initial fade
-            this.tailVelocities[i] = { life: life, lifeIncrement: 0.001, vel: velVec };
+            // this.tailOpacities[i] = (1 - life) * 0.5; // Initial fade
+             this.tailVelocities[i] = { life: life, lifeIncrement: 0.001, vel: velVec };
         }
 
         this.tailGeo.setAttribute('position', new THREE.BufferAttribute(this.tailPos, 3));
@@ -163,12 +163,9 @@ export class Comet extends CelestialBody {
         const cometSpeed = this.velocity.length();
 
         // Scale tail intensity based on distance (closer = brighter/longer)
-        const maxDist = 25000; // Distance where tail is minimal (comet's aphelion)
-        const minDist = 3500; // Distance where tail is maximal (comet's perihelion)
-        let tailIntensity = Math.max(0, Math.min(1, (maxDist - distToSun) / (maxDist - minDist)));
-
-        // Apply stronger falloff curve for more dramatic effect (computed once)
-        tailIntensity = tailIntensity * tailIntensity * Math.sqrt(tailIntensity); // Optimized pow(2.5)
+        // Intesity at known distance: 20000000000 * SCALE_FACTOR
+        // Apply the inverse square law.
+        const tailIntensity = Math.min(1, 20000000000 * SCALE_FACTOR / distToSunSq);
 
         // Direction away from sun (normalized once)
         const invDistToSun = 1 / distToSun;
@@ -177,17 +174,17 @@ export class Comet extends CelestialBody {
         const awayFromSunZ = this.mesh.position.z * invDistToSun;
 
         // Calculate desired tail length based on comet state (precompute constants)
-        const baseTailLength = 100;
-        const intensityBonus = tailIntensity * 400;
-        const velocityBonus = cometSpeed * 100;
+        const baseTailLength = 50 * SCALE_FACTOR;
+        const intensityBonus = tailIntensity * 400 * SCALE_FACTOR;
+        const velocityBonus = cometSpeed * 100 * SCALE_FACTOR;
         const targetTailLength = baseTailLength + intensityBonus + velocityBonus;
 
         // Convert tail length to life increment
         const avgParticleSpeed = 0.35;
         const lifeIncrement = (avgParticleSpeed * 60) / targetTailLength;
 
-        const dtScaled = dt * 60;
-        const spread = this.radius * 1;
+        const dtScaled = Math.abs(dt) * 60;
+        const spread = this.radius * 1 * SCALE_FACTOR;
 
         // Update all particles
         for (let i = 0; i < this.tailCount; i++) {
@@ -224,9 +221,9 @@ export class Comet extends CelestialBody {
 
         this.tailGeo.attributes.position.needsUpdate = true;
         // Make material opacity and size scale with distance
-        this.tailMat.opacity = 0.2 + tailIntensity * 0.8;
+        this.tailMat.opacity = 0.01 + tailIntensity * .8
         // Larger particles when closer to sun for denser appearance
-        this.tailMat.size = 2.5 + tailIntensity * 3.5;
+        this.tailMat.size = 2.5 + tailIntensity * 5;
     }
 
     die(skipEffects = false) {
