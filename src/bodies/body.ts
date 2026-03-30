@@ -167,7 +167,7 @@ export class Body {
                     }
                 }
             });
-            
+
             // Remove the mesh from the scene
             this.scene.remove(this.mesh);
         }

@@ -12,6 +12,14 @@ export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
     radius: number;
 }
 
+export interface IMoonCreationOptions extends ICelestialBodyCreationOptions {
+ distance: number;
+ angle?: number; // optional initial angle for multiple moons
+ yVariation?: number; // optional random Y variation for non-coplanar orbits
+ trailColor?: number;
+ maxTrail?: number;
+}
+
 export interface ICelectialBodyDependencies {
     addEvent: (message: string) => void;
     addExplosion: (explosion: ParticleExplosion) => void;
@@ -22,10 +30,10 @@ export interface ICelectialBodyDependencies {
 }
 
 export interface ITidalLockOptions {
-    target: CelestialBody,
-    spinAxisWorld: THREE.Vector3,
-    faceAxisLocal: THREE.Vector3,
-    angularSpeed: number
+    target: CelestialBody;
+    spinAxisWorld: THREE.Vector3;
+    faceAxisLocal: THREE.Vector3;
+    angularSpeed: number;
 }
 
 /**
@@ -56,7 +64,6 @@ export class CelestialBody extends Body {
     _tidalLockConfigured: boolean;
     _tidalLockOmegaInitialized: boolean = false;
 
-
     constructor(
         deps = {} as ICelectialBodyDependencies,
         scene: THREE.Scene,
@@ -72,7 +79,7 @@ export class CelestialBody extends Body {
         maxTrail = 500,
         hasRings = false,
         rotation: IRotation = { axis: new THREE.Vector3(0, 1, 0), speed: 0 },
-        geometryFactory: (radius: number) => THREE.BufferGeometry,
+        geometryFactory: ((radius: number) => THREE.BufferGeometry) | null,
         material: THREE.Material,
         tidalLock?: ITidalLockOptions
     ) {
@@ -130,9 +137,15 @@ export class CelestialBody extends Body {
             this.tidalLockTarget = tidalLock.target;
             if (tidalLock.spinAxisWorld) {
                 if (Array.isArray(tidalLock.spinAxisWorld)) {
-                    this.tidalLockSpinAxis = new THREE.Vector3(...tidalLock.spinAxisWorld).normalize();
+                    this.tidalLockSpinAxis = new THREE.Vector3(
+                        ...tidalLock.spinAxisWorld
+                    ).normalize();
                 } else {
-                    this.tidalLockSpinAxis = new THREE.Vector3(tidalLock.spinAxisWorld.x, tidalLock.spinAxisWorld.y, tidalLock.spinAxisWorld.z).normalize()
+                    this.tidalLockSpinAxis = new THREE.Vector3(
+                        tidalLock.spinAxisWorld.x,
+                        tidalLock.spinAxisWorld.y,
+                        tidalLock.spinAxisWorld.z
+                    ).normalize();
                 }
             }
             if (tidalLock.faceAxisLocal) {
@@ -227,70 +240,46 @@ export class CelestialBody extends Body {
             }
         }
 
-        const disposeMaterial = (mat: THREE.Material | null) => {
-            if (!mat) return;
-            const disposeTex = (t: THREE.Texture | null) => {
-                try {
-                    if (t && typeof t.dispose === 'function') t.dispose();
-                } catch {
-                    // ignore
-                }
-            };
-
-            try {
-                if (typeof mat.dispose === 'function') mat.dispose();
-            } catch {
-                // ignore
+        // Dispose of any resources owned by this class
+        if (this.clouds) {
+            this.scene.remove(this.clouds);
+            this.clouds.geometry.dispose();
+            if (Array.isArray(this.clouds.material)) {
+                this.clouds.material.forEach((mat) => mat.dispose());
+            } else {
+                this.clouds.material.dispose();
             }
-        };
-
-        const disposeObject3D = (obj: THREE.Object3D | null) => {
-            if (!obj) return;
-            obj.traverse((child) => {
-                if (child.geometry && typeof child.geometry.dispose === 'function') {
-                    try {
-                        child.geometry.dispose();
-                    } catch {
-                        // ignore
-                    }
-                }
-
-                if (child.material) {
-                    if (Array.isArray(child.material)) child.material.forEach(disposeMaterial);
-                    else disposeMaterial(child.material);
-                }
-            });
-        };
-
-        // Remove + dispose main mesh (and any child meshes like clouds/labels/lines)
-        try {
-            if (this.mesh) {
-                if (this.mesh.parent) this.mesh.parent.remove(this.mesh);
-                disposeObject3D(this.mesh);
-            }
-        } catch {
-            // ignore
         }
 
-        // Rings
-        try {
-            if (this.rings) {
-                if (this.rings.parent) this.rings.parent.remove(this.rings);
-                disposeObject3D(this.rings);
+        // Remove trail
+        this.scene.remove(this.trail);
+        this.trailGeo.dispose();
+        if (Array.isArray(this.trail?.material)) {
+            this.trail.material.forEach((mat) => mat.dispose());
+        } else {
+            this.trail?.material.dispose();
+        }
+        
+        // Dispoose of rings
+        if (this.rings) {
+            this.scene.remove(this.rings);
+            this.rings.geometry.dispose();
+            if (Array.isArray(this.rings.material)) {
+                this.rings.material.forEach((mat) => mat.dispose());
+            } else {
+                this.rings.material.dispose();
             }
-        } catch {
-            // ignore
         }
 
         // Trail
-        try {
-            if (this.trail) {
-                if (this.trail.parent) this.trail.parent.remove(this.trail);
-                disposeObject3D(this.trail);
-            }
-        } catch {
-            // ignore
-        }
+        // try {
+        //     if (this.trail) {
+        //         if (this.trail.parent) this.trail.parent.remove(this.trail);
+        //         disposeObject3D(this.trail);
+        //     }
+        // } catch {
+        //     // ignore
+        // }
 
         // Ensure any label bits are hidden (they should be disposed via traverse above)
         try {
@@ -402,7 +391,7 @@ export class CelestialBody extends Body {
         this.trailGeo.setDrawRange(0, this.history.length);
     }
 
-    createMoon(scene: THREE.Scene, config) {
+    createMoon(scene: THREE.Scene, config: IMoonCreationOptions) {
         // Calculate orbital trajectory based on parent's mass
         const trajectory = calculateTrajectory(config.distance, this.mass);
 
@@ -427,21 +416,21 @@ export class CelestialBody extends Body {
         const moonMaterial =
             moonName === 'Moon'
                 ? new THREE.MeshStandardMaterial({
-                    map: moonTexture,
-                    color: 0xffffff,
-                    emissive: 0x000000,
-                    emissiveIntensity: 0,
-                    roughness: 0.7,
-                    metalness: 0.7,
-                })
+                      map: moonTexture,
+                      color: 0xffffff,
+                      emissive: 0x000000,
+                      emissiveIntensity: 0,
+                      roughness: 0.7,
+                      metalness: 0.7,
+                  })
                 : new THREE.MeshStandardMaterial({
-                    map: pickRandom(fictionalTextures),
-                    color: 0xffffff, // keep texture untinted
-                    emissive: 0x000000,
-                    emissiveIntensity: 0,
-                    roughness: 0.7,
-                    metalness: 0.7,
-                });
+                      map: pickRandom(fictionalTextures),
+                      color: 0xffffff, // keep texture untinted
+                      emissive: 0x000000,
+                      emissiveIntensity: 0,
+                      roughness: 0.7,
+                      metalness: 0.7,
+                  });
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²
@@ -456,9 +445,9 @@ export class CelestialBody extends Body {
             this.deps,
             scene,
             config.radius,
-            config.color,
-            [posX, posY, posZ],
-            [velX, velY, velZ],
+            0xffffff, // Color is determined by texture, so keep material color white
+            new THREE.Vector3(posX, posY, posZ),
+            new THREE.Vector3(velX, velY, velZ),
             config.mass,
             config.id,
             moonName,
@@ -477,10 +466,10 @@ export class CelestialBody extends Body {
             }
         );
 
-        // Apply any additional properties
-        if (config.metalness !== undefined) {
-            moon.mesh.material.metalness = config.metalness;
-        }
+        // // Apply any additional properties
+        // if (config.metalness !== undefined) {
+        //     moon.mesh.material.metalness = config.metalness;
+        // }
 
         return moon;
     }
