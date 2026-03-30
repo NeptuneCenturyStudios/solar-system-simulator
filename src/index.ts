@@ -48,7 +48,7 @@ import {
     HYGIEA_RADIUS,
 } from './utilities/consts.js';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo.js';
-import { isBodyType, BodyType, pickRandom, createUniqueId } from './utilities/utilities.js';
+import { isBodyType, BodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities.js';
 import { calculateTrajectory } from './physics/physics.js';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
 import { Supernova } from './effects/supernova.js';
@@ -75,6 +75,7 @@ import { ManagementPanel } from './ui/management-panel.js';
 import { StartupModal } from './ui/startup-modal.js';
 import { EventLogEntry } from './event-log/event-log.js';
 import { Halley } from './bodies/halley.js';
+import { instance } from 'three/src/nodes/accessors/InstanceNode.js';
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
 const uranusTexture = loadSrgbTexture('./assets/textures/uranus.jpg');
@@ -130,7 +131,7 @@ window.addEventListener('beforeunload', (e) => {
  * @param {number} baseRadius - Reference radius
  * @returns {number} - Calculated radius
  */
-function calculateStarRadius(mass, baseMass, baseRadius) {
+function calculateStarRadius(mass: number, baseMass: number, baseRadius: number): number {
     // Use mass-radius relationship for main sequence stars
     return baseRadius * Math.pow(mass / baseMass, 0.8);
 }
@@ -138,10 +139,11 @@ function calculateStarRadius(mass, baseMass, baseRadius) {
 /**
  * Set the visual radius for any body. If the body implements `setRadius`, delegate to it.
  * Otherwise update mesh geometry, label, label line and rings if present.
- * @param {object} body
- * @param {number} newRadius
+ * TODO: This should be moved to the CelestialBody class
+ * @param {object} body - The celestial body to update
+ * @param {number} newRadius - The new radius to set
  */
-function setBodyRadius(body, newRadius) {
+function setBodyRadius(body: CelestialBody, newRadius: number) {
     if (!body) return;
 
     // Hard cap to prevent extreme “fills the screen” glitches.
@@ -150,15 +152,12 @@ function setBodyRadius(body, newRadius) {
     // Kuiper belt generation uses:
     //   r = NEPTUNE_DIST + rand * (PLUTO_DIST - NEPTUNE_DIST + 300000)
     // So the outer edge is roughly PLUTO_DIST + 300000.
-    const STAR_MAX_RADIUS = PLUTO_DIST + 300000;
-
-    if (isBodyType(body, BodyType.Star)) {
-        newRadius = Math.min(newRadius, STAR_MAX_RADIUS);
-    }
-
+    const MAX_RADIUS = PLUTO_DIST + 300000;
+    newRadius = Math.min(newRadius, MAX_RADIUS);
+    
     const oldRadius = body.radius || 1;
 
-    if (typeof body.setRadius === 'function') {
+    if (body instanceof Star) {
         body.setRadius(newRadius);
         return;
     }
@@ -255,7 +254,7 @@ function collisionScoreEscapeVelocity(body) {
     return m / r;
 }
 
-function chooseCollisionWinner(b1, b2) {
+function chooseCollisionWinner(b1: Body, b2: Body) {
     const s1 = collisionScoreEscapeVelocity(b1);
     const s2 = collisionScoreEscapeVelocity(b2);
 
@@ -274,7 +273,7 @@ function chooseCollisionWinner(b1, b2) {
     return { winner: b2, victim: b1 };
 }
 
-function absorbBody(winner, victim) {
+function absorbBody(winner: Body, victim: Body) {
     if (!winner || !victim) return;
     if (winner._isDisposed || victim._isDisposed) return;
     if (winner._isDisposed || victim._isDisposed) return;
@@ -295,8 +294,8 @@ function absorbBody(winner, victim) {
 
     // Stars: transfer remaining fuel + capacity (when fuel system is active)
     if (
-        isBodyType(winner, BodyType.Star) &&
-        isBodyType(victim, BodyType.Star) &&
+        winner instanceof Star &&
+        victim instanceof Star &&
         winner.fuel !== null &&
         victim.fuel !== null
     ) {
@@ -309,12 +308,10 @@ function absorbBody(winner, victim) {
     // Radius:
     // - Default: volume add => cbrt(r1^3 + r2^3)
     // - Black holes: radius is derived from mass compression, not added "raw volume".
-    const isWinnerBlackHole =
-        !!winner.isBlackHole || (winner.bodyType && winner.bodyType & BodyType.BlackHole);
-    if (isWinnerBlackHole) {
+    if (winner instanceof BlackHole) {
         const compressed = BlackHole.massToEventHorizonRadius(newMass);
         setBodyRadius(winner, compressed);
-    } else {
+    } else if (winner instanceof CelestialBody && victim instanceof CelestialBody) {
         const rw = Math.max(0.0001, winner.radius || 0.0001);
         const rv = Math.max(0.0001, victim.radius || 0.0001);
         const newRadius = Math.cbrt(rw * rw * rw + rv * rv * rv);
@@ -331,7 +328,7 @@ function absorbBody(winner, victim) {
 
 // --- IAU-style Random Naming Convention ---
 // Generates science-style provisional/catalog names for new bodies
-function generateIAUName(type, parentBody = null) {
+function generateIAUName(type: BodyTypeEnum, parentBody: Body | null = null) {
     const year = new Date().getFullYear();
 
     // Letter set excluding 'I' to mimic IAU conventions
@@ -373,7 +370,7 @@ function generateIAUName(type, parentBody = null) {
         return provisional();
     }
 
-    function moonName(parent) {
+    function moonName(parent: Body | null) {
         if (!parent) return `Moon ${provisional()}`;
         // Count existing moons that start with parent name (simple heuristic)
         const existing = simulationState.bodies.filter(
@@ -384,7 +381,7 @@ function generateIAUName(type, parentBody = null) {
     }
 
     // Convert integer to Roman numerals (1..3999)
-    function toRoman(num) {
+    function toRoman(num: number): string {
         if (!num || num <= 0) return 'I';
         const romans = [
             [1000, 'M'],
@@ -412,17 +409,16 @@ function generateIAUName(type, parentBody = null) {
         return result;
     }
 
-    switch ((type || '').toLowerCase()) {
-        case 'star':
-        case 'sun':
+    switch (type) {
+        case BodyTypeEnum.Star:
             return hdCatalog();
-        case 'planet':
+        case BodyTypeEnum.Planet:
             return planetDesignation();
-        case 'asteroid':
+        case BodyTypeEnum.Asteroid:
             return asteroidDesignation();
-        case 'comet':
+        case BodyTypeEnum.Comet:
             return cometDesignation();
-        case 'moon':
+        case BodyTypeEnum.Moon:
             return moonName(parentBody);
         default:
             return provisional();
@@ -430,9 +426,10 @@ function generateIAUName(type, parentBody = null) {
 }
 
 // Function to create/update FPS counter texture
-function createFPSTexture(fps) {
+function createFPSTexture(fps: number) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
+    if (!context) return null;
 
     // Set canvas size
     canvas.width = 256;
@@ -462,6 +459,7 @@ function createFPSTexture(fps) {
 function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
+    if (!context) return null;
 
     // Set canvas size
     canvas.width = 700;
@@ -2100,6 +2098,7 @@ function createNewBody(
                 {
                     radius: newStarRadius,
                     pos: starPos,
+                    vel: new THREE.Vector3(0, 0, 0),
                     mass: newStarMass,
                     id: createUniqueId('star'),
                     name: generateIAUName('star'),

@@ -25,6 +25,9 @@ export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
  * so `main.js` remains the single place that loads texture assets.
  */
 export class Star extends CelestialBody {
+    fuel: number;
+    maxFuel: number;
+
     /**
      * Hook for the app (main.js) to inject a supernova factory.
      * This avoids importing `Supernova` here (it currently lives in main.js).
@@ -141,7 +144,11 @@ export class Star extends CelestialBody {
         // Create corona + glow + light (all scene-owned)
         this.corona = this.createCorona(options.radius + 1);
         this.sunGlow = this.createGlow(options.radius, this.baseColor.getHex());
-        this.sunLight = this.createLight(options.pos, options.lightIntensity, options.lightDistance);
+        this.sunLight = this.createLight(
+            options.pos,
+            options.lightIntensity,
+            options.lightDistance
+        );
 
         // Add ambient light (only once per Star instance)
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
@@ -677,12 +684,15 @@ export class Star extends CelestialBody {
 
             if (this.corona && this.corona.points) {
                 this.corona.points.visible = false;
+                this.corona.dispose();
                 this.scene.remove(this.corona.points);
+                this.corona = null;
             }
-
+            
             if (this.sunGlow) {
                 this.sunGlow.visible = false;
                 this.scene.remove(this.sunGlow);
+                this.sunGlow = null;
             }
 
             this.fuel = null;

@@ -37,7 +37,6 @@ export class BlackHole extends CelestialBody {
             500
         );
 
-        this.isBlackHole = true;
         this.eventHorizonRadius = EVENT_HORIZON_RADIUS;
 
         // Make mesh pitch black and emissive
