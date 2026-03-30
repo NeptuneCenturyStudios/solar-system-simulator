@@ -40,8 +40,9 @@ export class Comet extends CelestialBody {
     private tailMat: THREE.PointsMaterial | null;
     private tailParticles: THREE.Points | null;
     private tailPos: Float32Array | null;
+    private tailColors: Float32Array | null;
     private tailOpacities: Float32Array | null;
-    private tailVelocities: { life: number; lifeIncrement: number; vel: THREE.Vector3 }[] | null;
+    private tailVelocities: { life: number; lifeIncrement: number; vel: THREE.Vector3; isBlue: boolean }[] | null;
 
     constructor(
         deps: ICelectialBodyDependencies,
@@ -82,6 +83,7 @@ export class Comet extends CelestialBody {
         this.tailCount = 800;
         this.tailGeo = new THREE.BufferGeometry();
         this.tailPos = new Float32Array(this.tailCount * 3);
+        this.tailColors = new Float32Array(this.tailCount * 3);
         this.tailOpacities = new Float32Array(this.tailCount);
         this.tailVelocities = [];
 
@@ -95,6 +97,7 @@ export class Comet extends CelestialBody {
         for (let i = 0; i < this.tailCount; i++) {
             // Initialize with random life values like corona does
             const life = Math.random();
+            const isBlue = Math.random() < 0.5;
 
             // Create velocity vector
             const velVec = awayFromSun
@@ -111,15 +114,22 @@ export class Comet extends CelestialBody {
             // Position particle along tail based on its life value
             // Simulate where it would be if it had been traveling
             const travelDistance = life * 200; // Approximate distance based on life
-            this.tailPos[i * 3] = options.pos.x + velVec.x * travelDistance;
-            this.tailPos[i * 3 + 1] = options.pos.y + velVec.y * travelDistance;
-            this.tailPos[i * 3 + 2] = options.pos.z + velVec.z * travelDistance;
+            const idx = i * 3;
+            this.tailPos[idx] = options.pos.x + velVec.x * travelDistance;
+            this.tailPos[idx + 1] = options.pos.y + velVec.y * travelDistance;
+            this.tailPos[idx + 2] = options.pos.z + velVec.z * travelDistance;
+
+            const color = isBlue ? new THREE.Color(0x7ab8ff) : new THREE.Color(0xffffff);
+            this.tailColors[idx] = color.r;
+            this.tailColors[idx + 1] = color.g;
+            this.tailColors[idx + 2] = color.b;
 
             // this.tailOpacities[i] = (1 - life) * 0.5; // Initial fade
-             this.tailVelocities[i] = { life: life, lifeIncrement: 0.001, vel: velVec };
+             this.tailVelocities[i] = { life: life, lifeIncrement: 0.001, vel: velVec, isBlue };
         }
 
         this.tailGeo.setAttribute('position', new THREE.BufferAttribute(this.tailPos, 3));
+        this.tailGeo.setAttribute('color', new THREE.BufferAttribute(this.tailColors, 3));
         this.tailMat = new THREE.PointsMaterial({
             color: 0xffffff,
             size: 2.5,
@@ -128,6 +138,7 @@ export class Comet extends CelestialBody {
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             depthTest: true,
+            vertexColors: true,
         });
         this.tailParticles = new THREE.Points(this.tailGeo, this.tailMat);
         this.tailParticles.frustumCulled = false;
@@ -148,6 +159,7 @@ export class Comet extends CelestialBody {
             !this.tailGeo ||
             !this.tailMat ||
             !this.tailPos ||
+            !this.tailColors ||
             !this.tailOpacities ||
             !this.tailVelocities
         ) {
@@ -213,6 +225,12 @@ export class Comet extends CelestialBody {
                 vel.vel.x = awayFromSunX * baseSpeed + (Math.random() - 0.5) * 0.2;
                 vel.vel.y = awayFromSunY * baseSpeed + (Math.random() - 0.5) * 0.2;
                 vel.vel.z = awayFromSunZ * baseSpeed + (Math.random() - 0.5) * 0.2;
+
+                vel.isBlue = Math.random() < 0.5;
+                const color = vel.isBlue ? new THREE.Color(0x7ab8ff) : new THREE.Color(0xffffff);
+                this.tailColors[idx] = color.r;
+                this.tailColors[idx + 1] = color.g;
+                this.tailColors[idx + 2] = color.b;
             }
 
             // Fade based on life ratio and intensity
@@ -220,6 +238,7 @@ export class Comet extends CelestialBody {
         }
 
         this.tailGeo.attributes.position.needsUpdate = true;
+        this.tailGeo.attributes.color.needsUpdate = true;
         // Make material opacity and size scale with distance
         this.tailMat.opacity = 0.01 + tailIntensity * .8
         // Larger particles when closer to sun for denser appearance
@@ -264,6 +283,7 @@ export class Comet extends CelestialBody {
         this.tailGeo = null;
         this.tailMat = null;
         this.tailPos = null;
+        this.tailColors = null;
         this.tailOpacities = null;
         this.tailVelocities = null;
     }
