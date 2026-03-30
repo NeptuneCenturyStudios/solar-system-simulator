@@ -24,7 +24,7 @@ export class Body {
     mesh: THREE.Mesh;
     label: THREE.Sprite | null = null;
     labelLine: THREE.Line | null = null;
-    protected bodyType: BodyTypeEnum;
+    bodyType: BodyTypeEnum;
     protected labelHeight = 0;
 
     constructor(

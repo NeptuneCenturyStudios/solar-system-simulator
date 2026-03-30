@@ -460,8 +460,8 @@ export class CelestialBody extends Body {
             moonMaterial,
             {
                 target: this,
-                spinAxisWorld: [0, 1, 0],
-                faceAxisLocal: [0, 0, 1],
+                spinAxisWorld: new THREE.Vector3(0, 1, 0),
+                faceAxisLocal: new THREE.Vector3(0, 0, 1),
                 angularSpeed: omega,
             }
         );

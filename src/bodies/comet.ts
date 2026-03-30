@@ -144,7 +144,6 @@ export class Comet extends CelestialBody {
         this.tailParticles.frustumCulled = false;
         
         this.scene.add(this.tailParticles);
-        this.tailParticles.visible = false;
     }
 
     update(acc: THREE.Vector3, dt: number) {

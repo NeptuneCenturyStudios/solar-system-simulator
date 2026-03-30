@@ -1,3 +1,5 @@
+import { Body } from '../bodies/body';
+
 // Bitwise flags for body classification (can be OR'd together)
 // Extended with Gas/Ice giants and dwarf planets for more detailed types
 export const BodyType = Object.freeze({
@@ -26,7 +28,6 @@ export enum BodyTypeEnum {
     IceGiant = 1 << 7,
     DwarfPlanet = 1 << 8,
     SpaceShip = 1 << 9,
-
 }
 
 // Shared body-type helper. Checks bodyType flags only.

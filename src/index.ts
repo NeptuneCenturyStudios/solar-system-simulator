@@ -247,8 +247,8 @@ function collisionScoreEscapeVelocity(body) {
         typeof body?.radius === 'number' && isFinite(body.radius) && body.radius > 0
             ? body.radius
             : typeof body?.eventHorizonRadius === 'number' && isFinite(body.eventHorizonRadius)
-                ? body.eventHorizonRadius
-                : 0;
+              ? body.eventHorizonRadius
+              : 0;
 
     const r = Math.max(1e-6, rawR);
 
@@ -376,7 +376,7 @@ function generateIAUName(type, parentBody = null) {
     function moonName(parent) {
         if (!parent) return `Moon ${provisional()}`;
         // Count existing moons that start with parent name (simple heuristic)
-        const existing = bodies.filter(
+        const existing = simulationState.bodies.filter(
             (b) => b.name && b.name.startsWith(parent.name + ' ')
         ).length;
         const roman = toRoman(existing + 1);
@@ -459,7 +459,7 @@ function createFPSTexture(fps) {
 }
 
 // Function to create/update body stats texture
-function createStatsTexture(body, bodiesArray = []) {
+function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
 
@@ -524,7 +524,7 @@ function createStatsTexture(body, bodiesArray = []) {
         drawStat(
             'Temperature: ',
             formatNumber(body.temperature, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-            'K',
+                'K',
             y
         );
         y += lineHeight;
@@ -772,7 +772,7 @@ const cameraState = {
     // Keep id string for legacy/debug, but camera behavior should not rely on it.
     focusID: 'camSun',
     // Canonical camera focus target (used when Look At is enabled)
-    focusBody: null,
+    focusBody: null as Body | null,
     offset: new THREE.Vector3(),
     lastPlanetAngle: 0,
     speed: 10,
@@ -790,7 +790,7 @@ const simulationState = {
     explosions: [] as ParticleExplosion[],
 };
 
-let selectedBody = null; // Track selected body for stats/management panel
+let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
 const dependencies = {
     gizmo: gizmo,
@@ -802,7 +802,7 @@ const dependencies = {
     },
     addBody: (body: CelestialBody) => {
         if (!body) return;
-        bodies.push(body);
+        simulationState.bodies.push(body);
 
         // Notify UI / systems that track live bodies
         try {
@@ -1161,7 +1161,8 @@ function getActiveContextHint() {
         };
     }
 
-    const selected = selectedBody && bodies.includes(selectedBody) ? selectedBody : null;
+    const selected =
+        selectedBody && simulationState.bodies.includes(selectedBody) ? selectedBody : null;
 
     const isFree = !!cameraState.isFreeCameraMode;
     const isTarget = !!cameraState.isTargetMode;
@@ -1249,16 +1250,16 @@ const lastPlanetAngle = 0;
 let isFreeCameraMode = false;
 let isMouseLookActive = false;
 let focusID = 'camSun';
-let manuallySelectedBody = null; // Track bodies clicked in space (without camera buttons)
+let manuallySelectedBody = null as Body | null; // Track bodies clicked in space (without camera buttons)
 const NONE_FOCUS_POSITION = new THREE.Vector3(0, 0, 0); // Center of solar system
 let isPaused = false;
 let savedTimeScale = 1.5;
 let lastT = performance.now();
-let bodies: Body[] = [];
+
 let supernovas: Supernova[] = []; // Track all supernova effects
 
 const isDragging = false;
-const dragTarget = null;
+const dragTarget = null as Body | null;
 let wasRunningBeforeDrag = false;
 const dragCameraOffset = new THREE.Vector3();
 const dragPlane = new THREE.Plane();
@@ -1328,12 +1329,6 @@ Object.defineProperty(window, 'lastT', {
     get: () => simulationState.lastT,
     set: (v) => {
         simulationState.lastT = v;
-    },
-});
-Object.defineProperty(window, 'bodies', {
-    get: () => simulationState.bodies,
-    set: (v) => {
-        simulationState.bodies = v;
     },
 });
 
@@ -1788,7 +1783,10 @@ function hidePositionIndicators() {
 }
 
 function getPrimaryStar() {
-    return bodies.find((b) => b && !b._isDisposed && isBodyType(b, BodyType.Star)) || null;
+    return (
+        simulationState.bodies.find((b) => b && !b._isDisposed && isBodyType(b, BodyType.Star)) ||
+        null
+    );
 }
 
 function syncPrimaryStarLightTarget() {
@@ -1796,17 +1794,17 @@ function syncPrimaryStarLightTarget() {
     if (!primaryStar || !primaryStar.sunLight || !primaryStar.sunLight.target) return;
 
     const activeLightTarget =
-        (selectedBody && bodies.includes(selectedBody) && !selectedBody._isDisposed
+        (selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
             ? selectedBody
             : manuallySelectedBody &&
-                bodies.includes(manuallySelectedBody) &&
+                simulationState.bodies.includes(manuallySelectedBody) &&
                 !manuallySelectedBody._isDisposed
-                ? manuallySelectedBody
-                : cameraState.focusBody &&
-                    bodies.includes(cameraState.focusBody) &&
-                    !cameraState.focusBody._isDisposed
-                    ? cameraState.focusBody
-                    : null) || null;
+              ? manuallySelectedBody
+              : cameraState.focusBody &&
+                  simulationState.bodies.includes(cameraState.focusBody) &&
+                  !cameraState.focusBody._isDisposed
+                ? cameraState.focusBody
+                : null) || null;
 
     if (activeLightTarget && activeLightTarget.mesh) {
         primaryStar.sunLight.target.position.copy(activeLightTarget.mesh.position);
@@ -1869,10 +1867,8 @@ function applyOrbitalTransforms(trajectory, orbitalAngleDeg, inclinationDeg) {
     return { pos, vel };
 }
 
-
-
 function getRandomStarSpawnPosition() {
-    const hasAnyExistingStar = bodies.some(
+    const hasAnyExistingStar = simulationState.bodies.some(
         (b) => b && !b._isDisposed && isBodyType(b, BodyType.Star)
     );
 
@@ -1885,7 +1881,7 @@ function getRandomStarSpawnPosition() {
     return new THREE.Vector3(
         Math.cos(randomAngle) * spawnRadius,
         (Math.random() - 0.5) * ySpread,
-        Math.sin(randomAngle) * spawnRadius,
+        Math.sin(randomAngle) * spawnRadius
     );
 }
 
@@ -1900,8 +1896,10 @@ function createPresetBody(presetKey) {
         createNewBody('sun');
     }
 
-    const ensureEarth = () => bodies.find((b) => b && !b._isDisposed && b.name === 'Earth');
-    const ensureJupiter = () => bodies.find((b) => b && !b._isDisposed && b.name === 'Jupiter');
+    const ensureEarth = () =>
+        simulationState.bodies.find((b) => b && !b._isDisposed && b.name === 'Earth');
+    const ensureJupiter = () =>
+        simulationState.bodies.find((b) => b && !b._isDisposed && b.name === 'Jupiter');
 
     let newBody = null;
 
@@ -1959,12 +1957,11 @@ function createPresetBody(presetKey) {
             if (!earth) {
                 earth = new Earth(dependencies, scene);
 
-                bodies.push(earth);
+                simulationState.bodies.push(earth);
 
                 newBody = earth.createMoon(scene, {
                     distance: MOON_DIST_FROM_EARTH,
                     radius: MOON_RADIUS,
-                    color: 0xaaaaaa,
                     mass: MOON_MASS,
                     id: createUniqueId('moon'),
                     name: 'Moon',
@@ -2006,7 +2003,7 @@ function createPresetBody(presetKey) {
 
     if (!newBody) return;
 
-    bodies.push(newBody);
+    simulationState.bodies.push(newBody);
 
     // Notify UI / systems that track live bodies
     try {
@@ -2058,7 +2055,7 @@ function createNewBody(
     customRadius = null
 ) {
     let newBody;
-    
+
     switch (bodyType) {
         case 'sun': {
             // Create a custom STAR.
@@ -2158,29 +2155,29 @@ function createNewBody(
                 typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
                     ? customRadius
                     : isSolidPlanet
-                        ? 5 + Math.random() * 10
-                        : 18 + Math.random() * 24;
+                      ? 5 + Math.random() * 10
+                      : 18 + Math.random() * 24;
 
             const planetMass =
                 typeof customMass === 'number' && isFinite(customMass) && customMass > 0
                     ? customMass
                     : isSolidPlanet
-                        ? 50 + Math.random() * 500
-                        : isGasGiant
-                            ? 4000 + Math.random() * 26000
-                            : 1200 + Math.random() * 7000;
+                      ? 50 + Math.random() * 500
+                      : isGasGiant
+                        ? 4000 + Math.random() * 26000
+                        : 1200 + Math.random() * 7000;
 
             const planetTexturePool = isGasGiant
                 ? fictionalGasTextures
                 : isIceGiant
-                    ? fictionalIceTextures
-                    : fictionalTextures;
+                  ? fictionalIceTextures
+                  : fictionalTextures;
 
             const customPlanetBodyType = isGasGiant
                 ? BodyType.GasGiant
                 : isIceGiant
-                    ? BodyType.IceGiant
-                    : BodyType.Planet;
+                  ? BodyType.IceGiant
+                  : BodyType.Planet;
 
             const planetMaterial = new THREE.MeshStandardMaterial({
                 map: pickRandom(planetTexturePool),
@@ -2238,7 +2235,11 @@ function createNewBody(
         case 'moon':
             // Create a moon orbiting the currently focused body
             const focusedBody = getFocusObject();
-            if (focusedBody && bodies.includes(focusedBody) && !focusedBody._isDisposed) {
+            if (
+                focusedBody &&
+                simulationState.bodies.includes(focusedBody) &&
+                !focusedBody._isDisposed
+            ) {
                 const moonDistance =
                     focusedBody.radius * 5 + Math.random() * focusedBody.radius * 10;
 
@@ -2341,7 +2342,7 @@ function createNewBody(
             const asteroidDistance =
                 ASTEROID_SPAWN_MIN_DIST * SCALE_FACTOR +
                 Math.random() *
-                ((ASTEROID_SPAWN_MAX_DIST - ASTEROID_SPAWN_MIN_DIST) * SCALE_FACTOR);
+                    ((ASTEROID_SPAWN_MAX_DIST - ASTEROID_SPAWN_MIN_DIST) * SCALE_FACTOR);
 
             // Use appropriate trajectory calculation based on orbit type
             let asteroidTrajectory;
@@ -2408,7 +2409,7 @@ function createNewBody(
     }
 
     if (newBody) {
-        bodies.push(newBody);
+        simulationState.bodies.push(newBody);
 
         // Notify UI / systems that track live bodies
         try {
@@ -2464,10 +2465,10 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
 
     // Unified cleanup: always dispose existing bodies (stars included).
     // No special-casing is required here; Star.die(true) is already the canonical disposal path.
-    for (const b of bodies || []) {
+    for (const b of simulationState.bodies || []) {
         if (!b || b._isDisposed) continue;
         try {
-            b.die(true);
+            b.die();
         } catch (e) {
             console.error('Error disposing body during spawn loop:', e);
         }
@@ -2499,30 +2500,30 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         mode === SimulationStartMode.Empty
             ? null
             : new Star(
-                dependencies,
-                scene,
-                {
-                    radius: SUN_RADIUS,
-                    pos: new THREE.Vector3(0, 0, 0),
-                    mass: SUN_MASS,
-                    id: createUniqueId('sun'),
-                    name: 'Sun',
-                    temperature: 5778,
-                    lightIntensity: 500000000,
-                    lightDistance: 524400,
-                },
-                {
-                    sunTexture,
-                    redStarTexture,
-                    orangeStarTexture,
-                    whiteStarTexture,
-                    blueStarTexture,
-                    whiteDwarfTexture,
-                }
-            );
+                  dependencies,
+                  scene,
+                  {
+                      radius: SUN_RADIUS,
+                      pos: new THREE.Vector3(0, 0, 0),
+                      mass: SUN_MASS,
+                      id: createUniqueId('sun'),
+                      name: 'Sun',
+                      temperature: 5778,
+                      lightIntensity: 500000000,
+                      lightDistance: 524400,
+                  },
+                  {
+                      sunTexture,
+                      redStarTexture,
+                      orangeStarTexture,
+                      whiteStarTexture,
+                      blueStarTexture,
+                      whiteDwarfTexture,
+                  }
+              );
 
     // Reset bodies array depending on mode
-    bodies = [];
+    simulationState.bodies = [];
 
     // Notify UI / systems that track live bodies
     try {
@@ -2538,21 +2539,21 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     }
 
     // Default mode: build the solar system
-    bodies = [primaryStar];
+    simulationState.bodies = [primaryStar];
     syncPrimaryStarLightTarget();
 
     // Mercury
-    bodies.push(new Mercury(dependencies, scene));
+    simulationState.bodies.push(new Mercury(dependencies, scene));
 
     // Venus
-    bodies.push(new Venus(dependencies, scene));
+    simulationState.bodies.push(new Venus(dependencies, scene));
 
     // Earth
     const earth = new Earth(dependencies, scene);
-    bodies.push(earth);
+    simulationState.bodies.push(earth);
 
     // Moon
-    bodies.push(
+    simulationState.bodies.push(
         earth.createMoon(scene, {
             distance: MOON_DIST_FROM_EARTH,
             radius: MOON_RADIUS, // 0.273 × Earth
@@ -2567,7 +2568,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     );
 
     // Mars
-    bodies.push(new Mars(dependencies, scene));
+    simulationState.bodies.push(new Mars(dependencies, scene));
 
     // Ceres - largest asteroid (dwarf planet), ~2.77 AU in real life
     const ceresAngle = Math.random() * Math.PI * 2;
@@ -2588,7 +2589,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         maxTrail: 2000,
         roughness: 0.9,
     });
-    bodies.push(ceres);
+    simulationState.bodies.push(ceres);
 
     // Vesta - second most massive asteroid, ~2.36 AU
     const vestaAngle = Math.random() * Math.PI * 2;
@@ -2613,7 +2614,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         maxTrail: 1500,
         roughness: 0.9,
     });
-    bodies.push(vesta);
+    simulationState.bodies.push(vesta);
 
     // Pallas - third most massive, ~2.77 AU
     const pallasAngle = Math.random() * Math.PI * 2;
@@ -2638,7 +2639,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         maxTrail: 1500,
         roughness: 0.9,
     });
-    bodies.push(pallas);
+    simulationState.bodies.push(pallas);
 
     // Hygiea - fourth largest, ~3.14 AU
     const hygieaAngle = Math.random() * Math.PI * 2;
@@ -2663,14 +2664,14 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         maxTrail: 1500,
         roughness: 0.9,
     });
-    bodies.push(hygiea);
+    simulationState.bodies.push(hygiea);
 
     // Jupiter
     const jupiter = new Jupiter(dependencies, scene, jupiterTexture);
-    bodies.push(jupiter);
+    simulationState.bodies.push(jupiter);
 
     // Io (innermost Galilean moon) - Start at 0 degrees
-    bodies.push(
+    simulationState.bodies.push(
         jupiter.createMoon(scene, {
             angle: 0,
             distance: IO_DIST_FROM_JUPITER,
@@ -2687,7 +2688,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     );
 
     // Europa - Start at 90 degrees
-    bodies.push(
+    simulationState.bodies.push(
         jupiter.createMoon(scene, {
             angle: Math.PI / 2,
             distance: EUROPA_DIST_FROM_JUPITER,
@@ -2704,7 +2705,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     );
 
     // Ganymede (largest moon in solar system) - Start at 180 degrees
-    bodies.push(
+    simulationState.bodies.push(
         jupiter.createMoon(scene, {
             angle: Math.PI,
             distance: GANYMEDE_DIST_FROM_JUPITER,
@@ -2721,7 +2722,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     );
 
     // Callisto (outermost Galilean moon) - Start at 270 degrees
-    bodies.push(
+    simulationState.bodies.push(
         jupiter.createMoon(scene, {
             angle: (Math.PI * 3) / 2,
             distance: CALLISTO_DIST_FROM_JUPITER,
@@ -2738,19 +2739,19 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     );
 
     // Saturn
-    bodies.push(new Saturn(dependencies, scene, saturnTexture));
+    simulationState.bodies.push(new Saturn(dependencies, scene, saturnTexture));
 
     // Uranus
-    bodies.push(new Uranus(dependencies, scene, uranusTexture));
+    simulationState.bodies.push(new Uranus(dependencies, scene, uranusTexture));
 
     // Neptune
-    bodies.push(new Neptune(dependencies, scene, neptuneTexture));
+    simulationState.bodies.push(new Neptune(dependencies, scene, neptuneTexture));
 
     // Pluto
-    bodies.push(new Pluto(dependencies, scene, plutoTexture));
+    simulationState.bodies.push(new Pluto(dependencies, scene, plutoTexture));
 
     // Comet
-    bodies.push(new Halley(dependencies, scene));
+    simulationState.bodies.push(new Halley(dependencies, scene));
 
     selectedBody = null;
 }
@@ -2794,11 +2795,11 @@ function togglePause() {
     }
 }
 
-function toggleShadows(enabled) {
+function toggleShadows(enabled: boolean) {
     renderer.shadowMap.enabled = enabled;
 
     // Update all celestial bodies
-    bodies.forEach((body) => {
+    simulationState.bodies.forEach((body) => {
         if (body && body.mesh) {
             if (isBodyType(body, BodyType.Star) && typeof body.setShadowsEnabled === 'function') {
                 // Call setShadowsEnabled on Star instances
@@ -2812,7 +2813,7 @@ function toggleShadows(enabled) {
     });
 }
 
-function onMouseDown(event) {
+function onMouseDown(event: MouseEvent) {
     // Surface mode RMB look uses the global mousemove handler (onSurfaceMouseMove).
     // Avoid engaging the generic pointer-lock mouse-look while on the surface.
     // Middle mouse button for velocity control when body is selected
@@ -2869,7 +2870,7 @@ function onMouseDown(event) {
 
             if (isFreeCameraMode) {
                 // Free camera: look at what's under the mouse
-                const allObjects = bodies.map((b) => b.mesh);
+                const allObjects = simulationState.bodies.map((b) => b.mesh);
                 const intersects = raycaster.intersectObjects(allObjects, false);
 
                 let lookAtPoint;
@@ -3010,8 +3011,8 @@ function onMouseDown(event) {
             activeAxis === 'x'
                 ? new THREE.Vector3(1, 0, 0)
                 : activeAxis === 'y'
-                    ? new THREE.Vector3(0, 1, 0)
-                    : new THREE.Vector3(0, 0, 1);
+                  ? new THREE.Vector3(0, 1, 0)
+                  : new THREE.Vector3(0, 0, 1);
 
         // Camera direction (from camera into the scene)
         const cameraDirection = new THREE.Vector3();
@@ -3063,9 +3064,10 @@ function onMouseDown(event) {
 
     // Check for Planets if no gizmo was clicked
     const bodyIntersects = raycaster.intersectObjects(
-        bodies.map((b) => b.mesh),
+        simulationState.bodies.map((b) => b.mesh),
         true
     );
+
     if (bodyIntersects.length > 0) {
         const clickedBody = bodyIntersects[0].object.userData.parentBody;
         if (clickedBody) {
@@ -3075,7 +3077,9 @@ function onMouseDown(event) {
             //    - Clicking the SAME body again should NOT zoom.
             //    - Clicking a DIFFERENT body should zoom.
             const prevSelectedBody =
-                selectedBody && bodies.includes(selectedBody) && !selectedBody._isDisposed
+                selectedBody &&
+                simulationState.bodies.includes(selectedBody) &&
+                !selectedBody._isDisposed
                     ? selectedBody
                     : null;
 
@@ -3146,7 +3150,9 @@ function onMouseMove(event) {
         raycaster.setFromCamera(mouse, camera);
 
         // Check if mouse is over another body for snapping
-        const otherBodies = bodies.filter((b) => b !== gizmo.target && !b?._isDisposed && b?.mesh);
+        const otherBodies = simulationState.bodies.filter(
+            (b) => b !== gizmo.target && !b?._isDisposed && b?.mesh
+        );
         const bodyIntersects = raycaster.intersectObjects(otherBodies.map((b) => b.mesh));
 
         if (bodyIntersects.length > 0) {
@@ -3245,8 +3251,8 @@ function onMouseMove(event) {
             activeAxis === 'x'
                 ? new THREE.Vector3(1, 0, 0)
                 : activeAxis === 'y'
-                    ? new THREE.Vector3(0, 1, 0)
-                    : new THREE.Vector3(0, 0, 1);
+                  ? new THREE.Vector3(0, 1, 0)
+                  : new THREE.Vector3(0, 0, 1);
 
         const startI = interactionState.dragStartIntersection || intersection;
         const startPos = interactionState.dragStartPosition || gizmo.target.mesh.position.clone();
@@ -3315,7 +3321,7 @@ function onMouseMove(event) {
             // - If a body is focused => orbit around it
             // - If no body is focused => behave like Look At OFF (center orbit)
             const focusObj = getFocusObject();
-            if (focusObj && bodies.includes(focusObj) && !focusObj._isDisposed) {
+            if (focusObj && simulationState.bodies.includes(focusObj) && !focusObj._isDisposed) {
                 const target = focusObj.mesh.position.clone();
                 const offset = camera.position.clone().sub(target);
 
@@ -3518,7 +3524,9 @@ function calcFitDistanceForBody(body) {
 
 function triggerZoomToBody(bodyOrNull) {
     const target =
-        bodyOrNull && bodies.includes(bodyOrNull) && !bodyOrNull._isDisposed ? bodyOrNull : null;
+        bodyOrNull && simulationState.bodies.includes(bodyOrNull) && !bodyOrNull._isDisposed
+            ? bodyOrNull
+            : null;
 
     if (!target) {
         const direction = new THREE.Vector3()
@@ -3538,7 +3546,9 @@ function triggerZoomToBody(bodyOrNull) {
 
 function setFocusBody(bodyOrNull, { zoom = false } = {}) {
     const body =
-        bodyOrNull && bodies.includes(bodyOrNull) && !bodyOrNull._isDisposed ? bodyOrNull : null;
+        bodyOrNull && simulationState.bodies.includes(bodyOrNull) && !bodyOrNull._isDisposed
+            ? bodyOrNull
+            : null;
     cameraState.focusBody = body;
 
     // Maintain selection pointers used by UI/gizmo
@@ -3683,11 +3693,11 @@ function animate() {
     // Physics integration loop
     for (let i = 0; i < steps; i++) {
         // Calculate accelerations for all bodies
-        for (const body of bodies) {
+        for (const body of simulationState.bodies) {
             const totalAcc = new THREE.Vector3(0, 0, 0);
 
             // Calculate pull from ALL OTHER bodies (n-body simulation)
-            for (const other of bodies) {
+            for (const other of simulationState.bodies) {
                 if (other !== body && !other?._isDisposed && other.mesh) {
                     const accFromOther = getAcc(
                         body.mesh.position,
@@ -3703,14 +3713,9 @@ function animate() {
         }
 
         // Apply accelerations to positions
-        for (const body of bodies) {
+        for (const body of simulationState.bodies) {
             if (body && !body._isDisposed && body.mesh) {
-                if (isBodyType(body, BodyType.Star)) {
-                    // Stars use the extended update signature
-                    body.update(body.tempAcc, dt, now);
-                } else {
-                    body.update(body.tempAcc, dt);
-                }
+                body.update(body.tempAcc, dt);
             }
         }
     }
@@ -3720,8 +3725,8 @@ function animate() {
         // NOTE: collision resolution can remove bodies from the `bodies` array mid-iteration.
         // Do NOT cache `bodies.length` (or rely on `bodies[j]` being non-undefined) in this loop.
         // Otherwise we can end up with `b1 === undefined` and crash on `b1.updateTrail()`.
-        for (let j = 0; j < bodies.length; j++) {
-            const b1 = bodies[j];
+        for (let j = 0; j < simulationState.bodies.length; j++) {
+            const b1 = simulationState.bodies[j];
             if (!b1) continue;
 
             // Update the trail position for b1
@@ -3731,8 +3736,8 @@ function animate() {
             if (b1._isDisposed || !b1.mesh) continue;
 
             // Collision Detection between all pairs of bodies
-            for (let k = j + 1; k < bodies.length; k++) {
-                const b2 = bodies[k];
+            for (let k = j + 1; k < simulationState.bodies.length; k++) {
+                const b2 = simulationState.bodies[k];
                 if (!b2 || b2._isDisposed || !b2.mesh) continue;
 
                 // Early distance culling - skip if bodies are too far apart to possibly collide
@@ -3772,7 +3777,7 @@ function animate() {
                     victim.die();
 
                     // Remove the dead body from simulation
-                    bodies = bodies.filter((b) => b !== victim);
+                    simulationState.bodies = simulationState.bodies.filter((b) => b !== victim);
 
                     // If primary star was destroyed, switch to None camera (legacy special-case)
                     if (victim === getPrimaryStar() && focusID === 'camSun') {
@@ -3789,18 +3794,12 @@ function animate() {
         }
     }
 
-    // Update tail visibility based on star existence
-    const hasSun = bodies.some((b) => b && !b._isDisposed && isBodyType(b, BodyType.Star));
-    for (const body of bodies) {
-        if (body.tailParticles) {
-            body.tailParticles.visible = hasSun;
-        }
-    }
-
     // Update material brightness based on distance from star (inverse square law)
-    const sunBody = bodies.find((b) => b && !b._isDisposed && isBodyType(b, BodyType.Star));
+    const sunBody = simulationState.bodies.find(
+        (b) => b && !b._isDisposed && isBodyType(b, BodyType.Star)
+    );
     if (sunBody) {
-        for (const body of bodies) {
+        for (const body of simulationState.bodies) {
             if (
                 body &&
                 !body._isDisposed &&
@@ -3916,7 +3915,7 @@ function animate() {
     // Update label scales based on distance from camera
     // Always update scale, visibility is controlled by checkbox
     const showNames = document.getElementById('showNames').checked;
-    bodies.forEach((body) => {
+    simulationState.bodies.forEach((body) => {
         if (body && !body._isDisposed && body.mesh && body.label) {
             body.label.visible = showNames;
             if (body.labelLine) {
@@ -3947,7 +3946,7 @@ function animate() {
         if (
             cameraState.isLookAtMode &&
             focusObj &&
-            bodies.includes(focusObj) &&
+            simulationState.bodies.includes(focusObj) &&
             !focusObj._isDisposed &&
             focusObj.mesh
         ) {
@@ -4007,12 +4006,12 @@ function animate() {
         // Update body stats if there's a selected body
         if (
             selectedBody &&
-            bodies.includes(selectedBody) &&
+            simulationState.bodies.includes(selectedBody) &&
             !selectedBody._isDisposed &&
             statsSprite
         ) {
             statsSprite.material.map.dispose();
-            statsSprite.material.map = createStatsTexture(selectedBody, bodies);
+            statsSprite.material.map = createStatsTexture(selectedBody, simulationState.bodies);
             statsSprite.material.needsUpdate = true;
             statsSprite.visible = true;
         } else if (statsSprite) {
@@ -4039,7 +4038,7 @@ function getFocusObject() {
     if (!cameraState.isLookAtMode) return null;
     if (!cameraState.focusBody) return null;
     return cameraState.focusBody &&
-        bodies.includes(cameraState.focusBody) &&
+        simulationState.bodies.includes(cameraState.focusBody) &&
         !cameraState.focusBody._isDisposed
         ? cameraState.focusBody
         : null;
@@ -4053,9 +4052,9 @@ function getOrbitAnchorPosition() {
     return focusObj && focusObj.mesh ? focusObj.mesh.position : NONE_FOCUS_POSITION;
 }
 
-function getBodyTypeLabel(b) {
+function getBodyTypeLabel(b: Body) {
     if (!b) return 'Unknown';
-    if (b.isBlackHole || b.bodyType & BodyType.BlackHole) return 'Black Hole';
+    if (b.bodyType & BodyType.BlackHole) return 'Black Hole';
     if (isBodyType(b, BodyType.Star)) return 'Star';
     if (b.bodyType && b.bodyType & BodyType.GasGiant) return 'Gas Giant';
     if (b.bodyType && b.bodyType & BodyType.IceGiant) return 'Ice Giant';
@@ -4069,7 +4068,7 @@ function getBodyTypeLabel(b) {
 
 function refreshBodiesTable() {
     if (!mainPanel) return;
-    const rows = bodies
+    const rows = simulationState.bodies
         .filter((b) => b && !b._isDisposed && b.mesh)
         .map((b) => ({
             name: b.name || 'Unnamed',
@@ -4141,10 +4140,10 @@ function clearCameraPresetHighlights() {
 // NOTE: Preset camera buttons were removed from the UI (replaced with toggles + bodies table).
 // The old `cameraChange` event path is intentionally removed to reduce dead code.
 
-function zoomRelativeToTarget(target, factor) {
+function zoomRelativeToTarget(target: Body, factor) {
     // target=null means "zoom around scene center" (used when Look At is OFF)
     const targetPos =
-        target && bodies.includes(target) && !target._isDisposed && target.mesh
+        target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
             ? target.mesh.position
             : NONE_FOCUS_POSITION;
 
@@ -4155,12 +4154,12 @@ function zoomRelativeToTarget(target, factor) {
 
     // Keep a sensible minimum distance so we don't clip into the body (only if we have a body target)
     const minDist =
-        target && bodies.includes(target) && !target._isDisposed
+        target && simulationState.bodies.includes(target) && !target._isDisposed
             ? Math.max((target.radius || 1) * 2.2, 10)
             : 10;
     const maxDist = MAX_ZOOM_OUT_DISTANCE;
     const targetDistance =
-        target && bodies.includes(target) && !target._isDisposed && target.mesh
+        target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
             ? target.mesh.position.length()
             : 0;
     const farLimit = Math.min(
@@ -4169,7 +4168,7 @@ function zoomRelativeToTarget(target, factor) {
     );
 
     const zoomInLimit =
-        target && bodies.includes(target) && !target._isDisposed
+        target && simulationState.bodies.includes(target) && !target._isDisposed
             ? Math.max((target.radius || 1) * 2.2, 10)
             : 10;
     const zoomOutLimit = farLimit;
@@ -4227,7 +4226,8 @@ const surfaceState = {
 };
 
 function isSurfaceEligibleBody(body) {
-    if (!body || !bodies.includes(body) || body._isDisposed || !body.mesh) return false;
+    if (!body || !simulationState.bodies.includes(body) || body._isDisposed || !body.mesh)
+        return false;
     if (isBodyType(body, BodyType.Star)) return false;
     if (body.isBlackHole || (body.bodyType && body.bodyType & BodyType.BlackHole)) return false;
     // require some minimum radius so we don't go crazy on tiny asteroids
@@ -4236,12 +4236,12 @@ function isSurfaceEligibleBody(body) {
 
 function updateSurfaceButtonEnabled() {
     const selected =
-        (selectedBody && bodies.includes(selectedBody) && !selectedBody._isDisposed
+        (selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
             ? selectedBody
             : null) ||
         (manuallySelectedBody &&
-            bodies.includes(manuallySelectedBody) &&
-            !manuallySelectedBody._isDisposed
+        simulationState.bodies.includes(manuallySelectedBody) &&
+        !manuallySelectedBody._isDisposed
             ? manuallySelectedBody
             : null);
 
@@ -4432,12 +4432,12 @@ mainPanel.on('surfaceCameraToggle', () => {
     }
 
     const selected =
-        (selectedBody && bodies.includes(selectedBody) && !selectedBody._isDisposed
+        (selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
             ? selectedBody
             : null) ||
         (manuallySelectedBody &&
-            bodies.includes(manuallySelectedBody) &&
-            !manuallySelectedBody._isDisposed
+        simulationState.bodies.includes(manuallySelectedBody) &&
+        !manuallySelectedBody._isDisposed
             ? manuallySelectedBody
             : null);
 
@@ -4462,12 +4462,12 @@ mainPanel.on('freeCameraToggle', () => {
     // - Selection should NEVER be cleared here.
     // - Gizmo should remain visible if Target is ON and a body is selected.
     const selected =
-        (selectedBody && bodies.includes(selectedBody) && !selectedBody._isDisposed
+        (selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
             ? selectedBody
             : null) ||
         (manuallySelectedBody &&
-            bodies.includes(manuallySelectedBody) &&
-            !manuallySelectedBody._isDisposed
+        simulationState.bodies.includes(manuallySelectedBody) &&
+        !manuallySelectedBody._isDisposed
             ? manuallySelectedBody
             : null);
 
@@ -4533,15 +4533,15 @@ if (enableSkydomeCheckbox) {
 }
 
 mainPanel.on('trailsChange', ({ checked }) => {
-    bodies.forEach((body) => {
-        if (body && body.trail) {
+    simulationState.bodies.forEach((body) => {
+        if (body && body instanceof CelestialBody) {
             body.trail.visible = checked;
         }
     });
 });
 
 mainPanel.on('namesChange', ({ checked }) => {
-    bodies.forEach((body) => {
+    simulationState.bodies.forEach((body) => {
         if (body && body.label) {
             body.label.visible = checked;
             if (body.labelLine) {
@@ -4584,7 +4584,7 @@ mainPanel.on('manageSystem', () => {
 
 // Manual selection from Bodies table
 mainPanel.on('manualBodySelect', ({ body }) => {
-    if (!body || !bodies.includes(body) || body._isDisposed) return;
+    if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
 
     // Clear any camera preset highlight (manual selection).
     // Do NOT clear LOOK AT / FREE / TARGET highlights, those are toggles with independent state.
@@ -4623,13 +4623,13 @@ mainPanel.on('targetToggle', () => {
     mainPanel.setTargetState(turningOn);
 
     const b =
-        selectedBody && bodies.includes(selectedBody) && !selectedBody._isDisposed
+        selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
             ? selectedBody
             : manuallySelectedBody &&
-                bodies.includes(manuallySelectedBody) &&
+                simulationState.bodies.includes(manuallySelectedBody) &&
                 !manuallySelectedBody._isDisposed
-                ? manuallySelectedBody
-                : null;
+              ? manuallySelectedBody
+              : null;
 
     if (turningOn) {
         if (b) {
@@ -4670,13 +4670,15 @@ mainPanel.on('lookAtToggle', () => {
 
     if (turningOn) {
         const b =
-            selectedBody && bodies.includes(selectedBody) && !selectedBody._isDisposed
+            selectedBody &&
+            simulationState.bodies.includes(selectedBody) &&
+            !selectedBody._isDisposed
                 ? selectedBody
                 : manuallySelectedBody &&
-                    bodies.includes(manuallySelectedBody) &&
+                    simulationState.bodies.includes(manuallySelectedBody) &&
                     !manuallySelectedBody._isDisposed
-                    ? manuallySelectedBody
-                    : null;
+                  ? manuallySelectedBody
+                  : null;
 
         // Look-at mode requires OrbitControls, so exit free camera mode if active
         if (isFreeCameraMode) {
@@ -4726,13 +4728,15 @@ mainPanel.on('lookAtToggle', () => {
         // Look At OFF does not force gizmo visibility; Target still controls it.
         if (cameraState.isTargetMode) {
             const b =
-                selectedBody && bodies.includes(selectedBody) && !selectedBody._isDisposed
+                selectedBody &&
+                simulationState.bodies.includes(selectedBody) &&
+                !selectedBody._isDisposed
                     ? selectedBody
                     : manuallySelectedBody &&
-                        bodies.includes(manuallySelectedBody) &&
+                        simulationState.bodies.includes(manuallySelectedBody) &&
                         !manuallySelectedBody._isDisposed
-                        ? manuallySelectedBody
-                        : null;
+                      ? manuallySelectedBody
+                      : null;
             if (b) gizmo.attach(b);
         }
     }
@@ -4939,14 +4943,14 @@ if (starDeathCheckbox) {
         // Update stats display if a body is currently selected
         if (selectedBody && statsSprite && statsSprite.visible) {
             statsSprite.material.map.dispose();
-            statsSprite.material.map = createStatsTexture(selectedBody, bodies);
+            statsSprite.material.map = createStatsTexture(selectedBody, simulationState.bodies);
             statsSprite.material.needsUpdate = true;
         }
     });
 }
 
 function deleteSelectedBody({ source = 'unknown' } = {}) {
-    if (!selectedBody || !bodies.includes(selectedBody) || selectedBody._isDisposed) return false;
+    if (!selectedBody || !simulationState.bodies.includes(selectedBody) || selectedBody._isDisposed) return false;
     const bodyToDelete = selectedBody;
 
     // Check if this body is the camera's current focus (legacy id check kept)
@@ -4960,8 +4964,8 @@ function deleteSelectedBody({ source = 'unknown' } = {}) {
         // Star.die(true) is the single cleanup path (no supernova/black hole for manual deletion).
         bodyToDelete.die(true);
 
-        const index = bodies.indexOf(bodyToDelete);
-        if (index > -1) bodies.splice(index, 1);
+        const index = simulationState.bodies.indexOf(bodyToDelete);
+        if (index > -1) simulationState.bodies.splice(index, 1);
 
         try {
             window.dispatchEvent(
@@ -4989,8 +4993,8 @@ function deleteSelectedBody({ source = 'unknown' } = {}) {
             console.error('Error dispatching body:removed event after deleting star:', e);
         }
 
-        const index = bodies.indexOf(bodyToDelete);
-        if (index > -1) bodies.splice(index, 1);
+        const index = simulationState.bodies.indexOf(bodyToDelete);
+        if (index > -1) simulationState.bodies.splice(index, 1);
 
         addEvent?.(`${bodyToDelete.name} deleted`);
 
@@ -5189,8 +5193,8 @@ function handleBodyBecameInvalid(body) {
     // We still clear selection pointers for the dead body.
     const collisionHandoffTarget =
         cameraState?.pendingCollisionFocusBody &&
-            bodies.includes(cameraState.pendingCollisionFocusBody) &&
-            !cameraState.pendingCollisionFocusBody._isDisposed
+        simulationState.bodies.includes(cameraState.pendingCollisionFocusBody) &&
+        !cameraState.pendingCollisionFocusBody._isDisposed
             ? cameraState.pendingCollisionFocusBody
             : null;
 
@@ -5255,7 +5259,7 @@ window.addEventListener('body:dead', (e) => {
         // Ensure truly-dead bodies are removed from the simulation array.
         // Collision deaths already remove immediately, but other death paths (e.g. star fuel death)
         // can emit `body:dead` without being spliced out here.
-        bodies = (bodies || []).filter((b) => b !== body);
+        simulationState.bodies = (simulationState.bodies || []).filter((b) => b !== body);
     }
 
     handleBodyBecameInvalid(body);
@@ -5356,7 +5360,7 @@ window.addEventListener('mouseup', onMouseUpWrapped);
 
 window.addEventListener(
     'keydown',
-    (e) => {
+    () => {
         if (modalBlocksInput()) return;
     },
     true
