@@ -15,6 +15,7 @@ export interface IBodyCreationOptions {
  * This class represents the basic body that has gravitational properties, update, and die methods.
  */
 export class Body {
+    readonly scene: THREE.Scene;
     readonly id: string;
     name: string;
     mass: number;
@@ -38,6 +39,7 @@ export class Body {
         name: string,
         bodyType: BodyTypeEnum
     ) {
+        this.scene = scene;
         this.mass = mass;
         this.velocity = new THREE.Vector3(...velocity);
         this.id = id;
@@ -144,6 +146,32 @@ export class Body {
         if (this._isDisposed) return;
 
         this._isDisposed = true;
+
+        // Dispose of the mesh and its resources
+        if (this.mesh) {
+            this.mesh.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    if (child.geometry) {
+                        console.info(`Disposing geometry for ${child.name || child.id}`);
+                        child.geometry.dispose();
+                    }
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach((mat) => {
+                                console.info(`Disposing material for ${child.name || child.id}`);
+                                mat.dispose();
+                            });
+                        } else {
+                            child.material.dispose();
+                        }
+                    }
+                }
+            });
+            
+            // Remove the mesh from the scene
+            this.scene.remove(this.mesh);
+        }
+
 
         try {
             window.dispatchEvent(
