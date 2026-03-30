@@ -306,7 +306,7 @@ export class Star extends CelestialBody {
         return light;
     }
 
-    update(acc, dt, _now) {
+    update(acc: THREE.Vector3, dt: number) {
         if (this._isDisposed) return;
 
         this._updateBirthEffect(dt);
@@ -446,8 +446,6 @@ export class Star extends CelestialBody {
 
                 if (this.dependencies?.addBody) {
                     this.dependencies.addBody(newBlackHole);
-                } else if (typeof window !== 'undefined' && Array.isArray(window.bodies)) {
-                    window.bodies.push(newBlackHole);
                 }
 
                 if (this.dependencies?.addEvent) {
@@ -629,7 +627,7 @@ export class Star extends CelestialBody {
 
         try {
             if (this.birthEffect) {
-                this.birthEffect.cleanup?.();
+                this.birthEffect.dispose();
                 this.birthEffect = null;
             }
             this.isBirthing = false;
@@ -772,7 +770,7 @@ export class Star extends CelestialBody {
             this.birthEffect.update?.(dt);
         } catch {
             try {
-                this.birthEffect.cleanup?.();
+                this.birthEffect.dispose();
             } catch {
                 // ignore
             }
@@ -792,7 +790,7 @@ export class Star extends CelestialBody {
             }
 
             try {
-                this.birthEffect.cleanup?.();
+                this.birthEffect.dispose();
             } catch {
                 // ignore
             }

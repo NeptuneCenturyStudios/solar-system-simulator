@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { IEffect } from './effect-base';
 
 /**
  * StarBirth
@@ -7,13 +8,29 @@ import * as THREE from 'three';
  * Implementation: particles converge into the star position + a central glow that ramps up.
  * This effect is intentionally decoupled from star death (supernova/collapse).
  */
-export class StarBirth {
+export class StarBirth implements IEffect {
+    active: boolean;
+    scene: THREE.Scene;
+    count: number;
+    positions: Float32Array;
+    points: THREE.Points;
+    geometry: THREE.BufferGeometry;
+    material: THREE.PointsMaterial;
+    velocities: THREE.Vector3[];
+    centralGlow: THREE.Mesh;
+    origin: THREE.Vector3;
+    birthTime: number;
+    duration: number;
+    isComplete: boolean;
+    colors: Float32Array;
+
     /**
      * @param {THREE.Scene} scene
      * @param {THREE.Vector3} pos
      * @param {number} radius
      */
     constructor(scene: THREE.Scene, pos: THREE.Vector3, radius: number) {
+        this.active = true;
         this.count = 1500; // Particles converging to form star
         this.geometry = new THREE.BufferGeometry();
         this.positions = new Float32Array(this.count * 3);
@@ -90,7 +107,7 @@ export class StarBirth {
         scene.add(this.centralGlow);
     }
 
-    update(dt) {
+    update(dt: number) {
         this.birthTime += dt;
         const progress = Math.min(this.birthTime / this.duration, 1.0);
         const p = this.geometry.attributes.position.array;
@@ -117,7 +134,8 @@ export class StarBirth {
         }
     }
 
-    cleanup() {
+    dispose() {
+        this.active = false;
         this.scene.remove(this.points);
         this.scene.remove(this.centralGlow);
         this.geometry.dispose();

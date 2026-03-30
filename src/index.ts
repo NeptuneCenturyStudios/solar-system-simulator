@@ -2490,7 +2490,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
 
     // Clean up all supernova effects
     for (const supernova of supernovas) {
-        supernova.cleanup();
+        supernova.dispose();
     }
     supernovas = [];
 
@@ -2504,6 +2504,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
                   {
                       radius: SUN_RADIUS,
                       pos: new THREE.Vector3(0, 0, 0),
+                      vel: new THREE.Vector3(0, 0, 0),
                       mass: SUN_MASS,
                       id: createUniqueId('sun'),
                       name: 'Sun',
@@ -3868,7 +3869,7 @@ function animate() {
     // Filter dead explosions
     simulationState.explosions = simulationState.explosions.filter((exp) => {
         exp.update(dtTotal);
-        return exp.alive;
+        return exp.active;
     });
 
     // Update all supernovas (remove those that have collapsed)
@@ -3876,8 +3877,8 @@ function animate() {
         const supernova = supernovas[i];
         supernova.update(dtTotal);
         // If supernova has collapsed (for black hole formation), clean it up
-        if (!supernova.alive) {
-            supernova.cleanup();
+        if (!supernova.active) {
+            supernova.dispose();
             supernovas.splice(i, 1);
         }
     }
@@ -4041,14 +4042,6 @@ function getFocusObject() {
         !cameraState.focusBody._isDisposed
         ? cameraState.focusBody
         : null;
-}
-
-function getOrbitAnchorPosition() {
-    // The point OrbitControls (and mouse-look orbit) should revolve around.
-    // - Look At OFF => center scene
-    // - Look At ON  => selected body (if alive), otherwise center scene
-    const focusObj = getFocusObject();
-    return focusObj && focusObj.mesh ? focusObj.mesh.position : NONE_FOCUS_POSITION;
 }
 
 function getBodyTypeLabel(b: Body) {
@@ -4328,7 +4321,7 @@ function updateSurfaceCameraTransform() {
     if (
         !surfaceState.isActive ||
         !surfaceState.body ||
-        !bodies.includes(surfaceState.body) ||
+        !simulationState.bodies.includes(surfaceState.body) ||
         surfaceState.body._isDisposed
     )
         return;
@@ -4781,12 +4774,12 @@ managementPanel.on('createPresetBody', ({ presetKey }) => {
 
 function refreshSelectionVisuals() {
     // Recompute gizmo scale immediately when selected body properties change (e.g., star mass -> radius)
-    if (!selectedBody || !bodies.includes(selectedBody) || selectedBody._isDisposed) return;
+    if (!selectedBody || !simulationState.bodies.includes(selectedBody) || selectedBody._isDisposed) return;
     gizmo.attach(selectedBody);
 }
 
 function keepCameraDistanceOnBodyScaleChange(body, oldRadius, newRadius) {
-    if (!body || !bodies.includes(body) || body._isDisposed) return;
+    if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
     if (!oldRadius || !newRadius || oldRadius <= 0 || newRadius <= 0) return;
 
     // If we're in free cam mode, do nothing (controls are disabled and we shouldn't move the camera)
@@ -4828,7 +4821,7 @@ managementPanel.on(
         inclination,
         color,
     }) => {
-        if (!body || !bodies.includes(body) || body._isDisposed) return;
+        if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
 
         // Update name
         if (name !== null && name !== '') {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { IEffect } from './effect-base';
 
 /**
  * Reusable star corona particle effect.
@@ -6,8 +7,9 @@ import * as THREE from 'three';
  * Owns its geometry/material/scene attachment and supports radius/color updates
  * without forcing Star to manage the particle internals directly.
  */
-export class Corona {
+export class Corona implements IEffect {
     scene: THREE.Scene;
+    active: boolean;
     points: THREE.Points;
     count: number;
     pArr: Float32Array;
@@ -22,6 +24,7 @@ export class Corona {
 
     constructor(scene: THREE.Scene, radius: number, glowHex = 0xffffcc) {
         this.scene = scene;
+        this.active = true;
         this.count = 1500;
         this.radius = radius;
         this.pArr = new Float32Array(this.count * 3);
@@ -91,8 +94,7 @@ export class Corona {
     }
 
     update(dt: number) {
-        const tScale = typeof window !== 'undefined' ? window.timeScale : 1;
-        if (!dt || tScale === 0) return;
+        if (!dt) return;
 
         const positionAttribute = this.geometry.attributes.position as THREE.BufferAttribute;
         const p = positionAttribute.array as Float32Array;
@@ -120,18 +122,15 @@ export class Corona {
         this.velocityVariation = 0.25 * scaleFactor;
         this.material.size = 3.5 * scaleFactor;
 
-        const tScale = typeof window !== 'undefined' ? window.timeScale : 1;
-        if (tScale !== 0) {
-            const s = prevRadius > 0 ? radius / prevRadius : 1;
-            if (Number.isFinite(s) && s > 0 && s !== 1) {
-                for (let i = 0; i < this.count; i++) {
-                    this.pArr[i * 3] *= s;
-                    this.pArr[i * 3 + 1] *= s;
-                    this.pArr[i * 3 + 2] *= s;
-                }
-
-                (this.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+        const s = prevRadius > 0 ? radius / prevRadius : 1;
+        if (Number.isFinite(s) && s > 0 && s !== 1) {
+            for (let i = 0; i < this.count; i++) {
+                this.pArr[i * 3] *= s;
+                this.pArr[i * 3 + 1] *= s;
+                this.pArr[i * 3 + 2] *= s;
             }
+
+            (this.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
         }
     }
 

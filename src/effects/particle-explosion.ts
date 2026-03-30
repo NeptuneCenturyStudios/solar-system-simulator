@@ -1,12 +1,24 @@
 import * as THREE from 'three';
+import { IEffect } from './effect-base';
 
-export class ParticleExplosion {
+export class ParticleExplosion implements IEffect {
+    active: boolean;
+    scene: THREE.Scene;
+    points: THREE.Points;
+    geometry: THREE.BufferGeometry;
+    material: THREE.PointsMaterial;
+    velocities: THREE.Vector3[];
+    flashSphere: THREE.Mesh | null;
+    flashOpacity: number;
+    count: number;
+    positions: Float32Array;
+
     constructor(scene, pos, color, radius = 10) {
         this.count = 800; // 4x more particles
         this.geometry = new THREE.BufferGeometry();
         this.positions = new Float32Array(this.count * 3);
         this.velocities = [];
-        this.alive = true;
+        this.active = true;
         this.opacity = 1.0;
         this.scene = scene;
 
@@ -49,7 +61,8 @@ export class ParticleExplosion {
         scene.add(this.flashSphere);
         this.flashOpacity = 1.0;
     }
-    update(dt) {
+
+    update(dt: number) {
         // Use absolute value of dt so explosion always plays forward regardless of time direction
         dt = Math.abs(dt);
 
@@ -82,7 +95,7 @@ export class ParticleExplosion {
         }
         this.geometry.attributes.position.needsUpdate = true;
         if (this.opacity <= 0) {
-            this.alive = false;
+            this.active = false;
             this.scene.remove(this.points);
 
             // flashSphere may already be cleaned up above
@@ -97,5 +110,9 @@ export class ParticleExplosion {
             this.geometry.dispose();
             this.material.dispose();
         }
+    }
+
+    dispose() {
+        // TODO: This method should be called by the manager when active becomes false, to ensure all resources are freed.
     }
 }

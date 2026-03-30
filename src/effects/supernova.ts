@@ -1,6 +1,8 @@
 import * as THREE from 'three';
+import { IEffect } from './effect-base';
 
-export class Supernova {
+export class Supernova implements IEffect {
+    active: boolean;
     constructor(scene, pos, radius, shouldCollapse = false) {
         this.count = 20000; // Even more particles for maximum density
         this.geometry = new THREE.BufferGeometry();
@@ -10,7 +12,7 @@ export class Supernova {
         this.sizes = new Float32Array(this.count);
         this.velocities = [];
         this.maxDistances = []; // Each particle has its own stopping distance
-        this.alive = true; // Always alive - persists until respawn
+        this.active = true;
         this.scene = scene;
         this.expandTime = 0;
         this.origin = pos.clone(); // Store origin for distance calculation
@@ -139,7 +141,7 @@ export class Supernova {
         }
     }
 
-    update(dt) {
+    update(dt: number) {
         // Use absolute time for supernova so it always progresses forward
         const absDt = Math.abs(dt);
         this.expandTime += absDt;
@@ -246,12 +248,12 @@ export class Supernova {
                 }
             }
             if (allAbsorbed) {
-                this.alive = false; // Mark for cleanup
+                this.active = false; // Mark for cleanup
             }
         }
     }
 
-    cleanup() {
+    dispose() {
         // Manual cleanup called on respawn
         if (this.points && this.points.parent) {
             this.scene.remove(this.points);
