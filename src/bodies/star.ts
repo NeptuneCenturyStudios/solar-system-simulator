@@ -684,7 +684,6 @@ export class Star extends CelestialBody {
 
             if (this.corona && this.corona.points) {
                 this.corona.points.visible = false;
-                this.corona.dispose();
                 this.scene.remove(this.corona.points);
                 this.corona = null;
             }
