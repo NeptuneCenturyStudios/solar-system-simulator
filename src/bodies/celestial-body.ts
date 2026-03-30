@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Body, IBodyCreationOptions } from './body.js';
 import { moonTexture, fictionalTextures } from '../drawing/textures.js';
-import { isBodyType, BodyType, pickRandom, BodyTypeEnum } from '../utilities/utilities.js';
+import { BodyType, pickRandom, BodyTypeEnum } from '../utilities/utilities.js';
 import { calculateTrajectory, IRotation } from '../physics/physics.js';
 import { ParticleExplosion } from '../effects/particle-explosion.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
@@ -14,6 +14,11 @@ export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
 
 export interface ICelectialBodyDependencies {
     addEvent: (message: string) => void;
+    addExplosion: (explosion: ParticleExplosion) => void;
+    gizmo: {
+        target: CelestialBody | null;
+        attach: (body: CelestialBody | null) => void;
+    };
 }
 
 export interface ITidalLockOptions {
@@ -188,6 +193,12 @@ export class CelestialBody extends Body {
             scene.add(this.rings);
         }
     }
+
+    /**
+     * Handles the death of the celestial body, including optional explosion effects.
+     * @param skipExplosion Whether to skip the explosion effect.
+     * @returns void
+     */
     die(skipExplosion = false) {
         if (this._isDisposed) return;
 
@@ -208,13 +219,7 @@ export class CelestialBody extends Body {
                     this.radius
                 );
 
-                // Prefer dependency-injected explosion hook (main.js uses this)
-                if (this.deps && typeof this.deps.addExplosion === 'function') {
-                    this.deps.addExplosion(exp);
-                } else if (typeof explosions !== 'undefined' && Array.isArray(explosions)) {
-                    // Back-compat fallback if a global exists
-                    explosions.push(exp);
-                }
+                this.deps.addExplosion(exp);
 
                 triggerScreenFlash();
             } catch {
@@ -222,25 +227,15 @@ export class CelestialBody extends Body {
             }
         }
 
-        const disposeMaterial = (mat) => {
+        const disposeMaterial = (mat: THREE.Material | null) => {
             if (!mat) return;
-            const disposeTex = (t) => {
+            const disposeTex = (t: THREE.Texture | null) => {
                 try {
                     if (t && typeof t.dispose === 'function') t.dispose();
                 } catch {
                     // ignore
                 }
             };
-
-            // Common texture slots we use in this project
-            disposeTex(mat.map);
-            disposeTex(mat.emissiveMap);
-            disposeTex(mat.alphaMap);
-            disposeTex(mat.roughnessMap);
-            disposeTex(mat.metalnessMap);
-            disposeTex(mat.normalMap);
-            disposeTex(mat.bumpMap);
-            disposeTex(mat.aoMap);
 
             try {
                 if (typeof mat.dispose === 'function') mat.dispose();
@@ -249,7 +244,7 @@ export class CelestialBody extends Body {
             }
         };
 
-        const disposeObject3D = (obj) => {
+        const disposeObject3D = (obj: THREE.Object3D | null) => {
             if (!obj) return;
             obj.traverse((child) => {
                 if (child.geometry && typeof child.geometry.dispose === 'function') {
