@@ -8,7 +8,6 @@ export interface IBodyCreationOptions {
     mass: number;
     id: string;
     name: string;
-
 }
 
 /**
@@ -26,6 +25,7 @@ export class Body {
     labelLine: THREE.Line | null = null;
     bodyType: BodyTypeEnum;
     protected labelHeight = 0;
+    tempAcc?: THREE.Vector3;
 
     constructor(
         dependencies: object,
@@ -171,7 +171,6 @@ export class Body {
             // Remove the mesh from the scene
             this.scene.remove(this.mesh);
         }
-
 
         try {
             window.dispatchEvent(

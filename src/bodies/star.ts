@@ -29,6 +29,7 @@ export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
 export class Star extends CelestialBody {
     fuel: number;
     maxFuel: number;
+    temperature: number;
 
     /**
      * Hook for the app (main.js) to inject a supernova factory.

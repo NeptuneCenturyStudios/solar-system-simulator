@@ -48,7 +48,13 @@ import {
     HYGIEA_RADIUS,
 } from './utilities/consts.js';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo.js';
-import { isBodyType, BodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities.js';
+import {
+    isBodyType,
+    BodyType,
+    pickRandom,
+    createUniqueId,
+    BodyTypeEnum,
+} from './utilities/utilities.js';
 import { calculateTrajectory } from './physics/physics.js';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
 import { Supernova } from './effects/supernova.js';
@@ -75,7 +81,6 @@ import { ManagementPanel } from './ui/management-panel.js';
 import { StartupModal } from './ui/startup-modal.js';
 import { EventLogEntry } from './event-log/event-log.js';
 import { Halley } from './bodies/halley.js';
-import { instance } from 'three/src/nodes/accessors/InstanceNode.js';
 import { IStateDependencies } from './interfaces.js';
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
@@ -155,7 +160,7 @@ function setBodyRadius(body: CelestialBody, newRadius: number) {
     // So the outer edge is roughly PLUTO_DIST + 300000.
     const MAX_RADIUS = PLUTO_DIST + 300000;
     newRadius = Math.min(newRadius, MAX_RADIUS);
-    
+
     const oldRadius = body.radius || 1;
 
     if (body instanceof Star) {
@@ -402,9 +407,9 @@ function generateIAUName(type: BodyTypeEnum, parentBody: Body | null = null) {
         let n = num;
         let result = '';
         for (const [val, sym] of romans) {
-            while (n >= val) {
+            while (n >= (val as number)) {
                 result += sym;
-                n -= val;
+                n -= val as number;
             }
         }
         return result;
@@ -476,7 +481,10 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     let y = 5;
 
     // Helper function to format numbers with locale separators and scientific notation for very small values
-    function formatNumber(num, options = {}) {
+    function formatNumber(
+        num: number,
+        options: { minimumFractionDigits?: number; maximumFractionDigits?: number } = {}
+    ) {
         const { minimumFractionDigits = 2, maximumFractionDigits = 2 } = options;
 
         if (!Number.isFinite(num)) return '—';
@@ -494,7 +502,8 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     }
 
     // Helper function to draw label + value right-aligned (normal font weight)
-    function drawStat(label, value, yPos) {
+    function drawStat(label: string, value: string | number, yPos: number) {
+        if (!context) return;
         context.font = '27px monospace';
         const text = label + value;
         context.fillText(text, canvas.width - rightPadding, yPos);
@@ -515,11 +524,13 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     y += lineHeight;
 
     // Radius
-    drawStat('Radius: ', formatNumber(body.radius), y);
-    y += lineHeight;
+    if (body instanceof CelestialBody) {
+        drawStat('Radius: ', formatNumber(body.radius), y);
+        y += lineHeight;
+    }
 
     // Temperature (for stars and stellar remnants)
-    if (body.temperature) {
+    if (body instanceof Star) {
         drawStat(
             'Temperature: ',
             formatNumber(body.temperature, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
@@ -530,13 +541,9 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     }
 
     // Fuel (for stars with fuel system, only if star death is enabled)
-    const starDeathEnabled = document.getElementById('enableStarDeath')?.checked || false;
-    if (
-        starDeathEnabled &&
-        isBodyType(body, BodyType.Star) &&
-        body.fuel !== null &&
-        body.maxFuel !== null
-    ) {
+    const starDeathEnabled =
+        (document.getElementById('enableStarDeath') as HTMLInputElement)?.checked || false;
+    if (starDeathEnabled && body instanceof Star && body.fuel !== null && body.maxFuel !== null) {
         const fuelPercent = ((body.fuel / body.maxFuel) * 100).toFixed(1);
         drawStat('Fuel: ', `${fuelPercent}%`, y);
         y += lineHeight;
@@ -619,7 +626,6 @@ const camera = new THREE.PerspectiveCamera(
     CAMERA_FAR_PLANE
 );
 const MAX_ZOOM_OUT_DISTANCE = camera.far * 0.8;
-const MIN_ZOOM_OUT_DISTANCE = Math.max(camera.near * 12, 1000 * SCALE_FACTOR);
 const MAX_CAMERA_VIEW_DISTANCE = camera.far * 0.98;
 const INITIAL_CAMERA_DISTANCE = 16388 * SCALE_FACTOR;
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); // Better depth precision at extreme scales
@@ -660,6 +666,7 @@ function addEvent(message: string) {
 function createEventLogTexture() {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
+    if (!context) return;
 
     canvas.width = 600;
     canvas.height = 250;
@@ -2028,14 +2035,25 @@ function createPresetBody(presetKey) {
 /**
  * Inject effect factories into body modules (keeps bodies decoupled from main.js-only effect impls).
  */
-Star.createSupernova = (dependencies: IStateDependencies, scene: THREE.Scene, pos: THREE.Vector3, radius: number, shouldCollapse: boolean) => {
+Star.createSupernova = (
+    dependencies: IStateDependencies,
+    scene: THREE.Scene,
+    pos: THREE.Vector3,
+    radius: number,
+    shouldCollapse: boolean
+) => {
     // `Supernova` is imported from ./effects/supernova.js.
     const supernova = new Supernova(dependencies, scene, pos, radius, shouldCollapse);
     supernovas.push(supernova);
     return supernova;
 };
 
-Star.createStarBirth = (dependencies: IStateDependencies, scene: THREE.Scene, pos: THREE.Vector3, radius: number) => {
+Star.createStarBirth = (
+    dependencies: IStateDependencies,
+    scene: THREE.Scene,
+    pos: THREE.Vector3,
+    radius: number
+) => {
     return new StarBirth(dependencies, scene, pos, radius);
 };
 
@@ -4773,7 +4791,8 @@ managementPanel.on('createPresetBody', ({ presetKey }) => {
 
 function refreshSelectionVisuals() {
     // Recompute gizmo scale immediately when selected body properties change (e.g., star mass -> radius)
-    if (!selectedBody || !simulationState.bodies.includes(selectedBody) || selectedBody._isDisposed) return;
+    if (!selectedBody || !simulationState.bodies.includes(selectedBody) || selectedBody._isDisposed)
+        return;
     gizmo.attach(selectedBody);
 }
 
@@ -4941,7 +4960,8 @@ if (starDeathCheckbox) {
 }
 
 function deleteSelectedBody({ source = 'unknown' } = {}) {
-    if (!selectedBody || !simulationState.bodies.includes(selectedBody) || selectedBody._isDisposed) return false;
+    if (!selectedBody || !simulationState.bodies.includes(selectedBody) || selectedBody._isDisposed)
+        return false;
     const bodyToDelete = selectedBody;
 
     // Check if this body is the camera's current focus (legacy id check kept)
