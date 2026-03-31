@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SHADOW_MAP_SIZE, SUN_MASS, SCALE_FACTOR } from '../utilities/consts.js';
+import { SHADOW_MAP_SIZE, SUN_MASS, SCALE_FACTOR, PLUTO_DIST } from '../utilities/consts.js';
 import { BodyType, BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body.js';
 import { BlackHole } from './black-hole.js';
@@ -364,7 +364,7 @@ export class Star extends CelestialBody {
             if (!isMassiveStar) {
                 if (fuelPercent < 0.3 && fuelPercent > 0) {
                     const expansionProgress = 1 - fuelPercent / 0.3;
-                    const STAR_MAX_RADIUS = 600000 * SCALE_FACTOR;
+                    const STAR_MAX_RADIUS = PLUTO_DIST;
 
                     const targetRadiusUnclamped = this.initialRadius * (1 + expansionProgress * 99);
                     const targetRadius = Math.min(targetRadiusUnclamped, STAR_MAX_RADIUS);
@@ -660,7 +660,7 @@ export class Star extends CelestialBody {
         if (this.sunGlow) {
             this.sunGlow.scale.setScalar(newRadius * 4.6);
         }
-        
+
         if (this.corona) {
             this.corona.setRadius(newRadius + 1);
         }

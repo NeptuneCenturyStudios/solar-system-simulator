@@ -785,6 +785,7 @@ const cameraState = {
     rotationSpeed: 0.002,
     keys: { w: false, a: false, s: false, d: false, c: false, space: false, shift: false },
     arrowKeys: { left: false, right: false, up: false, down: false },
+    pendingCollisionFocusBody: null as Body | null
 };
 
 const simulationState = {
@@ -1792,7 +1793,7 @@ function hidePositionIndicators() {
 
 function getPrimaryStar() {
     return (
-        simulationState.bodies.find((b) => b && !b._isDisposed && isBodyType(b, BodyType.Star)) ||
+        simulationState.bodies.find((b) => b && !b._isDisposed && b instanceof Star) as Star ||
         null
     );
 }
