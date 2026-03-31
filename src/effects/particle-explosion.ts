@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
+import { IStateDependencies } from '../interfaces';
 
 export class ParticleExplosion implements IEffect {
+    dependencies: IStateDependencies;
     active: boolean;
     scene: THREE.Scene;
     points: THREE.Points;
@@ -12,8 +14,11 @@ export class ParticleExplosion implements IEffect {
     flashOpacity: number;
     count: number;
     positions: Float32Array;
+    opacity: number;
 
-    constructor(scene, pos, color, radius = 10) {
+
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, pos: THREE.Vector3, color: number, radius = 10) {
+        this.dependencies = dependencies;
         this.count = 800; // 4x more particles
         this.geometry = new THREE.BufferGeometry();
         this.positions = new Float32Array(this.count * 3);

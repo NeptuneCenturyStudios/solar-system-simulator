@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
+import { IStateDependencies } from '../interfaces';
 
 /**
  * Reusable star corona particle effect.
@@ -8,6 +9,7 @@ import { IEffect } from './effect-base';
  * without forcing Star to manage the particle internals directly.
  */
 export class Corona implements IEffect {
+    dependencies: IStateDependencies;
     scene: THREE.Scene;
     active: boolean;
     points: THREE.Points;
@@ -22,7 +24,8 @@ export class Corona implements IEffect {
     private material: THREE.PointsMaterial;
     private geometry: THREE.BufferGeometry;
 
-    constructor(scene: THREE.Scene, radius: number, glowHex = 0xffffcc) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, radius: number, glowHex = 0xffffcc) {
+        this.dependencies = dependencies;
         this.scene = scene;
         this.active = true;
         this.count = 1500;

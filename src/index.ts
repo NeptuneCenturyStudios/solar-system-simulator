@@ -76,6 +76,7 @@ import { StartupModal } from './ui/startup-modal.js';
 import { EventLogEntry } from './event-log/event-log.js';
 import { Halley } from './bodies/halley.js';
 import { instance } from 'three/src/nodes/accessors/InstanceNode.js';
+import { IStateDependencies } from './interfaces.js';
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
 const uranusTexture = loadSrgbTexture('./assets/textures/uranus.jpg');
@@ -790,7 +791,7 @@ const simulationState = {
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
-const dependencies = {
+const dependencies: IStateDependencies = {
     gizmo: gizmo,
     addEvent: addEvent,
     addExplosion: (explosion: ParticleExplosion) => {
@@ -798,7 +799,7 @@ const dependencies = {
         // Push into the canonical explosions array that the main loop updates/filters
         simulationState.explosions.push(explosion);
     },
-    addBody: (body: CelestialBody) => {
+    addBody: (body: Body) => {
         if (!body) return;
         simulationState.bodies.push(body);
 
@@ -813,7 +814,9 @@ const dependencies = {
             console.error('Error adding body:', e);
         }
     },
+    getBodies: () => simulationState.bodies,
 };
+
 const VEL_SCALE = 546; // The multiplier used to visualize speed as arrow length (scaled)
 
 // --- Shared tuning constants ---
@@ -822,10 +825,6 @@ const SIM = Object.freeze({
     BASE_FRAME_DT: 0.016, // seconds (approx 60fps)
     DT_SCALE: 60, // existing convention: multiply by 60 to normalize to "frames"
 });
-
-// Backwards compatibility: legacy constants referenced elsewhere.
-// Prefer SIM + GIZMO_TUNING moving forward.
-const ARROW_SCALE = GIZMO_TUNING.VELOCITY_ARROW_SCALE;
 
 // --- Velocity editing arc helpers ---
 // NOTE: We use Line2 (fat lines) because LineBasicMaterial.linewidth is ignored on most WebGL platforms.
@@ -2029,15 +2028,15 @@ function createPresetBody(presetKey) {
 /**
  * Inject effect factories into body modules (keeps bodies decoupled from main.js-only effect impls).
  */
-Star.createSupernova = (scene, pos, radius, shouldCollapse) => {
+Star.createSupernova = (dependencies: IStateDependencies, scene: THREE.Scene, pos: THREE.Vector3, radius: number, shouldCollapse: boolean) => {
     // `Supernova` is imported from ./effects/supernova.js.
-    const supernova = new Supernova(scene, pos, radius, shouldCollapse);
+    const supernova = new Supernova(dependencies, scene, pos, radius, shouldCollapse);
     supernovas.push(supernova);
     return supernova;
 };
 
-Star.createStarBirth = (scene, pos, radius) => {
-    return new StarBirth(scene, pos, radius);
+Star.createStarBirth = (dependencies: IStateDependencies, scene: THREE.Scene, pos: THREE.Vector3, radius: number) => {
+    return new StarBirth(dependencies, scene, pos, radius);
 };
 
 function createNewBody(

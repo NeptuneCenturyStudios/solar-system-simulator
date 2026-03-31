@@ -2,9 +2,14 @@ import * as THREE from 'three';
 import { SUN_MASS } from '../utilities/consts.js';
 import { BodyType } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body.js';
+import { IRotation } from '../physics/physics.js';
+import { IStateDependencies } from '../interfaces.js';
 
 export class BlackHole extends CelestialBody {
-    static massToEventHorizonRadius(mass) {
+    dependencies: IStateDependencies;
+    eventHorizonRadius: number;
+
+    static massToEventHorizonRadius(mass: number) {
         // "Compress" a star's mass into a tiny sphere.
         // Baseline: at 3 solar masses, radius ~= 1 (much smaller than Earth in our sim units).
         const BASE_MASS = 3 * SUN_MASS;
@@ -18,7 +23,15 @@ export class BlackHole extends CelestialBody {
         return Math.max(0.25, r);
     }
 
-    constructor(dependencies, scene, pos, mass, id = 'blackHole', name = 'Black Hole') {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        pos: THREE.Vector3,
+        mass: number,
+        id = 'blackHole',
+        name = 'Black Hole',
+        rotation: IRotation
+    ) {
         const EVENT_HORIZON_RADIUS = BlackHole.massToEventHorizonRadius(mass);
         const BLACK_HOLE_COLOR = 0x000000; // Pure black
 
@@ -28,16 +41,19 @@ export class BlackHole extends CelestialBody {
             EVENT_HORIZON_RADIUS,
             BLACK_HOLE_COLOR,
             pos,
-            [0, 0, 0], // Black holes don't move initially
+            new THREE.Vector3(0, 0, 0),
             mass,
             id,
             name,
             BodyType.BlackHole,
             0xffffff,
-            500
+            500,
+            false,
+            rotation
         );
 
         this.eventHorizonRadius = EVENT_HORIZON_RADIUS;
+        this.dependencies = dependencies;
 
         // Make mesh pitch black and emissive
         this.mesh.material.color.setHex(0x000000);
@@ -147,7 +163,7 @@ export class BlackHole extends CelestialBody {
         return { points, vels, angularPositions, minRadius, maxRadius };
     }
 
-    updateAccretion(dt) {
+    updateAccretion(dt: number) {
         if (!this.accretion) return;
 
         const p = this.accretion.points.geometry.attributes.position.array;
@@ -220,7 +236,7 @@ export class BlackHole extends CelestialBody {
         }
     }
 
-    die(_skipExplosion = true) {
+    die() {
         // Clean up accretion disk
         if (this.accretion && this.accretion.points) {
             this.scene.remove(this.accretion.points);

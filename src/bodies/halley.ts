@@ -8,11 +8,11 @@ import {
     COMET_RADIUS,
 } from '../utilities/consts.js';
 
-import { ICelectialBodyDependencies } from './celestial-body.js';
 import { Comet } from './comet.js';
+import { IStateDependencies } from '../interfaces.js';
 
 export class Halley extends Comet {
-    constructor(deps: ICelectialBodyDependencies, scene: THREE.Scene) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         // Halley-like elliptical orbit
         const perihelion = COMET_PERIHELION_DIST; // Just outside Mars (scaled)
         const aphelion = COMET_APHELION_DIST; // Scaled
@@ -45,7 +45,7 @@ export class Halley extends Comet {
         });
 
         super(
-            deps,
+            dependencies,
             scene,
             {
                 pos: new THREE.Vector3(x, y, z),

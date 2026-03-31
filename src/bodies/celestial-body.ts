@@ -7,26 +7,18 @@ import { ParticleExplosion } from '../effects/particle-explosion.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 import { createTextTexture } from '../drawing/text-rendering.js';
+import { IStateDependencies } from '../interfaces.js';
 
 export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
     radius: number;
 }
 
 export interface IMoonCreationOptions extends ICelestialBodyCreationOptions {
- distance: number;
- angle?: number; // optional initial angle for multiple moons
- yVariation?: number; // optional random Y variation for non-coplanar orbits
- trailColor?: number;
- maxTrail?: number;
-}
-
-export interface ICelectialBodyDependencies {
-    addEvent: (message: string) => void;
-    addExplosion: (explosion: ParticleExplosion) => void;
-    gizmo: {
-        target: CelestialBody | null;
-        attach: (body: CelestialBody | null) => void;
-    };
+    distance: number;
+    angle?: number; // optional initial angle for multiple moons
+    yVariation?: number; // optional random Y variation for non-coplanar orbits
+    trailColor?: number;
+    maxTrail?: number;
 }
 
 export interface ITidalLockOptions {
@@ -40,7 +32,7 @@ export interface ITidalLockOptions {
  * This class represents a celestial body with physical properties, rendering capabilities, and optional features like rings, atmosphere, and tidal locking.
  */
 export class CelestialBody extends Body {
-    deps: ICelectialBodyDependencies;
+    deps: IStateDependencies;
     scene: THREE.Scene;
     radius: number;
     color: number;
@@ -65,7 +57,7 @@ export class CelestialBody extends Body {
     _tidalLockOmegaInitialized: boolean = false;
 
     constructor(
-        deps = {} as ICelectialBodyDependencies,
+        deps = {} as IStateDependencies,
         scene: THREE.Scene,
         radius: number,
         color: number,
@@ -79,17 +71,21 @@ export class CelestialBody extends Body {
         maxTrail = 500,
         hasRings = false,
         rotation: IRotation = { axis: new THREE.Vector3(0, 1, 0), speed: 0 },
-        geometryFactory: ((radius: number) => THREE.BufferGeometry) | null,
-        material: THREE.Material,
+        geometryFactory?: ((radius: number) => THREE.BufferGeometry),
+        material?: THREE.Material,
         tidalLock?: ITidalLockOptions
     ) {
-        const defaultMaterial = new THREE.MeshStandardMaterial({
-            color: color,
-            emissive: 0x000000,
-            emissiveIntensity: 0,
-            roughness: 0.7,
-            metalness: 0.7,
-        });
+
+        // Create a simple material if one isn't provided, using the specified color.
+        if (!material) {
+            material = new THREE.MeshStandardMaterial({
+                color: color,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                roughness: 0.7,
+                metalness: 0.7,
+            });
+        }
 
         // Default geometry is a sphere. Special bodies (e.g. Asteroids) can inject geometry via `geometryFactory`.
         const geometry =
@@ -97,18 +93,7 @@ export class CelestialBody extends Body {
                 ? geometryFactory(radius)
                 : new THREE.SphereGeometry(radius, 32, 32);
 
-        super(
-            deps,
-            scene,
-            mass,
-            pos,
-            vel,
-            geometry,
-            material ?? defaultMaterial,
-            id,
-            name,
-            bodyType
-        );
+        super(deps, scene, mass, pos, vel, geometry, material, id, name, bodyType);
 
         // Set dependencies
         this.deps = deps || {};
@@ -226,6 +211,7 @@ export class CelestialBody extends Body {
         if (!skipExplosion) {
             try {
                 const exp = new ParticleExplosion(
+                    this.deps,
                     this.scene,
                     this.mesh.position.clone(),
                     this.color,
@@ -259,7 +245,7 @@ export class CelestialBody extends Body {
         } else {
             this.trail?.material.dispose();
         }
-        
+
         // Dispoose of rings
         if (this.rings) {
             this.scene.remove(this.rings);
@@ -456,7 +442,7 @@ export class CelestialBody extends Body {
             config.maxTrail || 1500,
             false,
             { axis: new THREE.Vector3(0, 1, 0), speed: 0.15 + Math.random() * 0.35 },
-            null,
+            undefined,
             moonMaterial,
             {
                 target: this,

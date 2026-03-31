@@ -5,6 +5,7 @@ import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body.j
 import { BlackHole } from './black-hole.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
 import { Corona } from '../effects/corona.js';
+import { IStateDependencies } from '../interfaces.js';
 
 /**
  * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.
@@ -63,20 +64,18 @@ export class Star extends CelestialBody {
      * @param {THREE.Texture} textures.whiteDwarfTexture
      */
     constructor(
-        dependencies,
-        scene,
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
         options: IStarCreationOptions,
-        // {
-        //     radius,
-        //     pos,
-        //     mass,
-        //     id = 'camSun',
-        //     name = 'Sun',
-        //     temperature = 5778,
-        //     lightIntensity = 500000000,
-        //     lightDistance = 524400,
-        // },
-        textures
+
+        textures: {
+            sunTexture: THREE.Texture,
+            redStarTexture: THREE.Texture,
+            orangeStarTexture: THREE.Texture,
+            whiteStarTexture: THREE.Texture,
+            blueStarTexture: THREE.Texture,
+            whiteDwarfTexture: THREE.Texture
+        }
     ) {
         if (!textures) {
             throw new Error('Star requires textures to be injected');
@@ -133,7 +132,7 @@ export class Star extends CelestialBody {
         this.mesh.material.emissive.setHex(0xffffff);
         this.mesh.material.emissiveIntensity = 1.0;
 
-        this.corona = new Corona(scene, options.radius + 1, this.baseColor.getHex());
+        this.corona = new Corona(dependencies, scene, options.radius + 1, this.baseColor.getHex());
         this.sunGlow = this.createGlow(options.radius, this.baseColor.getHex());
         this.sunLight = this.createLight(
             options.pos,

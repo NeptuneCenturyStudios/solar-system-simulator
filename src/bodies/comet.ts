@@ -4,9 +4,9 @@ import { SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyType } from '../utilities/utilities.js';
 import {
     CelestialBody,
-    ICelectialBodyDependencies,
     ICelestialBodyCreationOptions,
 } from './celestial-body.js';
+import { IStateDependencies } from '../interfaces.js';
 
 //export interface ICometCreationOptions extends ICelestialBodyCreationOptions {
 //// Add any comet-specific options here if needed in the future
@@ -45,7 +45,7 @@ export class Comet extends CelestialBody {
     private tailVelocities: { life: number; lifeIncrement: number; vel: THREE.Vector3; isBlue: boolean }[] | null;
 
     constructor(
-        deps: ICelectialBodyDependencies,
+        deps: IStateDependencies,
         scene: THREE.Scene,
         options: ICelestialBodyCreationOptions,
         material: THREE.Material

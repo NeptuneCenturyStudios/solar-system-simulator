@@ -1,9 +1,18 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
+import { IStateDependencies } from '../interfaces';
 
 export class Supernova implements IEffect {
+    dependencies: IStateDependencies;
     active: boolean;
-    constructor(scene, pos, radius, shouldCollapse = false) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        pos: THREE.Vector3,
+        radius: number,
+        shouldCollapse = false
+    ) {
+        this.dependencies = dependencies;
         this.count = 20000; // Even more particles for maximum density
         this.geometry = new THREE.BufferGeometry();
         this.positions = new Float32Array(this.count * 3);

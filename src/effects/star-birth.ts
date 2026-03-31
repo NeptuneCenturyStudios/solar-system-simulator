@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
+import { IStateDependencies } from '../interfaces';
 
 /**
  * StarBirth
@@ -9,6 +10,7 @@ import { IEffect } from './effect-base';
  * This effect is intentionally decoupled from star death (supernova/collapse).
  */
 export class StarBirth implements IEffect {
+    dependencies: IStateDependencies;
     active: boolean;
     scene: THREE.Scene;
     count: number;
@@ -29,7 +31,8 @@ export class StarBirth implements IEffect {
      * @param {THREE.Vector3} pos
      * @param {number} radius
      */
-    constructor(scene: THREE.Scene, pos: THREE.Vector3, radius: number) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, pos: THREE.Vector3, radius: number) {
+        this.dependencies = dependencies;
         this.active = true;
         this.count = 1500; // Particles converging to form star
         this.geometry = new THREE.BufferGeometry();
