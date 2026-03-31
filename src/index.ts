@@ -2100,7 +2100,7 @@ function createNewBody(
                     vel: new THREE.Vector3(0, 0, 0),
                     mass: newStarMass,
                     id: createUniqueId('star'),
-                    name: generateIAUName('star'),
+                    name: generateIAUName(BodyTypeEnum.Star),
                     temperature: newStarTemp,
                     lightIntensity:
                         typeof customLightIntensity === 'number' && isFinite(customLightIntensity)
