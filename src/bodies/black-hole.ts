@@ -1,26 +1,43 @@
 import * as THREE from 'three';
-import { SUN_MASS } from '../utilities/consts.js';
+import { SCALE_FACTOR, SUN_MASS } from '../utilities/consts.js';
 import { BodyType } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body.js';
 import { IRotation } from '../physics/physics.js';
 import { IStateDependencies } from '../interfaces.js';
 
+interface IAccretionDiskState {
+    points: THREE.Points;
+    vels: { inward: number; orbital: number; radius: number }[];
+    angularPositions: number[];
+    minRadius: number;
+    maxRadius: number;
+}
+
+declare module './black-hole.js' {
+    interface BlackHole {
+        accretion: IAccretionDiskState | null;
+        accretionGlow: THREE.Sprite | null;
+    }
+}
+
 export class BlackHole extends CelestialBody {
     dependencies: IStateDependencies;
     eventHorizonRadius: number;
+    accretion: IAccretionDiskState | null = null;
+    accretionGlow: THREE.Sprite | null = null;
 
     static massToEventHorizonRadius(mass: number) {
         // "Compress" a star's mass into a tiny sphere.
         // Baseline: at 3 solar masses, radius ~= 1 (much smaller than Earth in our sim units).
         const BASE_MASS = 3 * SUN_MASS;
-        const BASE_RADIUS = 1;
+        const BASE_RADIUS = 1 * SCALE_FACTOR;
 
         // Constant-density approximation: radius scales with the cube root of mass.
         // This keeps black holes visually small while still allowing growth via absorption.
         const r = BASE_RADIUS * Math.cbrt(Math.max(0, mass) / BASE_MASS);
 
         // Clamp to avoid degenerate geometry / rendering issues.
-        return Math.max(0.25, r);
+        return Math.max(0.25 * SCALE_FACTOR, r);
     }
 
     constructor(
@@ -56,11 +73,12 @@ export class BlackHole extends CelestialBody {
         this.dependencies = dependencies;
 
         // Make mesh pitch black and emissive
-        this.mesh.material.color.setHex(0x000000);
-        this.mesh.material.emissive.setHex(0x000000);
-        this.mesh.material.emissiveIntensity = 0;
-        this.mesh.material.metalness = 1;
-        this.mesh.material.roughness = 0;
+        const blackHoleMaterial = this.mesh.material as THREE.MeshStandardMaterial;
+        blackHoleMaterial.color.setHex(0x000000);
+        blackHoleMaterial.emissive.setHex(0x000000);
+        blackHoleMaterial.emissiveIntensity = 0;
+        blackHoleMaterial.metalness = 1;
+        blackHoleMaterial.roughness = 0;
 
         // Create accretion disk glow (orange ring around black hole)
         this.createAccretionGlow();
@@ -75,6 +93,7 @@ export class BlackHole extends CelestialBody {
         canvas.width = 256;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
         // Clear to fully transparent
         ctx.clearRect(0, 0, 256, 256);
@@ -98,7 +117,7 @@ export class BlackHole extends CelestialBody {
         });
 
         this.accretionGlow = new THREE.Sprite(spriteMat);
-        this.accretionGlow.scale.setScalar(this.eventHorizonRadius * 8);
+        this.accretionGlow.scale.setScalar(this.eventHorizonRadius * 10);
         this.accretionGlow.position.copy(this.mesh.position);
         this.scene.add(this.accretionGlow);
     }
@@ -111,14 +130,15 @@ export class BlackHole extends CelestialBody {
         const vels = [];
         const angularPositions = []; // Track angle for spiral motion
 
-        const minRadius = this.eventHorizonRadius * 5;
-        const maxRadius = this.eventHorizonRadius * 25;
+        const buffer = 12 * SCALE_FACTOR;
+        const minRadius = Math.max(this.eventHorizonRadius + buffer, this.eventHorizonRadius * 8);
+        const maxRadius = Math.max(minRadius * 4, this.eventHorizonRadius * 42);
 
         for (let i = 0; i < count; i++) {
             // Start particles in a disk around black hole
             const angle = Math.random() * Math.PI * 2;
             const radius = minRadius + Math.random() * (maxRadius - minRadius);
-            const verticalSpread = (Math.random() - 0.5) * this.eventHorizonRadius * 2;
+            const verticalSpread = (Math.random() - 0.5) * this.eventHorizonRadius * 0.75;
 
             pArr[i * 3] = Math.cos(angle) * radius;
             pArr[i * 3 + 1] = verticalSpread;
@@ -128,8 +148,8 @@ export class BlackHole extends CelestialBody {
             angularPositions.push(angle);
 
             // Velocity: spiral inward + orbital motion
-            const inwardSpeed = 0.5 + Math.random() * 0.5;
-            const orbitalSpeed = Math.sqrt(this.mass / radius) * 0.1; // Keplerian orbital velocity
+            const inwardSpeed = (0.12 + Math.random() * 0.1) * SCALE_FACTOR;
+            const orbitalSpeed = Math.sqrt(this.mass / radius) * 0.005; // Keplerian orbital velocity
 
             vels.push({
                 inward: inwardSpeed,
@@ -148,7 +168,7 @@ export class BlackHole extends CelestialBody {
         geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
         const mat = new THREE.PointsMaterial({
-            size: 5,
+            size: 5 * SCALE_FACTOR,
             vertexColors: true,
             transparent: true,
             blending: THREE.AdditiveBlending,
@@ -172,7 +192,6 @@ export class BlackHole extends CelestialBody {
         for (let i = 0; i < count; i++) {
             // Get current position relative to black hole
             const dx = p[i * 3];
-            const _dy = p[i * 3 + 1];
             const dz = p[i * 3 + 2];
             const radius = Math.sqrt(dx * dx + dz * dz); // Distance in XZ plane
 
@@ -180,13 +199,13 @@ export class BlackHole extends CelestialBody {
             const vel = this.accretion.vels[i];
             const newRadius = radius - vel.inward * (dt * 60);
 
-            // If particle reaches event horizon, respawn at outer edge
-            if (newRadius < this.eventHorizonRadius * 2) {
+            // If particle reaches the inner buffer, respawn at outer edge
+            if (newRadius < this.eventHorizonRadius + 2 * SCALE_FACTOR) {
                 // Respawn at outer edge
                 const angle = Math.random() * Math.PI * 2;
                 const respawnRadius = this.accretion.maxRadius;
                 p[i * 3] = Math.cos(angle) * respawnRadius;
-                p[i * 3 + 1] = (Math.random() - 0.5) * this.eventHorizonRadius * 2;
+                p[i * 3 + 1] = (Math.random() - 0.5) * this.eventHorizonRadius * 0.75;
                 p[i * 3 + 2] = Math.sin(angle) * respawnRadius;
                 this.accretion.angularPositions[i] = angle;
                 this.accretion.vels[i].radius = respawnRadius;
@@ -212,7 +231,7 @@ export class BlackHole extends CelestialBody {
         }
     }
 
-    update(acc, dt) {
+    update(acc: THREE.Vector3, dt: number) {
         // Call parent update for physics
         super.update(acc, dt);
 
@@ -232,7 +251,7 @@ export class BlackHole extends CelestialBody {
 
         // Keep halo sized to current black hole radius (black holes can grow via absorption)
         if (this.accretionGlow) {
-            this.accretionGlow.scale.setScalar(this.radius * 8);
+            this.accretionGlow.scale.setScalar(this.radius * 10);
         }
     }
 
@@ -241,16 +260,15 @@ export class BlackHole extends CelestialBody {
         if (this.accretion && this.accretion.points) {
             this.scene.remove(this.accretion.points);
             this.accretion.points.geometry.dispose();
-            this.accretion.points.material.dispose();
+            const accretionMaterial = this.accretion.points.material;
+            if (!Array.isArray(accretionMaterial)) {
+                accretionMaterial.dispose();
+            }
         }
 
         // Clean up glow
         if (this.accretionGlow) {
             this.scene.remove(this.accretionGlow);
-            if (this.accretionGlow.material.map) {
-                this.accretionGlow.material.map.dispose();
-            }
-            this.accretionGlow.material.dispose();
         }
 
         // Call parent die (no explosion for black hole)
