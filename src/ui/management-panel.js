@@ -11,6 +11,7 @@ import {
     SUN_MASS,
 } from '../utilities/consts.js';
 import { BodyType, isBodyType } from '../utilities/utilities.js';
+import { Star } from '../bodies/star.js';
 
 /**
  * Management panel for creating and editing celestial bodies
@@ -1019,10 +1020,8 @@ export class ManagementPanel extends Panel {
 
         if (isStarBody && this.editLightIntensitySlider && this.editLightIntensityDisplay) {
             let intensity = null;
-            if (typeof body.lightIntensity === 'number' && isFinite(body.lightIntensity)) {
+            if (body instanceof Star) {
                 intensity = body.lightIntensity;
-            } else if (body._lightIntensity != null && isFinite(body._lightIntensity)) {
-                intensity = body._lightIntensity;
             }
 
             if (intensity == null) intensity = 500000000;

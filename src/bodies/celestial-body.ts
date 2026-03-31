@@ -43,7 +43,7 @@ export class CelestialBody extends Body {
     history: THREE.Vector3[];
     trailGeo: THREE.BufferGeometry;
     trailPositions: Float32Array;
-    trail: THREE.Line;
+    trail: THREE.Line | null;
     rings: THREE.Points | null = null;
     clouds: THREE.Mesh | null = null;
     cloudRotationSpeed: number = 0;
@@ -238,12 +238,14 @@ export class CelestialBody extends Body {
         }
 
         // Remove trail
-        this.scene.remove(this.trail);
-        this.trailGeo.dispose();
-        if (Array.isArray(this.trail?.material)) {
-            this.trail.material.forEach((mat) => mat.dispose());
-        } else {
-            this.trail?.material.dispose();
+        if (this.trail) {
+            this.scene.remove(this.trail);
+            this.trailGeo.dispose();
+            if (Array.isArray(this.trail.material)) {
+                this.trail.material.forEach((mat) => mat.dispose());
+            } else {
+                this.trail.material.dispose();
+            }
         }
 
         // Dispoose of rings

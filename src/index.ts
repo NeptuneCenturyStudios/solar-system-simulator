@@ -806,6 +806,10 @@ const dependencies: IStateDependencies = {
         // Push into the canonical explosions array that the main loop updates/filters
         simulationState.explosions.push(explosion);
     },
+    addSupernova: (supernova: Supernova) => {
+        if (!supernova) return;
+        supernovas.push(supernova);
+    },
     addBody: (body: Body) => {
         if (!body) return;
         simulationState.bodies.push(body);
@@ -2031,22 +2035,6 @@ function createPresetBody(presetKey) {
     setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
     clearCameraPresetHighlights();
 }
-
-/**
- * Inject effect factories into body modules (keeps bodies decoupled from main.js-only effect impls).
- */
-Star.createSupernova = (
-    dependencies: IStateDependencies,
-    scene: THREE.Scene,
-    pos: THREE.Vector3,
-    radius: number,
-    shouldCollapse: boolean
-) => {
-    // `Supernova` is imported from ./effects/supernova.js.
-    const supernova = new Supernova(dependencies, scene, pos, radius, shouldCollapse);
-    supernovas.push(supernova);
-    return supernova;
-};
 
 Star.createStarBirth = (
     dependencies: IStateDependencies,

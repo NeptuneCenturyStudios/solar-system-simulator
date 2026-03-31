@@ -13,7 +13,8 @@ export const BodyType = Object.freeze({
     GasGiant: 1 << 6,
     IceGiant: 1 << 7,
     DwarfPlanet: 1 << 8,
-    SpaceShip: 1 << 9,
+    WhiteDwarf: 1 << 9,
+    SpaceShip: 1 << 10,
 });
 
 export enum BodyTypeEnum {
@@ -27,7 +28,8 @@ export enum BodyTypeEnum {
     GasGiant = 1 << 6,
     IceGiant = 1 << 7,
     DwarfPlanet = 1 << 8,
-    SpaceShip = 1 << 9,
+    WhiteDwarf = 1 << 9,
+    SpaceShip = 1 << 10,
 }
 
 // Shared body-type helper. Checks bodyType flags only.
@@ -36,10 +38,10 @@ export function isBodyType(body: Body, type) {
 }
 
 // Utility to pick a random element from an array
-export function pickRandom(arr) {
+export function pickRandom<T>(arr: Array<T>): T {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function createUniqueId(prefix) {
+export function createUniqueId(prefix: string) {
     return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
 }

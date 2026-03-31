@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import { SHADOW_MAP_SIZE, SUN_MASS, SCALE_FACTOR } from '../utilities/consts.js';
-import { BodyType, isBodyType } from '../utilities/utilities.js';
+import { BodyType, BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body.js';
 import { BlackHole } from './black-hole.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
 import { Corona } from '../effects/corona.js';
 import { IStateDependencies } from '../interfaces.js';
+import { StarBirth } from '../effects/star-birth.js';
+import { IRotation } from '../physics/physics.js';
+import { Supernova } from '../effects/supernova.js';
 
 /**
  * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.
@@ -27,9 +30,37 @@ export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
  * so `main.js` remains the single place that loads texture assets.
  */
 export class Star extends CelestialBody {
-    fuel: number;
-    maxFuel: number;
+    dependencies: IStateDependencies;
+    textures: {
+        sunTexture: THREE.Texture;
+        redStarTexture: THREE.Texture;
+        orangeStarTexture: THREE.Texture;
+        whiteStarTexture: THREE.Texture;
+        blueStarTexture: THREE.Texture;
+        whiteDwarfTexture: THREE.Texture;
+    };
+    rotation: IRotation;
+    fuel: number | null;
+    maxFuel: number | null;
     temperature: number;
+    initialMass: number;
+    initialRadius: number;
+    initialColor: THREE.Color;
+
+    isBecomingWhiteDwarf: boolean;
+    targetWhiteDwarfRadius: number;
+    _pendingBlackHoleFormation: boolean;
+
+    visualTime: number;
+    corona: Corona | null;
+    isBirthing: boolean;
+    birthEffect: StarBirth | null;
+    sunGlow: THREE.Sprite<THREE.Object3DEventMap> | null;
+
+    // Lighting effects
+    lightIntensity: number;
+    ambientLight: THREE.AmbientLight;
+    sunLight: THREE.DirectionalLight;
 
     /**
      * Hook for the app (main.js) to inject a supernova factory.
@@ -70,12 +101,12 @@ export class Star extends CelestialBody {
         options: IStarCreationOptions,
 
         textures: {
-            sunTexture: THREE.Texture,
-            redStarTexture: THREE.Texture,
-            orangeStarTexture: THREE.Texture,
-            whiteStarTexture: THREE.Texture,
-            blueStarTexture: THREE.Texture,
-            whiteDwarfTexture: THREE.Texture
+            sunTexture: THREE.Texture;
+            redStarTexture: THREE.Texture;
+            orangeStarTexture: THREE.Texture;
+            whiteStarTexture: THREE.Texture;
+            blueStarTexture: THREE.Texture;
+            whiteDwarfTexture: THREE.Texture;
         }
     ) {
         if (!textures) {
@@ -93,6 +124,8 @@ export class Star extends CelestialBody {
             shininess: 10,
         });
 
+        const rotation: IRotation = { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 };
+
         super(
             dependencies,
             scene,
@@ -107,16 +140,15 @@ export class Star extends CelestialBody {
             0xffffff,
             500,
             false,
-            { axis: [0, 1, 0], speed: 0.08 },
-            null,
+            rotation,
+            undefined,
             starMaterial
         );
 
         this.dependencies = dependencies;
         this.textures = textures;
-
+        this.rotation = rotation;
         this.lightIntensity = options.lightIntensity;
-        this._lightIntensity = options.lightIntensity;
 
         this.initialMass = options.mass;
         this.initialRadius = options.radius;
@@ -130,8 +162,10 @@ export class Star extends CelestialBody {
         this.targetWhiteDwarfRadius = 8;
         this._pendingBlackHoleFormation = false;
 
-        this.mesh.material.emissive.setHex(0xffffff);
-        this.mesh.material.emissiveIntensity = 1.0;
+        if (this.mesh.material instanceof THREE.MeshPhongMaterial) {
+            this.mesh.material.emissive.setHex(0xffffff);
+            this.mesh.material.emissiveIntensity = 1.0;
+        }
 
         this.corona = new Corona(dependencies, scene, options.radius + 1, this.baseColor.getHex());
         this.sunGlow = this.createGlow(options.radius, this.baseColor.getHex());
@@ -153,7 +187,7 @@ export class Star extends CelestialBody {
         this._startBirthEffect();
     }
 
-    static temperatureToColor(temp) {
+    static temperatureToColor(temp: number) {
         temp = Math.max(1000, Math.min(40000, temp));
 
         temp = temp / 100;
@@ -215,7 +249,7 @@ export class Star extends CelestialBody {
         return (red << 16) | (green << 8) | blue;
     }
 
-    static temperatureToEmissiveIntensity(temp) {
+    static temperatureToEmissiveIntensity(temp: number) {
         const minTemp = 2000;
         const maxTemp = 30000;
         const sunTemp = 5778;
@@ -237,11 +271,14 @@ export class Star extends CelestialBody {
         return Math.min(2.0, intensity);
     }
 
-    createGlow(radius, glowHex = 0xffffcc) {
+    createGlow(radius: number, glowHex = 0xffffcc) {
         const canvas = document.createElement('canvas');
         canvas.width = 128;
         canvas.height = 128;
         const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return null;
+        }
 
         ctx.clearRect(0, 0, 128, 128);
 
@@ -278,9 +315,9 @@ export class Star extends CelestialBody {
         return glow;
     }
 
-    createLight(pos, intensity, distance) {
+    createLight(pos: THREE.Vector3, intensity: number, distance: number) {
         const light = new THREE.DirectionalLight(0xffffff, Math.max(1.0, intensity / 20000000));
-        light.position.set(pos[0], pos[1], pos[2]);
+        light.position.set(pos.x, pos.y, pos.z);
 
         light.target = new THREE.Object3D();
         light.target.position.set(21850, 0, 0);
@@ -313,14 +350,15 @@ export class Star extends CelestialBody {
 
         this.visualTime += dt;
 
-        const starDeathEnabled = document.getElementById('enableStarDeath')?.checked || false;
+        const starDeathEnabled =
+            (document.getElementById('enableStarDeath') as HTMLInputElement)?.checked || false;
         if (starDeathEnabled && this.fuel !== null && this.fuel > 0) {
             const referenceMass = 1000;
             const massRatio = this.mass / referenceMass;
             const burnRate = Math.pow(massRatio, 2.5) * 0.001 * Math.abs(dt);
             this.fuel -= burnRate;
 
-            const fuelPercent = this.fuel / this.maxFuel;
+            const fuelPercent = this.maxFuel !== null ? this.fuel / this.maxFuel : 0;
             const isMassiveStar = this.initialMass > SUN_MASS * 3.3;
 
             if (!isMassiveStar) {
@@ -352,13 +390,15 @@ export class Star extends CelestialBody {
                     this.temperature = targetTemp;
 
                     const redGiantColor = this.temperatureToColor(targetTemp);
-                    this.mesh.material.color.lerp(redGiantColor, 0.01);
-                    this.mesh.material.emissive.lerp(redGiantColor, 0.01);
+                    if (this.mesh.material instanceof THREE.MeshPhongMaterial) {
+                        this.mesh.material.color.lerp(redGiantColor, 0.01);
+                        this.mesh.material.emissive.lerp(redGiantColor, 0.01);
 
-                    const targetIntensity = Star.temperatureToEmissiveIntensity(targetTemp);
-                    this.mesh.material.emissiveIntensity =
-                        this.mesh.material.emissiveIntensity +
-                        (targetIntensity - this.mesh.material.emissiveIntensity) * 0.01;
+                        const targetIntensity = Star.temperatureToEmissiveIntensity(targetTemp);
+                        this.mesh.material.emissiveIntensity =
+                            this.mesh.material.emissiveIntensity +
+                            (targetIntensity - this.mesh.material.emissiveIntensity) * 0.01;
+                    }
                 }
             }
 
@@ -416,32 +456,39 @@ export class Star extends CelestialBody {
         }
     }
 
-    triggerStarDeath(isMassiveStar) {
+    createSupernova(pos: THREE.Vector3, radius: number, shouldCollapse: boolean) {
+        // `Supernova` is imported from ./effects/supernova.js.
+        const supernova = new Supernova(this.dependencies, this.scene, pos, radius, shouldCollapse);
+        this.dependencies.addSupernova(supernova);
+        return supernova;
+    }
+
+    triggerStarDeath(isMassiveStar: boolean) {
         if (isMassiveStar) {
             try {
-                if (typeof Star.createSupernova === 'function') {
-                    Star.createSupernova(this.scene, this.mesh.position.clone(), this.radius, true);
-                }
-            } catch {
-                // ignore
+                this.createSupernova(this.mesh.position.clone(), this.radius, true);
+            } catch (e) {
+                console.error('Error creating supernova:', e);
             }
 
             try {
                 triggerScreenFlash();
-            } catch {
-                // ignore
+            } catch (e) {
+                console.error('Error triggering screen flash:', e);
             }
 
+            // TODO: Add random chance for black hole formation based on star mass
             try {
                 const blackHoleMass = this.mass * 0.9999;
                 const uniqueBHId = `blackHole_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
                 const newBlackHole = new BlackHole(
                     this.dependencies,
                     this.scene,
-                    this.mesh.position.toArray(),
+                    this.mesh.position.clone(),
                     blackHoleMass,
                     uniqueBHId,
-                    'Black Hole'
+                    'Black Hole',
+                    this.rotation
                 );
 
                 if (this.dependencies?.addBody) {
@@ -451,20 +498,20 @@ export class Star extends CelestialBody {
                 if (this.dependencies?.addEvent) {
                     this.dependencies.addEvent(`Black Hole formed from ${this.name}!`);
                 }
-            } catch {
-                // ignore
+            } catch (e) {
+                console.error('Error creating black hole:', e);
             }
 
             this.die(true);
         } else {
             this.isBecomingWhiteDwarf = true;
-
-            this.mesh.material.map = this.textures.whiteDwarfTexture;
-            this.mesh.material.emissiveMap = this.textures.whiteDwarfTexture;
-            this.mesh.material.color.setHex(0xffffff);
-            this.mesh.material.emissive.setHex(0xffffff);
-            this.mesh.material.emissiveIntensity = 1.25;
-            this.mesh.material.needsUpdate = true;
+            const material = this.mesh.material as THREE.MeshPhongMaterial;
+            material.map = this.textures.whiteDwarfTexture;
+            material.emissiveMap = this.textures.whiteDwarfTexture;
+            material.color.setHex(0xffffff);
+            material.emissive.setHex(0xffffff);
+            material.emissiveIntensity = 1.25;
+            material.needsUpdate = true;
 
             this.temperature = 10000;
             this.name = this.name + ' (White Dwarf)';
@@ -495,11 +542,11 @@ export class Star extends CelestialBody {
 
             this.fuel = null;
             this.maxFuel = null;
-            this.bodyType &= ~BodyType.Star;
+            this.bodyType |= BodyTypeEnum.WhiteDwarf;
         }
     }
 
-    setShadowsEnabled(enabled) {
+    setShadowsEnabled(enabled: boolean) {
         this.sunLight.castShadow = enabled;
         if (enabled) {
             this.sunLight.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -516,21 +563,20 @@ export class Star extends CelestialBody {
         }
     }
 
-    setLightIntensity(intensity) {
+    setLightIntensity(intensity: number) {
         this.lightIntensity = intensity;
-        this._lightIntensity = intensity;
         this.sunLight.intensity = intensity / 100000000;
     }
 
-    setTemperature(temp) {
+    setTemperature(temp: number) {
         this.temperature = temp;
 
         if (!isBodyType(this, BodyType.Star)) {
             return;
         }
 
-        let map = this.textures.sunTexture;
-        let glowHex = 0xffffcc;
+        let map;
+        let glowHex;
 
         if (temp <= 3000) {
             map = this.textures.redStarTexture;
@@ -549,12 +595,12 @@ export class Star extends CelestialBody {
             glowHex = 0xaaccff;
         }
 
-        this.mesh.material.map = map;
-        this.mesh.material.emissiveMap = map;
-        this.mesh.material.needsUpdate = true;
-
-        this.mesh.material.emissive.setHex(0xffffff);
-        this.mesh.material.emissiveIntensity = 1.0;
+        const material = this.mesh.material as THREE.MeshPhongMaterial;
+        material.map = map;
+        material.emissiveMap = map;
+        material.needsUpdate = true;
+        material.emissive.setHex(0xffffff);
+        material.emissiveIntensity = 1.0;
 
         this.baseColor.setHex(glowHex);
 
@@ -566,10 +612,11 @@ export class Star extends CelestialBody {
                 if (oldMap && typeof oldMap.dispose === 'function') oldMap.dispose();
 
                 const newGlow = this.createGlow(this.radius, glowHex);
-                newGlow.position.copy(this.sunGlow.position);
-                newGlow.scale.copy(this.sunGlow.scale);
-                newGlow.visible = this.sunGlow.visible;
-
+                if (newGlow) {
+                    newGlow.position.copy(this.sunGlow.position);
+                    newGlow.scale.copy(this.sunGlow.scale);
+                    newGlow.visible = this.sunGlow.visible;
+                }
                 this.scene.remove(this.sunGlow);
                 this.sunGlow = newGlow;
             } catch {
@@ -588,7 +635,10 @@ export class Star extends CelestialBody {
 
     _syncBaselineRadiusIfStable() {
         const fuelActive = this.fuel !== null && this.maxFuel !== null && this.maxFuel > 0;
-        const fuelPercent = fuelActive ? this.fuel / this.maxFuel : 1;
+        const fuelPercent =
+            fuelActive && this.maxFuel !== null && this.fuel !== null
+                ? this.fuel / this.maxFuel
+                : 1;
 
         const inRedGiantPhase = fuelActive && fuelPercent < 0.3 && fuelPercent > 0;
         const inWhiteDwarfShrink = !!this.isBecomingWhiteDwarf;
@@ -599,7 +649,7 @@ export class Star extends CelestialBody {
         if (this.mesh) this.mesh.scale.setScalar(1);
     }
 
-    setRadius(newRadius) {
+    setRadius(newRadius: number) {
         this.radius = newRadius;
 
         this._syncBaselineRadiusIfStable();
@@ -607,14 +657,16 @@ export class Star extends CelestialBody {
         this.mesh.geometry.dispose();
         this.mesh.geometry = new THREE.SphereGeometry(newRadius, 32, 32);
 
-        this.sunGlow.scale.setScalar(newRadius * 4.6);
-
+        if (this.sunGlow) {
+            this.sunGlow.scale.setScalar(newRadius * 4.6);
+        }
+        
         if (this.corona) {
             this.corona.setRadius(newRadius + 1);
         }
     }
 
-    setLightDistance(distance) {
+    setLightDistance(distance: number) {
         this.sunLight.userData.distance = distance;
         if (this.sunLight.shadow && this.sunLight.shadow.camera) {
             this.sunLight.shadow.camera.far = Math.min(distance * 0.5, 500000);
@@ -728,7 +780,7 @@ export class Star extends CelestialBody {
         super.die(true);
     }
 
-    _setBirthVisibility(visible) {
+    _setBirthVisibility(visible: boolean) {
         try {
             if (this.mesh) this.mesh.visible = visible;
             if (this.trail) this.trail.visible = visible;
@@ -763,7 +815,7 @@ export class Star extends CelestialBody {
         }
     }
 
-    _updateBirthEffect(dt) {
+    _updateBirthEffect(dt: number) {
         if (!this.isBirthing || !this.birthEffect) return;
 
         try {

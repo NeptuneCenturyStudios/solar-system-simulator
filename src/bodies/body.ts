@@ -21,7 +21,7 @@ export class Body {
     velocity: THREE.Vector3;
     _isDisposed = false;
     mesh: THREE.Mesh;
-    label: THREE.Sprite | null = null;
+    label: THREE.Sprite;
     labelLine: THREE.Line | null = null;
     bodyType: BodyTypeEnum;
     protected labelHeight = 0;
@@ -58,7 +58,7 @@ export class Body {
 
         this.mesh.userData = { parentBody: this };
 
-        this.createLabel(this.name);
+        this.label = this.createLabel(this.name);
         if (this.label) this.mesh.add(this.label);
         if (this.labelLine) this.mesh.add(this.labelLine);
 
@@ -78,10 +78,10 @@ export class Body {
             depthWrite: false,
         });
 
-        this.label = new THREE.Sprite(labelMaterial);
-        this.label.scale.set(10, 4, 1);
-        this.label.position.set(0, this.getLabelHeight(), 0);
-        this.label.visible = false;
+        const label = new THREE.Sprite(labelMaterial);
+        label.scale.set(10, 4, 1);
+        label.position.set(0, this.getLabelHeight(), 0);
+        label.visible = false;
 
         const lineGeometry = new THREE.BufferGeometry();
         lineGeometry.setAttribute(
@@ -102,6 +102,8 @@ export class Body {
             })
         );
         this.labelLine.visible = false;
+
+        return label;
     }
 
     /**
