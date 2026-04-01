@@ -4,6 +4,25 @@ import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 
+// Tell typescript about our custom events that has detail property
+declare global {
+    interface WindowEventMap {
+        'body:added': CustomEvent<{ body: Body; id: string; name: string }>;
+        'body:removed': CustomEvent<{ body: Body; id: string; name: string }>;
+        'body:selected': CustomEvent<{ body: Body; id: string; name: string }>;
+        'body:deselected': CustomEvent<{ body: Body; id: string; name: string }>;
+        'camera:focusChanged': CustomEvent<{
+            body: Body | null;
+            id: string | null;
+            name: string | null;
+        }>;
+    }
+
+    interface Event {
+        detail?: { body: Body; id: string; name: string };
+    }
+}
+
 // Import all consts
 import {
     SCALE_FACTOR,
@@ -46,6 +65,7 @@ import {
     HYGIEA_MASS,
     HYGIEA_DISTANCE,
     HYGIEA_RADIUS,
+    SimulationStartMode,
 } from './utilities/consts.js';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo.js';
 import {
@@ -785,7 +805,7 @@ const cameraState = {
     rotationSpeed: 0.002,
     keys: { w: false, a: false, s: false, d: false, c: false, space: false, shift: false },
     arrowKeys: { left: false, right: false, up: false, down: false },
-    pendingCollisionFocusBody: null as Body | null
+    pendingCollisionFocusBody: null as Body | null,
 };
 
 const simulationState = {
@@ -845,13 +865,9 @@ const VEL_ARC_COLOR = 0x00ff00;
 const VEL_ARC_OPACITY = 0.25;
 const VEL_ARC_ACTIVE_OPACITY = 0.35;
 const VEL_ARC_LINEWIDTH_PX = 22;
-const VEL_ARC_MIN_R = 250;
-const VEL_ARC_MAX_R = 6000;
-const VEL_ARC_RADIUS_MULT = 1.0;
 
 // Arc is centered on the VELOCITY TIP (not the body), and its radius is based on body radius.
 // This creates a "mouse path preview" near where the tip will sweep as you drag.
-const VEL_ARC_TIP_RADIUS_MULT = 2.5;
 const VEL_ARC_TIP_RADIUS_MIN = 80;
 const VEL_ARC_TIP_RADIUS_MAX = 1200;
 
@@ -1030,7 +1046,7 @@ function updateVelocityArcs() {
 }
 
 // Create FPS counter sprite
-let fpsSprite = null;
+let fpsSprite: THREE.Sprite | null = null;
 let fpsLastUpdate = 0;
 function createFPSSprite() {
     const texture = createFPSTexture(60);
@@ -1057,7 +1073,7 @@ function createFPSSprite() {
 createFPSSprite();
 
 // Create body stats sprite
-let statsSprite = null;
+let statsSprite: THREE.Sprite | null = null;
 function createStatsSprite() {
     const texture = createStatsTexture({
         name: '',
@@ -1793,7 +1809,7 @@ function hidePositionIndicators() {
 
 function getPrimaryStar() {
     return (
-        simulationState.bodies.find((b) => b && !b._isDisposed && b instanceof Star) as Star ||
+        (simulationState.bodies.find((b) => b && !b._isDisposed && b instanceof Star) as Star) ||
         null
     );
 }
@@ -1829,19 +1845,17 @@ function syncPrimaryStarLightTarget() {
 }
 
 // State management
-let dragLine; // A visual helper to show the intended path
-
 const lineMat = new THREE.LineBasicMaterial({ color: 0xff0000 });
 const lineGeo = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(),
     new THREE.Vector3(),
 ]);
-dragLine = new THREE.Line(lineGeo, lineMat);
+const dragLine = new THREE.Line(lineGeo, lineMat);
 dragLine.visible = false;
 scene.add(dragLine);
 
 // Calculate elliptical orbit trajectory
-function calculateEllipticalTrajectory(distance, parentMass, eccentricity = 0.4) {
+function calculateEllipticalTrajectory(distance: number, parentMass: number, eccentricity: number = 0.4) {
     // For elliptical orbit, reduce velocity from circular orbit speed
     // Lower velocity = more elliptical orbit
     const circularSpeed = Math.sqrt((G * parentMass) / distance);
@@ -1857,7 +1871,7 @@ function calculateEllipticalTrajectory(distance, parentMass, eccentricity = 0.4)
 }
 
 // Apply orbital angle and inclination to trajectory
-function applyOrbitalTransforms(trajectory, orbitalAngleDeg, inclinationDeg) {
+function applyOrbitalTransforms(trajectory: { pos: THREE.Vector3; vel: THREE.Vector3 }, orbitalAngleDeg: number, inclinationDeg: number) {
     const orbitalAngleRad = (orbitalAngleDeg * Math.PI) / 180;
     const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
@@ -1894,7 +1908,7 @@ function getRandomStarSpawnPosition() {
     );
 }
 
-function createPresetBody(presetKey) {
+function createPresetBody(presetKey: string) {
     const key = String(presetKey).toLowerCase();
 
     // Helper: find the current primary star (first star in bodies)
@@ -1910,7 +1924,7 @@ function createPresetBody(presetKey) {
     const ensureJupiter = () =>
         simulationState.bodies.find((b) => b && !b._isDisposed && b.name === 'Jupiter');
 
-    let newBody = null;
+    let newBody: CelestialBody;
 
     switch (key) {
         case 'sun': {
@@ -1926,6 +1940,7 @@ function createPresetBody(presetKey) {
                 {
                     radius: SUN_RADIUS,
                     pos,
+                    vel: new THREE.Vector3(0, 0, 0),
                     mass: SUN_MASS,
                     id: createUniqueId('sun'),
                     name: 'Sun',
@@ -2060,132 +2075,209 @@ function createNewBody(
 ) {
     let newBody;
 
-    switch (bodyType) {
-        case 'sun': {
-            // Create a custom STAR.
-            //
-            // Defaults are randomized around star-like values so the user can override them
-            // in the creation UI before the body is actually created.
-            const starPos = getRandomStarSpawnPosition();
+    if (bodyType === 'sun') {
+        // Create a custom STAR.
+        //
+        // Defaults are randomized around star-like values so the user can override them
+        // in the creation UI before the body is actually created.
+        const starPos = getRandomStarSpawnPosition();
 
-            // Mass range: ~0.08 M☉ (red dwarf limit) up to ~150 M☉ (very massive / hypergiant-ish)
-            // Use log sampling so we get interesting small/medium stars more often.
-            const minMass = SUN_MASS * 0.08;
-            const maxMass = SUN_MASS * 150;
-            const t = Math.random();
-            const randomStarMass = minMass * Math.pow(maxMass / minMass, t);
-            const newStarMass =
-                typeof customMass === 'number' && isFinite(customMass) && customMass > 0
-                    ? customMass
-                    : randomStarMass;
+        // Mass range: ~0.08 M☉ (red dwarf limit) up to ~150 M☉ (very massive / hypergiant-ish)
+        // Use log sampling so we get interesting small/medium stars more often.
+        const minMass = SUN_MASS * 0.08;
+        const maxMass = SUN_MASS * 150;
+        const t = Math.random();
+        const randomStarMass = minMass * Math.pow(maxMass / minMass, t);
+        const newStarMass =
+            typeof customMass === 'number' && isFinite(customMass) && customMass > 0
+                ? customMass
+                : randomStarMass;
 
-            // Radius: use mass-radius relationship, but clamp to a wide plausible visual range.
-            // 0.08 M☉ ≈ 0.2 R☉ (very rough), 150 M☉ can be tens of R☉ to hundreds+ (supergiants).
-            // We'll allow an intentionally dramatic spread, but keep within the existing slider max.
-            const minRadius = SUN_RADIUS * 0.15;
-            const maxRadius = 200000;
-            const computedRadius = calculateStarRadius(newStarMass, SUN_MASS, SUN_RADIUS);
-            const newStarRadius =
-                typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
-                    ? customRadius
-                    : THREE.MathUtils.clamp(computedRadius, minRadius, maxRadius);
+        // Radius: use mass-radius relationship, but clamp to a wide plausible visual range.
+        // 0.08 M☉ ≈ 0.2 R☉ (very rough), 150 M☉ can be tens of R☉ to hundreds+ (supergiants).
+        // We'll allow an intentionally dramatic spread, but keep within the existing slider max.
+        const minRadius = SUN_RADIUS * 0.15;
+        const maxRadius = 200000;
+        const computedRadius = calculateStarRadius(newStarMass, SUN_MASS, SUN_RADIUS);
+        const newStarRadius =
+            typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
+                ? customRadius
+                : THREE.MathUtils.clamp(computedRadius, minRadius, maxRadius);
 
-            // Temperature: pick a broad range (cool red dwarfs/giants to hot blue stars)
-            // 2000K..30000K matches the edit slider + existing color function.
-            const randomStarTemp = 2000 + Math.random() * (30000 - 2000);
-            const newStarTemp =
-                typeof customTemperature === 'number' && isFinite(customTemperature)
-                    ? customTemperature
-                    : randomStarTemp;
+        // Temperature: pick a broad range (cool red dwarfs/giants to hot blue stars)
+        // 2000K..30000K matches the edit slider + existing color function.
+        const randomStarTemp = 2000 + Math.random() * (30000 - 2000);
+        const newStarTemp =
+            typeof customTemperature === 'number' && isFinite(customTemperature)
+                ? customTemperature
+                : randomStarTemp;
 
-            newBody = new Star(
-                dependencies,
-                scene,
-                {
-                    radius: newStarRadius,
-                    pos: starPos,
-                    vel: new THREE.Vector3(0, 0, 0),
-                    mass: newStarMass,
-                    id: createUniqueId('star'),
-                    name: generateIAUName(BodyTypeEnum.Star),
-                    temperature: newStarTemp,
-                    lightIntensity:
-                        typeof customLightIntensity === 'number' && isFinite(customLightIntensity)
-                            ? customLightIntensity
-                            : 500000000,
-                    lightDistance: 524400,
-                },
-                {
-                    sunTexture,
-                    redStarTexture,
-                    orangeStarTexture,
-                    whiteStarTexture,
-                    blueStarTexture,
-                    whiteDwarfTexture,
-                }
-            );
-
-            if (typeof customLightIntensity === 'number' && isFinite(customLightIntensity)) {
-                try {
-                    newBody.setLightIntensity(customLightIntensity);
-                } catch (e) {
-                    console.error('Error applying custom star light intensity:', e);
-                }
+        newBody = new Star(
+            dependencies,
+            scene,
+            {
+                radius: newStarRadius,
+                pos: starPos,
+                vel: new THREE.Vector3(0, 0, 0),
+                mass: newStarMass,
+                id: createUniqueId('star'),
+                name: generateIAUName(BodyTypeEnum.Star),
+                temperature: newStarTemp,
+                lightIntensity:
+                    typeof customLightIntensity === 'number' && isFinite(customLightIntensity)
+                        ? customLightIntensity
+                        : 500000000,
+                lightDistance: 524400,
+            },
+            {
+                sunTexture,
+                redStarTexture,
+                orangeStarTexture,
+                whiteStarTexture,
+                blueStarTexture,
+                whiteDwarfTexture,
             }
+        );
 
-            break;
+        if (typeof customLightIntensity === 'number' && isFinite(customLightIntensity)) {
+            try {
+                newBody.setLightIntensity(customLightIntensity);
+            } catch (e) {
+                console.error('Error applying custom star light intensity:', e);
+            }
+        }
+    } else if (bodyType === 'planet') {
+        // Create a new planet in orbit
+        const planetDistance = 30000 + Math.random() * 400000; // Random orbital distance
+
+        // Use appropriate trajectory calculation based on orbit type
+        let trajectory;
+        if (orbitType === 'elliptical') {
+            trajectory = calculateEllipticalTrajectory(planetDistance, SUN_MASS, 0.3);
+        } else {
+            trajectory = calculateTrajectory(planetDistance, SUN_MASS);
         }
 
-        case 'planet':
-            // Create a new planet in orbit
-            const planetDistance = 30000 + Math.random() * 400000; // Random orbital distance
+        // Apply orbital angle and inclination
+        trajectory = applyOrbitalTransforms(trajectory, orbitalAngle, inclination);
+
+        const resolvedPlanetType = planetType || 'solid';
+        const isGasGiant = resolvedPlanetType === 'gas_giant';
+        const isIceGiant = resolvedPlanetType === 'ice_giant';
+        const isSolidPlanet = !isGasGiant && !isIceGiant;
+
+        const planetRadius =
+            typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
+                ? customRadius
+                : isSolidPlanet
+                  ? 5 + Math.random() * 10
+                  : 18 + Math.random() * 24;
+
+        const planetMass =
+            typeof customMass === 'number' && isFinite(customMass) && customMass > 0
+                ? customMass
+                : isSolidPlanet
+                  ? 50 + Math.random() * 500
+                  : isGasGiant
+                    ? 4000 + Math.random() * 26000
+                    : 1200 + Math.random() * 7000;
+
+        const planetTexturePool = isGasGiant
+            ? fictionalGasTextures
+            : isIceGiant
+              ? fictionalIceTextures
+              : fictionalTextures;
+
+        const customPlanetBodyType = isGasGiant
+            ? BodyType.GasGiant
+            : isIceGiant
+              ? BodyType.IceGiant
+              : BodyType.Planet;
+
+        const planetMaterial = new THREE.MeshStandardMaterial({
+            map: pickRandom(planetTexturePool),
+            color: 0xffffff, // keep texture untinted
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.7,
+            metalness: 0.7,
+        });
+
+        newBody = new CelestialBody(
+            dependencies,
+            scene,
+            planetRadius,
+            0xffffff,
+            trajectory.pos.toArray(),
+            trajectory.vel.toArray(),
+            planetMass,
+            null, // No camera button
+            generateIAUName('planet'),
+            customPlanetBodyType,
+            0xaaaaaa,
+            3000,
+            false,
+            { axis: [0, 1, 0], speed: 0.1 + Math.random() * 0.4 },
+            null,
+            planetMaterial
+        );
+
+        // Optional atmosphere/cloud layer (checkbox-driven for custom solid planets only)
+        if (hasAtmosphere && isSolidPlanet) {
+            const cloudsMat = new THREE.MeshStandardMaterial({
+                map: pickRandom(fictionalAtmosphereTextures),
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.45,
+                depthWrite: false,
+                roughness: 1.0,
+                metalness: 0.0,
+            });
+
+            const cloudsGeo = new THREE.SphereGeometry(newBody.radius * 1.03, 32, 32);
+            newBody.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
+            newBody.clouds.renderOrder = 2;
+            // Make cloud sphere selectable (raycaster maps back to owning body)
+            newBody.clouds.userData = { parentBody: newBody };
+            newBody.mesh.add(newBody.clouds);
+            newBody.cloudRotationSpeed = 0.12 + Math.random() * 0.12;
+        }
+
+        // Ensure brightness scaling uses a neutral base when texture is present
+        newBody.baseColor = new THREE.Color(0xffffff);
+    } else if (bodyType === 'moon') {
+        // Create a moon orbiting the currently focused body
+        const focusedBody = getFocusObject();
+        if (
+            focusedBody &&
+            simulationState.bodies.includes(focusedBody) &&
+            !focusedBody._isDisposed
+        ) {
+            const moonDistance = focusedBody.radius * 5 + Math.random() * focusedBody.radius * 10;
 
             // Use appropriate trajectory calculation based on orbit type
-            let trajectory;
+            let moonTrajectory;
             if (orbitType === 'elliptical') {
-                trajectory = calculateEllipticalTrajectory(planetDistance, SUN_MASS, 0.3);
+                moonTrajectory = calculateEllipticalTrajectory(moonDistance, focusedBody.mass, 0.3);
             } else {
-                trajectory = calculateTrajectory(planetDistance, SUN_MASS);
+                moonTrajectory = calculateTrajectory(moonDistance, focusedBody.mass);
             }
 
             // Apply orbital angle and inclination
-            trajectory = applyOrbitalTransforms(trajectory, orbitalAngle, inclination);
+            moonTrajectory = applyOrbitalTransforms(moonTrajectory, orbitalAngle, inclination);
 
-            const resolvedPlanetType = planetType || 'solid';
-            const isGasGiant = resolvedPlanetType === 'gas_giant';
-            const isIceGiant = resolvedPlanetType === 'ice_giant';
-            const isSolidPlanet = !isGasGiant && !isIceGiant;
-
-            const planetRadius =
+            const moonRadius =
                 typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
                     ? customRadius
-                    : isSolidPlanet
-                      ? 5 + Math.random() * 10
-                      : 18 + Math.random() * 24;
-
-            const planetMass =
+                    : 1 + Math.random() * 3;
+            const moonMass =
                 typeof customMass === 'number' && isFinite(customMass) && customMass > 0
                     ? customMass
-                    : isSolidPlanet
-                      ? 50 + Math.random() * 500
-                      : isGasGiant
-                        ? 4000 + Math.random() * 26000
-                        : 1200 + Math.random() * 7000;
+                    : 0.5 + Math.random() * 2;
 
-            const planetTexturePool = isGasGiant
-                ? fictionalGasTextures
-                : isIceGiant
-                  ? fictionalIceTextures
-                  : fictionalTextures;
-
-            const customPlanetBodyType = isGasGiant
-                ? BodyType.GasGiant
-                : isIceGiant
-                  ? BodyType.IceGiant
-                  : BodyType.Planet;
-
-            const planetMaterial = new THREE.MeshStandardMaterial({
-                map: pickRandom(planetTexturePool),
+            // Random texture per custom moon instance
+            const moonMaterial = new THREE.MeshStandardMaterial({
+                map: pickRandom(fictionalTextures),
                 color: 0xffffff, // keep texture untinted
                 emissive: 0x000000,
                 emissiveIntensity: 0,
@@ -2193,27 +2285,39 @@ function createNewBody(
                 metalness: 0.7,
             });
 
+            // Offset position and velocity by parent body
+            const parentPos = focusedBody.mesh.position;
+            const parentVel = focusedBody.velocity;
+
             newBody = new CelestialBody(
                 dependencies,
                 scene,
-                planetRadius,
+                moonRadius,
                 0xffffff,
-                trajectory.pos.toArray(),
-                trajectory.vel.toArray(),
-                planetMass,
-                null, // No camera button
-                generateIAUName('planet'),
-                customPlanetBodyType,
-                0xaaaaaa,
-                3000,
-                false,
-                { axis: [0, 1, 0], speed: 0.1 + Math.random() * 0.4 },
+                [
+                    parentPos.x + moonTrajectory.pos.x,
+                    parentPos.y + moonTrajectory.pos.y,
+                    parentPos.z + moonTrajectory.pos.z,
+                ],
+                [
+                    parentVel.x + moonTrajectory.vel.x,
+                    parentVel.y + moonTrajectory.vel.y,
+                    parentVel.z + moonTrajectory.vel.z,
+                ],
+                moonMass,
                 null,
-                planetMaterial
+                generateIAUName('moon', focusedBody),
+                BodyType.Moon,
+                0x666666,
+                1000,
+                false,
+                { axis: [0, 1, 0], speed: 0.15 + Math.random() * 0.35 },
+                null,
+                moonMaterial
             );
 
-            // Optional atmosphere/cloud layer (checkbox-driven for custom solid planets only)
-            if (hasAtmosphere && isSolidPlanet) {
+            // Optional atmosphere/cloud layer (checkbox-driven for custom bodies)
+            if (hasAtmosphere) {
                 const cloudsMat = new THREE.MeshStandardMaterial({
                     map: pickRandom(fictionalAtmosphereTextures),
                     color: 0xffffff,
@@ -2235,182 +2339,70 @@ function createNewBody(
 
             // Ensure brightness scaling uses a neutral base when texture is present
             newBody.baseColor = new THREE.Color(0xffffff);
-            break;
-
-        case 'moon':
-            // Create a moon orbiting the currently focused body
-            const focusedBody = getFocusObject();
-            if (
-                focusedBody &&
-                simulationState.bodies.includes(focusedBody) &&
-                !focusedBody._isDisposed
-            ) {
-                const moonDistance =
-                    focusedBody.radius * 5 + Math.random() * focusedBody.radius * 10;
-
-                // Use appropriate trajectory calculation based on orbit type
-                let moonTrajectory;
-                if (orbitType === 'elliptical') {
-                    moonTrajectory = calculateEllipticalTrajectory(
-                        moonDistance,
-                        focusedBody.mass,
-                        0.3
-                    );
-                } else {
-                    moonTrajectory = calculateTrajectory(moonDistance, focusedBody.mass);
-                }
-
-                // Apply orbital angle and inclination
-                moonTrajectory = applyOrbitalTransforms(moonTrajectory, orbitalAngle, inclination);
-
-                const moonRadius =
-                    typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
-                        ? customRadius
-                        : 1 + Math.random() * 3;
-                const moonMass =
-                    typeof customMass === 'number' && isFinite(customMass) && customMass > 0
-                        ? customMass
-                        : 0.5 + Math.random() * 2;
-
-                // Random texture per custom moon instance
-                const moonMaterial = new THREE.MeshStandardMaterial({
-                    map: pickRandom(fictionalTextures),
-                    color: 0xffffff, // keep texture untinted
-                    emissive: 0x000000,
-                    emissiveIntensity: 0,
-                    roughness: 0.7,
-                    metalness: 0.7,
-                });
-
-                // Offset position and velocity by parent body
-                const parentPos = focusedBody.mesh.position;
-                const parentVel = focusedBody.velocity;
-
-                newBody = new CelestialBody(
-                    dependencies,
-                    scene,
-                    moonRadius,
-                    0xffffff,
-                    [
-                        parentPos.x + moonTrajectory.pos.x,
-                        parentPos.y + moonTrajectory.pos.y,
-                        parentPos.z + moonTrajectory.pos.z,
-                    ],
-                    [
-                        parentVel.x + moonTrajectory.vel.x,
-                        parentVel.y + moonTrajectory.vel.y,
-                        parentVel.z + moonTrajectory.vel.z,
-                    ],
-                    moonMass,
-                    null,
-                    generateIAUName('moon', focusedBody),
-                    BodyType.Moon,
-                    0x666666,
-                    1000,
-                    false,
-                    { axis: [0, 1, 0], speed: 0.15 + Math.random() * 0.35 },
-                    null,
-                    moonMaterial
-                );
-
-                // Optional atmosphere/cloud layer (checkbox-driven for custom bodies)
-                if (hasAtmosphere) {
-                    const cloudsMat = new THREE.MeshStandardMaterial({
-                        map: pickRandom(fictionalAtmosphereTextures),
-                        color: 0xffffff,
-                        transparent: true,
-                        opacity: 0.45,
-                        depthWrite: false,
-                        roughness: 1.0,
-                        metalness: 0.0,
-                    });
-
-                    const cloudsGeo = new THREE.SphereGeometry(newBody.radius * 1.03, 32, 32);
-                    newBody.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
-                    newBody.clouds.renderOrder = 2;
-                    // Make cloud sphere selectable (raycaster maps back to owning body)
-                    newBody.clouds.userData = { parentBody: newBody };
-                    newBody.mesh.add(newBody.clouds);
-                    newBody.cloudRotationSpeed = 0.12 + Math.random() * 0.12;
-                }
-
-                // Ensure brightness scaling uses a neutral base when texture is present
-                newBody.baseColor = new THREE.Color(0xffffff);
-            } else {
-                console.log('Please select a body first to create a moon');
-                return;
-            }
-            break;
-
-        case 'asteroid':
-            // Create a small asteroid
-            const asteroidDistance =
-                ASTEROID_SPAWN_MIN_DIST * SCALE_FACTOR +
-                Math.random() *
-                    ((ASTEROID_SPAWN_MAX_DIST - ASTEROID_SPAWN_MIN_DIST) * SCALE_FACTOR);
-
-            // Use appropriate trajectory calculation based on orbit type
-            let asteroidTrajectory;
-            if (orbitType === 'elliptical') {
-                asteroidTrajectory = calculateEllipticalTrajectory(asteroidDistance, SUN_MASS, 0.3);
-            } else {
-                asteroidTrajectory = calculateTrajectory(asteroidDistance, SUN_MASS);
-            }
-
-            // Apply orbital angle and inclination
-            asteroidTrajectory = applyOrbitalTransforms(
-                asteroidTrajectory,
-                orbitalAngle,
-                inclination
-            );
-
-            newBody = new Asteroid(dependencies, scene, {
-                pos: asteroidTrajectory.pos.toArray(),
-                vel: asteroidTrajectory.vel.toArray(),
-            });
-            break;
-
-        case 'comet': {
-            // Create a comet using the dedicated Comet class so it gets nucleus + tail behavior.
-            const cometDistance = 100000 + Math.random() * 500000;
-
-            // Use appropriate trajectory calculation based on orbit type
-            let cometTrajectory;
-            if (orbitType === 'elliptical') {
-                // Comets typically have highly elliptical orbits
-                cometTrajectory = calculateEllipticalTrajectory(cometDistance, SUN_MASS, 0.4);
-            } else {
-                cometTrajectory = calculateTrajectory(cometDistance, SUN_MASS);
-            }
-
-            // Apply orbital angle and inclination
-            cometTrajectory = applyOrbitalTransforms(cometTrajectory, orbitalAngle, inclination);
-
-            const cometRadius = 1 + Math.random() * 2;
-            const cometMass = 0.5 + Math.random() * 3;
-            const cometMaterial = new THREE.MeshStandardMaterial({
-                color: 0x888888,
-                emissive: 0x000000,
-                emissiveIntensity: 0,
-                roughness: 0.7,
-                metalness: 0.6,
-            });
-
-            newBody = new Comet(
-                dependencies,
-                scene,
-                {
-                    radius: cometRadius,
-                    pos: cometTrajectory.pos.toArray(),
-                    vel: cometTrajectory.vel.toArray(),
-                    mass: cometMass,
-                    id: createUniqueId('comet'),
-                    name: generateIAUName('comet'),
-                },
-                cometMaterial
-            );
-            break;
+        } else {
+            console.log('Please select a body first to create a moon');
+            return;
         }
+    } else if (bodyType === 'asteroid') {
+        // Create a small asteroid
+        const asteroidDistance =
+            ASTEROID_SPAWN_MIN_DIST * SCALE_FACTOR +
+            Math.random() * ((ASTEROID_SPAWN_MAX_DIST - ASTEROID_SPAWN_MIN_DIST) * SCALE_FACTOR);
+
+        // Use appropriate trajectory calculation based on orbit type
+        let asteroidTrajectory;
+        if (orbitType === 'elliptical') {
+            asteroidTrajectory = calculateEllipticalTrajectory(asteroidDistance, SUN_MASS, 0.3);
+        } else {
+            asteroidTrajectory = calculateTrajectory(asteroidDistance, SUN_MASS);
+        }
+
+        // Apply orbital angle and inclination
+        asteroidTrajectory = applyOrbitalTransforms(asteroidTrajectory, orbitalAngle, inclination);
+
+        newBody = new Asteroid(dependencies, scene, {
+            pos: asteroidTrajectory.pos.toArray(),
+            vel: asteroidTrajectory.vel.toArray(),
+        });
+    } else if (bodyType === 'comet') {
+        // Create a comet using the dedicated Comet class so it gets nucleus + tail behavior.
+        const cometDistance = 100000 + Math.random() * 500000;
+
+        // Use appropriate trajectory calculation based on orbit type
+        let cometTrajectory;
+        if (orbitType === 'elliptical') {
+            // Comets typically have highly elliptical orbits
+            cometTrajectory = calculateEllipticalTrajectory(cometDistance, SUN_MASS, 0.4);
+        } else {
+            cometTrajectory = calculateTrajectory(cometDistance, SUN_MASS);
+        }
+
+        // Apply orbital angle and inclination
+        cometTrajectory = applyOrbitalTransforms(cometTrajectory, orbitalAngle, inclination);
+
+        const cometRadius = 1 + Math.random() * 2;
+        const cometMass = 0.5 + Math.random() * 3;
+        const cometMaterial = new THREE.MeshStandardMaterial({
+            color: 0x888888,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.7,
+            metalness: 0.6,
+        });
+
+        newBody = new Comet(
+            dependencies,
+            scene,
+            {
+                radius: cometRadius,
+                pos: cometTrajectory.pos.toArray(),
+                vel: cometTrajectory.vel.toArray(),
+                mass: cometMass,
+                id: createUniqueId('comet'),
+                name: generateIAUName('comet'),
+            },
+            cometMaterial
+        );
     }
 
     if (newBody) {
@@ -2446,12 +2438,7 @@ function createNewBody(
     }
 }
 
-const SimulationStartMode = Object.freeze({
-    Default: 'default',
-    Empty: 'empty',
-});
-
-function applyEnvironmentDefaultsForMode(mode) {
+function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     // Only touches background visuals + management checkboxes (if already initialized).
     const isEmpty = mode === SimulationStartMode.Empty;
 
@@ -4508,37 +4495,36 @@ mainPanel.on('zoomOut', () => {
     zoomOut();
 });
 
-mainPanel.on('lockToSunChange', ({ checked }) => {
-    // Lock to sun checkbox - logic is already in animation loop
-    // No additional action needed, just checked in the render loop
+mainPanel.on('lockToSunChange', ({ checked }: { checked: boolean }) => {
+    // TODO: Move checkbox DOM lookup out of the animation loop.
 });
 
-mainPanel.on('shadowsChange', ({ checked }) => {
+mainPanel.on('shadowsChange', ({ checked }: { checked: boolean }) => {
     toggleShadows(checked);
 });
 
-managementPanel.on('kuiperBeltChange', ({ checked }) => {
+managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = checked;
     }
 });
 
-const enableSkydomeCheckbox = document.getElementById('enableSkydome');
+const enableSkydomeCheckbox = document.getElementById('enableSkydome') as HTMLInputElement;
 if (enableSkydomeCheckbox) {
     enableSkydomeCheckbox.onchange = () => {
         skydome.visible = enableSkydomeCheckbox.checked;
     };
 }
 
-mainPanel.on('trailsChange', ({ checked }) => {
+mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
     simulationState.bodies.forEach((body) => {
-        if (body && body instanceof CelestialBody) {
+        if (body && body instanceof CelestialBody && body.trail) {
             body.trail.visible = checked;
         }
     });
 });
 
-mainPanel.on('namesChange', ({ checked }) => {
+mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
     simulationState.bodies.forEach((body) => {
         if (body && body.label) {
             body.label.visible = checked;
@@ -4549,7 +4535,7 @@ mainPanel.on('namesChange', ({ checked }) => {
     });
 });
 
-mainPanel.on('timeScaleChange', ({ value }) => {
+mainPanel.on('timeScaleChange', ({ value }: { value: number }) => {
     const newSpeed = value;
     const direction = newSpeed < 0 ? ' REVERSE' : '';
     const absSpeed = Math.abs(newSpeed);
@@ -4581,7 +4567,7 @@ mainPanel.on('manageSystem', () => {
 });
 
 // Manual selection from Bodies table
-mainPanel.on('manualBodySelect', ({ body }) => {
+mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
     if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
 
     // Clear any camera preset highlight (manual selection).
@@ -5338,15 +5324,15 @@ function modalBlocksInput() {
     return startupModal.isVisible();
 }
 
-function onMouseDownWrapped(e) {
+function onMouseDownWrapped(e: MouseEvent) {
     if (modalBlocksInput()) return;
     return _origOnMouseDown(e);
 }
-function onMouseMoveWrapped(e) {
+function onMouseMoveWrapped(e: MouseEvent) {
     if (modalBlocksInput()) return;
     return _origOnMouseMove(e);
 }
-function onMouseUpWrapped(e) {
+function onMouseUpWrapped(e: MouseEvent) {
     if (modalBlocksInput()) return;
     return _origOnMouseUp(e);
 }
