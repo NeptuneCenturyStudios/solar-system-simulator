@@ -828,7 +828,7 @@ function createEventLogSprite() {
 createEventLogSprite();
 
 // --- Flight mode steering line (drawn in uiScene screen space) ---
-// A line from screen centre to the current pointer offset, visualising the ship's turn direction.
+// A line from the ship's projected aim point to the current pointer offset.
 const steeringLinePositions = new Float32Array(6); // 2 points × 3 coords
 const steeringLineGeo = new THREE.BufferGeometry();
 steeringLineGeo.setAttribute(
@@ -845,8 +845,31 @@ const flightSteeringLine = new THREE.Line(
         depthWrite: false,
     })
 );
+flightSteeringLine.frustumCulled = false;
 flightSteeringLine.visible = false;
 uiScene.add(flightSteeringLine);
+
+// Small static crosshair at the projected aim point (visible even when offset is zero).
+// Four vertices: left–right and top–bottom arm pairs for a + shape.
+const CROSSHAIR_SIZE = 10; // half-arm length in screen pixels
+const crosshairPositions = new Float32Array([
+    -CROSSHAIR_SIZE, 0, 0,  CROSSHAIR_SIZE, 0, 0,  // horizontal arm
+     0, -CROSSHAIR_SIZE, 0, 0, CROSSHAIR_SIZE, 0,  // vertical arm
+]);
+const crosshairGeo = new THREE.BufferGeometry();
+crosshairGeo.setAttribute('position', new THREE.BufferAttribute(crosshairPositions, 3));
+const flightCrosshair = new THREE.LineSegments(
+    crosshairGeo,
+    new THREE.LineBasicMaterial({
+        color: 0x00ffcc,
+        transparent: true,
+        opacity: 0.6,
+        depthTest: false,
+        depthWrite: false,
+    })
+);
+flightCrosshair.visible = false;
+uiScene.add(flightCrosshair);
 
 // (Ship engine trail is owned by each Spaceship via its ShipTrail property)
 
@@ -4825,10 +4848,26 @@ function updateFlightControls(dt: number) {
     //  modified in-place there — no override needed here)
 
     // ── Steering line (uiScene screen-space) ─────────────────────────────────
-    steeringLinePositions[3] = flightState.pointerOffsetX;
-    steeringLinePositions[4] = -flightState.pointerOffsetY;
+    // Project a point far ahead in the ship's forward direction onto the screen.
+    // This gives the screen-space position of where the ship is AIMING, which sits
+    // above screen-centre in 3rd-person view because the camera is elevated behind
+    // the ship and looks at its body-centre, not its nose.
+    const noseNDC = ship.mesh.position.clone()
+        .addScaledVector(forward, 8)
+        .project(camera);
+    const noseScreenX =  noseNDC.x * (window.innerWidth  * 0.5);
+    const noseScreenY =  noseNDC.y * (window.innerHeight * 0.5);
+
+    steeringLinePositions[0] = noseScreenX;
+    steeringLinePositions[1] = noseScreenY;
+    steeringLinePositions[2] = 0;
+    steeringLinePositions[3] = noseScreenX + flightState.pointerOffsetX;
+    steeringLinePositions[4] = noseScreenY - flightState.pointerOffsetY;
     steeringLinePositions[5] = 0;
     steeringLineGeo.attributes.position.needsUpdate = true;
+
+    // Move the static crosshair to the projected nose position
+    flightCrosshair.position.set(noseScreenX, noseScreenY, 0);
 }
 
 /** Spawn a spaceship in front of the camera and enter flight mode.
@@ -4907,6 +4946,7 @@ function spawnShip() {
     controls.enabled = false;
 
     flightSteeringLine.visible = true;
+    flightCrosshair.visible = true;
     flightControlsPanel.setFlightActive(true);
     flightControlsPanel.setViewState(flightState.isCockpitView);
 
@@ -4973,6 +5013,7 @@ function exitFlightMode() {
     controls.update();
 
     flightSteeringLine.visible = false;
+    flightCrosshair.visible = false;
     if (flightState.knownShip && !flightState.knownShip._isDisposed) {
         flightState.knownShip.trail.hide();
     }
