@@ -96,8 +96,10 @@ import { Star } from './bodies/star';
 import { Asteroid } from './bodies/asteroid.js';
 import { Comet } from './bodies/comet.js';
 
+import { Spaceship } from './bodies/spaceship.js';
 import { MainPanel } from './ui/main-panel.js';
 import { ManagementPanel } from './ui/management-panel.js';
+import { FlightControlsPanel } from './ui/flight-controls-panel.js';
 import { StartupModal } from './ui/startup-modal.js';
 import { EventLogEntry } from './event-log/event-log.js';
 import { Halley } from './bodies/halley.js';
@@ -481,6 +483,77 @@ function createFPSTexture(fps: number) {
     return texture;
 }
 
+// Flight speed HUD texture — drawn in the same style as the FPS counter
+function createSpeedTexture(speed: number, isBoosting: boolean, pos?: THREE.Vector3, vel?: THREE.Vector3) {
+    const hasExtra = !!(pos && vel);
+    // Canvas is sized so that sprite scale = canvas × 0.625 matches the FPS counter pixel density.
+    // 640×640 canvas → 400×400 sprite pixels on screen.
+    const W = 640;
+    const H = hasExtra ? 640 : 200;
+    const canvas = document.createElement('canvas');
+    canvas.width  = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const color = isBoosting ? '#ff9944' : '#00ffcc';
+    const glow  = isBoosting ? 'rgba(255,153,68,0.85)' : 'rgba(0,255,204,0.85)';
+    const dim   = 'rgba(0,255,204,0.5)';
+
+    ctx.textAlign    = 'right';
+    ctx.textBaseline = 'middle';
+
+    // ── Speed ─────────────────────────────────────────────────────────────────
+    ctx.fillStyle   = color;
+    ctx.shadowColor = glow;
+    ctx.shadowBlur  = 12;
+    ctx.font = '36px monospace';
+    ctx.fillText(isBoosting ? 'BOOST' : 'SPEED', W - 24, hasExtra ? 44 : 56);
+
+    ctx.shadowBlur = 28;
+    ctx.font = 'bold 68px monospace';
+    ctx.fillText(Math.abs(speed).toFixed(1), W - 24, hasExtra ? 120 : 140);
+
+    if (hasExtra) {
+        const lh = 56; // canvas-pixel line height for data rows
+
+        // ── Position ──────────────────────────────────────────────────────────
+        let y = 194;
+        ctx.shadowBlur  = 8;
+        ctx.font        = '32px monospace';
+        ctx.fillStyle   = dim;
+        ctx.shadowColor = dim;
+        ctx.fillText('POSITION', W - 24, y);  y += lh;
+
+        ctx.shadowBlur  = 16;
+        ctx.font        = '34px monospace';
+        ctx.fillStyle   = color;
+        ctx.shadowColor = glow;
+        ctx.fillText(`X  ${pos!.x.toFixed(1)}`, W - 24, y);  y += lh;
+        ctx.fillText(`Y  ${pos!.y.toFixed(1)}`, W - 24, y);  y += lh;
+        ctx.fillText(`Z  ${pos!.z.toFixed(1)}`, W - 24, y);  y += lh + 12;
+
+        // ── Velocity ──────────────────────────────────────────────────────────
+        ctx.shadowBlur  = 8;
+        ctx.font        = '32px monospace';
+        ctx.fillStyle   = dim;
+        ctx.shadowColor = dim;
+        ctx.fillText('VELOCITY', W - 24, y);  y += lh;
+
+        ctx.shadowBlur  = 16;
+        ctx.font        = '34px monospace';
+        ctx.fillStyle   = color;
+        ctx.shadowColor = glow;
+        ctx.fillText(`X  ${vel!.x.toFixed(2)}`, W - 24, y);  y += lh;
+        ctx.fillText(`Y  ${vel!.y.toFixed(2)}`, W - 24, y);  y += lh;
+        ctx.fillText(`Z  ${vel!.z.toFixed(2)}`, W - 24, y);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+}
+
 // Function to create/update body stats texture
 function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     const canvas = document.createElement('canvas');
@@ -754,6 +827,29 @@ function createEventLogSprite() {
 }
 createEventLogSprite();
 
+// --- Flight mode steering line (drawn in uiScene screen space) ---
+// A line from screen centre to the current pointer offset, visualising the ship's turn direction.
+const steeringLinePositions = new Float32Array(6); // 2 points × 3 coords
+const steeringLineGeo = new THREE.BufferGeometry();
+steeringLineGeo.setAttribute(
+    'position',
+    new THREE.BufferAttribute(steeringLinePositions, 3)
+);
+const flightSteeringLine = new THREE.Line(
+    steeringLineGeo,
+    new THREE.LineBasicMaterial({
+        color: 0x00ffcc,
+        transparent: true,
+        opacity: 0.85,
+        depthTest: false,
+        depthWrite: false,
+    })
+);
+flightSteeringLine.visible = false;
+uiScene.add(flightSteeringLine);
+
+// (Ship engine trail is owned by each Spaceship via its ShipTrail property)
+
 const controls = new OrbitControls(camera, renderer.domElement);
 camera.position.set(INITIAL_CAMERA_DISTANCE, 12018 * SCALE_FACTOR, INITIAL_CAMERA_DISTANCE); // Scaled for new world size
 // Start in "center scene" orbit mode (NONE_FOCUS_POSITION is defined later)
@@ -809,13 +905,57 @@ const cameraState = {
 };
 
 const simulationState = {
-    timeScale: 1.5,
+    timeScale: 1,
     isPaused: false,
-    savedTimeScale: 1.5,
+    savedTimeScale: 1,
     lastT: performance.now(),
     bodies: [] as Body[],
     explosions: [] as ParticleExplosion[],
 };
+
+// --- Flight mode state ---
+const flightState = {
+    isActive: false,
+    activeShip: null as Spaceship | null,
+    isCockpitView: false,
+    /** Current thrust speed; persists after key release (W increases, S decreases). */
+    currentSpeed: 0,
+    /** Accumulated mouse pointer offset from screen centre (x/y pixels, capped). */
+    pointerOffsetX: 0,
+    pointerOffsetY: 0,
+    rollLeft: false,
+    rollRight: false,
+    /** Current angular roll velocity (rad/s). Decays when key released. */
+    rollVelocity: 0,
+    /** Smoothed steering values in [-1, 1]. Lerp toward raw target each frame. */
+    steerX: 0,
+    steerY: 0,
+    /** Whether advanced (additive) flight physics are active. Default = false (simple mode). */
+    isAdvancedMode: false,
+    // Pre-flight camera snapshot so we can restore exactly on exit
+    prevCameraPos: new THREE.Vector3(),
+    prevCameraUp: new THREE.Vector3(0, 1, 0),
+    prevCameraQuat: new THREE.Quaternion(),
+    prevControlsTarget: new THREE.Vector3(),
+    /** Reference to the last spawned ship; persists after exit so user can re-enter it. */
+    knownShip: null as Spaceship | null,
+};
+
+// Flight tuning constants
+const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR;           // normal max speed cap (units/s)
+const FLIGHT_BOOST_MAX_SPEED = 5 * FLIGHT_MAX_SPEED;  // boost ceiling = 5× normal max speed
+const FLIGHT_THRUST_ACCEL = 8 * SCALE_FACTOR;          // acceleration rate while W/S held (u/s²)
+const FLIGHT_BOOST_ACCEL  = 60 * SCALE_FACTOR;         // acceleration rate while Shift held (u/s²)
+/** Rate at which cross-axis (gravity-accumulated) velocity decays while thrusting in simple mode.
+ *  Higher = quicker normalisation. At 1.5 the perpendicular component halves in ~0.46 s. */
+const FLIGHT_PERP_DECAY = 1.5;  // per second
+const FLIGHT_MAX_POINTER_OFFSET = 260;   // pixels before reaching full turn rate
+const FLIGHT_MAX_TURN_RATE = 0.6;        // radians/s at full pointer deflection
+const FLIGHT_ROLL_SPEED = 2.0;           // max roll angular velocity (rad/s)
+const FLIGHT_ROLL_ACCEL = 1.5;           // how fast roll ramps up (rad/s²) — lower = slower start
+const FLIGHT_ROLL_FRICTION = 1.5;        // how fast roll decays when key released (rad/s²)
+const FLIGHT_STEER_SMOOTHING = 0.018;    // lerp factor per frame — lower = heavier feel
+const FLIGHT_STEER_DEADZONE = 0.08;      // normalised dead zone (0–1); input below this is zeroed
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -1103,6 +1243,30 @@ function createStatsSprite() {
 }
 createStatsSprite();
 
+// Flight speed indicator — bottom-right corner, shown only while in flight mode
+let speedSprite: THREE.Sprite | null = null;
+function createSpeedSprite() {
+    const texture = createSpeedTexture(0, false);
+    if (!texture) return;
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+    });
+    speedSprite = new THREE.Sprite(material);
+    speedSprite.scale.set(400, 400, 1);
+    // Bottom-right corner: sprite center is 200px from right/bottom edges + 10px margin
+    speedSprite.position.set(
+        window.innerWidth  / 2 - 210,
+        -(window.innerHeight / 2 - 210),
+        0
+    );
+    speedSprite.visible = false;
+    uiScene.add(speedSprite);
+}
+createSpeedSprite();
+
 // --- Context hint system (top-center HUD text) ---
 let hintSprite = null;
 let hintLastText = '';
@@ -1269,7 +1433,7 @@ let isRepositioning = false;
 let activeAxis = null;
 let isChangingVelocity = false;
 let isMiddleMouseVelocity = false;
-let timeScale = 1.5;
+let timeScale = 1;
 const cameraOffsetFromPlanet = new THREE.Vector3();
 const lastPlanetAngle = 0;
 let isFreeCameraMode = false;
@@ -1278,7 +1442,7 @@ let focusID = 'camSun';
 let manuallySelectedBody = null as Body | null; // Track bodies clicked in space (without camera buttons)
 const NONE_FOCUS_POSITION = new THREE.Vector3(0, 0, 0); // Center of solar system
 let isPaused = false;
-let savedTimeScale = 1.5;
+let savedTimeScale = 1;
 let lastT = performance.now();
 
 let supernovas: Supernova[] = []; // Track all supernova effects
@@ -2807,6 +2971,10 @@ function toggleShadows(enabled: boolean) {
 }
 
 function onMouseDown(event: MouseEvent) {
+    // In flight mode: block all LMB interactions (selection, gizmo, velocity editing).
+    // Only allow RMB (which just sets isMouseLookActive that flight mode ignores anyway).
+    if (flightState.isActive && event.button !== 2) return;
+
     // Surface mode RMB look uses the global mousemove handler (onSurfaceMouseMove).
     // Avoid engaging the generic pointer-lock mouse-look while on the surface.
     // Middle mouse button for velocity control when body is selected
@@ -3123,6 +3291,21 @@ function onMouseDown(event: MouseEvent) {
 }
 
 function onMouseMove(event) {
+    // Flight mode: capture mouse movement as pointer offset for steering.
+    // The pointer is locked during flight, so event.movementX/Y gives reliable deltas.
+    if (flightState.isActive && document.pointerLockElement === renderer.domElement) {
+        const maxOff = FLIGHT_MAX_POINTER_OFFSET;
+        flightState.pointerOffsetX = Math.max(
+            -maxOff,
+            Math.min(maxOff, flightState.pointerOffsetX + (event.movementX || 0))
+        );
+        flightState.pointerOffsetY = Math.max(
+            -maxOff,
+            Math.min(maxOff, flightState.pointerOffsetY + (event.movementY || 0))
+        );
+        return; // Skip all other mouse-look / gizmo-drag logic during flight
+    }
+
     // Handle Velocity Dragging OR middle mouse button
     // NOTE: While dragging velocity we still allow right-mouse mouse-look + zoom.
     // So we do NOT early-return here; we only return if we actually applied a drag update.
@@ -3582,7 +3765,28 @@ function animate() {
         updateSurfaceCameraTransform();
     }
 
-    // WASD camera movement (works in both free camera and normal mode)
+    // Flight mode camera + controls update.
+    // When active, flight mode fully owns camera position/orientation and ship velocity.
+    const isFlightModeActive =
+        flightState.isActive &&
+        !!flightState.activeShip &&
+        !flightState.activeShip._isDisposed;
+
+    // Auto-exit if the active ship was destroyed this frame (absorbed by collision, etc.)
+    if (flightState.isActive && flightState.activeShip &&
+        (flightState.activeShip._isDisposed ||
+         !simulationState.bodies.includes(flightState.activeShip))) {
+        exitFlightMode();
+    }
+
+    if (isFlightModeActive) {
+        updateFlightControls(SIM.BASE_FRAME_DT);
+        // Camera is repositioned AFTER the physics loop (see updateFlightCamera below)
+        // so it always reflects the ship's final post-physics position.
+    }
+
+    // WASD camera movement (works in both free camera and normal mode, but NOT in flight mode)
+    if (!isFlightModeActive) {
     const speed = keys.shift ? cameraSpeed * 10 : cameraSpeed;
     const direction = new THREE.Vector3();
 
@@ -3679,6 +3883,8 @@ function animate() {
             }
         }
     }
+
+    } // end if (!isFlightModeActive) WASD movement
 
     const focusObj = getFocusObject();
     const oldPos = focusObj && focusObj.mesh ? focusObj.mesh.position.clone() : new THREE.Vector3();
@@ -3910,9 +4116,11 @@ function animate() {
     const showNames = document.getElementById('showNames').checked;
     simulationState.bodies.forEach((body) => {
         if (body && !body._isDisposed && body.mesh && body.label) {
-            body.label.visible = showNames;
+            // Hide the active ship's label while in flight (it would clutter the camera view)
+            const isActiveShip = flightState.isActive && body === flightState.activeShip;
+            body.label.visible = showNames && !isActiveShip;
             if (body.labelLine) {
-                body.labelLine.visible = showNames;
+                body.labelLine.visible = showNames && !isActiveShip;
             }
 
             if (showNames) {
@@ -3933,8 +4141,46 @@ function animate() {
         }
     });
 
-    // Handle camera positioning (skip entirely in surface mode)
-    if (!isSurfaceModeActive && !isFreeCameraMode) {
+    // Handle camera positioning (skip entirely in surface mode or flight mode)
+    // Flight camera is updated here — AFTER physics — so the camera uses the ship's
+    // true post-physics position and never lags behind at high speed.
+    if (isFlightModeActive) {
+        const ship = flightState.activeShip;
+        if (ship && !ship._isDisposed && ship.mesh) {
+            if (flightState.isCockpitView) {
+                const cockpitWorld = ship.cockpitOffset
+                    .clone()
+                    .applyQuaternion(ship.mesh.quaternion)
+                    .add(ship.mesh.position);
+                camera.position.copy(cockpitWorld);
+                const shipUp = new THREE.Vector3(0, 1, 0).applyQuaternion(ship.mesh.quaternion);
+                camera.up.copy(shipUp);
+                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
+                camera.lookAt(cockpitWorld.clone().add(forward.multiplyScalar(1000)));
+            } else {
+                const offset = ship.thirdPersonOffset
+                    .clone()
+                    .applyQuaternion(ship.mesh.quaternion);
+                camera.position.copy(ship.mesh.position).add(offset);
+                const shipUp = new THREE.Vector3(0, 1, 0).applyQuaternion(ship.mesh.quaternion);
+                camera.up.copy(shipUp);
+                camera.lookAt(ship.mesh.position);
+                controls.target.copy(ship.mesh.position);
+            }
+        }
+    }
+
+    // ── Ship trail update ──────────────────────────────────────────────────────
+    // Runs every frame after physics so the nozzle position is final.
+    if (isFlightModeActive) {
+        const ship = flightState.activeShip!;
+        const nozzle = ship.thrusterOffset.clone()
+            .applyQuaternion(ship.mesh.quaternion)
+            .add(ship.mesh.position);
+        ship.trail.update(nozzle, flightState.currentSpeed, FLIGHT_MAX_SPEED);
+    }
+
+    if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
         // Only "follow" a body (translate camera by its delta) when Look At is enabled.
         if (
             cameraState.isLookAtMode &&
@@ -3966,7 +4212,7 @@ function animate() {
         }
     }
 
-    if (!isSurfaceModeActive && !isFreeCameraMode) {
+    if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
         controls.update();
     }
 
@@ -3994,6 +4240,19 @@ function animate() {
             fpsSprite.material.map.dispose();
             fpsSprite.material.map = createFPSTexture(fps);
             fpsSprite.material.needsUpdate = true;
+        }
+
+        // Update flight speed sprite
+        if (speedSprite && speedSprite.visible && flightState.isActive) {
+            const ship = flightState.activeShip;
+            speedSprite.material.map?.dispose();
+            speedSprite.material.map = createSpeedTexture(
+                flightState.currentSpeed,
+                keys.shift,
+                ship?.mesh?.position,
+                ship?.velocity
+            );
+            speedSprite.material.needsUpdate = true;
         }
 
         // Update body stats if there's a selected body
@@ -4085,10 +4344,51 @@ function setF(id) {
 const startupModal = new StartupModal('startup-overlay');
 const mainPanel = new MainPanel('ui-layer');
 const managementPanel = new ManagementPanel('management-panel', { getFocusObject });
+const flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
 
 startupModal.initialize();
 mainPanel.initialize();
 managementPanel.initialize();
+flightControlsPanel.initialize();
+
+// Wire Flight Controls button and panel events
+{
+    const flightControlsBtn = document.getElementById('flightControlsBtn');
+    if (flightControlsBtn) {
+        flightControlsBtn.onclick = () => {
+            flightControlsPanel.toggle();
+            // Update spawn button label to reflect whether there is a re-enterable ship
+            updateFlightSpawnBtnLabel();
+        };
+    }
+    flightControlsPanel.on('spawnShip', () => spawnShip());
+    flightControlsPanel.on('toggleView', () => {
+        flightState.isCockpitView = !flightState.isCockpitView;
+        flightControlsPanel.setViewState(flightState.isCockpitView);
+    });
+    flightControlsPanel.on('exitFlight', () => exitFlightMode());
+
+    // Advanced flight mode checkbox
+    const advancedModeChk = document.getElementById('flightAdvancedMode') as HTMLInputElement | null;
+    if (advancedModeChk) {
+        advancedModeChk.checked = flightState.isAdvancedMode;
+        advancedModeChk.addEventListener('change', () => {
+            flightState.isAdvancedMode = advancedModeChk.checked;
+        });
+    }
+}
+
+/** Update the spawn/re-enter button label based on whether a live ship exists. */
+function updateFlightSpawnBtnLabel() {
+    const btn = document.getElementById('flightSpawnBtn');
+    if (!btn) return;
+    const existing = flightState.knownShip;
+    const canReenter = existing && !existing._isDisposed && simulationState.bodies.includes(existing);
+    const iconEl = btn.querySelector('.material-symbols-outlined');
+    if (iconEl) iconEl.textContent = canReenter ? 'login' : 'rocket_launch';
+    while (iconEl && iconEl.nextSibling) btn.removeChild(iconEl.nextSibling);
+    if (iconEl) btn.appendChild(document.createTextNode(canReenter ? ' RE-ENTER SHIP' : ' SPAWN SPACESHIP'));
+}
 
 // Prevent UI clicks and keyboard events from interfering with scene interaction
 const uiContainer = document.getElementById('ui-container');
@@ -4407,6 +4707,284 @@ function onSurfaceMouseMove(event) {
     );
 }
 
+// ── Flight mode functions ────────────────────────────────────────────────────
+
+/**
+ * Applies per-frame flight controls to the active spaceship.
+ * Called from animate() when flightState.isActive.
+ */
+function updateFlightControls(dt: number) {
+    const ship = flightState.activeShip;
+    if (!ship || ship._isDisposed || !ship.mesh) {
+        exitFlightMode();
+        return;
+    }
+
+    // ── Thrust ─────────────────────────────────────────────────────────────────────────────
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
+    const fwdSpeed = ship.velocity.dot(forward);
+    // W only counts as active thrust once the ship has decelerated to normal max speed.
+    // This prevents W from snapping the ship from boost speed (500) down to normal max (100)
+    // in one frame when pressed mid-deceleration.
+    const wEffective = keys.w && (flightState.currentSpeed <= FLIGHT_MAX_SPEED || keys.shift);
+    const thrustActive = keys.shift || wEffective || keys.s;
+
+    if (!flightState.isAdvancedMode) {
+        // ── Simple mode ──────────────────────────────────────────────────────────
+        // While a thrust key is held: currentSpeed is updated by hold-to-accelerate
+        // and the full velocity is OVERWRITTEN to match the current forward direction.
+        // This gives direct, arcade-style control of the ship vector.
+        // When no key is held the ship coasts freely and gravity accumulates.
+        if (thrustActive) {
+            const maxSpeed = keys.shift ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
+            const accel    = keys.shift ? FLIGHT_BOOST_ACCEL     : FLIGHT_THRUST_ACCEL;
+            if (keys.shift || wEffective) {
+                flightState.currentSpeed = Math.min(flightState.currentSpeed + accel * dt, maxSpeed);
+            } else { // keys.s
+                flightState.currentSpeed = Math.max(flightState.currentSpeed - accel * dt, -FLIGHT_MAX_SPEED);
+            }
+            // Gradually normalise trajectory toward the ship's forward axis while thrusting.
+            // Decompose current velocity into forward + perpendicular components,
+            // decay the perpendicular part, then reassemble — no jarring snap.
+            const perpVel = ship.velocity.clone().addScaledVector(forward, -fwdSpeed);
+            const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * dt);
+            perpVel.multiplyScalar(decay);
+            ship.velocity.copy(forward).multiplyScalar(flightState.currentSpeed).add(perpVel);
+        } else {
+            // Coasting: sync display value from real forward velocity
+            flightState.currentSpeed = fwdSpeed;
+        }
+    } else {
+        // ── Advanced mode ────────────────────────────────────────────────────────
+        // Thrust adds to velocity without removing gravity-accumulated perpendicular
+        // components, so orbital mechanics work at all times.
+        if (keys.shift) {
+            if (fwdSpeed < FLIGHT_BOOST_MAX_SPEED) {
+                const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            }
+        } else if (keys.w) {
+            if (fwdSpeed < FLIGHT_MAX_SPEED) {
+                const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            }
+        } else if (keys.s) {
+            if (fwdSpeed > -FLIGHT_MAX_SPEED) {
+                const delta = Math.max(-FLIGHT_THRUST_ACCEL * dt, -FLIGHT_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            }
+        }
+        // No thrust: ship coasts freely
+        flightState.currentSpeed = ship.velocity.dot(forward);
+    }
+
+    // ── Roll with inertia (A/D) ───────────────────────────────────────────────
+    // Accelerate rollVelocity toward ±FLIGHT_ROLL_SPEED when key held,
+    // then apply friction to bring it back to 0 when released.
+    const rollTarget = flightState.rollLeft ? -FLIGHT_ROLL_SPEED
+                     : flightState.rollRight ? FLIGHT_ROLL_SPEED
+                     : 0;
+    if (flightState.rollLeft || flightState.rollRight) {
+        // Ramp up toward target
+        const dir = rollTarget > 0 ? 1 : -1;
+        flightState.rollVelocity += dir * FLIGHT_ROLL_ACCEL * dt;
+        flightState.rollVelocity = THREE.MathUtils.clamp(
+            flightState.rollVelocity, -FLIGHT_ROLL_SPEED, FLIGHT_ROLL_SPEED
+        );
+    } else {
+        // No key — apply friction toward zero
+        if (Math.abs(flightState.rollVelocity) < FLIGHT_ROLL_FRICTION * dt) {
+            flightState.rollVelocity = 0;
+        } else {
+            flightState.rollVelocity -= Math.sign(flightState.rollVelocity) * FLIGHT_ROLL_FRICTION * dt;
+        }
+    }
+    if (flightState.rollVelocity !== 0) {
+        ship.mesh.rotateZ(flightState.rollVelocity * dt);
+    }
+
+    // ── Steering with smoothing + dead zone (mouse) ───────────────────────────
+    // Raw normalised pointer input
+    const rawXFull = THREE.MathUtils.clamp(flightState.pointerOffsetX / FLIGHT_MAX_POINTER_OFFSET, -1, 1);
+    const rawYFull = THREE.MathUtils.clamp(flightState.pointerOffsetY / FLIGHT_MAX_POINTER_OFFSET, -1, 1);
+    // Apply dead zone: values within ±DEADZONE snap to 0, outside rescale to 0-1
+    function applyDeadzone(v: number) {
+        const d = FLIGHT_STEER_DEADZONE;
+        if (Math.abs(v) < d) return 0;
+        return Math.sign(v) * (Math.abs(v) - d) / (1 - d);
+    }
+    const rawX = applyDeadzone(rawXFull);
+    const rawY = applyDeadzone(rawYFull);
+    // Exponential lerp — gives a weighted, inertia-like feel to the controls
+    flightState.steerX += (rawX - flightState.steerX) * FLIGHT_STEER_SMOOTHING;
+    flightState.steerY += (rawY - flightState.steerY) * FLIGHT_STEER_SMOOTHING;
+    ship.mesh.rotateY(-flightState.steerX * FLIGHT_MAX_TURN_RATE * dt);
+    ship.mesh.rotateX( flightState.steerY * FLIGHT_MAX_TURN_RATE * dt);
+
+    // (currentSpeed is updated in the thrust block above; velocity is
+    //  modified in-place there — no override needed here)
+
+    // ── Steering line (uiScene screen-space) ─────────────────────────────────
+    steeringLinePositions[3] = flightState.pointerOffsetX;
+    steeringLinePositions[4] = -flightState.pointerOffsetY;
+    steeringLinePositions[5] = 0;
+    steeringLineGeo.attributes.position.needsUpdate = true;
+}
+
+/** Spawn a spaceship in front of the camera and enter flight mode.
+ *  If a previously spawned ship is still alive in the scene, re-enters it instead. */
+function spawnShip() {
+    // Re-enter an existing ship when possible
+    const existing = flightState.knownShip;
+    const canReenter = existing &&
+        !existing._isDisposed &&
+        simulationState.bodies.includes(existing);
+
+    const ship: Spaceship = canReenter ? existing : (() => {
+        const cameraDir = new THREE.Vector3();
+        camera.getWorldDirection(cameraDir);
+        const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
+
+        const s = new Spaceship(
+            dependencies,
+            scene,
+            spawnPos,
+            new THREE.Vector3(),
+            createUniqueId('spaceship')
+        );
+        simulationState.bodies.push(s);
+        try {
+            window.dispatchEvent(
+                new CustomEvent('body:added', { detail: { body: s, id: s.id, name: s.name } })
+            );
+        } catch (e) { /* non-fatal */ }
+        return s;
+    })();
+
+    // Snapshot camera / controls state so exit can restore it cleanly
+    flightState.prevCameraPos.copy(camera.position);
+    flightState.prevCameraUp.copy(camera.up);
+    flightState.prevCameraQuat.copy(camera.quaternion);
+    flightState.prevControlsTarget.copy(controls.target);
+
+    flightState.knownShip = ship;
+    flightState.activeShip = ship;
+    flightState.isActive = true;
+    flightState.currentSpeed = 0;
+    flightState.pointerOffsetX = 0;
+    flightState.pointerOffsetY = 0;
+    flightState.rollLeft = false;
+    flightState.rollRight = false;
+    flightState.rollVelocity = 0;
+    flightState.steerX = 0;
+    flightState.steerY = 0;
+
+    // Deselect any currently selected body so the gizmo doesn't appear on entry
+    if (selectedBody) {
+        selectedBody = null;
+        manuallySelectedBody = null;
+        gizmo.attach(null);
+        managementPanel.setSelectedBody(null);
+        refreshBodiesTable();
+    }
+
+    // Seed trail at nozzle position so it starts collapsed (not at world origin)
+    const _initNozzle = ship.thrusterOffset.clone()
+        .applyQuaternion(ship.mesh.quaternion)
+        .add(ship.mesh.position);
+    ship.trail.init(_initNozzle);
+
+    // Show flight speed sprite
+    if (speedSprite) {
+        speedSprite.material.map?.dispose();
+        speedSprite.material.map = createSpeedTexture(0, false);
+        speedSprite.material.needsUpdate = true;
+        speedSprite.visible = true;
+    }
+
+    // Pointer lock so the mouse steers freely without leaving the window
+    renderer.domElement.requestPointerLock();
+    controls.enabled = false;
+
+    flightSteeringLine.visible = true;
+    flightControlsPanel.setFlightActive(true);
+    flightControlsPanel.setViewState(flightState.isCockpitView);
+
+    addEvent(canReenter ? 'Re-entered spaceship.' : 'Spaceship launched! W/S=speed  A/D=roll  Esc=exit');
+}
+
+/** Exit flight mode and restore normal camera controls. */
+function exitFlightMode() {
+    // Preserve the ship reference so the user can re-enter later.
+    // Only keep it if the ship is still alive.
+    if (flightState.activeShip && !flightState.activeShip._isDisposed &&
+        simulationState.bodies.includes(flightState.activeShip)) {
+        flightState.knownShip = flightState.activeShip;
+    } else {
+        // Ship was destroyed — clear the known reference too
+        flightState.knownShip = null;
+    }
+
+    // Zero all steering state FIRST, before clearing isActive,
+    // so that if any deferred event (pointer-lock release mousemove, etc.) sneaks
+    // through, it won't find non-zero values to apply.
+    flightState.pointerOffsetX = 0;
+    flightState.pointerOffsetY = 0;
+    flightState.rollLeft = false;
+    flightState.rollRight = false;
+    flightState.rollVelocity = 0;
+    flightState.steerX = 0;
+    flightState.steerY = 0;
+
+    flightState.isActive = false;
+    flightState.activeShip = null;
+    flightState.currentSpeed = 0;
+
+    // Reset mouse-look so camera doesn't spin after re-enabling controls
+    isMouseLookActive = false;
+
+    if (document.pointerLockElement === renderer.domElement) {
+        document.exitPointerLock();
+    }
+
+    // Restore camera up so OrbitControls rotation doesn't break (it was set to ship's local up).
+    camera.up.copy(flightState.prevCameraUp);
+
+    // Re-enable controls before moving camera so the orbit anchor is valid.
+    controls.enabled = !isFreeCameraMode;
+
+    // If the ship is still alive, orbit around it so the player can see where they left off.
+    // Otherwise fall back to the pre-flight camera snapshot.
+    if (flightState.knownShip && !flightState.knownShip._isDisposed &&
+        simulationState.bodies.includes(flightState.knownShip)) {
+        const shipPos = flightState.knownShip.mesh.position.clone();
+        // Keep the pre-flight viewing direction but reposition to look at the ship.
+        const prevDir = new THREE.Vector3()
+            .subVectors(flightState.prevCameraPos, flightState.prevControlsTarget)
+            .normalize();
+        const dist = flightState.prevCameraPos.distanceTo(flightState.prevControlsTarget);
+        camera.position.copy(shipPos).addScaledVector(prevDir, dist);
+        controls.target.copy(shipPos);
+    } else {
+        camera.position.copy(flightState.prevCameraPos);
+        camera.quaternion.copy(flightState.prevCameraQuat);
+        controls.target.copy(flightState.prevControlsTarget);
+    }
+    controls.update();
+
+    flightSteeringLine.visible = false;
+    if (flightState.knownShip && !flightState.knownShip._isDisposed) {
+        flightState.knownShip.trail.hide();
+    }
+    if (speedSprite) speedSprite.visible = false;
+    flightControlsPanel.setFlightActive(false);
+    flightControlsPanel.setViewState(false);
+    // updateFlightSpawnBtnLabel is defined after this function; call via a timeout
+    // to avoid forward-reference issues in the module execution order.
+    setTimeout(() => { try { updateFlightSpawnBtnLabel(); } catch (_) {} }, 0);
+    addEvent('Flight mode exited.');
+}
+
 window.addEventListener('mousemove', onSurfaceMouseMove, { passive: true });
 
 mainPanel.on('surfaceCameraToggle', () => {
@@ -4527,9 +5105,10 @@ mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
 mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
     simulationState.bodies.forEach((body) => {
         if (body && body.label) {
-            body.label.visible = checked;
+            const isActiveShip = flightState.isActive && body === flightState.activeShip;
+            body.label.visible = checked && !isActiveShip;
             if (body.labelLine) {
-                body.labelLine.visible = checked;
+                body.labelLine.visible = checked && !isActiveShip;
             }
         }
     });
@@ -5049,23 +5628,68 @@ window.addEventListener('keydown', (e) => {
     }
 
     if (key === 'w') {
+        // Flight mode: W = hold to thrust forward
+        if (flightState.isActive) {
+            keys.w = true;
+            e.preventDefault();
+            return;
+        }
         keys.w = true;
     }
     if (key === 'a') {
+        // Flight mode: A rolls left
+        if (flightState.isActive) {
+            flightState.rollLeft = true;
+            e.preventDefault();
+            return;
+        }
         keys.a = true;
     }
     if (key === 's') {
+        // Flight mode: S = hold to thrust backward / decelerate
+        if (flightState.isActive) {
+            keys.s = true;
+            e.preventDefault();
+            return;
+        }
         keys.s = true;
     }
     if (key === 'd') {
+        // Flight mode: D rolls right
+        if (flightState.isActive) {
+            flightState.rollRight = true;
+            e.preventDefault();
+            return;
+        }
         keys.d = true;
     }
-    if (key === 'c') keys.c = true;
+    if (key === 'c') {
+        // Flight mode: C toggles between cockpit and 3rd-person view
+        if (flightState.isActive) {
+            flightState.isCockpitView = !flightState.isCockpitView;
+            flightControlsPanel.setViewState(flightState.isCockpitView);
+            e.preventDefault();
+            return;
+        }
+        keys.c = true;
+    }
     if (key === ' ') {
+        // Flight mode: Space reserved for warp speed (hold 2 s — future feature)
+        if (flightState.isActive) {
+            e.preventDefault();
+            return;
+        }
         keys.space = true;
     }
     if (key === 'shift') {
         keys.shift = true;
+    }
+
+    // Escape exits flight mode
+    if (key === 'escape' && flightState.isActive) {
+        exitFlightMode();
+        e.preventDefault();
+        return;
     }
 
     // Delete key to remove selected body
@@ -5077,9 +5701,15 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
     const key = e.key.toLowerCase();
     if (key === 'w') keys.w = false;
-    if (key === 'a') keys.a = false;
+    if (key === 'a') {
+        keys.a = false;
+        if (flightState.isActive) flightState.rollLeft = false;
+    }
     if (key === 's') keys.s = false;
-    if (key === 'd') keys.d = false;
+    if (key === 'd') {
+        keys.d = false;
+        if (flightState.isActive) flightState.rollRight = false;
+    }
     if (key === 'c') keys.c = false;
     if (key === ' ') keys.space = false;
     if (key === 'shift') keys.shift = false;
@@ -5235,7 +5865,14 @@ function handleBodyBecameInvalid(body) {
 window.addEventListener('body:added', refreshBodiesTable);
 
 window.addEventListener('body:removed', (e) => {
-    handleBodyBecameInvalid(e?.detail?.body);
+    const removedBody = e?.detail?.body;
+    // If the deleted body was the player's known ship, clear the reference
+    // so the button reverts to "SPAWN SPACESHIP" rather than "RE-ENTER SHIP".
+    if (removedBody && removedBody === flightState.knownShip) {
+        flightState.knownShip = null;
+        setTimeout(() => { try { updateFlightSpawnBtnLabel(); } catch (_) {} }, 0);
+    }
+    handleBodyBecameInvalid(removedBody);
     refreshBodiesTable();
 });
 
@@ -5343,6 +5980,14 @@ window.removeEventListener('mouseup', onMouseUp);
 window.addEventListener('mousedown', onMouseDownWrapped);
 window.addEventListener('mousemove', onMouseMoveWrapped);
 window.addEventListener('mouseup', onMouseUpWrapped);
+
+// When the browser releases pointer lock (e.g. user presses Esc natively),
+// exit flight mode so the ship doesn't keep spinning with stale pointer offsets.
+document.addEventListener('pointerlockchange', () => {
+    if (flightState.isActive && document.pointerLockElement !== renderer.domElement) {
+        exitFlightMode();
+    }
+});
 
 window.addEventListener(
     'keydown',

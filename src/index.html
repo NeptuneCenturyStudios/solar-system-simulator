@@ -109,6 +109,10 @@
                     <span class="material-symbols-outlined">tune</span>
                     MANAGE SOLAR SYSTEM
                 </button>
+                <button id="flightControlsBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">rocket</span>
+                    FLIGHT CONTROLS
+                </button>
                 <button
                     id="donateBtn"
                     class="btn-with-icon"
@@ -118,6 +122,26 @@
                     DONATE
                 </button>
                 <div class="footer-note">© <span id="copyrightYear"></span> Neptune Century</div>
+            </div>
+
+            <div id="flight-controls-panel">
+                <div class="panel-header">Flight Controls</div>
+                <p style="font-size:0.8em;color:#aaa;margin:4px 0 8px;">W/S — speed &nbsp; A/D — roll &nbsp; Shift — boost<br>C — view &nbsp; Mouse steers &nbsp; Esc — exit</p>
+                <label class="checkbox-row" style="margin-bottom:8px;">
+                    <input type="checkbox" id="flightAdvancedMode" /> Advanced Flight Mode
+                </label>
+                <button id="flightSpawnBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">rocket_launch</span>
+                    SPAWN SPACESHIP
+                </button>
+                <button id="flightToggleViewBtn" class="btn-with-icon" disabled>
+                    <span class="material-symbols-outlined">visibility</span>
+                    COCKPIT VIEW
+                </button>
+                <button id="flightExitBtn" class="btn-with-icon" disabled style="background:#883333">
+                    <span class="material-symbols-outlined">exit_to_app</span>
+                    EXIT FLIGHT MODE
+                </button>
             </div>
 
             <div id="management-panel">
@@ -509,6 +533,7 @@
             </div>
         </div>
         <!-- Close ui-container -->
+
         <script type="module" src="index.ts"></script>
     </body>
 </html>

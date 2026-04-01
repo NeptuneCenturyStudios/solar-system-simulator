@@ -30,7 +30,8 @@ body {
 
 /* Prevent flex items from stretching to match tallest panel */
 #ui-layer,
-#management-panel {
+#management-panel,
+#flight-controls-panel {
     align-self: flex-start;
 }
 
@@ -68,7 +69,8 @@ body {
 }
 
 #ui-layer,
-#management-panel {
+#management-panel,
+#flight-controls-panel {
     pointer-events: auto;
 }
 
@@ -94,6 +96,21 @@ body {
 }
 
 #management-panel.visible {
+    display: block;
+}
+
+#flight-controls-panel {
+    background: rgba(5, 10, 25, 0.5);
+    backdrop-filter: blur(10px);
+    padding: 15px;
+    border-radius: 12px;
+    width: 260px;
+    border: 1px solid #224466;
+    box-shadow: var(--panel-box-shadow);
+    display: none;
+}
+
+#flight-controls-panel.visible {
     display: block;
 }
 
