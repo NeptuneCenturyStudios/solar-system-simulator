@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 
 const TRAIL_DEFAULT_LENGTH = 120;
+const SF = SCALE_FACTOR;
 
 /**
  * Renders a glowing engine-exhaust trail behind a spaceship.
@@ -89,7 +90,7 @@ export class ShipTrail {
 
         this.innerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 0.8 * SCALE_FACTOR,
+            size: 0.8 * SF,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -113,7 +114,7 @@ export class ShipTrail {
 
         this.outerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 4.0 * SCALE_FACTOR,
+            size: 4.0 * SF,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,

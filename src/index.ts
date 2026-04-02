@@ -982,7 +982,7 @@ const flightState = {
 
 // Flight tuning constants
 const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR;           // normal max speed cap (units/s)
-const FLIGHT_BOOST_MAX_SPEED = 5 * FLIGHT_MAX_SPEED;  // boost ceiling = 5× normal max speed
+const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED;  // boost ceiling = 10× normal max speed
 const FLIGHT_THRUST_ACCEL = 8 * SCALE_FACTOR;          // acceleration rate while W/S held (u/s²)
 const FLIGHT_BOOST_ACCEL  = 60 * SCALE_FACTOR;         // acceleration rate while Shift held (u/s²)
 /** Rate at which cross-axis (gravity-accumulated) velocity decays while thrusting in simple mode.
