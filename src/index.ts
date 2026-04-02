@@ -989,6 +989,8 @@ const flightState = {
     warpActive: false,
     /** True while decelerating back from warp speed. */
     warpDecelerating: false,
+    /** True while rapidly decelerating from boost speed back to normal max. */
+    boostDecelerating: false,
 };
 
 // Flight tuning constants
@@ -1004,11 +1006,12 @@ const FLIGHT_MAX_TURN_RATE = 0.6;        // radians/s at full pointer deflection
 const FLIGHT_ROLL_SPEED = 2.0;           // max roll angular velocity (rad/s)
 const FLIGHT_ROLL_ACCEL = 0.5;           // how fast roll ramps up (rad/s²) — lower = slower start
 const FLIGHT_ROLL_FRICTION = 0.5;        // how fast roll decays when key released (rad/s²)
-const FLIGHT_STEER_SMOOTHING = 0.005;    // lerp factor per frame — lower = heavier feel
+const FLIGHT_STEER_SMOOTHING = 0.002;    // lerp factor per frame — lower = heavier feel
 const FLIGHT_STEER_DEADZONE = 0.05;      // normalised dead zone (0–1); input below this is zeroed
 const FLIGHT_WARP_CHARGE_TIME = 2.0;     // seconds to hold Space before warp engages
 const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED * SCALE_FACTOR; // top warp speed (u/s)
-const FLIGHT_WARP_DECEL_RATE = 4000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
+const FLIGHT_WARP_DECEL_RATE = 8000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
+const FLIGHT_BOOST_DECEL_RATE = 800 * SCALE_FACTOR;  // decel rate after boost ends (u/s²)
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -4334,8 +4337,8 @@ function animate() {
         const nozzle = ship.thrusterOffset.clone()
             .applyQuaternion(ship.mesh.quaternion)
             .add(ship.mesh.position);
-        // Suppress trail during warp and warp deceleration
-        const trailThrust = flightState.thrustActive && !flightState.warpActive && !flightState.warpDecelerating;
+        // Suppress trail during warp, warp deceleration, and boost deceleration
+        const trailThrust = flightState.thrustActive && !flightState.warpActive && !flightState.warpDecelerating && !flightState.boostDecelerating;
         ship.trail.update(nozzle, flightState.currentSpeed, FLIGHT_MAX_SPEED, trailThrust);
     }
 
@@ -4901,6 +4904,22 @@ function updateFlightControls(dt: number) {
         // Fall through to steering/roll below (no early return)
     }
 
+    // ── Boost deceleration ───────────────────────────────────────────────────
+    // When Shift is released above FLIGHT_MAX_SPEED, rapidly decelerate back down.
+    if (flightState.boostDecelerating) {
+        const fwdSpd = ship.velocity.dot(forward);
+        if (fwdSpd > FLIGHT_MAX_SPEED) {
+            const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_BOOST_DECEL_RATE * dt);
+            ship.velocity.copy(forward).multiplyScalar(newSpd);
+            flightState.currentSpeed = newSpd;
+        } else {
+            flightState.boostDecelerating = false;
+            flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_MAX_SPEED);
+        }
+        flightState.thrustActive = false;
+        // Fall through to steering/roll below
+    }
+
     // ── Warp active ──────────────────────────────────────────────────────────
     if (flightState.warpActive) {
         // Drive ship forward at FLIGHT_WARP_SPEED; all other controls locked.
@@ -4957,7 +4976,21 @@ function updateFlightControls(dt: number) {
     const thrustActive = keys.shift || wEffective || keys.s;
     flightState.thrustActive = thrustActive;
 
-    if (!flightState.isAdvancedMode) {
+    // Trigger boost decel when Shift is released while still above normal max speed
+    if (!keys.shift && !flightState.boostDecelerating && !flightState.warpActive && !flightState.warpDecelerating) {
+        if (fwdSpeed > FLIGHT_MAX_SPEED) {
+            flightState.boostDecelerating = true;
+        }
+    }
+    // Re-engaging boost cancels the decel
+    if (keys.shift) {
+        flightState.boostDecelerating = false;
+    }
+
+    // Skip normal thrust while boost-decelerating (handled above)
+    if (flightState.boostDecelerating) {
+        // steering/roll still processed below
+    } else if (!flightState.isAdvancedMode) {
         // ── Simple mode ──────────────────────────────────────────────────────────
         // While a thrust key is held: currentSpeed is updated by hold-to-accelerate
         // and the full velocity is OVERWRITTEN to match the current forward direction.
@@ -5970,6 +6003,16 @@ window.addEventListener('keydown', (e) => {
     }
 
     // Delete key to remove selected body
+    if (key === 'n') {
+        const showNamesCheckbox = document.getElementById('showNames') as HTMLInputElement | null;
+        if (showNamesCheckbox) {
+            showNamesCheckbox.checked = !showNamesCheckbox.checked;
+            showNamesCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            e.preventDefault();
+            return;
+        }
+    }
+
     if (key === 'delete') {
         deleteSelectedBody({ source: 'keyboard' });
     }
