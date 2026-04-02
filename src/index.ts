@@ -987,7 +987,7 @@ const FLIGHT_THRUST_ACCEL = 10 * SCALE_FACTOR;          // acceleration rate whi
 const FLIGHT_BOOST_ACCEL  = 100 * SCALE_FACTOR;         // acceleration rate while Shift held (u/s²)
 /** Rate at which cross-axis (gravity-accumulated) velocity decays while thrusting in simple mode.
  *  Higher = quicker normalisation. At 1.5 the perpendicular component halves in ~0.46 s. */
-const FLIGHT_PERP_DECAY = 0.5;  // per second
+const FLIGHT_PERP_DECAY = 0.5;           // per second
 const FLIGHT_MAX_POINTER_OFFSET = 260;   // pixels before reaching full turn rate
 const FLIGHT_MAX_TURN_RATE = 0.6;        // radians/s at full pointer deflection
 const FLIGHT_ROLL_SPEED = 2.0;           // max roll angular velocity (rad/s)
