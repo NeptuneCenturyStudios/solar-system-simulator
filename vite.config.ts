@@ -12,8 +12,8 @@ export default defineConfig({
         viteStaticCopy({
             targets: [
                 {
-                    src: 'assets/textures/**/*',
-                    dest: 'assets/textures',
+                    src: './assets/textures/**/*',
+                    dest: './',
                 },
             ],
         }),
