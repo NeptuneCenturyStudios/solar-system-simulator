@@ -80,6 +80,7 @@ import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
 import { Supernova } from './effects/supernova.js';
 import { StarBirth } from './effects/star-birth';
 import { ParticleExplosion } from './effects/particle-explosion.js';
+import { WarpEffect } from './effects/warp-effect.js';
 import { Body } from './bodies/body.js';
 import { CelestialBody } from './bodies/celestial-body.js';
 import { Mercury } from './bodies/mercury.js';
@@ -484,7 +485,7 @@ function createFPSTexture(fps: number) {
 }
 
 // Flight speed HUD texture — drawn in the same style as the FPS counter
-function createSpeedTexture(speed: number, isBoosting: boolean, pos?: THREE.Vector3, vel?: THREE.Vector3) {
+function createSpeedTexture(speed: number, isBoosting: boolean, pos?: THREE.Vector3, vel?: THREE.Vector3, isWarp = false) {
     const hasExtra = !!(pos && vel);
     // Canvas is sized so that sprite scale = canvas × 0.625 matches the FPS counter pixel density.
     // 640×640 canvas → 400×400 sprite pixels on screen.
@@ -496,8 +497,8 @@ function createSpeedTexture(speed: number, isBoosting: boolean, pos?: THREE.Vect
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    const color = isBoosting ? '#ff9944' : '#00ffcc';
-    const glow  = isBoosting ? 'rgba(255,153,68,0.85)' : 'rgba(0,255,204,0.85)';
+    const color = isWarp ? '#ff4488' : isBoosting ? '#ff9944' : '#00ffcc';
+    const glow  = isWarp ? 'rgba(255,68,136,0.9)' : isBoosting ? 'rgba(255,153,68,0.85)' : 'rgba(0,255,204,0.85)';
     const dim   = 'rgba(0,255,204,0.5)';
 
     ctx.textAlign    = 'right';
@@ -508,7 +509,7 @@ function createSpeedTexture(speed: number, isBoosting: boolean, pos?: THREE.Vect
     ctx.shadowColor = glow;
     ctx.shadowBlur  = 12;
     ctx.font = '36px monospace';
-    ctx.fillText(isBoosting ? 'BOOST' : 'SPEED', W - 24, hasExtra ? 44 : 56);
+    ctx.fillText(isWarp ? 'WARP' : isBoosting ? 'BOOST' : 'SPEED', W - 24, hasExtra ? 44 : 56);
 
     ctx.shadowBlur = 28;
     ctx.font = 'bold 68px monospace';
@@ -980,6 +981,14 @@ const flightState = {
     knownShip: null as Spaceship | null,
     /** True while any thrust key (W/S/Shift) was held this frame. Used by trail. */
     thrustActive: false,
+    /** Seconds space bar has been held in flight mode (0 – FLIGHT_WARP_CHARGE_TIME). */
+    warpCharge: 0,
+    /** True while space bar is being held down to charge warp. */
+    warpCharging: false,
+    /** True when warp speed is active. */
+    warpActive: false,
+    /** True while decelerating back from warp speed. */
+    warpDecelerating: false,
 };
 
 // Flight tuning constants
@@ -997,6 +1006,9 @@ const FLIGHT_ROLL_ACCEL = 0.5;           // how fast roll ramps up (rad/s²) —
 const FLIGHT_ROLL_FRICTION = 0.5;        // how fast roll decays when key released (rad/s²)
 const FLIGHT_STEER_SMOOTHING = 0.005;    // lerp factor per frame — lower = heavier feel
 const FLIGHT_STEER_DEADZONE = 0.05;      // normalised dead zone (0–1); input below this is zeroed
+const FLIGHT_WARP_CHARGE_TIME = 2.0;     // seconds to hold Space before warp engages
+const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED * SCALE_FACTOR; // top warp speed (u/s)
+const FLIGHT_WARP_DECEL_RATE = 4000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -1307,6 +1319,100 @@ function createSpeedSprite() {
     uiScene.add(speedSprite);
 }
 createSpeedSprite();
+
+// ── Warp HUD sprite ───────────────────────────────────────────────────────────
+// Bottom-center canvas sprite. Shows progress bar while charging, pulsing
+// "WARP ACTIVE" text once warp is engaged.
+let warpSprite: THREE.Sprite | null = null;
+const warpEffect = new WarpEffect(uiScene, window.innerWidth, window.innerHeight);
+
+/** Renders the charging progress bar (fill = 0..1) with label above. */
+function createWarpChargeTexture(fill: number): THREE.CanvasTexture {
+    const W = 512, H = 128;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d')!;
+
+    // Label
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font         = 'bold 36px monospace';
+    ctx.shadowBlur   = 10;
+    ctx.fillStyle    = '#00ffcc';
+    ctx.shadowColor  = 'rgba(0,255,204,0.9)';
+    ctx.fillText('INITIATING WARP', W / 2, 34);
+
+    // Bar track
+    const barX = 40, barY = 68, barW = W - 80, barH = 28;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle  = 'rgba(0,255,204,0.12)';
+    ctx.strokeStyle = 'rgba(0,255,204,0.5)';
+    ctx.lineWidth  = 2;
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.strokeRect(barX, barY, barW, barH);
+
+    // Bar fill — gradient cyan→white at tip
+    if (fill > 0) {
+        const fillW = barW * fill;
+        const grad  = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
+        grad.addColorStop(0,   'rgba(0,200,180,0.9)');
+        grad.addColorStop(0.8, 'rgba(0,255,220,1.0)');
+        grad.addColorStop(1,   'rgba(255,255,255,1.0)');
+        ctx.fillStyle = grad;
+        ctx.shadowBlur  = 8;
+        ctx.shadowColor = 'rgba(0,255,204,0.9)';
+        ctx.fillRect(barX, barY, fillW, barH);
+        ctx.shadowBlur = 0;
+    }
+
+    // Percentage label inside bar
+    ctx.font         = 'bold 18px monospace';
+    ctx.fillStyle    = 'rgba(255,255,255,0.85)';
+    ctx.shadowBlur   = 0;
+    ctx.fillText(`${Math.round(fill * 100)}%`, W / 2, barY + barH / 2);
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+}
+
+/** Renders the pulsing "WARP ACTIVE" text (pulse = 0..1 sine wave). */
+function createWarpActiveTexture(pulse: number): THREE.CanvasTexture {
+    const W = 512, H = 96;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d')!;
+
+    const alpha = 0.55 + 0.45 * pulse; // 0.55–1.0
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font         = 'bold 52px monospace';
+    ctx.shadowBlur   = 20 + 20 * pulse;
+    ctx.shadowColor  = `rgba(255,120,0,${alpha})`;
+    ctx.fillStyle    = `rgba(255,${Math.round(180 + 75 * pulse)},0,${alpha})`;
+    ctx.fillText('⚡ WARP ACTIVE ⚡', W / 2, H / 2);
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+}
+
+function createWarpSprite() {
+    const texture = createWarpChargeTexture(0);
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+    });
+    warpSprite = new THREE.Sprite(material);
+    // 512×128 canvas at 0.625 ratio → 320×80 screen pixels; center at bottom
+    warpSprite.scale.set(320, 80, 1);
+    warpSprite.position.set(0, -(window.innerHeight / 2 - 50), 0);
+    warpSprite.visible = false;
+    uiScene.add(warpSprite);
+}
+createWarpSprite();
 
 // --- Context hint system (top-center HUD text) ---
 let hintSprite = null;
@@ -4228,7 +4334,9 @@ function animate() {
         const nozzle = ship.thrusterOffset.clone()
             .applyQuaternion(ship.mesh.quaternion)
             .add(ship.mesh.position);
-        ship.trail.update(nozzle, flightState.currentSpeed, FLIGHT_MAX_SPEED, flightState.thrustActive);
+        // Suppress trail during warp and warp deceleration
+        const trailThrust = flightState.thrustActive && !flightState.warpActive && !flightState.warpDecelerating;
+        ship.trail.update(nozzle, flightState.currentSpeed, FLIGHT_MAX_SPEED, trailThrust);
     }
 
     if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
@@ -4301,7 +4409,8 @@ function animate() {
                 flightState.currentSpeed,
                 keys.shift,
                 ship?.mesh?.position,
-                ship?.velocity
+                ship?.velocity,
+                flightState.warpActive || flightState.warpDecelerating
             );
             speedSprite.material.needsUpdate = true;
         }
@@ -4771,8 +4880,75 @@ function updateFlightControls(dt: number) {
         return;
     }
 
-    // ── Thrust ─────────────────────────────────────────────────────────────────────────────
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
+
+    // ── Warp deceleration ────────────────────────────────────────────────────
+    // After warp ends, rapidly decelerate toward FLIGHT_MAX_SPEED, then hand
+    // back to normal flight controls (steering/roll still work during decel).
+    if (flightState.warpDecelerating) {
+        const fwdSpd = ship.velocity.dot(forward);
+        if (fwdSpd > FLIGHT_MAX_SPEED) {
+            const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_WARP_DECEL_RATE * dt);
+            ship.velocity.copy(forward).multiplyScalar(newSpd);
+            flightState.currentSpeed = newSpd;
+        } else {
+            flightState.warpDecelerating = false;
+            flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_MAX_SPEED);
+            warpEffect.stop();
+        }
+        flightState.thrustActive = false;
+        if (warpSprite) warpSprite.visible = false;
+        // Fall through to steering/roll below (no early return)
+    }
+
+    // ── Warp active ──────────────────────────────────────────────────────────
+    if (flightState.warpActive) {
+        // Drive ship forward at FLIGHT_WARP_SPEED; all other controls locked.
+        const warpVel = forward.clone().multiplyScalar(FLIGHT_WARP_SPEED);
+        ship.velocity.copy(warpVel);
+        flightState.currentSpeed = FLIGHT_WARP_SPEED;
+        flightState.thrustActive = true;
+        // Hide trail during warp — at ludicrous speed it stretches out badly
+        ship.trail.update(
+            ship.thrusterOffset.clone().applyQuaternion(ship.mesh.quaternion).add(ship.mesh.position),
+            FLIGHT_WARP_SPEED, FLIGHT_MAX_SPEED, false
+        );
+        warpEffect.update(dt);
+        // Pulsing warp-active text (update every call is cheap since canvas is small)
+        if (warpSprite) {
+            const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
+            warpSprite.material.map?.dispose();
+            warpSprite.material.map = createWarpActiveTexture(pulse);
+            warpSprite.material.needsUpdate = true;
+            warpSprite.scale.set(320, 60, 1);
+            warpSprite.visible = true;
+        }
+        return; // Skip all flight controls below
+    }
+
+    // ── Warp charging ────────────────────────────────────────────────────────
+    if (flightState.warpCharging && !flightState.warpDecelerating) {
+        flightState.warpCharge = Math.min(flightState.warpCharge + dt, FLIGHT_WARP_CHARGE_TIME);
+        const fill = flightState.warpCharge / FLIGHT_WARP_CHARGE_TIME;
+        if (warpSprite) {
+            warpSprite.material.map?.dispose();
+            warpSprite.material.map = createWarpChargeTexture(fill);
+            warpSprite.material.needsUpdate = true;
+            warpSprite.scale.set(320, 80, 1);
+            warpSprite.visible = true;
+        }
+        if (flightState.warpCharge >= FLIGHT_WARP_CHARGE_TIME) {
+            // Engage warp!
+            flightState.warpActive   = true;
+            flightState.warpCharging = false;
+            flightState.warpCharge   = 0;
+            warpEffect.start();
+            addEvent('⚡ Warp engaged! Press Space to disengage.');
+        }
+        // Allow normal flight controls while charging (just can't turn on warp mid-turn)
+    }
+
+    // ── Thrust ─────────────────────────────────────────────────────────────────────────────
     const fwdSpeed = ship.velocity.dot(forward);
     // W only counts as active thrust once the ship has decelerated to normal max speed.
     // This prevents W from snapping the ship from boost speed (500) down to normal max (100)
@@ -4952,6 +5128,10 @@ function spawnShip() {
     flightState.rollVelocity = 0;
     flightState.steerX = 0;
     flightState.steerY = 0;
+    flightState.warpCharge       = 0;
+    flightState.warpCharging     = false;
+    flightState.warpActive       = false;
+    flightState.warpDecelerating = false;
 
     // Deselect any currently selected body so the gizmo doesn't appear on entry
     if (selectedBody) {
@@ -4983,6 +5163,7 @@ function spawnShip() {
     flightSteeringLine.visible = true;
     flightCrosshair.visible = true;
     steeringEndMarker.visible = true;
+    if (warpSprite) warpSprite.visible = false;
     flightControlsPanel.setFlightActive(true);
     flightControlsPanel.setViewState(flightState.isCockpitView);
 
@@ -5051,6 +5232,12 @@ function exitFlightMode() {
     flightSteeringLine.visible = false;
     flightCrosshair.visible = false;
     steeringEndMarker.visible = false;
+    if (warpSprite) warpSprite.visible = false;
+    flightState.warpCharge       = 0;
+    flightState.warpCharging     = false;
+    flightState.warpActive       = false;
+    flightState.warpDecelerating = false;
+    warpEffect.stop();
     if (flightState.knownShip && !flightState.knownShip._isDisposed) {
         flightState.knownShip.trail.hide();
     }
@@ -5752,9 +5939,21 @@ window.addEventListener('keydown', (e) => {
         keys.c = true;
     }
     if (key === ' ') {
-        // Flight mode: Space reserved for warp speed (hold 2 s — future feature)
         if (flightState.isActive) {
             e.preventDefault();
+            if (e.repeat) return; // ignore key-repeat; only act on the initial press
+            if (flightState.warpActive) {
+                // Disengage warp
+                flightState.warpActive       = false;
+                flightState.warpCharging     = false;
+                flightState.warpCharge       = 0;
+                flightState.warpDecelerating = true;
+                warpEffect.stop();
+                addEvent('Warp disengaged. Decelerating...');
+            } else if (!flightState.warpDecelerating) {
+                // Only start charging when not already decelerating from a previous warp
+                flightState.warpCharging = true;
+            }
             return;
         }
         keys.space = true;
@@ -5789,7 +5988,17 @@ window.addEventListener('keyup', (e) => {
         if (flightState.isActive) flightState.rollRight = false;
     }
     if (key === 'c') keys.c = false;
-    if (key === ' ') keys.space = false;
+    if (key === ' ') {
+        keys.space = false;
+        if (flightState.isActive) {
+            // Cancel warp charge if space released before full charge
+            if (flightState.warpCharging) {
+                flightState.warpCharging = false;
+                flightState.warpCharge   = 0;
+                if (warpSprite) warpSprite.visible = false;
+            }
+        }
+    }
     if (key === 'shift') keys.shift = false;
 
     if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
@@ -5869,6 +6078,8 @@ window.addEventListener('resize', () => {
     if (eventLogSprite) {
         eventLogSprite.position.set(-window.innerWidth / 2 + 300, -window.innerHeight / 2 + 125, 0);
     }
+
+    warpEffect.resize(window.innerWidth, window.innerHeight);
 });
 
 // Apply initial background visibility (pre-launch view): kuiper off
