@@ -978,6 +978,8 @@ const flightState = {
     prevControlsTarget: new THREE.Vector3(),
     /** Reference to the last spawned ship; persists after exit so user can re-enter it. */
     knownShip: null as Spaceship | null,
+    /** True while any thrust key (W/S/Shift) was held this frame. Used by trail. */
+    thrustActive: false,
 };
 
 // Flight tuning constants
@@ -4226,7 +4228,7 @@ function animate() {
         const nozzle = ship.thrusterOffset.clone()
             .applyQuaternion(ship.mesh.quaternion)
             .add(ship.mesh.position);
-        ship.trail.update(nozzle, flightState.currentSpeed, FLIGHT_MAX_SPEED);
+        ship.trail.update(nozzle, flightState.currentSpeed, FLIGHT_MAX_SPEED, flightState.thrustActive);
     }
 
     if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
@@ -4777,6 +4779,7 @@ function updateFlightControls(dt: number) {
     // in one frame when pressed mid-deceleration.
     const wEffective = keys.w && (flightState.currentSpeed <= FLIGHT_MAX_SPEED || keys.shift);
     const thrustActive = keys.shift || wEffective || keys.s;
+    flightState.thrustActive = thrustActive;
 
     if (!flightState.isAdvancedMode) {
         // ── Simple mode ──────────────────────────────────────────────────────────
