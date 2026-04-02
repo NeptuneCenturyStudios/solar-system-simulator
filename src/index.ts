@@ -871,6 +871,22 @@ const flightCrosshair = new THREE.LineSegments(
 flightCrosshair.visible = false;
 uiScene.add(flightCrosshair);
 
+// End-circle marker at the pointer end of the steering line.
+const steeringEndMarker = new THREE.Mesh(
+    new THREE.RingGeometry(4, 6, 24),
+    new THREE.MeshBasicMaterial({
+        color: 0x00ffcc,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+    })
+);
+steeringEndMarker.frustumCulled = false;
+steeringEndMarker.visible = false;
+uiScene.add(steeringEndMarker);
+
 // (Ship engine trail is owned by each Spaceship via its ShipTrail property)
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -1805,7 +1821,7 @@ function calcGridRequiredSize(targetBody) {
 
     // Buffer rules:
     // Keep the initial grid SMALL and only slightly larger than the dragged body.
-    // Then EXPAND ONLY as the body moves away from the drag-start anchor.
+    // Then EXPAND ONLY as the body moves away from the anchor.
     //
     // Use a smaller body-relative padding so the grid doesn't feel excessively large.
     const buffer = Math.max(25, radius * 4);
@@ -4088,6 +4104,16 @@ function animate() {
         }
     }
 
+    // Keep steering end marker synced with the line endpoint
+    if (flightState.isActive && flightSteeringLine.visible) {
+        const endX = steeringLinePositions[3];
+        const endY = steeringLinePositions[4];
+        steeringEndMarker.position.set(endX, endY, 0);
+        steeringEndMarker.visible = true;
+    } else {
+        steeringEndMarker.visible = false;
+    }
+
     // Filter dead explosions
     simulationState.explosions = simulationState.explosions.filter((exp) => {
         exp.update(dtTotal);
@@ -4856,7 +4882,7 @@ function updateFlightControls(dt: number) {
         .addScaledVector(forward, 8)
         .project(camera);
     const noseScreenX =  noseNDC.x * (window.innerWidth  * 0.5);
-    const noseScreenY =  noseNDC.y * (window.innerHeight * 0.5);
+    const noseScreenY = noseNDC.y * (window.innerHeight * 0.5);
 
     steeringLinePositions[0] = noseScreenX;
     steeringLinePositions[1] = noseScreenY;
@@ -4868,6 +4894,12 @@ function updateFlightControls(dt: number) {
 
     // Move the static crosshair to the projected nose position
     flightCrosshair.position.set(noseScreenX, noseScreenY, 0);
+    steeringEndMarker.position.set(
+        noseScreenX + flightState.pointerOffsetX,
+        noseScreenY - flightState.pointerOffsetY,
+        0
+    );
+    steeringEndMarker.visible = true;
 }
 
 /** Spawn a spaceship in front of the camera and enter flight mode.
@@ -4947,6 +4979,7 @@ function spawnShip() {
 
     flightSteeringLine.visible = true;
     flightCrosshair.visible = true;
+    steeringEndMarker.visible = true;
     flightControlsPanel.setFlightActive(true);
     flightControlsPanel.setViewState(flightState.isCockpitView);
 
@@ -5014,6 +5047,7 @@ function exitFlightMode() {
 
     flightSteeringLine.visible = false;
     flightCrosshair.visible = false;
+    steeringEndMarker.visible = false;
     if (flightState.knownShip && !flightState.knownShip._isDisposed) {
         flightState.knownShip.trail.hide();
     }
