@@ -57,7 +57,7 @@ export class Spaceship extends Body {
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
         this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF, -0.9 * SF);
-        this.thirdPersonOffset = new THREE.Vector3(0, 3 * SF, -8 * SF);
+        this.thirdPersonOffset = new THREE.Vector3(0, 0.6 * SF, -2.7 * SF);
 
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
