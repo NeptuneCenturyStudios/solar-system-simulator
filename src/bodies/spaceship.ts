@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { Body } from './body.js';
 import { ShipTrail } from './ship-trail.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
@@ -31,70 +32,9 @@ export class Spaceship extends Body {
         velocity: THREE.Vector3,
         id: string
     ) {
-        // ── Geometry ──────────────────────────────────────────────────────────
-        // All parts are authored in local space where +Z is forward (ship nose).
-        // CylinderGeometry is Y-up by default; rotate 90° around X to align it to Z.
-
-        // Main hull — elongated cylinder, slightly wider at the rear
-        const hull = new THREE.CylinderGeometry(0.18 * SF, 0.32 * SF, 1.6 * SF, 8);
-        hull.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-
-        // Cockpit dome — sits on top-front of hull
-        const cockpit = new THREE.SphereGeometry(0.22 * SF, 10, 8);
-        cockpit.applyMatrix4(
-            new THREE.Matrix4().makeTranslation(0, 0.28 * SF, 0.52 * SF)
-        );
-
-        // Left wing — swept-back flat box
-        const wingL = new THREE.BoxGeometry(1.1 * SF, 0.06 * SF, 0.55 * SF);
-        wingL.applyMatrix4(
-            new THREE.Matrix4().makeTranslation(-0.72 * SF, -0.06 * SF, -0.12 * SF)
-        );
-
-        // Right wing (mirror of left)
-        const wingR = new THREE.BoxGeometry(1.1 * SF, 0.06 * SF, 0.55 * SF);
-        wingR.applyMatrix4(
-            new THREE.Matrix4().makeTranslation(0.72 * SF, -0.06 * SF, -0.12 * SF)
-        );
-
-        // Engine nacelle — left
-        const nacL = new THREE.CylinderGeometry(0.07 * SF, 0.1 * SF, 0.65 * SF, 6);
-        nacL.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-        nacL.applyMatrix4(
-            new THREE.Matrix4().makeTranslation(-0.3 * SF, -0.1 * SF, -0.58 * SF)
-        );
-
-        // Engine nacelle — right
-        const nacR = new THREE.CylinderGeometry(0.07 * SF, 0.1 * SF, 0.65 * SF, 6);
-        nacR.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-        nacR.applyMatrix4(
-            new THREE.Matrix4().makeTranslation(0.3 * SF, -0.1 * SF, -0.58 * SF)
-        );
-
-        const merged = mergeGeometries([hull, cockpit, wingL, wingR, nacL, nacR]);
-        // mergeGeometries returns null if all geometries have the same attribute count.
-        // Fall back to a simple box so the ship is still spawnable.
-        const geometry = merged ?? new THREE.BoxGeometry(2 * SF, 0.5 * SF, 1.5 * SF);
-
-        // Center the geometry so the mesh origin sits at the bounding-box center.
-        // Without this the roll axis passes above/below the visual center of the ship
-        // (the cockpit dome shifts the bbox upward), making the ship appear to orbit
-        // a point rather than spin in place.
-        geometry.computeBoundingBox();
-        const geoCenter = new THREE.Vector3();
-        if (geometry.boundingBox) {
-            geometry.boundingBox.getCenter(geoCenter);
-            geometry.translate(-geoCenter.x, -geoCenter.y, -geoCenter.z);
-        }
-
-        // ── Material ──────────────────────────────────────────────────────────
-        const material = new THREE.MeshStandardMaterial({
-            color: 0x7799bb,
-            metalness: 0.85,
-            roughness: 0.25,
-            emissive: 0x001122,
-            emissiveIntensity: 0.1,
-        });
+        // Invisible placeholder mesh — replaced by the loaded OBJ group once ready.
+        const placeholderGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
+        const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
 
         // ── Base class ────────────────────────────────────────────────────────
         super(
@@ -103,28 +43,22 @@ export class Spaceship extends Body {
             /* mass — tiny so it barely perturbs celestial orbits */ 0.05,
             position,
             velocity,
-            geometry,
-            material,
+            placeholderGeometry,
+            placeholderMaterial,
             id,
             'Spaceship',
             BodyTypeEnum.SpaceShip
         );
 
         // ── Ship-specific properties ──────────────────────────────────────────
-        // Collision radius: half the total wingspan (wing tip to centre ≈ 0.72 + hull half-width)
+        // Collision radius: approximate half-wingspan
         this.radius = 1.3 * SF;
 
-        // 1st-person camera sits inside the cockpit dome.
-        // geoCenter offset is subtracted so the offset matches the shifted geometry.
-        this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF - geoCenter.y, 0.52 * SF - geoCenter.z);
-
-        // Engine nozzle — midpoint between the two nacelle exits at the rear.
-        this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF - geoCenter.y, -0.9 * SF - geoCenter.z);
-
-        // 3rd-person camera: well behind and slightly above (large offset; geoCenter is negligible).
+        // Initial camera offsets (approximate; updated precisely after OBJ loads).
+        this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
+        this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF, -0.9 * SF);
         this.thirdPersonOffset = new THREE.Vector3(0, 3 * SF, -8 * SF);
 
-        // Shadows
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
 
@@ -134,5 +68,54 @@ export class Spaceship extends Body {
         // Keep default label (shows in bodies table) but hide it during flight
         if (this.label) this.label.visible = false;
         if (this.labelLine) this.labelLine.visible = false;
+
+        // ── Async OBJ + MTL load ──────────────────────────────────────────────
+        const mtlLoader = new MTLLoader();
+        mtlLoader.setPath('./assets/models/');
+        mtlLoader
+            .loadAsync('spaceship.mtl')
+            .then((materials) => {
+                materials.preload();
+                const objLoader = new OBJLoader();
+                objLoader.setMaterials(materials);
+                return objLoader.loadAsync('./assets/models/spaceship.obj');
+            })
+            .then((group) => {
+                // Compute bounding box of the unscaled model (group at world origin, no parent).
+                const bbox = new THREE.Box3().setFromObject(group);
+                const size = new THREE.Vector3();
+                bbox.getSize(size);
+                const longestDim = Math.max(size.x, size.y, size.z);
+                const scale = (1.6 * SF) / longestDim;
+                group.scale.setScalar(scale);
+
+                // Re-compute bbox after scaling to find the center.
+                group.updateMatrixWorld(true);
+                const scaledBbox = new THREE.Box3().setFromObject(group);
+                const center = new THREE.Vector3();
+                scaledBbox.getCenter(center);
+                group.position.sub(center);
+
+                // Compute LOCAL bbox now — before adding to this.mesh — so world space
+                // equals mesh-local space and the values are valid as local offsets.
+                group.updateMatrixWorld(true);
+                const localBbox = new THREE.Box3().setFromObject(group);
+
+                // Enable shadows on every sub-mesh.
+                group.traverse((child) => {
+                    if ((child as THREE.Mesh).isMesh) {
+                        child.castShadow = true;
+                    }
+                });
+
+                this.mesh.add(group);
+
+                // Update camera/thruster offsets from the local bbox.
+                this.cockpitOffset.set(0, localBbox.max.y * 0.5, localBbox.max.z * 0.75);
+                this.thrusterOffset.set(0, localBbox.min.y * 0.3, localBbox.min.z);
+            })
+            .catch((e) => {
+                console.warn('Spaceship OBJ/MTL load failed — using placeholder mesh', e);
+            });
     }
 }

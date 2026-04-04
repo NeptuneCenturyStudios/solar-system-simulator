@@ -15,6 +15,10 @@ export default defineConfig({
                     src: './assets/textures/**/*',
                     dest: './',
                 },
+                {
+                    src: './assets/models/**/*',
+                    dest: './',
+                },
             ],
         }),
     ],
