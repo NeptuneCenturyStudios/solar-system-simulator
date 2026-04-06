@@ -6,7 +6,7 @@ import { ShipTrail } from './ship-trail.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 
-const SF = SCALE_FACTOR;
+const SF = SCALE_FACTOR / SCALE_FACTOR;
 
 /**
  * Player-controllable spaceship body.
@@ -40,7 +40,7 @@ export class Spaceship extends Body {
         super(
             dependencies,
             scene,
-            /* mass — tiny so it barely perturbs celestial orbits */ 0.05,
+            /* mass — tiny so it barely perturbs celestial orbits */ 0.001,
             position,
             velocity,
             placeholderGeometry,
@@ -52,12 +52,12 @@ export class Spaceship extends Body {
 
         // ── Ship-specific properties ──────────────────────────────────────────
         // Collision radius: approximate half-wingspan
-        this.radius = 1.3 * SF;
+        this.radius = 0.6 * SF;
 
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
         this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF, -0.9 * SF);
-        this.thirdPersonOffset = new THREE.Vector3(0, 0.6 * SF, -2.7 * SF);
+        this.thirdPersonOffset = new THREE.Vector3(0, 0.4 * SF, -2.2 * SF);
 
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
@@ -86,7 +86,7 @@ export class Spaceship extends Body {
                 const size = new THREE.Vector3();
                 bbox.getSize(size);
                 const longestDim = Math.max(size.x, size.y, size.z);
-                const scale = (1.6 * SF) / longestDim;
+                const scale = (0.6 * SF) / longestDim;
                 group.scale.setScalar(scale);
 
                 // Re-compute bbox after scaling to find the center.

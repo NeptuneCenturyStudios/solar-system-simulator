@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 
 const TRAIL_RAW_LENGTH = 200;   // raw history capacity (ring buffer)
-const SF = SCALE_FACTOR;
+const SF = SCALE_FACTOR / SCALE_FACTOR; // trail size scaling factor (independent of world scale)
 
 /** Number of uniformly-resampled display points drawn each frame.
  *  Constant regardless of speed — always looks dense. */
@@ -106,7 +106,7 @@ export class ShipTrail {
 
         this.innerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 0.05 * SF,
+            size: 0.01 * SF,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -129,7 +129,7 @@ export class ShipTrail {
 
         this.outerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 2.0 * SF,
+            size: 0.5 * SF,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,

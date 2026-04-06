@@ -1,5 +1,5 @@
 // Constants - Real-world scale ratios (Earth = 100 mass, 2000 distance, 8 radius)
-export const SCALE_FACTOR = 1;
+export const SCALE_FACTOR = 4;
 
 export const G = 1;
 

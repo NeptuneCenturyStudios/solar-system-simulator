@@ -994,24 +994,24 @@ const flightState = {
 };
 
 // Flight tuning constants
-const FLIGHT_MAX_SPEED = 250 * SCALE_FACTOR;           // normal max speed cap (units/s)
+const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR;           // normal max speed cap (units/s)
 const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED;  // boost ceiling = 10× normal max speed
 const FLIGHT_THRUST_ACCEL = 10 * SCALE_FACTOR;          // acceleration rate while W/S held (u/s²)
-const FLIGHT_BOOST_ACCEL  = 800 * SCALE_FACTOR;         // acceleration rate while Shift held (u/s²)
+const FLIGHT_BOOST_ACCEL  = 1000 * SCALE_FACTOR;         // acceleration rate while Shift held (u/s²)
 /** Rate at which cross-axis (gravity-accumulated) velocity decays while thrusting in simple mode.
  *  Higher = quicker normalisation. At 1.5 the perpendicular component halves in ~0.46 s. */
 const FLIGHT_PERP_DECAY = 0.5;           // per second
 const FLIGHT_MAX_POINTER_OFFSET = 260;   // pixels before reaching full turn rate
 const FLIGHT_MAX_TURN_RATE = 0.6;        // radians/s at full pointer deflection
 const FLIGHT_ROLL_SPEED = 2.0;           // max roll angular velocity (rad/s)
-const FLIGHT_ROLL_ACCEL = 0.5;           // how fast roll ramps up (rad/s²) — lower = slower start
-const FLIGHT_ROLL_FRICTION = 0.5;        // how fast roll decays when key released (rad/s²)
+const FLIGHT_ROLL_ACCEL = 0.4;           // how fast roll ramps up (rad/s²) — lower = slower start
+const FLIGHT_ROLL_FRICTION = 0.4;        // how fast roll decays when key released (rad/s²)
 const FLIGHT_STEER_SMOOTHING = 0.004;    // lerp factor per frame — lower = heavier feel
 const FLIGHT_STEER_DEADZONE = 0.05;      // normalised dead zone (0–1); input below this is zeroed
 const FLIGHT_WARP_CHARGE_TIME = 2.0;     // seconds to hold Space before warp engages
 const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED * SCALE_FACTOR; // top warp speed (u/s)
-const FLIGHT_WARP_DECEL_RATE = 8000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
-const FLIGHT_BOOST_DECEL_RATE = 800 * SCALE_FACTOR;  // decel rate after boost ends (u/s²)
+const FLIGHT_WARP_DECEL_RATE = 10000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
+const FLIGHT_BOOST_DECEL_RATE = 1000 * SCALE_FACTOR;  // decel rate after boost ends (u/s²)
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -4617,7 +4617,7 @@ function zoomRelativeToTarget(target: Body, factor) {
 
     const zoomInLimit =
         target && simulationState.bodies.includes(target) && !target._isDisposed
-            ? Math.max((target.radius || 1) * 2.2, 10)
+            ? .01
             : 10;
     const zoomOutLimit = farLimit;
 
