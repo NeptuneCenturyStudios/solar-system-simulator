@@ -552,14 +552,8 @@ export class Star extends CelestialBody {
             this.sunLight.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
             this.sunLight.shadow.bias = -0.00001;
             this.sunLight.shadow.normalBias = 0.01;
-            const shadowSize = 5000;
-            this.sunLight.shadow.camera.left = -shadowSize;
-            this.sunLight.shadow.camera.right = shadowSize;
-            this.sunLight.shadow.camera.top = shadowSize;
-            this.sunLight.shadow.camera.bottom = -shadowSize;
-            this.sunLight.shadow.camera.near = 1;
-            this.sunLight.shadow.camera.far = 100000;
-            this.sunLight.shadow.camera.updateProjectionMatrix();
+            // Shadow frustum is managed dynamically per-body each frame.
+            this.sunLight.shadow.needsUpdate = true;
         }
     }
 
@@ -672,6 +666,25 @@ export class Star extends CelestialBody {
             this.sunLight.shadow.camera.far = Math.min(distance * 0.5, 500000);
             this.sunLight.shadow.camera.updateProjectionMatrix();
         }
+    }
+
+    /**
+     * Dynamically tunes the directional light's orthographic shadow frustum to tightly
+     * wrap the given body. Called every frame by syncAllStarLightTargets() when a valid
+     * non-star body is in focus, so shadows work correctly at any scale or orbital distance.
+     */
+    updateShadowFrustumForBody(body: CelestialBody) {
+        const dist = this.mesh.position.distanceTo(body.mesh.position);
+        const size = body.radius * 4;
+        this.sunLight.shadow.camera.left = -size;
+        this.sunLight.shadow.camera.right = size;
+        this.sunLight.shadow.camera.top = size;
+        this.sunLight.shadow.camera.bottom = -size;
+        this.sunLight.shadow.camera.near = 1;
+        // Ensure far always exceeds the ortho frustum width to avoid near==far edge cases.
+        this.sunLight.shadow.camera.far = Math.max(dist * 1.2, size * 2);
+        this.sunLight.shadow.camera.updateProjectionMatrix();
+        this.sunLight.shadow.needsUpdate = true;
     }
 
     die(skipExplosion = false) {

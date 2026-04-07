@@ -2128,33 +2128,77 @@ function getPrimaryStar() {
     );
 }
 
-function syncPrimaryStarLightTarget() {
-    const primaryStar = getPrimaryStar();
-    if (!primaryStar || !primaryStar.sunLight || !primaryStar.sunLight.target) return;
+function syncAllStarLightTargets() {
+    const stars = simulationState.bodies.filter(
+        (b): b is Star => b instanceof Star && !b._isDisposed
+    );
+    if (stars.length === 0) return;
+
+    // Priority chain: find the best non-star body to use as the light direction target.
+    // Stars are excluded — targeting a star with its own light produces a near-zero direction.
+    //
+    // Last-resort: closest non-star body to the camera. This is critical for free-cam mode —
+    // when the user deselects a body they were just viewing, the camera is still near that planet
+    // so it stays the light target and the correct side remains illuminated.
+    const _closestNonStarBody = (() => {
+        let closest: Body | null = null;
+        let closestDist = Infinity;
+        for (const b of simulationState.bodies) {
+            if (!b || b._isDisposed || b instanceof Star || !b.mesh) continue;
+            const d = camera.position.distanceTo(b.mesh.position);
+            if (d < closestDist) { closestDist = d; closest = b; }
+        }
+        return closest;
+    })();
 
     const activeLightTarget =
-        (selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
+        (selectedBody &&
+        !selectedBody._isDisposed &&
+        !(selectedBody instanceof Star) &&
+        simulationState.bodies.includes(selectedBody)
             ? selectedBody
             : manuallySelectedBody &&
-                simulationState.bodies.includes(manuallySelectedBody) &&
-                !manuallySelectedBody._isDisposed
+                !manuallySelectedBody._isDisposed &&
+                !(manuallySelectedBody instanceof Star) &&
+                simulationState.bodies.includes(manuallySelectedBody)
               ? manuallySelectedBody
               : cameraState.focusBody &&
-                  simulationState.bodies.includes(cameraState.focusBody) &&
-                  !cameraState.focusBody._isDisposed
+                  !cameraState.focusBody._isDisposed &&
+                  !(cameraState.focusBody instanceof Star) &&
+                  simulationState.bodies.includes(cameraState.focusBody)
                 ? cameraState.focusBody
-                : null) || null;
+                : _closestNonStarBody) ?? null;
 
-    if (activeLightTarget && activeLightTarget.mesh) {
-        primaryStar.sunLight.target.position.copy(activeLightTarget.mesh.position);
-    } else {
-        // Default to a stable world-space direction instead of the scene center.
-        // This avoids the initial "wrong side lit" look before a body is focused.
-        primaryStar.sunLight.target.position.set(1, 0, 0);
-    }
+    // Shadows are only needed when: the user has them enabled, we're not in free cam (user
+    // requirement), and there is a non-star body to project shadows onto.
+    const shadowsUserEnabled =
+        (document.getElementById('enableShadows') as HTMLInputElement)?.checked ?? false;
+    const shouldCastShadows =
+        shadowsUserEnabled && !cameraState.isFreeCameraMode && activeLightTarget != null;
 
-    if (primaryStar.sunLight.target.parent) {
-        primaryStar.sunLight.target.updateMatrixWorld();
+    for (const star of stars) {
+        if (!star.sunLight?.target) continue;
+
+        if (activeLightTarget?.mesh) {
+            star.sunLight.target.position.copy(activeLightTarget.mesh.position);
+        } else {
+            // Star-relative fallback: offset +X from the star so the direction is always
+            // well-defined regardless of where the star is in world space.
+            star.sunLight.target.position.set(
+                star.mesh.position.x + 1,
+                star.mesh.position.y,
+                star.mesh.position.z
+            );
+        }
+
+        if (star.sunLight.target.parent) {
+            star.sunLight.target.updateMatrixWorld();
+        }
+
+        star.sunLight.castShadow = shouldCastShadows;
+        if (shouldCastShadows) {
+            star.updateShadowFrustumForBody(activeLightTarget!);
+        }
     }
 }
 
@@ -2847,7 +2891,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
 
     // Default mode: build the solar system
     simulationState.bodies = [primaryStar];
-    syncPrimaryStarLightTarget();
+    syncAllStarLightTargets();
 
     // Mercury
     simulationState.bodies.push(new Mercury(dependencies, scene));
@@ -3061,6 +3105,11 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     simulationState.bodies.push(new Halley(dependencies, scene));
 
     selectedBody = null;
+
+    // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
+    // immediately without requiring the user to toggle the checkbox.
+    const shadowCheckbox = document.getElementById('enableShadows') as HTMLInputElement;
+    toggleShadows(shadowCheckbox ? shadowCheckbox.checked : true);
 }
 
 function getAcc(p1, p2, m2) {
@@ -4378,7 +4427,7 @@ function animate() {
         controls.update();
     }
 
-    syncPrimaryStarLightTarget();
+    syncAllStarLightTargets();
 
     // Update hint sprite each frame (cheap; texture only updates when text changes)
     if (window.__updateHintSprite) {
@@ -6255,7 +6304,7 @@ function applyDefaultCameraTogglesAfterSpawn() {
     camera.lookAt(NONE_FOCUS_POSITION);
 
     // Force the primary light to initialize correctly on first load.
-    syncPrimaryStarLightTarget();
+    syncAllStarLightTargets();
 
     // No selection => no gizmo attachment yet.
     gizmo.attach(null);
