@@ -268,9 +268,11 @@ export class MainPanel extends Panel {
 
     /**
      * Render/update the bodies table.
-     * @param {Array<{name:string,typeLabel:string, body:any}>} rows
+     * @param {Array<{name:string,typeLabel:string,body:any,isShip:boolean}>} rows
+     * @param {boolean} hasShip - Whether a spaceship exists (enables Fly Here buttons).
+     * @param {any|null} autopilotTarget - The body currently being tracked by autopilot (or null).
      */
-    renderBodiesTable(rows) {
+    renderBodiesTable(rows, hasShip = false, autopilotTarget = null) {
         if (!this.bodiesTableContainer) return;
 
         const safeRows = Array.isArray(rows) ? rows : [];
@@ -279,23 +281,30 @@ export class MainPanel extends Panel {
                         <table>
                             <thead>
                                 <tr>
-                                    <th style="width: 65%">Name</th>
-                                    <th style="width: 35%">Type</th>
+                                    <th style="width: 50%">Name</th>
+                                    <th style="width: 30%">Type</th>
+                                    <th style="width: 20%"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${
                                     safeRows.length === 0
-                                        ? `<tr><td colspan="2" style="opacity:0.7; padding:10px 6px;">No bodies</td></tr>`
+                                        ? `<tr><td colspan="3" style="opacity:0.7; padding:10px 6px;">No bodies</td></tr>`
                                         : safeRows
                                               .map((r) => {
                                                   const isSel =
                                                       this._selectedBodyRef &&
                                                       r.body === this._selectedBodyRef;
+                                                  const isApTarget = autopilotTarget && r.body === autopilotTarget;
+                                                  // Show "Fly Here" only for non-ship bodies when a ship exists
+                                                  const flyBtnHtml = (!r.isShip && hasShip)
+                                                      ? `<td style="padding:2px 4px;"><button class="fly-here-btn${isApTarget ? ' active' : ''}" data-flyhere="1" title="${isApTarget ? 'Cancel autopilot' : 'Fly to this body'}" style="font-size:0.72em;padding:2px 6px;cursor:pointer;">${isApTarget ? '✕' : '✈'}</button></td>`
+                                                      : `<td></td>`;
                                                   return `
                                                       <tr class="${isSel ? 'selected' : ''}" data-row="1">
                                                           <td>${escapeHtml(r.name || 'Unnamed')}</td>
                                                           <td>${escapeHtml(r.typeLabel || 'Unknown')}</td>
+                                                          ${flyBtnHtml}
                                                       </tr>
                                                   `;
                                               })
@@ -315,6 +324,18 @@ export class MainPanel extends Panel {
         trList.forEach((tr, idx) => {
             // Skip empty placeholder row (no bodies)
             if (!safeRows[idx]) return;
+
+            // "Fly Here" button — stop row-select propagation
+            const flyBtn = tr.querySelector('[data-flyhere]');
+            if (flyBtn) {
+                flyBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const row = safeRows[idx];
+                    if (!row || !row.body) return;
+                    this.emit('autopilot', { body: row.body });
+                });
+            }
+
             tr.addEventListener('click', () => {
                 const row = safeRows[idx];
                 if (!row || !row.body) return;

@@ -993,6 +993,30 @@ const flightState = {
     boostDecelerating: false,
 };
 
+// --- Autopilot state ---
+type AutopilotPhase = 'APPROACH' | 'BRAKE' | 'CIRCULARIZE';
+const autopilotState = {
+    isActive: false,
+    targetBody: null as Body | null,
+    phase: null as AutopilotPhase | null,
+    /** Stable-orbit notification timer (seconds remaining to display). */
+    orbitNotifyTimer: 0,
+};
+
+// Autopilot tuning constants
+/** Thrust acceleration used by autopilot (u/s²). */
+const AUTOPILOT_ACCEL = 20 * SCALE_FACTOR;
+/** Safety pad multiplier on brake distance (>1 = start braking earlier). */
+const AUTOPILOT_BRAKE_PAD = 2.0;
+/** Target orbit altitude expressed as a multiple of the target body's radius. */
+const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 3.0;
+/** Relative-speed threshold at which BRAKE hands off to CIRCULARIZE (u/s). */
+const AUTOPILOT_BRAKE_DONE_SPEED = 5 * SCALE_FACTOR;
+/** Maximum timeScale at which autopilot may engage. Above this it refuses with a warning. */
+const AUTOPILOT_MAX_TIMESCALE = 5000;
+/** Duration (seconds) to show the "Stable Orbit" HUD notification. */
+const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
+
 // Flight tuning constants
 const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR;           // normal max speed cap (units/s)
 const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED;  // boost ceiling = 10× normal max speed
@@ -1416,6 +1440,48 @@ function createWarpSprite() {
     uiScene.add(warpSprite);
 }
 createWarpSprite();
+
+// ── Stable-orbit notify HUD sprite ───────────────────────────────────────────
+// Appears briefly (AUTOPILOT_ORBIT_NOTIFY_DURATION seconds) after circularization.
+let orbitNotifySprite: THREE.Sprite | null = null;
+
+function createOrbitNotifyTexture(): THREE.CanvasTexture {
+    const W = 512, H = 80;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d')!;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font         = 'bold 40px monospace';
+    ctx.shadowBlur   = 14;
+    ctx.shadowColor  = 'rgba(100,220,255,0.9)';
+    ctx.fillStyle    = '#7ef0ff';
+    ctx.fillText('✓ STABLE ORBIT ESTABLISHED', W / 2, H / 2);
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+}
+
+function createOrbitNotifySprite() {
+    const material = new THREE.SpriteMaterial({
+        map: createOrbitNotifyTexture(),
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+    });
+    orbitNotifySprite = new THREE.Sprite(material);
+    orbitNotifySprite.scale.set(420, 65, 1);
+    orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), 0);
+    orbitNotifySprite.visible = false;
+    uiScene.add(orbitNotifySprite);
+}
+createOrbitNotifySprite();
+
+function showOrbitNotifySprite() {
+    if (!orbitNotifySprite) return;
+    orbitNotifySprite.visible = true;
+    autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
+}
 
 // --- Context hint system (top-center HUD text) ---
 let hintSprite = null;
@@ -3978,6 +4044,18 @@ function animate() {
         exitFlightMode();
     }
 
+    // Auto-cancel autopilot if the known ship was destroyed while autopilot was running.
+    if (autopilotState.isActive) {
+        const ap_ship = flightState.knownShip;
+        if (!ap_ship || ap_ship._isDisposed || !simulationState.bodies.includes(ap_ship)) {
+            cancelAutopilot();
+        }
+        // Cancel on manual thrust key — checked once per frame (not inside substep loop).
+        if (keys.w || keys.s || keys.shift) {
+            cancelAutopilot('Autopilot disengaged: manual override.');
+        }
+    }
+
     if (isFlightModeActive) {
         updateFlightControls(SIM.BASE_FRAME_DT);
         // Camera is repositioned AFTER the physics loop (see updateFlightCamera below)
@@ -4109,6 +4187,11 @@ function animate() {
             // Store the accumulated force to apply in the update step
             body.tempAcc = totalAcc;
         }
+
+        // Apply autopilot thrust impulse each substep so it scales correctly with timeScale.
+        // Running once per frame at BASE_FRAME_DT would let the ship fly through brake zones
+        // at high time-warp without ever triggering phase transitions.
+        if (autopilotState.isActive) updateAutopilot(dt);
 
         // Apply accelerations to positions
         for (const body of simulationState.bodies) {
@@ -4482,6 +4565,14 @@ function animate() {
             statsSprite.visible = false;
         }
 
+        // Tick down orbit-notify timer and hide sprite when expired
+        if (orbitNotifySprite && orbitNotifySprite.visible) {
+            autopilotState.orbitNotifyTimer -= (now - lastT) / 1000;
+            if (autopilotState.orbitNotifyTimer <= 0) {
+                orbitNotifySprite.visible = false;
+            }
+        }
+
         // Update event log
         if (eventLogSprite) {
             eventLogSprite.material.map.dispose();
@@ -4524,18 +4615,23 @@ function getBodyTypeLabel(b: Body) {
 
 function refreshBodiesTable() {
     if (!mainPanel) return;
+
+    const ship = flightState.knownShip;
+    const hasShip = !!(ship && !ship._isDisposed && simulationState.bodies.includes(ship));
+
     const rows = simulationState.bodies
         .filter((b) => b && !b._isDisposed && b.mesh)
         .map((b) => ({
             name: b.name || 'Unnamed',
             typeLabel: getBodyTypeLabel(b),
             body: b,
+            isShip: b.bodyType === BodyTypeEnum.SpaceShip,
         }))
         .sort((a, b) => a.typeLabel.localeCompare(b.typeLabel) || a.name.localeCompare(b.name));
 
     // Keep table highlight in sync with current selection
     mainPanel.setSelectedBody(selectedBody || manuallySelectedBody || null);
-    mainPanel.renderBodiesTable(rows);
+    mainPanel.renderBodiesTable(rows, hasShip, autopilotState.targetBody);
 
     // Surface camera enablement depends on selection, so keep it in sync.
     try {
@@ -4579,6 +4675,20 @@ flightControlsPanel.initialize();
         flightControlsPanel.setViewState(flightState.isCockpitView);
     });
     flightControlsPanel.on('exitFlight', () => exitFlightMode());
+
+    // Autopilot toggle from the flight controls panel (targets currently selected body)
+    flightControlsPanel.on('autopilot', () => {
+        if (autopilotState.isActive) {
+            cancelAutopilot('Autopilot disengaged.');
+            return;
+        }
+        const target = selectedBody || manuallySelectedBody;
+        if (!target || target._isDisposed) {
+            addEvent('Autopilot: select a target body first.');
+            return;
+        }
+        engageAutopilot(target);
+    });
 
     // Advanced flight mode checkbox
     const advancedModeChk = document.getElementById('flightAdvancedMode') as HTMLInputElement | null;
@@ -4922,6 +5032,229 @@ function onSurfaceMouseMove(event) {
 // ── Flight mode functions ────────────────────────────────────────────────────
 
 /**
+ * Autopilot: steers the ship through three phases to reach a target body and enter a circular orbit.
+ * Phase 1 — APPROACH: Orient ship toward predicted intercept and thrust toward target.
+ * Phase 2 — BRAKE:    Thrust opposite relative velocity to cancel approach speed near the target.
+ * Phase 3 — CIRCULARIZE: Set tangential velocity for a stable circular orbit, then disengage.
+ *
+ * This runs regardless of whether flight mode is active (the ship must exist in simulationState.bodies).
+ * Any manual thrust key press cancels the autopilot immediately.
+ */
+function updateAutopilot(dt: number) {
+    if (!autopilotState.isActive) return;
+
+    // ── Safety guards ────────────────────────────────────────────────────────
+    const ship = flightState.knownShip;
+    const target = autopilotState.targetBody;
+
+    const shipAlive = ship && !ship._isDisposed && ship.mesh && simulationState.bodies.includes(ship);
+    const targetAlive = target && !target._isDisposed && target.mesh && simulationState.bodies.includes(target);
+
+    if (!shipAlive || !targetAlive) {
+        cancelAutopilot('Autopilot disengaged: target or ship no longer exists.');
+        return;
+    }
+
+    // ── Derived values ───────────────────────────────────────────────────────
+    const shipPos  = ship.mesh.position;    // live reference — no clone needed for reading
+    const targetPos = target.mesh.position;
+
+    const toTarget = new THREE.Vector3().subVectors(targetPos, shipPos);
+    const distance = toTarget.length();
+
+    const orbitRadius = (target.radius ?? 10) * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
+    const relVel = new THREE.Vector3().subVectors(ship.velocity, target.velocity);
+    const approachSpeed = relVel.length();
+
+    // ── Phase transitions ────────────────────────────────────────────────────
+    const toTargetDir = toTarget.clone().normalize();
+    // Closing speed: how fast THIS ship is moving toward the target (world frame).
+    // This is what matters for "can I stop in time?" — independent of the target's velocity.
+    const shipClosingSpeed = Math.max(0, ship.velocity.dot(toTargetDir));
+
+    if (autopilotState.phase === 'APPROACH') {
+        // Switch to BRAKE when the ship's own closing speed would carry it past orbit altitude.
+        // brakeDistance = v² / (2 * a) * pad  — uses closing speed, not full relVel
+        const brakeDistance = (shipClosingSpeed * shipClosingSpeed) / (2 * AUTOPILOT_ACCEL) * AUTOPILOT_BRAKE_PAD;
+        if (distance <= orbitRadius + brakeDistance) {
+            autopilotState.phase = 'BRAKE';
+        }
+    }
+
+    if (autopilotState.phase === 'BRAKE') {
+        // Switch to CIRCULARIZE once relative velocity is low — regardless of exact distance.
+        // The subsequent orbit insertion will give the correct velocity for whatever distance we're at.
+        if (approachSpeed < AUTOPILOT_BRAKE_DONE_SPEED) {
+            autopilotState.phase = 'CIRCULARIZE';
+        }
+    }
+
+    // ── Phase execution ──────────────────────────────────────────────────────
+
+    if (autopilotState.phase === 'APPROACH') {
+        // ── Orient toward predicted intercept position ───────────────────────
+        // Use FLIGHT_MAX_SPEED as the arrival-time denominator so that the lead
+        // prediction stays sensible regardless of the ship's current speed.  Using
+        // relVel here produced a near-zero denominator whenever the ship was
+        // stationary, sending tArrival (and the predicted position) to infinity.
+        const tArrival = distance / FLIGHT_MAX_SPEED;
+
+        // Predicted target position at estimated arrival time.
+        const predictedPos = new THREE.Vector3()
+            .copy(targetPos)
+            .addScaledVector(target.velocity, tArrival);
+
+        // Direction from ship to predicted target
+        const desiredDir = new THREE.Vector3().subVectors(predictedPos, shipPos);
+        if (desiredDir.lengthSq() > 1e-10) {
+            desiredDir.normalize();
+        } else {
+            desiredDir.copy(toTarget).normalize();
+        }
+
+        // Build target quaternion: ship +Z points toward desired direction.
+        const targetQuat = new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            desiredDir
+        );
+
+        // Slerp toward it — max angular movement per frame = FLIGHT_MAX_TURN_RATE * dt
+        const maxSlerpT = Math.min(1, (FLIGHT_MAX_TURN_RATE * dt) /
+            (2 * Math.acos(Math.max(-1, Math.min(1, ship.mesh.quaternion.dot(targetQuat))))));
+        ship.mesh.quaternion.slerp(targetQuat, isNaN(maxSlerpT) ? 1 : maxSlerpT);
+
+        // ── Thrust along current (post-slerp) forward — capped at FLIGHT_MAX_SPEED ──
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
+        const fwdSpeed = ship.velocity.dot(forward);
+        if (fwdSpeed < FLIGHT_MAX_SPEED) {
+            const thrust = Math.min(AUTOPILOT_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
+            ship.velocity.addScaledVector(forward, thrust);
+            flightState.thrustActive = true;
+        } else {
+            flightState.thrustActive = false;
+        }
+
+    } else if (autopilotState.phase === 'BRAKE') {
+        // ── Orient opposite relative velocity and thrust ─────────────────────
+        if (relVel.lengthSq() > 1e-10) {
+            const brakeDir = relVel.clone().negate().normalize();
+            const targetQuat = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1),
+                brakeDir
+            );
+            const maxSlerpT = Math.min(1, (FLIGHT_MAX_TURN_RATE * dt) /
+                (2 * Math.acos(Math.max(-1, Math.min(1, ship.mesh.quaternion.dot(targetQuat))))));
+            ship.mesh.quaternion.slerp(targetQuat, isNaN(maxSlerpT) ? 1 : maxSlerpT);
+
+            const brakeForce = Math.min(AUTOPILOT_ACCEL, approachSpeed / dt);
+            ship.velocity.addScaledVector(brakeDir, brakeForce * dt);
+            flightState.thrustActive = approachSpeed > AUTOPILOT_BRAKE_DONE_SPEED;
+        } else {
+            flightState.thrustActive = false;
+        }
+
+    } else if (autopilotState.phase === 'CIRCULARIZE') {
+        // ── Insert into circular orbit ────────────────────────────────────────
+        // Radial direction (outward from target)
+        const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
+        if (radial.lengthSq() < 1e-10) {
+            // Ship is at the target centre — offset slightly and retry next frame
+            ship.mesh.position.addScaledVector(new THREE.Vector3(1, 0, 0), orbitRadius);
+            return;
+        }
+
+        const r = radial.length();
+        radial.normalize();
+
+        // Tangential direction: perpendicular to radial in the horizontal plane
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const tangential = new THREE.Vector3().crossVectors(radial, worldUp).normalize();
+        if (tangential.lengthSq() < 1e-10) {
+            // Degenerate case (flying straight up/down); use a fallback
+            tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
+        }
+
+        // Orbital speed: v = sqrt(G * M / r)
+        const vOrbit = Math.sqrt((G * target.mass) / r);
+
+        // Set velocity = target velocity + tangential orbital velocity
+        ship.velocity.copy(target.velocity).addScaledVector(tangential, vOrbit);
+        flightState.thrustActive = false;
+
+        // Notify and disengage
+        const targetName = target.name || 'the body';
+        addEvent(`✓ Autopilot: Stable orbit around ${targetName} achieved.`);
+        autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
+        showOrbitNotifySprite();
+
+        // Disengage
+        autopilotState.isActive = false;
+        autopilotState.phase = null;
+        autopilotState.targetBody = null;
+        // Defer DOM update — running inside the physics substep loop.
+        setTimeout(() => updateAutopilotUI(), 0);
+    }
+
+    // Update ship trail to show thrust during approach/brake
+    if (ship.mesh) {
+        const nozzle = ship.thrusterOffset.clone()
+            .applyQuaternion(ship.mesh.quaternion)
+            .add(ship.mesh.position);
+        ship.trail.update(nozzle, AUTOPILOT_ACCEL, FLIGHT_MAX_SPEED, flightState.thrustActive);
+    }
+}
+
+/** Cancel the autopilot with an optional log message. */
+function cancelAutopilot(message?: string) {
+    if (!autopilotState.isActive) return;
+    autopilotState.isActive = false;
+    autopilotState.phase = null;
+    autopilotState.targetBody = null;
+    flightState.thrustActive = false;
+    if (message) addEvent(message);
+    // Defer DOM update — this may be called from inside the physics substep loop.
+    setTimeout(() => updateAutopilotUI(), 0);
+}
+
+/** Engage the autopilot toward a specific target body. */
+function engageAutopilot(target: Body) {
+    if (!target || target._isDisposed) return;
+
+    const ship = flightState.knownShip;
+    if (!ship || ship._isDisposed || !simulationState.bodies.includes(ship)) {
+        addEvent('Autopilot: no ship found. Spawn a spaceship first.');
+        return;
+    }
+
+    if (simulationState.timeScale > AUTOPILOT_MAX_TIMESCALE) {
+        addEvent(`Autopilot: time scale is too high (>${AUTOPILOT_MAX_TIMESCALE}×). Reduce time scale first.`);
+        return;
+    }
+
+    // If already engaged, cancel (toggle)
+    if (autopilotState.isActive && autopilotState.targetBody === target) {
+        cancelAutopilot('Autopilot disengaged.');
+        return;
+    }
+
+    autopilotState.isActive = true;
+    autopilotState.targetBody = target;
+    autopilotState.phase = 'APPROACH';
+    flightState.thrustActive = false;
+
+    addEvent(`Autopilot engaged: flying to ${target.name || 'target'}.`);
+    updateAutopilotUI();
+}
+
+/** Reflect autopilot state back to buttons after any state change. */
+function updateAutopilotUI() {
+    const ship = flightState.knownShip;
+    const shipExists = !!(ship && !ship._isDisposed && simulationState.bodies.includes(ship));
+    flightControlsPanel.setAutopilotState(autopilotState.isActive, shipExists && !!autopilotState.targetBody || autopilotState.isActive);
+    refreshBodiesTable();
+}
+
+/**
  * Applies per-frame flight controls to the active spaceship.
  * Called from animate() when flightState.isActive.
  */
@@ -5248,6 +5581,9 @@ function spawnShip() {
     if (warpSprite) warpSprite.visible = false;
     flightControlsPanel.setFlightActive(true);
     flightControlsPanel.setViewState(flightState.isCockpitView);
+    // Enable the autopilot button now that a ship is active
+    flightControlsPanel.setAutopilotState(autopilotState.isActive, true);
+    refreshBodiesTable();
 
     addEvent(canReenter ? 'Re-entered spaceship.' : 'Spaceship launched! W/S=speed  A/D=roll  Esc=exit');
 }
@@ -5326,6 +5662,11 @@ function exitFlightMode() {
     if (speedSprite) speedSprite.visible = false;
     flightControlsPanel.setFlightActive(false);
     flightControlsPanel.setViewState(false);
+    // Keep autopilot button enabled as long as the known ship still exists
+    const _exitShip = flightState.knownShip;
+    const _exitShipAlive = !!(_exitShip && !_exitShip._isDisposed && simulationState.bodies.includes(_exitShip));
+    flightControlsPanel.setAutopilotState(autopilotState.isActive, _exitShipAlive);
+    refreshBodiesTable();
     // updateFlightSpawnBtnLabel is defined after this function; call via a timeout
     // to avoid forward-reference issues in the module execution order.
     setTimeout(() => { try { updateFlightSpawnBtnLabel(); } catch (_) {} }, 0);
@@ -5490,6 +5831,12 @@ mainPanel.on('reset', () => {
 
 mainPanel.on('manageSystem', () => {
     managementPanel.toggle();
+});
+
+// "Fly Here" button from the bodies table
+mainPanel.on('autopilot', ({ body }: { body: Body }) => {
+    if (!body || body._isDisposed) return;
+    engageAutopilot(body);
 });
 
 // Manual selection from Bodies table
