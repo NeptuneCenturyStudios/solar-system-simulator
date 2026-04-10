@@ -1572,7 +1572,7 @@ function showOrbitNotifySprite() {
 }
 
 // --- Context hint system (top-center HUD text) ---
-let hintSprite = null;
+let hintSprite: THREE.Sprite | null = null;
 let hintLastText = '';
 
 function createHintSprite() {
@@ -1698,7 +1698,7 @@ function getActiveContextHint() {
     };
 }
 
-function createHintTexture({ lines }) {
+function createHintTexture({ lines }: { lines: string[] }) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
 
@@ -3303,6 +3303,10 @@ function togglePause() {
         mainPanel.updateTimeScaleDisplay(Math.abs(savedTimeScale) + 'x' + direction);
         mainPanel.setPauseState(false);
     }
+}
+
+function handlePauseShortcut() {
+    togglePause();
 }
 
 function toggleShadows(enabled: boolean) {
@@ -5273,30 +5277,30 @@ function updateAutopilot(dt: number) {
 
         if (deltaLen > 1e-6) {
             const accelDir = velDelta.clone().normalize();
+            const needsDecel = approachSpeed > targetSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
             // When current speed exceeds the target speed we need to decelerate, which
             // requires the full AUTOPILOT_DECEL rate (80 u/s²).  Using only AUTOPILOT_ACCEL
             // (20 u/s²) here would take 45 sim-seconds to scrub from boost speed, causing the
             // ship to fly thousands of units past the threshold before slowing down.
             // When the ship needs to speed UP, use the appropriate accel (boost or normal).
-            const needsDecel = approachSpeed > targetSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
-            // Use AUTOPILOT_BOOST_DECEL to shed above-normal speed quickly so the
-            // ship doesn't need thousands of units of runway.  Once at normal speed,
-            // switch to AUTOPILOT_DECEL for a smoother, controlled approach.
             const rate = needsDecel
                 ? (approachSpeed > FLIGHT_MAX_SPEED ? AUTOPILOT_BOOST_DECEL : AUTOPILOT_DECEL)
                 : (useBoost ? FLIGHT_BOOST_ACCEL : AUTOPILOT_ACCEL);
             const accelMag = Math.min(rate * dt, deltaLen);
             ship.velocity.addScaledVector(accelDir, accelMag);
-
-            // Rotate ship to face thrust direction (visual only — force already applied above).
-            const targetQuat = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1), accelDir
-            );
-            ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
-            flightState.thrustActive = true;
-        } else {
-            flightState.thrustActive = false;
         }
+
+        // Always keep the ship pointed toward the target during approach.
+        // Braking phase intentionally handles its own turnaround behavior.
+        const approachQuat = new THREE.Quaternion().setFromRotationMatrix(
+            new THREE.Matrix4().lookAt(
+                targetPos,
+                shipPos,
+                new THREE.Vector3(0, 1, 0)
+            )
+        );
+        ship.mesh.quaternion.rotateTowards(approachQuat, FLIGHT_MAX_TURN_RATE * dt);
+        flightState.thrustActive = deltaLen > 1e-6;
 
     } else if (autopilotState.phase === 'BRAKE') {
         // ── Trajectory-blend orbital insertion ────────────────────────────────
@@ -5516,6 +5520,13 @@ function updateFlightControls(dt: number) {
         return;
     }
 
+    // Pause guard: while paused, do not mutate ship rotation, thrust, roll, or velocity.
+    // Keep the active flight state intact so unpausing resumes from the exact same ship state.
+    if (isPaused || simulationState.timeScale === 0) {
+        flightState.thrustActive = false;
+        return;
+    }
+
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
 
     // ── Warp deceleration ────────────────────────────────────────────────────
@@ -5694,6 +5705,7 @@ function updateFlightControls(dt: number) {
 
     // ── Steering with smoothing + dead zone (mouse) ───────────────────────────
     // Raw normalised pointer input
+    const dtScale = Math.max(0, dt / (1 / 60));
     const rawXFull = THREE.MathUtils.clamp(flightState.pointerOffsetX / FLIGHT_MAX_POINTER_OFFSET, -1, 1);
     const rawYFull = THREE.MathUtils.clamp(flightState.pointerOffsetY / FLIGHT_MAX_POINTER_OFFSET, -1, 1);
     // Apply dead zone: values within ±DEADZONE snap to 0, outside rescale to 0-1
@@ -6655,6 +6667,12 @@ window.addEventListener('keydown', (e) => {
         }
     }
 
+    if (key === 'p') {
+        handlePauseShortcut();
+        e.preventDefault();
+        return;
+    }
+
     if (key === 'delete') {
         deleteSelectedBody({ source: 'keyboard' });
     }
@@ -6709,8 +6727,8 @@ window.addEventListener(
     (e) => {
         // If the wheel is used over the UI panel, let it scroll normally.
         // This allows scrolling the Bodies table without zooming the scene.
-        const uiContainer = document.getElementById('ui-container');
-        if (uiContainer && e.target && uiContainer.contains(e.target)) {
+    const uiContainer = document.getElementById('ui-container');
+    if (uiContainer && e.target instanceof Node && uiContainer.contains(e.target)) {
             return;
         }
 
