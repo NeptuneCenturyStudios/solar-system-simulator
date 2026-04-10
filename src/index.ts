@@ -1008,11 +1008,12 @@ const autopilotState = {
 // Autopilot tuning constants
 /** Thrust acceleration used by autopilot during approach (u/s²). */
 const AUTOPILOT_ACCEL = 20 * SCALE_FACTOR;
-/** Braking deceleration — higher than accel so the ship stops decisively. */
-const AUTOPILOT_DECEL = 80 * SCALE_FACTOR;
-/** Safety pad multiplier on brake distance. 1.0 = exact stop at orbit, higher = start braking earlier.
- *  Keep close to 1.0 — every 0.1 above 1.0 adds v²/(2*decel)*0.1 extra units to the final orbit radius. */
-const AUTOPILOT_BRAKE_PAD = 1.1;
+/** Braking deceleration — moderate so the stop feels gradual rather than jarring. */
+const AUTOPILOT_DECEL = 30 * SCALE_FACTOR;
+/** Safety pad multiplier on brake distance. Higher = start braking earlier / more gradually.
+ *  At 1.2 the ship begins braking at 1.2× the theoretical stopping distance — smooth
+ *  but ends up at approximately orbitRadius + 0.2×stoppingDist from the target. */
+const AUTOPILOT_BRAKE_PAD = 1.2;
 /** Target orbit altitude expressed as a multiple of the target body's radius.
  *  1.5 = tight low orbit just above the surface (moon-like proximity). */
 const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 1.5;
@@ -1045,8 +1046,9 @@ const FLIGHT_WARP_DECEL_RATE = 10000 * SCALE_FACTOR; // decel rate after warp en
 const FLIGHT_BOOST_DECEL_RATE = 1000 * SCALE_FACTOR;  // decel rate after boost ends (u/s²)
 
 /** Distance (u) above which autopilot switches to boost speed for faster transit.
- *  Derived as 2 × boost-stopping-distance so there is always room to accelerate then brake. */
-const AUTOPILOT_BOOST_THRESHOLD = 2 * (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) / (2 * AUTOPILOT_DECEL);
+ *  The minimum safe value is 1.0× the boost stopping distance (v²/2a ≈ 16,500 u).
+ *  1.3× keeps the ship in boost longer while still leaving enough runway to decelerate. */
+const AUTOPILOT_BOOST_THRESHOLD = 1.3 * (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) / (2 * AUTOPILOT_DECEL);
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -1460,15 +1462,15 @@ let orbitNotifySprite: THREE.Sprite | null = null;
 type AutopilotHudState = 'APPROACH' | 'APPROACH_BOOST' | 'BRAKE' | 'ORBIT' | 'NONE';
 let _lastAutopilotHudState: AutopilotHudState = 'NONE';
 
-function createAutopilotPhaseTexture(state: AutopilotHudState): THREE.CanvasTexture {
+function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = ''): THREE.CanvasTexture {
     // Canvas is deliberately wide (800px) so no label ever clips.
-    const W = 800, H = 70;
+    // Two rows: phase label on top, distance on the bottom.
+    const W = 800, H = 100;
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const ctx = c.getContext('2d')!;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font         = 'bold 34px monospace';
 
     let text: string;
     let color: string;
@@ -1500,10 +1502,21 @@ function createAutopilotPhaseTexture(state: AutopilotHudState): THREE.CanvasText
             glow = 'transparent';
     }
 
+    // Phase label
+    ctx.font        = 'bold 34px monospace';
     ctx.shadowBlur  = 14;
     ctx.shadowColor = glow;
     ctx.fillStyle   = color;
-    ctx.fillText(text, W / 2, H / 2);
+    ctx.fillText(text, W / 2, 34);
+
+    // Distance sub-label
+    if (distanceLabel) {
+        ctx.font        = '24px monospace';
+        ctx.shadowBlur  = 6;
+        ctx.fillStyle   = 'rgba(255,255,255,0.75)';
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.fillText(distanceLabel, W / 2, 72);
+    }
 
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
@@ -1518,8 +1531,8 @@ function createOrbitNotifySprite() {
         depthWrite: false,
     });
     orbitNotifySprite = new THREE.Sprite(material);
-    // 800px canvas → ~800 screen-pixel sprite width.
-    orbitNotifySprite.scale.set(800, 58, 1);
+    // 800×100 canvas → 800×80 screen-pixel sprite (two-line display).
+    orbitNotifySprite.scale.set(800, 80, 1);
     orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), 0);
     orbitNotifySprite.visible = false;
     uiScene.add(orbitNotifySprite);
@@ -4636,10 +4649,28 @@ function animate() {
                 _lastAutopilotHudState = 'NONE';
             } else {
                 orbitNotifySprite.visible = true;
-                // Re-render canvas only when phase changes — not every frame.
-                if (desiredHud !== _lastAutopilotHudState) {
+
+                // Build distance label whenever autopilot is active.
+                let distLabel = '';
+                if (autopilotState.isActive && autopilotState.targetBody?.mesh) {
+                    const ship = flightState.knownShip;
+                    if (ship?.mesh) {
+                        const dist = ship.mesh.position.distanceTo(autopilotState.targetBody.mesh.position);
+                        // Format: show as integer with thousands separator, strip tiny noise.
+                        const distRounded = Math.max(0, Math.round(dist));
+                        distLabel = `Distance to target: ${distRounded.toLocaleString()} u`;
+                    }
+                }
+
+                // Re-render canvas every frame while active (distance changes continuously),
+                // but only on phase changes when the stable-orbit message is showing.
+                const needsRedraw = autopilotState.isActive
+                    ? true  // distance always changes
+                    : desiredHud !== _lastAutopilotHudState;
+
+                if (needsRedraw) {
                     orbitNotifySprite.material.map?.dispose();
-                    orbitNotifySprite.material.map = createAutopilotPhaseTexture(desiredHud);
+                    orbitNotifySprite.material.map = createAutopilotPhaseTexture(desiredHud, distLabel);
                     orbitNotifySprite.material.needsUpdate = true;
                     _lastAutopilotHudState = desiredHud;
                 }
