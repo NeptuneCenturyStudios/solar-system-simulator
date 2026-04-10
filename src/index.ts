@@ -1003,6 +1003,10 @@ const autopilotState = {
     orbitNotifyTimer: 0,
     /** True while the approach phase is using boost speed. */
     isBoostActive: false,
+    /** Distance from target when BRAKE phase started — used to compute the
+     *  0→1 blend factor that rotates the desired velocity from 'stop' to
+     *  'orbital velocity' as the ship closes on the orbit radius. */
+    brakeEntryDistance: 0,
 };
 
 // Autopilot tuning constants
@@ -1010,9 +1014,19 @@ const autopilotState = {
 const AUTOPILOT_ACCEL = 20 * SCALE_FACTOR;
 /** Braking deceleration — moderate so the stop feels gradual rather than jarring. */
 const AUTOPILOT_DECEL = 20 * SCALE_FACTOR;
+/** High deceleration rate used to scrub boost speed quickly during approach.
+ *  AUTOPILOT_DECEL alone would take 99,000 u to shed boost speed — BOOST_DECEL
+ *  brings that down to a reasonable ~4,000 u. */
+const AUTOPILOT_BOOST_DECEL = 500 * SCALE_FACTOR;
 /** Orbit-insertion rate — gentler than AUTOPILOT_DECEL so the turn into orbit is
  *  visually smooth rather than a sharp snap.  Lower = longer arc, higher = snappier. */
-const AUTOPILOT_CIRCULARIZE_RATE = 1.5 * SCALE_FACTOR;
+const AUTOPILOT_CIRCULARIZE_RATE = 2 * SCALE_FACTOR;
+/** Safety multiplier for the physics-derived minimum circularize rate.  Near massive bodies
+ *  (like the Sun) gravity is strong enough to swallow the ship before it builds orbital
+ *  velocity at the aesthetic rate above.  This factor scales a gravity-derived floor:
+ *  effectiveRate = max(CIRCULARIZE_RATE, GRAVITY_MARGIN × v_orbit × sqrt(g / altitude))
+ *  Raise to give more headroom; lower to allow a more gradual arc near large bodies. */
+const AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN = 16;
 /** Safety pad multiplier on brake distance. Higher = start braking earlier / more gradually.
  *  At 1.2 the ship begins braking at 1.2× the theoretical stopping distance — smooth
  *  but ends up at approximately orbitRadius + 0.2×stoppingDist from the target. */
@@ -1029,7 +1043,7 @@ const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
 // AUTOPILOT_BOOST_THRESHOLD is declared after the FLIGHT_* constants it depends on.
 
 // Flight tuning constants
-const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR;           // normal max speed cap (units/s)
+const FLIGHT_MAX_SPEED = 200 * SCALE_FACTOR;           // normal max speed cap (units/s)
 const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED;  // boost ceiling = 10× normal max speed
 const FLIGHT_THRUST_ACCEL = 10 * SCALE_FACTOR;          // acceleration rate while W/S held (u/s²)
 const FLIGHT_BOOST_ACCEL  = 1000 * SCALE_FACTOR;         // acceleration rate while Shift held (u/s²)
@@ -1049,9 +1063,13 @@ const FLIGHT_WARP_DECEL_RATE = 10000 * SCALE_FACTOR; // decel rate after warp en
 const FLIGHT_BOOST_DECEL_RATE = 1000 * SCALE_FACTOR;  // decel rate after boost ends (u/s²)
 
 /** Distance (u) above which autopilot switches to boost speed for faster transit.
- *  The minimum safe value is 1.0× the boost stopping distance (v²/2a ≈ 16,500 u).
- *  1.3× keeps the ship in boost longer while still leaving enough runway to decelerate. */
-const AUTOPILOT_BOOST_THRESHOLD = 1.3 * (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) / (2 * AUTOPILOT_DECEL);
+ *  Computed as 1.5× the two-phase stopping distance: first shed boost speed at
+ *  AUTOPILOT_BOOST_DECEL, then shed normal speed at AUTOPILOT_DECEL.  This
+ *  guarantees the ship always has enough runway to fully brake before the orbit. */
+const AUTOPILOT_BOOST_THRESHOLD = 1.5 * (
+    (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_BOOST_DECEL)
+    + (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
+);
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -5187,20 +5205,34 @@ function updateAutopilot(dt: number) {
 
     // ── Phase transitions ────────────────────────────────────────────────────
     const toTargetDir = toTarget.clone().normalize();
-    // Use TOTAL relative speed (not just the radial component) for the brake trigger.
-    // When the ship is circling the target, radial closing speed ≈ 0 even though the
-    // ship is moving fast in the target's frame — which was causing the brake to never fire.
-    // approachSpeed = relVel.length() correctly captures that kinetic energy regardless of direction.
-    const brakeDistance = (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL) * AUTOPILOT_BRAKE_PAD;
+    // Two-phase stopping distance: shed boost speed at AUTOPILOT_BOOST_DECEL first,
+    // then shed normal speed at AUTOPILOT_DECEL.  Using only AUTOPILOT_DECEL would give
+    // a brake trigger 100,000 u from the target when coming in at boost speed.
+    const effectiveStopDist = approachSpeed > FLIGHT_MAX_SPEED
+        ? (approachSpeed * approachSpeed - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_BOOST_DECEL)
+          + (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
+        : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
+    const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
     if (autopilotState.phase === 'APPROACH') {
         if (distance <= orbitRadius + brakeDistance) {
             autopilotState.phase = 'BRAKE';
+            // Record entry distance so BRAKE can compute how far through the blend it is.
+            autopilotState.brakeEntryDistance = distance;
         }
     }
 
     if (autopilotState.phase === 'BRAKE') {
-        if (approachSpeed < AUTOPILOT_BRAKE_DONE_SPEED) {
+        // Transition when the ship is within 2% of orbitRadius.  A strict equality check
+        // fails because the inward blend component is ~0 in the last few units, so the
+        // ship settles into a gravitational equilibrium just above orbitRadius (e.g. 132u
+        // vs 131.64u for Jupiter).  The 2% margin catches that and CIRCULARIZE snaps the
+        // tiny residual.  Also fall back on radial closing speed: if the ship has stopped
+        // moving inward while it's within 10% of orbit, the blend has converged.
+        const radialClosingSpeed = -relVel.dot(toTargetDir); // positive = closing on target
+        const withinOrbit   = distance <= orbitRadius * 1.02;
+        const driftedToOrbit = distance <= orbitRadius * 1.10 && radialClosingSpeed < 1;
+        if (withinOrbit || driftedToOrbit) {
             autopilotState.phase = 'CIRCULARIZE';
         }
     }
@@ -5234,8 +5266,11 @@ function updateAutopilot(dt: number) {
             // ship to fly thousands of units past the threshold before slowing down.
             // When the ship needs to speed UP, use the appropriate accel (boost or normal).
             const needsDecel = approachSpeed > targetSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
+            // Use AUTOPILOT_BOOST_DECEL to shed above-normal speed quickly so the
+            // ship doesn't need thousands of units of runway.  Once at normal speed,
+            // switch to AUTOPILOT_DECEL for a smoother, controlled approach.
             const rate = needsDecel
-                ? AUTOPILOT_DECEL
+                ? (approachSpeed > FLIGHT_MAX_SPEED ? AUTOPILOT_BOOST_DECEL : AUTOPILOT_DECEL)
                 : (useBoost ? FLIGHT_BOOST_ACCEL : AUTOPILOT_ACCEL);
             const accelMag = Math.min(rate * dt, deltaLen);
             ship.velocity.addScaledVector(accelDir, accelMag);
@@ -5251,20 +5286,71 @@ function updateAutopilot(dt: number) {
         }
 
     } else if (autopilotState.phase === 'BRAKE') {
-        // Desired velocity: match target velocity (zero relative motion).
-        // velDelta needed = -relVel
-        if (relVel.lengthSq() > 1e-10) {
-            const brakeDir = relVel.clone().negate().normalize();
-            // Apply decel directly — no waiting for ship to physically rotate first.
-            const brakeMag = Math.min(AUTOPILOT_DECEL * dt, approachSpeed);
-            ship.velocity.addScaledVector(brakeDir, brakeMag);
+        // ── Trajectory-blend orbital insertion ────────────────────────────────
+        // Key insight: both the "stop" vector (target.velocity) and the orbital
+        // velocity vector have ZERO radial component in the target frame.  This
+        // means the desired-velocity controller always drives the inward (approach)
+        // velocity toward zero — regardless of the blend factor.  The blend only
+        // controls how much tangential orbital speed to build at each distance.
+        // Result: the ship spirals in, killing radial velocity while simultaneously
+        // rotating its velocity vector toward the orbit direction so it arrives at
+        // orbitRadius already moving tangentially at the correct orbital speed.
+        const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
+        if (radial.lengthSq() < 1e-10) return;
+        const r = radial.length();
+        radial.normalize();
 
-            // Rotate ship to face retrofire direction (cosmetic).
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const tangential = new THREE.Vector3().crossVectors(radial, worldUp).normalize();
+        if (tangential.lengthSq() < 1e-10) {
+            tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
+        }
+
+        const vOrbit = Math.sqrt((G * target.mass) / r);
+
+        // α = 0 at brake entry, 1 at orbitRadius.  Smoothstep eases the blend so
+        // most of the approach velocity is killed before the hard turn to orbit.
+        const brakeSpan = Math.max(autopilotState.brakeEntryDistance - orbitRadius, 1);
+        const rawT     = 1 - (distance - orbitRadius) / brakeSpan;
+        const t        = Math.max(0, Math.min(1, rawT));
+        const alpha    = t * t * (3 - 2 * t); // smoothstep
+
+        // Blend desired velocity as the ship spirals inward:
+        //   tangential component: 0 → vOrbit  (builds up as alpha → 1)
+        //   radial-inward component: FLIGHT_MAX_SPEED → 0  (fades to 0 at orbitRadius)
+        //
+        // Without the inward component, when alpha ≈ 1 the controller settles the ship
+        // into a stable circular orbit at whatever distance it happens to be at (e.g. 328u
+        // around Jupiter instead of 131u).  The inward term keeps the ship spiralling toward
+        // orbitRadius so alpha and inward both reach their final values at the same point.
+        const inwardSpeed = FLIGHT_MAX_SPEED * (1 - alpha);
+        const desiredVel = new THREE.Vector3()
+            .copy(target.velocity)
+            .addScaledVector(tangential, vOrbit * alpha)   // tangential: 0 → vOrbit
+            .addScaledVector(toTargetDir, inwardSpeed);    // inward: FLIGHT_MAX_SPEED → 0
+
+        // Explicit gravity compensation — same taper as CIRCULARIZE.
+        // Prevents gravity accumulating inward velocity faster than thrust can counter it.
+        const gravAccel = (G * target.mass) / (r * r);
+        const tangentialSpeed = relVel.dot(tangential);
+        const speedRatio = Math.max(0, Math.min(1, tangentialSpeed / vOrbit));
+        const gravCompFraction = 1 - speedRatio * speedRatio;
+        ship.velocity.addScaledVector(radial, gravAccel * gravCompFraction * dt);
+
+        // Desired-velocity controller.
+        const velDelta = new THREE.Vector3().subVectors(desiredVel, ship.velocity);
+        const deltaLen = velDelta.length();
+
+        if (deltaLen > 1e-6) {
+            const thrustDir = velDelta.clone().normalize();
+            const brakeMag  = Math.min(AUTOPILOT_DECEL * dt, deltaLen);
+            ship.velocity.addScaledVector(thrustDir, brakeMag);
+
             const targetQuat = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1), brakeDir
+                new THREE.Vector3(0, 0, 1), thrustDir
             );
             ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
-            flightState.thrustActive = approachSpeed > AUTOPILOT_BRAKE_DONE_SPEED;
+            flightState.thrustActive = deltaLen > 1;
         } else {
             flightState.thrustActive = false;
         }
@@ -5290,6 +5376,34 @@ function updateAutopilot(dt: number) {
         }
 
         const vOrbit = Math.sqrt((G * target.mass) / r);
+
+        // ── Gravity-scaled minimum rate for velocity rotation ─────────────────
+        const bodyRadius = target.radius ?? 10;
+        const altitude   = Math.max(r - bodyRadius, 1);
+        const gravAccel  = (G * target.mass) / (r * r);
+        const safeRate   = AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN * vOrbit * Math.sqrt(gravAccel / altitude);
+        const effectiveRate = Math.max(AUTOPILOT_CIRCULARIZE_RATE, safeRate);
+
+        // ── Explicit gravity compensation ─────────────────────────────────────
+        // The desired-velocity controller drives velocity toward the orbital vector,
+        // but at the start of circularize the velDelta is almost entirely tangential
+        // (~159 u/s), so only ~1% of thrust goes radially outward even though gravity
+        // is pulling the ship inward at full strength.  Near massive bodies this means
+        // the ship is swallowed before orbital speed builds.
+        //
+        // Fix: cancel gravity explicitly, separate from the desired-velocity step.
+        // Taper the compensation by (1 - speedRatio²): when tangential speed = 0,
+        // counteract 100% of gravity; when tangential speed = vOrbit, counteract 0%
+        // (the orbit is self-sustaining via centripetal acceleration at that point).
+        const tangentialSpeed = relVel.dot(tangential);
+        const speedRatio      = Math.max(0, Math.min(1, tangentialSpeed / vOrbit));
+        const gravCompFraction = 1 - speedRatio * speedRatio;
+        ship.velocity.addScaledVector(radial, gravAccel * gravCompFraction * dt);
+
+        // ── Desired-velocity controller ───────────────────────────────────────
+        // Drive toward pure orbital velocity.  Gravity is handled above so we don't
+        // need to bundle inward-drift correction into desiredVel — velDelta's radial
+        // component handles any residual drift from the BRAKE phase naturally.
         const desiredVel = new THREE.Vector3()
             .copy(target.velocity)
             .addScaledVector(tangential, vOrbit);
@@ -5312,9 +5426,9 @@ function updateAutopilot(dt: number) {
             autopilotState.targetBody = null;
             setTimeout(() => updateAutopilotUI(), 0);
         } else {
-            // Drive velocity toward the orbital vector at AUTOPILOT_CIRCULARIZE_RATE.
+            // Drive velocity toward the orbital vector at the gravity-adjusted rate.
             const thrustDir = velDelta.clone().normalize();
-            const mag = Math.min(AUTOPILOT_CIRCULARIZE_RATE * dt, deltaLen);
+            const mag = Math.min(effectiveRate * dt, deltaLen);
             ship.velocity.addScaledVector(thrustDir, mag);
 
             // Rotate ship to face thrust direction (cosmetic).
