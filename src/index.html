@@ -44,8 +44,14 @@
                         physics, exploration, and interactive body management.
                     </p>
                     <p>
-                        Placeholder text for now. This section can later be replaced with project
-                        details, credits, controls, or any other about content.
+                        Spaceship by Liz Reddington
+                        <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
+                            >CC-BY</a
+                        >
+                        via Poly Pizza
+                        <a href="https://poly.pizza/m/5nWeu4IQXVX" target="_blank"
+                            >https://poly.pizza/m/5nWeu4IQXVX</a
+                        >
                     </p>
                 </div>
                 <div class="modal__actions">
@@ -103,7 +109,9 @@
                 </label>
                 <label class="checkbox-row">
                     <input type="checkbox" id="showNames" /> Show Planet Names
-                    <span style="margin-left: 8px; font-size: 0.75em; color: #aaa;" aria-hidden="true"
+                    <span
+                        style="margin-left: 8px; font-size: 0.75em; color: #aaa"
+                        aria-hidden="true"
                         >(N)</span
                     >
                 </label>
@@ -124,7 +132,12 @@
 
                 <button id="pauseBtn" class="btn-with-icon">
                     <span class="material-symbols-outlined">pause</span>
-                    PAUSE SIMULATION <span style="margin-left: 8px; font-size: 0.75em; color: #aaa;" aria-hidden="true">(P)</span>
+                    PAUSE SIMULATION
+                    <span
+                        style="margin-left: 8px; font-size: 0.75em; color: #aaa"
+                        aria-hidden="true"
+                        >(P)</span
+                    >
                 </button>
                 <button id="resetBtn" class="btn-with-icon">
                     <span class="material-symbols-outlined">refresh</span>
@@ -141,7 +154,7 @@
                 <div class="btn-row btn-row--action-buttons">
                     <button
                         id="donateBtn"
-                        class="btn-with-icon btn-donate"
+                        class="btn-with-icon btn-with-icon--donate"
                         title="Support Neptune Century on Ko-fi"
                     >
                         <span class="material-symbols-outlined">favorite</span>
@@ -149,11 +162,12 @@
                     </button>
                     <button
                         id="aboutBtn"
-                        class="btn-icon-only btn-about"
+                        class="btn-with-icon"
                         title="About this simulator"
                         aria-label="About this simulator"
                     >
                         <span class="material-symbols-outlined">info</span>
+                        ABOUT
                     </button>
                 </div>
                 <div class="footer-note">© <span id="copyrightYear"></span> Neptune Century</div>
@@ -161,8 +175,11 @@
 
             <div id="flight-controls-panel">
                 <div class="panel-header">Flight Controls</div>
-                <p style="font-size:0.8em;color:#aaa;margin:4px 0 8px;">W/S — speed &nbsp; A/D — roll &nbsp; Shift — boost<br>C — view &nbsp; Mouse steers &nbsp; Hold space — warp &nbsp; Esc — exit</p>
-                <label class="checkbox-row" style="margin-bottom:8px;">
+                <p style="font-size: 0.8em; color: #aaa; margin: 4px 0 8px">
+                    W/S — speed &nbsp; A/D — roll &nbsp; Shift — boost<br />C — view &nbsp; Mouse
+                    steers &nbsp; Hold space — warp &nbsp; Esc — exit
+                </p>
+                <label class="checkbox-row" style="margin-bottom: 8px">
                     <input type="checkbox" id="flightAdvancedMode" /> Advanced Flight Mode
                 </label>
                 <button id="flightSpawnBtn" class="btn-with-icon">
@@ -177,7 +194,12 @@
                     <span class="material-symbols-outlined">rocket</span>
                     AUTOPILOT
                 </button>
-                <button id="flightExitBtn" class="btn-with-icon" disabled style="background:#883333">
+                <button
+                    id="flightExitBtn"
+                    class="btn-with-icon"
+                    disabled
+                    style="background: #883333"
+                >
                     <span class="material-symbols-outlined">exit_to_app</span>
                     EXIT FLIGHT MODE
                 </button>
@@ -385,11 +407,7 @@
                         Please select a body first to create a moon
                     </div>
 
-                    <div
-                        class="form-row form-row--actions"
-                        id="randomizeCreateRow"
-                        hidden
-                    >
+                    <div class="form-row form-row--actions" id="randomizeCreateRow" hidden>
                         <button id="randomizeCreateBtn" type="button" class="btn-with-icon">
                             <span class="material-symbols-outlined">shuffle</span>
                             RANDOMIZE

@@ -276,7 +276,7 @@ input[type='range'] {
 
 button {
     width: 100%;
-    padding: 8px 4px;
+    padding: 8px 8px;
     background: #004488;
     color: white;
     border: none;
@@ -348,17 +348,17 @@ button:disabled:hover {
     background: #d35400;
 }
 
-#donateBtn {
+.btn-with-icon--donate {
     background: #f2b6b6;
     color: #2b1b1b;
 }
 
-#donateBtn:hover {
+.btn-with-icon--donate:hover {
     background: #e8a2a2;
     color: #1f1111;
 }
 
-#donateBtn:active {
+.btn-with-icon--donate:active {
     background: #d98f8f;
     color: #1f1111;
 }
@@ -543,32 +543,12 @@ button.btn-with-icon {
     align-items: center;
     justify-content: center;
     gap: 6px;
+    width: 100%;
 }
 
 .btn-row--action-buttons {
     grid-template-columns: 1fr auto;
     gap: 8px;
-}
-
-.btn-about {
-    width: 42px;
-    min-width: 42px;
-    padding: 8px 0;
-    border-radius: 999px;
-    background: #1e6cff;
-    color: white;
-}
-
-.btn-about:hover {
-    background: #3a82ff;
-}
-
-.btn-about:active {
-    background: #1557d6;
-}
-
-.btn-about .material-symbols-outlined {
-    font-size: 20px;
 }
 
 .modal {
@@ -601,6 +581,29 @@ button.btn-with-icon {
     font-size: 0.9em;
     line-height: 1.5;
     color: #fff;
+}
+
+.modal__body a {
+    color: #7dd3fc;
+    text-decoration: none;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(125, 211, 252, 0.35);
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease,
+        text-shadow 0.2s ease;
+}
+
+.modal__body a:hover {
+    color: #d9f3ff;
+    border-bottom-color: #d9f3ff;
+    text-shadow: 0 0 10px rgba(125, 211, 252, 0.35);
+}
+
+.modal__body a:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 3px;
+    border-bottom-color: transparent;
 }
 
 .modal__actions {
