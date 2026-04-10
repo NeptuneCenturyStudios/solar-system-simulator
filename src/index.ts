@@ -1037,7 +1037,7 @@ const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 1.5;
 /** Relative-speed threshold at which BRAKE hands off to CIRCULARIZE (u/s). */
 const AUTOPILOT_BRAKE_DONE_SPEED = 5 * SCALE_FACTOR;
 /** Maximum timeScale at which autopilot may engage. Above this it refuses with a warning. */
-const AUTOPILOT_MAX_TIMESCALE = 5000;
+const AUTOPILOT_MAX_TIMESCALE = 50;
 /** Duration (seconds) to show the "Stable Orbit" HUD notification. */
 const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
 // AUTOPILOT_BOOST_THRESHOLD is declared after the FLIGHT_* constants it depends on.
@@ -4570,7 +4570,9 @@ function animate() {
         const exhaustDir = new THREE.Vector3(0, 0, -1).applyQuaternion(trailShip.mesh.quaternion);
         // In autopilot-only mode flightState.currentSpeed isn't maintained — use velocity magnitude
         const trailSpeed = isFlightModeActive ? flightState.currentSpeed : trailShip.velocity.length();
-        trailShip.trail.update(nozzle, trailSpeed, FLIGHT_MAX_SPEED, trailThrust, trailShip.velocity, exhaustDir, dtTotal);
+        // Pass the active speed ceiling so the trail reflects boost vs normal mode
+        const trailMaxSpeed = (keys.shift || flightState.boostDecelerating || autopilotState.isBoostActive) ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
+        trailShip.trail.update(nozzle, trailSpeed, trailMaxSpeed, trailThrust, trailShip.velocity, exhaustDir, dtTotal);
     }
 
     if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
