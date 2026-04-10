@@ -102,6 +102,7 @@ import { MainPanel } from './ui/main-panel.js';
 import { ManagementPanel } from './ui/management-panel.js';
 import { FlightControlsPanel } from './ui/flight-controls-panel.js';
 import { StartupModal } from './ui/startup-modal.js';
+import { AboutModal } from './ui/about-modal.js';
 import { EventLogEntry } from './event-log/event-log.js';
 import { Halley } from './bodies/halley.js';
 import { IStateDependencies } from './interfaces.js';
@@ -4805,11 +4806,13 @@ function setF(id) {
 // Create and initialize panels
 const startupModal = new StartupModal('startup-overlay');
 const mainPanel = new MainPanel('ui-layer');
+const aboutModal = new AboutModal('about-overlay', 'aboutBtn', 'aboutCloseBtn');
 const managementPanel = new ManagementPanel('management-panel', { getFocusObject });
 const flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
 
 startupModal.initialize();
 mainPanel.initialize();
+aboutModal.initialize();
 managementPanel.initialize();
 flightControlsPanel.initialize();
 

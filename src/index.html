@@ -13,9 +13,9 @@
     </head>
 
     <body>
-        <div id="startup-overlay" class="visible" aria-modal="true" role="dialog">
-            <div id="startup-modal">
-                <div class="panel-header">Launch Control</div>
+        <div id="startup-overlay" class="modal-overlay visible" aria-modal="true" role="dialog">
+            <div id="startup-modal" class="modal">
+                <div class="modal__header">Launch Control</div>
                 <button id="startupLaunchDefaultBtn" class="btn-with-icon">
                     <span class="material-symbols-outlined">rocket_launch</span>
                     LAUNCH SOLAR SYSTEM
@@ -32,6 +32,28 @@
                     <span class="material-symbols-outlined">close</span>
                     CANCEL
                 </button>
+            </div>
+        </div>
+
+        <div id="about-overlay" class="modal-overlay" aria-modal="true" role="dialog">
+            <div id="about-modal" class="modal">
+                <div class="modal__header">About</div>
+                <div class="modal__body">
+                    <p>
+                        Solar System Simulator is a browser-based space simulation focused on
+                        physics, exploration, and interactive body management.
+                    </p>
+                    <p>
+                        Placeholder text for now. This section can later be replaced with project
+                        details, credits, controls, or any other about content.
+                    </p>
+                </div>
+                <div class="modal__actions">
+                    <button id="aboutCloseBtn" class="btn-with-icon">
+                        <span class="material-symbols-outlined">close</span>
+                        CLOSE
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -116,14 +138,24 @@
                     <span class="material-symbols-outlined">rocket</span>
                     FLIGHT CONTROLS
                 </button>
-                <button
-                    id="donateBtn"
-                    class="btn-with-icon"
-                    title="Support Neptune Century on Ko-fi"
-                >
-                    <span class="material-symbols-outlined">favorite</span>
-                    DONATE
-                </button>
+                <div class="btn-row btn-row--action-buttons">
+                    <button
+                        id="donateBtn"
+                        class="btn-with-icon btn-donate"
+                        title="Support Neptune Century on Ko-fi"
+                    >
+                        <span class="material-symbols-outlined">favorite</span>
+                        DONATE
+                    </button>
+                    <button
+                        id="aboutBtn"
+                        class="btn-icon-only btn-about"
+                        title="About this simulator"
+                        aria-label="About this simulator"
+                    >
+                        <span class="material-symbols-outlined">info</span>
+                    </button>
+                </div>
                 <div class="footer-note">© <span id="copyrightYear"></span> Neptune Century</div>
             </div>
 
