@@ -1001,21 +1001,28 @@ const autopilotState = {
     phase: null as AutopilotPhase | null,
     /** Stable-orbit notification timer (seconds remaining to display). */
     orbitNotifyTimer: 0,
+    /** True while the approach phase is using boost speed. */
+    isBoostActive: false,
 };
 
 // Autopilot tuning constants
-/** Thrust acceleration used by autopilot (u/s²). */
+/** Thrust acceleration used by autopilot during approach (u/s²). */
 const AUTOPILOT_ACCEL = 20 * SCALE_FACTOR;
-/** Safety pad multiplier on brake distance (>1 = start braking earlier). */
-const AUTOPILOT_BRAKE_PAD = 2.0;
-/** Target orbit altitude expressed as a multiple of the target body's radius. */
-const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 3.0;
+/** Braking deceleration — higher than accel so the ship stops decisively. */
+const AUTOPILOT_DECEL = 80 * SCALE_FACTOR;
+/** Safety pad multiplier on brake distance. 1.0 = exact stop at orbit, higher = start braking earlier.
+ *  Keep close to 1.0 — every 0.1 above 1.0 adds v²/(2*decel)*0.1 extra units to the final orbit radius. */
+const AUTOPILOT_BRAKE_PAD = 1.1;
+/** Target orbit altitude expressed as a multiple of the target body's radius.
+ *  1.5 = tight low orbit just above the surface (moon-like proximity). */
+const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 1.5;
 /** Relative-speed threshold at which BRAKE hands off to CIRCULARIZE (u/s). */
 const AUTOPILOT_BRAKE_DONE_SPEED = 5 * SCALE_FACTOR;
 /** Maximum timeScale at which autopilot may engage. Above this it refuses with a warning. */
 const AUTOPILOT_MAX_TIMESCALE = 5000;
 /** Duration (seconds) to show the "Stable Orbit" HUD notification. */
 const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
+// AUTOPILOT_BOOST_THRESHOLD is declared after the FLIGHT_* constants it depends on.
 
 // Flight tuning constants
 const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR;           // normal max speed cap (units/s)
@@ -1036,6 +1043,10 @@ const FLIGHT_WARP_CHARGE_TIME = 2.0;     // seconds to hold Space before warp en
 const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED * SCALE_FACTOR; // top warp speed (u/s)
 const FLIGHT_WARP_DECEL_RATE = 10000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
 const FLIGHT_BOOST_DECEL_RATE = 1000 * SCALE_FACTOR;  // decel rate after boost ends (u/s²)
+
+/** Distance (u) above which autopilot switches to boost speed for faster transit.
+ *  Derived as 2 × boost-stopping-distance so there is always room to accelerate then brake. */
+const AUTOPILOT_BOOST_THRESHOLD = 2 * (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) / (2 * AUTOPILOT_DECEL);
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -1441,22 +1452,59 @@ function createWarpSprite() {
 }
 createWarpSprite();
 
-// ── Stable-orbit notify HUD sprite ───────────────────────────────────────────
-// Appears briefly (AUTOPILOT_ORBIT_NOTIFY_DURATION seconds) after circularization.
+// ── Autopilot phase-status HUD sprite ───────────────────────────────────────
+// Shows the current autopilot phase while active, and a brief "STABLE ORBIT"
+// confirmation for AUTOPILOT_ORBIT_NOTIFY_DURATION seconds after completion.
 let orbitNotifySprite: THREE.Sprite | null = null;
 
-function createOrbitNotifyTexture(): THREE.CanvasTexture {
-    const W = 512, H = 80;
+type AutopilotHudState = 'APPROACH' | 'APPROACH_BOOST' | 'BRAKE' | 'ORBIT' | 'NONE';
+let _lastAutopilotHudState: AutopilotHudState = 'NONE';
+
+function createAutopilotPhaseTexture(state: AutopilotHudState): THREE.CanvasTexture {
+    // Canvas is deliberately wide (800px) so no label ever clips.
+    const W = 800, H = 70;
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const ctx = c.getContext('2d')!;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font         = 'bold 40px monospace';
-    ctx.shadowBlur   = 14;
-    ctx.shadowColor  = 'rgba(100,220,255,0.9)';
-    ctx.fillStyle    = '#7ef0ff';
-    ctx.fillText('✓ STABLE ORBIT ESTABLISHED', W / 2, H / 2);
+    ctx.font         = 'bold 34px monospace';
+
+    let text: string;
+    let color: string;
+    let glow: string;
+    switch (state) {
+        case 'APPROACH':
+            text  = '▶  AUTOPILOT: APPROACHING TARGET';
+            color = '#ffdd55';
+            glow  = 'rgba(255,210,50,0.8)';
+            break;
+        case 'APPROACH_BOOST':
+            text  = '▶▶  AUTOPILOT: APPROACHING TARGET (BOOST)';
+            color = '#ffaa00';
+            glow  = 'rgba(255,160,0,0.9)';
+            break;
+        case 'BRAKE':
+            text  = '◼  AUTOPILOT: BRAKING';
+            color = '#ff8844';
+            glow  = 'rgba(255,120,50,0.9)';
+            break;
+        case 'ORBIT':
+            text  = '✓  STABLE ORBIT ESTABLISHED';
+            color = '#7ef0ff';
+            glow  = 'rgba(100,220,255,0.9)';
+            break;
+        default:
+            text = '';
+            color = '#ffffff';
+            glow = 'transparent';
+    }
+
+    ctx.shadowBlur  = 14;
+    ctx.shadowColor = glow;
+    ctx.fillStyle   = color;
+    ctx.fillText(text, W / 2, H / 2);
+
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
     return tex;
@@ -1464,13 +1512,14 @@ function createOrbitNotifyTexture(): THREE.CanvasTexture {
 
 function createOrbitNotifySprite() {
     const material = new THREE.SpriteMaterial({
-        map: createOrbitNotifyTexture(),
+        map: createAutopilotPhaseTexture('NONE'),
         transparent: true,
         depthTest: false,
         depthWrite: false,
     });
     orbitNotifySprite = new THREE.Sprite(material);
-    orbitNotifySprite.scale.set(420, 65, 1);
+    // 800px canvas → ~800 screen-pixel sprite width.
+    orbitNotifySprite.scale.set(800, 58, 1);
     orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), 0);
     orbitNotifySprite.visible = false;
     uiScene.add(orbitNotifySprite);
@@ -4565,11 +4614,40 @@ function animate() {
             statsSprite.visible = false;
         }
 
-        // Tick down orbit-notify timer and hide sprite when expired
-        if (orbitNotifySprite && orbitNotifySprite.visible) {
-            autopilotState.orbitNotifyTimer -= (now - lastT) / 1000;
-            if (autopilotState.orbitNotifyTimer <= 0) {
+        // Autopilot phase status HUD — update canvas texture whenever the phase changes,
+        // then hide the sprite once the stable-orbit timer expires.
+        if (orbitNotifySprite) {
+            // Determine desired HUD state
+            let desiredHud: AutopilotHudState = 'NONE';
+            if (autopilotState.isActive) {
+                if (autopilotState.phase === 'BRAKE') {
+                    desiredHud = 'BRAKE';
+                } else if (autopilotState.isBoostActive) {
+                    desiredHud = 'APPROACH_BOOST';
+                } else {
+                    desiredHud = 'APPROACH';
+                }
+            } else if (autopilotState.orbitNotifyTimer > 0) {
+                desiredHud = 'ORBIT';
+            }
+
+            if (desiredHud === 'NONE') {
                 orbitNotifySprite.visible = false;
+                _lastAutopilotHudState = 'NONE';
+            } else {
+                orbitNotifySprite.visible = true;
+                // Re-render canvas only when phase changes — not every frame.
+                if (desiredHud !== _lastAutopilotHudState) {
+                    orbitNotifySprite.material.map?.dispose();
+                    orbitNotifySprite.material.map = createAutopilotPhaseTexture(desiredHud);
+                    orbitNotifySprite.material.needsUpdate = true;
+                    _lastAutopilotHudState = desiredHud;
+                }
+
+                // Tick down the stable-orbit timer
+                if (desiredHud === 'ORBIT') {
+                    autopilotState.orbitNotifyTimer -= (now - lastT) / 1000;
+                }
             }
         }
 
@@ -5068,86 +5146,83 @@ function updateAutopilot(dt: number) {
 
     // ── Phase transitions ────────────────────────────────────────────────────
     const toTargetDir = toTarget.clone().normalize();
-    // Closing speed: how fast THIS ship is moving toward the target (world frame).
-    // This is what matters for "can I stop in time?" — independent of the target's velocity.
-    const shipClosingSpeed = Math.max(0, ship.velocity.dot(toTargetDir));
+    // Use TOTAL relative speed (not just the radial component) for the brake trigger.
+    // When the ship is circling the target, radial closing speed ≈ 0 even though the
+    // ship is moving fast in the target's frame — which was causing the brake to never fire.
+    // approachSpeed = relVel.length() correctly captures that kinetic energy regardless of direction.
+    const brakeDistance = (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL) * AUTOPILOT_BRAKE_PAD;
 
     if (autopilotState.phase === 'APPROACH') {
-        // Switch to BRAKE when the ship's own closing speed would carry it past orbit altitude.
-        // brakeDistance = v² / (2 * a) * pad  — uses closing speed, not full relVel
-        const brakeDistance = (shipClosingSpeed * shipClosingSpeed) / (2 * AUTOPILOT_ACCEL) * AUTOPILOT_BRAKE_PAD;
         if (distance <= orbitRadius + brakeDistance) {
             autopilotState.phase = 'BRAKE';
         }
     }
 
     if (autopilotState.phase === 'BRAKE') {
-        // Switch to CIRCULARIZE once relative velocity is low — regardless of exact distance.
-        // The subsequent orbit insertion will give the correct velocity for whatever distance we're at.
         if (approachSpeed < AUTOPILOT_BRAKE_DONE_SPEED) {
             autopilotState.phase = 'CIRCULARIZE';
         }
     }
 
     // ── Phase execution ──────────────────────────────────────────────────────
+    // Both APPROACH and BRAKE use a desired-velocity controller: each substep we compute
+    // the velocity we want and apply thrust toward it.  Decoupling the force from the ship's
+    // visual orientation means there is NO rotation-lag overshoot — the ship slows down on
+    // time regardless of which way it is currently pointing.  The ship still rotates to face
+    // the thrust direction, but that rotation is cosmetic only.
 
     if (autopilotState.phase === 'APPROACH') {
-        // ── Orient toward predicted intercept position ───────────────────────
-        // Use FLIGHT_MAX_SPEED as the arrival-time denominator so that the lead
-        // prediction stays sensible regardless of the ship's current speed.  Using
-        // relVel here produced a near-zero denominator whenever the ship was
-        // stationary, sending tArrival (and the predicted position) to infinity.
-        const tArrival = distance / FLIGHT_MAX_SPEED;
+        // Use boost speed when far away; switch to normal approach speed close in.
+        const useBoost = distance > AUTOPILOT_BOOST_THRESHOLD;
+        autopilotState.isBoostActive = useBoost;
+        const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
 
-        // Predicted target position at estimated arrival time.
-        const predictedPos = new THREE.Vector3()
-            .copy(targetPos)
-            .addScaledVector(target.velocity, tArrival);
+        // Desired velocity: move at targetSpeed toward the target in the target's frame.
+        const desiredVel = new THREE.Vector3()
+            .copy(target.velocity)
+            .addScaledVector(toTargetDir, targetSpeed);
 
-        // Direction from ship to predicted target
-        const desiredDir = new THREE.Vector3().subVectors(predictedPos, shipPos);
-        if (desiredDir.lengthSq() > 1e-10) {
-            desiredDir.normalize();
-        } else {
-            desiredDir.copy(toTarget).normalize();
-        }
+        const velDelta = new THREE.Vector3().subVectors(desiredVel, ship.velocity);
+        const deltaLen = velDelta.length();
 
-        // Build target quaternion: ship +Z points toward desired direction.
-        const targetQuat = new THREE.Quaternion().setFromUnitVectors(
-            new THREE.Vector3(0, 0, 1),
-            desiredDir
-        );
+        if (deltaLen > 1e-6) {
+            const accelDir = velDelta.clone().normalize();
+            // When current speed exceeds the target speed we need to decelerate, which
+            // requires the full AUTOPILOT_DECEL rate (80 u/s²).  Using only AUTOPILOT_ACCEL
+            // (20 u/s²) here would take 45 sim-seconds to scrub from boost speed, causing the
+            // ship to fly thousands of units past the threshold before slowing down.
+            // When the ship needs to speed UP, use the appropriate accel (boost or normal).
+            const needsDecel = approachSpeed > targetSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
+            const rate = needsDecel
+                ? AUTOPILOT_DECEL
+                : (useBoost ? FLIGHT_BOOST_ACCEL : AUTOPILOT_ACCEL);
+            const accelMag = Math.min(rate * dt, deltaLen);
+            ship.velocity.addScaledVector(accelDir, accelMag);
 
-        // Slerp toward it — max angular movement per frame = FLIGHT_MAX_TURN_RATE * dt
-        const maxSlerpT = Math.min(1, (FLIGHT_MAX_TURN_RATE * dt) /
-            (2 * Math.acos(Math.max(-1, Math.min(1, ship.mesh.quaternion.dot(targetQuat))))));
-        ship.mesh.quaternion.slerp(targetQuat, isNaN(maxSlerpT) ? 1 : maxSlerpT);
-
-        // ── Thrust along current (post-slerp) forward — capped at FLIGHT_MAX_SPEED ──
-        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
-        const fwdSpeed = ship.velocity.dot(forward);
-        if (fwdSpeed < FLIGHT_MAX_SPEED) {
-            const thrust = Math.min(AUTOPILOT_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
-            ship.velocity.addScaledVector(forward, thrust);
+            // Rotate ship to face thrust direction (visual only — force already applied above).
+            const targetQuat = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1), accelDir
+            );
+            ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
             flightState.thrustActive = true;
         } else {
             flightState.thrustActive = false;
         }
 
     } else if (autopilotState.phase === 'BRAKE') {
-        // ── Orient opposite relative velocity and thrust ─────────────────────
+        // Desired velocity: match target velocity (zero relative motion).
+        // velDelta needed = -relVel
         if (relVel.lengthSq() > 1e-10) {
             const brakeDir = relVel.clone().negate().normalize();
-            const targetQuat = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1),
-                brakeDir
-            );
-            const maxSlerpT = Math.min(1, (FLIGHT_MAX_TURN_RATE * dt) /
-                (2 * Math.acos(Math.max(-1, Math.min(1, ship.mesh.quaternion.dot(targetQuat))))));
-            ship.mesh.quaternion.slerp(targetQuat, isNaN(maxSlerpT) ? 1 : maxSlerpT);
+            // Apply decel directly — no waiting for ship to physically rotate first.
+            const brakeMag = Math.min(AUTOPILOT_DECEL * dt, approachSpeed);
+            ship.velocity.addScaledVector(brakeDir, brakeMag);
 
-            const brakeForce = Math.min(AUTOPILOT_ACCEL, approachSpeed / dt);
-            ship.velocity.addScaledVector(brakeDir, brakeForce * dt);
+            // Rotate ship to face retrofire direction (cosmetic).
+            const targetQuat = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1), brakeDir
+            );
+            ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
             flightState.thrustActive = approachSpeed > AUTOPILOT_BRAKE_DONE_SPEED;
         } else {
             flightState.thrustActive = false;
