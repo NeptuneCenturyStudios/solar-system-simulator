@@ -1,112 +1,115 @@
 import * as THREE from 'three';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 
-const TRAIL_RAW_LENGTH = 200;   // raw history capacity (ring buffer)
-const SF = SCALE_FACTOR / SCALE_FACTOR; // trail size scaling factor (independent of world scale)
-
-/** Number of uniformly-resampled display points drawn each frame.
- *  Constant regardless of speed — always looks dense. */
-const N_DISPLAY = 128;
-
-/** Maximum physical arc length of the visible flame (world units).
- *  Keeps the flame compact; speed only affects brightness/colour. */
-const MAX_FLAME_LENGTH = 2 * SCALE_FACTOR;
+/** Maximum number of live particles in the pool. */
+const MAX_PARTICLES = 500;
+/** Particle lifetime in render frames. Frame-count-based so it is completely dt-independent. */
+const PARTICLE_LIFETIME_FRAMES = 6;
+/** Max world-unit drift each particle can travel from its birth position over its lifetime.
+ *  Each particle gets a randomised fraction (0.3–1.0) so the plume has depth variation. */
+const MAX_REACH = 5.0 * SCALE_FACTOR;
+/** Maximum world-unit spawn segment. Set to the distance the ship travels in one frame at
+ *  full boost speed and timeScale=1 (2000 u/s × 0.016 s ≈ 32 u). This ensures:
+ *  - timeScale=1 at 2000 u/s: 32-unit gap is fully covered → continuous streak.
+ *  - High timeScale: segment capped to 35 u near the nozzle → compact flame blob. */
+const MAX_TRAIL_LENGTH = 35 * SCALE_FACTOR;
+/** Half-angle of the exhaust cone in radians. */
+const EXHAUST_SPREAD = 0.65;
+/** Minimum particles emitted per frame while thrusting. */
+const EMIT_MIN = 8;
+/** Maximum particles emitted per frame. */
+const EMIT_MAX = 80;
+/** Target particles per world-unit of the (capped) spawn segment. */
+const EMIT_DENSITY = 2.5;
+/** Sentinel: negative age means the slot is unused. */
+const DEAD = -1;
 
 /**
- * Renders a glowing engine-exhaust "propulsion flame" trail behind a spaceship.
+ * Renders a glowing engine-exhaust trail as a physics-accurate particle ejector.
  *
  * Architecture:
- *  - `rawPositions` ring buffer records the nozzle position every thrusting frame.
- *  - Each frame, the raw arc is walked up to MAX_FLAME_LENGTH, then uniformly
- *    resampled into exactly N_DISPLAY interpolated points (`displayPositions`).
- *  - Result: always N_DISPLAY tightly-packed particles regardless of speed,
- *    physically capped at MAX_FLAME_LENGTH world units.
- *  - Trail is only visible when `thrusting = true`; hidden immediately on release.
- *  - Two additive particle layers (inner hot core + outer cyan halo) share
- *    `displayPositions`; with additive blending, black vertex color = transparent.
+ *  - Particles are emitted from the nozzle each frame while thrusting.
+ *  - Each particle's initial world-space velocity = shipVelocity + exhaustDir * EXHAUST_SPEED
+ *    plus a small random spread within an exhaust cone.
+ *  - Particles move freely in world space after emission (no gravity).
+ *  - Particles fade from hot white/orange at birth to cool cyan/transparent at death.
+ *  - Because the flame always shoots in the nozzle's backward direction, turning 180°
+ *    will never push the trail through the front of the ship.
  */
 export class ShipTrail {
-    private scene: THREE.Scene;
-    readonly length: number;
+    private readonly scene: THREE.Scene;
 
-    // ── Raw ring buffer (nozzle positions per thrusting frame) ────────────────
-    private rawPositions: Float32Array;
-    // Pre-allocated arc-distance scratch buffer (avoids GC per frame)
-    private arcDists: Float32Array;
-    private arcLen = 0; // how many arc entries are valid this frame
+    // ── Particle pool (parallel arrays, indexed by slot) ─────────────────────
+    // px/py/pz: world-space birth position (fixed at spawn, never updated).
+    // vx/vy/vz: total drift vector from birth to death (scattered exhaust dir * MAX_REACH).
+    //           GPU position = birth + drift * t  (no per-frame integration needed).
+    // age:      render-frame count since birth (incremented by 1 per frame, DEAD = unused).
+    // lifetime: randomised frame count until death.
+    private readonly px: Float32Array;
+    private readonly py: Float32Array;
+    private readonly pz: Float32Array;
+    private readonly vx: Float32Array;
+    private readonly vy: Float32Array;
+    private readonly vz: Float32Array;
+    private readonly age:      Float32Array;
+    private readonly lifetime: Float32Array;
 
-    // ── Display buffers (N_DISPLAY uniformly resampled points) ────────────────
-    private displayPositions: Float32Array;
-    private lineColors: Float32Array;
-    private innerColors: Float32Array;
-    private outerColors: Float32Array;
+    // ── GPU upload buffers (compacted live-particle data) ─────────────────────
+    private readonly gpuPos:        Float32Array;
+    private readonly gpuColorInner: Float32Array;
+    private readonly gpuColorOuter: Float32Array;
 
-    private geo: THREE.BufferGeometry;
-    private innerGeo: THREE.BufferGeometry;
-    private outerGeo: THREE.BufferGeometry;
-    private innerMat: THREE.PointsMaterial;
-    private outerMat: THREE.PointsMaterial;
+    private readonly innerGeo: THREE.BufferGeometry;
+    private readonly outerGeo: THREE.BufferGeometry;
+    private readonly innerMat: THREE.PointsMaterial;
+    private readonly outerMat: THREE.PointsMaterial;
 
-    readonly line: THREE.Line;
     readonly glowInner: THREE.Points;
     readonly glowOuter: THREE.Points;
 
-    private wasThrusting = false;
+    /** Nozzle world-position from the previous frame — interpolate spawn positions against this. */
+    private prevNozzle: THREE.Vector3 | null = null;
 
-    constructor(scene: THREE.Scene, length = TRAIL_RAW_LENGTH) {
-        this.scene  = scene;
-        this.length = length;
+    constructor(scene: THREE.Scene) {
+        this.scene = scene;
 
-        this.rawPositions     = new Float32Array(length * 3);
-        this.arcDists         = new Float32Array(length);
-        this.displayPositions = new Float32Array(N_DISPLAY * 3);
-        this.lineColors       = new Float32Array(N_DISPLAY * 3);
-        this.innerColors      = new Float32Array(N_DISPLAY * 3);
-        this.outerColors      = new Float32Array(N_DISPLAY * 3);
+        this.px       = new Float32Array(MAX_PARTICLES);
+        this.py       = new Float32Array(MAX_PARTICLES);
+        this.pz       = new Float32Array(MAX_PARTICLES);
+        this.vx       = new Float32Array(MAX_PARTICLES);
+        this.vy       = new Float32Array(MAX_PARTICLES);
+        this.vz       = new Float32Array(MAX_PARTICLES);
+        this.age      = new Float32Array(MAX_PARTICLES).fill(DEAD);
+        this.lifetime = new Float32Array(MAX_PARTICLES);
 
-        // ── Line (structural backbone) ────────────────────────────────────────
-        this.geo = new THREE.BufferGeometry();
-        this.geo.setAttribute('position', new THREE.BufferAttribute(this.displayPositions, 3));
-        this.geo.setAttribute('color',    new THREE.BufferAttribute(this.lineColors, 3));
-
-        this.line = new THREE.Line(
-            this.geo,
-            new THREE.LineBasicMaterial({
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.6,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-            })
-        );
-        this.line.frustumCulled = false;
-        this.line.visible = false;
-        scene.add(this.line);
+        this.gpuPos        = new Float32Array(MAX_PARTICLES * 3);
+        this.gpuColorInner = new Float32Array(MAX_PARTICLES * 3);
+        this.gpuColorOuter = new Float32Array(MAX_PARTICLES * 3);
 
         // ── Shared radial-gradient flame texture ─────────────────────────────
         const tc = document.createElement('canvas');
-        const GRAD_SIZE = 128;
-        tc.width = GRAD_SIZE; tc.height = GRAD_SIZE;
-        const tCtx = tc.getContext('2d')!;
-        const grad = tCtx.createRadialGradient(GRAD_SIZE / 2, GRAD_SIZE / 2, 0, GRAD_SIZE / 2, GRAD_SIZE / 2, GRAD_SIZE / 2);
+        const GS = 128;
+        tc.width = GS; tc.height = GS;
+        const ctx = tc.getContext('2d')!;
+        const grad = ctx.createRadialGradient(GS / 2, GS / 2, 0, GS / 2, GS / 2, GS / 2);
         grad.addColorStop(0,    'rgba(255, 255, 255, 1.0)');
         grad.addColorStop(0.12, 'rgba(255, 220, 120, 1.0)');
         grad.addColorStop(0.35, 'rgba(80,  200, 255, 0.7)');
         grad.addColorStop(0.65, 'rgba(20,   80, 255, 0.2)');
         grad.addColorStop(1,    'rgba(0,    10, 180, 0.0)');
-        tCtx.fillStyle = grad;
-        tCtx.fillRect(0, 0, GRAD_SIZE, GRAD_SIZE);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, GS, GS);
         const flameTex = new THREE.CanvasTexture(tc);
 
-        // ── Inner glow (tight, hot) ───────────────────────────────────────────
+        // ── Inner glow (tight, hot core) ─────────────────────────────────────
         this.innerGeo = new THREE.BufferGeometry();
-        this.innerGeo.setAttribute('position', new THREE.BufferAttribute(this.displayPositions, 3));
-        this.innerGeo.setAttribute('color',    new THREE.BufferAttribute(this.innerColors, 3));
+        this.innerGeo.setAttribute('position', new THREE.BufferAttribute(this.gpuPos, 3));
+        this.innerGeo.setAttribute('color',    new THREE.BufferAttribute(this.gpuColorInner, 3));
         this.innerGeo.setDrawRange(0, 0);
 
         this.innerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 0.01 * SF,
+            size: 0.28 * SCALE_FACTOR,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -123,13 +126,13 @@ export class ShipTrail {
 
         // ── Outer glow (broad, soft halo) ────────────────────────────────────
         this.outerGeo = new THREE.BufferGeometry();
-        this.outerGeo.setAttribute('position', new THREE.BufferAttribute(this.displayPositions, 3));
-        this.outerGeo.setAttribute('color',    new THREE.BufferAttribute(this.outerColors, 3));
+        this.outerGeo.setAttribute('position', new THREE.BufferAttribute(this.gpuPos, 3));
+        this.outerGeo.setAttribute('color',    new THREE.BufferAttribute(this.gpuColorOuter, 3));
         this.outerGeo.setDrawRange(0, 0);
 
         this.outerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 0.5 * SF,
+            size: 1.1 * SCALE_FACTOR,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -145,162 +148,169 @@ export class ShipTrail {
         scene.add(this.glowOuter);
     }
 
-    /** Seed the raw buffer to `pos` so the trail starts collapsed at the nozzle. */
-    init(pos: THREE.Vector3): void {
-        for (let i = 0; i < this.length * 3; i += 3) {
-            this.rawPositions[i]     = pos.x;
-            this.rawPositions[i + 1] = pos.y;
-            this.rawPositions[i + 2] = pos.z;
-        }
-        this.line.visible      = false;
-        this.glowInner.visible = false;
-        this.glowOuter.visible = false;
+    /** Kill all particles and hide the trail. Call when entering flight mode. */
+    init(_pos: THREE.Vector3): void {
+        this.age.fill(DEAD);
+        this.prevNozzle = null;
         this.innerGeo.setDrawRange(0, 0);
         this.outerGeo.setDrawRange(0, 0);
-        this.wasThrusting = false;
+        this.glowInner.visible = false;
+        this.glowOuter.visible = false;
     }
 
     /**
-     * Update per frame.
+     * Update per frame (call once per render frame, NOT per physics substep).
      *
-     * @param nozzle    World-space nozzle position this frame.
-     * @param speed     Current ship forward speed — drives brightness.
-     * @param maxSpeed  Normal (non-boost) max speed — brightness reference.
-     * @param thrusting True while any thrust key (W/S/Shift) is held. Trail
-     *                  is hidden immediately when false.
+     * @param nozzle       World-space nozzle position this frame.
+     * @param speed        Current ship speed — drives particle brightness.
+     * @param maxSpeed     Normal (non-boost) max speed — brightness reference.
+     * @param thrusting    True while any thrust key (W/S/Shift) is held.
+     * @param _shipVelocity Unused — kept for API compatibility.
+     * @param exhaustDir   Normalized world-space exhaust direction (ship's −forward).
+     * @param _dt          Unused — aging is frame-count-based, not sim-time-based.
      */
-    update(nozzle: THREE.Vector3, speed: number, maxSpeed: number, thrusting: boolean): void {
-        if (!thrusting) {
-            this.line.visible      = false;
-            this.glowInner.visible = false;
-            this.glowOuter.visible = false;
-            this.wasThrusting = false;
-            return;
-        }
+    update(
+        nozzle: THREE.Vector3,
+        speed: number,
+        maxSpeed: number,
+        thrusting: boolean,
+        _shipVelocity: THREE.Vector3,
+        exhaustDir: THREE.Vector3,
+        _dt: number,
+    ): void {
+        const speedFactor = THREE.MathUtils.clamp(Math.abs(speed) / Math.max(maxSpeed * 0.25, 1), 0, 1);
 
-        // Re-seed the ring buffer on thrust re-engagement so stale old-trajectory
-        // positions don't bleed into the new flame.
-        if (!this.wasThrusting) {
-            for (let i = 0; i < this.length * 3; i += 3) {
-                this.rawPositions[i]     = nozzle.x;
-                this.rawPositions[i + 1] = nozzle.y;
-                this.rawPositions[i + 2] = nozzle.z;
+        // ── 1. Age live particles (frame-count, completely dt-independent) ─────
+        // Incrementing by 1 per render frame means particles always live for
+        // PARTICLE_LIFETIME_FRAMES frames regardless of the sim time scale.
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+            if (this.age[i] < 0) continue;
+            this.age[i] += 1;
+            if (this.age[i] >= this.lifetime[i]) {
+                this.age[i] = DEAD;
             }
         }
-        this.wasThrusting = true;
 
-        // ── Push nozzle into raw ring buffer (index 0 = newest) ──────────────
-        for (let i = this.length - 1; i > 0; i--) {
-            this.rawPositions[i * 3]     = this.rawPositions[(i - 1) * 3];
-            this.rawPositions[i * 3 + 1] = this.rawPositions[(i - 1) * 3 + 1];
-            this.rawPositions[i * 3 + 2] = this.rawPositions[(i - 1) * 3 + 2];
-        }
-        this.rawPositions[0] = nozzle.x;
-        this.rawPositions[1] = nozzle.y;
-        this.rawPositions[2] = nozzle.z;
+        // ── 2. Emit new particles ─────────────────────────────────────────────
+        const prev = this.prevNozzle;
+        if (thrusting) {
+            // Build a tangent basis perpendicular to exhaustDir for cone spread
+            const up = Math.abs(exhaustDir.y) < 0.9
+                ? new THREE.Vector3(0, 1, 0)
+                : new THREE.Vector3(1, 0, 0);
+            const perp1 = new THREE.Vector3().crossVectors(exhaustDir, up).normalize();
+            const perp2 = new THREE.Vector3().crossVectors(exhaustDir, perp1);
 
-        // ── Build arc-distance table up to MAX_FLAME_LENGTH ───────────────────
-        // arcDists[i] = cumulative distance from rawPositions[0] to rawPositions[i].
-        this.arcDists[0] = 0;
-        let arcLen = 1;
-        let totalDist = 0;
-        for (let i = 1; i < this.length; i++) {
-            const p3 = (i - 1) * 3, i3 = i * 3;
-            const dx = this.rawPositions[i3]     - this.rawPositions[p3];
-            const dy = this.rawPositions[i3 + 1] - this.rawPositions[p3 + 1];
-            const dz = this.rawPositions[i3 + 2] - this.rawPositions[p3 + 2];
-            totalDist += Math.sqrt(dx * dx + dy * dy + dz * dz);
-            if (totalDist >= MAX_FLAME_LENGTH) {
-                this.arcDists[i] = MAX_FLAME_LENGTH;
-                arcLen = i + 1;
-                break;
-            }
-            this.arcDists[i] = totalDist;
-            arcLen = i + 1;
-        }
-        this.arcLen   = arcLen;
-        const flameDist = this.arcDists[arcLen - 1]; // physical length of flame
+            const travel = prev ? prev.distanceTo(nozzle) : 0;
+            // Cap the spawn segment to MAX_TRAIL_LENGTH.
+            // - At timeScale=1, 2000 u/s: displacement≈32 u < 35 u cap → fully filled.
+            // - At high timeScale: only 35 u near the nozzle is populated → compact flame.
+            // Without this cap, high-timeScale frames scatter sparse dots across thousands of units.
+            const cappedTravel = Math.min(travel, MAX_TRAIL_LENGTH);
+            const nEmit = Math.min(EMIT_MAX, Math.max(EMIT_MIN,
+                Math.round(cappedTravel * EMIT_DENSITY)));
 
-        // ── Resample: N_DISPLAY uniformly-spaced points along the arc ─────────
-        // This gives a consistently dense flame at any speed. At high speed the
-        // raw samples are sparse (large per-frame steps) so we interpolate between
-        // them to maintain visual density.
-        const n = N_DISPLAY;
-        for (let k = 0; k < n; k++) {
-            const target = (k / (n - 1)) * flameDist;
-
-            // Binary search for the segment [lo, hi] in the arc table
-            let lo = 0, hi = arcLen - 1;
-            while (hi - lo > 1) {
-                const mid = (lo + hi) >> 1;
-                if (this.arcDists[mid] <= target) lo = mid; else hi = mid;
+            // Compute the capped start position (at most MAX_TRAIL_LENGTH back from nozzle)
+            let startX = nozzle.x, startY = nozzle.y, startZ = nozzle.z;
+            if (prev && travel > 0) {
+                const cap = cappedTravel / travel;
+                startX = nozzle.x + (prev.x - nozzle.x) * cap;
+                startY = nozzle.y + (prev.y - nozzle.y) * cap;
+                startZ = nozzle.z + (prev.z - nozzle.z) * cap;
             }
 
-            // Lerp between rawPositions[lo] and rawPositions[hi]
-            const segLen = this.arcDists[hi] - this.arcDists[lo];
-            const frac   = segLen < 1e-9 ? 0 : (target - this.arcDists[lo]) / segLen;
-            const lo3 = lo * 3, hi3 = hi * 3;
-            this.displayPositions[k * 3]     = this.rawPositions[lo3]     + (this.rawPositions[hi3]     - this.rawPositions[lo3])     * frac;
-            this.displayPositions[k * 3 + 1] = this.rawPositions[lo3 + 1] + (this.rawPositions[hi3 + 1] - this.rawPositions[lo3 + 1]) * frac;
-            this.displayPositions[k * 3 + 2] = this.rawPositions[lo3 + 2] + (this.rawPositions[hi3 + 2] - this.rawPositions[lo3 + 2]) * frac;
+            let emitted = 0;
+            for (let i = 0; i < MAX_PARTICLES && emitted < nEmit; i++) {
+                if (this.age[i] >= 0) continue; // slot in use
+
+                // Spread spawn positions evenly along the (capped) trail segment
+                const frac   = (emitted + 0.5) / nEmit;
+                const spawnX = startX + (nozzle.x - startX) * frac;
+                const spawnY = startY + (nozzle.y - startY) * frac;
+                const spawnZ = startZ + (nozzle.z - startZ) * frac;
+
+                // Random cone scatter within EXHAUST_SPREAD
+                const phi   = Math.random() * Math.PI * 2;
+                const theta = Math.random() * EXHAUST_SPREAD;
+                const cosT  = Math.cos(theta);
+                const sinT  = Math.sin(theta);
+                const dx = exhaustDir.x * cosT + (perp1.x * Math.cos(phi) + perp2.x * Math.sin(phi)) * sinT;
+                const dy = exhaustDir.y * cosT + (perp1.y * Math.cos(phi) + perp2.y * Math.sin(phi)) * sinT;
+                const dz = exhaustDir.z * cosT + (perp1.z * Math.cos(phi) + perp2.z * Math.sin(phi)) * sinT;
+
+                // px/py/pz = fixed world-space birth position.
+                // vx/vy/vz = total drift vector (direction * MAX_REACH).
+                // GPU position = birthPos + drift * t — no per-frame integration needed.
+                this.px[i] = spawnX;
+                this.py[i] = spawnY;
+                this.pz[i] = spawnZ;
+                // Randomise reach so particles don't all die at the same radius —
+                // produces depth in the plume rather than a uniform sphere.
+                const reach = MAX_REACH * (0.3 + Math.random() * 0.7);
+                this.vx[i] = dx * reach;
+                this.vy[i] = dy * reach;
+                this.vz[i] = dz * reach;
+
+                this.age[i]      = 0;
+                this.lifetime[i] = PARTICLE_LIFETIME_FRAMES * (0.4 + Math.random() * 0.9);
+                emitted++;
+            }
+        }
+        // Always update prevNozzle (even when not thrusting) so the first frame
+        // of a new thrust burst has a valid prev position.
+        this.prevNozzle = nozzle.clone();
+
+        // ── 3. Compact live particles into GPU buffers ────────────────────────
+        let n = 0;
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+            if (this.age[i] < 0) continue;
+            const t     = this.age[i] / this.lifetime[i]; // 0 = birth, 1 = death
+            const alive = 1 - t;
+
+            // Drift from birth position toward birth + drift vector over lifetime
+            this.gpuPos[n * 3]     = this.px[i] + this.vx[i] * t;
+            this.gpuPos[n * 3 + 1] = this.py[i] + this.vy[i] * t;
+            this.gpuPos[n * 3 + 2] = this.pz[i] + this.vz[i] * t;
+
+            // Inner: hot white/orange at birth → fades out quickly
+            const hot = alive * alive * speedFactor;
+            this.gpuColorInner[n * 3]     = hot;
+            this.gpuColorInner[n * 3 + 1] = hot * 0.65;
+            this.gpuColorInner[n * 3 + 2] = hot * 0.25;
+
+            // Outer: cyan halo, softer fade
+            const cool = alive * speedFactor * 0.45;
+            this.gpuColorOuter[n * 3]     = cool * 0.1;
+            this.gpuColorOuter[n * 3 + 1] = cool * 0.7;
+            this.gpuColorOuter[n * 3 + 2] = cool;
+
+            n++;
         }
 
-        // ── Write colours: fade hot→cool from nozzle to tail ─────────────────
-        const speedFactor = THREE.MathUtils.clamp(Math.abs(speed) / (maxSpeed * 0.25), 0, 1);
-        for (let k = 0; k < n; k++) {
-            const norm   = k / (n - 1);
-            const t      = Math.pow(1 - norm, 2.0) * speedFactor;
-
-            // Line: blue-cyan
-            this.lineColors[k * 3]     = t * 0.5;
-            this.lineColors[k * 3 + 1] = t * 0.9;
-            this.lineColors[k * 3 + 2] = t;
-
-            // Inner: white/orange-hot at nozzle
-            this.innerColors[k * 3]     = t;
-            this.innerColors[k * 3 + 1] = t * 0.75;
-            this.innerColors[k * 3 + 2] = t * 0.35;
-
-            // Outer: cyan halo
-            const tOuter = Math.pow(1 - norm, 1.5) * speedFactor * 0.55;
-            this.outerColors[k * 3]     = tOuter * 0.1;
-            this.outerColors[k * 3 + 1] = tOuter * 0.7;
-            this.outerColors[k * 3 + 2] = tOuter;
-        }
-
-        this.geo.attributes.position.needsUpdate      = true;
-        this.geo.attributes.color.needsUpdate         = true;
         this.innerGeo.attributes.position.needsUpdate = true;
         this.innerGeo.attributes.color.needsUpdate    = true;
         this.outerGeo.attributes.position.needsUpdate = true;
         this.outerGeo.attributes.color.needsUpdate    = true;
-
-        this.geo.setDrawRange(0, n);
         this.innerGeo.setDrawRange(0, n);
         this.outerGeo.setDrawRange(0, n);
 
-        const showing = speedFactor > 0.02;
-        this.line.visible      = true;
+        const showing = n > 0;
         this.glowInner.visible = showing;
         this.glowOuter.visible = showing;
     }
 
-    /** Hide trail immediately. Called on flight exit or ship destruction. */
+    /** Kill all particles and hide immediately. Called on flight exit or ship destruction. */
     hide(): void {
-        this.line.visible      = false;
-        this.glowInner.visible = false;
-        this.glowOuter.visible = false;
+        this.age.fill(DEAD);
+        this.prevNozzle = null;
         this.innerGeo.setDrawRange(0, 0);
         this.outerGeo.setDrawRange(0, 0);
-        this.wasThrusting = false;
+        this.glowInner.visible = false;
+        this.glowOuter.visible = false;
     }
 
     /** Remove from scene and free GPU resources. */
     dispose(): void {
-        this.scene.remove(this.line);
-        this.geo.dispose();
-        (this.line.material as THREE.Material).dispose();
-
         this.scene.remove(this.glowInner);
         this.innerGeo.dispose();
         this.innerMat.map?.dispose();

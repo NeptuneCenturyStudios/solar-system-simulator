@@ -4552,14 +4552,25 @@ function animate() {
 
     // ── Ship trail update ──────────────────────────────────────────────────────
     // Runs every frame after physics so the nozzle position is final.
-    if (isFlightModeActive) {
-        const ship = flightState.activeShip!;
-        const nozzle = ship.thrusterOffset.clone()
-            .applyQuaternion(ship.mesh.quaternion)
-            .add(ship.mesh.position);
-        // Suppress trail during warp, warp deceleration, and boost deceleration
-        const trailThrust = flightState.thrustActive && !flightState.warpActive && !flightState.warpDecelerating && !flightState.boostDecelerating;
-        ship.trail.update(nozzle, flightState.currentSpeed, FLIGHT_MAX_SPEED, trailThrust);
+    // Covers both flight mode (player piloting) and autopilot-only (bodies-table "Fly Here").
+    const trailShip = isFlightModeActive
+        ? flightState.activeShip!
+        : (autopilotState.isActive ? flightState.knownShip : null);
+    if (trailShip && trailShip.mesh) {
+        const nozzle = trailShip.thrusterOffset.clone()
+            .applyQuaternion(trailShip.mesh.quaternion)
+            .add(trailShip.mesh.position);
+        // Suppress trail during warp and warp deceleration.
+        // For player flight: any thrust key held fires the engine regardless of speed cap.
+        // For autopilot: use the thrustActive flag set by the autopilot state machine.
+        const trailThrust = isFlightModeActive
+            ? (keys.w || keys.s || keys.shift) && !flightState.warpActive && !flightState.warpDecelerating
+            : flightState.thrustActive;
+        // Exhaust direction = ship's backward direction (−forward axis)
+        const exhaustDir = new THREE.Vector3(0, 0, -1).applyQuaternion(trailShip.mesh.quaternion);
+        // In autopilot-only mode flightState.currentSpeed isn't maintained — use velocity magnitude
+        const trailSpeed = isFlightModeActive ? flightState.currentSpeed : trailShip.velocity.length();
+        trailShip.trail.update(nozzle, trailSpeed, FLIGHT_MAX_SPEED, trailThrust, trailShip.velocity, exhaustDir, dtTotal);
     }
 
     if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
@@ -5440,13 +5451,6 @@ function updateAutopilot(dt: number) {
         }
     }
 
-    // Update ship trail to show thrust during approach/brake
-    if (ship.mesh) {
-        const nozzle = ship.thrusterOffset.clone()
-            .applyQuaternion(ship.mesh.quaternion)
-            .add(ship.mesh.position);
-        ship.trail.update(nozzle, AUTOPILOT_ACCEL, FLIGHT_MAX_SPEED, flightState.thrustActive);
-    }
 }
 
 /** Cancel the autopilot with an optional log message. */
@@ -5554,11 +5558,6 @@ function updateFlightControls(dt: number) {
         ship.velocity.copy(warpVel);
         flightState.currentSpeed = FLIGHT_WARP_SPEED;
         flightState.thrustActive = true;
-        // Hide trail during warp — at ludicrous speed it stretches out badly
-        ship.trail.update(
-            ship.thrusterOffset.clone().applyQuaternion(ship.mesh.quaternion).add(ship.mesh.position),
-            FLIGHT_WARP_SPEED, FLIGHT_MAX_SPEED, false
-        );
         warpEffect.update(dt);
         // Pulsing warp-active text (update every call is cheap since canvas is small)
         if (warpSprite) {
