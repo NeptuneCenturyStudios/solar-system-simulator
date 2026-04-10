@@ -1009,7 +1009,10 @@ const autopilotState = {
 /** Thrust acceleration used by autopilot during approach (u/s²). */
 const AUTOPILOT_ACCEL = 20 * SCALE_FACTOR;
 /** Braking deceleration — moderate so the stop feels gradual rather than jarring. */
-const AUTOPILOT_DECEL = 30 * SCALE_FACTOR;
+const AUTOPILOT_DECEL = 20 * SCALE_FACTOR;
+/** Orbit-insertion rate — gentler than AUTOPILOT_DECEL so the turn into orbit is
+ *  visually smooth rather than a sharp snap.  Lower = longer arc, higher = snappier. */
+const AUTOPILOT_CIRCULARIZE_RATE = 1.5 * SCALE_FACTOR;
 /** Safety pad multiplier on brake distance. Higher = start braking earlier / more gradually.
  *  At 1.2 the ship begins braking at 1.2× the theoretical stopping distance — smooth
  *  but ends up at approximately orbitRadius + 0.2×stoppingDist from the target. */
@@ -1459,7 +1462,7 @@ createWarpSprite();
 // confirmation for AUTOPILOT_ORBIT_NOTIFY_DURATION seconds after completion.
 let orbitNotifySprite: THREE.Sprite | null = null;
 
-type AutopilotHudState = 'APPROACH' | 'APPROACH_BOOST' | 'BRAKE' | 'ORBIT' | 'NONE';
+type AutopilotHudState = 'APPROACH' | 'APPROACH_BOOST' | 'BRAKE' | 'CIRCULARIZE' | 'ORBIT' | 'NONE';
 let _lastAutopilotHudState: AutopilotHudState = 'NONE';
 
 function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = ''): THREE.CanvasTexture {
@@ -1490,6 +1493,11 @@ function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = '
             text  = '◼  AUTOPILOT: BRAKING';
             color = '#ff8844';
             glow  = 'rgba(255,120,50,0.9)';
+            break;
+        case 'CIRCULARIZE':
+            text  = '↻  AUTOPILOT: ENTERING ORBIT';
+            color = '#88ffcc';
+            glow  = 'rgba(80,255,180,0.85)';
             break;
         case 'ORBIT':
             text  = '✓  STABLE ORBIT ESTABLISHED';
@@ -4633,7 +4641,9 @@ function animate() {
             // Determine desired HUD state
             let desiredHud: AutopilotHudState = 'NONE';
             if (autopilotState.isActive) {
-                if (autopilotState.phase === 'BRAKE') {
+                if (autopilotState.phase === 'CIRCULARIZE') {
+                    desiredHud = 'CIRCULARIZE';
+                } else if (autopilotState.phase === 'BRAKE') {
                     desiredHud = 'BRAKE';
                 } else if (autopilotState.isBoostActive) {
                     desiredHud = 'APPROACH_BOOST';
@@ -5260,11 +5270,12 @@ function updateAutopilot(dt: number) {
         }
 
     } else if (autopilotState.phase === 'CIRCULARIZE') {
-        // ── Insert into circular orbit ────────────────────────────────────────
-        // Radial direction (outward from target)
+        // ── Gradually steer into circular orbit ───────────────────────────────
+        // Compute the desired orbital velocity for the ship's current position,
+        // then use the same desired-velocity controller used in APPROACH/BRAKE to
+        // smoothly blend toward it.  The ship curves into orbit instead of snapping.
         const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
         if (radial.lengthSq() < 1e-10) {
-            // Ship is at the target centre — offset slightly and retry next frame
             ship.mesh.position.addScaledVector(new THREE.Vector3(1, 0, 0), orbitRadius);
             return;
         }
@@ -5272,33 +5283,47 @@ function updateAutopilot(dt: number) {
         const r = radial.length();
         radial.normalize();
 
-        // Tangential direction: perpendicular to radial in the horizontal plane
         const worldUp = new THREE.Vector3(0, 1, 0);
         const tangential = new THREE.Vector3().crossVectors(radial, worldUp).normalize();
         if (tangential.lengthSq() < 1e-10) {
-            // Degenerate case (flying straight up/down); use a fallback
             tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
         }
 
-        // Orbital speed: v = sqrt(G * M / r)
         const vOrbit = Math.sqrt((G * target.mass) / r);
+        const desiredVel = new THREE.Vector3()
+            .copy(target.velocity)
+            .addScaledVector(tangential, vOrbit);
 
-        // Set velocity = target velocity + tangential orbital velocity
-        ship.velocity.copy(target.velocity).addScaledVector(tangential, vOrbit);
-        flightState.thrustActive = false;
+        const velDelta = new THREE.Vector3().subVectors(desiredVel, ship.velocity);
+        const deltaLen = velDelta.length();
 
-        // Notify and disengage
-        const targetName = target.name || 'the body';
-        addEvent(`✓ Autopilot: Stable orbit around ${targetName} achieved.`);
-        autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
-        showOrbitNotifySprite();
+        if (deltaLen < AUTOPILOT_BRAKE_DONE_SPEED) {
+            // Close enough — snap the residual and complete.
+            ship.velocity.copy(desiredVel);
+            flightState.thrustActive = false;
 
-        // Disengage
-        autopilotState.isActive = false;
-        autopilotState.phase = null;
-        autopilotState.targetBody = null;
-        // Defer DOM update — running inside the physics substep loop.
-        setTimeout(() => updateAutopilotUI(), 0);
+            const targetName = target.name || 'the body';
+            addEvent(`✓ Autopilot: Stable orbit around ${targetName} achieved.`);
+            autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
+            showOrbitNotifySprite();
+
+            autopilotState.isActive = false;
+            autopilotState.phase = null;
+            autopilotState.targetBody = null;
+            setTimeout(() => updateAutopilotUI(), 0);
+        } else {
+            // Drive velocity toward the orbital vector at AUTOPILOT_CIRCULARIZE_RATE.
+            const thrustDir = velDelta.clone().normalize();
+            const mag = Math.min(AUTOPILOT_CIRCULARIZE_RATE * dt, deltaLen);
+            ship.velocity.addScaledVector(thrustDir, mag);
+
+            // Rotate ship to face thrust direction (cosmetic).
+            const targetQuat = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1), thrustDir
+            );
+            ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
+            flightState.thrustActive = true;
+        }
     }
 
     // Update ship trail to show thrust during approach/brake
