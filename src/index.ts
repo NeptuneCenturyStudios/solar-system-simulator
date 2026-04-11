@@ -995,13 +995,17 @@ const flightState = {
 };
 
 // --- Autopilot state ---
-type AutopilotPhase = 'APPROACH' | 'BRAKE' | 'CIRCULARIZE';
+type AutopilotPhase = 'WARP_CHARGING' | 'WARP' | 'APPROACH' | 'BRAKE' | 'CIRCULARIZE';
 const autopilotState = {
     isActive: false,
     targetBody: null as Body | null,
     phase: null as AutopilotPhase | null,
     /** Stable-orbit notification timer (seconds remaining to display). */
     orbitNotifyTimer: 0,
+    /** True while the autopilot WARP phase is active (post-charge). */
+    isWarpActive: false,
+    /** Accumulated charge time (seconds) during the WARP_CHARGING phase. */
+    warpChargeTimer: 0,
     /** True while the approach phase is using boost speed. */
     isBoostActive: false,
     /** Distance from target when BRAKE phase started — used to compute the
@@ -1071,6 +1075,15 @@ const AUTOPILOT_BOOST_THRESHOLD = 1.5 * (
     (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_BOOST_DECEL)
     + (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
 );
+/** Deceleration rate used to scrub warp speed during autopilot approach.
+ *  Matches FLIGHT_WARP_DECEL_RATE so the feel is consistent with manual warp decel. */
+const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL_RATE;
+/** Distance (u) above which autopilot engages warp for fast transit.
+ *  Computed as 1.5× the stopping distance from warp speed down to boost speed,
+ *  plus AUTOPILOT_BOOST_THRESHOLD (the runway still needed once warp ends). */
+const AUTOPILOT_WARP_THRESHOLD = 1.5 * (
+    (FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) / (2 * AUTOPILOT_WARP_DECEL)
+) + AUTOPILOT_BOOST_THRESHOLD;
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -1481,7 +1494,7 @@ createWarpSprite();
 // confirmation for AUTOPILOT_ORBIT_NOTIFY_DURATION seconds after completion.
 let orbitNotifySprite: THREE.Sprite | null = null;
 
-type AutopilotHudState = 'APPROACH' | 'APPROACH_BOOST' | 'BRAKE' | 'CIRCULARIZE' | 'ORBIT' | 'NONE';
+type AutopilotHudState = 'APPROACH_WARP' | 'APPROACH_BOOST' | 'APPROACH' | 'BRAKE' | 'CIRCULARIZE' | 'ORBIT' | 'NONE';
 let _lastAutopilotHudState: AutopilotHudState = 'NONE';
 
 function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = ''): THREE.CanvasTexture {
@@ -1498,25 +1511,30 @@ function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = '
     let color: string;
     let glow: string;
     switch (state) {
-        case 'APPROACH':
-            text  = '▶  AUTOPILOT: APPROACHING TARGET';
-            color = '#ffdd55';
-            glow  = 'rgba(255,210,50,0.8)';
+        case 'APPROACH_WARP':
+            text  = '⚡  AUTOPILOT: WARP APPROACH';
+            color = '#ff4488';
+            glow  = 'rgba(255,68,136,0.9)';
             break;
         case 'APPROACH_BOOST':
             text  = '▶▶  AUTOPILOT: APPROACHING TARGET (BOOST)';
-            color = '#ffaa00';
-            glow  = 'rgba(255,160,0,0.9)';
+            color = '#ff9944';
+            glow  = 'rgba(255,153,68,0.85)';
+            break;
+        case 'APPROACH':
+            text  = '▶  AUTOPILOT: APPROACHING TARGET';
+            color = '#00ffcc';
+            glow  = 'rgba(0,255,204,0.85)';
             break;
         case 'BRAKE':
             text  = '◼  AUTOPILOT: BRAKING';
-            color = '#ff8844';
-            glow  = 'rgba(255,120,50,0.9)';
+            color = '#00ffcc';
+            glow  = 'rgba(0,255,204,0.85)';
             break;
         case 'CIRCULARIZE':
             text  = '↻  AUTOPILOT: ENTERING ORBIT';
-            color = '#88ffcc';
-            glow  = 'rgba(80,255,180,0.85)';
+            color = '#00ffcc';
+            glow  = 'rgba(0,255,204,0.85)';
             break;
         case 'ORBIT':
             text  = '✓  STABLE ORBIT ESTABLISHED';
@@ -4570,13 +4588,15 @@ function animate() {
         // For autopilot: use the thrustActive flag set by the autopilot state machine.
         const trailThrust = isFlightModeActive
             ? (keys.w || keys.s || keys.shift) && !flightState.warpActive && !flightState.warpDecelerating
-            : flightState.thrustActive;
+            : flightState.thrustActive && !autopilotState.isWarpActive;
         // Exhaust direction = ship's backward direction (−forward axis)
         const exhaustDir = new THREE.Vector3(0, 0, -1).applyQuaternion(trailShip.mesh.quaternion);
         // In autopilot-only mode flightState.currentSpeed isn't maintained — use velocity magnitude
         const trailSpeed = isFlightModeActive ? flightState.currentSpeed : trailShip.velocity.length();
-        // Pass the active speed ceiling so the trail reflects boost vs normal mode
-        const trailMaxSpeed = (keys.shift || flightState.boostDecelerating || autopilotState.isBoostActive) ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
+        // Pass the active speed ceiling so the trail reflects warp vs boost vs normal mode
+        const trailMaxSpeed = autopilotState.isWarpActive ? FLIGHT_WARP_SPEED
+            : (keys.shift || flightState.boostDecelerating || autopilotState.isBoostActive) ? FLIGHT_BOOST_MAX_SPEED
+            : FLIGHT_MAX_SPEED;
         trailShip.trail.update(nozzle, trailSpeed, trailMaxSpeed, trailThrust, trailShip.velocity, exhaustDir, dtTotal);
     }
 
@@ -4623,6 +4643,16 @@ function animate() {
         window.__updateHintSprite();
     }
 
+    // Warp effect visibility: only show when the player can actually see it —
+    // i.e. in flight mode, or when the ship is the current look-at camera target.
+    if (warpEffect.active) {
+        const warpShip = flightState.knownShip;
+        const shipIsLookAtTarget = cameraState.isLookAtMode
+            && cameraState.focusBody !== null
+            && cameraState.focusBody === warpShip;
+        warpEffect.lines.visible = isFlightModeActive || shipIsLookAtTarget;
+    }
+
     // Render 3D scene first, then UI overlay on top
     renderer.autoClear = true;
     renderer.render(scene, camera);
@@ -4645,13 +4675,19 @@ function animate() {
         // Update flight speed sprite
         if (speedSprite && speedSprite.visible && flightState.isActive) {
             const ship = flightState.activeShip;
+            // Autopilot phases override the manual warp/boost flags for the speed HUD.
+            const hudIsWarp = flightState.warpActive || flightState.warpDecelerating
+                || autopilotState.phase === 'WARP' || autopilotState.phase === 'WARP_CHARGING';
+            const hudIsBoosting = !hudIsWarp && (keys.shift
+                || autopilotState.phase === 'APPROACH' && autopilotState.isBoostActive
+                || autopilotState.phase === 'BRAKE' && (flightState.activeShip?.velocity?.length() ?? 0) > FLIGHT_MAX_SPEED);
             speedSprite.material.map?.dispose();
             speedSprite.material.map = createSpeedTexture(
                 flightState.currentSpeed,
-                keys.shift,
+                hudIsBoosting,
                 ship?.mesh?.position,
                 ship?.velocity,
-                flightState.warpActive || flightState.warpDecelerating
+                hudIsWarp
             );
             speedSprite.material.needsUpdate = true;
         }
@@ -4677,7 +4713,9 @@ function animate() {
             // Determine desired HUD state
             let desiredHud: AutopilotHudState = 'NONE';
             if (autopilotState.isActive) {
-                if (autopilotState.phase === 'CIRCULARIZE') {
+                if (autopilotState.phase === 'WARP_CHARGING' || autopilotState.phase === 'WARP') {
+                    desiredHud = 'APPROACH_WARP';
+                } else if (autopilotState.phase === 'CIRCULARIZE') {
                     desiredHud = 'CIRCULARIZE';
                 } else if (autopilotState.phase === 'BRAKE') {
                     desiredHud = 'BRAKE';
@@ -5225,14 +5263,28 @@ function updateAutopilot(dt: number) {
 
     // ── Phase transitions ────────────────────────────────────────────────────
     const toTargetDir = toTarget.clone().normalize();
-    // Two-phase stopping distance: shed boost speed at AUTOPILOT_BOOST_DECEL first,
-    // then shed normal speed at AUTOPILOT_DECEL.  Using only AUTOPILOT_DECEL would give
-    // a brake trigger 100,000 u from the target when coming in at boost speed.
-    const effectiveStopDist = approachSpeed > FLIGHT_MAX_SPEED
-        ? (approachSpeed * approachSpeed - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_BOOST_DECEL)
+    // Three-phase stopping distance: shed warp→boost at AUTOPILOT_WARP_DECEL, then
+    // boost→normal at AUTOPILOT_BOOST_DECEL, then normal→stop at AUTOPILOT_DECEL.
+    // Using only AUTOPILOT_BOOST_DECEL at warp speed would give a brake trigger
+    // millions of units away, causing an immediate BRAKE transition.
+    const effectiveStopDist = approachSpeed > FLIGHT_BOOST_MAX_SPEED
+        ? (approachSpeed * approachSpeed - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) / (2 * AUTOPILOT_WARP_DECEL)
+          + (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_BOOST_DECEL)
           + (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
-        : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
+        : approachSpeed > FLIGHT_MAX_SPEED
+          ? (approachSpeed * approachSpeed - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_BOOST_DECEL)
+            + (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
+          : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
     const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
+
+    if (autopilotState.phase === 'WARP') {
+        // Transition to APPROACH once close enough for boost/normal to finish the journey.
+        if (distance <= AUTOPILOT_WARP_THRESHOLD) {
+            autopilotState.isWarpActive = false;
+            warpEffect.stop();
+            autopilotState.phase = 'APPROACH';
+        }
+    }
 
     if (autopilotState.phase === 'APPROACH') {
         if (distance <= orbitRadius + brakeDistance) {
@@ -5264,7 +5316,49 @@ function updateAutopilot(dt: number) {
     // time regardless of which way it is currently pointing.  The ship still rotates to face
     // the thrust direction, but that rotation is cosmetic only.
 
-    if (autopilotState.phase === 'APPROACH') {
+    if (autopilotState.phase === 'WARP_CHARGING') {
+        // Reuse the same charge progress bar shown during manual warp.
+        autopilotState.warpChargeTimer = Math.min(
+            autopilotState.warpChargeTimer + dt, FLIGHT_WARP_CHARGE_TIME
+        );
+        const fill = autopilotState.warpChargeTimer / FLIGHT_WARP_CHARGE_TIME;
+        if (warpSprite) {
+            warpSprite.material.map?.dispose();
+            warpSprite.material.map = createWarpChargeTexture(fill);
+            warpSprite.material.needsUpdate = true;
+            warpSprite.scale.set(320, 80, 1);
+            warpSprite.visible = true;
+        }
+        // Point toward target while charging.
+        const chargeQuat = new THREE.Quaternion().setFromRotationMatrix(
+            new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
+        );
+        ship.mesh.quaternion.rotateTowards(chargeQuat, FLIGHT_MAX_TURN_RATE * dt);
+        flightState.thrustActive = false;
+
+        if (autopilotState.warpChargeTimer >= FLIGHT_WARP_CHARGE_TIME) {
+            autopilotState.warpChargeTimer = 0;
+            autopilotState.isWarpActive = true;
+            autopilotState.phase = 'WARP';
+            if (warpSprite) warpSprite.visible = false;
+            warpEffect.start();
+            addEvent('⚡ Autopilot warp engaged.');
+        }
+
+    } else if (autopilotState.phase === 'WARP') {
+        // Lock ship velocity to warp speed toward the target, in the target's frame.
+        ship.velocity.copy(target.velocity).addScaledVector(toTargetDir, FLIGHT_WARP_SPEED);
+        flightState.currentSpeed = FLIGHT_WARP_SPEED;
+        flightState.thrustActive = true;
+        warpEffect.update(dt);
+
+        // Keep ship visually pointed toward the target.
+        const warpQuat = new THREE.Quaternion().setFromRotationMatrix(
+            new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
+        );
+        ship.mesh.quaternion.rotateTowards(warpQuat, FLIGHT_MAX_TURN_RATE * dt);
+
+    } else if (autopilotState.phase === 'APPROACH') {
         // Use boost speed when far away; switch to normal approach speed close in.
         const useBoost = distance > AUTOPILOT_BOOST_THRESHOLD;
         autopilotState.isBoostActive = useBoost;
@@ -5287,7 +5381,9 @@ function updateAutopilot(dt: number) {
             // ship to fly thousands of units past the threshold before slowing down.
             // When the ship needs to speed UP, use the appropriate accel (boost or normal).
             const rate = needsDecel
-                ? (approachSpeed > FLIGHT_MAX_SPEED ? AUTOPILOT_BOOST_DECEL : AUTOPILOT_DECEL)
+                ? (approachSpeed > FLIGHT_BOOST_MAX_SPEED ? AUTOPILOT_WARP_DECEL
+                    : approachSpeed > FLIGHT_MAX_SPEED ? AUTOPILOT_BOOST_DECEL
+                    : AUTOPILOT_DECEL)
                 : (useBoost ? FLIGHT_BOOST_ACCEL : AUTOPILOT_ACCEL);
             const accelMag = Math.min(rate * dt, deltaLen);
             ship.velocity.addScaledVector(accelDir, accelMag);
@@ -5465,7 +5561,17 @@ function updateAutopilot(dt: number) {
 /** Cancel the autopilot with an optional log message. */
 function cancelAutopilot(message?: string) {
     if (!autopilotState.isActive) return;
+    if (autopilotState.isWarpActive) {
+        autopilotState.isWarpActive = false;
+        warpEffect.stop();
+    }
+    // Hide the charge bar if it was showing.
+    if (autopilotState.phase === 'WARP_CHARGING') {
+        if (warpSprite) warpSprite.visible = false;
+        autopilotState.warpChargeTimer = 0;
+    }
     autopilotState.isActive = false;
+    autopilotState.isBoostActive = false;
     autopilotState.phase = null;
     autopilotState.targetBody = null;
     flightState.thrustActive = false;
@@ -5489,18 +5595,42 @@ function engageAutopilot(target: Body) {
         return;
     }
 
-    // If already engaged, cancel (toggle)
+    // If already engaged on the same target, cancel (toggle)
     if (autopilotState.isActive && autopilotState.targetBody === target) {
         cancelAutopilot('Autopilot disengaged.');
         return;
     }
 
+    // Guard: refuse to engage while manual warp is live.
+    if (flightState.warpActive || flightState.warpDecelerating || flightState.warpCharging) {
+        addEvent('Autopilot: disengage warp before engaging autopilot.');
+        return;
+    }
+
+    // Clean up any prior autopilot warp when switching targets.
+    if (autopilotState.isWarpActive) {
+        autopilotState.isWarpActive = false;
+        warpEffect.stop();
+    }
+
+    // Choose initial phase based on distance: warp for far targets, approach otherwise.
+    const dist0 = (ship.mesh && target.mesh)
+        ? ship.mesh.position.distanceTo(target.mesh.position)
+        : Infinity;
+    const startWithWarp = dist0 > AUTOPILOT_WARP_THRESHOLD;
+
     autopilotState.isActive = true;
     autopilotState.targetBody = target;
-    autopilotState.phase = 'APPROACH';
+    autopilotState.isWarpActive = false;
+    autopilotState.warpChargeTimer = 0;
+    autopilotState.phase = startWithWarp ? 'WARP_CHARGING' : 'APPROACH';
     flightState.thrustActive = false;
 
-    addEvent(`Autopilot engaged: flying to ${target.name || 'target'}.`);
+    if (startWithWarp) {
+        addEvent(`Autopilot engaged: initiating warp to ${target.name || 'target'}.`);
+    } else {
+        addEvent(`Autopilot engaged: flying to ${target.name || 'target'}.`);
+    }
     updateAutopilotUI();
 }
 
@@ -5535,15 +5665,19 @@ function updateFlightControls(dt: number) {
     // ── Warp deceleration ────────────────────────────────────────────────────
     // After warp ends, rapidly decelerate toward FLIGHT_MAX_SPEED, then hand
     // back to normal flight controls (steering/roll still work during decel).
+    // If Shift is held and speed has already fallen into boost range, end early
+    // so boost can engage immediately rather than coasting all the way to normal max.
     if (flightState.warpDecelerating) {
         const fwdSpd = ship.velocity.dot(forward);
-        if (fwdSpd > FLIGHT_MAX_SPEED) {
+        const boostHandoff = keys.shift && fwdSpd <= FLIGHT_BOOST_MAX_SPEED;
+        if (!boostHandoff && fwdSpd > FLIGHT_MAX_SPEED) {
             const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_WARP_DECEL_RATE * dt);
             ship.velocity.copy(forward).multiplyScalar(newSpd);
             flightState.currentSpeed = newSpd;
         } else {
             flightState.warpDecelerating = false;
-            flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_MAX_SPEED);
+            // On boost handoff keep current speed; on natural end clamp to normal max.
+            flightState.currentSpeed = boostHandoff ? fwdSpd : Math.min(fwdSpd, FLIGHT_MAX_SPEED);
             warpEffect.stop();
         }
         flightState.thrustActive = false;
@@ -5588,7 +5722,7 @@ function updateFlightControls(dt: number) {
     }
 
     // ── Warp charging ────────────────────────────────────────────────────────
-    if (flightState.warpCharging && !flightState.warpDecelerating) {
+    if (flightState.warpCharging && !flightState.warpDecelerating && !autopilotState.isWarpActive) {
         flightState.warpCharge = Math.min(flightState.warpCharge + dt, FLIGHT_WARP_CHARGE_TIME);
         const fill = flightState.warpCharge / FLIGHT_WARP_CHARGE_TIME;
         if (warpSprite) {
@@ -5624,13 +5758,17 @@ function updateFlightControls(dt: number) {
             flightState.boostDecelerating = true;
         }
     }
-    // Re-engaging boost cancels the decel
-    if (keys.shift) {
+    // Re-engaging boost cancels the decel — but only when we're already at or below boost max
+    // speed.  Above that threshold the ship is still shedding warp speed and boost should be
+    // ignored so it doesn't snap the ship's speed down to FLIGHT_BOOST_MAX_SPEED.
+    if (keys.shift && fwdSpeed <= FLIGHT_BOOST_MAX_SPEED) {
         flightState.boostDecelerating = false;
     }
 
-    // Skip normal thrust while boost-decelerating (handled above)
-    if (flightState.boostDecelerating) {
+    // Skip normal thrust while boost- or warp-decelerating (velocity is managed above).
+    // This prevents the thrust block fighting the decel and avoids the S-key else-branch
+    // firing incorrectly when Shift is held at warp speeds above FLIGHT_BOOST_MAX_SPEED.
+    if (flightState.boostDecelerating || flightState.warpDecelerating) {
         // steering/roll still processed below
     } else if (!flightState.isAdvancedMode) {
         // ── Simple mode ──────────────────────────────────────────────────────────
@@ -5641,7 +5779,10 @@ function updateFlightControls(dt: number) {
         if (thrustActive) {
             const maxSpeed = keys.shift ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
             const accel    = keys.shift ? FLIGHT_BOOST_ACCEL     : FLIGHT_THRUST_ACCEL;
-            if (keys.shift || wEffective) {
+            // Ignore boost while above boost max speed (e.g. decelerating from warp);
+            // the ship should coast down through FLIGHT_BOOST_MAX_SPEED naturally.
+            const shiftEffective = keys.shift && flightState.currentSpeed <= FLIGHT_BOOST_MAX_SPEED;
+            if (shiftEffective || wEffective) {
                 flightState.currentSpeed = Math.min(flightState.currentSpeed + accel * dt, maxSpeed);
             } else { // keys.s
                 flightState.currentSpeed = Math.max(flightState.currentSpeed - accel * dt, -FLIGHT_MAX_SPEED);

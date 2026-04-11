@@ -578,7 +578,7 @@ button.btn-with-icon {
     display: grid;
     gap: 10px;
     margin-bottom: 14px;
-    font-size: 0.9em;
+    font-size: 1.25em;
     line-height: 1.5;
     color: #fff;
 }
