@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { Body } from './body.js';
-import { ShipTrail } from './ship-trail.js';
+import { ShipTrail } from '../ship-effects/ship-trail';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 

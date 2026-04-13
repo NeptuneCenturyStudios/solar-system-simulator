@@ -1500,7 +1500,7 @@ let _lastAutopilotHudState: AutopilotHudState = 'NONE';
 function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = ''): THREE.CanvasTexture {
     // Canvas is deliberately wide (800px) so no label ever clips.
     // Two rows: phase label on top, distance on the bottom.
-    const W = 800, H = 100;
+    const W = 900, H = 100;
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const ctx = c.getContext('2d')!;
@@ -1512,7 +1512,7 @@ function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = '
     let glow: string;
     switch (state) {
         case 'APPROACH_WARP':
-            text  = '⚡  AUTOPILOT: WARP APPROACH';
+            text  = '⚡  AUTOPILOT: WARPING';
             color = '#ff4488';
             glow  = 'rgba(255,68,136,0.9)';
             break;
@@ -1527,7 +1527,7 @@ function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = '
             glow  = 'rgba(0,255,204,0.85)';
             break;
         case 'BRAKE':
-            text  = '◼  AUTOPILOT: BRAKING';
+            text  = '◼  AUTOPILOT: ESTABLISHING ORBIT TRAJECTORY';
             color = '#00ffcc';
             glow  = 'rgba(0,255,204,0.85)';
             break;

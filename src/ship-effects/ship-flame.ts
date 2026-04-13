@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SCALE_FACTOR } from '../utilities/consts.js';
+import { IShipEffect } from './ship-effect-base.js';
 
 /** Maximum number of live particles in the pool. */
 const MAX_PARTICLES = 1200;
@@ -35,7 +36,7 @@ const DEAD = -1;
  *    randomised ±30% per particle so they don't all die at once.
  *  - Colours: hot white→orange inner core, warm orange outer glow (additive).
  */
-export class ShipTrail {
+export class ShipTrail implements IShipEffect {
     private readonly scene: THREE.Scene;
 
     // ── Particle pool (parallel arrays, indexed by slot) ─────────────────────
@@ -147,7 +148,7 @@ export class ShipTrail {
     }
 
     /** Kill all particles and hide the trail. Call when entering flight mode. */
-    init(_pos: THREE.Vector3): void {
+    init(): void {
         this.life.fill(DEAD);
         this.prevNozzle = null;
         this.innerGeo.setDrawRange(0, 0);
