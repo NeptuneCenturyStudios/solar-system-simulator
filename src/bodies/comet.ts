@@ -80,7 +80,7 @@ export class Comet extends CelestialBody {
             material
         );
 
-        this.tailCount = 800;
+        this.tailCount = 1200;
         this.tailGeo = new THREE.BufferGeometry();
         this.tailPos = new Float32Array(this.tailCount * 3);
         this.tailColors = new Float32Array(this.tailCount * 3);
@@ -186,7 +186,7 @@ export class Comet extends CelestialBody {
 
         // Calculate desired tail length based on comet state (precompute constants)
         const baseTailLength = 50 * SCALE_FACTOR;
-        const intensityBonus = tailIntensity * 400 * SCALE_FACTOR;
+        const intensityBonus = tailIntensity * 800 * SCALE_FACTOR;
         const velocityBonus = cometSpeed * 100 * SCALE_FACTOR;
         const targetTailLength = baseTailLength + intensityBonus + velocityBonus;
 
@@ -194,7 +194,7 @@ export class Comet extends CelestialBody {
         const avgParticleSpeed = 0.35;
         const lifeIncrement = (avgParticleSpeed * 60) / targetTailLength;
 
-        const dtScaled = Math.abs(dt) * 60;
+        const dtScaled = Math.abs(dt) * 6000;
         const spread = this.radius * 1 * SCALE_FACTOR;
 
         // Update all particles
