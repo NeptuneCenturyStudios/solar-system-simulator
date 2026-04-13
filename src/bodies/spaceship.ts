@@ -5,6 +5,7 @@ import { Body } from './body.js';
 import { ShipTrail } from '../ship-effects/ship-trail';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
+import { IShipEffect } from '../ship-effects/ship-effect-base.js';
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
 
@@ -23,7 +24,7 @@ export class Spaceship extends Body {
     /** Local-space offset to the engine nozzle (used for the trail origin). */
     thrusterOffset: THREE.Vector3;
     /** Glowing engine exhaust trail rendered as a connected line in world space. */
-    trail: ShipTrail;
+    trail: IShipEffect;
 
     constructor(
         dependencies: object,

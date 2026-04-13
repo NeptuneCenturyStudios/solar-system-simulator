@@ -36,7 +36,7 @@ const DEAD = -1;
  *    randomised ±30% per particle so they don't all die at once.
  *  - Colours: hot white→orange inner core, warm orange outer glow (additive).
  */
-export class ShipTrail implements IShipEffect {
+export class ShipFlame implements IShipEffect {
     private readonly scene: THREE.Scene;
 
     // ── Particle pool (parallel arrays, indexed by slot) ─────────────────────
