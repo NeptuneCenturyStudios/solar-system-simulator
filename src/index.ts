@@ -3670,15 +3670,19 @@ function onMouseMove(event) {
     // Flight mode: capture mouse movement as pointer offset for steering.
     // The pointer is locked during flight, so event.movementX/Y gives reliable deltas.
     if (flightState.isActive && document.pointerLockElement === renderer.domElement) {
-        const maxOff = FLIGHT_MAX_POINTER_OFFSET;
-        flightState.pointerOffsetX = Math.max(
-            -maxOff,
-            Math.min(maxOff, flightState.pointerOffsetX + (event.movementX || 0))
-        );
-        flightState.pointerOffsetY = Math.max(
-            -maxOff,
-            Math.min(maxOff, flightState.pointerOffsetY + (event.movementY || 0))
-        );
+        // Ignore mouse movement while autopilot is active so it can't be accidentally
+        // steered (or later lurch) from accumulated offsets.
+        if (!autopilotState.isActive) {
+            const maxOff = FLIGHT_MAX_POINTER_OFFSET;
+            flightState.pointerOffsetX = Math.max(
+                -maxOff,
+                Math.min(maxOff, flightState.pointerOffsetX + (event.movementX || 0))
+            );
+            flightState.pointerOffsetY = Math.max(
+                -maxOff,
+                Math.min(maxOff, flightState.pointerOffsetY + (event.movementY || 0))
+            );
+        }
         return; // Skip all other mouse-look / gizmo-drag logic during flight
     }
 
@@ -4161,10 +4165,8 @@ function animate() {
         if (!ap_ship || ap_ship._isDisposed || !simulationState.bodies.includes(ap_ship)) {
             cancelAutopilot();
         }
-        // Cancel on manual thrust key — checked once per frame (not inside substep loop).
-        if (keys.w || keys.s || keys.shift) {
-            cancelAutopilot('Autopilot disengaged: manual override.');
-        }
+        // Manual thrust/steering keys are intentionally ignored during autopilot
+        // (they no longer disengage it).
     }
 
     if (isFlightModeActive) {
@@ -4583,21 +4585,19 @@ function animate() {
         const nozzle = trailShip.thrusterOffset.clone()
             .applyQuaternion(trailShip.mesh.quaternion)
             .add(trailShip.mesh.position);
-        // Suppress trail during warp and warp deceleration.
-        // For player flight: any thrust key held fires the engine regardless of speed cap.
-        // For autopilot: use the thrustActive flag set by the autopilot state machine.
-        const trailThrust = isFlightModeActive
-            ? (keys.w || keys.s || keys.shift) && !flightState.warpActive && !flightState.warpDecelerating
-            : flightState.thrustActive && !autopilotState.isWarpActive;
+        // Record trail continuously in flight; suppress only during warp/warp-decel.
+        const trailRecord = isFlightModeActive
+            ? !flightState.warpActive && !flightState.warpDecelerating
+            : !autopilotState.isWarpActive;
         // Exhaust direction = ship's backward direction (−forward axis)
         const exhaustDir = new THREE.Vector3(0, 0, -1).applyQuaternion(trailShip.mesh.quaternion);
         // In autopilot-only mode flightState.currentSpeed isn't maintained — use velocity magnitude
         const trailSpeed = isFlightModeActive ? flightState.currentSpeed : trailShip.velocity.length();
-        // Pass the active speed ceiling so the trail reflects warp vs boost vs normal mode
+        // Pass the active speed ceiling so brightness scales correctly across modes
         const trailMaxSpeed = autopilotState.isWarpActive ? FLIGHT_WARP_SPEED
             : (keys.shift || flightState.boostDecelerating || autopilotState.isBoostActive) ? FLIGHT_BOOST_MAX_SPEED
             : FLIGHT_MAX_SPEED;
-        trailShip.trail.update(nozzle, trailSpeed, trailMaxSpeed, trailThrust, trailShip.velocity, exhaustDir, dtTotal);
+        trailShip.trail.update(nozzle, trailSpeed, trailMaxSpeed, trailRecord, trailShip.velocity, exhaustDir, dtTotal);
     }
 
     if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
@@ -5744,16 +5744,18 @@ function updateFlightControls(dt: number) {
     }
 
     // ── Thrust ─────────────────────────────────────────────────────────────────────────────
+    // Manual controls (WASD / mouse steering) are completely ignored while autopilot is active.
+    const manualInput = !autopilotState.isActive;
     const fwdSpeed = ship.velocity.dot(forward);
     // W only counts as active thrust once the ship has decelerated to normal max speed.
     // This prevents W from snapping the ship from boost speed (500) down to normal max (100)
     // in one frame when pressed mid-deceleration.
-    const wEffective = keys.w && (flightState.currentSpeed <= FLIGHT_MAX_SPEED || keys.shift);
-    const thrustActive = keys.shift || wEffective || keys.s;
-    flightState.thrustActive = thrustActive;
+    const wEffective = manualInput && keys.w && (flightState.currentSpeed <= FLIGHT_MAX_SPEED || keys.shift);
+    const thrustActive = manualInput && (keys.shift || wEffective || keys.s);
+    if (manualInput) flightState.thrustActive = thrustActive;
 
     // Trigger boost decel when Shift is released while still above normal max speed
-    if (!keys.shift && !flightState.boostDecelerating && !flightState.warpActive && !flightState.warpDecelerating) {
+    if (manualInput && !keys.shift && !flightState.boostDecelerating && !flightState.warpActive && !flightState.warpDecelerating) {
         if (fwdSpeed > FLIGHT_MAX_SPEED) {
             flightState.boostDecelerating = true;
         }
@@ -5761,7 +5763,7 @@ function updateFlightControls(dt: number) {
     // Re-engaging boost cancels the decel — but only when we're already at or below boost max
     // speed.  Above that threshold the ship is still shedding warp speed and boost should be
     // ignored so it doesn't snap the ship's speed down to FLIGHT_BOOST_MAX_SPEED.
-    if (keys.shift && fwdSpeed <= FLIGHT_BOOST_MAX_SPEED) {
+    if (manualInput && keys.shift && fwdSpeed <= FLIGHT_BOOST_MAX_SPEED) {
         flightState.boostDecelerating = false;
     }
 
@@ -5770,7 +5772,7 @@ function updateFlightControls(dt: number) {
     // firing incorrectly when Shift is held at warp speeds above FLIGHT_BOOST_MAX_SPEED.
     if (flightState.boostDecelerating || flightState.warpDecelerating) {
         // steering/roll still processed below
-    } else if (!flightState.isAdvancedMode) {
+    } else if (manualInput && !flightState.isAdvancedMode) {
         // ── Simple mode ──────────────────────────────────────────────────────────
         // While a thrust key is held: currentSpeed is updated by hold-to-accelerate
         // and the full velocity is OVERWRITTEN to match the current forward direction.
@@ -5798,7 +5800,7 @@ function updateFlightControls(dt: number) {
             // Coasting: sync display value from real forward velocity
             flightState.currentSpeed = fwdSpeed;
         }
-    } else {
+    } else if (manualInput) {
         // ── Advanced mode ────────────────────────────────────────────────────────
         // Thrust adds to velocity without removing gravity-accumulated perpendicular
         // components, so orbital mechanics work at all times.
@@ -5820,6 +5822,9 @@ function updateFlightControls(dt: number) {
         }
         // No thrust: ship coasts freely
         flightState.currentSpeed = ship.velocity.dot(forward);
+    } else if (!manualInput) {
+        // Autopilot: sync display speed from real forward velocity (autopilot manages thrust)
+        flightState.currentSpeed = fwdSpeed;
     }
 
     // ── Roll with inertia (A/D) ───────────────────────────────────────────────
@@ -5828,7 +5833,7 @@ function updateFlightControls(dt: number) {
     const rollTarget = flightState.rollLeft ? -FLIGHT_ROLL_SPEED
                      : flightState.rollRight ? FLIGHT_ROLL_SPEED
                      : 0;
-    if (flightState.rollLeft || flightState.rollRight) {
+    if (manualInput && (flightState.rollLeft || flightState.rollRight)) {
         // Ramp up toward target
         const dir = rollTarget > 0 ? 1 : -1;
         flightState.rollVelocity += dir * FLIGHT_ROLL_ACCEL * dt;
@@ -5861,10 +5866,16 @@ function updateFlightControls(dt: number) {
     const rawX = applyDeadzone(rawXFull);
     const rawY = applyDeadzone(rawYFull);
     // Exponential lerp — gives a weighted, inertia-like feel to the controls
-    flightState.steerX += (rawX - flightState.steerX) * FLIGHT_STEER_SMOOTHING;
-    flightState.steerY += (rawY - flightState.steerY) * FLIGHT_STEER_SMOOTHING;
-    ship.mesh.rotateY(-flightState.steerX * FLIGHT_MAX_TURN_RATE * dt);
-    ship.mesh.rotateX( flightState.steerY * FLIGHT_MAX_TURN_RATE * dt);
+    if (manualInput) {
+        flightState.steerX += (rawX - flightState.steerX) * FLIGHT_STEER_SMOOTHING;
+        flightState.steerY += (rawY - flightState.steerY) * FLIGHT_STEER_SMOOTHING;
+        ship.mesh.rotateY(-flightState.steerX * FLIGHT_MAX_TURN_RATE * dt);
+        ship.mesh.rotateX( flightState.steerY * FLIGHT_MAX_TURN_RATE * dt);
+    } else {
+        // Reset steer state so there is no lurch when autopilot disengages.
+        flightState.steerX = 0;
+        flightState.steerY = 0;
+    }
 
     // (currentSpeed is updated in the thrust block above; velocity is
     //  modified in-place there — no override needed here)
