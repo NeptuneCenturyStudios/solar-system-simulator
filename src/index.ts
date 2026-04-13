@@ -4177,7 +4177,7 @@ function animate() {
 
     // WASD camera movement (works in both free camera and normal mode, but NOT in flight mode)
     if (!isFlightModeActive) {
-    const speed = keys.shift ? cameraSpeed * 10 : cameraSpeed;
+    const speed = (keys.shift ? cameraSpeed * 10 : cameraSpeed) * SCALE_FACTOR;
     const direction = new THREE.Vector3();
 
     camera.getWorldDirection(direction);
