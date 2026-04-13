@@ -4678,7 +4678,7 @@ function animate() {
             // Autopilot phases override the manual warp/boost flags for the speed HUD.
             const hudIsWarp = flightState.warpActive || flightState.warpDecelerating
                 || autopilotState.phase === 'WARP' || autopilotState.phase === 'WARP_CHARGING';
-            const hudIsBoosting = !hudIsWarp && (keys.shift
+            const hudIsBoosting = !hudIsWarp && ((!autopilotState.isActive && keys.shift)
                 || autopilotState.phase === 'APPROACH' && autopilotState.isBoostActive
                 || autopilotState.phase === 'BRAKE' && (flightState.activeShip?.velocity?.length() ?? 0) > FLIGHT_MAX_SPEED);
             speedSprite.material.map?.dispose();
@@ -5970,11 +5970,8 @@ function spawnShip() {
         refreshBodiesTable();
     }
 
-    // Seed trail at nozzle position so it starts collapsed (not at world origin)
-    const _initNozzle = ship.thrusterOffset.clone()
-        .applyQuaternion(ship.mesh.quaternion)
-        .add(ship.mesh.position);
-    ship.trail.init(_initNozzle);
+    // Initialize the ship's trail (but it will be hidden until warp ends, to avoid showing a long trail from spawn point to first flight location)
+    ship.trail.init();
 
     // Show flight speed sprite
     if (speedSprite) {
@@ -6792,8 +6789,9 @@ window.addEventListener('keydown', (e) => {
                 flightState.warpDecelerating = true;
                 warpEffect.stop();
                 addEvent('Warp disengaged. Decelerating...');
-            } else if (!flightState.warpDecelerating) {
-                // Only start charging when not already decelerating from a previous warp
+            } else if (!flightState.warpDecelerating && !autopilotState.isActive) {
+                // Only start charging when not already decelerating from a previous warp,
+                // and not under autopilot control.
                 flightState.warpCharging = true;
             }
             return;
