@@ -6,6 +6,7 @@ import { ShipTrail } from '../ship-effects/ship-trail';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 import { IShipEffect } from '../ship-effects/ship-effect-base.js';
+//import { ShipFlame } from '../ship-effects/ship-flame.js';
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
 

@@ -1,5 +1,5 @@
 // Screen flash effect for explosions
-let screenFlashDiv = null;
+let screenFlashDiv: HTMLDivElement;
 function createScreenFlash() {
     screenFlashDiv = document.createElement('div');
     screenFlashDiv.style.position = 'fixed';
@@ -20,7 +20,9 @@ export function triggerScreenFlash() {
     if (screenFlashDiv) {
         screenFlashDiv.style.opacity = '0.6';
         setTimeout(() => {
-            screenFlashDiv.style.opacity = '0';
+            if (screenFlashDiv) {
+                screenFlashDiv.style.opacity = '0';
+            }
         }, 50);
     }
 }

@@ -4,6 +4,7 @@ import { SUN_MASS, EARTH_MASS, EARTH_DIST, EARTH_RADIUS } from '../utilities/con
 import { BodyType, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { CelestialBody } from './celestial-body.js';
+import { IStateDependencies } from '../interfaces.js';
 
 const earthDayTexture = loadSrgbTexture('./assets/textures/earth_day.jpg');
 const earthCloudsTexture = loadSrgbTexture('./assets/textures/earth_clouds.jpg');
@@ -11,7 +12,7 @@ earthCloudsTexture.wrapS = THREE.RepeatWrapping;
 earthCloudsTexture.wrapT = THREE.RepeatWrapping;
 
 export class Earth extends CelestialBody {
-    constructor(dependencies, scene) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         const earthTrajectory = calculateTrajectory(EARTH_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
@@ -28,8 +29,8 @@ export class Earth extends CelestialBody {
             scene,
             EARTH_RADIUS,
             0x2266ff,
-            earthTrajectory.pos.toArray(),
-            earthTrajectory.vel.toArray(),
+            earthTrajectory.pos,
+            earthTrajectory.vel,
             EARTH_MASS, // Mass
             createUniqueId('earth'),
             'Earth',
@@ -37,8 +38,8 @@ export class Earth extends CelestialBody {
             0xffffff,
             4500,
             false,
-            { axis: [0, 1, 0], speed: 0.3 },
-            null,
+            { axis: new THREE.Vector3(0, 1, 0), speed: 0.3 },
+            undefined,
             material
         );
 
@@ -65,7 +66,7 @@ export class Earth extends CelestialBody {
         this.cloudRotationSpeed = 0.18;
     }
 
-    update(acc, dt) {
+    update(acc: THREE.Vector3, dt: number) {
         super.update(acc, dt);
     }
 }
