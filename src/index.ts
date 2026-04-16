@@ -7047,11 +7047,11 @@ window.addEventListener('bodies:reset', () => {
 // --- Startup modal wiring ---
 function applyDefaultCameraTogglesAfterSpawn() {
     // Default behavior:
-    // - Target ON (so gizmo appears once a body is selected)
+    // - Target OFF by default
     // - Look At ON (button shows active), but with NO pre-selected body
     //   so camera still behaves like center-orbit until the user selects a body.
-    cameraState.isTargetMode = true;
-    mainPanel.setTargetState(true);
+    cameraState.isTargetMode = false;
+    mainPanel.setTargetState(false);
 
     cameraState.isLookAtMode = true;
     mainPanel.setLookAtState(true);
