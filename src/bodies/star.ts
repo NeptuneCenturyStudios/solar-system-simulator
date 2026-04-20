@@ -63,19 +63,6 @@ export class Star extends CelestialBody {
     sunLight: THREE.DirectionalLight;
 
     /**
-     * Hook for the app (main.js) to inject a supernova factory.
-     * This avoids importing `Supernova` here (it currently lives in main.js).
-     * @type {(scene: THREE.Scene, pos: THREE.Vector3, radius: number, shouldCollapse: boolean) => any}
-     */
-    static createSupernova = null;
-
-    /**
-     * Hook for the app (main.js) to inject the StarBirth effect factory.
-     * This keeps Star decoupled from effect module imports.
-     * @type {(scene: THREE.Scene, pos: THREE.Vector3, radius: number) => any}
-     */
-    static createStarBirth = null;
-    /**
      * @param {object} dependencies - same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
      * @param {THREE.Scene} scene
      * @param {object} options
@@ -463,6 +450,10 @@ export class Star extends CelestialBody {
         return supernova;
     }
 
+    createStarBirth(scene: THREE.Scene, pos: THREE.Vector3, radius: number) {
+        return new StarBirth(this.dependencies, scene, pos, radius);
+    }
+
     triggerStarDeath(isMassiveStar: boolean) {
         if (isMassiveStar) {
             try {
@@ -807,19 +798,12 @@ export class Star extends CelestialBody {
     }
 
     _startBirthEffect() {
-        if (typeof Star.createStarBirth !== 'function') {
-            this._setBirthVisibility(true);
-            this.isBirthing = false;
-            this.birthEffect = null;
-            return;
-        }
-
         try {
             this._setBirthVisibility(false);
 
             const pos = this.mesh?.position?.clone?.() || new THREE.Vector3();
             const radius = this.radius || 1;
-            this.birthEffect = Star.createStarBirth(this.scene, pos, radius);
+            this.birthEffect = this.createStarBirth(this.scene, pos, radius);
             this.isBirthing = !!this.birthEffect;
         } catch {
             this.birthEffect = null;

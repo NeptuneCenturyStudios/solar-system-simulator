@@ -2288,7 +2288,6 @@ function updatePositionIndicator(
 }
 
 function setIndicatorMode(mode: string) {
-    indicatorMode = mode;
     const showRed = mode === 'position' || mode === 'both';
     const showGreen = mode === 'velocity' || mode === 'both';
 
@@ -2642,15 +2641,6 @@ function createPresetBody(presetKey: string) {
     setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
     clearCameraPresetHighlights();
 }
-
-Star.createStarBirth = (
-    dependencies: IStateDependencies,
-    scene: THREE.Scene,
-    pos: THREE.Vector3,
-    radius: number
-) => {
-    return new StarBirth(dependencies, scene, pos, radius);
-};
 
 function createNewBody(
     bodyType: string,
@@ -6082,8 +6072,8 @@ function spawnShip() {
                   window.dispatchEvent(
                       new CustomEvent('body:added', { detail: { body: s, id: s.id, name: s.name } })
                   );
-              } catch (e) {
-                  /* non-fatal */
+              } catch {
+                  // Empty
               }
               return s;
           })();
