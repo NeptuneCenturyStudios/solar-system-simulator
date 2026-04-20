@@ -958,6 +958,7 @@ const interactionState = {
 const cameraState = {
     isFreeCameraMode: false,
     isLookAtMode: false,
+    lockToSun: false,
     // Target mode controls gizmo visibility behavior (similar to Look At toggle, but for gizmo)
     isTargetMode: false,
     // Keep id string for legacy/debug, but camera behavior should not rely on it.
@@ -4652,7 +4653,7 @@ function animate() {
             // Calculate how much the planet moved this frame (whether by physics or dragging)
             const delta = new THREE.Vector3().subVectors(focusObj.mesh.position, oldPos);
 
-            if (document.getElementById('lockToSun').checked) {
+            if (cameraState.lockToSun) {
                 // Simply move the camera by the same delta as the planet
                 camera.position.add(delta);
 
@@ -6332,7 +6333,7 @@ mainPanel.on('zoomOut', () => {
 });
 
 mainPanel.on('lockToSunChange', ({ checked }: { checked: boolean }) => {
-    // TODO: Move checkbox DOM lookup out of the animation loop.
+    cameraState.lockToSun = checked;
 });
 
 mainPanel.on('shadowsChange', ({ checked }: { checked: boolean }) => {
