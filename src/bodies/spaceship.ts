@@ -17,7 +17,6 @@ const SF = SCALE_FACTOR / SCALE_FACTOR;
  * Extends Body so gravity applies automatically when added to simulationState.bodies.
  */
 export class Spaceship extends Body {
-    radius: number;
     /** Local-space offset for 1st-person cockpit camera. */
     cockpitOffset: THREE.Vector3;
     /** Local-space offset for 3rd-person chase camera. */
@@ -38,11 +37,14 @@ export class Spaceship extends Body {
         const placeholderGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
         const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
 
+        const radius = 0.6 * SF; // Approximate half-wingspan for collision purposes
+
         // ── Base class ────────────────────────────────────────────────────────
         super(
             dependencies,
             scene,
             /* mass — tiny so it barely perturbs celestial orbits */ 0.001,
+            radius,
             position,
             velocity,
             placeholderGeometry,
@@ -51,10 +53,6 @@ export class Spaceship extends Body {
             'Spaceship',
             BodyTypeEnum.SpaceShip
         );
-
-        // ── Ship-specific properties ──────────────────────────────────────────
-        // Collision radius: approximate half-wingspan
-        this.radius = 0.6 * SF;
 
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);

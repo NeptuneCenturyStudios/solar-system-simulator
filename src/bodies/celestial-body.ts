@@ -34,7 +34,6 @@ export interface ITidalLockOptions {
 export class CelestialBody extends Body {
     deps: IStateDependencies;
     scene: THREE.Scene;
-    radius: number;
     color: number;
     rotationAxis: THREE.Vector3;
     rotationSpeed: number;
@@ -93,7 +92,7 @@ export class CelestialBody extends Body {
                 ? geometryFactory(radius)
                 : new THREE.SphereGeometry(radius, 32, 32);
 
-        super(deps, scene, mass, pos, vel, geometry, material, id, name, bodyType);
+        super(deps, scene, mass, radius, pos, vel, geometry, material, id, name, bodyType);
 
         // Set dependencies
         this.deps = deps || {};

@@ -32,6 +32,7 @@ export class Body {
         dependencies: object,
         scene: THREE.Scene,
         mass: number,
+        radius: number,
         position: THREE.Vector3,
         velocity: THREE.Vector3,
         geometry: THREE.BufferGeometry,
@@ -42,6 +43,7 @@ export class Body {
     ) {
         this.scene = scene;
         this.mass = mass;
+        this.radius = radius;
         this.velocity = new THREE.Vector3(...velocity);
         this.id = id;
         this.name = name;

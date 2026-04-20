@@ -104,6 +104,7 @@ import { AboutModal } from './ui/about-modal.js';
 import { EventLogEntry } from './event-log/event-log.js';
 import { Halley } from './bodies/halley.js';
 import { IStateDependencies } from './interfaces.js';
+
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
 const uranusTexture = loadSrgbTexture('./assets/textures/uranus.jpg');
@@ -261,7 +262,7 @@ function setBodyRadius(body: CelestialBody, newRadius: number) {
     }
 }
 
-function collisionScoreEscapeVelocity(body) {
+function collisionScoreEscapeVelocity(body: Body) {
     // Winner heuristic: compare escape velocity (constants cancel):
     //   v_esc = sqrt(2GM/R)  => ordering is equivalent to M/R
     //
@@ -274,7 +275,7 @@ function collisionScoreEscapeVelocity(body) {
     const rawR =
         typeof body?.radius === 'number' && isFinite(body.radius) && body.radius > 0
             ? body.radius
-            : typeof body?.eventHorizonRadius === 'number' && isFinite(body.eventHorizonRadius)
+            : body instanceof BlackHole && isFinite(body.eventHorizonRadius)
               ? body.eventHorizonRadius
               : 0;
 
@@ -2762,17 +2763,17 @@ function createNewBody(
             scene,
             planetRadius,
             0xffffff,
-            trajectory.pos.toArray(),
-            trajectory.vel.toArray(),
+            trajectory.pos,
+            trajectory.vel,
             planetMass,
-            null, // No camera button
-            generateIAUName('planet'),
+            createUniqueId('planet'),
+            generateIAUName(customPlanetBodyType),
             customPlanetBodyType,
-            0xaaaaaa,
+            0x888888,
             3000,
             false,
-            { axis: [0, 1, 0], speed: 0.1 + Math.random() * 0.4 },
-            null,
+            { axis: new THREE.Vector3(0, 1, 0), speed: 0.1 + Math.random() * 0.4 },
+            undefined,
             planetMaterial
         );
 
@@ -2848,25 +2849,25 @@ function createNewBody(
                 scene,
                 moonRadius,
                 0xffffff,
-                [
+                new THREE.Vector3(
                     parentPos.x + moonTrajectory.pos.x,
                     parentPos.y + moonTrajectory.pos.y,
-                    parentPos.z + moonTrajectory.pos.z,
-                ],
-                [
+                    parentPos.z + moonTrajectory.pos.z
+                ),
+                new THREE.Vector3(
                     parentVel.x + moonTrajectory.vel.x,
                     parentVel.y + moonTrajectory.vel.y,
                     parentVel.z + moonTrajectory.vel.z,
-                ],
+                ),
                 moonMass,
-                null,
-                generateIAUName('moon', focusedBody),
+                createUniqueId('moon'),
+                generateIAUName(BodyTypeEnum.Moon, focusedBody),
                 BodyType.Moon,
                 0x666666,
                 1000,
                 false,
-                { axis: [0, 1, 0], speed: 0.15 + Math.random() * 0.35 },
-                null,
+                { axis: new THREE.Vector3(0, 1, 0), speed: 0.15 + Math.random() * 0.35 },
+                undefined,
                 moonMaterial
             );
 
@@ -2949,11 +2950,11 @@ function createNewBody(
             scene,
             {
                 radius: cometRadius,
-                pos: cometTrajectory.pos.toArray(),
-                vel: cometTrajectory.vel.toArray(),
+                pos: cometTrajectory.pos,
+                vel: cometTrajectory.vel,
                 mass: cometMass,
                 id: createUniqueId('comet'),
-                name: generateIAUName('comet'),
+                name: generateIAUName(BodyTypeEnum.Comet),
             },
             cometMaterial
         );
@@ -4808,6 +4809,7 @@ function getBodyTypeLabel(b: Body) {
     if (b.bodyType && b.bodyType & BodyType.Moon) return 'Moon';
     if (b.bodyType && b.bodyType & BodyType.Asteroid) return 'Asteroid';
     if (b.bodyType && b.bodyType & BodyType.Comet) return 'Comet';
+    if (b.bodyType && b.bodyType & BodyType.SpaceShip) return 'Spaceship';
     return 'Unknown';
 }
 
