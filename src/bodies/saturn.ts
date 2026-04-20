@@ -4,9 +4,10 @@ import { CelestialBody } from './celestial-body.js';
 import { calculateTrajectory } from '../physics/physics.js';
 import { BodyType, createUniqueId } from '../utilities/utilities.js';
 import { SATURN_DIST, SATURN_MASS, SUN_MASS, SATURN_RADIUS } from '../utilities/consts.js';
+import { IStateDependencies } from '../interfaces.js';
 
 export class Saturn extends CelestialBody {
-    constructor(dependencies, scene, saturnTexture) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, saturnTexture: THREE.Texture) {
         const trajectory = calculateTrajectory(SATURN_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
@@ -23,8 +24,8 @@ export class Saturn extends CelestialBody {
             scene,
             SATURN_RADIUS,
             0xe6cc80,
-            trajectory.pos.toArray(),
-            trajectory.vel.toArray(),
+            trajectory.pos,
+            trajectory.vel,
             SATURN_MASS,
             createUniqueId('saturn'),
             'Saturn',
@@ -32,8 +33,8 @@ export class Saturn extends CelestialBody {
             0xffeebb,
             12000,
             true,
-            { axis: [0, 1, 0], speed: 0.5 },
-            null,
+            { axis: new THREE.Vector3(0, 1, 0), speed: 0.5 },
+            undefined,
             material
         );
     }

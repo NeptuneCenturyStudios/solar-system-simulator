@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
-import { SUN_MASS, VENUS_DIST, VENUS_MASS } from '../utilities/consts.js';
+import { SUN_MASS, VENUS_DIST, VENUS_MASS, VENUS_RADIUS } from '../utilities/consts.js';
 import { BodyType, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { CelestialBody } from './celestial-body.js';
+import { IStateDependencies } from '../interfaces.js';
 
 const venusTexture = loadSrgbTexture('./assets/textures/venus.jpg');
 const venusAtmosphereTexture = loadSrgbTexture('./assets/textures/venus_atmosphere.jpg');
 
 export class Venus extends CelestialBody {
-    constructor(dependencies, scene) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         const trajectory = calculateTrajectory(VENUS_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
@@ -24,10 +25,10 @@ export class Venus extends CelestialBody {
         super(
             dependencies,
             scene,
-            7.6, // 0.950 × Earth
+            VENUS_RADIUS,
             0xffc649,
-            trajectory.pos.toArray(),
-            trajectory.vel.toArray(),
+            trajectory.pos,
+            trajectory.vel,
             VENUS_MASS,
             createUniqueId('venus'),
             'Venus',
@@ -35,12 +36,11 @@ export class Venus extends CelestialBody {
             0xffdd88,
             3500,
             false,
-            { axis: [0, 1, 0], speed: -0.08 },
-            null,
+            { axis: new THREE.Vector3(0, 1, 0), speed: -0.08 },
+            undefined,
             material
         );
 
-        // Cloud / atmosphere layer (similar to Earth clouds)
         const cloudsMat = new THREE.MeshStandardMaterial({
             map: venusAtmosphereTexture,
             color: 0xffffff,
@@ -54,15 +54,13 @@ export class Venus extends CelestialBody {
         const cloudsGeo = new THREE.SphereGeometry(this.radius * 1.03, 32, 32);
         this.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
         this.clouds.renderOrder = 2;
-        // Make cloud sphere selectable (raycaster maps back to owning body)
         this.clouds.userData = { parentBody: this };
         this.mesh.add(this.clouds);
 
-        // Give the atmosphere a subtle drift for visual interest.
         this.cloudRotationSpeed = 0.12;
     }
 
-    update(acc, dt) {
+    update(acc: THREE.Vector3, dt: number): void {
         super.update(acc, dt);
     }
 }

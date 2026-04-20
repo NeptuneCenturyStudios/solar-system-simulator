@@ -4,11 +4,12 @@ import { SUN_MASS, MARS_MASS, MARS_DIST, MARS_RADIUS } from '../utilities/consts
 import { BodyType, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { CelestialBody } from './celestial-body.js';
+import { IStateDependencies } from '../interfaces.js';
 
 const marsTexture = loadSrgbTexture('./assets/textures/mars.jpg');
 
 export class Mars extends CelestialBody {
-    constructor(dependencies, scene) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         const trajectory = calculateTrajectory(MARS_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
@@ -25,8 +26,8 @@ export class Mars extends CelestialBody {
             scene,
             MARS_RADIUS,
             0xcd5c5c,
-            trajectory.pos.toArray(),
-            trajectory.vel.toArray(),
+            trajectory.pos,
+            trajectory.vel,
             MARS_MASS,
             createUniqueId('mars'),
             'Mars',
@@ -34,8 +35,8 @@ export class Mars extends CelestialBody {
             0xff8888,
             3000,
             false,
-            { axis: [0, 1, 0], speed: 0.26 },
-            null,
+            { axis: new THREE.Vector3(0, 1, 0), speed: 0.26 },
+            undefined,
             material
         );
     }
