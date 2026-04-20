@@ -991,6 +991,16 @@ const flightState = {
     warpDecelerating: false,
     /** True while rapidly decelerating from boost speed back to normal max. */
     boostDecelerating: false,
+    /** Camera reference frame quaternion, independent of ship mesh visual banking.
+     *  Rotated by mouse steering (world-yaw + local-pitch) and A/D roll.
+     *  In 3rd-person view the camera follows this, not ship.mesh.quaternion. */
+    flightCameraQuat: new THREE.Quaternion(),
+    /** Visual roll offset of ship mesh relative to camera frame (radians).
+     *  Animated toward -steerX * FLIGHT_MAX_BANK_ANGLE when steering laterally. */
+    shipBankRoll: 0,
+    /** Visual pitch offset of ship mesh relative to camera frame (radians).
+     *  Animated toward steerY * FLIGHT_MAX_BANK_PITCH when steering vertically. */
+    shipBankPitch: 0,
 };
 
 // --- Autopilot state ---
@@ -1065,6 +1075,12 @@ const FLIGHT_WARP_CHARGE_TIME = 2.0;     // seconds to hold Space before warp en
 const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
 const FLIGHT_WARP_DECEL_RATE = 10000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
 const FLIGHT_BOOST_DECEL_RATE = 1000 * SCALE_FACTOR;  // decel rate after boost ends (u/s²)
+/** Maximum visual roll of ship relative to camera at full lateral mouse deflection (rad ~20°). */
+const FLIGHT_MAX_BANK_ANGLE = 0.35;
+/** Maximum visual pitch of ship relative to camera at full vertical mouse deflection (rad ~11.5°). */
+const FLIGHT_MAX_BANK_PITCH = 0.20;
+/** Per-frame lerp factor for banking animation. Higher = snappier return to neutral. */
+const FLIGHT_BANK_LERP_RATE = 0.08;
 
 /** Distance (u) above which autopilot switches to boost speed for faster transit.
  *  Computed as 1.5× the two-phase stopping distance: first shed boost speed at
@@ -4550,10 +4566,10 @@ function animate() {
             } else {
                 const offset = ship.thirdPersonOffset
                     .clone()
-                    .applyQuaternion(ship.mesh.quaternion);
+                    .applyQuaternion(flightState.flightCameraQuat);
                 camera.position.copy(ship.mesh.position).add(offset);
-                const shipUp = new THREE.Vector3(0, 1, 0).applyQuaternion(ship.mesh.quaternion);
-                camera.up.copy(shipUp);
+                const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(flightState.flightCameraQuat);
+                camera.up.copy(cameraUp);
                 camera.lookAt(ship.mesh.position);
                 controls.target.copy(ship.mesh.position);
             }
@@ -5645,7 +5661,7 @@ function updateFlightControls(dt: number) {
         return;
     }
 
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
 
     // ── Warp deceleration ────────────────────────────────────────────────────
     // After warp ends, rapidly decelerate toward FLIGHT_MAX_SPEED, then hand
@@ -5834,7 +5850,12 @@ function updateFlightControls(dt: number) {
         }
     }
     if (flightState.rollVelocity !== 0) {
-        ship.mesh.rotateZ(flightState.rollVelocity * dt);
+        // Rotate the camera frame around its local forward (Z) axis so the
+        // camera rolls with the ship when A/D is held.
+        const dqRoll = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(0, 0, 1), flightState.rollVelocity * dt
+        );
+        flightState.flightCameraQuat.multiply(dqRoll);
     }
 
     // ── Steering with smoothing + dead zone (mouse) ───────────────────────────
@@ -5854,10 +5875,40 @@ function updateFlightControls(dt: number) {
     if (manualInput) {
         flightState.steerX += (rawX - flightState.steerX) * FLIGHT_STEER_SMOOTHING;
         flightState.steerY += (rawY - flightState.steerY) * FLIGHT_STEER_SMOOTHING;
-        ship.mesh.rotateY(-flightState.steerX * FLIGHT_MAX_TURN_RATE * dt);
-        ship.mesh.rotateX( flightState.steerY * FLIGHT_MAX_TURN_RATE * dt);
+
+        // Yaw: rotate around camera's own local Y axis so left/right steering always
+        // matches the screen regardless of orientation (including upside-down flight).
+        // Using multiply (local space) rather than premultiply (world space) ensures
+        // the yaw direction flips with the camera when rolled, keeping it screen-consistent.
+        const yawQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            -flightState.steerX * FLIGHT_MAX_TURN_RATE * dt
+        );
+        flightState.flightCameraQuat.multiply(yawQuat);
+
+        // Pitch: rotate around camera's own right (X) axis so up/down always matches screen.
+        const pitchQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0),
+            flightState.steerY * FLIGHT_MAX_TURN_RATE * dt
+        );
+        flightState.flightCameraQuat.multiply(pitchQuat);
+
+        // Animate visual banking of ship mesh relative to camera frame.
+        flightState.shipBankRoll  += ( flightState.steerX * FLIGHT_MAX_BANK_ANGLE - flightState.shipBankRoll)  * FLIGHT_BANK_LERP_RATE;
+        flightState.shipBankPitch += ( flightState.steerY * FLIGHT_MAX_BANK_PITCH  - flightState.shipBankPitch) * FLIGHT_BANK_LERP_RATE;
+
+        // Apply banking offset to ship mesh: camera frame * cosmetic bank/pitch rotation.
+        const bankQuat = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(flightState.shipBankPitch, 0, flightState.shipBankRoll, 'XYZ')
+        );
+        ship.mesh.quaternion.copy(flightState.flightCameraQuat).multiply(bankQuat);
+        flightState.flightCameraQuat.normalize();
     } else {
-        // Reset steer state so there is no lurch when autopilot disengages.
+        // Autopilot is flying — sync camera frame to the ship's actual orientation
+        // so there is no lurch when the player retakes manual control.
+        flightState.flightCameraQuat.copy(ship.mesh.quaternion);
+        flightState.shipBankRoll  = 0;
+        flightState.shipBankPitch = 0;
         flightState.steerX = 0;
         flightState.steerY = 0;
     }
@@ -5876,19 +5927,26 @@ function updateFlightControls(dt: number) {
     const noseScreenX =  noseNDC.x * (window.innerWidth  * 0.5);
     const noseScreenY = noseNDC.y * (window.innerHeight * 0.5);
 
+    // Circularly clamp the pointer offset for display so the indicator line
+    // has equal maximum length in all directions (not square-capped).
+    const rawMag = Math.sqrt(flightState.pointerOffsetX ** 2 + flightState.pointerOffsetY ** 2);
+    const circleScale = rawMag > FLIGHT_MAX_POINTER_OFFSET ? FLIGHT_MAX_POINTER_OFFSET / rawMag : 1;
+    const displayOffX = flightState.pointerOffsetX * circleScale;
+    const displayOffY = flightState.pointerOffsetY * circleScale;
+
     steeringLinePositions[0] = noseScreenX;
     steeringLinePositions[1] = noseScreenY;
     steeringLinePositions[2] = 0;
-    steeringLinePositions[3] = noseScreenX + flightState.pointerOffsetX;
-    steeringLinePositions[4] = noseScreenY - flightState.pointerOffsetY;
+    steeringLinePositions[3] = noseScreenX + displayOffX;
+    steeringLinePositions[4] = noseScreenY - displayOffY;
     steeringLinePositions[5] = 0;
     steeringLineGeo.attributes.position.needsUpdate = true;
 
     // Move the static crosshair to the projected nose position
     flightCrosshair.position.set(noseScreenX, noseScreenY, 0);
     steeringEndMarker.position.set(
-        noseScreenX + flightState.pointerOffsetX,
-        noseScreenY - flightState.pointerOffsetY,
+        noseScreenX + displayOffX,
+        noseScreenY - displayOffY,
         0
     );
     steeringEndMarker.visible = true;
@@ -5945,6 +6003,9 @@ function spawnShip() {
     flightState.warpCharging     = false;
     flightState.warpActive       = false;
     flightState.warpDecelerating = false;
+    flightState.flightCameraQuat.copy(ship.mesh.quaternion);
+    flightState.shipBankRoll  = 0;
+    flightState.shipBankPitch = 0;
 
     // Deselect any currently selected body so the gizmo doesn't appear on entry
     if (selectedBody) {
