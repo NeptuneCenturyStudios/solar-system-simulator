@@ -1048,7 +1048,7 @@ const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
 // AUTOPILOT_BOOST_THRESHOLD is declared after the FLIGHT_* constants it depends on.
 
 // Flight tuning constants
-const FLIGHT_MAX_SPEED = 200 * SCALE_FACTOR;           // normal max speed cap (units/s)
+const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR;           // normal max speed cap (units/s)
 const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED;  // boost ceiling = 10× normal max speed
 const FLIGHT_THRUST_ACCEL = 10 * SCALE_FACTOR;          // acceleration rate while W/S held (u/s²)
 const FLIGHT_BOOST_ACCEL  = 1000 * SCALE_FACTOR;         // acceleration rate while Shift held (u/s²)
