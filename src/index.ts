@@ -1063,7 +1063,7 @@ const FLIGHT_ROLL_FRICTION = 0.4;        // how fast roll decays when key releas
 const FLIGHT_STEER_SMOOTHING = 0.004;    // lerp factor per frame — lower = heavier feel
 const FLIGHT_STEER_DEADZONE = 0.05;      // normalised dead zone (0–1); input below this is zeroed
 const FLIGHT_WARP_CHARGE_TIME = 2.0;     // seconds to hold Space before warp engages
-const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED * SCALE_FACTOR; // top warp speed (u/s)
+const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
 const FLIGHT_WARP_DECEL_RATE = 10000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
 const FLIGHT_BOOST_DECEL_RATE = 1000 * SCALE_FACTOR;  // decel rate after boost ends (u/s²)
 
