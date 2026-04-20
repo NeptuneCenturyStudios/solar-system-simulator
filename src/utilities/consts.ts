@@ -58,9 +58,9 @@ export const ASTEROID_SPAWN_MIN_DIST = 50000 * SCALE_FACTOR;
 export const ASTEROID_SPAWN_MAX_DIST = 300000 * SCALE_FACTOR;
 
 // Preset asteroids
-export const CERES_MASS = 0.09 * SCALE_FACTOR;
+export const CERES_MASS = 0.016 * SCALE_FACTOR;
 export const CERES_DISTANCE = 67735 * SCALE_FACTOR;
-export const CERES_RADIUS = 3 * SCALE_FACTOR;
+export const CERES_RADIUS = 0.59 * SCALE_FACTOR;
 export const VESTA_MASS = 0.06 * SCALE_FACTOR;
 export const VESTA_DISTANCE = 35300 * SCALE_FACTOR;
 export const VESTA_RADIUS = 2 * SCALE_FACTOR;

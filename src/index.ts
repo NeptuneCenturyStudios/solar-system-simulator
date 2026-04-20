@@ -53,9 +53,6 @@ import {
     KUIPER_BELT_INNER_DIST,
     KUIPER_BELT_OUTER_DIST,
     KUIPER_BELT_VERTICAL_SPREAD,
-    CERES_MASS,
-    CERES_DISTANCE,
-    CERES_RADIUS,
     VESTA_MASS,
     VESTA_DISTANCE,
     VESTA_RADIUS,
@@ -92,6 +89,7 @@ import { Saturn } from './bodies/saturn.js';
 import { Uranus } from './bodies/uranus.js';
 import { Neptune } from './bodies/neptune.js';
 import { Pluto } from './bodies/pluto.js';
+import { Ceres } from './bodies/ceres.js';
 import { BlackHole } from './bodies/black-hole.js';
 import { Star } from './bodies/star';
 import { Asteroid } from './bodies/asteroid.js';
@@ -111,6 +109,7 @@ const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
 const uranusTexture = loadSrgbTexture('./assets/textures/uranus.jpg');
 const neptuneTexture = loadSrgbTexture('./assets/textures/neptune.jpg');
 const plutoTexture = loadSrgbTexture('./assets/textures/pluto.jpg');
+const ceresTexture = loadSrgbTexture('./assets/textures/ceres.jpg');
 const sunTexture = loadSrgbTexture('./assets/textures/sun.jpg');
 const blueStarTexture = loadSrgbTexture('./assets/textures/blue-star.jpg');
 const redStarTexture = loadSrgbTexture('./assets/textures/red-star.jpg');
@@ -2551,6 +2550,10 @@ function createPresetBody(presetKey: string) {
             newBody = new Pluto(dependencies, scene, plutoTexture);
             break;
         }
+        case 'ceres': {
+            newBody = new Ceres(dependencies, scene, ceresTexture);
+            break;
+        }
         default:
             console.warn('Unknown presetKey:', presetKey);
             return;
@@ -3094,26 +3097,8 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     // Mars
     simulationState.bodies.push(new Mars(dependencies, scene));
 
-    // Ceres - largest asteroid (dwarf planet), ~2.77 AU in real life
-    const ceresAngle = Math.random() * Math.PI * 2;
-    const ceresTrajectory = calculateTrajectory(CERES_DISTANCE, SUN_MASS);
-    const ceres = new Asteroid(dependencies, scene, {
-        radius: CERES_RADIUS, // Larger than typical asteroids
-        color: 0xaaaaaa,
-        pos: [Math.cos(ceresAngle) * CERES_DISTANCE, 0, Math.sin(ceresAngle) * CERES_DISTANCE],
-        vel: [
-            -Math.sin(ceresAngle) * ceresTrajectory.vel.length(),
-            0,
-            Math.cos(ceresAngle) * ceresTrajectory.vel.length(),
-        ],
-        mass: CERES_MASS,
-        id: 'ceres',
-        name: 'Ceres',
-        trailColor: 0xcccccc,
-        maxTrail: 2000,
-        roughness: 0.9,
-    });
-    simulationState.bodies.push(ceres);
+    // Ceres - dwarf planet, ~2.77 AU
+    simulationState.bodies.push(new Ceres(dependencies, scene, ceresTexture));
 
     // Vesta - second most massive asteroid, ~2.36 AU
     const vestaAngle = Math.random() * Math.PI * 2;
