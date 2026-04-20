@@ -805,7 +805,7 @@ function createEventLogTexture() {
     return texture;
 }
 
-let eventLogSprite = null;
+let eventLogSprite: THREE.Sprite | null = null;
 function createEventLogSprite() {
     const texture = createEventLogTexture();
     const material = new THREE.SpriteMaterial({
@@ -915,15 +915,19 @@ const interactionState = {
     isMiddleMouseVelocity: false,
     isMouseLookActive: false,
     isDragging: false,
-    activeAxis: null,
+    activeAxis: null as string | null,
     wasRunningBeforeDrag: false,
-    dragTarget: null,
+    dragTarget: null as Body | null,
     dragCameraOffset: new THREE.Vector3(),
     dragPlane: new THREE.Plane(),
 
     // Velocity editing UX
     velocityEditMode: 'xz', // 'xz' | 'y'
     velocityEditHadRunningBeforeDrag: false,
+
+    // Drag tracking for repositioning
+    dragStartIntersection: null as THREE.Vector3 | null,
+    dragStartPosition: null as THREE.Vector3 | null,
 };
 
 const cameraState = {
@@ -1201,7 +1205,7 @@ function updateArcResolution() {
     if (velocityArcY?.material?.resolution) velocityArcY.material.resolution.set(w, h);
 }
 
-function calcVelArcRadius(body) {
+function calcVelArcRadius(body: Body) {
     // Arc radius should match the velocity arrow length (treat arrow as circle radius).
     // velocityArrow length = speed * ARROW_SCALE
     const speed = body?.velocity?.length?.() ? body.velocity.length() : 0;
@@ -1768,7 +1772,7 @@ createHintSprite();
 
 // Backward compatibility aliases
 let isRepositioning = false;
-let activeAxis = null;
+let activeAxis: string | null = null;
 let isChangingVelocity = false;
 let isMiddleMouseVelocity = false;
 let timeScale = 1;
@@ -1917,7 +1921,7 @@ function getCameraLeftRightBasis() {
     };
 }
 
-function moveSelectedBodyRelativeToCamera(directionKey, ctrlKey = false) {
+function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false) {
     if (!canMoveSelectedBodyWithArrowKeys()) return false;
 
     const body = gizmo.target;
@@ -2050,7 +2054,7 @@ scene.add(kuiperBeltPoints);
 // Grid plane for when dragging gizmo or velocity arrow
 // UX goal: grid should feel "world anchored" (does not move with the body),
 // but should dynamically expand/contract to encompass the dragged target + buffer.
-let gridHelper = null;
+let gridHelper: THREE.GridHelper | null = null;
 const gridState = {
     size: 0,
     divisions: 0,
@@ -2059,7 +2063,7 @@ const gridState = {
     dragAnchor: new THREE.Vector3(),
 
     // Base cell size to use for the drag session (fixed; derived from body radius at drag start).
-    dragCellSize: null,
+    dragCellSize: null as number | null,
 
     // While dragging, keep divisions stable to avoid a distracting "grid shifting" effect
     // (divisions changes re-quantize line spacing, which reads as the grid moving).
@@ -2076,7 +2080,7 @@ function disposeGridHelper() {
     gridState.divisions = 0;
 }
 
-function createGridHelper({ size, divisions, center }) {
+function createGridHelper({ size, divisions, center }: { size: number; divisions: number; center: THREE.Vector3 | null }) {
     // Recreate (GridHelper doesn't support resizing)
     disposeGridHelper();
 
@@ -2094,7 +2098,7 @@ function createGridHelper({ size, divisions, center }) {
     gridState.divisions = divisions;
 }
 
-function calcGridRequiredSize(targetBody) {
+function calcGridRequiredSize(targetBody: CelestialBody | null) {
     // Fallback: if no target, just keep a modest grid.
     if (!targetBody || targetBody._isDisposed || !targetBody.mesh) {
         const fallbackSize = 12000;
@@ -2153,7 +2157,7 @@ function calcGridRequiredSize(targetBody) {
     return { size, divisions, center: anchor };
 }
 
-function ensureGridHelperSizedToTarget(targetBody) {
+function ensureGridHelperSizedToTarget(targetBody: CelestialBody | null) {
     const {
         size: requiredSize,
         divisions: requiredDivisions,
@@ -2201,13 +2205,13 @@ function ensureGridHelperSizedToTarget(targetBody) {
 createGridHelper(calcGridRequiredSize(null));
 
 // Y-axis indicator (red line from grid to object with ring at bottom)
-let yAxisIndicator = null;
-let yAxisRing = null;
-let velocityTipIndicator = null;
-let velocityTipRing = null;
+let yAxisIndicator: THREE.Line | null = null;
+let yAxisRing: THREE.Mesh | null = null;
+let velocityTipIndicator: THREE.Line | null = null;
+let velocityTipRing: THREE.Mesh | null = null;
 let indicatorMode = 'none';
 
-function createPositionIndicator(color) {
+function createPositionIndicator(color: number) {
     // Create vertical line
     const lineMaterial = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
     const lineGeometry = new THREE.BufferGeometry().setFromPoints([
@@ -2239,7 +2243,7 @@ const greenIndicator = createPositionIndicator(0x00ff00);
 velocityTipIndicator = greenIndicator.line;
 velocityTipRing = greenIndicator.ring;
 
-function updatePositionIndicator(line, ring, position) {
+function updatePositionIndicator(line: THREE.Line | null, ring: THREE.Mesh | null, position: THREE.Vector3 | null) {
     if (!line || !ring || !position) return;
 
     const gridY = 0; // Grid is at y=0
@@ -2256,7 +2260,7 @@ function updatePositionIndicator(line, ring, position) {
     ring.position.set(position.x, gridY, position.z);
 }
 
-function setIndicatorMode(mode) {
+function setIndicatorMode(mode: string) {
     indicatorMode = mode;
     const showRed = mode === 'position' || mode === 'both';
     const showGreen = mode === 'velocity' || mode === 'both';
@@ -2612,7 +2616,7 @@ Star.createStarBirth = (
 };
 
 function createNewBody(
-    bodyType,
+    bodyType: string,
     planetType = 'solid',
     orbitType = 'circular',
     orbitalAngle = 0,
@@ -3286,7 +3290,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     toggleShadows(shadowCheckbox ? shadowCheckbox.checked : true);
 }
 
-function getAcc(p1, p2, m2) {
+function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number) {
     const diff = new THREE.Vector3().subVectors(p2, p1);
     const r = diff.length();
 
@@ -3667,7 +3671,7 @@ function onMouseDown(event: MouseEvent) {
     }
 }
 
-function onMouseMove(event) {
+function onMouseMove(event: MouseEvent) {
     // Flight mode: capture mouse movement as pointer offset for steering.
     // The pointer is locked during flight, so event.movementX/Y gives reliable deltas.
     if (flightState.isActive && document.pointerLockElement === renderer.domElement) {
@@ -3972,7 +3976,7 @@ function onMouseMove(event) {
     return;
 }
 
-function onMouseUp(event) {
+function onMouseUp(event: MouseEvent) {
     // Middle mouse button release
     if (event.button === 1) {
         isMiddleMouseVelocity = false;
@@ -4065,7 +4069,7 @@ function onMouseUp(event) {
     }
 }
 
-function calcFitDistanceForBody(body) {
+function calcFitDistanceForBody(body: CelestialBody | null) {
     const radius = body && !body._isDisposed && body.mesh ? Math.max(1e-6, body.radius || 1) : 1;
     // Fit a sphere of size `radius` inside the camera's vertical FOV, with margin.
     const fovRad = THREE.MathUtils.degToRad(camera.fov || 60);
@@ -4079,7 +4083,7 @@ function calcFitDistanceForBody(body) {
     return THREE.MathUtils.clamp(dist, minDist, Math.min(maxDist, farMargin));
 }
 
-function triggerZoomToBody(bodyOrNull) {
+function triggerZoomToBody(bodyOrNull: Body | null) {
     const target =
         bodyOrNull && simulationState.bodies.includes(bodyOrNull) && !bodyOrNull._isDisposed
             ? bodyOrNull
@@ -4101,7 +4105,7 @@ function triggerZoomToBody(bodyOrNull) {
     camera.position.copy(targetPos.clone().add(direction.multiplyScalar(distance)));
 }
 
-function setFocusBody(bodyOrNull, { zoom = false } = {}) {
+function setFocusBody(bodyOrNull: Body | null, { zoom = false } = {}) {
     const body =
         bodyOrNull && simulationState.bodies.includes(bodyOrNull) && !bodyOrNull._isDisposed
             ? bodyOrNull
@@ -4834,7 +4838,7 @@ function refreshBodiesTable() {
         // ignore
     }
 }
-function setF(id) {
+function setF(id: string) {
     // Legacy helper kept for compatibility with existing call sites,
     // but camera behavior should no longer depend on id.
     focusID = id;
@@ -4943,7 +4947,7 @@ function clearCameraPresetHighlights() {
 // NOTE: Preset camera buttons were removed from the UI (replaced with toggles + bodies table).
 // The old `cameraChange` event path is intentionally removed to reduce dead code.
 
-function zoomRelativeToTarget(target: Body, factor) {
+function zoomRelativeToTarget(target: Body, factor: number) {
     // target=null means "zoom around scene center" (used when Look At is OFF)
     const targetPos =
         target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
@@ -5204,7 +5208,7 @@ function updateSurfaceCameraTransform() {
 }
 
 // Mouse look (RMB) while in surface mode: yaw/pitch, with pitch clamp.
-function onSurfaceMouseMove(event) {
+function onSurfaceMouseMove(event: MouseEvent) {
     if (!surfaceState.isActive) return;
 
     // Only apply surface look while RMB is held AND we're not pointer-locked.
@@ -6500,7 +6504,7 @@ function refreshSelectionVisuals() {
     gizmo.attach(selectedBody);
 }
 
-function keepCameraDistanceOnBodyScaleChange(body, oldRadius, newRadius) {
+function keepCameraDistanceOnBodyScaleChange(body: Body, oldRadius: number, newRadius: number) {
     if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
     if (!oldRadius || !newRadius || oldRadius <= 0 || newRadius <= 0) return;
 
@@ -6992,7 +6996,7 @@ if (managementPanel.enableKuiperBeltCheckbox)
 if (skydome) skydome.visible = true;
 if (enableSkydomeCheckbox) enableSkydomeCheckbox.checked = true;
 
-function handleBodyBecameInvalid(body) {
+function handleBodyBecameInvalid(body: Body | null) {
     if (!body) return;
 
     // If collision logic already handed camera focus off to a different body this frame,

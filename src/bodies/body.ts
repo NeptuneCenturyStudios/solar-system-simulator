@@ -18,6 +18,7 @@ export class Body {
     readonly id: string;
     name: string;
     mass: number;
+    radius: number;
     velocity: THREE.Vector3;
     _isDisposed = false;
     mesh: THREE.Mesh;
