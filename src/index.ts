@@ -486,29 +486,39 @@ function createFPSTexture(fps: number) {
 }
 
 // Flight speed HUD texture — drawn in the same style as the FPS counter
-function createSpeedTexture(speed: number, isBoosting: boolean, pos?: THREE.Vector3, vel?: THREE.Vector3, isWarp = false) {
+function createSpeedTexture(
+    speed: number,
+    isBoosting: boolean,
+    pos?: THREE.Vector3,
+    vel?: THREE.Vector3,
+    isWarp = false
+) {
     const hasExtra = !!(pos && vel);
     // Canvas is sized so that sprite scale = canvas × 0.625 matches the FPS counter pixel density.
     // 640×640 canvas → 400×400 sprite pixels on screen.
     const W = 640;
     const H = hasExtra ? 640 : 200;
     const canvas = document.createElement('canvas');
-    canvas.width  = W;
+    canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
     const color = isWarp ? '#ff4488' : isBoosting ? '#ff9944' : '#00ffcc';
-    const glow  = isWarp ? 'rgba(255,68,136,0.9)' : isBoosting ? 'rgba(255,153,68,0.85)' : 'rgba(0,255,204,0.85)';
-    const dim   = 'rgba(0,255,204,0.5)';
+    const glow = isWarp
+        ? 'rgba(255,68,136,0.9)'
+        : isBoosting
+          ? 'rgba(255,153,68,0.85)'
+          : 'rgba(0,255,204,0.85)';
+    const dim = 'rgba(0,255,204,0.5)';
 
-    ctx.textAlign    = 'right';
+    ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
 
     // ── Speed ─────────────────────────────────────────────────────────────────
-    ctx.fillStyle   = color;
+    ctx.fillStyle = color;
     ctx.shadowColor = glow;
-    ctx.shadowBlur  = 12;
+    ctx.shadowBlur = 12;
     ctx.font = '36px monospace';
     ctx.fillText(isWarp ? 'WARP' : isBoosting ? 'BOOST' : 'SPEED', W - 24, hasExtra ? 44 : 56);
 
@@ -521,33 +531,40 @@ function createSpeedTexture(speed: number, isBoosting: boolean, pos?: THREE.Vect
 
         // ── Position ──────────────────────────────────────────────────────────
         let y = 194;
-        ctx.shadowBlur  = 8;
-        ctx.font        = '32px monospace';
-        ctx.fillStyle   = dim;
+        ctx.shadowBlur = 8;
+        ctx.font = '32px monospace';
+        ctx.fillStyle = dim;
         ctx.shadowColor = dim;
-        ctx.fillText('POSITION', W - 24, y);  y += lh;
+        ctx.fillText('POSITION', W - 24, y);
+        y += lh;
 
-        ctx.shadowBlur  = 16;
-        ctx.font        = '34px monospace';
-        ctx.fillStyle   = color;
+        ctx.shadowBlur = 16;
+        ctx.font = '34px monospace';
+        ctx.fillStyle = color;
         ctx.shadowColor = glow;
-        ctx.fillText(`X  ${pos!.x.toFixed(1)}`, W - 24, y);  y += lh;
-        ctx.fillText(`Y  ${pos!.y.toFixed(1)}`, W - 24, y);  y += lh;
-        ctx.fillText(`Z  ${pos!.z.toFixed(1)}`, W - 24, y);  y += lh + 12;
+        ctx.fillText(`X  ${pos!.x.toFixed(1)}`, W - 24, y);
+        y += lh;
+        ctx.fillText(`Y  ${pos!.y.toFixed(1)}`, W - 24, y);
+        y += lh;
+        ctx.fillText(`Z  ${pos!.z.toFixed(1)}`, W - 24, y);
+        y += lh + 12;
 
         // ── Velocity ──────────────────────────────────────────────────────────
-        ctx.shadowBlur  = 8;
-        ctx.font        = '32px monospace';
-        ctx.fillStyle   = dim;
+        ctx.shadowBlur = 8;
+        ctx.font = '32px monospace';
+        ctx.fillStyle = dim;
         ctx.shadowColor = dim;
-        ctx.fillText('VELOCITY', W - 24, y);  y += lh;
+        ctx.fillText('VELOCITY', W - 24, y);
+        y += lh;
 
-        ctx.shadowBlur  = 16;
-        ctx.font        = '34px monospace';
-        ctx.fillStyle   = color;
+        ctx.shadowBlur = 16;
+        ctx.font = '34px monospace';
+        ctx.fillStyle = color;
         ctx.shadowColor = glow;
-        ctx.fillText(`X  ${vel!.x.toFixed(2)}`, W - 24, y);  y += lh;
-        ctx.fillText(`Y  ${vel!.y.toFixed(2)}`, W - 24, y);  y += lh;
+        ctx.fillText(`X  ${vel!.x.toFixed(2)}`, W - 24, y);
+        y += lh;
+        ctx.fillText(`Y  ${vel!.y.toFixed(2)}`, W - 24, y);
+        y += lh;
         ctx.fillText(`Z  ${vel!.z.toFixed(2)}`, W - 24, y);
     }
 
@@ -833,10 +850,7 @@ createEventLogSprite();
 // A line from the ship's projected aim point to the current pointer offset.
 const steeringLinePositions = new Float32Array(6); // 2 points × 3 coords
 const steeringLineGeo = new THREE.BufferGeometry();
-steeringLineGeo.setAttribute(
-    'position',
-    new THREE.BufferAttribute(steeringLinePositions, 3)
-);
+steeringLineGeo.setAttribute('position', new THREE.BufferAttribute(steeringLinePositions, 3));
 const flightSteeringLine = new THREE.Line(
     steeringLineGeo,
     new THREE.LineBasicMaterial({
@@ -855,8 +869,18 @@ uiScene.add(flightSteeringLine);
 // Four vertices: left–right and top–bottom arm pairs for a + shape.
 const CROSSHAIR_SIZE = 10; // half-arm length in screen pixels
 const crosshairPositions = new Float32Array([
-    -CROSSHAIR_SIZE, 0, 0,  CROSSHAIR_SIZE, 0, 0,  // horizontal arm
-     0, -CROSSHAIR_SIZE, 0, 0, CROSSHAIR_SIZE, 0,  // vertical arm
+    -CROSSHAIR_SIZE,
+    0,
+    0,
+    CROSSHAIR_SIZE,
+    0,
+    0, // horizontal arm
+    0,
+    -CROSSHAIR_SIZE,
+    0,
+    0,
+    CROSSHAIR_SIZE,
+    0, // vertical arm
 ]);
 const crosshairGeo = new THREE.BufferGeometry();
 crosshairGeo.setAttribute('position', new THREE.BufferAttribute(crosshairPositions, 3));
@@ -1062,28 +1086,28 @@ const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
 // AUTOPILOT_BOOST_THRESHOLD is declared after the FLIGHT_* constants it depends on.
 
 // Flight tuning constants
-const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR;           // normal max speed cap (units/s)
-const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED;  // boost ceiling = 10× normal max speed
-const FLIGHT_THRUST_ACCEL = 10 * SCALE_FACTOR;          // acceleration rate while W/S held (u/s²)
-const FLIGHT_BOOST_ACCEL  = 1000 * SCALE_FACTOR;         // acceleration rate while Shift held (u/s²)
+const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR; // normal max speed cap (units/s)
+const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED; // boost ceiling = 10× normal max speed
+const FLIGHT_THRUST_ACCEL = 10 * SCALE_FACTOR; // acceleration rate while W/S held (u/s²)
+const FLIGHT_BOOST_ACCEL = 1000 * SCALE_FACTOR; // acceleration rate while Shift held (u/s²)
 /** Rate at which cross-axis (gravity-accumulated) velocity decays while thrusting in simple mode.
  *  Higher = quicker normalisation. At 1.5 the perpendicular component halves in ~0.46 s. */
-const FLIGHT_PERP_DECAY = 0.5;           // per second
-const FLIGHT_MAX_POINTER_OFFSET = 260;   // pixels before reaching full turn rate
-const FLIGHT_MAX_TURN_RATE = 0.6;        // radians/s at full pointer deflection
-const FLIGHT_ROLL_SPEED = 2.0;           // max roll angular velocity (rad/s)
-const FLIGHT_ROLL_ACCEL = 0.4;           // how fast roll ramps up (rad/s²) — lower = slower start
-const FLIGHT_ROLL_FRICTION = 0.4;        // how fast roll decays when key released (rad/s²)
-const FLIGHT_STEER_SMOOTHING = 0.004;    // lerp factor per frame — lower = heavier feel
-const FLIGHT_STEER_DEADZONE = 0.05;      // normalised dead zone (0–1); input below this is zeroed
-const FLIGHT_WARP_CHARGE_TIME = 2.0;     // seconds to hold Space before warp engages
+const FLIGHT_PERP_DECAY = 0.5; // per second
+const FLIGHT_MAX_POINTER_OFFSET = 260; // pixels before reaching full turn rate
+const FLIGHT_MAX_TURN_RATE = 0.6; // radians/s at full pointer deflection
+const FLIGHT_ROLL_SPEED = 2.0; // max roll angular velocity (rad/s)
+const FLIGHT_ROLL_ACCEL = 0.4; // how fast roll ramps up (rad/s²) — lower = slower start
+const FLIGHT_ROLL_FRICTION = 0.4; // how fast roll decays when key released (rad/s²)
+const FLIGHT_STEER_SMOOTHING = 0.004; // lerp factor per frame — lower = heavier feel
+const FLIGHT_STEER_DEADZONE = 0.05; // normalised dead zone (0–1); input below this is zeroed
+const FLIGHT_WARP_CHARGE_TIME = 2.0; // seconds to hold Space before warp engages
 const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
 const FLIGHT_WARP_DECEL_RATE = 10000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
-const FLIGHT_BOOST_DECEL_RATE = 1000 * SCALE_FACTOR;  // decel rate after boost ends (u/s²)
+const FLIGHT_BOOST_DECEL_RATE = 1000 * SCALE_FACTOR; // decel rate after boost ends (u/s²)
 /** Maximum visual roll of ship relative to camera at full lateral mouse deflection (rad ~20°). */
 const FLIGHT_MAX_BANK_ANGLE = 0.35;
 /** Maximum visual pitch of ship relative to camera at full vertical mouse deflection (rad ~11.5°). */
-const FLIGHT_MAX_BANK_PITCH = 0.20;
+const FLIGHT_MAX_BANK_PITCH = 0.2;
 /** Per-frame lerp factor for banking animation. Higher = snappier return to neutral. */
 const FLIGHT_BANK_LERP_RATE = 0.08;
 
@@ -1091,19 +1115,22 @@ const FLIGHT_BANK_LERP_RATE = 0.08;
  *  Computed as 1.5× the two-phase stopping distance: first shed boost speed at
  *  AUTOPILOT_BOOST_DECEL, then shed normal speed at AUTOPILOT_DECEL.  This
  *  guarantees the ship always has enough runway to fully brake before the orbit. */
-const AUTOPILOT_BOOST_THRESHOLD = 1.5 * (
-    (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_BOOST_DECEL)
-    + (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
-);
+const AUTOPILOT_BOOST_THRESHOLD =
+    1.5 *
+    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+        (2 * AUTOPILOT_BOOST_DECEL) +
+        (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL));
 /** Deceleration rate used to scrub warp speed during autopilot approach.
  *  Matches FLIGHT_WARP_DECEL_RATE so the feel is consistent with manual warp decel. */
 const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL_RATE;
 /** Distance (u) above which autopilot engages warp for fast transit.
  *  Computed as 1.5× the stopping distance from warp speed down to boost speed,
  *  plus AUTOPILOT_BOOST_THRESHOLD (the runway still needed once warp ends). */
-const AUTOPILOT_WARP_THRESHOLD = 1.5 * (
-    (FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) / (2 * AUTOPILOT_WARP_DECEL)
-) + AUTOPILOT_BOOST_THRESHOLD;
+const AUTOPILOT_WARP_THRESHOLD =
+    1.5 *
+        ((FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
+            (2 * AUTOPILOT_WARP_DECEL)) +
+    AUTOPILOT_BOOST_THRESHOLD;
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -1278,10 +1305,6 @@ function updateVelocityArcs() {
     // Heading in XZ
     const yaw = -Math.atan2(h.z, h.x);
 
-    // Pitch relative to XZ plane (signed): atan2(y, horizontalLen)
-    const hLen = Math.sqrt(handleDir.x * handleDir.x + handleDir.z * handleDir.z);
-    const pitch = Math.atan2(handleDir.y, hLen);
-
     // Keep the XZ arc FLAT in the XZ plane regardless of the arrow's pitch.
     // Only rotate around Y to match the horizontal heading.
     velocityArcXZ.rotation.set(0, yaw, 0);
@@ -1405,11 +1428,7 @@ function createSpeedSprite() {
     speedSprite = new THREE.Sprite(material);
     speedSprite.scale.set(400, 400, 1);
     // Bottom-right corner: sprite center is 200px from right/bottom edges + 10px margin
-    speedSprite.position.set(
-        window.innerWidth  / 2 - 210,
-        -(window.innerHeight / 2 - 210),
-        0
-    );
+    speedSprite.position.set(window.innerWidth / 2 - 210, -(window.innerHeight / 2 - 210), 0);
     speedSprite.visible = false;
     uiScene.add(speedSprite);
 }
@@ -1423,47 +1442,52 @@ const warpEffect = new WarpEffect(uiScene, window.innerWidth, window.innerHeight
 
 /** Renders the charging progress bar (fill = 0..1) with label above. */
 function createWarpChargeTexture(fill: number): THREE.CanvasTexture {
-    const W = 512, H = 128;
+    const W = 512,
+        H = 128;
     const c = document.createElement('canvas');
-    c.width = W; c.height = H;
+    c.width = W;
+    c.height = H;
     const ctx = c.getContext('2d')!;
 
     // Label
-    ctx.textAlign    = 'center';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font         = 'bold 36px monospace';
-    ctx.shadowBlur   = 10;
-    ctx.fillStyle    = '#00ffcc';
-    ctx.shadowColor  = 'rgba(0,255,204,0.9)';
+    ctx.font = 'bold 36px monospace';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#00ffcc';
+    ctx.shadowColor = 'rgba(0,255,204,0.9)';
     ctx.fillText('INITIATING WARP', W / 2, 34);
 
     // Bar track
-    const barX = 40, barY = 68, barW = W - 80, barH = 28;
+    const barX = 40,
+        barY = 68,
+        barW = W - 80,
+        barH = 28;
     ctx.shadowBlur = 0;
-    ctx.fillStyle  = 'rgba(0,255,204,0.12)';
+    ctx.fillStyle = 'rgba(0,255,204,0.12)';
     ctx.strokeStyle = 'rgba(0,255,204,0.5)';
-    ctx.lineWidth  = 2;
+    ctx.lineWidth = 2;
     ctx.fillRect(barX, barY, barW, barH);
     ctx.strokeRect(barX, barY, barW, barH);
 
     // Bar fill — gradient cyan→white at tip
     if (fill > 0) {
         const fillW = barW * fill;
-        const grad  = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
-        grad.addColorStop(0,   'rgba(0,200,180,0.9)');
+        const grad = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
+        grad.addColorStop(0, 'rgba(0,200,180,0.9)');
         grad.addColorStop(0.8, 'rgba(0,255,220,1.0)');
-        grad.addColorStop(1,   'rgba(255,255,255,1.0)');
+        grad.addColorStop(1, 'rgba(255,255,255,1.0)');
         ctx.fillStyle = grad;
-        ctx.shadowBlur  = 8;
+        ctx.shadowBlur = 8;
         ctx.shadowColor = 'rgba(0,255,204,0.9)';
         ctx.fillRect(barX, barY, fillW, barH);
         ctx.shadowBlur = 0;
     }
 
     // Percentage label inside bar
-    ctx.font         = 'bold 18px monospace';
-    ctx.fillStyle    = 'rgba(255,255,255,0.85)';
-    ctx.shadowBlur   = 0;
+    ctx.font = 'bold 18px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.shadowBlur = 0;
     ctx.fillText(`${Math.round(fill * 100)}%`, W / 2, barY + barH / 2);
 
     const tex = new THREE.CanvasTexture(c);
@@ -1473,18 +1497,20 @@ function createWarpChargeTexture(fill: number): THREE.CanvasTexture {
 
 /** Renders the pulsing "WARP ACTIVE" text (pulse = 0..1 sine wave). */
 function createWarpActiveTexture(pulse: number): THREE.CanvasTexture {
-    const W = 512, H = 96;
+    const W = 512,
+        H = 96;
     const c = document.createElement('canvas');
-    c.width = W; c.height = H;
+    c.width = W;
+    c.height = H;
     const ctx = c.getContext('2d')!;
 
     const alpha = 0.55 + 0.45 * pulse; // 0.55–1.0
-    ctx.textAlign    = 'center';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font         = 'bold 52px monospace';
-    ctx.shadowBlur   = 20 + 20 * pulse;
-    ctx.shadowColor  = `rgba(255,120,0,${alpha})`;
-    ctx.fillStyle    = `rgba(255,${Math.round(180 + 75 * pulse)},0,${alpha})`;
+    ctx.font = 'bold 52px monospace';
+    ctx.shadowBlur = 20 + 20 * pulse;
+    ctx.shadowColor = `rgba(255,120,0,${alpha})`;
+    ctx.fillStyle = `rgba(255,${Math.round(180 + 75 * pulse)},0,${alpha})`;
     ctx.fillText('⚡ WARP ACTIVE ⚡', W / 2, H / 2);
 
     const tex = new THREE.CanvasTexture(c);
@@ -1514,17 +1540,29 @@ createWarpSprite();
 // confirmation for AUTOPILOT_ORBIT_NOTIFY_DURATION seconds after completion.
 let orbitNotifySprite: THREE.Sprite | null = null;
 
-type AutopilotHudState = 'APPROACH_WARP' | 'APPROACH_BOOST' | 'APPROACH' | 'BRAKE' | 'CIRCULARIZE' | 'ORBIT' | 'NONE';
+type AutopilotHudState =
+    | 'APPROACH_WARP'
+    | 'APPROACH_BOOST'
+    | 'APPROACH'
+    | 'BRAKE'
+    | 'CIRCULARIZE'
+    | 'ORBIT'
+    | 'NONE';
 let _lastAutopilotHudState: AutopilotHudState = 'NONE';
 
-function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = ''): THREE.CanvasTexture {
+function createAutopilotPhaseTexture(
+    state: AutopilotHudState,
+    distanceLabel = ''
+): THREE.CanvasTexture {
     // Canvas is deliberately wide (800px) so no label ever clips.
     // Two rows: phase label on top, distance on the bottom.
-    const W = 900, H = 100;
+    const W = 900,
+        H = 100;
     const c = document.createElement('canvas');
-    c.width = W; c.height = H;
+    c.width = W;
+    c.height = H;
     const ctx = c.getContext('2d')!;
-    ctx.textAlign    = 'center';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     let text: string;
@@ -1532,34 +1570,34 @@ function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = '
     let glow: string;
     switch (state) {
         case 'APPROACH_WARP':
-            text  = '⚡  AUTOPILOT: WARPING';
+            text = '⚡  AUTOPILOT: WARPING';
             color = '#ff4488';
-            glow  = 'rgba(255,68,136,0.9)';
+            glow = 'rgba(255,68,136,0.9)';
             break;
         case 'APPROACH_BOOST':
-            text  = '▶▶  AUTOPILOT: APPROACHING TARGET (BOOST)';
+            text = '▶▶  AUTOPILOT: APPROACHING TARGET (BOOST)';
             color = '#ff9944';
-            glow  = 'rgba(255,153,68,0.85)';
+            glow = 'rgba(255,153,68,0.85)';
             break;
         case 'APPROACH':
-            text  = '▶  AUTOPILOT: APPROACHING TARGET';
+            text = '▶  AUTOPILOT: APPROACHING TARGET';
             color = '#00ffcc';
-            glow  = 'rgba(0,255,204,0.85)';
+            glow = 'rgba(0,255,204,0.85)';
             break;
         case 'BRAKE':
-            text  = '◼  AUTOPILOT: ESTABLISHING ORBIT TRAJECTORY';
+            text = '◼  AUTOPILOT: ESTABLISHING ORBIT TRAJECTORY';
             color = '#00ffcc';
-            glow  = 'rgba(0,255,204,0.85)';
+            glow = 'rgba(0,255,204,0.85)';
             break;
         case 'CIRCULARIZE':
-            text  = '↻  AUTOPILOT: ENTERING ORBIT';
+            text = '↻  AUTOPILOT: ENTERING ORBIT';
             color = '#00ffcc';
-            glow  = 'rgba(0,255,204,0.85)';
+            glow = 'rgba(0,255,204,0.85)';
             break;
         case 'ORBIT':
-            text  = '✓  STABLE ORBIT ESTABLISHED';
+            text = '✓  STABLE ORBIT ESTABLISHED';
             color = '#7ef0ff';
-            glow  = 'rgba(100,220,255,0.9)';
+            glow = 'rgba(100,220,255,0.9)';
             break;
         default:
             text = '';
@@ -1568,17 +1606,17 @@ function createAutopilotPhaseTexture(state: AutopilotHudState, distanceLabel = '
     }
 
     // Phase label
-    ctx.font        = 'bold 34px monospace';
-    ctx.shadowBlur  = 14;
+    ctx.font = 'bold 34px monospace';
+    ctx.shadowBlur = 14;
     ctx.shadowColor = glow;
-    ctx.fillStyle   = color;
+    ctx.fillStyle = color;
     ctx.fillText(text, W / 2, 34);
 
     // Distance sub-label
     if (distanceLabel) {
-        ctx.font        = '24px monospace';
-        ctx.shadowBlur  = 6;
-        ctx.fillStyle   = 'rgba(255,255,255,0.75)';
+        ctx.font = '24px monospace';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.fillText(distanceLabel, W / 2, 72);
     }
@@ -1740,6 +1778,7 @@ function getActiveContextHint() {
 function createHintTexture({ lines }: { lines: string[] }) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
+    if (!context) throw new Error('Failed to create canvas context for hint texture');
 
     canvas.width = 2200;
     canvas.height = 140;
@@ -1777,8 +1816,6 @@ let activeAxis: string | null = null;
 let isChangingVelocity = false;
 let isMiddleMouseVelocity = false;
 let timeScale = 1;
-const cameraOffsetFromPlanet = new THREE.Vector3();
-const lastPlanetAngle = 0;
 let isFreeCameraMode = false;
 let isMouseLookActive = false;
 let focusID = 'camSun';
@@ -1790,8 +1827,6 @@ let lastT = performance.now();
 
 let supernovas: Supernova[] = []; // Track all supernova effects
 
-const isDragging = false;
-const dragTarget = null as Body | null;
 let wasRunningBeforeDrag = false;
 const dragCameraOffset = new THREE.Vector3();
 const dragPlane = new THREE.Plane();
@@ -1886,7 +1921,6 @@ Object.defineProperty(window, 'dragPlane', {
 const keys = cameraState.keys;
 const cameraSpeed = cameraState.speed;
 const cameraRotationSpeed = cameraState.rotationSpeed;
-const arrowKeys = cameraState.arrowKeys;
 
 function canMoveSelectedBodyWithArrowKeys() {
     const target = gizmo?.target;
@@ -1901,25 +1935,6 @@ function canMoveSelectedBodyWithArrowKeys() {
         !isChangingVelocity &&
         !isMiddleMouseVelocity
     );
-}
-
-function getCameraLeftRightBasis() {
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-
-    const up = camera.up.clone().normalize();
-    const right = new THREE.Vector3().crossVectors(forward, up);
-
-    if (right.lengthSq() < 1e-10) {
-        right.set(1, 0, 0);
-    } else {
-        right.normalize();
-    }
-
-    return {
-        left: right.clone().multiplyScalar(-1),
-        right,
-    };
 }
 
 function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false) {
@@ -2081,7 +2096,15 @@ function disposeGridHelper() {
     gridState.divisions = 0;
 }
 
-function createGridHelper({ size, divisions, center }: { size: number; divisions: number; center: THREE.Vector3 | null }) {
+function createGridHelper({
+    size,
+    divisions,
+    center,
+}: {
+    size: number;
+    divisions: number;
+    center: THREE.Vector3 | null;
+}) {
     // Recreate (GridHelper doesn't support resizing)
     disposeGridHelper();
 
@@ -2210,7 +2233,6 @@ let yAxisIndicator: THREE.Line | null = null;
 let yAxisRing: THREE.Mesh | null = null;
 let velocityTipIndicator: THREE.Line | null = null;
 let velocityTipRing: THREE.Mesh | null = null;
-let indicatorMode = 'none';
 
 function createPositionIndicator(color: number) {
     // Create vertical line
@@ -2244,7 +2266,11 @@ const greenIndicator = createPositionIndicator(0x00ff00);
 velocityTipIndicator = greenIndicator.line;
 velocityTipRing = greenIndicator.ring;
 
-function updatePositionIndicator(line: THREE.Line | null, ring: THREE.Mesh | null, position: THREE.Vector3 | null) {
+function updatePositionIndicator(
+    line: THREE.Line | null,
+    ring: THREE.Mesh | null,
+    position: THREE.Vector3 | null
+) {
     if (!line || !ring || !position) return;
 
     const gridY = 0; // Grid is at y=0
@@ -2339,7 +2365,10 @@ function syncAllStarLightTargets() {
         for (const b of simulationState.bodies) {
             if (!b || b._isDisposed || b instanceof Star || !b.mesh) continue;
             const d = camera.position.distanceTo(b.mesh.position);
-            if (d < closestDist) { closestDist = d; closest = b; }
+            if (d < closestDist) {
+                closestDist = d;
+                closest = b;
+            }
         }
         return closest;
     })();
@@ -2389,8 +2418,8 @@ function syncAllStarLightTargets() {
         }
 
         star.sunLight.castShadow = shouldCastShadows;
-        if (shouldCastShadows) {
-            star.updateShadowFrustumForBody(activeLightTarget!);
+        if (shouldCastShadows && activeLightTarget instanceof CelestialBody) {
+            star.updateShadowFrustumForBody(activeLightTarget);
         }
     }
 }
@@ -2406,7 +2435,11 @@ dragLine.visible = false;
 scene.add(dragLine);
 
 // Calculate elliptical orbit trajectory
-function calculateEllipticalTrajectory(distance: number, parentMass: number, eccentricity: number = 0.4) {
+function calculateEllipticalTrajectory(
+    distance: number,
+    parentMass: number,
+    eccentricity: number = 0.4
+) {
     // For elliptical orbit, reduce velocity from circular orbit speed
     // Lower velocity = more elliptical orbit
     const circularSpeed = Math.sqrt((G * parentMass) / distance);
@@ -2422,7 +2455,11 @@ function calculateEllipticalTrajectory(distance: number, parentMass: number, ecc
 }
 
 // Apply orbital angle and inclination to trajectory
-function applyOrbitalTransforms(trajectory: { pos: THREE.Vector3; vel: THREE.Vector3 }, orbitalAngleDeg: number, inclinationDeg: number) {
+function applyOrbitalTransforms(
+    trajectory: { pos: THREE.Vector3; vel: THREE.Vector3 },
+    orbitalAngleDeg: number,
+    inclinationDeg: number
+) {
     const orbitalAngleRad = (orbitalAngleDeg * Math.PI) / 180;
     const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
@@ -2475,7 +2512,7 @@ function createPresetBody(presetKey: string) {
     const ensureJupiter = () =>
         simulationState.bodies.find((b) => b && !b._isDisposed && b.name === 'Jupiter');
 
-    let newBody: CelestialBody;
+    let newBody: CelestialBody | null = null;
 
     switch (key) {
         case 'sun': {
@@ -2541,8 +2578,7 @@ function createPresetBody(presetKey: string) {
                     id: createUniqueId('moon'),
                     name: 'Moon',
                     trailColor: 0xffffff,
-                    maxTrail: 1500,
-                    metalness: 0.95,
+                    maxTrail: 1500
                 });
             }
             break;
@@ -2623,10 +2659,10 @@ function createNewBody(
     orbitalAngle = 0,
     inclination = 0,
     hasAtmosphere = false,
-    customMass = null,
-    customTemperature = null,
-    customLightIntensity = null,
-    customRadius = null
+    customMass: number | null = null,
+    customTemperature: number | null = null,
+    customLightIntensity: number | null = null,
+    customRadius: number | null = null
 ) {
     let newBody;
 
@@ -2857,7 +2893,7 @@ function createNewBody(
                 new THREE.Vector3(
                     parentVel.x + moonTrajectory.vel.x,
                     parentVel.y + moonTrajectory.vel.y,
-                    parentVel.z + moonTrajectory.vel.z,
+                    parentVel.z + moonTrajectory.vel.z
                 ),
                 moonMass,
                 createUniqueId('moon'),
@@ -3042,34 +3078,6 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     }
     supernovas = [];
 
-    // Recreate the primary star for default mode (local, not global)
-    const primaryStar =
-        mode === SimulationStartMode.Empty
-            ? null
-            : new Star(
-                  dependencies,
-                  scene,
-                  {
-                      radius: SUN_RADIUS,
-                      pos: new THREE.Vector3(0, 0, 0),
-                      vel: new THREE.Vector3(0, 0, 0),
-                      mass: SUN_MASS,
-                      id: createUniqueId('sun'),
-                      name: 'Sun',
-                      temperature: 5778,
-                      lightIntensity: 500000000,
-                      lightDistance: 524400,
-                  },
-                  {
-                      sunTexture,
-                      redStarTexture,
-                      orangeStarTexture,
-                      whiteStarTexture,
-                      blueStarTexture,
-                      whiteDwarfTexture,
-                  }
-              );
-
     // Reset bodies array depending on mode
     simulationState.bodies = [];
 
@@ -3086,8 +3094,33 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         return;
     }
 
+    // Recreate the primary star for default mode (local, not global)
+    const sun = new Star(
+        dependencies,
+        scene,
+        {
+            radius: SUN_RADIUS,
+            pos: new THREE.Vector3(0, 0, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            mass: SUN_MASS,
+            id: createUniqueId('sun'),
+            name: 'Sun',
+            temperature: 5778,
+            lightIntensity: 500000000,
+            lightDistance: 524400,
+        },
+        {
+            sunTexture,
+            redStarTexture,
+            orangeStarTexture,
+            whiteStarTexture,
+            blueStarTexture,
+            whiteDwarfTexture,
+        }
+    );
+
     // Default mode: build the solar system
-    simulationState.bodies = [primaryStar];
+    simulationState.bodies = [sun];
     syncAllStarLightTargets();
 
     // Mercury
@@ -3105,13 +3138,11 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         earth.createMoon(scene, {
             distance: MOON_DIST_FROM_EARTH,
             radius: MOON_RADIUS, // 0.273 × Earth
-            color: 0xffffff,
             mass: MOON_MASS,
             id: 'camMoon',
             name: 'Moon',
             trailColor: 0xffffff,
             maxTrail: 1500,
-            metalness: 0.95,
         })
     );
 
@@ -3206,14 +3237,12 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             angle: 0,
             distance: IO_DIST_FROM_JUPITER,
             radius: IO_RADIUS, // 1.048 × Moon
-            color: 0xffdd77,
             mass: IO_MASS,
             id: 'camIo',
             name: 'Io',
             trailColor: 0xffdd77,
             maxTrail: 800,
             yVariation: 109,
-            metalness: 0.95,
         })
     );
 
@@ -3223,14 +3252,12 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             angle: Math.PI / 2,
             distance: EUROPA_DIST_FROM_JUPITER,
             radius: EUROPA_RADIUS, // 0.899 × Moon
-            color: 0xccddee,
             mass: EUROPA_MASS,
             id: 'camEuropa',
             name: 'Europa',
             trailColor: 0xccddee,
             maxTrail: 1000,
             yVariation: 164,
-            metalness: 0.95,
         })
     );
 
@@ -3240,14 +3267,12 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             angle: Math.PI,
             distance: GANYMEDE_DIST_FROM_JUPITER,
             radius: GANYMEDE_RADIUS, // 1.517 × Moon (largest moon!)
-            color: 0xaaaaaa,
             mass: GANYMEDE_MASS,
             id: 'camGanymede',
             name: 'Ganymede',
             trailColor: 0xcccccc,
             maxTrail: 1200,
             yVariation: 219,
-            metalness: 0.95,
         })
     );
 
@@ -3257,14 +3282,12 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             angle: (Math.PI * 3) / 2,
             distance: CALLISTO_DIST_FROM_JUPITER,
             radius: CALLISTO_RADIUS, // 1.387 × Moon
-            color: 0x998877,
             mass: CALLISTO_MASS,
             id: 'camCallisto',
             name: 'Callisto',
             trailColor: 0xaa9988,
             maxTrail: 1500,
             yVariation: 273,
-            metalness: 0.95,
         })
     );
 
@@ -3340,8 +3363,7 @@ function toggleShadows(enabled: boolean) {
     // Update all celestial bodies
     simulationState.bodies.forEach((body) => {
         if (body && body.mesh) {
-            if (isBodyType(body, BodyType.Star) && typeof body.setShadowsEnabled === 'function') {
-                // Call setShadowsEnabled on Star instances
+            if (body instanceof Star) {
                 body.setShadowsEnabled(enabled);
             } else {
                 // Update non-star bodies
@@ -4056,8 +4078,9 @@ function onMouseUp(event: MouseEvent) {
 
             // If Look At is enabled, keep controls target consistent with the focus.
             // Otherwise keep orbit anchored at center.
-            if (cameraState.isLookAtMode && getFocusObject()) {
-                controls.target.copy(getFocusObject().mesh.position);
+            const lookAtFocus = getFocusObject();
+            if (cameraState.isLookAtMode && lookAtFocus) {
+                controls.target.copy(lookAtFocus.mesh.position);
             } else {
                 controls.target.copy(NONE_FOCUS_POSITION);
             }
@@ -4070,7 +4093,7 @@ function onMouseUp(event: MouseEvent) {
     }
 }
 
-function calcFitDistanceForBody(body: CelestialBody | null) {
+function calcFitDistanceForBody(body: Body | null) {
     const radius = body && !body._isDisposed && body.mesh ? Math.max(1e-6, body.radius || 1) : 1;
     // Fit a sphere of size `radius` inside the camera's vertical FOV, with margin.
     const fovRad = THREE.MathUtils.degToRad(camera.fov || 60);
@@ -4154,14 +4177,15 @@ function animate() {
     // Flight mode camera + controls update.
     // When active, flight mode fully owns camera position/orientation and ship velocity.
     const isFlightModeActive =
-        flightState.isActive &&
-        !!flightState.activeShip &&
-        !flightState.activeShip._isDisposed;
+        flightState.isActive && !!flightState.activeShip && !flightState.activeShip._isDisposed;
 
     // Auto-exit if the active ship was destroyed this frame (absorbed by collision, etc.)
-    if (flightState.isActive && flightState.activeShip &&
+    if (
+        flightState.isActive &&
+        flightState.activeShip &&
         (flightState.activeShip._isDisposed ||
-         !simulationState.bodies.includes(flightState.activeShip))) {
+            !simulationState.bodies.includes(flightState.activeShip))
+    ) {
         exitFlightMode();
     }
 
@@ -4183,103 +4207,104 @@ function animate() {
 
     // WASD camera movement (works in both free camera and normal mode, but NOT in flight mode)
     if (!isFlightModeActive) {
-    const speed = (keys.shift ? cameraSpeed * 10 : cameraSpeed) * SCALE_FACTOR;
-    const direction = new THREE.Vector3();
+        const speed = (keys.shift ? cameraSpeed * 10 : cameraSpeed) * SCALE_FACTOR;
+        const direction = new THREE.Vector3();
 
-    camera.getWorldDirection(direction);
-    const right = new THREE.Vector3();
-    right.crossVectors(camera.up, direction).normalize();
+        camera.getWorldDirection(direction);
+        const right = new THREE.Vector3();
+        right.crossVectors(camera.up, direction).normalize();
 
-    const movement = new THREE.Vector3();
-    if (keys.w) movement.add(direction.clone().multiplyScalar(speed));
-    if (keys.s) movement.add(direction.clone().multiplyScalar(-speed));
-    if (keys.a) movement.add(right.clone().multiplyScalar(speed));
-    if (keys.d) movement.add(right.clone().multiplyScalar(-speed));
-    if (keys.space) movement.y += speed;
-    if (keys.c) movement.y -= speed;
+        const movement = new THREE.Vector3();
+        if (keys.w) movement.add(direction.clone().multiplyScalar(speed));
+        if (keys.s) movement.add(direction.clone().multiplyScalar(-speed));
+        if (keys.a) movement.add(right.clone().multiplyScalar(speed));
+        if (keys.d) movement.add(right.clone().multiplyScalar(-speed));
+        if (keys.space) movement.y += speed;
+        if (keys.c) movement.y -= speed;
 
-    const didMove = movement.length() > 0;
+        const didMove = movement.length() > 0;
 
-    if (didMove) {
-        camera.position.add(movement);
+        if (didMove) {
+            camera.position.add(movement);
 
-        // In normal mode (except 'None'), also move the orbit controls target to maintain relative position
-        // For 'None' mode, keep target fixed at center [0,0,0]
-        if (!isFreeCameraMode && focusID !== 'camNone') {
-            controls.target.add(movement);
-        }
-
-        // If dragging gizmo arrow, move the planet along that specific axis
-        if (isRepositioning && gizmo.target && activeAxis) {
-            if (activeAxis === 'x') {
-                gizmo.target.mesh.position.x += movement.x;
-            } else if (activeAxis === 'y') {
-                gizmo.target.mesh.position.y += movement.y;
-            } else if (activeAxis === 'z') {
-                gizmo.target.mesh.position.z += movement.z;
-            }
-        }
-
-        // If dragging velocity arrow and camera moved, keep plane through body and recalc velocity.
-        // IMPORTANT: plane must respect the active velocity edit mode:
-        // - XZ mode => horizontal plane (y=0) through the body
-        // - Y mode  => vertical plane containing world-up + current horizontal heading
-        if (isChangingVelocity && gizmo.target) {
-            const origin = gizmo.target.mesh.position;
-
-            if (interactionState.velocityEditMode === 'y') {
-                const v = gizmo.target.velocity.clone();
-                v.y = 0;
-                const hDir = v.lengthSq() > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
-                const up = new THREE.Vector3(0, 1, 0);
-                const planeNormal = new THREE.Vector3().crossVectors(hDir, up).normalize();
-                dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
-            } else {
-                dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), origin);
+            // In normal mode (except 'None'), also move the orbit controls target to maintain relative position
+            // For 'None' mode, keep target fixed at center [0,0,0]
+            if (!isFreeCameraMode && focusID !== 'camNone') {
+                controls.target.add(movement);
             }
 
-            // Use center screen coordinates if pointer is locked
-            const targetMouse = new THREE.Vector2(
-                document.pointerLockElement === renderer.domElement ? 0 : mouse.x,
-                document.pointerLockElement === renderer.domElement ? 0 : mouse.y
-            );
-            raycaster.setFromCamera(targetMouse, camera);
-            const intersection = new THREE.Vector3();
-            if (raycaster.ray.intersectPlane(dragPlane, intersection)) {
-                const vNow = gizmo.target.velocity.clone();
-                const tipDelta = new THREE.Vector3().subVectors(intersection, origin);
-                if (tipDelta.lengthSq() < 1e-10) {
-                    tipDelta.set(1, 0, 0);
+            // If dragging gizmo arrow, move the planet along that specific axis
+            if (isRepositioning && gizmo.target && activeAxis) {
+                if (activeAxis === 'x') {
+                    gizmo.target.mesh.position.x += movement.x;
+                } else if (activeAxis === 'y') {
+                    gizmo.target.mesh.position.y += movement.y;
+                } else if (activeAxis === 'z') {
+                    gizmo.target.mesh.position.z += movement.z;
+                }
+            }
+
+            // If dragging velocity arrow and camera moved, keep plane through body and recalc velocity.
+            // IMPORTANT: plane must respect the active velocity edit mode:
+            // - XZ mode => horizontal plane (y=0) through the body
+            // - Y mode  => vertical plane containing world-up + current horizontal heading
+            if (isChangingVelocity && gizmo.target) {
+                const origin = gizmo.target.mesh.position;
+
+                if (interactionState.velocityEditMode === 'y') {
+                    const v = gizmo.target.velocity.clone();
+                    v.y = 0;
+                    const hDir = v.lengthSq() > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
+                    const up = new THREE.Vector3(0, 1, 0);
+                    const planeNormal = new THREE.Vector3().crossVectors(hDir, up).normalize();
+                    dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
+                } else {
+                    dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), origin);
                 }
 
-                if (interactionState.velocityEditMode === 'xz') {
-                    if (tipDelta.lengthSq() > 1e-10) {
-                        const newVel = tipDelta.divideScalar(GIZMO_TUNING.VELOCITY_ARROW_SCALE);
-                        newVel.y = vNow.y;
+                // Use center screen coordinates if pointer is locked
+                const targetMouse = new THREE.Vector2(
+                    document.pointerLockElement === renderer.domElement ? 0 : mouse.x,
+                    document.pointerLockElement === renderer.domElement ? 0 : mouse.y
+                );
+                raycaster.setFromCamera(targetMouse, camera);
+                const intersection = new THREE.Vector3();
+                if (raycaster.ray.intersectPlane(dragPlane, intersection)) {
+                    const vNow = gizmo.target.velocity.clone();
+                    const tipDelta = new THREE.Vector3().subVectors(intersection, origin);
+                    if (tipDelta.lengthSq() < 1e-10) {
+                        tipDelta.set(1, 0, 0);
+                    }
+
+                    if (interactionState.velocityEditMode === 'xz') {
+                        if (tipDelta.lengthSq() > 1e-10) {
+                            const newVel = tipDelta.divideScalar(GIZMO_TUNING.VELOCITY_ARROW_SCALE);
+                            newVel.y = vNow.y;
+                            gizmo.target.velocity.copy(newVel);
+                        }
+                    } else {
+                        const vFlat = vNow.clone();
+                        vFlat.y = 0;
+                        const hDir =
+                            vFlat.lengthSq() > 1e-10
+                                ? vFlat.normalize()
+                                : new THREE.Vector3(1, 0, 0);
+                        const up = new THREE.Vector3(0, 1, 0);
+
+                        const tipH = tipDelta.dot(hDir);
+                        const tipY = tipDelta.dot(up);
+
+                        const horizontalSpeed = tipH / GIZMO_TUNING.VELOCITY_ARROW_SCALE;
+                        const verticalSpeed = tipY / GIZMO_TUNING.VELOCITY_ARROW_SCALE;
+
+                        const newVel = new THREE.Vector3()
+                            .addScaledVector(hDir, horizontalSpeed)
+                            .addScaledVector(up, verticalSpeed);
                         gizmo.target.velocity.copy(newVel);
                     }
-                } else {
-                    const vFlat = vNow.clone();
-                    vFlat.y = 0;
-                    const hDir =
-                        vFlat.lengthSq() > 1e-10 ? vFlat.normalize() : new THREE.Vector3(1, 0, 0);
-                    const up = new THREE.Vector3(0, 1, 0);
-
-                    const tipH = tipDelta.dot(hDir);
-                    const tipY = tipDelta.dot(up);
-
-                    const horizontalSpeed = tipH / GIZMO_TUNING.VELOCITY_ARROW_SCALE;
-                    const verticalSpeed = tipY / GIZMO_TUNING.VELOCITY_ARROW_SCALE;
-
-                    const newVel = new THREE.Vector3()
-                        .addScaledVector(hDir, horizontalSpeed)
-                        .addScaledVector(up, verticalSpeed);
-                    gizmo.target.velocity.copy(newVel);
                 }
             }
         }
-    }
-
     } // end if (!isFlightModeActive) WASD movement
 
     const focusObj = getFocusObject();
@@ -4314,7 +4339,7 @@ function animate() {
 
         // Apply accelerations to positions
         for (const body of simulationState.bodies) {
-            if (body && !body._isDisposed && body.mesh) {
+            if (body && !body._isDisposed && body.mesh && body.tempAcc) {
                 body.update(body.tempAcc, dt);
             }
         }
@@ -4330,7 +4355,7 @@ function animate() {
             if (!b1) continue;
 
             // Update the trail position for b1
-            if (typeof b1.updateTrail === 'function') b1.updateTrail();
+            if (b1 instanceof CelestialBody) b1.updateTrail();
 
             // Skip disposed bodies in collision detection
             if (b1._isDisposed || !b1.mesh) continue;
@@ -4387,7 +4412,7 @@ function animate() {
                         controls.enabled = true;
                         controls.target.set(0, 0, 0);
                         controls.mouseButtons.RIGHT = null;
-                        triggerZoom('camNone');
+                        triggerZoomToBody(null);
                     }
                 }
             }
@@ -4404,8 +4429,8 @@ function animate() {
                 body &&
                 !body._isDisposed &&
                 body.mesh &&
-                !isBodyType(body, BodyType.Star) &&
-                body.baseColor
+                body instanceof CelestialBody &&
+                !isBodyType(body, BodyType.Star)
             ) {
                 // Calculate distance from sun
                 const dx = body.mesh.position.x - sunBody.mesh.position.x;
@@ -4422,7 +4447,9 @@ function animate() {
                 );
 
                 // Apply brightness to material color
-                body.mesh.material.color.copy(body.baseColor).multiplyScalar(brightness);
+                (body.mesh.material as THREE.MeshStandardMaterial).color
+                    .copy(body.baseColor)
+                    .multiplyScalar(brightness);
             }
         }
     }
@@ -4573,7 +4600,9 @@ function animate() {
                     .clone()
                     .applyQuaternion(flightState.flightCameraQuat);
                 camera.position.copy(ship.mesh.position).add(offset);
-                const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(flightState.flightCameraQuat);
+                const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(
+                    flightState.flightCameraQuat
+                );
                 camera.up.copy(cameraUp);
                 camera.lookAt(ship.mesh.position);
                 controls.target.copy(ship.mesh.position);
@@ -4586,9 +4615,12 @@ function animate() {
     // Covers both flight mode (player piloting) and autopilot-only (bodies-table "Fly Here").
     const trailShip = isFlightModeActive
         ? flightState.activeShip!
-        : (autopilotState.isActive ? flightState.knownShip : null);
+        : autopilotState.isActive
+          ? flightState.knownShip
+          : null;
     if (trailShip && trailShip.mesh) {
-        const nozzle = trailShip.thrusterOffset.clone()
+        const nozzle = trailShip.thrusterOffset
+            .clone()
             .applyQuaternion(trailShip.mesh.quaternion)
             .add(trailShip.mesh.position);
         // Record trail continuously in flight; suppress only during warp/warp-decel.
@@ -4598,12 +4630,24 @@ function animate() {
         // Exhaust direction = ship's backward direction (−forward axis)
         const exhaustDir = new THREE.Vector3(0, 0, -1).applyQuaternion(trailShip.mesh.quaternion);
         // In autopilot-only mode flightState.currentSpeed isn't maintained — use velocity magnitude
-        const trailSpeed = isFlightModeActive ? flightState.currentSpeed : trailShip.velocity.length();
+        const trailSpeed = isFlightModeActive
+            ? flightState.currentSpeed
+            : trailShip.velocity.length();
         // Pass the active speed ceiling so brightness scales correctly across modes
-        const trailMaxSpeed = autopilotState.isWarpActive ? FLIGHT_WARP_SPEED
-            : (keys.shift || flightState.boostDecelerating || autopilotState.isBoostActive) ? FLIGHT_BOOST_MAX_SPEED
-            : FLIGHT_MAX_SPEED;
-        trailShip.trail.update(nozzle, trailSpeed, trailMaxSpeed, trailRecord, trailShip.velocity, exhaustDir, dtTotal);
+        const trailMaxSpeed = autopilotState.isWarpActive
+            ? FLIGHT_WARP_SPEED
+            : keys.shift || flightState.boostDecelerating || autopilotState.isBoostActive
+              ? FLIGHT_BOOST_MAX_SPEED
+              : FLIGHT_MAX_SPEED;
+        trailShip.trail.update(
+            nozzle,
+            trailSpeed,
+            trailMaxSpeed,
+            trailRecord,
+            trailShip.velocity,
+            exhaustDir,
+            dtTotal
+        );
     }
 
     if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
@@ -4653,9 +4697,10 @@ function animate() {
     // i.e. in flight mode, or when the ship is the current look-at camera target.
     if (warpEffect.active) {
         const warpShip = flightState.knownShip;
-        const shipIsLookAtTarget = cameraState.isLookAtMode
-            && cameraState.focusBody !== null
-            && cameraState.focusBody === warpShip;
+        const shipIsLookAtTarget =
+            cameraState.isLookAtMode &&
+            cameraState.focusBody !== null &&
+            cameraState.focusBody === warpShip;
         warpEffect.lines.visible = isFlightModeActive || shipIsLookAtTarget;
     }
 
@@ -4682,11 +4727,17 @@ function animate() {
         if (speedSprite && speedSprite.visible && flightState.isActive) {
             const ship = flightState.activeShip;
             // Autopilot phases override the manual warp/boost flags for the speed HUD.
-            const hudIsWarp = flightState.warpActive || flightState.warpDecelerating
-                || autopilotState.phase === 'WARP' || autopilotState.phase === 'WARP_CHARGING';
-            const hudIsBoosting = !hudIsWarp && ((!autopilotState.isActive && keys.shift)
-                || autopilotState.phase === 'APPROACH' && autopilotState.isBoostActive
-                || autopilotState.phase === 'BRAKE' && (flightState.activeShip?.velocity?.length() ?? 0) > FLIGHT_MAX_SPEED);
+            const hudIsWarp =
+                flightState.warpActive ||
+                flightState.warpDecelerating ||
+                autopilotState.phase === 'WARP' ||
+                autopilotState.phase === 'WARP_CHARGING';
+            const hudIsBoosting =
+                !hudIsWarp &&
+                ((!autopilotState.isActive && keys.shift) ||
+                    (autopilotState.phase === 'APPROACH' && autopilotState.isBoostActive) ||
+                    (autopilotState.phase === 'BRAKE' &&
+                        (flightState.activeShip?.velocity?.length() ?? 0) > FLIGHT_MAX_SPEED));
             speedSprite.material.map?.dispose();
             speedSprite.material.map = createSpeedTexture(
                 flightState.currentSpeed,
@@ -4745,7 +4796,9 @@ function animate() {
                 if (autopilotState.isActive && autopilotState.targetBody?.mesh) {
                     const ship = flightState.knownShip;
                     if (ship?.mesh) {
-                        const dist = ship.mesh.position.distanceTo(autopilotState.targetBody.mesh.position);
+                        const dist = ship.mesh.position.distanceTo(
+                            autopilotState.targetBody.mesh.position
+                        );
                         // Format: show as integer with thousands separator, strip tiny noise.
                         const distRounded = Math.max(0, Math.round(dist));
                         distLabel = `Distance to target: ${distRounded.toLocaleString()} u`;
@@ -4755,12 +4808,15 @@ function animate() {
                 // Re-render canvas every frame while active (distance changes continuously),
                 // but only on phase changes when the stable-orbit message is showing.
                 const needsRedraw = autopilotState.isActive
-                    ? true  // distance always changes
+                    ? true // distance always changes
                     : desiredHud !== _lastAutopilotHudState;
 
                 if (needsRedraw) {
                     orbitNotifySprite.material.map?.dispose();
-                    orbitNotifySprite.material.map = createAutopilotPhaseTexture(desiredHud, distLabel);
+                    orbitNotifySprite.material.map = createAutopilotPhaseTexture(
+                        desiredHud,
+                        distLabel
+                    );
                     orbitNotifySprite.material.needsUpdate = true;
                     _lastAutopilotHudState = desiredHud;
                 }
@@ -4836,8 +4892,8 @@ function refreshBodiesTable() {
     // Surface camera enablement depends on selection, so keep it in sync.
     try {
         updateSurfaceButtonEnabled?.();
-    } catch (e) {
-        // ignore
+    } catch {
+        // Empty
     }
 }
 function setF(id: string) {
@@ -4893,7 +4949,9 @@ flightControlsPanel.initialize();
     });
 
     // Advanced flight mode checkbox
-    const advancedModeChk = document.getElementById('flightAdvancedMode') as HTMLInputElement | null;
+    const advancedModeChk = document.getElementById(
+        'flightAdvancedMode'
+    ) as HTMLInputElement | null;
     if (advancedModeChk) {
         advancedModeChk.checked = flightState.isAdvancedMode;
         advancedModeChk.addEventListener('change', () => {
@@ -4907,11 +4965,15 @@ function updateFlightSpawnBtnLabel() {
     const btn = document.getElementById('flightSpawnBtn');
     if (!btn) return;
     const existing = flightState.knownShip;
-    const canReenter = existing && !existing._isDisposed && simulationState.bodies.includes(existing);
+    const canReenter =
+        existing && !existing._isDisposed && simulationState.bodies.includes(existing);
     const iconEl = btn.querySelector('.material-symbols-outlined');
     if (iconEl) iconEl.textContent = canReenter ? 'login' : 'rocket_launch';
     while (iconEl && iconEl.nextSibling) btn.removeChild(iconEl.nextSibling);
-    if (iconEl) btn.appendChild(document.createTextNode(canReenter ? ' RE-ENTER SHIP' : ' SPAWN SPACESHIP'));
+    if (iconEl)
+        btn.appendChild(
+            document.createTextNode(canReenter ? ' RE-ENTER SHIP' : ' SPAWN SPACESHIP')
+        );
 }
 
 // Prevent UI clicks and keyboard events from interfering with scene interaction
@@ -4949,7 +5011,7 @@ function clearCameraPresetHighlights() {
 // NOTE: Preset camera buttons were removed from the UI (replaced with toggles + bodies table).
 // The old `cameraChange` event path is intentionally removed to reduce dead code.
 
-function zoomRelativeToTarget(target: Body, factor: number) {
+function zoomRelativeToTarget(target: Body | null, factor: number) {
     // target=null means "zoom around scene center" (used when Look At is OFF)
     const targetPos =
         target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
@@ -4977,9 +5039,7 @@ function zoomRelativeToTarget(target: Body, factor: number) {
     );
 
     const zoomInLimit =
-        target && simulationState.bodies.includes(target) && !target._isDisposed
-            ? .01
-            : 10;
+        target && simulationState.bodies.includes(target) && !target._isDisposed ? 0.01 : 10;
     const zoomOutLimit = farLimit;
 
     const newDist = THREE.MathUtils.clamp(currentDist * factor, zoomInLimit, zoomOutLimit);
@@ -5011,7 +5071,7 @@ function zoomOut() {
 // --- Surface camera / player rig ---
 const surfaceState = {
     isActive: false,
-    body: null, // CelestialBody
+    body: null as Body | null, // CelestialBody
 
     // Anchor point on the body's surface, expressed in the body's LOCAL space.
     // This is what makes the camera "fixed to the planet" while the planet spins.
@@ -5034,11 +5094,11 @@ const surfaceState = {
     lookSensitivity: 0.002,
 };
 
-function isSurfaceEligibleBody(body) {
+function isSurfaceEligibleBody(body: Body | null) {
     if (!body || !simulationState.bodies.includes(body) || body._isDisposed || !body.mesh)
         return false;
     if (isBodyType(body, BodyType.Star)) return false;
-    if (body.isBlackHole || (body.bodyType && body.bodyType & BodyType.BlackHole)) return false;
+    if (body instanceof BlackHole) return false;
     // require some minimum radius so we don't go crazy on tiny asteroids
     return (body.radius || 0) >= 1.0;
 }
@@ -5083,7 +5143,8 @@ function exitSurfaceMode() {
     forceHintRefresh();
 }
 
-function enterSurfaceMode(body) {
+function enterSurfaceMode(body: Body | null) {
+    if (!body) return;
     if (!isSurfaceEligibleBody(body)) return;
 
     // Snapshot camera/controls state so exiting returns to the exact view.
@@ -5249,8 +5310,10 @@ function updateAutopilot(dt: number) {
     const ship = flightState.knownShip;
     const target = autopilotState.targetBody;
 
-    const shipAlive = ship && !ship._isDisposed && ship.mesh && simulationState.bodies.includes(ship);
-    const targetAlive = target && !target._isDisposed && target.mesh && simulationState.bodies.includes(target);
+    const shipAlive =
+        ship && !ship._isDisposed && ship.mesh && simulationState.bodies.includes(ship);
+    const targetAlive =
+        target && !target._isDisposed && target.mesh && simulationState.bodies.includes(target);
 
     if (!shipAlive || !targetAlive) {
         cancelAutopilot('Autopilot disengaged: target or ship no longer exists.');
@@ -5258,7 +5321,7 @@ function updateAutopilot(dt: number) {
     }
 
     // ── Derived values ───────────────────────────────────────────────────────
-    const shipPos  = ship.mesh.position;    // live reference — no clone needed for reading
+    const shipPos = ship.mesh.position; // live reference — no clone needed for reading
     const targetPos = target.mesh.position;
 
     const toTarget = new THREE.Vector3().subVectors(targetPos, shipPos);
@@ -5274,14 +5337,19 @@ function updateAutopilot(dt: number) {
     // boost→normal at AUTOPILOT_BOOST_DECEL, then normal→stop at AUTOPILOT_DECEL.
     // Using only AUTOPILOT_BOOST_DECEL at warp speed would give a brake trigger
     // millions of units away, causing an immediate BRAKE transition.
-    const effectiveStopDist = approachSpeed > FLIGHT_BOOST_MAX_SPEED
-        ? (approachSpeed * approachSpeed - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) / (2 * AUTOPILOT_WARP_DECEL)
-          + (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_BOOST_DECEL)
-          + (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
-        : approachSpeed > FLIGHT_MAX_SPEED
-          ? (approachSpeed * approachSpeed - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_BOOST_DECEL)
-            + (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
-          : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
+    const effectiveStopDist =
+        approachSpeed > FLIGHT_BOOST_MAX_SPEED
+            ? (approachSpeed * approachSpeed - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
+                  (2 * AUTOPILOT_WARP_DECEL) +
+              (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
+                  FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+                  (2 * AUTOPILOT_BOOST_DECEL) +
+              (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
+            : approachSpeed > FLIGHT_MAX_SPEED
+              ? (approachSpeed * approachSpeed - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+                    (2 * AUTOPILOT_BOOST_DECEL) +
+                (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
+              : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
     const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
     if (autopilotState.phase === 'WARP') {
@@ -5309,8 +5377,8 @@ function updateAutopilot(dt: number) {
         // tiny residual.  Also fall back on radial closing speed: if the ship has stopped
         // moving inward while it's within 10% of orbit, the blend has converged.
         const radialClosingSpeed = -relVel.dot(toTargetDir); // positive = closing on target
-        const withinOrbit   = distance <= orbitRadius * 1.02;
-        const driftedToOrbit = distance <= orbitRadius * 1.10 && radialClosingSpeed < 1;
+        const withinOrbit = distance <= orbitRadius * 1.02;
+        const driftedToOrbit = distance <= orbitRadius * 1.1 && radialClosingSpeed < 1;
         if (withinOrbit || driftedToOrbit) {
             autopilotState.phase = 'CIRCULARIZE';
         }
@@ -5326,7 +5394,8 @@ function updateAutopilot(dt: number) {
     if (autopilotState.phase === 'WARP_CHARGING') {
         // Reuse the same charge progress bar shown during manual warp.
         autopilotState.warpChargeTimer = Math.min(
-            autopilotState.warpChargeTimer + dt, FLIGHT_WARP_CHARGE_TIME
+            autopilotState.warpChargeTimer + dt,
+            FLIGHT_WARP_CHARGE_TIME
         );
         const fill = autopilotState.warpChargeTimer / FLIGHT_WARP_CHARGE_TIME;
         if (warpSprite) {
@@ -5351,7 +5420,6 @@ function updateAutopilot(dt: number) {
             warpEffect.start();
             addEvent('⚡ Autopilot warp engaged.');
         }
-
     } else if (autopilotState.phase === 'WARP') {
         // Lock ship velocity to warp speed toward the target, in the target's frame.
         ship.velocity.copy(target.velocity).addScaledVector(toTargetDir, FLIGHT_WARP_SPEED);
@@ -5364,7 +5432,6 @@ function updateAutopilot(dt: number) {
             new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
         );
         ship.mesh.quaternion.rotateTowards(warpQuat, FLIGHT_MAX_TURN_RATE * dt);
-
     } else if (autopilotState.phase === 'APPROACH') {
         // Use boost speed when far away; switch to normal approach speed close in.
         const useBoost = distance > AUTOPILOT_BOOST_THRESHOLD;
@@ -5388,10 +5455,14 @@ function updateAutopilot(dt: number) {
             // ship to fly thousands of units past the threshold before slowing down.
             // When the ship needs to speed UP, use the appropriate accel (boost or normal).
             const rate = needsDecel
-                ? (approachSpeed > FLIGHT_BOOST_MAX_SPEED ? AUTOPILOT_WARP_DECEL
-                    : approachSpeed > FLIGHT_MAX_SPEED ? AUTOPILOT_BOOST_DECEL
-                    : AUTOPILOT_DECEL)
-                : (useBoost ? FLIGHT_BOOST_ACCEL : AUTOPILOT_ACCEL);
+                ? approachSpeed > FLIGHT_BOOST_MAX_SPEED
+                    ? AUTOPILOT_WARP_DECEL
+                    : approachSpeed > FLIGHT_MAX_SPEED
+                      ? AUTOPILOT_BOOST_DECEL
+                      : AUTOPILOT_DECEL
+                : useBoost
+                  ? FLIGHT_BOOST_ACCEL
+                  : AUTOPILOT_ACCEL;
             const accelMag = Math.min(rate * dt, deltaLen);
             ship.velocity.addScaledVector(accelDir, accelMag);
         }
@@ -5399,15 +5470,10 @@ function updateAutopilot(dt: number) {
         // Always keep the ship pointed toward the target during approach.
         // Braking phase intentionally handles its own turnaround behavior.
         const approachQuat = new THREE.Quaternion().setFromRotationMatrix(
-            new THREE.Matrix4().lookAt(
-                targetPos,
-                shipPos,
-                new THREE.Vector3(0, 1, 0)
-            )
+            new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
         );
         ship.mesh.quaternion.rotateTowards(approachQuat, FLIGHT_MAX_TURN_RATE * dt);
         flightState.thrustActive = deltaLen > 1e-6;
-
     } else if (autopilotState.phase === 'BRAKE') {
         // ── Trajectory-blend orbital insertion ────────────────────────────────
         // Key insight: both the "stop" vector (target.velocity) and the orbital
@@ -5434,9 +5500,9 @@ function updateAutopilot(dt: number) {
         // α = 0 at brake entry, 1 at orbitRadius.  Smoothstep eases the blend so
         // most of the approach velocity is killed before the hard turn to orbit.
         const brakeSpan = Math.max(autopilotState.brakeEntryDistance - orbitRadius, 1);
-        const rawT     = 1 - (distance - orbitRadius) / brakeSpan;
-        const t        = Math.max(0, Math.min(1, rawT));
-        const alpha    = t * t * (3 - 2 * t); // smoothstep
+        const rawT = 1 - (distance - orbitRadius) / brakeSpan;
+        const t = Math.max(0, Math.min(1, rawT));
+        const alpha = t * t * (3 - 2 * t); // smoothstep
 
         // Blend desired velocity as the ship spirals inward:
         //   tangential component: 0 → vOrbit  (builds up as alpha → 1)
@@ -5449,8 +5515,8 @@ function updateAutopilot(dt: number) {
         const inwardSpeed = FLIGHT_MAX_SPEED * (1 - alpha);
         const desiredVel = new THREE.Vector3()
             .copy(target.velocity)
-            .addScaledVector(tangential, vOrbit * alpha)   // tangential: 0 → vOrbit
-            .addScaledVector(toTargetDir, inwardSpeed);    // inward: FLIGHT_MAX_SPEED → 0
+            .addScaledVector(tangential, vOrbit * alpha) // tangential: 0 → vOrbit
+            .addScaledVector(toTargetDir, inwardSpeed); // inward: FLIGHT_MAX_SPEED → 0
 
         // Explicit gravity compensation — same taper as CIRCULARIZE.
         // Prevents gravity accumulating inward velocity faster than thrust can counter it.
@@ -5466,18 +5532,18 @@ function updateAutopilot(dt: number) {
 
         if (deltaLen > 1e-6) {
             const thrustDir = velDelta.clone().normalize();
-            const brakeMag  = Math.min(AUTOPILOT_DECEL * dt, deltaLen);
+            const brakeMag = Math.min(AUTOPILOT_DECEL * dt, deltaLen);
             ship.velocity.addScaledVector(thrustDir, brakeMag);
 
             const targetQuat = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1), thrustDir
+                new THREE.Vector3(0, 0, 1),
+                thrustDir
             );
             ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
             flightState.thrustActive = deltaLen > 1;
         } else {
             flightState.thrustActive = false;
         }
-
     } else if (autopilotState.phase === 'CIRCULARIZE') {
         // ── Gradually steer into circular orbit ───────────────────────────────
         // Compute the desired orbital velocity for the ship's current position,
@@ -5502,9 +5568,10 @@ function updateAutopilot(dt: number) {
 
         // ── Gravity-scaled minimum rate for velocity rotation ─────────────────
         const bodyRadius = target.radius ?? 10;
-        const altitude   = Math.max(r - bodyRadius, 1);
-        const gravAccel  = (G * target.mass) / (r * r);
-        const safeRate   = AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN * vOrbit * Math.sqrt(gravAccel / altitude);
+        const altitude = Math.max(r - bodyRadius, 1);
+        const gravAccel = (G * target.mass) / (r * r);
+        const safeRate =
+            AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN * vOrbit * Math.sqrt(gravAccel / altitude);
         const effectiveRate = Math.max(AUTOPILOT_CIRCULARIZE_RATE, safeRate);
 
         // ── Explicit gravity compensation ─────────────────────────────────────
@@ -5519,7 +5586,7 @@ function updateAutopilot(dt: number) {
         // counteract 100% of gravity; when tangential speed = vOrbit, counteract 0%
         // (the orbit is self-sustaining via centripetal acceleration at that point).
         const tangentialSpeed = relVel.dot(tangential);
-        const speedRatio      = Math.max(0, Math.min(1, tangentialSpeed / vOrbit));
+        const speedRatio = Math.max(0, Math.min(1, tangentialSpeed / vOrbit));
         const gravCompFraction = 1 - speedRatio * speedRatio;
         ship.velocity.addScaledVector(radial, gravAccel * gravCompFraction * dt);
 
@@ -5556,13 +5623,13 @@ function updateAutopilot(dt: number) {
 
             // Rotate ship to face thrust direction (cosmetic).
             const targetQuat = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1), thrustDir
+                new THREE.Vector3(0, 0, 1),
+                thrustDir
             );
             ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
             flightState.thrustActive = true;
         }
     }
-
 }
 
 /** Cancel the autopilot with an optional log message. */
@@ -5598,7 +5665,9 @@ function engageAutopilot(target: Body) {
     }
 
     if (simulationState.timeScale > AUTOPILOT_MAX_TIMESCALE) {
-        addEvent(`Autopilot: time scale is too high (>${AUTOPILOT_MAX_TIMESCALE}×). Reduce time scale first.`);
+        addEvent(
+            `Autopilot: time scale is too high (>${AUTOPILOT_MAX_TIMESCALE}×). Reduce time scale first.`
+        );
         return;
     }
 
@@ -5621,9 +5690,8 @@ function engageAutopilot(target: Body) {
     }
 
     // Choose initial phase based on distance: warp for far targets, approach otherwise.
-    const dist0 = (ship.mesh && target.mesh)
-        ? ship.mesh.position.distanceTo(target.mesh.position)
-        : Infinity;
+    const dist0 =
+        ship.mesh && target.mesh ? ship.mesh.position.distanceTo(target.mesh.position) : Infinity;
     const startWithWarp = dist0 > AUTOPILOT_WARP_THRESHOLD;
 
     autopilotState.isActive = true;
@@ -5645,7 +5713,10 @@ function engageAutopilot(target: Body) {
 function updateAutopilotUI() {
     const ship = flightState.knownShip;
     const shipExists = !!(ship && !ship._isDisposed && simulationState.bodies.includes(ship));
-    flightControlsPanel.setAutopilotState(autopilotState.isActive, shipExists && !!autopilotState.targetBody || autopilotState.isActive);
+    flightControlsPanel.setAutopilotState(
+        autopilotState.isActive,
+        (shipExists && !!autopilotState.targetBody) || autopilotState.isActive
+    );
     refreshBodiesTable();
 }
 
@@ -5741,9 +5812,9 @@ function updateFlightControls(dt: number) {
         }
         if (flightState.warpCharge >= FLIGHT_WARP_CHARGE_TIME) {
             // Engage warp!
-            flightState.warpActive   = true;
+            flightState.warpActive = true;
             flightState.warpCharging = false;
-            flightState.warpCharge   = 0;
+            flightState.warpCharge = 0;
             warpEffect.start();
             addEvent('⚡ Warp engaged! Press Space to disengage.');
         }
@@ -5757,12 +5828,19 @@ function updateFlightControls(dt: number) {
     // W only counts as active thrust once the ship has decelerated to normal max speed.
     // This prevents W from snapping the ship from boost speed (500) down to normal max (100)
     // in one frame when pressed mid-deceleration.
-    const wEffective = manualInput && keys.w && (flightState.currentSpeed <= FLIGHT_MAX_SPEED || keys.shift);
+    const wEffective =
+        manualInput && keys.w && (flightState.currentSpeed <= FLIGHT_MAX_SPEED || keys.shift);
     const thrustActive = manualInput && (keys.shift || wEffective || keys.s);
     if (manualInput) flightState.thrustActive = thrustActive;
 
     // Trigger boost decel when Shift is released while still above normal max speed
-    if (manualInput && !keys.shift && !flightState.boostDecelerating && !flightState.warpActive && !flightState.warpDecelerating) {
+    if (
+        manualInput &&
+        !keys.shift &&
+        !flightState.boostDecelerating &&
+        !flightState.warpActive &&
+        !flightState.warpDecelerating
+    ) {
         if (fwdSpeed > FLIGHT_MAX_SPEED) {
             flightState.boostDecelerating = true;
         }
@@ -5787,14 +5865,21 @@ function updateFlightControls(dt: number) {
         // When no key is held the ship coasts freely and gravity accumulates.
         if (thrustActive) {
             const maxSpeed = keys.shift ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
-            const accel    = keys.shift ? FLIGHT_BOOST_ACCEL     : FLIGHT_THRUST_ACCEL;
+            const accel = keys.shift ? FLIGHT_BOOST_ACCEL : FLIGHT_THRUST_ACCEL;
             // Ignore boost while above boost max speed (e.g. decelerating from warp);
             // the ship should coast down through FLIGHT_BOOST_MAX_SPEED naturally.
             const shiftEffective = keys.shift && flightState.currentSpeed <= FLIGHT_BOOST_MAX_SPEED;
             if (shiftEffective || wEffective) {
-                flightState.currentSpeed = Math.min(flightState.currentSpeed + accel * dt, maxSpeed);
-            } else { // keys.s
-                flightState.currentSpeed = Math.max(flightState.currentSpeed - accel * dt, -FLIGHT_MAX_SPEED);
+                flightState.currentSpeed = Math.min(
+                    flightState.currentSpeed + accel * dt,
+                    maxSpeed
+                );
+            } else {
+                // keys.s
+                flightState.currentSpeed = Math.max(
+                    flightState.currentSpeed - accel * dt,
+                    -FLIGHT_MAX_SPEED
+                );
             }
             // Gradually normalise trajectory toward the ship's forward axis while thrusting.
             // Decompose current velocity into forward + perpendicular components,
@@ -5837,29 +5922,35 @@ function updateFlightControls(dt: number) {
     // ── Roll with inertia (A/D) ───────────────────────────────────────────────
     // Accelerate rollVelocity toward ±FLIGHT_ROLL_SPEED when key held,
     // then apply friction to bring it back to 0 when released.
-    const rollTarget = flightState.rollLeft ? -FLIGHT_ROLL_SPEED
-                     : flightState.rollRight ? FLIGHT_ROLL_SPEED
-                     : 0;
+    const rollTarget = flightState.rollLeft
+        ? -FLIGHT_ROLL_SPEED
+        : flightState.rollRight
+          ? FLIGHT_ROLL_SPEED
+          : 0;
     if (manualInput && (flightState.rollLeft || flightState.rollRight)) {
         // Ramp up toward target
         const dir = rollTarget > 0 ? 1 : -1;
         flightState.rollVelocity += dir * FLIGHT_ROLL_ACCEL * dt;
         flightState.rollVelocity = THREE.MathUtils.clamp(
-            flightState.rollVelocity, -FLIGHT_ROLL_SPEED, FLIGHT_ROLL_SPEED
+            flightState.rollVelocity,
+            -FLIGHT_ROLL_SPEED,
+            FLIGHT_ROLL_SPEED
         );
     } else {
         // No key — apply friction toward zero
         if (Math.abs(flightState.rollVelocity) < FLIGHT_ROLL_FRICTION * dt) {
             flightState.rollVelocity = 0;
         } else {
-            flightState.rollVelocity -= Math.sign(flightState.rollVelocity) * FLIGHT_ROLL_FRICTION * dt;
+            flightState.rollVelocity -=
+                Math.sign(flightState.rollVelocity) * FLIGHT_ROLL_FRICTION * dt;
         }
     }
     if (flightState.rollVelocity !== 0) {
         // Rotate the camera frame around its local forward (Z) axis so the
         // camera rolls with the ship when A/D is held.
         const dqRoll = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 0, 1), flightState.rollVelocity * dt
+            new THREE.Vector3(0, 0, 1),
+            flightState.rollVelocity * dt
         );
         flightState.flightCameraQuat.multiply(dqRoll);
     }
@@ -5867,13 +5958,21 @@ function updateFlightControls(dt: number) {
     // ── Steering with smoothing + dead zone (mouse) ───────────────────────────
     // Raw normalised pointer input
     const dtScale = Math.max(0, dt / (1 / 60));
-    const rawXFull = THREE.MathUtils.clamp(flightState.pointerOffsetX / FLIGHT_MAX_POINTER_OFFSET, -1, 1);
-    const rawYFull = THREE.MathUtils.clamp(flightState.pointerOffsetY / FLIGHT_MAX_POINTER_OFFSET, -1, 1);
+    const rawXFull = THREE.MathUtils.clamp(
+        flightState.pointerOffsetX / FLIGHT_MAX_POINTER_OFFSET,
+        -1,
+        1
+    );
+    const rawYFull = THREE.MathUtils.clamp(
+        flightState.pointerOffsetY / FLIGHT_MAX_POINTER_OFFSET,
+        -1,
+        1
+    );
     // Apply dead zone: values within ±DEADZONE snap to 0, outside rescale to 0-1
     function applyDeadzone(v: number) {
         const d = FLIGHT_STEER_DEADZONE;
         if (Math.abs(v) < d) return 0;
-        return Math.sign(v) * (Math.abs(v) - d) / (1 - d);
+        return (Math.sign(v) * (Math.abs(v) - d)) / (1 - d);
     }
     const rawX = applyDeadzone(rawXFull);
     const rawY = applyDeadzone(rawYFull);
@@ -5900,8 +5999,12 @@ function updateFlightControls(dt: number) {
         flightState.flightCameraQuat.multiply(pitchQuat);
 
         // Animate visual banking of ship mesh relative to camera frame.
-        flightState.shipBankRoll  += ( flightState.steerX * FLIGHT_MAX_BANK_ANGLE - flightState.shipBankRoll)  * FLIGHT_BANK_LERP_RATE;
-        flightState.shipBankPitch += ( flightState.steerY * FLIGHT_MAX_BANK_PITCH  - flightState.shipBankPitch) * FLIGHT_BANK_LERP_RATE;
+        flightState.shipBankRoll +=
+            (flightState.steerX * FLIGHT_MAX_BANK_ANGLE - flightState.shipBankRoll) *
+            FLIGHT_BANK_LERP_RATE;
+        flightState.shipBankPitch +=
+            (flightState.steerY * FLIGHT_MAX_BANK_PITCH - flightState.shipBankPitch) *
+            FLIGHT_BANK_LERP_RATE;
 
         // Apply banking offset to ship mesh: camera frame * cosmetic bank/pitch rotation.
         const bankQuat = new THREE.Quaternion().setFromEuler(
@@ -5913,7 +6016,7 @@ function updateFlightControls(dt: number) {
         // Autopilot is flying — sync camera frame to the ship's actual orientation
         // so there is no lurch when the player retakes manual control.
         flightState.flightCameraQuat.copy(ship.mesh.quaternion);
-        flightState.shipBankRoll  = 0;
+        flightState.shipBankRoll = 0;
         flightState.shipBankPitch = 0;
         flightState.steerX = 0;
         flightState.steerY = 0;
@@ -5927,10 +6030,8 @@ function updateFlightControls(dt: number) {
     // This gives the screen-space position of where the ship is AIMING, which sits
     // above screen-centre in 3rd-person view because the camera is elevated behind
     // the ship and looks at its body-centre, not its nose.
-    const noseNDC = ship.mesh.position.clone()
-        .addScaledVector(forward, 8)
-        .project(camera);
-    const noseScreenX =  noseNDC.x * (window.innerWidth  * 0.5);
+    const noseNDC = ship.mesh.position.clone().addScaledVector(forward, 8).project(camera);
+    const noseScreenX = noseNDC.x * (window.innerWidth * 0.5);
     const noseScreenY = noseNDC.y * (window.innerHeight * 0.5);
 
     // Circularly clamp the pointer offset for display so the indicator line
@@ -5950,11 +6051,7 @@ function updateFlightControls(dt: number) {
 
     // Move the static crosshair to the projected nose position
     flightCrosshair.position.set(noseScreenX, noseScreenY, 0);
-    steeringEndMarker.position.set(
-        noseScreenX + displayOffX,
-        noseScreenY - displayOffY,
-        0
-    );
+    steeringEndMarker.position.set(noseScreenX + displayOffX, noseScreenY - displayOffY, 0);
     steeringEndMarker.visible = true;
 }
 
@@ -5963,30 +6060,33 @@ function updateFlightControls(dt: number) {
 function spawnShip() {
     // Re-enter an existing ship when possible
     const existing = flightState.knownShip;
-    const canReenter = existing &&
-        !existing._isDisposed &&
-        simulationState.bodies.includes(existing);
+    const canReenter =
+        existing && !existing._isDisposed && simulationState.bodies.includes(existing);
 
-    const ship: Spaceship = canReenter ? existing : (() => {
-        const cameraDir = new THREE.Vector3();
-        camera.getWorldDirection(cameraDir);
-        const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
+    const ship: Spaceship = canReenter
+        ? existing
+        : (() => {
+              const cameraDir = new THREE.Vector3();
+              camera.getWorldDirection(cameraDir);
+              const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
 
-        const s = new Spaceship(
-            dependencies,
-            scene,
-            spawnPos,
-            new THREE.Vector3(),
-            createUniqueId('spaceship')
-        );
-        simulationState.bodies.push(s);
-        try {
-            window.dispatchEvent(
-                new CustomEvent('body:added', { detail: { body: s, id: s.id, name: s.name } })
-            );
-        } catch (e) { /* non-fatal */ }
-        return s;
-    })();
+              const s = new Spaceship(
+                  dependencies,
+                  scene,
+                  spawnPos,
+                  new THREE.Vector3(),
+                  createUniqueId('spaceship')
+              );
+              simulationState.bodies.push(s);
+              try {
+                  window.dispatchEvent(
+                      new CustomEvent('body:added', { detail: { body: s, id: s.id, name: s.name } })
+                  );
+              } catch (e) {
+                  /* non-fatal */
+              }
+              return s;
+          })();
 
     // Snapshot camera / controls state so exit can restore it cleanly
     flightState.prevCameraPos.copy(camera.position);
@@ -6005,12 +6105,12 @@ function spawnShip() {
     flightState.rollVelocity = 0;
     flightState.steerX = 0;
     flightState.steerY = 0;
-    flightState.warpCharge       = 0;
-    flightState.warpCharging     = false;
-    flightState.warpActive       = false;
+    flightState.warpCharge = 0;
+    flightState.warpCharging = false;
+    flightState.warpActive = false;
     flightState.warpDecelerating = false;
     flightState.flightCameraQuat.copy(ship.mesh.quaternion);
-    flightState.shipBankRoll  = 0;
+    flightState.shipBankRoll = 0;
     flightState.shipBankPitch = 0;
 
     // Deselect any currently selected body so the gizmo doesn't appear on entry
@@ -6047,15 +6147,20 @@ function spawnShip() {
     flightControlsPanel.setAutopilotState(autopilotState.isActive, true);
     refreshBodiesTable();
 
-    addEvent(canReenter ? 'Re-entered spaceship.' : 'Spaceship launched! W/S=speed  A/D=roll  Esc=exit');
+    addEvent(
+        canReenter ? 'Re-entered spaceship.' : 'Spaceship launched! W/S=speed  A/D=roll  Esc=exit'
+    );
 }
 
 /** Exit flight mode and restore normal camera controls. */
 function exitFlightMode() {
     // Preserve the ship reference so the user can re-enter later.
     // Only keep it if the ship is still alive.
-    if (flightState.activeShip && !flightState.activeShip._isDisposed &&
-        simulationState.bodies.includes(flightState.activeShip)) {
+    if (
+        flightState.activeShip &&
+        !flightState.activeShip._isDisposed &&
+        simulationState.bodies.includes(flightState.activeShip)
+    ) {
         flightState.knownShip = flightState.activeShip;
     } else {
         // Ship was destroyed — clear the known reference too
@@ -6092,8 +6197,11 @@ function exitFlightMode() {
 
     // If the ship is still alive, orbit around it so the player can see where they left off.
     // Otherwise fall back to the pre-flight camera snapshot.
-    if (flightState.knownShip && !flightState.knownShip._isDisposed &&
-        simulationState.bodies.includes(flightState.knownShip)) {
+    if (
+        flightState.knownShip &&
+        !flightState.knownShip._isDisposed &&
+        simulationState.bodies.includes(flightState.knownShip)
+    ) {
         const shipPos = flightState.knownShip.mesh.position.clone();
         // Keep the pre-flight viewing direction but reposition to look at the ship.
         const prevDir = new THREE.Vector3()
@@ -6113,9 +6221,9 @@ function exitFlightMode() {
     flightCrosshair.visible = false;
     steeringEndMarker.visible = false;
     if (warpSprite) warpSprite.visible = false;
-    flightState.warpCharge       = 0;
-    flightState.warpCharging     = false;
-    flightState.warpActive       = false;
+    flightState.warpCharge = 0;
+    flightState.warpCharging = false;
+    flightState.warpActive = false;
     flightState.warpDecelerating = false;
     warpEffect.stop();
     if (flightState.knownShip && !flightState.knownShip._isDisposed) {
@@ -6126,12 +6234,22 @@ function exitFlightMode() {
     flightControlsPanel.setViewState(false);
     // Keep autopilot button enabled as long as the known ship still exists
     const _exitShip = flightState.knownShip;
-    const _exitShipAlive = !!(_exitShip && !_exitShip._isDisposed && simulationState.bodies.includes(_exitShip));
+    const _exitShipAlive = !!(
+        _exitShip &&
+        !_exitShip._isDisposed &&
+        simulationState.bodies.includes(_exitShip)
+    );
     flightControlsPanel.setAutopilotState(autopilotState.isActive, _exitShipAlive);
     refreshBodiesTable();
     // updateFlightSpawnBtnLabel is defined after this function; call via a timeout
     // to avoid forward-reference issues in the module execution order.
-    setTimeout(() => { try { updateFlightSpawnBtnLabel(); } catch (_) {} }, 0);
+    setTimeout(() => {
+        try {
+            updateFlightSpawnBtnLabel();
+        } catch {
+            // Empty
+        }
+    }, 0);
     addEvent('Flight mode exited.');
 }
 
@@ -6475,6 +6593,17 @@ managementPanel.on(
         customTemperature,
         customLightIntensity,
         customRadius,
+    }: {
+        bodyType: string;
+        planetType: string;
+        orbitType: string;
+        orbitalAngle: number;
+        inclination: number;
+        hasAtmosphere: boolean;
+        customMass: number | null;
+        customTemperature: number | null;
+        customLightIntensity: number | null;
+        customRadius: number | null;
     }) => {
         createNewBody(
             bodyType,
@@ -6493,7 +6622,7 @@ managementPanel.on(
 );
 
 // Preset bodies (canonical solar-system objects)
-managementPanel.on('createPresetBody', ({ presetKey }) => {
+managementPanel.on('createPresetBody', ({ presetKey }: { presetKey: string }) => {
     if (!presetKey) return;
     createPresetBody(presetKey);
     refreshBodiesTable();
@@ -6533,7 +6662,7 @@ function keepCameraDistanceOnBodyScaleChange(body: Body, oldRadius: number, newR
 }
 
 managementPanel.on('deleteBody', () => {
-    deleteSelectedBody({ source: 'ui' });
+    deleteSelectedBody();
 });
 
 managementPanel.on(
@@ -6548,6 +6677,16 @@ managementPanel.on(
         orbitalAngle,
         inclination,
         color,
+    }: {
+        body: Body;
+        name: string;
+        mass: number;
+        temperature: number | null;
+        lightIntensity: number | null;
+        velocity: number;
+        orbitalAngle: number;
+        inclination: number;
+        color: number;
     }) => {
         if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
 
@@ -6568,7 +6707,7 @@ managementPanel.on(
         body.mass = mass;
 
         // Refill fuel for stars based on new mass
-        if (isBodyType(body, BodyType.Star) && body.fuel !== null) {
+        if (body instanceof Star && body.fuel !== null) {
             body.maxFuel = mass * 100000;
             body.fuel = body.maxFuel;
             // Reset to initial state (in case it was in red giant phase)
@@ -6577,7 +6716,7 @@ managementPanel.on(
         }
 
         // Star-only updates (temperature, light) — radius handled globally below
-        if (isBodyType(body, BodyType.Star)) {
+        if (body instanceof Star) {
             // Update temperature if provided
             if (temperature !== null) {
                 body.setTemperature(temperature);
@@ -6602,13 +6741,15 @@ managementPanel.on(
 
             if (managementPanel && managementPanel.editRadiusSlider) {
                 const oldRadiusAll = body.radius || 1;
-                const newRadiusAll = parseFloat(managementPanel.editRadiusSlider.value);
+                const newRadiusAll = parseFloat(
+                    (managementPanel.editRadiusSlider as HTMLInputElement).value
+                );
                 if (!isNaN(newRadiusAll) && isFinite(newRadiusAll)) {
                     if (isLowMassAsteroid) {
                         body.mass = mass;
                         if (body === selectedBody) refreshSelectionVisuals();
                     } else {
-                        setBodyRadius(body, newRadiusAll);
+                        if (body instanceof CelestialBody) setBodyRadius(body, newRadiusAll);
                         keepCameraDistanceOnBodyScaleChange(body, oldRadiusAll, newRadiusAll);
                         if (body === selectedBody) refreshSelectionVisuals();
                     }
@@ -6644,9 +6785,9 @@ managementPanel.on(
                 // Convert hex string to THREE.Color
                 const col = new THREE.Color(color);
                 if (body.mesh && body.mesh.material) {
-                    body.mesh.material.color.set(col);
+                    (body.mesh.material as THREE.MeshStandardMaterial).color?.set(col);
                 }
-                if (body.baseColor) body.baseColor.set(col);
+                if (body instanceof CelestialBody) body.baseColor.set(col);
             } catch (e) {
                 console.error('Error applying body color edit:', e);
             }
@@ -6669,7 +6810,7 @@ if (starDeathCheckbox) {
     });
 }
 
-function deleteSelectedBody({ source = 'unknown' } = {}) {
+function deleteSelectedBody() {
     if (!selectedBody || !simulationState.bodies.includes(selectedBody) || selectedBody._isDisposed)
         return false;
     const bodyToDelete = selectedBody;
@@ -6683,7 +6824,7 @@ function deleteSelectedBody({ source = 'unknown' } = {}) {
 
     if (deletingStar) {
         // Star.die(true) is the single cleanup path (no supernova/black hole for manual deletion).
-        bodyToDelete.die(true);
+        bodyToDelete.die();
 
         const index = simulationState.bodies.indexOf(bodyToDelete);
         if (index > -1) simulationState.bodies.splice(index, 1);
@@ -6724,7 +6865,7 @@ function deleteSelectedBody({ source = 'unknown' } = {}) {
             controls.enabled = true;
             controls.target.set(0, 0, 0);
             controls.mouseButtons.RIGHT = null;
-            triggerZoom('camNone');
+            triggerZoomToBody(null);
         }
     }
 
@@ -6835,9 +6976,9 @@ window.addEventListener('keydown', (e) => {
             if (e.repeat) return; // ignore key-repeat; only act on the initial press
             if (flightState.warpActive) {
                 // Disengage warp
-                flightState.warpActive       = false;
-                flightState.warpCharging     = false;
-                flightState.warpCharge       = 0;
+                flightState.warpActive = false;
+                flightState.warpCharging = false;
+                flightState.warpCharge = 0;
                 flightState.warpDecelerating = true;
                 warpEffect.stop();
                 addEvent('Warp disengaged. Decelerating...');
@@ -6879,7 +7020,7 @@ window.addEventListener('keydown', (e) => {
     }
 
     if (key === 'delete') {
-        deleteSelectedBody({ source: 'keyboard' });
+        deleteSelectedBody();
     }
 });
 
@@ -6902,7 +7043,7 @@ window.addEventListener('keyup', (e) => {
             // Cancel warp charge if space released before full charge
             if (flightState.warpCharging) {
                 flightState.warpCharging = false;
-                flightState.warpCharge   = 0;
+                flightState.warpCharge = 0;
                 if (warpSprite) warpSprite.visible = false;
             }
         }
@@ -6932,8 +7073,8 @@ window.addEventListener(
     (e) => {
         // If the wheel is used over the UI panel, let it scroll normally.
         // This allows scrolling the Bodies table without zooming the scene.
-    const uiContainer = document.getElementById('ui-container');
-    if (uiContainer && e.target instanceof Node && uiContainer.contains(e.target)) {
+        const uiContainer = document.getElementById('ui-container');
+        if (uiContainer && e.target instanceof Node && uiContainer.contains(e.target)) {
             return;
         }
 
@@ -6998,7 +7139,7 @@ if (managementPanel.enableKuiperBeltCheckbox)
 if (skydome) skydome.visible = true;
 if (enableSkydomeCheckbox) enableSkydomeCheckbox.checked = true;
 
-function handleBodyBecameInvalid(body: Body | null) {
+function handleBodyBecameInvalid(body: Body | null | undefined) {
     if (!body) return;
 
     // If collision logic already handed camera focus off to a different body this frame,
@@ -7067,7 +7208,13 @@ window.addEventListener('body:removed', (e) => {
     // so the button reverts to "SPAWN SPACESHIP" rather than "RE-ENTER SHIP".
     if (removedBody && removedBody === flightState.knownShip) {
         flightState.knownShip = null;
-        setTimeout(() => { try { updateFlightSpawnBtnLabel(); } catch (_) {} }, 0);
+        setTimeout(() => {
+            try {
+                updateFlightSpawnBtnLabel();
+            } catch {
+                // Empty
+            }
+        }, 0);
     }
     handleBodyBecameInvalid(removedBody);
     refreshBodiesTable();

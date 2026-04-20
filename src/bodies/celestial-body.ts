@@ -10,10 +10,11 @@ import { createTextTexture } from '../drawing/text-rendering.js';
 import { IStateDependencies } from '../interfaces.js';
 
 export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
-    radius: number;
+    pos: THREE.Vector3;
+    vel: THREE.Vector3;
 }
 
-export interface IMoonCreationOptions extends ICelestialBodyCreationOptions {
+export interface IMoonCreationOptions extends IBodyCreationOptions {
     distance: number;
     angle?: number; // optional initial angle for multiple moons
     yVariation?: number; // optional random Y variation for non-coplanar orbits
@@ -70,11 +71,10 @@ export class CelestialBody extends Body {
         maxTrail = 500,
         hasRings = false,
         rotation: IRotation = { axis: new THREE.Vector3(0, 1, 0), speed: 0 },
-        geometryFactory?: ((radius: number) => THREE.BufferGeometry),
+        geometryFactory?: (radius: number) => THREE.BufferGeometry,
         material?: THREE.Material,
         tidalLock?: ITidalLockOptions
     ) {
-
         // Create a simple material if one isn't provided, using the specified color.
         if (!material) {
             material = new THREE.MeshStandardMaterial({

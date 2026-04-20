@@ -3,9 +3,8 @@ import { createTextTexture } from '../drawing/text-rendering.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 
 export interface IBodyCreationOptions {
-    pos: THREE.Vector3;
-    vel: THREE.Vector3;
     mass: number;
+    radius: number;
     id: string;
     name: string;
 }
@@ -116,14 +115,14 @@ export class Body {
     update(acc: THREE.Vector3, dt: number) {
         if (this._isDisposed) return;
 
-        if (
-            !acc ||
-            typeof acc.x !== 'number' ||
-            typeof acc.y !== 'number' ||
-            typeof acc.z !== 'number'
-        ) {
-            acc = new THREE.Vector3(0, 0, 0);
-        }
+        // if (
+        //     !acc ||
+        //     typeof acc.x !== 'number' ||
+        //     typeof acc.y !== 'number' ||
+        //     typeof acc.z !== 'number'
+        // ) {
+        //     acc = new THREE.Vector3(0, 0, 0);
+        // }
 
         this.velocity.x += acc.x * dt * 0.5;
         this.velocity.y += acc.y * dt * 0.5;
