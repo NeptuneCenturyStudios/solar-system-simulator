@@ -11,18 +11,25 @@ function createScreenFlash() {
     screenFlashDiv.style.opacity = '0';
     screenFlashDiv.style.pointerEvents = 'none';
     screenFlashDiv.style.zIndex = '9999';
-    screenFlashDiv.style.transition = 'opacity 0.5s';
     document.body.appendChild(screenFlashDiv);
 }
 createScreenFlash();
 
-export function triggerScreenFlash() {
+/**
+ * Trigger a white screen flash.
+ * @param holdMs   How long (ms) the flash stays at full brightness before fading. Default 50.
+ * @param fadeInSecs CSS transition duration for the fade-in in seconds. Default 0.5.
+ * @param fadeOutSecs CSS transition duration for the fade-out in seconds. Default 0.5.
+ */
+export function triggerScreenFlash(holdMs = 50, fadeInSecs = 0.5, fadeOutSecs = 0.5) {
     if (screenFlashDiv) {
-        screenFlashDiv.style.opacity = '0.6';
+        screenFlashDiv.style.transition = `opacity ${fadeInSecs}s`;
+        screenFlashDiv.style.opacity = '0.8';
         setTimeout(() => {
             if (screenFlashDiv) {
+                screenFlashDiv.style.transition = `opacity ${fadeOutSecs}s`;
                 screenFlashDiv.style.opacity = '0';
             }
-        }, 50);
+        }, holdMs);
     }
 }

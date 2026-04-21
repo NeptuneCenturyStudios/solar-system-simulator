@@ -77,6 +77,7 @@ import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
 import { Supernova } from './effects/supernova.js';
 import { ParticleExplosion } from './effects/particle-explosion.js';
 import { WarpEffect } from './effects/warp-effect.js';
+import { triggerScreenFlash } from './effects/screen-flash.js';
 import { Body } from './bodies/body.js';
 import { CelestialBody } from './bodies/celestial-body.js';
 import { Mercury } from './bodies/mercury.js';
@@ -1062,6 +1063,8 @@ const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED / 2; // decel rate after warp ends (
 const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
 /** Camera distance (u) at which the warp tunnel has fully faded out. */
 const WARP_FADE_DIST     = 200 * SCALE_FACTOR;
+/** Peak camera shake displacement (u) applied each frame during warp. */
+const WARP_SHAKE_MAG     = 0.002 * SCALE_FACTOR;
 
 // Autopilot tuning constants
 /** Thrust acceleration used by autopilot during approach (u/s²). */
@@ -4624,6 +4627,22 @@ function animate() {
         }
     }
 
+    // ── Warp camera shake ───────────────────────────────────────────────
+    // Jitter the camera slightly while warp is active — applies to flight mode
+    // (cockpit + 3rd person) and to lookAt mode when the tunnel is visible.
+    if (flightState.warpActive) {
+        const warpShakeVisible =
+            isFlightModeActive ||
+            (warpEffect.active && warpEffect.lines.visible);
+        if (warpShakeVisible) {
+            const camFwd = new THREE.Vector3();
+            camera.getWorldDirection(camFwd);
+            const camRight = new THREE.Vector3().crossVectors(camFwd, camera.up).normalize();
+            camera.position.addScaledVector(camRight,  (Math.random() - 0.5) * WARP_SHAKE_MAG);
+            camera.position.addScaledVector(camera.up, (Math.random() - 0.5) * WARP_SHAKE_MAG);
+        }
+    }
+
     // ── Ship trail update ──────────────────────────────────────────────────────
     // Runs every frame after physics so the nozzle position is final.
     // Covers both flight mode (player piloting) and autopilot-only (bodies-table "Fly Here").
@@ -5447,6 +5466,7 @@ function updateAutopilot(dt: number) {
             autopilotState.phase = 'WARP';
             if (warpSprite) warpSprite.visible = false;
             warpEffect.start();
+            triggerScreenFlash(200, 0.01, 2.5);
             addEvent('⚡ Autopilot warp engaged.');
         }
     } else if (autopilotState.phase === 'WARP') {
@@ -5870,6 +5890,7 @@ function updateFlightControls(dt: number) {
             flightState.warpCharging = false;
             flightState.warpCharge = 0;
             warpEffect.start();
+            triggerScreenFlash(200, 0.01, 2.5);
             addEvent('⚡ Warp engaged! Press Space to disengage.');
         }
         // Allow normal flight controls while charging (just can't turn on warp mid-turn)
