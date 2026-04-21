@@ -125,7 +125,7 @@ export class StarBirth implements IEffect {
         this.geometry.attributes.position.needsUpdate = true;
 
         // Grow central glow as particles converge
-        this.centralGlow.material.opacity = progress * 0.8;
+        (this.centralGlow.material as THREE.MeshBasicMaterial).opacity = progress * 0.8;
         this.centralGlow.scale.setScalar(progress * 50);
 
         // Fade out particles as they approach center
@@ -144,6 +144,6 @@ export class StarBirth implements IEffect {
         this.geometry.dispose();
         this.material.dispose();
         this.centralGlow.geometry.dispose();
-        this.centralGlow.material.dispose();
+        (this.centralGlow.material as THREE.MeshBasicMaterial).dispose();
     }
 }

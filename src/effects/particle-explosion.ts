@@ -81,14 +81,14 @@ export class ParticleExplosion implements IEffect {
         if (this.flashSphere) {
             if (this.flashOpacity > 0) {
                 this.flashOpacity -= 0.05 * (dt * 60);
-                this.flashSphere.material.opacity = Math.max(0, this.flashOpacity);
+                ((this.flashSphere.material) as THREE.MeshBasicMaterial).opacity = Math.max(0, this.flashOpacity);
                 this.flashSphere.scale.setScalar(1 + (1 - this.flashOpacity) * 2); // Expand as it fades
             }
 
             if (this.flashOpacity <= 0) {
                 this.scene.remove(this.flashSphere);
                 this.flashSphere.geometry.dispose();
-                this.flashSphere.material.dispose();
+                (this.flashSphere.material as THREE.MeshBasicMaterial).dispose();
                 this.flashSphere = null;
             }
         }
@@ -107,7 +107,7 @@ export class ParticleExplosion implements IEffect {
             if (this.flashSphere) {
                 this.scene.remove(this.flashSphere);
                 this.flashSphere.geometry.dispose();
-                this.flashSphere.material.dispose();
+                (this.flashSphere.material as THREE.MeshBasicMaterial).dispose();
                 this.flashSphere = null;
             }
 

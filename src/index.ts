@@ -75,7 +75,6 @@ import {
 import { calculateTrajectory } from './physics/physics.js';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
 import { Supernova } from './effects/supernova.js';
-import { StarBirth } from './effects/star-birth';
 import { ParticleExplosion } from './effects/particle-explosion.js';
 import { WarpEffect } from './effects/warp-effect.js';
 import { Body } from './bodies/body.js';
@@ -765,10 +764,7 @@ const EVENT_DISPLAY_TIME = 5000; // Show for 5 seconds
 const EVENT_FADE_START = 3000; // Start fading after 3 seconds
 
 function addEvent(message: string) {
-    eventLog.push({
-        message: message,
-        timestamp: performance.now(),
-    });
+    eventLog.push(new EventLogEntry(message));
     // Keep only recent events
     while (eventLog.length > MAX_EVENTS) {
         eventLog.shift();
@@ -778,7 +774,7 @@ function addEvent(message: string) {
 function createEventLogTexture() {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    if (!context) return;
+    if (!context) return null;
 
     canvas.width = 600;
     canvas.height = 250;
@@ -4718,7 +4714,7 @@ function animate() {
         // Update every 100ms
         const fps = Math.round(1000 / (now - lastT));
         if (fpsSprite) {
-            fpsSprite.material.map.dispose();
+            fpsSprite.material.map?.dispose();
             fpsSprite.material.map = createFPSTexture(fps);
             fpsSprite.material.needsUpdate = true;
         }
@@ -4756,7 +4752,7 @@ function animate() {
             !selectedBody._isDisposed &&
             statsSprite
         ) {
-            statsSprite.material.map.dispose();
+            statsSprite.material.map?.dispose();
             statsSprite.material.map = createStatsTexture(selectedBody, simulationState.bodies);
             statsSprite.material.needsUpdate = true;
             statsSprite.visible = true;
@@ -4830,7 +4826,7 @@ function animate() {
 
         // Update event log
         if (eventLogSprite) {
-            eventLogSprite.material.map.dispose();
+            eventLogSprite.material.map?.dispose();
             eventLogSprite.material.map = createEventLogTexture();
             eventLogSprite.material.needsUpdate = true;
         }
@@ -5701,8 +5697,7 @@ function engageAutopilot(target: Body) {
     const orbitRadius0 = (target.radius ?? 10) * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
     // Skip APPROACH when the available braking room is shorter than the stopping distance
     // from full normal speed — e.g. Moon → Earth (110 u) where APPROACH would need ~1,200 u.
-    const startInBrake =
-        !startWithWarp && dist0 <= orbitRadius0 + AUTOPILOT_APPROACH_MIN_DISTANCE;
+    const startInBrake = !startWithWarp && dist0 <= orbitRadius0 + AUTOPILOT_APPROACH_MIN_DISTANCE;
 
     autopilotState.isActive = true;
     autopilotState.targetBody = target;
@@ -5977,7 +5972,6 @@ function updateFlightControls(dt: number) {
 
     // ── Steering with smoothing + dead zone (mouse) ───────────────────────────
     // Raw normalised pointer input
-    const dtScale = Math.max(0, dt / (1 / 60));
     const rawXFull = THREE.MathUtils.clamp(
         flightState.pointerOffsetX / FLIGHT_MAX_POINTER_OFFSET,
         -1,

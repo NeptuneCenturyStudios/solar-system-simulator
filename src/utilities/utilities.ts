@@ -33,7 +33,7 @@ export enum BodyTypeEnum {
 }
 
 // Shared body-type helper. Checks bodyType flags only.
-export function isBodyType(body: Body, type) {
+export function isBodyType(body: Body, type: BodyTypeEnum) {
     return !!(body && body.bodyType && body.bodyType & type);
 }
 

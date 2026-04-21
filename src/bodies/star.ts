@@ -59,8 +59,8 @@ export class Star extends CelestialBody {
 
     // Lighting effects
     lightIntensity: number;
-    ambientLight: THREE.AmbientLight;
-    sunLight: THREE.DirectionalLight;
+    ambientLight: THREE.AmbientLight | null;
+    sunLight: THREE.DirectionalLight | null;
 
     /**
      * @param {object} dependencies - same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
@@ -538,6 +538,7 @@ export class Star extends CelestialBody {
     }
 
     setShadowsEnabled(enabled: boolean) {
+        if (!this.sunLight) return;
         this.sunLight.castShadow = enabled;
         if (enabled) {
             this.sunLight.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -550,7 +551,9 @@ export class Star extends CelestialBody {
 
     setLightIntensity(intensity: number) {
         this.lightIntensity = intensity;
-        this.sunLight.intensity = intensity / 100000000;
+        if (this.sunLight) {
+            this.sunLight.intensity = intensity / 100000000;
+        }
     }
 
     setTemperature(temp: number) {
@@ -652,6 +655,7 @@ export class Star extends CelestialBody {
     }
 
     setLightDistance(distance: number) {
+        if (!this.sunLight) return;
         this.sunLight.userData.distance = distance;
         if (this.sunLight.shadow && this.sunLight.shadow.camera) {
             this.sunLight.shadow.camera.far = Math.min(distance * 0.5, 500000);
@@ -665,6 +669,7 @@ export class Star extends CelestialBody {
      * non-star body is in focus, so shadows work correctly at any scale or orbital distance.
      */
     updateShadowFrustumForBody(body: CelestialBody) {
+        if (!this.sunLight) return;
         const dist = this.mesh.position.distanceTo(body.mesh.position);
         const size = body.radius * 4;
         this.sunLight.shadow.camera.left = -size;
@@ -697,7 +702,7 @@ export class Star extends CelestialBody {
                 this.scene.remove(this.trail);
 
                 this.trail.geometry?.dispose?.();
-                this.trail.material?.dispose?.();
+                (this.trail.material as THREE.Material)?.dispose?.();
                 this.trail = null;
             }
         } catch {
@@ -710,8 +715,8 @@ export class Star extends CelestialBody {
                 this.scene.remove(this.mesh);
 
                 this.mesh.geometry?.dispose?.();
-                this.mesh.material?.dispose?.();
-                this.mesh = null;
+                (this.mesh.material as THREE.Material)?.dispose?.();
+                //this.mesh = null;
             }
         } catch {
             // ignore
@@ -748,7 +753,7 @@ export class Star extends CelestialBody {
 
                 if (this.sunLight.target) {
                     this.scene.remove(this.sunLight.target);
-                    this.sunLight.target = null;
+                    //this.sunLight.target = null;
                 }
 
                 try {
