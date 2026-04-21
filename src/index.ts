@@ -1053,15 +1053,25 @@ const autopilotState = {
     brakeEntryDistance: 0,
 };
 
+// Flight tuning constants
+const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR; // normal max speed cap (units/s)
+const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED; // boost ceiling = 10× normal max speed
+const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED / 10; // acceleration rate while W/S held (u/s²)
+const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED / 10; // deceleration rate while W/S held (u/s²)
+const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED / 10; // acceleration rate while Shift held (u/s²)
+const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED / 10; // decel rate after boost ends (u/s²)
+const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
+const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED / 2; // decel rate after warp ends (u/s²)
+
 // Autopilot tuning constants
 /** Thrust acceleration used by autopilot during approach (u/s²). */
-const AUTOPILOT_ACCEL = 20 * SCALE_FACTOR;
+const AUTOPILOT_ACCEL = FLIGHT_THRUST_ACCEL;
 /** Braking deceleration — moderate so the stop feels gradual rather than jarring. */
-const AUTOPILOT_DECEL = 20 * SCALE_FACTOR;
+const AUTOPILOT_DECEL = FLIGHT_THRUST_DECEL;
 /** High deceleration rate used to scrub boost speed quickly during approach.
  *  AUTOPILOT_DECEL alone would take 99,000 u to shed boost speed — BOOST_DECEL
  *  brings that down to a reasonable ~4,000 u. */
-const AUTOPILOT_BOOST_DECEL = 500 * SCALE_FACTOR;
+const AUTOPILOT_BOOST_DECEL = FLIGHT_BOOST_DECEL;
 /** Orbit-insertion rate — gentler than AUTOPILOT_DECEL so the turn into orbit is
  *  visually smooth rather than a sharp snap.  Lower = longer arc, higher = snappier. */
 const AUTOPILOT_CIRCULARIZE_RATE = 2 * SCALE_FACTOR;
@@ -1070,7 +1080,7 @@ const AUTOPILOT_CIRCULARIZE_RATE = 2 * SCALE_FACTOR;
  *  velocity at the aesthetic rate above.  This factor scales a gravity-derived floor:
  *  effectiveRate = max(CIRCULARIZE_RATE, GRAVITY_MARGIN × v_orbit × sqrt(g / altitude))
  *  Raise to give more headroom; lower to allow a more gradual arc near large bodies. */
-const AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN = 16;
+const AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN = 16 * SCALE_FACTOR;
 /** Safety pad multiplier on brake distance. Higher = start braking earlier / more gradually.
  *  At 1.2 the ship begins braking at 1.2× the theoretical stopping distance — smooth
  *  but ends up at approximately orbitRadius + 0.2×stoppingDist from the target. */
@@ -1086,11 +1096,6 @@ const AUTOPILOT_MAX_TIMESCALE = 50;
 const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
 // AUTOPILOT_BOOST_THRESHOLD is declared after the FLIGHT_* constants it depends on.
 
-// Flight tuning constants
-const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR; // normal max speed cap (units/s)
-const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED; // boost ceiling = 10× normal max speed
-const FLIGHT_THRUST_ACCEL = 10 * SCALE_FACTOR; // acceleration rate while W/S held (u/s²)
-const FLIGHT_BOOST_ACCEL = 1000 * SCALE_FACTOR; // acceleration rate while Shift held (u/s²)
 /** Rate at which cross-axis (gravity-accumulated) velocity decays while thrusting in simple mode.
  *  Higher = quicker normalisation. At 1.5 the perpendicular component halves in ~0.46 s. */
 const FLIGHT_PERP_DECAY = 0.5; // per second
@@ -1102,9 +1107,7 @@ const FLIGHT_ROLL_FRICTION = 0.4; // how fast roll decays when key released (rad
 const FLIGHT_STEER_SMOOTHING = 0.004; // lerp factor per frame — lower = heavier feel
 const FLIGHT_STEER_DEADZONE = 0.05; // normalised dead zone (0–1); input below this is zeroed
 const FLIGHT_WARP_CHARGE_TIME = 2.0; // seconds to hold Space before warp engages
-const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
-const FLIGHT_WARP_DECEL_RATE = 10000 * SCALE_FACTOR; // decel rate after warp ends (u/s²)
-const FLIGHT_BOOST_DECEL_RATE = 1000 * SCALE_FACTOR; // decel rate after boost ends (u/s²)
+
 /** Maximum visual roll of ship relative to camera at full lateral mouse deflection (rad ~20°). */
 const FLIGHT_MAX_BANK_ANGLE = 0.35;
 /** Maximum visual pitch of ship relative to camera at full vertical mouse deflection (rad ~11.5°). */
@@ -1122,8 +1125,14 @@ const AUTOPILOT_BOOST_THRESHOLD =
         (2 * AUTOPILOT_BOOST_DECEL) +
         (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL));
 /** Deceleration rate used to scrub warp speed during autopilot approach.
- *  Matches FLIGHT_WARP_DECEL_RATE so the feel is consistent with manual warp decel. */
-const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL_RATE;
+ *  Matches FLIGHT_WARP_DECEL so the feel is consistent with manual warp decel. */
+const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
+/** Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop.
+ *  When the gap between the ship and orbitRadius is shorter than this, autopilot skips
+ *  APPROACH and enters BRAKE directly so the ship doesn't arrive with too much speed.
+ *  Derived from: BRAKE_PAD × v² / (2 × decel) at FLIGHT_MAX_SPEED. */
+const AUTOPILOT_APPROACH_MIN_DISTANCE =
+    AUTOPILOT_BRAKE_PAD * ((FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL));
 /** Distance (u) above which autopilot engages warp for fast transit.
  *  Computed as 1.5× the stopping distance from warp speed down to boost speed,
  *  plus AUTOPILOT_BOOST_THRESHOLD (the runway still needed once warp ends). */
@@ -2578,7 +2587,7 @@ function createPresetBody(presetKey: string) {
                     id: createUniqueId('moon'),
                     name: 'Moon',
                     trailColor: 0xffffff,
-                    maxTrail: 1500
+                    maxTrail: 1500,
                 });
             }
             break;
@@ -5497,13 +5506,18 @@ function updateAutopilot(dt: number) {
 
         // Blend desired velocity as the ship spirals inward:
         //   tangential component: 0 → vOrbit  (builds up as alpha → 1)
-        //   radial-inward component: FLIGHT_MAX_SPEED → 0  (fades to 0 at orbitRadius)
+        //   radial-inward component: maxInward → 0  (fades to 0 at orbitRadius)
         //
         // Without the inward component, when alpha ≈ 1 the controller settles the ship
         // into a stable circular orbit at whatever distance it happens to be at (e.g. 328u
         // around Jupiter instead of 131u).  The inward term keeps the ship spiralling toward
         // orbitRadius so alpha and inward both reach their final values at the same point.
-        const inwardSpeed = FLIGHT_MAX_SPEED * (1 - alpha);
+        //
+        // Cap the inward speed to what AUTOPILOT_DECEL can stop in the available brakeSpan.
+        // Without this cap, short-distance entries (e.g. Moon → Earth) target FLIGHT_MAX_SPEED
+        // inward but only have ~86 u to stop — causing the ship to crash through the target.
+        const maxInwardForSpan = Math.sqrt(2 * AUTOPILOT_DECEL * brakeSpan);
+        const inwardSpeed = Math.min(FLIGHT_MAX_SPEED, maxInwardForSpan) * (1 - alpha);
         const desiredVel = new THREE.Vector3()
             .copy(target.velocity)
             .addScaledVector(tangential, vOrbit * alpha) // tangential: 0 → vOrbit
@@ -5680,20 +5694,34 @@ function engageAutopilot(target: Body) {
         warpEffect.stop();
     }
 
-    // Choose initial phase based on distance: warp for far targets, approach otherwise.
+    // Choose initial phase based on distance.
     const dist0 =
         ship.mesh && target.mesh ? ship.mesh.position.distanceTo(target.mesh.position) : Infinity;
     const startWithWarp = dist0 > AUTOPILOT_WARP_THRESHOLD;
+    const orbitRadius0 = (target.radius ?? 10) * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
+    // Skip APPROACH when the available braking room is shorter than the stopping distance
+    // from full normal speed — e.g. Moon → Earth (110 u) where APPROACH would need ~1,200 u.
+    const startInBrake =
+        !startWithWarp && dist0 <= orbitRadius0 + AUTOPILOT_APPROACH_MIN_DISTANCE;
 
     autopilotState.isActive = true;
     autopilotState.targetBody = target;
     autopilotState.isWarpActive = false;
     autopilotState.warpChargeTimer = 0;
-    autopilotState.phase = startWithWarp ? 'WARP_CHARGING' : 'APPROACH';
+    if (startWithWarp) {
+        autopilotState.phase = 'WARP_CHARGING';
+    } else if (startInBrake) {
+        autopilotState.phase = 'BRAKE';
+        autopilotState.brakeEntryDistance = dist0;
+    } else {
+        autopilotState.phase = 'APPROACH';
+    }
     flightState.thrustActive = false;
 
     if (startWithWarp) {
         addEvent(`Autopilot engaged: initiating warp to ${target.name || 'target'}.`);
+    } else if (startInBrake) {
+        addEvent(`Autopilot engaged: direct approach to ${target.name || 'target'}.`);
     } else {
         addEvent(`Autopilot engaged: flying to ${target.name || 'target'}.`);
     }
@@ -5740,7 +5768,7 @@ function updateFlightControls(dt: number) {
         const fwdSpd = ship.velocity.dot(forward);
         const boostHandoff = keys.shift && fwdSpd <= FLIGHT_BOOST_MAX_SPEED;
         if (!boostHandoff && fwdSpd > FLIGHT_MAX_SPEED) {
-            const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_WARP_DECEL_RATE * dt);
+            const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_WARP_DECEL * dt);
             ship.velocity.copy(forward).multiplyScalar(newSpd);
             flightState.currentSpeed = newSpd;
         } else {
@@ -5759,7 +5787,7 @@ function updateFlightControls(dt: number) {
     if (flightState.boostDecelerating) {
         const fwdSpd = ship.velocity.dot(forward);
         if (fwdSpd > FLIGHT_MAX_SPEED) {
-            const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_BOOST_DECEL_RATE * dt);
+            const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_BOOST_DECEL * dt);
             ship.velocity.copy(forward).multiplyScalar(newSpd);
             flightState.currentSpeed = newSpd;
         } else {
@@ -5857,6 +5885,7 @@ function updateFlightControls(dt: number) {
         if (thrustActive) {
             const maxSpeed = keys.shift ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
             const accel = keys.shift ? FLIGHT_BOOST_ACCEL : FLIGHT_THRUST_ACCEL;
+            const decel = keys.shift ? FLIGHT_BOOST_DECEL : FLIGHT_THRUST_DECEL;
             // Ignore boost while above boost max speed (e.g. decelerating from warp);
             // the ship should coast down through FLIGHT_BOOST_MAX_SPEED naturally.
             const shiftEffective = keys.shift && flightState.currentSpeed <= FLIGHT_BOOST_MAX_SPEED;
@@ -5868,7 +5897,7 @@ function updateFlightControls(dt: number) {
             } else {
                 // keys.s
                 flightState.currentSpeed = Math.max(
-                    flightState.currentSpeed - accel * dt,
+                    flightState.currentSpeed - decel * dt,
                     -FLIGHT_MAX_SPEED
                 );
             }
@@ -5899,7 +5928,7 @@ function updateFlightControls(dt: number) {
             }
         } else if (keys.s) {
             if (fwdSpeed > -FLIGHT_MAX_SPEED) {
-                const delta = Math.max(-FLIGHT_THRUST_ACCEL * dt, -FLIGHT_MAX_SPEED - fwdSpeed);
+                const delta = Math.max(-FLIGHT_THRUST_DECEL * dt, -FLIGHT_MAX_SPEED - fwdSpeed);
                 ship.velocity.addScaledVector(forward, delta);
             }
         }
