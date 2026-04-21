@@ -1064,7 +1064,7 @@ const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
 /** Camera distance (u) at which the warp tunnel has fully faded out. */
 const WARP_FADE_DIST     = 200 * SCALE_FACTOR;
 /** Peak camera shake displacement (u) applied each frame during warp. */
-const WARP_SHAKE_MAG     = 0.002 * SCALE_FACTOR;
+const WARP_SHAKE_MAG     = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
 
 // Autopilot tuning constants
 /** Thrust acceleration used by autopilot during approach (u/s²). */
@@ -4208,18 +4208,24 @@ function animate() {
         // so it always reflects the ship's final post-physics position.
     }
 
-    // Background warp: keep the known ship at warp speed and animate the tunnel
-    // when the player has exited the cockpit while warp was still active.
+    // Background warp: keep the known ship at warp speed when the player has
+    // exited the cockpit while warp was still active.
     if (!isFlightModeActive && flightState.warpActive) {
         const bgShip = flightState.knownShip;
         if (bgShip && !bgShip._isDisposed && bgShip.mesh) {
             const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
             bgShip.velocity.copy(bgFwd).multiplyScalar(FLIGHT_WARP_SPEED);
-            warpEffect.update(SIM.BASE_FRAME_DT, bgShip.mesh.position, bgShip.mesh.quaternion);
         } else {
             flightState.warpActive = false;
-            warpEffect.stop();
         }
+    }
+
+    // Always update warp streaks — opacity is driven by ship speed so no
+    // explicit start/stop is needed.  Runs even when not in flight mode so
+    // the tunnel is visible from lookAt mode and fades naturally on decel.
+    const _warpUpdateShip = flightState.activeShip ?? flightState.knownShip;
+    if (_warpUpdateShip && !_warpUpdateShip._isDisposed && _warpUpdateShip.mesh) {
+        warpEffect.update(SIM.BASE_FRAME_DT, _warpUpdateShip.mesh.position, _warpUpdateShip.velocity, FLIGHT_WARP_SPEED);
     }
 
     // WASD camera movement (works in both free camera and normal mode, but NOT in flight mode)
@@ -4630,10 +4636,8 @@ function animate() {
     // ── Warp camera shake ───────────────────────────────────────────────
     // Jitter the camera slightly while warp is active — applies to flight mode
     // (cockpit + 3rd person) and to lookAt mode when the tunnel is visible.
-    if (flightState.warpActive) {
-        const warpShakeVisible =
-            isFlightModeActive ||
-            (warpEffect.active && warpEffect.lines.visible);
+    if (flightState.warpActive || autopilotState.isWarpActive) {
+        const warpShakeVisible = isFlightModeActive || warpEffect.lines.visible;
         if (warpShakeVisible) {
             const camFwd = new THREE.Vector3();
             camera.getWorldDirection(camFwd);
@@ -4726,30 +4730,32 @@ function animate() {
         window.__updateHintSprite();
     }
 
-    // Warp effect visibility: always visible in flight mode; fades with distance
-    // when the ship is the current look-at target (fully opaque ≤ WARP_FULL_VIS_DIST,
-    // fully hidden ≥ WARP_FADE_DIST).
-    if (warpEffect.active) {
-        const warpShip = flightState.knownShip;
-        const shipIsLookAtTarget =
-            cameraState.isLookAtMode &&
-            cameraState.focusBody !== null &&
-            cameraState.focusBody === warpShip;
+    // Distance-fade the warp streaks based on camera proximity to the ship.
+    // Speed-based opacity is handled inside warpEffect.update(); here we only
+    // apply the distance multiplier and handle the case where no ship exists.
+    const _visShip = flightState.activeShip ?? flightState.knownShip;
+    if (_visShip && !_visShip._isDisposed && _visShip.mesh) {
         if (isFlightModeActive) {
-            warpEffect.lines.visible = true;
             warpEffect.setOpacity(1.0);
-        } else if (shipIsLookAtTarget && warpShip) {
-            const dist = camera.position.distanceTo(warpShip.mesh.position);
-            if (dist >= WARP_FADE_DIST) {
-                warpEffect.lines.visible = false;
-            } else {
-                const t = Math.max(0, (dist - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST));
-                warpEffect.lines.visible = true;
-                warpEffect.setOpacity(1.0 - t);
-            }
         } else {
-            warpEffect.lines.visible = false;
+            const shipIsLookAtTarget =
+                cameraState.isLookAtMode &&
+                cameraState.focusBody !== null &&
+                cameraState.focusBody === _visShip;
+            if (shipIsLookAtTarget) {
+                const dist = camera.position.distanceTo(_visShip.mesh.position);
+                if (dist >= WARP_FADE_DIST) {
+                    warpEffect.setOpacity(0.0);
+                } else {
+                    const t = Math.max(0, (dist - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST));
+                    warpEffect.setOpacity(1.0 - t);
+                }
+            } else {
+                warpEffect.setOpacity(0.0);
+            }
         }
+    } else {
+        warpEffect.setOpacity(0.0);
     }
 
     // Render 3D scene first, then UI overlay on top
@@ -5474,7 +5480,7 @@ function updateAutopilot(dt: number) {
         ship.velocity.copy(target.velocity).addScaledVector(toTargetDir, FLIGHT_WARP_SPEED);
         flightState.currentSpeed = FLIGHT_WARP_SPEED;
         flightState.thrustActive = true;
-        warpEffect.update(dt, ship.mesh.position, ship.mesh.quaternion);
+        // (warpEffect.update is called centrally in the animate loop each frame)
 
         // Keep ship visually pointed toward the target.
         const warpQuat = new THREE.Quaternion().setFromRotationMatrix(
@@ -5856,7 +5862,7 @@ function updateFlightControls(dt: number) {
         ship.velocity.copy(warpVel);
         flightState.currentSpeed = FLIGHT_WARP_SPEED;
         flightState.thrustActive = true;
-        warpEffect.update(dt, ship.mesh.position, ship.mesh.quaternion);
+        // (warpEffect.update is called centrally in the animate loop each frame)
         // Hide steering HUD during warp (no manual steering available).
         flightSteeringLine.visible = false;
         flightCrosshair.visible = false;

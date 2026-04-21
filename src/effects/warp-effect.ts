@@ -4,7 +4,7 @@ import { SCALE_FACTOR } from '../utilities/consts.js';
 // ─── Tunnel geometry constants ───────────────────────────────────────────────
 const SF = SCALE_FACTOR;
 
-const N_STREAKS      = 500;
+const N_STREAKS      = 750;
 
 // How far ahead of the ship (along its +Z axis) new streaks spawn.
 const FAR_SPAWN_Z    = 3000 * SF;
@@ -31,21 +31,23 @@ const OUTER_BAND_MAX  = 1.00;
 const INNER_BAND_MIN  = 0.05;
 const INNER_BAND_MAX  = 0.35;
 
+// Cached unit vector — avoids allocating a new Vector3 every frame.
+const _FWD = new THREE.Vector3(0, 0, 1);
+
 /**
  * 3-D warp tunnel effect.
  *
- * Renders rainbow speed-streaks arranged in a cylindrical tunnel around the
- * ship's forward axis (+Z in ship-local space).  The geometry lives in the
- * main perspective scene so depth, perspective and camera angle are all
- * handled naturally by Three.js.
+ * Renders rainbow speed-streaks arranged in a cylindrical tunnel along the
+ * ship's velocity direction.  Opacity is driven purely by ship speed:
+ * 0 at rest → 1 at maxSpeed, so the effect fades in and out automatically
+ * as the ship accelerates and decelerates.
  *
  * Usage:
  *   const warpEffect = new WarpEffect(scene);
- *   warpEffect.start();
- *   // each frame:
- *   warpEffect.update(dt, ship.mesh.position, ship.mesh.quaternion);
- *   // to end:
- *   warpEffect.stop();
+ *   // each frame (always, whenever a ship exists):
+ *   warpEffect.update(dt, ship.mesh.position, ship.velocity, FLIGHT_WARP_SPEED);
+ *   // optional per-frame distance fade from outside:
+ *   warpEffect.setOpacity(distanceFade);  // 0–1 multiplier
  */
 export class WarpEffect {
     private scene: THREE.Scene;
@@ -65,7 +67,10 @@ export class WarpEffect {
     private mat: THREE.LineBasicMaterial;
     readonly lines: THREE.LineSegments;
 
-    active = false;
+    /** Speed-derived base opacity (0–1), updated each frame by update(). */
+    private speedOpacity = 0;
+    /** Distance-fade multiplier applied on top of speedOpacity (set by setOpacity). */
+    private distanceFade = 1;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
@@ -100,7 +105,7 @@ export class WarpEffect {
         scene.add(this.lines);
 
         // Pre-seed all streaks spread along the full tunnel so the effect is
-        // immediately populated when start() is called.
+        // immediately populated once the ship starts moving.
         for (let i = 0; i < N_STREAKS; i++) {
             this.seedStreak(i, /*randomZ=*/true);
         }
@@ -179,33 +184,38 @@ export class WarpEffect {
 
     // ─── public API ─────────────────────────────────────────────────────────
 
-    start(): void {
-        this.active = true;
-        this.lines.visible = true;
-    }
+    /** No-op — kept for call-site compatibility. Visibility is driven by speed. */
+    start(): void { /* no-op */ }
 
-    stop(): void {
-        this.active = false;
-        this.lines.visible = false;
-    }
+    /** No-op — kept for call-site compatibility. Visibility is driven by speed. */
+    stop():  void { /* no-op */ }
 
     /**
-     * Call every frame while warp is active.
-     * @param dt        Delta time in seconds.
-     * @param shipPos   World-space position of the ship.
-     * @param shipQuat  World-space orientation of the ship (+Z = forward).
+     * Call every frame while a ship exists in the scene.
+     *
+     * @param dt           Delta time in seconds.
+     * @param shipPos      World-space position of the ship.
+     * @param shipVelocity World-space velocity of the ship.
+     * @param maxSpeed     Speed at which opacity reaches 1.0 (pass FLIGHT_WARP_SPEED).
      */
-    update(dt: number, shipPos: THREE.Vector3, shipQuat: THREE.Quaternion): void {
-        if (!this.active) return;
-
-        // Anchor the geometry to the ship so positions stay in ship-local space.
+    update(dt: number, shipPos: THREE.Vector3, shipVelocity: THREE.Vector3, maxSpeed: number): void {
+        // Anchor geometry to the ship.
         this.lines.position.copy(shipPos);
-        this.lines.quaternion.copy(shipQuat);
 
-        // Advance each streak toward the camera (−Z in ship-local space).
+        const speed = shipVelocity.length();
+
+        // Opacity ramps linearly: 0 at rest → 1 at maxSpeed.
+        this.speedOpacity = Math.min(speed / maxSpeed, 1);
+        this._applyOpacity();
+
+        // Orient tunnel along velocity direction.
+        if (speed > 1e-3) {
+            this.lines.quaternion.setFromUnitVectors(_FWD, shipVelocity.clone().divideScalar(speed));
+        }
+
+        // Always advance streaks so they're ready the moment they become visible.
         for (let i = 0; i < N_STREAKS; i++) {
             this.zPos[i] -= this.speed[i] * dt;
-            // Re-seed once the trailing tip has fully passed the ship's origin.
             if (this.zPos[i] + this.len[i] < EXPIRE_Z) {
                 this.seedStreak(i, /*randomZ=*/false);
             }
@@ -214,14 +224,25 @@ export class WarpEffect {
         this.rebuildGeometry();
     }
 
-    /** Set the material opacity (used for distance-based fade). */
-    setOpacity(alpha: number): void {
-        this.mat.opacity = alpha;
+    /**
+     * Apply a distance-based fade multiplier (0–1).
+     * Final opacity = speedOpacity × distanceFade.
+     * Call once per frame from the visibility block in index.ts.
+     */
+    setOpacity(distanceFade: number): void {
+        this.distanceFade = distanceFade;
+        this._applyOpacity();
     }
 
     /** No-op — kept for call-site compatibility with the previous 2-D version. */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     resize(_width: number, _height: number): void { /* no-op */ }
+
+    private _applyOpacity(): void {
+        const final = this.speedOpacity * this.distanceFade;
+        this.mat.opacity = final;
+        this.lines.visible = final > 0.005;
+    }
 
     dispose(): void {
         this.scene.remove(this.lines);
