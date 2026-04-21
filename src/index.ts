@@ -1058,6 +1058,10 @@ const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED / 10; // acceleration rate whi
 const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED / 10; // decel rate after boost ends (u/s²)
 const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
 const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED / 2; // decel rate after warp ends (u/s²)
+/** Camera distance (u) at which the warp tunnel is still fully opaque. */
+const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
+/** Camera distance (u) at which the warp tunnel has fully faded out. */
+const WARP_FADE_DIST     = 200 * SCALE_FACTOR;
 
 // Autopilot tuning constants
 /** Thrust acceleration used by autopilot during approach (u/s²). */
@@ -1444,7 +1448,7 @@ createSpeedSprite();
 // Bottom-center canvas sprite. Shows progress bar while charging, pulsing
 // "WARP ACTIVE" text once warp is engaged.
 let warpSprite: THREE.Sprite | null = null;
-const warpEffect = new WarpEffect(uiScene, window.innerWidth, window.innerHeight);
+const warpEffect = new WarpEffect(scene);
 
 /** Renders the charging progress bar (fill = 0..1) with label above. */
 function createWarpChargeTexture(fill: number): THREE.CanvasTexture {
@@ -4201,6 +4205,20 @@ function animate() {
         // so it always reflects the ship's final post-physics position.
     }
 
+    // Background warp: keep the known ship at warp speed and animate the tunnel
+    // when the player has exited the cockpit while warp was still active.
+    if (!isFlightModeActive && flightState.warpActive) {
+        const bgShip = flightState.knownShip;
+        if (bgShip && !bgShip._isDisposed && bgShip.mesh) {
+            const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
+            bgShip.velocity.copy(bgFwd).multiplyScalar(FLIGHT_WARP_SPEED);
+            warpEffect.update(SIM.BASE_FRAME_DT, bgShip.mesh.position, bgShip.mesh.quaternion);
+        } else {
+            flightState.warpActive = false;
+            warpEffect.stop();
+        }
+    }
+
     // WASD camera movement (works in both free camera and normal mode, but NOT in flight mode)
     if (!isFlightModeActive) {
         const speed = (keys.shift ? cameraSpeed * 10 : cameraSpeed) * SCALE_FACTOR;
@@ -4689,15 +4707,30 @@ function animate() {
         window.__updateHintSprite();
     }
 
-    // Warp effect visibility: only show when the player can actually see it —
-    // i.e. in flight mode, or when the ship is the current look-at camera target.
+    // Warp effect visibility: always visible in flight mode; fades with distance
+    // when the ship is the current look-at target (fully opaque ≤ WARP_FULL_VIS_DIST,
+    // fully hidden ≥ WARP_FADE_DIST).
     if (warpEffect.active) {
         const warpShip = flightState.knownShip;
         const shipIsLookAtTarget =
             cameraState.isLookAtMode &&
             cameraState.focusBody !== null &&
             cameraState.focusBody === warpShip;
-        warpEffect.lines.visible = isFlightModeActive || shipIsLookAtTarget;
+        if (isFlightModeActive) {
+            warpEffect.lines.visible = true;
+            warpEffect.setOpacity(1.0);
+        } else if (shipIsLookAtTarget && warpShip) {
+            const dist = camera.position.distanceTo(warpShip.mesh.position);
+            if (dist >= WARP_FADE_DIST) {
+                warpEffect.lines.visible = false;
+            } else {
+                const t = Math.max(0, (dist - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST));
+                warpEffect.lines.visible = true;
+                warpEffect.setOpacity(1.0 - t);
+            }
+        } else {
+            warpEffect.lines.visible = false;
+        }
     }
 
     // Render 3D scene first, then UI overlay on top
@@ -5421,7 +5454,7 @@ function updateAutopilot(dt: number) {
         ship.velocity.copy(target.velocity).addScaledVector(toTargetDir, FLIGHT_WARP_SPEED);
         flightState.currentSpeed = FLIGHT_WARP_SPEED;
         flightState.thrustActive = true;
-        warpEffect.update(dt);
+        warpEffect.update(dt, ship.mesh.position, ship.mesh.quaternion);
 
         // Keep ship visually pointed toward the target.
         const warpQuat = new THREE.Quaternion().setFromRotationMatrix(
@@ -5771,6 +5804,9 @@ function updateFlightControls(dt: number) {
             // On boost handoff keep current speed; on natural end clamp to normal max.
             flightState.currentSpeed = boostHandoff ? fwdSpd : Math.min(fwdSpd, FLIGHT_MAX_SPEED);
             warpEffect.stop();
+            // Restore steering HUD now that warp deceleration is complete.
+            flightSteeringLine.visible = true;
+            flightCrosshair.visible = true;
         }
         flightState.thrustActive = false;
         if (warpSprite) warpSprite.visible = false;
@@ -5800,7 +5836,11 @@ function updateFlightControls(dt: number) {
         ship.velocity.copy(warpVel);
         flightState.currentSpeed = FLIGHT_WARP_SPEED;
         flightState.thrustActive = true;
-        warpEffect.update(dt);
+        warpEffect.update(dt, ship.mesh.position, ship.mesh.quaternion);
+        // Hide steering HUD during warp (no manual steering available).
+        flightSteeringLine.visible = false;
+        flightCrosshair.visible = false;
+        steeringEndMarker.visible = false;
         // Pulsing warp-active text (update every call is cheap since canvas is small)
         if (warpSprite) {
             const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
@@ -6127,7 +6167,9 @@ function spawnShip() {
     flightState.knownShip = ship;
     flightState.activeShip = ship;
     flightState.isActive = true;
-    flightState.currentSpeed = 0;
+    // Preserve warp state: if the ship was warping autonomously while the player
+    // was outside, keep warpActive so flight resumes at warp speed immediately.
+    flightState.currentSpeed = flightState.warpActive ? FLIGHT_WARP_SPEED : 0;
     flightState.pointerOffsetX = 0;
     flightState.pointerOffsetY = 0;
     flightState.rollLeft = false;
@@ -6137,8 +6179,8 @@ function spawnShip() {
     flightState.steerY = 0;
     flightState.warpCharge = 0;
     flightState.warpCharging = false;
-    flightState.warpActive = false;
-    flightState.warpDecelerating = false;
+    // warpActive and warpDecelerating are intentionally NOT zeroed here —
+    // they are preserved from the background-warp state set before re-entry.
     flightState.flightCameraQuat.copy(ship.mesh.quaternion);
     flightState.shipBankRoll = 0;
     flightState.shipBankPitch = 0;
@@ -6231,11 +6273,13 @@ function exitFlightMode() {
         simulationState.bodies.includes(flightState.knownShip)
     ) {
         const shipPos = flightState.knownShip.mesh.position.clone();
-        // Keep the pre-flight viewing direction but reposition to look at the ship.
+        // Use the current in-flight camera-to-ship distance so the view doesn't
+        // jump to the pre-flight zoom level after exit.
+        const currentCamDist = camera.position.distanceTo(shipPos);
         const prevDir = new THREE.Vector3()
             .subVectors(flightState.prevCameraPos, flightState.prevControlsTarget)
             .normalize();
-        const dist = flightState.prevCameraPos.distanceTo(flightState.prevControlsTarget);
+        const dist = currentCamDist > 0 ? currentCamDist : flightState.prevCameraPos.distanceTo(flightState.prevControlsTarget);
         camera.position.copy(shipPos).addScaledVector(prevDir, dist);
         controls.target.copy(shipPos);
     } else {
@@ -6251,9 +6295,14 @@ function exitFlightMode() {
     if (warpSprite) warpSprite.visible = false;
     flightState.warpCharge = 0;
     flightState.warpCharging = false;
-    flightState.warpActive = false;
     flightState.warpDecelerating = false;
-    warpEffect.stop();
+    if (!flightState.warpActive) {
+        // Not warping — clean up fully.
+        warpEffect.stop();
+    }
+    // If warpActive is true, the ship continues warping autonomously and the
+    // background updater (in the animate loop) maintains its velocity and the
+    // tunnel animation.  Do NOT zero warpActive or stop the effect here.
     if (flightState.knownShip && !flightState.knownShip._isDisposed) {
         flightState.knownShip.trail.hide();
     }
@@ -7009,6 +7058,10 @@ window.addEventListener('keydown', (e) => {
                 flightState.warpCharge = 0;
                 flightState.warpDecelerating = true;
                 warpEffect.stop();
+                // Restore steering HUD immediately on disengage (decel still active,
+                // but steering is restored so the player can redirect during slowdown).
+                flightSteeringLine.visible = true;
+                flightCrosshair.visible = true;
                 addEvent('Warp disengaged. Decelerating...');
             } else if (!flightState.warpDecelerating && !autopilotState.isActive) {
                 // Only start charging when not already decelerating from a previous warp,
