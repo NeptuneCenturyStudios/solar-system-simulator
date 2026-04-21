@@ -4968,7 +4968,7 @@ function updateFlightSpawnBtnLabel() {
     while (iconEl && iconEl.nextSibling) btn.removeChild(iconEl.nextSibling);
     if (iconEl)
         btn.appendChild(
-            document.createTextNode(canReenter ? ' RE-ENTER SHIP' : ' SPAWN SPACESHIP')
+            document.createTextNode(canReenter ? ' ENTER SHIP' : ' SPAWN SPACESHIP')
         );
 }
 
@@ -6077,30 +6077,46 @@ function spawnShip() {
     const canReenter =
         existing && !existing._isDisposed && simulationState.bodies.includes(existing);
 
-    const ship: Spaceship = canReenter
-        ? existing
-        : (() => {
-              const cameraDir = new THREE.Vector3();
-              camera.getWorldDirection(cameraDir);
-              const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
+    if (!canReenter) {
+        // --- Fresh spawn: create the ship and focus the camera on it without entering flight mode ---
+        const cameraDir = new THREE.Vector3();
+        camera.getWorldDirection(cameraDir);
+        const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
 
-              const s = new Spaceship(
-                  dependencies,
-                  scene,
-                  spawnPos,
-                  new THREE.Vector3(),
-                  createUniqueId('spaceship')
-              );
-              simulationState.bodies.push(s);
-              try {
-                  window.dispatchEvent(
-                      new CustomEvent('body:added', { detail: { body: s, id: s.id, name: s.name } })
-                  );
-              } catch {
-                  // Empty
-              }
-              return s;
-          })();
+        const ship = new Spaceship(
+            dependencies,
+            scene,
+            spawnPos,
+            new THREE.Vector3(),
+            createUniqueId('spaceship')
+        );
+        simulationState.bodies.push(ship);
+        try {
+            window.dispatchEvent(
+                new CustomEvent('body:added', { detail: { body: ship, id: ship.id, name: ship.name } })
+            );
+        } catch {
+            // Empty
+        }
+
+        // Remember the ship so "RE-ENTER SHIP" works on the next click
+        flightState.knownShip = ship;
+
+        // Select the ship as the look-at target (same as clicking it in the bodies list)
+        cameraState.isLookAtMode = true;
+        mainPanel.setLookAtState(true);
+        setFocusBody(ship, { zoom: true });
+        managementPanel.setSelectedBody(ship);
+
+        // Update button label to "RE-ENTER SHIP"
+        updateFlightSpawnBtnLabel();
+
+        addEvent('Spaceship spawned. Click RE-ENTER SHIP to pilot it.');
+        return;
+    }
+
+    // --- Re-enter existing ship: enter flight mode immediately ---
+    const ship: Spaceship = existing;
 
     // Snapshot camera / controls state so exit can restore it cleanly
     flightState.prevCameraPos.copy(camera.position);
@@ -6161,9 +6177,7 @@ function spawnShip() {
     flightControlsPanel.setAutopilotState(autopilotState.isActive, true);
     refreshBodiesTable();
 
-    addEvent(
-        canReenter ? 'Re-entered spaceship.' : 'Spaceship launched! W/S=speed  A/D=roll  Esc=exit'
-    );
+    addEvent('Entered spaceship.');
 }
 
 /** Exit flight mode and restore normal camera controls. */
@@ -7219,7 +7233,7 @@ window.addEventListener('body:added', refreshBodiesTable);
 window.addEventListener('body:removed', (e) => {
     const removedBody = e?.detail?.body;
     // If the deleted body was the player's known ship, clear the reference
-    // so the button reverts to "SPAWN SPACESHIP" rather than "RE-ENTER SHIP".
+    // so the button reverts to "SPAWN SPACESHIP" rather than "ENTER SHIP".
     if (removedBody && removedBody === flightState.knownShip) {
         flightState.knownShip = null;
         setTimeout(() => {
