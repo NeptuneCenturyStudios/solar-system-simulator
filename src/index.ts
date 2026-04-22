@@ -6907,7 +6907,7 @@ if (starDeathCheckbox) {
     starDeathCheckbox.addEventListener('change', () => {
         // Update stats display if a body is currently selected
         if (selectedBody && statsSprite && statsSprite.visible) {
-            statsSprite.material.map.dispose();
+            statsSprite.material.map?.dispose();
             statsSprite.material.map = createStatsTexture(selectedBody, simulationState.bodies);
             statsSprite.material.needsUpdate = true;
         }
