@@ -8,7 +8,9 @@ import {
     MOON_RADIUS,
     NEPTUNE_MASS,
     NEPTUNE_RADIUS,
+    SCALE_FACTOR,
     SUN_MASS,
+    SUN_RADIUS,
 } from '../utilities/consts.js';
 import { BodyType, isBodyType } from '../utilities/utilities.js';
 import { Star } from '../bodies/star.js';
@@ -35,9 +37,6 @@ export class ManagementPanel extends Panel {
         this.presetBodySelect = null;
         this.customBodyGroup = null;
         this.orbitTypeGroup = null;
-        this.orbitalAngleGroup = null;
-        this.orbitalAngleSlider = null;
-        this.orbitalAngleDisplay = null;
         this.inclinationGroup = null;
         this.inclinationSlider = null;
         this.inclinationDisplay = null;
@@ -116,9 +115,6 @@ export class ManagementPanel extends Panel {
         this.presetBodySelect = document.getElementById('presetBody');
         this.customBodyGroup = document.getElementById('customBodyGroup');
         this.orbitTypeGroup = document.getElementById('orbitTypeGroup');
-        this.orbitalAngleGroup = document.getElementById('orbitalAngleGroup');
-        this.orbitalAngleSlider = document.getElementById('orbitalAngle');
-        this.orbitalAngleDisplay = document.getElementById('orbital-angle-val');
         this.inclinationGroup = document.getElementById('inclinationGroup');
         this.inclinationSlider = document.getElementById('inclination');
         this.inclinationDisplay = document.getElementById('inclination-val');
@@ -303,7 +299,6 @@ export class ManagementPanel extends Panel {
 
             if (isPreset) {
                 if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'none';
-                if (this.orbitalAngleGroup) this.orbitalAngleGroup.style.display = 'none';
                 if (this.inclinationGroup) this.inclinationGroup.style.display = 'none';
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
@@ -322,7 +317,6 @@ export class ManagementPanel extends Panel {
             const bodyType = this.bodyTypeSelect ? this.bodyTypeSelect.value : null;
             if (bodyType && bodyType !== 'sun') {
                 if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'block';
-                if (this.orbitalAngleGroup) this.orbitalAngleGroup.style.display = 'block';
                 if (this.inclinationGroup) this.inclinationGroup.style.display = 'block';
 
                 const isCustomPlanet = bodyType === 'planet';
@@ -375,7 +369,6 @@ export class ManagementPanel extends Panel {
                 );
 
                 if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'none';
-                if (this.orbitalAngleGroup) this.orbitalAngleGroup.style.display = 'none';
                 if (this.inclinationGroup) this.inclinationGroup.style.display = 'none';
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
@@ -445,17 +438,15 @@ export class ManagementPanel extends Panel {
                 const value = parseFloat(this.createRadiusSlider.value);
                 this.createRadiusDisplay.textContent = formatNumberForDisplay(value);
             };
+            this.createRadiusSlider.max = String(200000 * SCALE_FACTOR);
             this.createRadiusSlider.oninput();
         }
 
-        updateAddModeVisibility();
-
-        if (this.orbitalAngleSlider && this.orbitalAngleDisplay) {
-            this.orbitalAngleSlider.oninput = () => {
-                const value = parseFloat(this.orbitalAngleSlider.value);
-                this.orbitalAngleDisplay.textContent = value.toFixed(0) + '°';
-            };
+        if (this.editRadiusSlider) {
+            this.editRadiusSlider.max = String(200000 * SCALE_FACTOR);
         }
+
+        updateAddModeVisibility();
 
         if (this.inclinationSlider && this.inclinationDisplay) {
             this.inclinationSlider.oninput = () => {
@@ -507,9 +498,6 @@ export class ManagementPanel extends Panel {
 
                 const bodyType = this.getSelectedBodyType();
                 const orbitType = this.getSelectedOrbitType();
-                const orbitalAngle = this.orbitalAngleSlider
-                    ? parseFloat(this.orbitalAngleSlider.value)
-                    : 0;
                 const inclination = this.inclinationSlider
                     ? parseFloat(this.inclinationSlider.value)
                     : 0;
@@ -544,7 +532,6 @@ export class ManagementPanel extends Panel {
                     bodyType,
                     planetType,
                     orbitType,
-                    orbitalAngle,
                     inclination,
                     hasAtmosphere,
                     customMass,
@@ -721,9 +708,6 @@ export class ManagementPanel extends Panel {
         const randInt = (min, max) => Math.floor(rand(min, max + 1));
         const randBool = () => Math.random() < 0.5;
 
-        if (this.orbitalAngleSlider) {
-            setValue(this.orbitalAngleSlider, randInt(0, 359));
-        }
         if (this.inclinationSlider) {
             setValue(this.inclinationSlider, randInt(0, 90));
         }
@@ -847,8 +831,8 @@ export class ManagementPanel extends Panel {
         const temperatureMax = useStarlikeValues ? 12000 : 40000;
         const lightIntensityMin = useStarlikeValues ? 1000000 : 100000;
         const lightIntensityMax = useStarlikeValues ? 5000000000 : 50000000000;
-        const radiusMin = useStarlikeValues ? EARTH_RADIUS * 0.7 : MOON_RADIUS * 0.5;
-        const radiusMax = useStarlikeValues ? SUN_MASS ? 2000000 : 5000000 : MOON_RADIUS * 20;
+        const radiusMin = useStarlikeValues ? SUN_RADIUS * 0.15 : MOON_RADIUS * 0.5;
+        const radiusMax = useStarlikeValues ? 200000 * SCALE_FACTOR : MOON_RADIUS * 20;
 
         setValue(this.createMassInput, this.clampMassValue(rand(starMassMin, starMassMax)));
         setValue(this.createTemperatureSlider, Math.round(rand(temperatureMin, temperatureMax)));
@@ -897,8 +881,9 @@ export class ManagementPanel extends Panel {
     validateMoonCreation() {
         const bodyType = this.bodyTypeSelect ? this.bodyTypeSelect.value : null;
         if (bodyType === 'moon') {
-            const focusedBody = this.getFocusObject();
-            const isValid = focusedBody && !focusedBody._isDisposed;
+            // Use the management panel's selected body (what the user has focused in the UI)
+            const parentBody = this.selectedBody || this.getFocusObject();
+            const isValid = parentBody && !parentBody._isDisposed;
 
             if (this.moonValidationMessage) {
                 if (isValid) {
