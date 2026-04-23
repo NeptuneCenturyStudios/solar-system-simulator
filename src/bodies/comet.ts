@@ -186,7 +186,7 @@ export class Comet extends CelestialBody {
 
         // Calculate desired tail length based on comet state (precompute constants)
         const baseTailLength = 50 * SCALE_FACTOR;
-        const intensityBonus = tailIntensity * 800 * SCALE_FACTOR;
+        const intensityBonus = tailIntensity * 400 * SCALE_FACTOR;
         const velocityBonus = cometSpeed * 100 * SCALE_FACTOR;
         const targetTailLength = baseTailLength + intensityBonus + velocityBonus;
 
