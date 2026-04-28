@@ -118,14 +118,37 @@
 
                 <div class="control-group">
                     <label>Time Warp <span id="speed-val" class="val-display">1x</span></label>
-                    <input
-                        type="range"
-                        id="timeScale"
-                        min="-100.0"
-                        max="100.0"
-                        step="0.5"
-                        value="1"
-                    />
+                    <div class="slider-row">
+                        <input
+                            type="range"
+                            id="timeScale"
+                            min="-100.0"
+                            max="100.0"
+                            step="0.5"
+                            value="1"
+                        />
+                        <button class="btn-slider-reset" id="timeScaleResetBtn" title="Reset to 1x">
+                            <span class="material-symbols-outlined">replay</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Physics Accuracy <span id="substeps-val" class="val-display">64</span></label>
+                    <div class="slider-row">
+                        <input
+                            type="range"
+                            id="substepsSlider"
+                            min="16"
+                            max="128"
+                            step="8"
+                            value="64"
+                            title="Controls how many physics steps are calculated per frame. Higher values improve orbital accuracy but use more CPU. Lower values are faster but less precise."
+                        />
+                        <button class="btn-slider-reset" id="substepsResetBtn" title="Reset to default (64)">
+                            <span class="material-symbols-outlined">replay</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Light Intensity moved to Solar System Management -> Edit (stars only) -->

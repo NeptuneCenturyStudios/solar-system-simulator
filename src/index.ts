@@ -1184,6 +1184,9 @@ const SIM = Object.freeze({
     DT_SCALE: 60, // existing convention: multiply by 60 to normalize to "frames"
 });
 
+// Physics accuracy: adjustable substeps per frame (16–128, default 64)
+let stepsPerFrame = 64;
+
 // --- Velocity editing arc helpers ---
 // NOTE: We use Line2 (fat lines) because LineBasicMaterial.linewidth is ignored on most WebGL platforms.
 const VEL_ARC_SEGMENTS = 64;
@@ -4171,7 +4174,7 @@ function animate() {
     const now = performance.now();
     requestAnimationFrame(animate);
     const tScale = timeScale;
-    const steps = SIM.STEPS_PER_FRAME;
+    const steps = stepsPerFrame;
     const dt = (SIM.BASE_FRAME_DT * tScale) / steps;
     const dtTotal = dt * steps;
 
@@ -4232,7 +4235,7 @@ function animate() {
     // the tunnel is visible from lookAt mode and fades naturally on decel.
     const _warpUpdateShip = flightState.activeShip ?? flightState.knownShip;
     if (_warpUpdateShip && !_warpUpdateShip._isDisposed && _warpUpdateShip.mesh) {
-        warpEffect.update(SIM.BASE_FRAME_DT, _warpUpdateShip.mesh.position, _warpUpdateShip.velocity, FLIGHT_WARP_SPEED);
+        warpEffect.update(dtTotal, _warpUpdateShip.mesh.position, _warpUpdateShip.velocity, FLIGHT_WARP_SPEED);
     }
 
     // WASD camera movement (works in both free camera and normal mode, but NOT in flight mode)
@@ -4643,7 +4646,7 @@ function animate() {
     // ── Warp camera shake ───────────────────────────────────────────────
     // Jitter the camera slightly while warp is active — applies to flight mode
     // (cockpit + 3rd person) and to lookAt mode when the tunnel is visible.
-    if (flightState.warpActive || autopilotState.isWarpActive) {
+    if (!isPaused && (flightState.warpActive || autopilotState.isWarpActive)) {
         const warpShakeVisible = isFlightModeActive || warpEffect.lines.visible;
         if (warpShakeVisible) {
             const camFwd = new THREE.Vector3();
@@ -6496,6 +6499,10 @@ mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
             }
         }
     });
+});
+
+mainPanel.on('substepsChange', ({ value }: { value: number }) => {
+    stepsPerFrame = value;
 });
 
 mainPanel.on('timeScaleChange', ({ value }: { value: number }) => {

@@ -262,6 +262,30 @@ input[type='range'] {
     accent-color: #00ffcc;
 }
 
+.slider-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.slider-row input[type='range'] {
+    flex: 1;
+    width: auto;
+}
+
+button.btn-slider-reset {
+    width: auto;
+    flex-shrink: 0;
+    padding: 4px 6px;
+    margin-bottom: 0;
+    background: #003366;
+    line-height: 1;
+}
+
+button.btn-slider-reset .material-symbols-outlined {
+    font-size: 16px;
+}
+
 .btn-row {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr 1fr;

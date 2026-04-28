@@ -26,6 +26,10 @@ export class MainPanel extends Panel {
         // Sliders
         this.timeScaleSlider = null;
         this.timeScaleDisplay = null;
+        this.timeScaleResetBtn = null;
+        this.substepsSlider = null;
+        this.substepsDisplay = null;
+        this.substepsResetBtn = null;
 
         // Buttons
         this.pauseBtn = null;
@@ -119,6 +123,33 @@ export class MainPanel extends Panel {
             this.timeScaleSlider.oninput = () => {
                 const value = parseFloat(this.timeScaleSlider.value);
                 this.emit('timeScaleChange', { value });
+            };
+        }
+
+        this.timeScaleResetBtn = document.getElementById('timeScaleResetBtn');
+        if (this.timeScaleResetBtn) {
+            this.timeScaleResetBtn.onclick = () => {
+                if (this.timeScaleSlider) this.timeScaleSlider.value = '1';
+                this.emit('timeScaleChange', { value: 1 });
+            };
+        }
+
+        this.substepsSlider = document.getElementById('substepsSlider');
+        this.substepsDisplay = document.getElementById('substeps-val');
+        if (this.substepsSlider) {
+            this.substepsSlider.oninput = () => {
+                const value = parseInt(this.substepsSlider.value, 10);
+                if (this.substepsDisplay) this.substepsDisplay.textContent = `${value}`;
+                this.emit('substepsChange', { value });
+            };
+        }
+
+        this.substepsResetBtn = document.getElementById('substepsResetBtn');
+        if (this.substepsResetBtn) {
+            this.substepsResetBtn.onclick = () => {
+                if (this.substepsSlider) this.substepsSlider.value = '64';
+                if (this.substepsDisplay) this.substepsDisplay.textContent = '64';
+                this.emit('substepsChange', { value: 64 });
             };
         }
 
