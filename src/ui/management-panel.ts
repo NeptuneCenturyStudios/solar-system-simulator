@@ -12,18 +12,103 @@ import {
     SUN_MASS,
     SUN_RADIUS,
 } from '../utilities/consts.js';
-import { BodyType, isBodyType } from '../utilities/utilities.js';
+import { BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
 import { Star } from '../bodies/star.js';
+import { Body } from '../bodies/body.js';
+
+interface ManagementPanelDeps {
+    getFocusObject?: () => Body | null;
+}
+
+interface CreateSliderInitState {
+    mass: number | null;
+    temperature: number | null;
+    lightIntensity: number | null;
+    radius: number | null;
+}
 
 /**
  * Management panel for creating and editing celestial bodies
  */
 export class ManagementPanel extends Panel {
-    /**
-     * @param {string|HTMLElement} elementId
-     * @param {{ getFocusObject?: () => any }} deps
-     */
-    constructor(elementId, deps = {}) {
+    getFocusObject: () => Body | null;
+
+    addBodyBtn: HTMLButtonElement | null;
+    bodyCreationForm: HTMLElement | null;
+    bodyTypeSelect: HTMLSelectElement | null;
+    addModeSelect: HTMLSelectElement | null;
+    presetBodyGroup: HTMLElement | null;
+    presetBodySelect: HTMLSelectElement | null;
+    customBodyGroup: HTMLElement | null;
+    orbitTypeGroup: HTMLElement | null;
+    inclinationGroup: HTMLElement | null;
+    inclinationSlider: HTMLInputElement | null;
+    inclinationDisplay: HTMLElement | null;
+    moonValidationMessage: HTMLElement | null;
+    planetTypeGroup: HTMLElement | null;
+    hasAtmosphereRow: HTMLElement | null;
+    hasAtmosphereCheckbox: HTMLInputElement | null;
+    randomizeCreateBtn: HTMLButtonElement | null;
+    randomizeCreateRow: HTMLElement | null;
+
+    // Create numeric inputs (custom planets/moons/stars)
+    createMassGroup: HTMLElement | null;
+    createMassInput: HTMLInputElement | null;
+    createMassDisplay: HTMLElement | null;
+    createTemperatureGroup: HTMLElement | null;
+    createTemperatureSlider: HTMLInputElement | null;
+    createTemperatureDisplay: HTMLElement | null;
+    createLightIntensityGroup: HTMLElement | null;
+    createLightIntensitySlider: HTMLInputElement | null;
+    createLightIntensityDisplay: HTMLElement | null;
+    createRadiusGroup: HTMLElement | null;
+    createRadiusSlider: HTMLInputElement | null;
+    createRadiusDisplay: HTMLElement | null;
+
+    createBodyBtn: HTMLButtonElement | null;
+    cancelCreateBtn: HTMLButtonElement | null;
+    createSliderInitState: CreateSliderInitState | null;
+
+    editBodyBtn: HTMLButtonElement | null;
+    bodyEditForm: HTMLElement | null;
+    editControlsContainer: HTMLElement | null;
+    editBodyName: HTMLElement | null;
+    editNameInput: HTMLInputElement | null;
+    editMassInput: HTMLInputElement | null;
+    editMassDisplay: HTMLElement | null;
+    editTempSlider: HTMLInputElement | null;
+    editTempDisplay: HTMLElement | null;
+    editTempGroup: HTMLElement | null;
+    editRadiusSlider: HTMLInputElement | null;
+    editRadiusDisplay: HTMLElement | null;
+    editRadiusGroup: HTMLElement | null;
+    editColorInput: HTMLInputElement | null;
+    editLightIntensityGroup: HTMLElement | null;
+    editLightIntensitySlider: HTMLInputElement | null;
+    editLightIntensityDisplay: HTMLElement | null;
+    editVelocitySlider: HTMLInputElement | null;
+    editVelocityDisplay: HTMLElement | null;
+    editOrbitalAngleSlider: HTMLInputElement | null;
+    editOrbitalAngleDisplay: HTMLElement | null;
+    editInclinationSlider: HTMLInputElement | null;
+    editInclinationDisplay: HTMLElement | null;
+    applyEditBtn: HTMLButtonElement | null;
+    deleteBodyBtn: HTMLButtonElement | null;
+    cancelEditBtn: HTMLButtonElement | null;
+
+    // Environment toggles (owned by ManagementPanel)
+    enableKuiperBeltCheckbox: HTMLInputElement | null;
+
+    selectedBody: Body | null;
+
+    MASS_MAX!: number;
+    MASS_MIN!: number;
+    formatNumberForDisplay!: (value: number) => string;
+    formatMassForDisplay!: (actualMass: number) => string;
+    formatLightIntensityForDisplay!: (value: number) => string;
+    clampMassValue!: (value: number) => number;
+
+    constructor(elementId: string | HTMLElement, deps: ManagementPanelDeps = {}) {
         super(elementId);
 
         this.getFocusObject =
@@ -98,84 +183,82 @@ export class ManagementPanel extends Panel {
         this.selectedBody = null;
     }
 
-    /**
-     * Initialize all UI elements and event listeners
-     */
-    initialize() {
-        this.addBodyBtn = document.getElementById('addBodyBtn');
+    initialize(): void {
+        this.addBodyBtn = document.getElementById('addBodyBtn') as HTMLButtonElement | null;
         this.bodyCreationForm = document.getElementById('bodyCreationForm');
-        this.bodyTypeSelect = document.getElementById('bodyType');
-        this.addModeSelect = document.getElementById('addMode');
+        this.bodyTypeSelect = document.getElementById('bodyType') as HTMLSelectElement | null;
+        this.addModeSelect = document.getElementById('addMode') as HTMLSelectElement | null;
         if (this.bodyTypeSelect) {
             this.bodyTypeSelect.addEventListener('change', () => {
                 this.randomizeCreateBodyInputs(this.getSelectedBodyType());
             });
         }
         this.presetBodyGroup = document.getElementById('presetBodyGroup');
-        this.presetBodySelect = document.getElementById('presetBody');
+        this.presetBodySelect = document.getElementById('presetBody') as HTMLSelectElement | null;
         this.customBodyGroup = document.getElementById('customBodyGroup');
         this.orbitTypeGroup = document.getElementById('orbitTypeGroup');
         this.inclinationGroup = document.getElementById('inclinationGroup');
-        this.inclinationSlider = document.getElementById('inclination');
+        this.inclinationSlider = document.getElementById('inclination') as HTMLInputElement | null;
         this.inclinationDisplay = document.getElementById('inclination-val');
         this.moonValidationMessage = document.getElementById('moonValidationMessage');
         this.planetTypeGroup = document.getElementById('planetTypeGroup');
         this.hasAtmosphereRow = document.getElementById('hasAtmosphereRow');
-        this.hasAtmosphereCheckbox = document.getElementById('hasAtmosphere');
-        this.randomizeCreateBtn = document.getElementById('randomizeCreateBtn');
+        this.hasAtmosphereCheckbox = document.getElementById('hasAtmosphere') as HTMLInputElement | null;
+        this.randomizeCreateBtn = document.getElementById('randomizeCreateBtn') as HTMLButtonElement | null;
         this.randomizeCreateRow = document.getElementById('randomizeCreateRow');
 
         // Create numeric inputs (custom planets/moons/stars)
         this.createMassGroup = document.getElementById('createMassGroup');
-        this.createMassInput = document.getElementById('createMass');
+        this.createMassInput = document.getElementById('createMass') as HTMLInputElement | null;
         this.createMassDisplay = document.getElementById('create-mass-val');
         this.createTemperatureGroup = document.getElementById('createTemperatureGroup');
-        this.createTemperatureSlider = document.getElementById('createTemperature');
+        this.createTemperatureSlider = document.getElementById('createTemperature') as HTMLInputElement | null;
         this.createTemperatureDisplay = document.getElementById('create-temp-val');
         this.createLightIntensityGroup = document.getElementById('createLightIntensityGroup');
-        this.createLightIntensitySlider = document.getElementById('createLightIntensity');
+        this.createLightIntensitySlider = document.getElementById('createLightIntensity') as HTMLInputElement | null;
         this.createLightIntensityDisplay = document.getElementById('create-light-intensity-val');
         this.createRadiusGroup = document.getElementById('createRadiusGroup');
-        this.createRadiusSlider = document.getElementById('createRadius');
+        this.createRadiusSlider = document.getElementById('createRadius') as HTMLInputElement | null;
         this.createRadiusDisplay = document.getElementById('create-radius-val');
 
-        this.createBodyBtn = document.getElementById('createBodyBtn');
-        this.cancelCreateBtn = document.getElementById('cancelCreateBtn');
+        this.createBodyBtn = document.getElementById('createBodyBtn') as HTMLButtonElement | null;
+        this.cancelCreateBtn = document.getElementById('cancelCreateBtn') as HTMLButtonElement | null;
         this.randomizeCreateRow = document.getElementById('randomizeCreateRow');
 
-        this.editBodyBtn = document.getElementById('editBodyBtn');
+        this.editBodyBtn = document.getElementById('editBodyBtn') as HTMLButtonElement | null;
         this.bodyEditForm = document.getElementById('bodyEditForm');
         this.editControlsContainer = document.getElementById('editControlsContainer');
         this.editBodyName = document.getElementById('editBodyName');
-        this.editNameInput = document.getElementById('editName');
-        this.editMassInput = document.getElementById('editMass');
+        this.editNameInput = document.getElementById('editName') as HTMLInputElement | null;
+        this.editMassInput = document.getElementById('editMass') as HTMLInputElement | null;
         this.editMassDisplay = document.getElementById('edit-mass-val');
-        this.editTempSlider = document.getElementById('editTemperature');
+        this.editTempSlider = document.getElementById('editTemperature') as HTMLInputElement | null;
         this.editTempDisplay = document.getElementById('edit-temp-val');
         this.editTempGroup = document.getElementById('editTempGroup');
-        this.editColorInput = document.getElementById('editColor');
+        this.editColorInput = document.getElementById('editColor') as HTMLInputElement | null;
         this.editLightIntensityGroup = document.getElementById('editLightIntensityGroup');
-        this.editLightIntensitySlider = document.getElementById('editLightIntensity');
+        this.editLightIntensitySlider = document.getElementById('editLightIntensity') as HTMLInputElement | null;
         this.editLightIntensityDisplay = document.getElementById('edit-light-intensity-val');
         this.editRadiusGroup = document.getElementById('editRadiusGroup');
-        this.editRadiusSlider = document.getElementById('editRadius');
+        this.editRadiusSlider = document.getElementById('editRadius') as HTMLInputElement | null;
         this.editRadiusDisplay = document.getElementById('edit-radius-val');
-        this.editVelocitySlider = document.getElementById('editVelocity');
+        this.editVelocitySlider = document.getElementById('editVelocity') as HTMLInputElement | null;
         this.editVelocityDisplay = document.getElementById('edit-velocity-val');
-        this.editOrbitalAngleSlider = document.getElementById('editOrbitalAngle');
+        this.editOrbitalAngleSlider = document.getElementById('editOrbitalAngle') as HTMLInputElement | null;
         this.editOrbitalAngleDisplay = document.getElementById('edit-orbital-angle-val');
-        this.editInclinationSlider = document.getElementById('editInclination');
+        this.editInclinationSlider = document.getElementById('editInclination') as HTMLInputElement | null;
         this.editInclinationDisplay = document.getElementById('edit-inclination-val');
-        this.applyEditBtn = document.getElementById('applyEditBtn');
-        this.deleteBodyBtn = document.getElementById('deleteBodyBtn');
-        this.cancelEditBtn = document.getElementById('cancelEditBtn');
+        this.applyEditBtn = document.getElementById('applyEditBtn') as HTMLButtonElement | null;
+        this.deleteBodyBtn = document.getElementById('deleteBodyBtn') as HTMLButtonElement | null;
+        this.cancelEditBtn = document.getElementById('cancelEditBtn') as HTMLButtonElement | null;
 
         // Environment toggles (owned by ManagementPanel)
-        this.enableKuiperBeltCheckbox = document.getElementById('enableKuiperBelt');
+        this.enableKuiperBeltCheckbox = document.getElementById('enableKuiperBelt') as HTMLInputElement | null;
 
         if (this.enableKuiperBeltCheckbox) {
-            this.enableKuiperBeltCheckbox.onchange = () => {
-                this.emit('kuiperBeltChange', { checked: this.enableKuiperBeltCheckbox.checked });
+            const kuiperBeltCheckbox = this.enableKuiperBeltCheckbox;
+            kuiperBeltCheckbox.onchange = () => {
+                this.emit('kuiperBeltChange', { checked: kuiperBeltCheckbox.checked });
             };
         }
 
@@ -220,31 +303,35 @@ export class ManagementPanel extends Panel {
             maximumFractionDigits: 2,
         });
 
-        const formatNumberForDisplay = (value) => {
+        const formatNumberForDisplay = (value: number): string => {
             if (!isFinite(value) || value <= 0) return '0';
             return numberFormatter.format(value);
         };
 
         this.formatNumberForDisplay = formatNumberForDisplay;
 
-        this.formatMassForDisplay = (actualMass) => {
+        this.formatMassForDisplay = (actualMass: number): string => {
             return formatNumberForDisplay(actualMass);
         };
 
-        const formatLightIntensityForDisplay = (value) => {
+        const formatLightIntensityForDisplay = (value: number): string => {
             if (!isFinite(value) || value <= 0) return '0M';
             return `${formatNumberForDisplay(value / 1000000)}M`;
         };
 
         this.formatLightIntensityForDisplay = formatLightIntensityForDisplay;
 
-        this.clampMassValue = (value) => {
+        this.clampMassValue = (value: number): number => {
             if (!isFinite(value)) return this.MASS_MIN;
             const numericValue = Number(value);
             return numericValue < this.MASS_MIN ? this.MASS_MIN : numericValue;
         };
 
-        const syncCreateDisplay = (input, display, formatter) => {
+        const syncCreateDisplay = (
+            input: HTMLInputElement | null,
+            display: HTMLElement | null,
+            formatter: (v: number) => string
+        ): void => {
             if (!input || !display) return;
             const value = parseFloat(input.value);
             display.textContent = formatter(value);
@@ -289,12 +376,14 @@ export class ManagementPanel extends Panel {
                 this.presetBodyGroup.style.display = isPreset ? 'block' : 'none';
             if (this.customBodyGroup)
                 this.customBodyGroup.style.display = isPreset ? 'none' : 'block';
+
+            const randomizeParent = this.randomizeCreateBtn?.parentElement ?? null;
             if (this.randomizeCreateRow) {
                 this.randomizeCreateRow.hidden = isPreset;
                 this.randomizeCreateRow.style.display = isCustom ? 'flex' : 'none';
-            } else if (this.randomizeCreateBtn?.parentElement) {
-                this.randomizeCreateBtn.parentElement.hidden = isPreset;
-                this.randomizeCreateBtn.parentElement.style.display = isCustom ? 'flex' : 'none';
+            } else if (randomizeParent) {
+                randomizeParent.hidden = isPreset;
+                randomizeParent.style.display = isCustom ? 'flex' : 'none';
             }
 
             if (isPreset) {
@@ -396,50 +485,57 @@ export class ManagementPanel extends Panel {
         });
 
         if (this.createMassInput && this.createMassDisplay) {
-            this.createMassInput.step = 'any';
-            this.createMassInput.min = String(this.MASS_MIN);
-            this.createMassInput.setAttribute('min', String(this.MASS_MIN));
-            this.createMassInput.setAttribute('step', 'any');
-            this.createMassInput.oninput = () => {
-                const rawValue = parseFloat(this.createMassInput.value);
+            const createMassInput = this.createMassInput;
+            const createMassDisplay = this.createMassDisplay;
+            createMassInput.step = 'any';
+            createMassInput.min = String(this.MASS_MIN);
+            createMassInput.setAttribute('min', String(this.MASS_MIN));
+            createMassInput.setAttribute('step', 'any');
+            createMassInput.oninput = () => {
+                const rawValue = parseFloat(createMassInput.value);
                 const value = this.clampMassValue(rawValue);
-                this.createMassDisplay.textContent = this.formatMassForDisplay(value);
+                createMassDisplay.textContent = this.formatMassForDisplay(value);
             };
             if (this.bodyTypeSelect && this.bodyTypeSelect.value === 'sun') {
-                this.createMassInput.value = String(SUN_MASS);
-                this.createMassInput.max = String(this.MASS_MAX);
-                this.createMassInput.setAttribute('max', String(this.MASS_MAX));
+                createMassInput.value = String(SUN_MASS);
+                createMassInput.max = String(this.MASS_MAX);
+                createMassInput.setAttribute('max', String(this.MASS_MAX));
             } else {
-                this.createMassInput.removeAttribute('max');
-                this.createMassInput.max = '';
+                createMassInput.removeAttribute('max');
+                createMassInput.max = '';
             }
-            this.createMassInput.oninput();
+            (createMassInput.oninput as () => void)();
         }
 
         if (this.createTemperatureSlider && this.createTemperatureDisplay) {
-            this.createTemperatureSlider.oninput = () => {
-                const value = parseFloat(this.createTemperatureSlider.value);
-                this.createTemperatureDisplay.textContent = formatNumberForDisplay(value) + 'K';
+            const createTemperatureSlider = this.createTemperatureSlider;
+            const createTemperatureDisplay = this.createTemperatureDisplay;
+            createTemperatureSlider.oninput = () => {
+                const value = parseFloat(createTemperatureSlider.value);
+                createTemperatureDisplay.textContent = formatNumberForDisplay(value) + 'K';
             };
-            this.createTemperatureSlider.oninput();
+            (createTemperatureSlider.oninput as () => void)();
         }
 
         if (this.createLightIntensitySlider && this.createLightIntensityDisplay) {
-            this.createLightIntensitySlider.oninput = () => {
-                const value = parseFloat(this.createLightIntensitySlider.value);
-                this.createLightIntensityDisplay.textContent =
-                    formatLightIntensityForDisplay(value);
+            const createLightIntensitySlider = this.createLightIntensitySlider;
+            const createLightIntensityDisplay = this.createLightIntensityDisplay;
+            createLightIntensitySlider.oninput = () => {
+                const value = parseFloat(createLightIntensitySlider.value);
+                createLightIntensityDisplay.textContent = formatLightIntensityForDisplay(value);
             };
-            this.createLightIntensitySlider.oninput();
+            (createLightIntensitySlider.oninput as () => void)();
         }
 
         if (this.createRadiusSlider && this.createRadiusDisplay) {
-            this.createRadiusSlider.oninput = () => {
-                const value = parseFloat(this.createRadiusSlider.value);
-                this.createRadiusDisplay.textContent = formatNumberForDisplay(value);
+            const createRadiusSlider = this.createRadiusSlider;
+            const createRadiusDisplay = this.createRadiusDisplay;
+            createRadiusSlider.oninput = () => {
+                const value = parseFloat(createRadiusSlider.value);
+                createRadiusDisplay.textContent = formatNumberForDisplay(value);
             };
-            this.createRadiusSlider.max = String(200000 * SCALE_FACTOR);
-            this.createRadiusSlider.oninput();
+            createRadiusSlider.max = String(200000 * SCALE_FACTOR);
+            (createRadiusSlider.oninput as () => void)();
         }
 
         if (this.editRadiusSlider) {
@@ -449,9 +545,11 @@ export class ManagementPanel extends Panel {
         updateAddModeVisibility();
 
         if (this.inclinationSlider && this.inclinationDisplay) {
-            this.inclinationSlider.oninput = () => {
-                const value = parseFloat(this.inclinationSlider.value);
-                this.inclinationDisplay.textContent = value.toFixed(0) + '°';
+            const inclinationSlider = this.inclinationSlider;
+            const inclinationDisplay = this.inclinationDisplay;
+            inclinationSlider.oninput = () => {
+                const value = parseFloat(inclinationSlider.value);
+                inclinationDisplay.textContent = value.toFixed(0) + '°';
             };
         }
 
@@ -569,44 +667,52 @@ export class ManagementPanel extends Panel {
         }
 
         if (this.editMassInput) {
-            this.editMassInput.max = String(this.MASS_MAX);
-            this.editMassInput.min = String(this.MASS_MIN);
-            this.editMassInput.oninput = () => {
-                const value = this.clampMassValue(parseFloat(this.editMassInput.value));
-                this.editMassDisplay.textContent = this.formatMassForDisplay(value);
+            const editMassInput = this.editMassInput;
+            editMassInput.max = String(this.MASS_MAX);
+            editMassInput.min = String(this.MASS_MIN);
+            editMassInput.oninput = () => {
+                const value = this.clampMassValue(parseFloat(editMassInput.value));
+                if (this.editMassDisplay) {
+                    this.editMassDisplay.textContent = this.formatMassForDisplay(value);
+                }
             };
-            this.editMassInput.min = '0.001';
-            this.editMassInput.step = 'any';
-            this.editMassInput.oninput();
+            editMassInput.min = '0.001';
+            editMassInput.step = 'any';
+            (editMassInput.oninput as () => void)();
         }
 
         if (this.editTempSlider) {
-            this.editTempSlider.oninput = () => {
-                const value = parseFloat(this.editTempSlider.value);
-                this.editTempDisplay.textContent = formatNumberForDisplay(value) + 'K';
+            const editTempSlider = this.editTempSlider;
+            editTempSlider.oninput = () => {
+                const value = parseFloat(editTempSlider.value);
+                if (this.editTempDisplay) {
+                    this.editTempDisplay.textContent = formatNumberForDisplay(value) + 'K';
+                }
             };
-            this.editTempSlider.oninput();
+            (editTempSlider.oninput as () => void)();
         }
 
         if (this.editLightIntensitySlider) {
-            this.editLightIntensitySlider.oninput = () => {
-                const value = parseFloat(this.editLightIntensitySlider.value);
+            const editLightIntensitySlider = this.editLightIntensitySlider;
+            editLightIntensitySlider.oninput = () => {
+                const value = parseFloat(editLightIntensitySlider.value);
                 if (this.editLightIntensityDisplay) {
                     this.editLightIntensityDisplay.textContent =
                         formatLightIntensityForDisplay(value);
                 }
             };
-            this.editLightIntensitySlider.oninput();
+            (editLightIntensitySlider.oninput as () => void)();
         }
 
         if (this.editRadiusSlider) {
-            this.editRadiusSlider.oninput = () => {
-                const value = parseFloat(this.editRadiusSlider.value);
+            const editRadiusSlider = this.editRadiusSlider;
+            editRadiusSlider.oninput = () => {
+                const value = parseFloat(editRadiusSlider.value);
                 if (this.editRadiusDisplay) {
                     this.editRadiusDisplay.textContent = formatNumberForDisplay(value);
                 }
             };
-            this.editRadiusSlider.oninput();
+            (editRadiusSlider.oninput as () => void)();
         }
 
         if (this.editColorInput) {
@@ -614,25 +720,31 @@ export class ManagementPanel extends Panel {
         }
 
         if (this.editVelocitySlider && this.editVelocityDisplay) {
-            this.editVelocitySlider.oninput = () => {
-                const value = parseFloat(this.editVelocitySlider.value);
-                this.editVelocityDisplay.textContent = value.toLocaleString(undefined, {
+            const editVelocitySlider = this.editVelocitySlider;
+            const editVelocityDisplay = this.editVelocityDisplay;
+            editVelocitySlider.oninput = () => {
+                const value = parseFloat(editVelocitySlider.value);
+                editVelocityDisplay.textContent = value.toLocaleString(undefined, {
                     maximumFractionDigits: 1,
                 });
             };
         }
 
         if (this.editOrbitalAngleSlider && this.editOrbitalAngleDisplay) {
-            this.editOrbitalAngleSlider.oninput = () => {
-                const value = parseFloat(this.editOrbitalAngleSlider.value);
-                this.editOrbitalAngleDisplay.textContent = value.toFixed(0) + '°';
+            const editOrbitalAngleSlider = this.editOrbitalAngleSlider;
+            const editOrbitalAngleDisplay = this.editOrbitalAngleDisplay;
+            editOrbitalAngleSlider.oninput = () => {
+                const value = parseFloat(editOrbitalAngleSlider.value);
+                editOrbitalAngleDisplay.textContent = value.toFixed(0) + '°';
             };
         }
 
         if (this.editInclinationSlider && this.editInclinationDisplay) {
-            this.editInclinationSlider.oninput = () => {
-                const value = parseFloat(this.editInclinationSlider.value);
-                this.editInclinationDisplay.textContent = value.toFixed(0) + '°';
+            const editInclinationSlider = this.editInclinationSlider;
+            const editInclinationDisplay = this.editInclinationDisplay;
+            editInclinationSlider.oninput = () => {
+                const value = parseFloat(editInclinationSlider.value);
+                editInclinationDisplay.textContent = value.toFixed(0) + '°';
             };
         }
 
@@ -641,8 +753,10 @@ export class ManagementPanel extends Panel {
         if (this.applyEditBtn) {
             this.applyEditBtn.onclick = () => {
                 const name = this.editNameInput ? this.editNameInput.value.trim() : null;
-                const mass = this.clampMassValue(parseFloat(this.editMassInput.value));
-                const isStarBody = isBodyType(this.selectedBody, BodyType.Star);
+                const mass = this.clampMassValue(parseFloat(this.editMassInput?.value ?? '0'));
+                const isStarBody = this.selectedBody
+                    ? isBodyType(this.selectedBody, BodyTypeEnum.Star)
+                    : false;
 
                 const temperature = this.editTempSlider
                     ? parseFloat(this.editTempSlider.value)
@@ -693,19 +807,19 @@ export class ManagementPanel extends Panel {
         }
     }
 
-    randomizeCreateBodyInputs(bodyType) {
+    randomizeCreateBodyInputs(bodyType?: string | null): void {
         const type = bodyType || this.getSelectedBodyType();
 
-        const setValue = (input, value) => {
+        const setValue = (input: HTMLInputElement | null, value: number): void => {
             if (!input) return;
             input.value = String(value);
             if (typeof input.oninput === 'function') {
-                input.oninput();
+                (input.oninput as () => void)();
             }
         };
 
-        const rand = (min, max) => min + Math.random() * (max - min);
-        const randInt = (min, max) => Math.floor(rand(min, max + 1));
+        const rand = (min: number, max: number) => min + Math.random() * (max - min);
+        const randInt = (min: number, max: number) => Math.floor(rand(min, max + 1));
         const randBool = () => Math.random() < 0.5;
 
         if (this.inclinationSlider) {
@@ -724,10 +838,10 @@ export class ManagementPanel extends Panel {
         if (type === 'planet') {
             const planetType = this.getSelectedPlanetType();
 
-            let massMin;
-            let massMax;
-            let radiusMin;
-            let radiusMax;
+            let massMin: number;
+            let massMax: number;
+            let radiusMin: number;
+            let radiusMax: number;
 
             if (planetType === 'gas_giant') {
                 massMin = JUPITER_MASS;
@@ -761,7 +875,7 @@ export class ManagementPanel extends Panel {
                     this.createMassDisplay.textContent = this.formatMassForDisplay(massValue);
                 }
                 if (typeof this.createMassInput.oninput === 'function') {
-                    this.createMassInput.oninput();
+                    (this.createMassInput.oninput as () => void)();
                 }
             }
 
@@ -788,7 +902,7 @@ export class ManagementPanel extends Panel {
                     this.createMassDisplay.textContent = this.formatMassForDisplay(massValue);
                 }
                 if (typeof this.createMassInput.oninput === 'function') {
-                    this.createMassInput.oninput();
+                    (this.createMassInput.oninput as () => void)();
                 }
             }
 
@@ -815,13 +929,13 @@ export class ManagementPanel extends Panel {
         this.randomizeCustomStarValues(false);
     }
 
-    randomizeCustomStarValues(useStarlikeValues) {
-        const rand = (min, max) => min + Math.random() * (max - min);
-        const setValue = (input, value) => {
+    randomizeCustomStarValues(useStarlikeValues: boolean): void {
+        const rand = (min: number, max: number) => min + Math.random() * (max - min);
+        const setValue = (input: HTMLInputElement | null, value: number): void => {
             if (!input) return;
             input.value = String(value);
             if (typeof input.oninput === 'function') {
-                input.oninput();
+                (input.oninput as () => void)();
             }
         };
 
@@ -843,34 +957,34 @@ export class ManagementPanel extends Panel {
         setValue(this.createRadiusSlider, Math.round(rand(radiusMin, radiusMax)));
     }
 
-    toggleCreationForm() {
+    toggleCreationForm(): void {
         if (this.bodyCreationForm) {
             this.bodyCreationForm.classList.toggle('visible');
         }
     }
 
-    toggleEditForm() {
+    toggleEditForm(): void {
         if (this.bodyEditForm) {
             this.bodyEditForm.classList.toggle('visible');
         }
     }
 
-    getSelectedBodyType() {
+    getSelectedBodyType(): string | null {
         return this.bodyTypeSelect ? this.bodyTypeSelect.value : null;
     }
 
-    getSelectedOrbitType() {
-        const circularRadio = document.getElementById('orbitCircular');
-        const ellipticalRadio = document.getElementById('orbitElliptical');
+    getSelectedOrbitType(): string {
+        const circularRadio = document.getElementById('orbitCircular') as HTMLInputElement | null;
+        const ellipticalRadio = document.getElementById('orbitElliptical') as HTMLInputElement | null;
         if (circularRadio && circularRadio.checked) return 'circular';
         if (ellipticalRadio && ellipticalRadio.checked) return 'elliptical';
         return 'circular';
     }
 
-    getSelectedPlanetType() {
-        const solidRadio = document.getElementById('planetTypeSolid');
-        const gasGiantRadio = document.getElementById('planetTypeGasGiant');
-        const iceGiantRadio = document.getElementById('planetTypeIceGiant');
+    getSelectedPlanetType(): string {
+        const solidRadio = document.getElementById('planetTypeSolid') as HTMLInputElement | null;
+        const gasGiantRadio = document.getElementById('planetTypeGasGiant') as HTMLInputElement | null;
+        const iceGiantRadio = document.getElementById('planetTypeIceGiant') as HTMLInputElement | null;
 
         if (gasGiantRadio && gasGiantRadio.checked) return 'gas_giant';
         if (iceGiantRadio && iceGiantRadio.checked) return 'ice_giant';
@@ -878,7 +992,7 @@ export class ManagementPanel extends Panel {
         return 'solid';
     }
 
-    validateMoonCreation() {
+    validateMoonCreation(): void {
         const bodyType = this.bodyTypeSelect ? this.bodyTypeSelect.value : null;
         if (bodyType === 'moon') {
             // Use the management panel's selected body (what the user has focused in the UI)
@@ -899,25 +1013,26 @@ export class ManagementPanel extends Panel {
         }
     }
 
-    setSelectedBody(body) {
+    setSelectedBody(body: Body | null): void {
         this.selectedBody = body;
 
-        const setGroupVisible = (el, visible, display = 'block') => {
+        const setGroupVisible = (el: HTMLElement | null, visible: boolean, display = 'block'): void => {
             if (!el) return;
             el.style.display = visible ? display : 'none';
         };
 
-        const safeSetText = (el, text) => {
+        const safeSetText = (el: HTMLElement | null, text: string): void => {
             if (!el) return;
             el.textContent = text;
         };
 
-        const toHexColor = (c) => {
+        const toHexColor = (c: unknown): string => {
             try {
                 if (c && typeof c === 'object' && 'r' in c && 'g' in c && 'b' in c) {
-                    const r = Math.max(0, Math.min(255, Math.round(c.r * 255)));
-                    const g = Math.max(0, Math.min(255, Math.round(c.g * 255)));
-                    const b = Math.max(0, Math.min(255, Math.round(c.b * 255)));
+                    const rgb = c as { r: number; g: number; b: number };
+                    const r = Math.max(0, Math.min(255, Math.round(rgb.r * 255)));
+                    const g = Math.max(0, Math.min(255, Math.round(rgb.g * 255)));
+                    const b = Math.max(0, Math.min(255, Math.round(rgb.b * 255)));
                     return (
                         '#' +
                         [r, g, b]
@@ -936,7 +1051,7 @@ export class ManagementPanel extends Panel {
         };
 
         if (!body) {
-            this.editBodyName.textContent = 'No body selected';
+            safeSetText(this.editBodyName, 'No body selected');
             if (this.editControlsContainer) {
                 this.editControlsContainer.style.display = 'none';
             }
@@ -958,16 +1073,16 @@ export class ManagementPanel extends Panel {
             this.deleteBodyBtn.disabled = false;
         }
 
-        const isStarBody = isBodyType(body, BodyType.Star);
+        const isStarBody = isBodyType(body, BodyTypeEnum.Star);
 
-        this.editBodyName.textContent = body.name || 'Unnamed Body';
+        safeSetText(this.editBodyName, body.name || 'Unnamed Body');
         if (this.editNameInput) {
             this.editNameInput.value = body.name || '';
         }
 
         if (this.editColorInput) {
             const showColorPicker =
-                isBodyType(body, BodyType.Asteroid) || isBodyType(body, BodyType.Comet);
+                isBodyType(body, BodyTypeEnum.Asteroid) || isBodyType(body, BodyTypeEnum.Comet);
             this.editColorInput.disabled = !showColorPicker;
             if (this.editColorInput.parentElement) {
                 this.editColorInput.parentElement.style.display = showColorPicker
@@ -976,7 +1091,8 @@ export class ManagementPanel extends Panel {
             }
 
             if (showColorPicker) {
-                const c = body.baseColor || body.color || 0xffffff;
+                const bodyWithColor = body as Body & { baseColor?: unknown; color?: unknown };
+                const c = bodyWithColor.baseColor || bodyWithColor.color || 0xffffff;
                 this.editColorInput.value = toHexColor(c);
             }
         }
@@ -987,24 +1103,28 @@ export class ManagementPanel extends Panel {
 
         if (this.editRadiusSlider && this.editRadiusDisplay) {
             const r = typeof body.radius === 'number' && isFinite(body.radius) ? body.radius : 1;
-            this.editRadiusSlider.value = r;
+            this.editRadiusSlider.value = String(r);
             safeSetText(this.editRadiusDisplay, this.formatNumberForDisplay(r));
-            if (typeof this.editRadiusSlider.oninput === 'function')
-                this.editRadiusSlider.oninput();
+            if (typeof this.editRadiusSlider.oninput === 'function') {
+                (this.editRadiusSlider.oninput as () => void)();
+            }
         }
 
         if (isStarBody && this.editTempSlider && this.editTempDisplay) {
+            const starBody = body as Star;
             const t =
-                typeof body.temperature === 'number' && isFinite(body.temperature)
-                    ? body.temperature
+                typeof starBody.temperature === 'number' && isFinite(starBody.temperature)
+                    ? starBody.temperature
                     : 5778;
-            this.editTempSlider.value = t;
+            this.editTempSlider.value = String(t);
             safeSetText(this.editTempDisplay, this.formatNumberForDisplay(t) + 'K');
-            if (typeof this.editTempSlider.oninput === 'function') this.editTempSlider.oninput();
+            if (typeof this.editTempSlider.oninput === 'function') {
+                (this.editTempSlider.oninput as () => void)();
+            }
         }
 
         if (isStarBody && this.editLightIntensitySlider && this.editLightIntensityDisplay) {
-            let intensity = null;
+            let intensity: number | null = null;
             if (body instanceof Star) {
                 intensity = body.lightIntensity;
             }
@@ -1032,26 +1152,28 @@ export class ManagementPanel extends Panel {
         }
 
         if (this.editVelocitySlider && this.editVelocityDisplay) {
-            this.editVelocitySlider.oninput = () => {
-                const value = parseFloat(this.editVelocitySlider.value);
-                this.editVelocityDisplay.textContent = value.toLocaleString(undefined, {
+            const editVelocitySlider = this.editVelocitySlider;
+            const editVelocityDisplay = this.editVelocityDisplay;
+            editVelocitySlider.oninput = () => {
+                const value = parseFloat(editVelocitySlider.value);
+                editVelocityDisplay.textContent = value.toLocaleString(undefined, {
                     maximumFractionDigits: 1,
                 });
             };
-            this.editVelocitySlider.oninput();
+            (editVelocitySlider.oninput as () => void)();
         }
 
         if (this.editOrbitalAngleSlider && this.editOrbitalAngleDisplay) {
-            this.editOrbitalAngleSlider.value = this.editOrbitalAngleSlider.value || 0;
+            this.editOrbitalAngleSlider.value = this.editOrbitalAngleSlider.value || '0';
             this.editOrbitalAngleDisplay.textContent =
-                this.formatNumberForDisplay(parseFloat(this.editOrbitalAngleSlider.value || 0)) +
+                this.formatNumberForDisplay(parseFloat(this.editOrbitalAngleSlider.value || '0')) +
                 '°';
         }
 
         if (this.editInclinationSlider && this.editInclinationDisplay) {
-            this.editInclinationSlider.value = this.editInclinationSlider.value || 0;
+            this.editInclinationSlider.value = this.editInclinationSlider.value || '0';
             this.editInclinationDisplay.textContent =
-                this.formatNumberForDisplay(parseFloat(this.editInclinationSlider.value || 0)) +
+                this.formatNumberForDisplay(parseFloat(this.editInclinationSlider.value || '0')) +
                 '°';
         }
 
