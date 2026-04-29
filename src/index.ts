@@ -976,6 +976,7 @@ const simulationState = {
     lastT: performance.now(),
     bodies: [] as Body[],
     explosions: [] as ParticleExplosion[],
+    showNames: false,
 };
 
 // --- Flight mode state ---
@@ -4584,7 +4585,7 @@ function animate() {
 
     // Update label scales based on distance from camera
     // Always update scale, visibility is controlled by checkbox
-    const showNames = document.getElementById('showNames').checked;
+    const showNames = simulationState.showNames;
     simulationState.bodies.forEach((body) => {
         if (body && !body._isDisposed && body.mesh && body.label) {
             // Hide the active ship's label while in flight (it would clutter the camera view)
@@ -6490,6 +6491,7 @@ mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
 });
 
 mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
+    simulationState.showNames = checked;
     simulationState.bodies.forEach((body) => {
         if (body && body.label) {
             const isActiveShip = flightState.isActive && body === flightState.activeShip;
@@ -7129,7 +7131,7 @@ window.addEventListener('keydown', (e) => {
 
     // Delete key to remove selected body
     if (key === 'n') {
-        const showNamesCheckbox = document.getElementById('showNames') as HTMLInputElement | null;
+        const showNamesCheckbox = mainPanel.showNamesCheckbox as HTMLInputElement | null;
         if (showNamesCheckbox) {
             showNamesCheckbox.checked = !showNamesCheckbox.checked;
             showNamesCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
