@@ -2,7 +2,10 @@
  * Base Panel class for managing UI panels with custom event system
  */
 export class Panel {
-    constructor(elementId) {
+    element: HTMLElement | null;
+    private _eventListeners: { [key: string]: Array<(data?: any) => void> };
+
+    constructor(elementId: string | HTMLElement) {
         this.element =
             typeof elementId === 'string' ? document.getElementById(elementId) : elementId;
 
@@ -19,7 +22,7 @@ export class Panel {
      * @param {string} eventName - Name of the event
      * @param {function} callback - Callback function to execute
      */
-    on(eventName, callback) {
+    on(eventName: string, callback: (data?: any) => void) {
         if (!this._eventListeners[eventName]) {
             this._eventListeners[eventName] = [];
         }
@@ -31,7 +34,7 @@ export class Panel {
      * @param {string} eventName - Name of the event
      * @param {function} callback - Callback function to remove
      */
-    off(eventName, callback) {
+    off(eventName: string, callback: (data?: any) => void) {
         if (!this._eventListeners[eventName]) return;
 
         this._eventListeners[eventName] = this._eventListeners[eventName].filter(
@@ -44,7 +47,7 @@ export class Panel {
      * @param {string} eventName - Name of the event
      * @param {any} data - Data to pass to callbacks
      */
-    emit(eventName, data) {
+    emit(eventName: string, data?: any) {
         if (!this._eventListeners[eventName]) return;
 
         this._eventListeners[eventName].forEach((callback) => {

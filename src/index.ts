@@ -5094,10 +5094,10 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
     dir.normalize();
 
     // Keep a sensible minimum distance so we don't clip into the body (only if we have a body target)
-    const minDist =
-        target && simulationState.bodies.includes(target) && !target._isDisposed
-            ? Math.max((target.radius || 1) * 2.2, 10)
-            : 10;
+    // const minDist =
+    //     target && simulationState.bodies.includes(target) && !target._isDisposed
+    //         ? Math.max((target.radius || 1) * 2.2, 10)
+    //         : 10;
     const maxDist = MAX_ZOOM_OUT_DISTANCE;
     const targetDistance =
         target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh

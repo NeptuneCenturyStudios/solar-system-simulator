@@ -1,4 +1,4 @@
-export function escapeHtml(s) {
+export function escapeHtml(s: string) {
     // NOTE: Required because we build the bodies table via `innerHTML`.
     // Always escape user-provided strings (names can be edited/auto-generated).
     // Produce proper HTML entities so the string is safe to insert into HTML.
