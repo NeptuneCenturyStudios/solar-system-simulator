@@ -4664,20 +4664,24 @@ function animate() {
     // ── Ship trail update ──────────────────────────────────────────────────────
     // Runs every frame after physics so the nozzle position is final.
     // Covers both flight mode (player piloting) and autopilot-only (bodies-table "Fly Here").
-    const trailShip = isFlightModeActive
-        ? flightState.activeShip!
-        : autopilotState.isActive
-          ? flightState.knownShip
-          : null;
+    // const trailShip = isFlightModeActive
+    //     ? flightState.activeShip!
+    //     : autopilotState.isActive
+    //       ? flightState.knownShip
+    //       : null;
+
+    // Get the ship whose trail we should update. The trail should always be visible for the active/known ship, even if the player has exited the cockpit view.
+    const trailShip = flightState.activeShip ?? flightState.knownShip ?? null;
+
     if (trailShip && trailShip.mesh) {
         const nozzle = trailShip.thrusterOffset
             .clone()
             .applyQuaternion(trailShip.mesh.quaternion)
             .add(trailShip.mesh.position);
         // Record trail continuously in flight; suppress only during warp/warp-decel.
-        const trailRecord = isFlightModeActive
-            ? !flightState.warpActive && !flightState.warpDecelerating
-            : !autopilotState.isWarpActive;
+        // const trailRecord = isFlightModeActive
+        //     ? !flightState.warpActive && !flightState.warpDecelerating
+        //     : !autopilotState.isWarpActive;
         // Exhaust direction = ship's backward direction (−forward axis)
         const exhaustDir = new THREE.Vector3(0, 0, -1).applyQuaternion(trailShip.mesh.quaternion);
         // In autopilot-only mode flightState.currentSpeed isn't maintained — use velocity magnitude
@@ -4694,7 +4698,7 @@ function animate() {
             nozzle,
             trailSpeed,
             trailMaxSpeed,
-            trailRecord,
+            true,
             trailShip.velocity,
             exhaustDir,
             dtTotal

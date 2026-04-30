@@ -2,24 +2,22 @@ import * as THREE from 'three';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 import { IShipEffect } from './ship-effect-base.js';
 
+const SF = SCALE_FACTOR / SCALE_FACTOR;
+
 /** Maximum number of live particles in the pool. */
 const MAX_PARTICLES = 1200;
-/** Maximum world-unit spawn segment — caps the filled length at high timeScale. */
-const MAX_TRAIL_LENGTH = 35 * SCALE_FACTOR;
-/** Half-angle of the exhaust cone in radians. Tighter than before for a cleaner plume. */
-const EXHAUST_SPREAD = 0.4;
+/** Half-angle of the exhaust cone in radians. */
+const EXHAUST_SPREAD = 0.22;
 /** Minimum particles emitted per frame while thrusting. */
 const EMIT_MIN = 8;
 /** Maximum particles emitted per frame. */
-const EMIT_MAX = 120;
-/** Target particles per world-unit of the (capped) spawn segment. */
-const EMIT_DENSITY = 4.0;
+const EMIT_MAX = 256;
 /** Base particle lifetime in seconds. Actual lifetime is randomised ±30% around this. */
-const LIFETIME_BASE = 0.5;
-/** Speed (u/s) at which particles drift backward *in the ship's reference frame*.
- *  At any ship speed the inter-particle gap per frame = EXHAUST_DRIFT_SPEED × dt
- *  (≈ 0.8 units at 60 fps), well under one particle radius — no visible gaps. */
-const EXHAUST_DRIFT_SPEED = 50000 * SCALE_FACTOR;
+const LIFETIME_BASE = 128 * SF;
+/** Speed (u/s) at which exhaust particles travel in world space.
+ *  plumeLength ≈ EXHAUST_DRIFT_SPEED × LIFETIME_BASE; keep this a few ship-lengths
+ *  (ship radius ≈ 0.6 u, so targeting ~3 u plume). */
+const EXHAUST_DRIFT_SPEED = 4 * SF;
 /** Sentinel: negative life means the slot is unused. */
 const DEAD = -1;
 
@@ -66,9 +64,6 @@ export class ShipFlame implements IShipEffect {
     readonly glowInner: THREE.Points;
     readonly glowOuter: THREE.Points;
 
-    /** Nozzle world-position from the previous frame — interpolate spawn positions against this. */
-    private prevNozzle: THREE.Vector3 | null = null;
-
     constructor(scene: THREE.Scene) {
         this.scene = scene;
 
@@ -92,10 +87,9 @@ export class ShipFlame implements IShipEffect {
         const ctx = tc.getContext('2d')!;
         const grad = ctx.createRadialGradient(GS / 2, GS / 2, 0, GS / 2, GS / 2, GS / 2);
         grad.addColorStop(0,    'rgba(255, 255, 255, 1.0)');
-        grad.addColorStop(0.12, 'rgba(255, 220, 120, 1.0)');
-        grad.addColorStop(0.35, 'rgba(80,  200, 255, 0.7)');
-        grad.addColorStop(0.65, 'rgba(20,   80, 255, 0.2)');
-        grad.addColorStop(1,    'rgba(0,    10, 180, 0.0)');
+        grad.addColorStop(0.25, 'rgba(255, 255, 255, 0.8)');
+        grad.addColorStop(0.6,  'rgba(255, 255, 255, 0.3)');
+        grad.addColorStop(1,    'rgba(255, 255, 255, 0.0)');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, GS, GS);
         const flameTex = new THREE.CanvasTexture(tc);
@@ -108,7 +102,7 @@ export class ShipFlame implements IShipEffect {
 
         this.innerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 0.35 * SCALE_FACTOR,
+            size: 0.08 * SF,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -131,7 +125,7 @@ export class ShipFlame implements IShipEffect {
 
         this.outerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 1 * SCALE_FACTOR,
+            size: 0.22 * SF,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -150,7 +144,6 @@ export class ShipFlame implements IShipEffect {
     /** Kill all particles and hide the trail. Call when entering flight mode. */
     init(): void {
         this.life.fill(DEAD);
-        this.prevNozzle = null;
         this.innerGeo.setDrawRange(0, 0);
         this.outerGeo.setDrawRange(0, 0);
         this.glowInner.visible = false;
@@ -195,7 +188,7 @@ export class ShipFlame implements IShipEffect {
         // ── 1. Age live particles (sim-time based, comet pattern) ─────────────
         for (let i = 0; i < MAX_PARTICLES; i++) {
             if (this.life[i] < 0) continue;
-            this.life[i] += this.lifeIncrement[i] * absDt;
+            this.life[i] += this.lifeIncrement[i] * absDt *32;
             if (this.life[i] >= 1.0) {
                 this.life[i] = DEAD;
             }
@@ -205,14 +198,13 @@ export class ShipFlame implements IShipEffect {
         if (absDt > 0) {
             for (let i = 0; i < MAX_PARTICLES; i++) {
                 if (this.life[i] < 0) continue;
-                this.px[i] += this.vx[i] * absDt;
-                this.py[i] += this.vy[i] * absDt;
-                this.pz[i] += this.vz[i] * absDt;
+                this.px[i] += this.vx[i] * absDt * 32;
+                this.py[i] += this.vy[i] * absDt * 32;
+                this.pz[i] += this.vz[i] * absDt * 32;
             }
         }
 
         // ── 3. Emit new particles ─────────────────────────────────────────────
-        const prev = this.prevNozzle;
         if (thrusting) {
             // Build a tangent basis perpendicular to exhaustDir for cone spread
             const upRef = Math.abs(exhaustDir.y) < 0.9
@@ -221,39 +213,20 @@ export class ShipFlame implements IShipEffect {
             const perp1 = new THREE.Vector3().crossVectors(exhaustDir, upRef).normalize();
             const perp2 = new THREE.Vector3().crossVectors(exhaustDir, perp1);
 
-            const travel = prev ? prev.distanceTo(nozzle) : 0;
-            const cappedTravel = Math.min(travel, MAX_TRAIL_LENGTH);
+            // Emit count scales with speed; no longer driven by travel distance so spawn
+            // positions always come from the nozzle regardless of ship movement direction.
             const nEmit = Math.min(EMIT_MAX, Math.max(EMIT_MIN,
-                Math.round(cappedTravel * EMIT_DENSITY)));
+                Math.round(EMIT_MIN + (EMIT_MAX - EMIT_MIN) * speedFactor)));
 
             // Scale particle lifetime so pool stays under 50% full at any emit rate.
-            // At 60 fps: pool_used = nEmit × lifetime × 60 ≤ MAX_PARTICLES × 0.5
-            //   → lifetime ≤ (MAX_PARTICLES × 0.5) / (nEmit × 60)
-            // At low speed (nEmit≈13): limit≈0.77 s → clamped to LIFETIME_BASE=0.5 s.
-            // At boost  (nEmit=120): limit≈0.083 s → short-lived so pool never fills.
             const adjustedLifetime = Math.min(
                 LIFETIME_BASE,
                 (MAX_PARTICLES * 0.5) / (Math.max(nEmit, 1) * 60)
             );
 
-            // Capped start position (at most MAX_TRAIL_LENGTH back from nozzle)
-            let startX = nozzle.x, startY = nozzle.y, startZ = nozzle.z;
-            if (prev && travel > 0) {
-                const cap = cappedTravel / travel;
-                startX = nozzle.x + (prev.x - nozzle.x) * cap;
-                startY = nozzle.y + (prev.y - nozzle.y) * cap;
-                startZ = nozzle.z + (prev.z - nozzle.z) * cap;
-            }
-
             let emitted = 0;
             for (let i = 0; i < MAX_PARTICLES && emitted < nEmit; i++) {
                 if (this.life[i] >= 0) continue; // slot in use
-
-                // Spread spawn positions evenly along the (capped) trail segment
-                const frac   = (emitted + 0.5) / nEmit;
-                this.px[i] = startX + (nozzle.x - startX) * frac;
-                this.py[i] = startY + (nozzle.y - startY) * frac;
-                this.pz[i] = startZ + (nozzle.z - startZ) * frac;
 
                 // Random cone scatter within EXHAUST_SPREAD
                 const phi   = Math.random() * Math.PI * 2;
@@ -264,23 +237,37 @@ export class ShipFlame implements IShipEffect {
                 const dy = exhaustDir.y * cosT + (perp1.y * Math.cos(phi) + perp2.y * Math.sin(phi)) * sinT;
                 const dz = exhaustDir.z * cosT + (perp1.z * Math.cos(phi) + perp2.z * Math.sin(phi)) * sinT;
 
-                // Particle velocity = ship velocity + small backward drift in ship frame.
-                // Gap per frame = EXHAUST_DRIFT_SPEED × dt ≈ 0.8 u @ 60 fps — no visible gaps
-                // even at 10× boost speed where the old exhaustSpeed approach left 64-unit gaps.
+                // Particle velocity: exhaust direction × drift speed (absolute world space).
+                // Particles always eject opposite the ship's facing direction regardless of
+                // the ship's actual movement vector.
                 const radialBoost = 1.0 + (Math.random() - 0.5) * 0.15;
-                this.vx[i] = shipVelocity.x + dx * EXHAUST_DRIFT_SPEED * radialBoost;
-                this.vy[i] = shipVelocity.y + dy * EXHAUST_DRIFT_SPEED * radialBoost;
-                this.vz[i] = shipVelocity.z + dz * EXHAUST_DRIFT_SPEED * radialBoost;
+                const speed = EXHAUST_DRIFT_SPEED * radialBoost;
+                // Particle velocity = ship velocity + exhaust drift in the ejection direction.
+                // Adding ship velocity keeps ejected particles tracking near the ship's world
+                // position so ghost trails don't drift away and create a gap. The exhaust
+                // component makes particles drift backward at EXHAUST_DRIFT_SPEED in the
+                // ship's reference frame, which is the visible plume.
+                this.vx[i] = shipVelocity.x + dx * speed;
+                this.vy[i] = shipVelocity.y + dy * speed;
+                this.vz[i] = shipVelocity.z + dz * speed;
 
-                this.life[i]          = 0;
+                // Spread spawn positions randomly along the exhaust axis over the full
+                // plume length. Pre-age each particle proportionally so the plume has
+                // uniform density on every frame instead of emitting discrete clumps.
+                const plumeLength = EXHAUST_DRIFT_SPEED * adjustedLifetime;
+                const depthFrac   = Math.random();
+                const depth       = depthFrac * plumeLength;
+                this.px[i] = nozzle.x + exhaustDir.x * depth;
+                this.py[i] = nozzle.y + exhaustDir.y * depth;
+                this.pz[i] = nozzle.z + exhaustDir.z * depth;
+
                 // lifeIncrement = 1/adjustedLifetime, ±30% randomisation like the comet.
-                // adjustedLifetime shrinks at high emit rates to prevent pool exhaustion.
                 this.lifeIncrement[i] = (1 / adjustedLifetime) * (0.7 + Math.random() * 0.6);
+                // Pre-age to match spawn depth so deeper particles die sooner.
+                this.life[i] = depthFrac;
                 emitted++;
             }
         }
-        // Always update prevNozzle so the first frame of a new thrust burst has a valid prev.
-        this.prevNozzle = nozzle.clone();
 
         // ── 4. Compact live particles into GPU buffers ────────────────────────
         let n = 0;
@@ -293,16 +280,16 @@ export class ShipFlame implements IShipEffect {
             this.gpuPos[n * 3 + 1] = this.py[i];
             this.gpuPos[n * 3 + 2] = this.pz[i];
 
-            // Inner: hot white at birth → orange/red at death
-            const hot = alive * alive * speedFactor;
-            this.gpuColorInner[n * 3]     = hot;
-            this.gpuColorInner[n * 3 + 1] = hot * 0.4;
-            this.gpuColorInner[n * 3 + 2] = hot * 0.1;
+            // Inner core: white-hot at birth → yellow → orange → dim red at death
+            const hot = alive * speedFactor;
+            this.gpuColorInner[n * 3]     = hot;                          // R: full
+            this.gpuColorInner[n * 3 + 1] = hot * (0.6 + 0.4 * alive);   // G: high when young (white/yellow), low when old (red)
+            this.gpuColorInner[n * 3 + 2] = hot * 0.15 * alive;          // B: slight white tint only at birth
 
-            // Outer: warm orange glow, softer fade
-            const warm = alive * speedFactor;
-            this.gpuColorOuter[n * 3]     = warm * 0.8;
-            this.gpuColorOuter[n * 3 + 1] = warm * 0.3;
+            // Outer glow: orange halo, fades faster than inner
+            const warm = alive * alive * speedFactor;
+            this.gpuColorOuter[n * 3]     = warm;
+            this.gpuColorOuter[n * 3 + 1] = warm * 0.35;
             this.gpuColorOuter[n * 3 + 2] = 0;
 
             n++;
@@ -327,7 +314,6 @@ export class ShipFlame implements IShipEffect {
     /** Kill all particles and hide immediately. Called on flight exit or ship destruction. */
     hide(): void {
         this.life.fill(DEAD);
-        this.prevNozzle = null;
         this.innerGeo.setDrawRange(0, 0);
         this.outerGeo.setDrawRange(0, 0);
         this.glowInner.visible = false;
