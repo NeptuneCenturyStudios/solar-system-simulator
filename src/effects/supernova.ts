@@ -5,6 +5,24 @@ import { IStateDependencies } from '../interfaces';
 export class Supernova implements IEffect {
     dependencies: IStateDependencies;
     active: boolean;
+    count: number;
+    scene: THREE.Scene;
+    geometry: THREE.BufferGeometry;
+    material: THREE.PointsMaterial;
+    points: THREE.Points;
+    positions: Float32Array;
+    colors: Float32Array;
+    baseColors: { r: number; g: number; b: number }[];
+    sizes: Float32Array;
+    velocities: THREE.Vector3[];
+    maxDistances: number[];
+    expandTime: number;
+    origin: THREE.Vector3;
+    shouldCollapse: boolean;
+    collapseStartTime: number | null;
+    flashSphere: THREE.Mesh | null;
+    flashOpacity: number;
+
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
@@ -158,7 +176,7 @@ export class Supernova implements IEffect {
         const colorAttr = this.geometry.attributes.color.array;
 
         // Check if we should start collapsing (black hole formation)
-        const isCollapsing = this.shouldCollapse && this.expandTime >= this.collapseStartTime;
+        const isCollapsing = this.shouldCollapse && this.expandTime >= this.collapseStartTime ;
 
         // Flash fades quickly - remove immediately if collapsing
         if (this.flashSphere) {
@@ -169,20 +187,20 @@ export class Supernova implements IEffect {
                 // Force remove flash sphere when collapse starts
                 if (hasParent) this.scene.remove(this.flashSphere);
                 this.flashSphere.geometry?.dispose?.();
-                this.flashSphere.material?.dispose?.();
+                (this.flashSphere.material as THREE.MeshBasicMaterial)?.dispose?.();
                 this.flashSphere = null;
                 this.flashOpacity = 0;
             } else if (this.flashOpacity > 0) {
                 this.flashOpacity -= 0.02 * (absDt * 60);
                 if (this.flashSphere.material) {
-                    this.flashSphere.material.opacity = Math.max(0, this.flashOpacity);
+                    (this.flashSphere.material as THREE.MeshBasicMaterial).opacity = Math.max(0, this.flashOpacity);
                 }
                 this.flashSphere.scale.setScalar(1 + (1 - this.flashOpacity) * 8);
 
                 if (this.flashOpacity <= 0) {
                     if (hasParent) this.scene.remove(this.flashSphere);
                     this.flashSphere.geometry?.dispose?.();
-                    this.flashSphere.material?.dispose?.();
+                    (this.flashSphere.material as THREE.MeshBasicMaterial)?.dispose?.();
                     this.flashSphere = null;
                 }
             }
@@ -274,7 +292,7 @@ export class Supernova implements IEffect {
                 this.scene.remove(this.flashSphere);
             }
             this.flashSphere.geometry?.dispose?.();
-            this.flashSphere.material?.dispose?.();
+            (this.flashSphere.material as THREE.MeshBasicMaterial)?.dispose?.();
             this.flashSphere = null;
         }
 

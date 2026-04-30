@@ -457,7 +457,7 @@ export class Star extends CelestialBody {
     triggerStarDeath(isMassiveStar: boolean) {
         if (isMassiveStar) {
             try {
-                this.createSupernova(this.mesh.position.clone(), this.radius, true);
+                this.createSupernova(this.mesh.position.clone(), this.radius, false);
             } catch (e) {
                 console.error('Error creating supernova:', e);
             }
