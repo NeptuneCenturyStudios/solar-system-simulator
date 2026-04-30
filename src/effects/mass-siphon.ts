@@ -25,22 +25,24 @@ export class MassSiphonEffect implements IEffect {
 
     private scene: THREE.Scene;
     private star: ISiphonTarget;
-    private blackHole: { mesh: THREE.Mesh; radius: number; _isDisposed: boolean };
+    private blackHole: { mesh: THREE.Mesh; radius: number; _isDisposed: boolean; rotationAxis: THREE.Vector3; accretion?: { maxRadius: number } | null };
 
     private geometry: THREE.BufferGeometry;
     private material: THREE.PointsMaterial;
     private points: THREE.Points;
+    private spawnDirs: THREE.Vector3[];
 
     /** Progress along the stream [0, 1] for each particle. */
     private tArr: Float32Array;
     /** Per-particle travel speed (units of t per simulation-second). */
     private speedArr: Float32Array;
 
+    // Accept accretion disk info if present
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         star: ISiphonTarget,
-        blackHole: { mesh: THREE.Mesh; radius: number; _isDisposed: boolean }
+        blackHole: { mesh: THREE.Mesh; radius: number; _isDisposed: boolean; rotationAxis: THREE.Vector3; accretion?: { maxRadius: number } | null }
     ) {
         this.dependencies = dependencies;
         this.active = true;
@@ -51,10 +53,21 @@ export class MassSiphonEffect implements IEffect {
         // Stagger particles across the full stream length from the start.
         this.tArr = new Float32Array(PARTICLE_COUNT);
         this.speedArr = new Float32Array(PARTICLE_COUNT);
+        // For each particle, store a random direction for star surface spawn
+        this.spawnDirs = [];
+        // ...existing code...
         for (let i = 0; i < PARTICLE_COUNT; i++) {
             this.tArr[i] = Math.random();
             // Stream travel time varies ~8–20 simulation-seconds to spread density.
             this.speedArr[i] = 0.05 + Math.random() * 0.095;
+            // Random direction on unit sphere for star surface
+            const theta = Math.random() * 2 * Math.PI;
+            const phi = Math.acos(2 * Math.random() - 1);
+            this.spawnDirs[i] = new THREE.Vector3(
+                Math.sin(phi) * Math.cos(theta),
+                Math.cos(phi),
+                Math.sin(phi) * Math.sin(theta)
+            );
         }
 
         const positions = new Float32Array(PARTICLE_COUNT * 3);
@@ -69,7 +82,7 @@ export class MassSiphonEffect implements IEffect {
             vertexColors: true,
             transparent: true,
             blending: THREE.AdditiveBlending,
-            opacity: 0.85,
+            opacity: 0.95,
             sizeAttenuation: true,
             depthWrite: false,
         });
@@ -86,31 +99,15 @@ export class MassSiphonEffect implements IEffect {
         }
 
         const absDt = Math.abs(dt);
-        const startPos = this.star.mesh.position;
-        const endPos = this.blackHole.mesh.position;
-
-        // Bézier mid-point: perpendicular offset creates an arc like a tidal stream.
-        const dir = new THREE.Vector3().subVectors(endPos, startPos);
-        const dist = dir.length();
-        const midBase = new THREE.Vector3()
-            .addVectors(startPos, endPos)
-            .multiplyScalar(0.5);
-
-        // Perpendicular to the star→BH direction in the XZ plane (with Y fallback).
-        const up = new THREE.Vector3(0, 1, 0);
-        const perp = new THREE.Vector3().crossVectors(dir, up);
-        if (perp.lengthSq() < 1e-6) {
-            perp.set(1, 0, 0);
-        } else {
-            perp.normalize();
-        }
-        const midPos = midBase.clone().addScaledVector(perp, dist * 0.35);
+        // We'll compute start/end/mid for each particle
 
         // Star corona colour (source end of the stream).
         const starR = this.star.baseColor.r;
         const starG = this.star.baseColor.g;
         const starB = this.star.baseColor.b;
 
+            // Angle offset in radians for disk rotation (clockwise = negative)
+            const DISK_ROTATION_OFFSET = Math.PI / 2; // 90 degrees, adjust as needed
         const posArr = this.geometry.attributes.position.array as Float32Array;
         const colArr = this.geometry.attributes.color.array as Float32Array;
 
@@ -119,15 +116,53 @@ export class MassSiphonEffect implements IEffect {
             if (this.tArr[i] >= 1.0) {
                 // Respawn just beyond the star so the stream is continuous.
                 this.tArr[i] = Math.random() * 0.05;
+                // New random direction for next spawn
+                const theta = Math.random() * 2 * Math.PI;
+                const phi = Math.acos(2 * Math.random() - 1);
+                this.spawnDirs[i] = new THREE.Vector3(
+                    Math.sin(phi) * Math.cos(theta),
+                    Math.cos(phi),
+                    Math.sin(phi) * Math.sin(theta)
+                );
             }
+
+            // Start: star surface
+            const starCenter = this.star.mesh.position;
+            const starRadius = this.star.radius;
+            const spawnDir = this.spawnDirs[i];
+            const start = new THREE.Vector3().copy(starCenter).addScaledVector(spawnDir, starRadius);
+
+            // End: offset point on accretion disk outer edge in direction of rotation (in disk plane)
+            const accretionMaxRadius = (this.blackHole.accretion && this.blackHole.accretion.maxRadius) ? this.blackHole.accretion.maxRadius : (this.blackHole.radius * 2 * 32);
+            const bhCenter = this.blackHole.mesh.position;
+            // Direction from star to black hole
+            const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
+            // Disk normal (rotation axis)
+            const diskNormal = this.blackHole.rotationAxis ? this.blackHole.rotationAxis.clone().normalize() : new THREE.Vector3(0, 1, 0);
+            // Project toBH onto the disk plane
+            const toBH_proj = toBH.clone().sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal))).normalize();
+            // Rotate the projected vector around the disk normal by the offset angle
+            const offsetDir = toBH_proj.clone().applyAxisAngle(diskNormal, DISK_ROTATION_OFFSET).normalize();
+            const end = new THREE.Vector3().copy(bhCenter).addScaledVector(offsetDir, accretionMaxRadius);
+
+            // Bézier mid-point: curve to merge with disk tangent at entry
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const dist = dir.length();
+            // Disk tangent at entry: cross(diskNormal, offsetDir) (direction of disk rotation)
+            const diskTangent = new THREE.Vector3().crossVectors(diskNormal, offsetDir).normalize();
+            // Place mid-point closer to the disk, offset along the tangent for a smooth merge
+            const mergeFrac = 0.7; // 0 = at start, 1 = at end; closer to disk for sharper merge
+            const tangentStrength = dist * 0.5; // adjust for more/less curve
+            const midBase = new THREE.Vector3().lerpVectors(start, end, mergeFrac);
+            const mid = midBase.clone().addScaledVector(diskTangent, tangentStrength);
 
             const t = this.tArr[i];
             const s = 1.0 - t;
 
             // Quadratic Bézier: P = s²·start + 2·s·t·mid + t²·end
-            posArr[i * 3]     = s * s * startPos.x + 2 * s * t * midPos.x + t * t * endPos.x;
-            posArr[i * 3 + 1] = s * s * startPos.y + 2 * s * t * midPos.y + t * t * endPos.y;
-            posArr[i * 3 + 2] = s * s * startPos.z + 2 * s * t * midPos.z + t * t * endPos.z;
+            posArr[i * 3]     = s * s * start.x + 2 * s * t * mid.x + t * t * end.x;
+            posArr[i * 3 + 1] = s * s * start.y + 2 * s * t * mid.y + t * t * end.y;
+            posArr[i * 3 + 2] = s * s * start.z + 2 * s * t * mid.z + t * t * end.z;
 
             // Colour: star base colour → BH accretion outer orange/red.
             colArr[i * 3]     = starR + (BH_R - starR) * t;
