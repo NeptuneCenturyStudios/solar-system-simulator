@@ -1065,9 +1065,9 @@ const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED / 2; // decel rate after warp ends (
 /** Camera distance (u) at which the warp tunnel is still fully opaque. */
 const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
 /** Camera distance (u) at which the warp tunnel has fully faded out. */
-const WARP_FADE_DIST     = 200 * SCALE_FACTOR;
+const WARP_FADE_DIST = 200 * SCALE_FACTOR;
 /** Peak camera shake displacement (u) applied each frame during warp. */
-const WARP_SHAKE_MAG     = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
+const WARP_SHAKE_MAG = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
 
 // Autopilot tuning constants
 /** Thrust acceleration used by autopilot during approach (u/s²). */
@@ -2613,7 +2613,14 @@ function createPresetBody(presetKey: string) {
             : new THREE.Vector3(0, 0, 0);
         const presetStarMass = presetStar ? presetStar.mass : SUN_MASS;
         newBody.velocity.copy(
-            computeOrbitVelocityAtPos(presetSpawnPos, presetStarPos, presetStarMass, 'circular', 0, 0)
+            computeOrbitVelocityAtPos(
+                presetSpawnPos,
+                presetStarPos,
+                presetStarMass,
+                'circular',
+                0,
+                0
+            )
         );
     }
 
@@ -2737,7 +2744,14 @@ function createNewBody(
         const starMass = primaryStar ? primaryStar.mass : SUN_MASS;
 
         const spawnPos = getNearCameraSpawnPos();
-        const spawnVel = computeOrbitVelocityAtPos(spawnPos, starPos, starMass, orbitType, 0.3, inclination);
+        const spawnVel = computeOrbitVelocityAtPos(
+            spawnPos,
+            starPos,
+            starMass,
+            orbitType,
+            0.3,
+            inclination
+        );
 
         const resolvedPlanetType = planetType || 'solid';
         const isGasGiant = resolvedPlanetType === 'gas_giant';
@@ -2863,13 +2877,15 @@ function createNewBody(
                     ? circularSpeed * Math.sqrt(Math.max(0, 1 - 0.3))
                     : circularSpeed;
 
-            const basisHelper = Math.abs(radialDir.y) < 0.9
-                ? new THREE.Vector3(0, 1, 0)
-                : new THREE.Vector3(1, 0, 0);
+            const basisHelper =
+                Math.abs(radialDir.y) < 0.9
+                    ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(1, 0, 0);
             const perp1 = new THREE.Vector3().crossVectors(radialDir, basisHelper).normalize();
             const perp2 = new THREE.Vector3().crossVectors(radialDir, perp1).normalize();
             const orbitAngle = Math.random() * Math.PI * 2;
-            const orbitDir = perp1.clone()
+            const orbitDir = perp1
+                .clone()
                 .multiplyScalar(Math.cos(orbitAngle))
                 .addScaledVector(perp2, Math.sin(orbitAngle));
 
@@ -3578,7 +3594,8 @@ function onMouseDown(event: MouseEvent) {
         gizmo.arrows.forEach((a) => ((a.line.material as THREE.LineBasicMaterial).opacity = 0.2)); // Dim others
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const _parentArrow = gizmoIntersects[0].object.parent as Record<string, any>;
-        if (_parentArrow?.line?.material) (_parentArrow.line.material as THREE.LineBasicMaterial).opacity = 1.0; // Highlight active
+        if (_parentArrow?.line?.material)
+            (_parentArrow.line.material as THREE.LineBasicMaterial).opacity = 1.0; // Highlight active
         controls.enabled = false; // Stop camera from moving
 
         // Capture initial camera offset relative to the body so we can restore perspective on mouse-up.
@@ -4239,7 +4256,12 @@ function animate() {
     // the tunnel is visible from lookAt mode and fades naturally on decel.
     const _warpUpdateShip = flightState.activeShip ?? flightState.knownShip;
     if (_warpUpdateShip && !_warpUpdateShip._isDisposed && _warpUpdateShip.mesh) {
-        warpEffect.update(dtTotal, _warpUpdateShip.mesh.position, _warpUpdateShip.velocity, FLIGHT_WARP_SPEED);
+        warpEffect.update(
+            dtTotal,
+            _warpUpdateShip.mesh.position,
+            _warpUpdateShip.velocity,
+            FLIGHT_WARP_SPEED
+        );
     }
 
     // WASD camera movement (works in both free camera and normal mode, but NOT in flight mode)
@@ -4656,7 +4678,7 @@ function animate() {
             const camFwd = new THREE.Vector3();
             camera.getWorldDirection(camFwd);
             const camRight = new THREE.Vector3().crossVectors(camFwd, camera.up).normalize();
-            camera.position.addScaledVector(camRight,  (Math.random() - 0.5) * WARP_SHAKE_MAG);
+            camera.position.addScaledVector(camRight, (Math.random() - 0.5) * WARP_SHAKE_MAG);
             camera.position.addScaledVector(camera.up, (Math.random() - 0.5) * WARP_SHAKE_MAG);
         }
     }
@@ -4765,7 +4787,10 @@ function animate() {
                 if (dist >= WARP_FADE_DIST) {
                     warpEffect.setOpacity(0.0);
                 } else {
-                    const t = Math.max(0, (dist - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST));
+                    const t = Math.max(
+                        0,
+                        (dist - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST)
+                    );
                     warpEffect.setOpacity(1.0 - t);
                 }
             } else {
@@ -4778,7 +4803,12 @@ function animate() {
 
     // Render 3D scene first, then UI overlay on top
     renderer.autoClear = true;
-    renderer.render(scene, camera);
+    try {
+        renderer.render(scene, camera);
+    } catch (e) {
+        console.error('Error during rendering:', e);
+        console.log(simulationState.bodies);
+    }
 
     renderer.autoClear = false;
     renderer.clearDepth(); // ensure 2D overlay draws on top even after rendering the 3D scene
@@ -5048,9 +5078,7 @@ function updateFlightSpawnBtnLabel() {
     if (iconEl) iconEl.textContent = canReenter ? 'login' : 'rocket_launch';
     while (iconEl && iconEl.nextSibling) btn.removeChild(iconEl.nextSibling);
     if (iconEl)
-        btn.appendChild(
-            document.createTextNode(canReenter ? ' ENTER SHIP' : ' SPAWN SPACESHIP')
-        );
+        btn.appendChild(document.createTextNode(canReenter ? ' ENTER SHIP' : ' SPAWN SPACESHIP'));
 }
 
 // Prevent UI clicks and keyboard events from interfering with scene interaction
@@ -6183,7 +6211,9 @@ function spawnShip() {
         simulationState.bodies.push(ship);
         try {
             window.dispatchEvent(
-                new CustomEvent('body:added', { detail: { body: ship, id: ship.id, name: ship.name } })
+                new CustomEvent('body:added', {
+                    detail: { body: ship, id: ship.id, name: ship.name },
+                })
             );
         } catch {
             // Empty
@@ -6329,7 +6359,10 @@ function exitFlightMode() {
         const prevDir = new THREE.Vector3()
             .subVectors(flightState.prevCameraPos, flightState.prevControlsTarget)
             .normalize();
-        const dist = currentCamDist > 0 ? currentCamDist : flightState.prevCameraPos.distanceTo(flightState.prevControlsTarget);
+        const dist =
+            currentCamDist > 0
+                ? currentCamDist
+                : flightState.prevCameraPos.distanceTo(flightState.prevControlsTarget);
         camera.position.copy(shipPos).addScaledVector(prevDir, dist);
         controls.target.copy(shipPos);
     } else {

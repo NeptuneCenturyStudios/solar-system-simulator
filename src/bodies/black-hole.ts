@@ -11,6 +11,7 @@ interface IAccretionDiskState {
     angularPositions: number[];
     minRadius: number;
     maxRadius: number;
+    opacities: Float32Array; // Per-particle opacity
 }
 
 declare module './black-hole.js' {
@@ -21,6 +22,7 @@ declare module './black-hole.js' {
 }
 
 export class BlackHole extends CelestialBody {
+    jet: { points: THREE.Points, positions: Float32Array, velocities: Float32Array, ages: Float32Array, origins: Float32Array, maxAge: number } | null = null;
     dependencies: IStateDependencies;
     eventHorizonRadius: number;
     accretion: IAccretionDiskState | null = null;
@@ -85,6 +87,9 @@ export class BlackHole extends CelestialBody {
 
         // Create continuous particle accretion animation
         this.accretion = this.createAccretionDisk();
+
+        // Create continuous jet effect
+        this.jet = this.createJet();
     }
 
     createAccretionGlow() {
@@ -123,15 +128,20 @@ export class BlackHole extends CelestialBody {
     }
 
     createAccretionDisk() {
-        const count = 200 * SCALE_FACTOR;
+        const count = 20 * this.eventHorizonRadius * SCALE_FACTOR;
         const geo = new THREE.BufferGeometry();
         const pArr = new Float32Array(count * 3);
         const colors = new Float32Array(count * 3);
+        const opacities = new Float32Array(count); // Per-particle opacity
         const vels = [];
         const angularPositions = []; // Track angle for spiral motion
 
-        const minRadius = this.eventHorizonRadius * 8 * SCALE_FACTOR;
-        const maxRadius = minRadius * 8 * SCALE_FACTOR;
+        const minRadius = this.eventHorizonRadius * 2 * SCALE_FACTOR;
+        const maxRadius = minRadius * 4 * SCALE_FACTOR;
+
+        // Opacity: more opaque near center, more transparent at outer edge
+        const minOpacity = 0.05;
+        const maxOpacity = 1.0;
 
         for (let i = 0; i < count; i++) {
             // Start particles in a disk around black hole
@@ -157,21 +167,57 @@ export class BlackHole extends CelestialBody {
             });
 
             // Color: white-hot to orange gradient
-            const heat = 1 - (radius - minRadius) / (maxRadius - minRadius);
-            colors[i * 3] = 1.0; // Red
-            colors[i * 3 + 1] = 0.5 + heat * 0.5; // Green (more at center)
-            colors[i * 3 + 2] = heat * 0.3; // Blue (less overall)
+            const t = (radius - minRadius) / (maxRadius - minRadius);
+            // Outer: dark orange/red (e.g., RGB 0.8, 0.2, 0.05), Inner: white (1.0, 1.0, 0.95)
+            const r = 1.0; // Red
+            const g = 1.0; // Green
+            const b = 0.95; // Blue
+            colors[i * 3] = r;
+            colors[i * 3 + 1] = g;
+            colors[i * 3 + 2] = b;
+
+            // Opacity: more opaque near center, more transparent at outer edge
+            opacities[i] = maxOpacity - t * (maxOpacity - minOpacity);
         }
 
         geo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
         geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.setAttribute('alpha', new THREE.BufferAttribute(opacities, 1));
 
-        const mat = new THREE.PointsMaterial({
-            size: 10 * SCALE_FACTOR,
-            vertexColors: true,
+        // Custom ShaderMaterial for per-particle color and alpha
+        const mat = new THREE.ShaderMaterial({
+            uniforms: {
+                pointSize: { value: 8 * SCALE_FACTOR },
+            },
+            vertexShader: `
+                precision mediump float;
+                attribute vec3 color;
+                attribute float alpha;
+                varying vec3 vColor;
+                varying float vAlpha;
+                uniform float pointSize;
+                void main() {
+                    vColor = color;
+                    vAlpha = alpha;
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = pointSize * (300.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                precision mediump float;
+                varying vec3 vColor;
+                varying float vAlpha;
+                void main() {
+                    float dist = length(gl_PointCoord - vec2(0.5));
+                    // Sharper edge: solid circle with only edge fading out
+                    float alpha = vAlpha * smoothstep(0.5, 0.48, 0.5 - dist);
+                    gl_FragColor = vec4(vColor, alpha);
+                    if (gl_FragColor.a < 0.01) discard;
+                }
+            `,
             transparent: true,
             blending: THREE.AdditiveBlending,
-            opacity: 0.9,
             depthWrite: false,
         });
 
@@ -179,16 +225,101 @@ export class BlackHole extends CelestialBody {
         points.frustumCulled = false;
         this.scene.add(points);
 
-        return { points, vels, angularPositions, minRadius, maxRadius };
+        return { points, vels, angularPositions, minRadius, maxRadius, opacities };
+    }
+
+    createJet() {
+        const jetCount = 100;
+        const velocities = new Float32Array(jetCount * 3);
+        const ages = new Float32Array(jetCount);
+        const origins = new Float32Array(jetCount * 3); // Store spawn origin for each particle
+        const maxAge = 0.7; // seconds (shorter lifetime for straighter jet)
+        // Use eventHorizonRadius for scaling
+        const r = this.eventHorizonRadius;
+        for (let i = 0; i < jetCount; i++) {
+            // Alternate between top and bottom pole
+            const up = i % 2 === 0 ? 1 : -1;
+            // Jet velocity: mostly along Y, with slight random XZ spread, scaled by radius
+            const speed = 1200 * SCALE_FACTOR * (r / SCALE_FACTOR); // scale with radius
+            const spread = 0.08 * (r / SCALE_FACTOR); // scale spread with radius
+            velocities[i * 3] = (Math.random() - 0.5) * spread * speed;
+            velocities[i * 3 + 1] = up * speed;
+            velocities[i * 3 + 2] = (Math.random() - 0.5) * spread * speed;
+            ages[i] = Math.random() * maxAge;
+            // Spawn at pole offset by radius
+            origins[i * 3] = this.mesh.position.x;
+            origins[i * 3 + 1] = this.mesh.position.y + up * r;
+            origins[i * 3 + 2] = this.mesh.position.z;
+        }
+        const geo = new THREE.BufferGeometry();
+        // We'll fill the position attribute each frame
+        const positions = new Float32Array(jetCount * 3);
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        // Jet color: white-hot
+        const colors = new Float32Array(jetCount * 3);
+        for (let i = 0; i < jetCount; i++) {
+            colors[i * 3] = 0.85;   // R
+            colors[i * 3 + 1] = 0.95; // G
+            colors[i * 3 + 2] = 1.0;  // B (more blue)
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        // Opacity: fade out with age
+        const opacities = new Float32Array(jetCount);
+        for (let i = 0; i < jetCount; i++) opacities[i] = 1.0;
+        geo.setAttribute('alpha', new THREE.BufferAttribute(opacities, 1));
+        const mat = new THREE.ShaderMaterial({
+            uniforms: {
+                pointSize: { value: 18 * r },
+            },
+            vertexShader: `
+                precision mediump float;
+                attribute vec3 color;
+                attribute float alpha;
+                varying vec3 vColor;
+                varying float vAlpha;
+                uniform float pointSize;
+                void main() {
+                    vColor = color;
+                    vAlpha = alpha;
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = pointSize * (300.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                precision mediump float;
+                varying vec3 vColor;
+                varying float vAlpha;
+                void main() {
+                    float dist = length(gl_PointCoord - vec2(0.5));
+                    float alpha = vAlpha * smoothstep(0.5, 0.48, 0.5 - dist);
+                    gl_FragColor = vec4(vColor, alpha);
+                    if (gl_FragColor.a < 0.01) discard;
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+        });
+        const points = new THREE.Points(geo, mat);
+        points.frustumCulled = false;
+        this.scene.add(points);
+        return { points, positions, velocities, ages, origins, maxAge };
     }
 
     updateAccretion(dt: number) {
         if (!this.accretion) return;
 
-        const absDt = Math.abs(dt);
+        const absDt = Math.abs(dt) / 10;
 
         const p = this.accretion.points.geometry.attributes.position.array;
+        const opacities = this.accretion.opacities;
         const count = p.length / 3;
+        const minRadius = this.accretion.minRadius;
+        const maxRadius = this.accretion.maxRadius;
+        const minOpacity = 0.2;
+        const maxOpacity = 0.9;
+        const colors = this.accretion.points.geometry.attributes.color.array;
 
         for (let i = 0; i < count; i++) {
             // Get current position relative to black hole
@@ -198,18 +329,43 @@ export class BlackHole extends CelestialBody {
 
             // Spiral inward
             const vel = this.accretion.vels[i];
-            const newRadius = radius - vel.inward * (absDt);
+            // Inward speed increases as radius decreases (e.g., proportional to 1/r)
+            const inwardSpeed = vel.inward * (maxRadius / Math.max(radius, 1));
+            const newRadius = radius - inwardSpeed * (absDt);
+
+            // Color/heat mapping: t=0 (inner) is white/yellow, t=1 (outer) is dim red/orange
+            const t = (newRadius - minRadius) / (maxRadius - minRadius);
+            // Outer: dark orange/red (e.g., RGB 0.8, 0.2, 0.05), Inner: white/yellow (1.0, 0.95, 0.7)
+            const r = 0.8 + (1.0 - 0.8) * (1 - t); // 0.8→1.0
+            const g = 0.2 + (0.95 - 0.2) * (1 - t); // 0.2→0.95
+            const b = 0.05 + (0.7 - 0.05) * (1 - t); // 0.05→0.7
+            colors[i * 3] = r;
+            colors[i * 3 + 1] = g;
+            colors[i * 3 + 2] = b;
 
             // If particle reaches the inner buffer, respawn at outer edge
             if (newRadius < this.eventHorizonRadius + 2 * SCALE_FACTOR) {
                 // Respawn at outer edge
                 const angle = Math.random() * Math.PI * 2;
-                const respawnRadius = this.accretion.maxRadius;
+                const respawnRadius = maxRadius;
                 p[i * 3] = Math.cos(angle) * respawnRadius;
                 p[i * 3 + 1] = (Math.random() - 0.5) * this.eventHorizonRadius * 0.75;
                 p[i * 3 + 2] = Math.sin(angle) * respawnRadius;
                 this.accretion.angularPositions[i] = angle;
-                this.accretion.vels[i].radius = respawnRadius;
+                // Reset velocity to match initial spawn logic
+                const inwardSpeed0 = (0.12 + Math.random() * 0.1) * SCALE_FACTOR;
+                const orbitalSpeed = Math.sqrt(this.mass / respawnRadius) * 0.005;
+                this.accretion.vels[i] = {
+                    inward: inwardSpeed0,
+                    orbital: orbitalSpeed,
+                    radius: respawnRadius,
+                };
+                // Reset opacity to min at respawn (most transparent at outer edge)
+                opacities[i] = minOpacity;
+                // Reset color to outer color
+                colors[i * 3] = 0.8;
+                colors[i * 3 + 1] = 0.2;
+                colors[i * 3 + 2] = 0.05;
             } else {
                 // Update orbital position (spiral motion)
                 this.accretion.angularPositions[i] += vel.orbital * (absDt);
@@ -221,10 +377,17 @@ export class BlackHole extends CelestialBody {
                 p[i * 3 + 1] = p[i * 3 + 1] * 0.98;
 
                 this.accretion.vels[i].radius = newRadius;
+
+                // Update opacity based on new radius (more opaque near center)
+                opacities[i] = maxOpacity - t * (maxOpacity - minOpacity);
             }
         }
 
+        // TODO: Jet effect - add/update jet particle system here
+
         this.accretion.points.geometry.attributes.position.needsUpdate = true;
+        this.accretion.points.geometry.attributes.alpha.needsUpdate = true;
+        this.accretion.points.geometry.attributes.color.needsUpdate = true;
 
         // Update glow position
         if (this.accretionGlow) {
@@ -238,6 +401,47 @@ export class BlackHole extends CelestialBody {
 
         // Update accretion disk animation
         this.updateAccretion(dt);
+
+        // Update jet
+        if (this.jet) {
+            const absDt = Math.abs(dt);
+            // Update point size uniform to match current radius
+            const r = this.eventHorizonRadius;
+            const mat = this.jet.points.material as THREE.ShaderMaterial;
+            if (mat.uniforms.pointSize.value !== 18 * r) {
+                mat.uniforms.pointSize.value = 18 * r;
+            }
+            if (absDt > 0) {
+                const { points, velocities, ages, origins, maxAge } = this.jet;
+                const posAttr = points.geometry.attributes.position;
+                const alphaAttr = points.geometry.attributes.alpha;
+                for (let i = 0; i < velocities.length / 3; i++) {
+                    ages[i] += absDt;
+                    if (ages[i] > maxAge) {
+                        // Respawn at pole, offset by radius
+                        const up = i % 2 === 0 ? 1 : -1;
+                        const speed = 120 * SCALE_FACTOR * (r / SCALE_FACTOR);
+                        const spread = 0.08 * (r / SCALE_FACTOR);
+                        velocities[i * 3] = (Math.random() - 0.5) * spread * speed;
+                        velocities[i * 3 + 1] = up * speed;
+                        velocities[i * 3 + 2] = (Math.random() - 0.5) * spread * speed;
+                        ages[i] = 0;
+                        // Store new origin at current black hole position, offset by radius
+                        origins[i * 3] = this.mesh.position.x;
+                        origins[i * 3 + 1] = this.mesh.position.y + up * r;
+                        origins[i * 3 + 2] = this.mesh.position.z;
+                    }
+                    // Fade out with age
+                    alphaAttr.array[i] = 1.0 - (ages[i] / maxAge);
+                    // Compute world position: origin + velocity * age
+                    posAttr.array[i * 3] = origins[i * 3] + velocities[i * 3] * ages[i];
+                    posAttr.array[i * 3 + 1] = origins[i * 3 + 1] + velocities[i * 3 + 1] * ages[i];
+                    posAttr.array[i * 3 + 2] = origins[i * 3 + 2] + velocities[i * 3 + 2] * ages[i];
+                }
+                posAttr.needsUpdate = true;
+                alphaAttr.needsUpdate = true;
+            }
+        }
 
         // Keep accretion disk centered on black hole
         if (this.accretion && this.accretion.points) {
