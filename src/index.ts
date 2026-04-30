@@ -169,9 +169,7 @@ function calculateStarRadius(mass: number, baseMass: number, baseRadius: number)
 }
 
 /**
- * Set the visual radius for any body. If the body implements `setRadius`, delegate to it.
- * Otherwise update mesh geometry, label, label line and rings if present.
- * TODO: This should be moved to the CelestialBody class
+ * Set the visual radius for any body. Delegates to the body's setRadius method.
  * @param {object} body - The celestial body to update
  * @param {number} newRadius - The new radius to set
  */
@@ -187,101 +185,14 @@ function setBodyRadius(body: CelestialBody, newRadius: number) {
     const MAX_RADIUS = PLUTO_DIST + 300000;
     newRadius = Math.min(newRadius, MAX_RADIUS);
 
-    const oldRadius = body.radius || 1;
-
-    if (body instanceof Star) {
-        body.setRadius(newRadius);
-        return;
-    }
-
-    // Update stored radius
-    body.radius = newRadius;
-
-    // Update mesh geometry
-    try {
-        if (body.mesh && body.mesh.geometry) {
-            body.mesh.geometry.dispose();
-            body.mesh.geometry = new THREE.SphereGeometry(newRadius, 32, 32);
-        }
-    } catch (e) {
-        console.error('Error updating body geometry radius:', e);
-    }
-
-    // Update cast/receive shadow for non-stars
-    if (body.mesh) {
-        const isBodyStar = isBodyType(body, BodyType.Star);
-        body.mesh.castShadow = !isBodyStar;
-        body.mesh.receiveShadow = !isBodyStar;
-    }
-
-    // Update label position and label line
-    try {
-        if (body.label) {
-            const labelHeight = newRadius * 3.5;
-            body.label.position.set(0, labelHeight, 0);
-        }
-
-        if (body.labelLine && body.labelLine.geometry) {
-            const posAttr = body.labelLine.geometry.attributes.position;
-            if (posAttr && posAttr.array) {
-                posAttr.array[0] = 0;
-                posAttr.array[1] = newRadius;
-                posAttr.array[2] = 0;
-                posAttr.array[3] = 0;
-                posAttr.array[4] = newRadius * 3.5;
-                posAttr.array[5] = 0;
-                posAttr.needsUpdate = true;
-            }
-        }
-    } catch (e) {
-        console.error('Error updating body label or label line position:', e);
-    }
-
-    // Update cloud layer (if present) to follow new radius
-    try {
-        if (body.clouds && body.clouds.geometry) {
-            try {
-                body.clouds.geometry.dispose();
-            } catch (e) {
-                console.error('Error disposing old cloud geometry:', e);
-            }
-
-            const cloudFactor = 1.03;
-            body.clouds.geometry = new THREE.SphereGeometry(newRadius * cloudFactor, 32, 32);
-        }
-    } catch (e) {
-        console.error('Error updating cloud layer radius:', e);
-    }
-
-    // If rings exist, scale them roughly to new radius
-    try {
-        if (body.rings) {
-            const scaleFactor = newRadius / Math.max(oldRadius, 1);
-            body.rings.scale.setScalar(scaleFactor);
-        }
-    } catch (e) {
-        console.error('Error updating body rings scale:', e);
-    }
+    body.setRadius(newRadius);
 }
 
 function collisionScoreEscapeVelocity(body: Body) {
     // Winner heuristic: compare escape velocity (constants cancel):
     //   v_esc = sqrt(2GM/R)  => ordering is equivalent to M/R
-    //
-    // Important nuance for black holes in this sim:
-    // - `radius` is the visual/event-horizon sphere (very small).
-    // - `eventHorizonRadius` may represent the original baseline horizon and doesn't update on absorption.
-    // So: prefer `radius` (current), but use `eventHorizonRadius` as a fallback if present.
     const m = Math.max(0, body?.mass || 0);
-
-    const rawR =
-        typeof body?.radius === 'number' && isFinite(body.radius) && body.radius > 0
-            ? body.radius
-            : body instanceof BlackHole && isFinite(body.eventHorizonRadius)
-              ? body.eventHorizonRadius
-              : 0;
-
-    const r = Math.max(1e-6, rawR);
+    const r = Math.max(1e-6, typeof body?.radius === 'number' && isFinite(body.radius) && body.radius > 0 ? body.radius : 0);
 
     return m / r;
 }

@@ -21,10 +21,13 @@ declare module './black-hole.js' {
     }
 }
 
+const BLACK_HOLE_JET_POINT_SIZE = 4;
+const BLACK_HOLE_JET_SPEED_BASE = 1200; // Base speed for jet particles, scaled by radius
+const BLACK_HOLE_ACCRETION_DISK_POINT_SIZE = 4; // Angular spread for jet particles (as a fraction of speed)
+
 export class BlackHole extends CelestialBody {
     jet: { points: THREE.Points, positions: Float32Array, velocities: Float32Array, ages: Float32Array, origins: Float32Array, maxAge: number } | null = null;
     dependencies: IStateDependencies;
-    eventHorizonRadius: number;
     accretion: IAccretionDiskState | null = null;
     accretionGlow: THREE.Sprite | null = null;
 
@@ -71,7 +74,6 @@ export class BlackHole extends CelestialBody {
             rotation
         );
 
-        this.eventHorizonRadius = EVENT_HORIZON_RADIUS;
         this.dependencies = dependencies;
 
         // Make mesh pitch black and emissive
@@ -122,13 +124,13 @@ export class BlackHole extends CelestialBody {
         });
 
         this.accretionGlow = new THREE.Sprite(spriteMat);
-        this.accretionGlow.scale.setScalar(this.eventHorizonRadius * 10);
+        this.accretionGlow.scale.setScalar(this.radius * 10);
         this.accretionGlow.position.copy(this.mesh.position);
         this.scene.add(this.accretionGlow);
     }
 
     createAccretionDisk() {
-        const count = 20 * this.eventHorizonRadius * SCALE_FACTOR;
+        const count = 400;
         const geo = new THREE.BufferGeometry();
         const pArr = new Float32Array(count * 3);
         const colors = new Float32Array(count * 3);
@@ -136,8 +138,8 @@ export class BlackHole extends CelestialBody {
         const vels = [];
         const angularPositions = []; // Track angle for spiral motion
 
-        const minRadius = this.eventHorizonRadius * 2 * SCALE_FACTOR;
-        const maxRadius = minRadius * 4 * SCALE_FACTOR;
+        const minRadius = this.radius * 2;
+        const maxRadius = minRadius * 32;
 
         // Opacity: more opaque near center, more transparent at outer edge
         const minOpacity = 0.05;
@@ -147,7 +149,7 @@ export class BlackHole extends CelestialBody {
             // Start particles in a disk around black hole
             const angle = Math.random() * Math.PI * 2;
             const radius = minRadius + Math.random() * (maxRadius - minRadius);
-            const verticalSpread = (Math.random() - 0.5) * this.eventHorizonRadius * 0.75;
+            const verticalSpread = (Math.random() - 0.5) * this.radius * 0.75;
 
             pArr[i * 3] = Math.cos(angle) * radius;
             pArr[i * 3 + 1] = verticalSpread;
@@ -187,7 +189,7 @@ export class BlackHole extends CelestialBody {
         // Custom ShaderMaterial for per-particle color and alpha
         const mat = new THREE.ShaderMaterial({
             uniforms: {
-                pointSize: { value: 8 * SCALE_FACTOR },
+                pointSize: { value: BLACK_HOLE_ACCRETION_DISK_POINT_SIZE * this.radius },
             },
             vertexShader: `
                 precision mediump float;
@@ -234,14 +236,13 @@ export class BlackHole extends CelestialBody {
         const ages = new Float32Array(jetCount);
         const origins = new Float32Array(jetCount * 3); // Store spawn origin for each particle
         const maxAge = 0.7; // seconds (shorter lifetime for straighter jet)
-        // Use eventHorizonRadius for scaling
-        const r = this.eventHorizonRadius;
+        const r = this.radius;
         for (let i = 0; i < jetCount; i++) {
             // Alternate between top and bottom pole
             const up = i % 2 === 0 ? 1 : -1;
             // Jet velocity: mostly along Y, with slight random XZ spread, scaled by radius
-            const speed = 1200 * SCALE_FACTOR * (r / SCALE_FACTOR); // scale with radius
-            const spread = 0.08 * (r / SCALE_FACTOR); // scale spread with radius
+            const speed = BLACK_HOLE_JET_SPEED_BASE * r;
+            const spread = 0.08; // constant angular fraction — keeps jet narrow at all radii
             velocities[i * 3] = (Math.random() - 0.5) * spread * speed;
             velocities[i * 3 + 1] = up * speed;
             velocities[i * 3 + 2] = (Math.random() - 0.5) * spread * speed;
@@ -269,7 +270,7 @@ export class BlackHole extends CelestialBody {
         geo.setAttribute('alpha', new THREE.BufferAttribute(opacities, 1));
         const mat = new THREE.ShaderMaterial({
             uniforms: {
-                pointSize: { value: 18 * r },
+                pointSize: { value: BLACK_HOLE_JET_POINT_SIZE * r },
             },
             vertexShader: `
                 precision mediump float;
@@ -305,6 +306,33 @@ export class BlackHole extends CelestialBody {
         points.frustumCulled = false;
         this.scene.add(points);
         return { points, positions, velocities, ages, origins, maxAge };
+    }
+
+    setRadius(newRadius: number) {
+        super.setRadius(newRadius);
+
+        if (this.accretionGlow) {
+            this.accretionGlow.scale.setScalar(newRadius * 10);
+        }
+
+        if (this.jet) {
+            const mat = this.jet.points.material as THREE.ShaderMaterial;
+            mat.uniforms.pointSize.value = BLACK_HOLE_JET_POINT_SIZE * newRadius;
+        }
+
+        // Recreate accretion disk so particle count and radii match the new size
+        this.disposeAccretionDisk();
+        this.accretion = this.createAccretionDisk();
+    }
+
+    disposeAccretionDisk() {
+        if (this.accretion && this.accretion.points) {
+            this.scene.remove(this.accretion.points);
+            this.accretion.points.geometry.dispose();
+            const mat = this.accretion.points.material;
+            if (!Array.isArray(mat)) mat.dispose();
+        }
+        this.accretion = null;
     }
 
     updateAccretion(dt: number) {
@@ -344,12 +372,12 @@ export class BlackHole extends CelestialBody {
             colors[i * 3 + 2] = b;
 
             // If particle reaches the inner buffer, respawn at outer edge
-            if (newRadius < this.eventHorizonRadius + 2 * SCALE_FACTOR) {
+            if (newRadius < this.radius + 2 * SCALE_FACTOR) {
                 // Respawn at outer edge
                 const angle = Math.random() * Math.PI * 2;
                 const respawnRadius = maxRadius;
                 p[i * 3] = Math.cos(angle) * respawnRadius;
-                p[i * 3 + 1] = (Math.random() - 0.5) * this.eventHorizonRadius * 0.75;
+                p[i * 3 + 1] = (Math.random() - 0.5) * this.radius * 0.75;
                 p[i * 3 + 2] = Math.sin(angle) * respawnRadius;
                 this.accretion.angularPositions[i] = angle;
                 // Reset velocity to match initial spawn logic
@@ -406,10 +434,10 @@ export class BlackHole extends CelestialBody {
         if (this.jet) {
             const absDt = Math.abs(dt);
             // Update point size uniform to match current radius
-            const r = this.eventHorizonRadius;
+            const r = this.radius;
             const mat = this.jet.points.material as THREE.ShaderMaterial;
-            if (mat.uniforms.pointSize.value !== 18 * r) {
-                mat.uniforms.pointSize.value = 18 * r;
+            if (mat.uniforms.pointSize.value !== BLACK_HOLE_JET_POINT_SIZE * r) {
+                mat.uniforms.pointSize.value = BLACK_HOLE_JET_POINT_SIZE * r;
             }
             if (absDt > 0) {
                 const { points, velocities, ages, origins, maxAge } = this.jet;
@@ -420,8 +448,8 @@ export class BlackHole extends CelestialBody {
                     if (ages[i] > maxAge) {
                         // Respawn at pole, offset by radius
                         const up = i % 2 === 0 ? 1 : -1;
-                        const speed = 120 * SCALE_FACTOR * (r / SCALE_FACTOR);
-                        const spread = 0.08 * (r / SCALE_FACTOR);
+                        const speed = 120 * r;
+                        const spread = 0.08; // constant angular fraction — keeps jet narrow at all radii
                         velocities[i * 3] = (Math.random() - 0.5) * spread * speed;
                         velocities[i * 3 + 1] = up * speed;
                         velocities[i * 3 + 2] = (Math.random() - 0.5) * spread * speed;
@@ -446,12 +474,6 @@ export class BlackHole extends CelestialBody {
         // Keep accretion disk centered on black hole
         if (this.accretion && this.accretion.points) {
             this.accretion.points.position.copy(this.mesh.position);
-
-            // Keep disk sized to current black hole radius (black holes can grow via absorption).
-            // Base disk radii are authored relative to EVENT_HORIZON_RADIUS, so we scale by the
-            // ratio of current radius to initial event horizon radius.
-            const diskScale = Math.max(0.01, this.radius / this.eventHorizonRadius);
-            this.accretion.points.scale.setScalar(diskScale);
         }
 
         // Keep halo sized to current black hole radius (black holes can grow via absorption)
@@ -462,14 +484,7 @@ export class BlackHole extends CelestialBody {
 
     die() {
         // Clean up accretion disk
-        if (this.accretion && this.accretion.points) {
-            this.scene.remove(this.accretion.points);
-            this.accretion.points.geometry.dispose();
-            const accretionMaterial = this.accretion.points.material;
-            if (!Array.isArray(accretionMaterial)) {
-                accretionMaterial.dispose();
-            }
-        }
+        this.disposeAccretionDisk();
 
         // Clean up glow
         if (this.accretionGlow) {

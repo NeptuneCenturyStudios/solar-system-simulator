@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Body, IBodyCreationOptions } from './body.js';
 import { moonTexture, fictionalTextures } from '../drawing/textures.js';
-import { BodyType, pickRandom, BodyTypeEnum } from '../utilities/utilities.js';
+import { BodyType, pickRandom, BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
 import { calculateTrajectory, IRotation } from '../physics/physics.js';
 import { ParticleExplosion } from '../effects/particle-explosion.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
@@ -285,6 +285,78 @@ export class CelestialBody extends Body {
             // ignore
         }
     }
+
+    setRadius(newRadius: number) {
+        const oldRadius = this.radius || 1;
+
+        this.radius = newRadius;
+
+        // Update mesh geometry
+        try {
+            if (this.mesh && this.mesh.geometry) {
+                this.mesh.geometry.dispose();
+                this.mesh.geometry = new THREE.SphereGeometry(newRadius, 32, 32);
+            }
+        } catch (e) {
+            console.error('Error updating body geometry radius:', e);
+        }
+
+        // Update cast/receive shadow
+        if (this.mesh) {
+            const isBodyStar = isBodyType(this, BodyType.Star);
+            this.mesh.castShadow = !isBodyStar;
+            this.mesh.receiveShadow = !isBodyStar;
+        }
+
+        // Update label position and label line
+        try {
+            if (this.label) {
+                const labelHeight = newRadius * 3.5;
+                this.label.position.set(0, labelHeight, 0);
+            }
+
+            if (this.labelLine && this.labelLine.geometry) {
+                const posAttr = this.labelLine.geometry.attributes.position;
+                if (posAttr && posAttr.array) {
+                    posAttr.array[0] = 0;
+                    posAttr.array[1] = newRadius;
+                    posAttr.array[2] = 0;
+                    posAttr.array[3] = 0;
+                    posAttr.array[4] = newRadius * 3.5;
+                    posAttr.array[5] = 0;
+                    posAttr.needsUpdate = true;
+                }
+            }
+        } catch (e) {
+            console.error('Error updating body label or label line position:', e);
+        }
+
+        // Update cloud layer (if present) to follow new radius
+        try {
+            if (this.clouds && this.clouds.geometry) {
+                try {
+                    this.clouds.geometry.dispose();
+                } catch (e) {
+                    console.error('Error disposing old cloud geometry:', e);
+                }
+                const cloudFactor = 1.03;
+                this.clouds.geometry = new THREE.SphereGeometry(newRadius * cloudFactor, 32, 32);
+            }
+        } catch (e) {
+            console.error('Error updating cloud layer radius:', e);
+        }
+
+        // If rings exist, scale them to new radius
+        try {
+            if (this.rings) {
+                const scaleFactor = newRadius / Math.max(oldRadius, 1);
+                this.rings.scale.setScalar(scaleFactor);
+            }
+        } catch (e) {
+            console.error('Error updating body rings scale:', e);
+        }
+    }
+
     update(acc: THREE.Vector3, dt: number) {
         super.update(acc, dt);
 

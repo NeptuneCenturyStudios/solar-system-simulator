@@ -638,12 +638,9 @@ export class Star extends CelestialBody {
     }
 
     setRadius(newRadius: number) {
-        this.radius = newRadius;
+        super.setRadius(newRadius);
 
         this._syncBaselineRadiusIfStable();
-
-        this.mesh.geometry.dispose();
-        this.mesh.geometry = new THREE.SphereGeometry(newRadius, 32, 32);
 
         if (this.sunGlow) {
             this.sunGlow.scale.setScalar(newRadius * 4.6);
