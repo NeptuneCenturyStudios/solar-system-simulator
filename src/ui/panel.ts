@@ -3,7 +3,7 @@
  */
 export class Panel {
     element: HTMLElement | null;
-    private _eventListeners: { [key: string]: Array<(data?: any) => void> };
+    private _eventListeners: { [key: string]: Array<(data?: unknown) => void> };
 
     constructor(elementId: string | HTMLElement) {
         this.element =
@@ -22,11 +22,11 @@ export class Panel {
      * @param {string} eventName - Name of the event
      * @param {function} callback - Callback function to execute
      */
-    on(eventName: string, callback: (data?: any) => void) {
+    on<T = unknown>(eventName: string, callback: (data: T) => void) {
         if (!this._eventListeners[eventName]) {
             this._eventListeners[eventName] = [];
         }
-        this._eventListeners[eventName].push(callback);
+        this._eventListeners[eventName].push(callback as (data?: unknown) => void);
     }
 
     /**
@@ -34,11 +34,11 @@ export class Panel {
      * @param {string} eventName - Name of the event
      * @param {function} callback - Callback function to remove
      */
-    off(eventName: string, callback: (data?: any) => void) {
+    off<T = unknown>(eventName: string, callback: (data: T) => void) {
         if (!this._eventListeners[eventName]) return;
 
         this._eventListeners[eventName] = this._eventListeners[eventName].filter(
-            (cb) => cb !== callback
+            (cb) => cb !== (callback as (data?: unknown) => void)
         );
     }
 
@@ -47,7 +47,7 @@ export class Panel {
      * @param {string} eventName - Name of the event
      * @param {any} data - Data to pass to callbacks
      */
-    emit(eventName: string, data?: any) {
+    emit<T = unknown>(eventName: string, data?: T) {
         if (!this._eventListeners[eventName]) return;
 
         this._eventListeners[eventName].forEach((callback) => {

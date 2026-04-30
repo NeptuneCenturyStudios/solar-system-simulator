@@ -21,6 +21,10 @@ declare global {
     interface Event {
         detail?: { body: Body; id: string; name: string };
     }
+
+    interface Window {
+        __updateHintSprite?: () => void;
+    }
 }
 
 // Import all consts
@@ -1407,7 +1411,7 @@ function createStatsSprite() {
         radius: 0,
         mesh: { position: new THREE.Vector3() },
         velocity: new THREE.Vector3(),
-    });
+    } as unknown as Body);
     const material = new THREE.SpriteMaterial({
         map: texture,
         transparent: true,
@@ -2001,11 +2005,11 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
 
     body.mesh.position.add(movement);
 
-    if (body.rings) {
+    if (body instanceof CelestialBody && body.rings) {
         body.rings.position.copy(body.mesh.position);
     }
 
-    if (body.clouds) {
+    if (body instanceof CelestialBody && body.clouds) {
         body.clouds.position.set(0, 0, 0);
     }
 
@@ -2137,7 +2141,7 @@ function createGridHelper({
     gridState.divisions = divisions;
 }
 
-function calcGridRequiredSize(targetBody: CelestialBody | null) {
+function calcGridRequiredSize(targetBody: Body | null) {
     // Fallback: if no target, just keep a modest grid.
     if (!targetBody || targetBody._isDisposed || !targetBody.mesh) {
         const fallbackSize = 12000;
@@ -2196,7 +2200,7 @@ function calcGridRequiredSize(targetBody: CelestialBody | null) {
     return { size, divisions, center: anchor };
 }
 
-function ensureGridHelperSizedToTarget(targetBody: CelestialBody | null) {
+function ensureGridHelperSizedToTarget(targetBody: Body | null) {
     const {
         size: requiredSize,
         divisions: requiredDivisions,
@@ -2496,9 +2500,6 @@ function createPresetBody(presetKey: string) {
 
     const ensureEarth = () =>
         simulationState.bodies.find((b) => b && !b._isDisposed && b.name === 'Earth');
-    const ensureJupiter = () =>
-        simulationState.bodies.find((b) => b && !b._isDisposed && b.name === 'Jupiter');
-
     let newBody: CelestialBody | null = null;
 
     switch (key) {
@@ -3081,7 +3082,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         if (explosion.flashSphere) {
             scene.remove(explosion.flashSphere);
             explosion.flashSphere.geometry?.dispose();
-            explosion.flashSphere.material?.dispose();
+            (explosion.flashSphere.material as THREE.MeshBasicMaterial)?.dispose();
         }
     });
     simulationState.explosions = [];
@@ -3574,8 +3575,10 @@ function onMouseDown(event: MouseEvent) {
         isRepositioning = true;
         activeAxis = gizmoIntersects[0].object.userData.axis;
         // Inside onMouseDown, when an arrow is clicked:
-        gizmo.arrows.forEach((a) => (a.line.material.opacity = 0.2)); // Dim others
-        gizmoIntersects[0].object.parent.line.material.opacity = 1.0; // Highlight active
+        gizmo.arrows.forEach((a) => ((a.line.material as THREE.LineBasicMaterial).opacity = 0.2)); // Dim others
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const _parentArrow = gizmoIntersects[0].object.parent as Record<string, any>;
+        if (_parentArrow?.line?.material) (_parentArrow.line.material as THREE.LineBasicMaterial).opacity = 1.0; // Highlight active
         controls.enabled = false; // Stop camera from moving
 
         // Capture initial camera offset relative to the body so we can restore perspective on mouse-up.
@@ -3865,7 +3868,7 @@ function onMouseMove(event: MouseEvent) {
         // The camera can still be moved manually by the user (RMB / zoom / etc).
 
         // Sync visuals
-        if (gizmo.target.rings) {
+        if (gizmo.target instanceof CelestialBody && gizmo.target.rings) {
             gizmo.target.rings.position.copy(gizmo.target.mesh.position);
         }
         // Don't return here - let mouse look still work if in free camera mode
@@ -4047,7 +4050,7 @@ function onMouseUp(event: MouseEvent) {
         isRepositioning = false;
         isChangingVelocity = false;
         activeAxis = null;
-        gizmo.arrows.forEach((a) => (a.line.material.opacity = 1.0));
+        gizmo.arrows.forEach((a) => ((a.line.material as THREE.LineBasicMaterial).opacity = 1.0));
         controls.enabled = !isFreeCameraMode;
         hidePositionIndicators();
 

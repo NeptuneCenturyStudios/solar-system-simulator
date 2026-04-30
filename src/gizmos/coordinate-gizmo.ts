@@ -1,11 +1,23 @@
 import * as THREE from 'three';
 import { GIZMO_TUNING, GRAV_ARROW_SCALE } from '../utilities/consts.js';
+import { Body } from '../bodies/body.js';
 
 export class CoordinateGizmo {
-    constructor(scene) {
+    group: THREE.Group;
+    arrows: THREE.ArrowHelper[];
+    velocityArrow: THREE.ArrowHelper;
+    gravityArrow: THREE.ArrowHelper;
+    target: Body | null;  // The body this gizmo is attached to
+    velocityHeadLength: number;
+    velocityHeadWidth: number;
+    gravityHeadLength: number;
+    gravityHeadWidth: number;
+
+    constructor(scene: THREE.Scene) {
         this.group = new THREE.Group();
         this.arrows = [];
         this.group.visible = false;
+        this.target = null;
         scene.add(this.group);
 
         // Arrow configuration: [direction vector, color, axis name]
@@ -43,13 +55,18 @@ export class CoordinateGizmo {
         });
 
         // Velocity arrow (part of the gizmo group so selection visibility is unified)
+        this.velocityHeadLength = 15;
+        this.velocityHeadWidth = 8;
+        this.gravityHeadLength = 12;
+        this.gravityHeadWidth = 6;
+
         this.velocityArrow = new THREE.ArrowHelper(
             new THREE.Vector3(1, 0, 0),
             new THREE.Vector3(0, 0, 0),
             1,
             0xffff00,
-            15, // Slightly larger head for easier clicking
-            8
+            this.velocityHeadLength,
+            this.velocityHeadWidth
         );
         this.velocityArrow.visible = false;
         this.velocityArrow.line.userData = { isVelocityGizmo: true };
@@ -63,8 +80,8 @@ export class CoordinateGizmo {
             new THREE.Vector3(0, 0, 0),
             1,
             0xaaaaaa,
-            12,
-            6
+            this.gravityHeadLength,
+            this.gravityHeadWidth
         );
         this.gravityArrow.visible = false;
         this.gravityArrow.line.userData = { isGravityGizmo: true };
@@ -72,7 +89,7 @@ export class CoordinateGizmo {
         this.group.add(this.gravityArrow);
     }
 
-    attach(body) {
+    attach(body: Body | null) {
         if (!body) {
             this.target = null;
             this.group.visible = false;
@@ -94,16 +111,16 @@ export class CoordinateGizmo {
         });
 
         // Scale velocity arrow similarly so it's clickable on small bodies
-        const velHeadLength = 15 * scaleFactor;
-        const velHeadWidth = 8 * scaleFactor;
-        this.velocityArrow.setLength(1, velHeadLength, velHeadWidth);
+        this.velocityHeadLength = 15 * scaleFactor;
+        this.velocityHeadWidth = 8 * scaleFactor;
+        this.velocityArrow.setLength(1, this.velocityHeadLength, this.velocityHeadWidth);
         this.velocityArrow.line.scale.set(3, 1, 3);
         this.velocityArrow.cone.scale.set(2, 2, 2);
 
         // Scale gravity arrow similarly for consistency (not for raycasting, just visuals)
-        const gravHeadLength = 12 * scaleFactor;
-        const gravHeadWidth = 6 * scaleFactor;
-        this.gravityArrow.setLength(1, gravHeadLength, gravHeadWidth);
+        this.gravityHeadLength = 12 * scaleFactor;
+        this.gravityHeadWidth = 6 * scaleFactor;
+        this.gravityArrow.setLength(1, this.gravityHeadLength, this.gravityHeadWidth);
         this.gravityArrow.line.scale.set(3, 1, 3);
         this.gravityArrow.cone.scale.set(2, 2, 2);
     }
@@ -121,8 +138,8 @@ export class CoordinateGizmo {
         this.velocityArrow.setDirection(direction);
         this.velocityArrow.setLength(
             Math.max(speed * arrowScale, 0.1),
-            this.velocityArrow.headLength,
-            this.velocityArrow.headWidth
+            this.velocityHeadLength,
+            this.velocityHeadWidth
         );
     }
 
@@ -148,7 +165,7 @@ export class CoordinateGizmo {
 
         this.gravityArrow.visible = true;
         this.gravityArrow.setDirection(direction);
-        this.gravityArrow.setLength(len, this.gravityArrow.headLength, this.gravityArrow.headWidth);
+        this.gravityArrow.setLength(len, this.gravityHeadLength, this.gravityHeadWidth);
     }
 
     update() {
