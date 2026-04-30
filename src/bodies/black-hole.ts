@@ -483,6 +483,15 @@ export class BlackHole extends CelestialBody {
     }
 
     die() {
+        // Clean up jet
+        if (this.jet) {
+            this.scene.remove(this.jet.points);
+            this.jet.points.geometry.dispose();
+            const jetMat = this.jet.points.material;
+            if (!Array.isArray(jetMat)) jetMat.dispose();
+            this.jet = null;
+        }
+
         // Clean up accretion disk
         this.disposeAccretionDisk();
 

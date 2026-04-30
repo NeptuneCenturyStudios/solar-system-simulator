@@ -364,6 +364,11 @@ export class ManagementPanel extends Panel {
                 return;
             }
 
+            if (bodyType === 'black_hole') {
+                this.randomizeCreateBodyInputs('black_hole');
+                return;
+            }
+
             this.randomizeCreateBodyInputs(bodyType);
         };
 
@@ -404,7 +409,26 @@ export class ManagementPanel extends Panel {
             }
 
             const bodyType = this.bodyTypeSelect ? this.bodyTypeSelect.value : null;
-            if (bodyType && bodyType !== 'sun') {
+            if (bodyType === 'black_hole') {
+                if (this.createMassGroup) this.createMassGroup.style.display = 'block';
+                if (this.createRadiusGroup) this.createRadiusGroup.style.display = 'block';
+                if (this.createTemperatureGroup) this.createTemperatureGroup.style.display = 'none';
+                if (this.createLightIntensityGroup) this.createLightIntensityGroup.style.display = 'none';
+                if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'none';
+                if (this.inclinationGroup) this.inclinationGroup.style.display = 'none';
+                if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
+                if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
+                if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
+                if (this.moonValidationMessage) this.moonValidationMessage.classList.remove('visible');
+                if (this.createBodyBtn) this.createBodyBtn.disabled = false;
+
+                syncCreateDisplay(this.createMassInput, this.createMassDisplay, (value) =>
+                    this.formatMassForDisplay(value)
+                );
+                syncCreateDisplay(this.createRadiusSlider, this.createRadiusDisplay, (value) =>
+                    formatNumberForDisplay(value)
+                );
+            } else if (bodyType && bodyType !== 'sun') {
                 if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'block';
                 if (this.inclinationGroup) this.inclinationGroup.style.display = 'block';
 
@@ -495,6 +519,18 @@ export class ManagementPanel extends Panel {
                 const rawValue = parseFloat(createMassInput.value);
                 const value = this.clampMassValue(rawValue);
                 createMassDisplay.textContent = this.formatMassForDisplay(value);
+
+                // For black holes, recompute the radius slider from the new mass
+                if (this.getSelectedBodyType() === 'black_hole' && this.createRadiusSlider && this.createRadiusDisplay) {
+                    const BH_BASE_MASS = 3 * SUN_MASS;
+                    const BH_BASE_RADIUS = 1 * SCALE_FACTOR;
+                    const bhRadius = Math.max(
+                        0.25 * SCALE_FACTOR,
+                        BH_BASE_RADIUS * Math.cbrt(value / BH_BASE_MASS)
+                    );
+                    this.createRadiusSlider.value = String(bhRadius);
+                    this.createRadiusDisplay.textContent = String(Math.round(bhRadius * 100) / 100);
+                }
             };
             if (this.bodyTypeSelect && this.bodyTypeSelect.value === 'sun') {
                 createMassInput.value = String(SUN_MASS);
@@ -674,6 +710,23 @@ export class ManagementPanel extends Panel {
                 const value = this.clampMassValue(parseFloat(editMassInput.value));
                 if (this.editMassDisplay) {
                     this.editMassDisplay.textContent = this.formatMassForDisplay(value);
+                }
+
+                // For black holes, recompute the radius slider from the new mass
+                if (
+                    this.selectedBody &&
+                    isBodyType(this.selectedBody, BodyTypeEnum.BlackHole) &&
+                    this.editRadiusSlider &&
+                    this.editRadiusDisplay
+                ) {
+                    const BH_BASE_MASS = 3 * SUN_MASS;
+                    const BH_BASE_RADIUS = 1 * SCALE_FACTOR;
+                    const bhRadius = Math.max(
+                        0.25 * SCALE_FACTOR,
+                        BH_BASE_RADIUS * Math.cbrt(value / BH_BASE_MASS)
+                    );
+                    this.editRadiusSlider.value = String(bhRadius);
+                    this.editRadiusDisplay.textContent = String(Math.round(bhRadius * 100) / 100);
                 }
             };
             editMassInput.min = '0.001';
@@ -923,6 +976,39 @@ export class ManagementPanel extends Panel {
                 setValue(this.createMassInput, this.clampMassValue(rand(1e9, 1e16)));
             }
             if (this.createRadiusSlider) setValue(this.createRadiusSlider, rand(1, 100));
+            return;
+        }
+
+        if (type === 'black_hole') {
+            // Log-sample mass between 3 and 50 solar masses
+            const BH_BASE_MASS = 3 * SUN_MASS;
+            const BH_MAX_MASS = 50 * SUN_MASS;
+            const t = Math.random();
+            const bhMass = BH_BASE_MASS * Math.pow(BH_MAX_MASS / BH_BASE_MASS, t);
+            const clampedMass = this.clampMassValue(bhMass);
+
+            if (this.createMassInput) {
+                this.createMassInput.removeAttribute('max');
+                this.createMassInput.min = String(BH_BASE_MASS);
+                this.createMassInput.step = 'any';
+                this.createMassInput.value = String(clampedMass);
+                this.createMassInput.setAttribute('value', String(clampedMass));
+                this.createMassInput.defaultValue = String(clampedMass);
+                if (this.createMassDisplay) {
+                    this.createMassDisplay.textContent = this.formatMassForDisplay(clampedMass);
+                }
+                if (typeof this.createMassInput.oninput === 'function') {
+                    (this.createMassInput.oninput as () => void)();
+                }
+            }
+
+            // Compute initial radius using same formula as BlackHole.massToEventHorizonRadius
+            const BH_BASE_RADIUS = 1 * SCALE_FACTOR;
+            const bhRadius = Math.max(
+                0.25 * SCALE_FACTOR,
+                BH_BASE_RADIUS * Math.cbrt(clampedMass / BH_BASE_MASS)
+            );
+            setValue(this.createRadiusSlider, bhRadius);
             return;
         }
 

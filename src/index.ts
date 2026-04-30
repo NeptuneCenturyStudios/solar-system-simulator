@@ -2929,6 +2929,33 @@ function createNewBody(
             },
             cometMaterial
         );
+    } else if (bodyType === 'black_hole') {
+        const bhSpawnPos = getNearCameraSpawnPos();
+
+        // Mass: use customMass only if it meets the 3-solar-mass minimum
+        const BH_MIN_MASS = 3 * SUN_MASS;
+        const BH_MAX_MASS = 50 * SUN_MASS;
+        const t = Math.random();
+        const randomBhMass = BH_MIN_MASS * Math.pow(BH_MAX_MASS / BH_MIN_MASS, t);
+        const bhMass =
+            typeof customMass === 'number' && isFinite(customMass) && customMass >= BH_MIN_MASS
+                ? customMass
+                : randomBhMass;
+
+        newBody = new BlackHole(
+            dependencies,
+            scene,
+            bhSpawnPos,
+            bhMass,
+            createUniqueId('black_hole'),
+            generateIAUName(BodyTypeEnum.BlackHole),
+            { axis: new THREE.Vector3(0, 1, 0), speed: 0 }
+        );
+
+        // Apply custom radius if the user overrode the slider
+        if (typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0) {
+            setBodyRadius(newBody as unknown as CelestialBody, customRadius);
+        }
     }
 
     if (newBody) {
