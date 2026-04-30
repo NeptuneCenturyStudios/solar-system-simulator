@@ -2,7 +2,13 @@ import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
 
+import { SCALE_FACTOR } from '../utilities/consts';
+
 export class Supernova implements IEffect {
+    // Cooldown fade factor per frame (tweakable)
+    static readonly COOLDOWN_FADE = 0.9998;
+    // Speed loss factor per frame (tweakable)
+    static readonly SPEED_LOSS = 0.9988;
     dependencies: IStateDependencies;
     active: boolean;
     count: number;
@@ -15,7 +21,7 @@ export class Supernova implements IEffect {
     baseColors: { r: number; g: number; b: number }[];
     sizes: Float32Array;
     velocities: THREE.Vector3[];
-    maxDistances: number[];
+    // maxDistances: number[]; // No longer needed
     expandTime: number;
     origin: THREE.Vector3;
     shouldCollapse: boolean;
@@ -38,7 +44,7 @@ export class Supernova implements IEffect {
         this.baseColors = []; // Store original colors for fading
         this.sizes = new Float32Array(this.count);
         this.velocities = [];
-        this.maxDistances = []; // Each particle has its own stopping distance
+        // this.maxDistances = []; // No longer needed
         this.active = true;
         this.scene = scene;
         this.expandTime = 0;
@@ -62,7 +68,7 @@ export class Supernova implements IEffect {
         // Split particles: 5000 inner white-hot core, 15000 outer nebula
         const innerCount = 5000;
         // Expand to halfway to Kuiper Belt (Neptune distance / 2)
-        const maxExpansion = 328000;
+        // const maxExpansion = 328000; // No longer used
 
         for (let i = 0; i < this.count; i++) {
             // Start at supernova center
@@ -73,55 +79,71 @@ export class Supernova implements IEffect {
             const isInnerParticle = i < innerCount;
 
             if (isInnerParticle) {
-                // Inner core particles - white-hot, random directions, slower, stop closer
+                // Inner core particles - white-hot, random directions, more chaotic
                 const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(Math.random() * 2 - 1); // Uniform sphere distribution
+                const phi = Math.acos(Math.random() * 2 - 1);
+                let vx = Math.sin(phi) * Math.cos(theta);
+                let vy = Math.sin(phi) * Math.sin(theta);
+                let vz = Math.cos(phi);
 
-                const vx = Math.sin(phi) * Math.cos(theta);
-                const vy = Math.sin(phi) * Math.sin(theta);
-                const vz = Math.cos(phi);
+                // Add random perturbation to direction
+                vx += (Math.random() - 0.5) * 0.4;
+                vy += (Math.random() - 0.5) * 0.4;
+                vz += (Math.random() - 0.5) * 0.4;
 
-                const speed = Math.random() * 80 + 40; // Much faster for scale
-                const v = new THREE.Vector3(vx, vy, vz).normalize().multiplyScalar(speed);
+                // Randomize speed scaling per axis for more chaos
+                const speed = (Math.random() * 180 + 80) * SCALE_FACTOR; // Increased max speed and scaled
+                const v = new THREE.Vector3(
+                    vx * (1 + (Math.random() - 0.5) * 0.2),
+                    vy * (1 + (Math.random() - 0.5) * 0.2),
+                    vz * (1 + (Math.random() - 0.5) * 0.2)
+                )
+                    .normalize()
+                    .multiplyScalar(speed * (1 + (Math.random() - 0.5) * 0.2));
                 this.velocities.push(v);
-
-                // Stop at inner distances
-                const maxDist = Math.random() * 50000 + 20000; // 20k-70k units
-                this.maxDistances.push(maxDist);
 
                 // White-hot colors with alpha
                 this.colors[i * 4] = 1.0;
                 this.colors[i * 4 + 1] = 1.0;
                 this.colors[i * 4 + 2] = 1.0;
-                this.colors[i * 4 + 3] = 1.0; // Alpha
+                this.colors[i * 4 + 3] = 1.0;
                 this.baseColors.push({ r: 1.0, g: 1.0, b: 1.0 });
 
                 // Much larger particles for core
                 this.sizes[i] = Math.random() * 25 + 20;
             } else {
-                // Outer ring particles - colorful nebula
+                // Outer ring particles - colorful nebula, more chaotic
                 const angle = Math.random() * Math.PI * 2;
-                const ringRadius = Math.random();
-                const verticalSpread = 0.3;
+                // Aggressively randomize ring radius and vertical spread
+                const ringRadius = Math.pow(Math.random(), 1.5) * (1 + Math.random() * 0.7);
+                const verticalSpread = 0.3 + Math.random() * 0.7;
 
-                const vx = Math.cos(angle) * ringRadius;
-                const vy = (Math.random() - 0.5) * verticalSpread;
-                const vz = Math.sin(angle) * ringRadius;
+                let vx = Math.cos(angle) * ringRadius;
+                let vy = (Math.random() - 0.5) * verticalSpread * (1 + Math.random() * 0.7);
+                let vz = Math.sin(angle) * ringRadius;
 
-                const speed = Math.random() * 150 + 80; // Much faster
-                const v = new THREE.Vector3(vx, vy, vz).normalize().multiplyScalar(speed);
+                // Add random perturbation to direction
+                vx += (Math.random() - 0.5) * 0.7;
+                vy += (Math.random() - 0.5) * 0.7;
+                vz += (Math.random() - 0.5) * 0.7;
+
+                // Randomize speed scaling per axis for more chaos
+                const speed = (Math.random() * 1500 + 600) * SCALE_FACTOR; // Increased max speed and scaled
+                const v = new THREE.Vector3(
+                    vx * (1 + (Math.random() - 0.5) * 0.3),
+                    vy * (1 + (Math.random() - 0.5) * 0.3),
+                    vz * (1 + (Math.random() - 0.5) * 0.3)
+                )
+                    .normalize()
+                    .multiplyScalar(speed * (1 + (Math.random() - 0.5) * 0.3));
                 this.velocities.push(v);
-
-                // Stop at outer distances - up to halfway to Kuiper Belt
-                const maxDist = Math.random() * (maxExpansion - 80000) + 80000; // 80k-328k units
-                this.maxDistances.push(maxDist);
 
                 // Assign random nebula color
                 const color = nebulaColors[Math.floor(Math.random() * nebulaColors.length)];
                 this.colors[i * 4] = color.r;
                 this.colors[i * 4 + 1] = color.g;
                 this.colors[i * 4 + 2] = color.b;
-                this.colors[i * 4 + 3] = 1.0; // Alpha
+                this.colors[i * 4 + 3] = 1.0;
                 this.baseColors.push({ r: color.r, g: color.g, b: color.b });
 
                 // Much larger particles for nebula
@@ -176,7 +198,10 @@ export class Supernova implements IEffect {
         const colorAttr = this.geometry.attributes.color.array;
 
         // Check if we should start collapsing (black hole formation)
-        const isCollapsing = this.shouldCollapse && this.expandTime >= this.collapseStartTime ;
+        const isCollapsing =
+            this.shouldCollapse &&
+            this.collapseStartTime !== null &&
+            this.expandTime >= this.collapseStartTime;
 
         // Flash fades quickly - remove immediately if collapsing
         if (this.flashSphere) {
@@ -193,7 +218,10 @@ export class Supernova implements IEffect {
             } else if (this.flashOpacity > 0) {
                 this.flashOpacity -= 0.02 * (absDt * 60);
                 if (this.flashSphere.material) {
-                    (this.flashSphere.material as THREE.MeshBasicMaterial).opacity = Math.max(0, this.flashOpacity);
+                    (this.flashSphere.material as THREE.MeshBasicMaterial).opacity = Math.max(
+                        0,
+                        this.flashOpacity
+                    );
                 }
                 this.flashSphere.scale.setScalar(1 + (1 - this.flashOpacity) * 8);
 
@@ -206,59 +234,57 @@ export class Supernova implements IEffect {
             }
         }
 
-        // Particles expand and gradually fade as they approach max distance
+        // Particles expand and gradually slow down
+        let allFaded = true;
         for (let i = 0; i < this.count; i++) {
-            // Calculate distance from origin
-            const dx = p[i * 3] - this.origin.x;
-            const dy = p[i * 3 + 1] - this.origin.y;
-            const dz = p[i * 3 + 2] - this.origin.z;
-            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-            const maxDist = this.maxDistances[i];
-            const fadeStartDist = maxDist * 0.7; // Start fading at 70% of max distance
-
             if (isCollapsing) {
-                // REVERSE: Pull particles back toward origin
+                // REVERSE: Pull particles back toward origin (collapse logic unchanged)
+                const dx = p[i * 3] - this.origin.x;
+                const dy = p[i * 3 + 1] - this.origin.y;
+                const dz = p[i * 3 + 2] - this.origin.z;
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                // Use a default maxDist for collapse speed scaling
+                const maxDist = 100000; // Arbitrary large value
                 const dirToOrigin = new THREE.Vector3(
                     this.origin.x - p[i * 3],
                     this.origin.y - p[i * 3 + 1],
                     this.origin.z - p[i * 3 + 2]
                 ).normalize();
-
-                // Accelerate toward black hole (much faster for massive stars)
-                const collapseSpeed = 300 + (1 - dist / maxDist) * 500; // Much faster collapse
+                const collapseSpeed = 300 + (1 - dist / maxDist) * 500;
                 p[i * 3] += dirToOrigin.x * collapseSpeed * (absDt * 60);
                 p[i * 3 + 1] += dirToOrigin.y * collapseSpeed * (absDt * 60);
                 p[i * 3 + 2] += dirToOrigin.z * collapseSpeed * (absDt * 60);
-
-                // Fade out more aggressively based on collapse progress
-                const collapseProgress = (this.expandTime - this.collapseStartTime) / 3.0; // 3 seconds to fully collapse
-                const baseFade = Math.max(0, 1 - collapseProgress * 0.5); // Fade over time
-                const distFade = dist < maxDist * 0.5 ? dist / (maxDist * 0.5) : 1.0; // Fade near center
-                colorAttr[i * 4 + 3] = Math.min(baseFade, distFade);
+                // Fade out based on collapse progress
+                const collapseProgress =
+                    this.collapseStartTime !== null
+                        ? (this.expandTime - this.collapseStartTime) / 3.0
+                        : 0;
+                const baseFade = Math.max(0, 1 - collapseProgress * 0.5);
+                colorAttr[i * 4 + 3] = baseFade;
             } else {
-                // Normal expansion - use absolute time
+                // Normal expansion - particles slow down gradually
                 p[i * 3] += this.velocities[i].x * (absDt * 60);
                 p[i * 3 + 1] += this.velocities[i].y * (absDt * 60);
                 p[i * 3 + 2] += this.velocities[i].z * (absDt * 60);
-
-                // Gradually fade particles as they approach their max distance
-                if (dist > fadeStartDist) {
-                    const fadeProgress = (dist - fadeStartDist) / (maxDist - fadeStartDist);
-                    const alpha = Math.max(0, 1 - fadeProgress);
-                    colorAttr[i * 4 + 3] = alpha; // Update alpha channel
-
-                    // Slow down particles as they fade (creates smoother expansion)
-                    const slowdownFactor = 1 - fadeProgress * 0.3;
-                    this.velocities[i].multiplyScalar(Math.max(0.7, slowdownFactor));
+                // Apply gradual slowdown (tweak factor for desired effect)
+                this.velocities[i].multiplyScalar(Supernova.SPEED_LOSS); // Tweakable slowdown factor
+                // Gradually fade out each particle
+                colorAttr[i * 4 + 3] *= Supernova.COOLDOWN_FADE;
+                if (colorAttr[i * 4 + 3] < 0.01) {
+                    colorAttr[i * 4 + 3] = 0;
                 } else {
-                    colorAttr[i * 4 + 3] = 1.0;
+                    allFaded = false;
                 }
             }
         }
 
         this.geometry.attributes.position.needsUpdate = true;
         this.geometry.attributes.color.needsUpdate = true;
+
+        // If all particles are faded, mark for cleanup
+        if (!isCollapsing && allFaded) {
+            this.active = false;
+        }
 
         // Check if collapse is complete (all particles absorbed)
         if (isCollapsing) {

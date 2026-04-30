@@ -123,16 +123,15 @@ export class BlackHole extends CelestialBody {
     }
 
     createAccretionDisk() {
-        const count = 3000;
+        const count = 200 * SCALE_FACTOR;
         const geo = new THREE.BufferGeometry();
         const pArr = new Float32Array(count * 3);
         const colors = new Float32Array(count * 3);
         const vels = [];
         const angularPositions = []; // Track angle for spiral motion
 
-        const buffer = 12 * SCALE_FACTOR;
-        const minRadius = Math.max(this.eventHorizonRadius + buffer, this.eventHorizonRadius * 8);
-        const maxRadius = Math.max(minRadius * 4, this.eventHorizonRadius * 42);
+        const minRadius = this.eventHorizonRadius * 8 * SCALE_FACTOR;
+        const maxRadius = minRadius * 8 * SCALE_FACTOR;
 
         for (let i = 0; i < count; i++) {
             // Start particles in a disk around black hole
@@ -168,7 +167,7 @@ export class BlackHole extends CelestialBody {
         geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
         const mat = new THREE.PointsMaterial({
-            size: 5 * SCALE_FACTOR,
+            size: 10 * SCALE_FACTOR,
             vertexColors: true,
             transparent: true,
             blending: THREE.AdditiveBlending,
@@ -186,6 +185,8 @@ export class BlackHole extends CelestialBody {
     updateAccretion(dt: number) {
         if (!this.accretion) return;
 
+        const absDt = Math.abs(dt);
+
         const p = this.accretion.points.geometry.attributes.position.array;
         const count = p.length / 3;
 
@@ -197,7 +198,7 @@ export class BlackHole extends CelestialBody {
 
             // Spiral inward
             const vel = this.accretion.vels[i];
-            const newRadius = radius - vel.inward * (dt * 60);
+            const newRadius = radius - vel.inward * (absDt);
 
             // If particle reaches the inner buffer, respawn at outer edge
             if (newRadius < this.eventHorizonRadius + 2 * SCALE_FACTOR) {
@@ -211,7 +212,7 @@ export class BlackHole extends CelestialBody {
                 this.accretion.vels[i].radius = respawnRadius;
             } else {
                 // Update orbital position (spiral motion)
-                this.accretion.angularPositions[i] += vel.orbital * (dt * 60);
+                this.accretion.angularPositions[i] += vel.orbital * (absDt);
                 const angle = this.accretion.angularPositions[i];
 
                 p[i * 3] = Math.cos(angle) * newRadius;
