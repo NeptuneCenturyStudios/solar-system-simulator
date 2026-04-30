@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { SCALE_FACTOR, SUN_MASS } from '../utilities/consts.js';
-import { BodyType } from '../utilities/utilities.js';
+import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G } from '../utilities/consts.js';
+import { BodyType, BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body.js';
 import { IRotation } from '../physics/physics.js';
-import { IStateDependencies } from '../interfaces.js';
+import { IStateDependencies, ISiphonTarget } from '../interfaces.js';
+import { MassSiphonEffect } from '../effects/mass-siphon.js';
 
 interface IAccretionDiskState {
     points: THREE.Points;
@@ -25,11 +26,16 @@ const BLACK_HOLE_JET_POINT_SIZE = 4;
 const BLACK_HOLE_JET_SPEED_BASE = 1200; // Base speed for jet particles, scaled by radius
 const BLACK_HOLE_ACCRETION_DISK_POINT_SIZE = 4; // Angular spread for jet particles (as a fraction of speed)
 
+/** Multiplier for the gravitational mass-transfer formula. Tune to taste. */
+const SIPHON_MASS_TRANSFER_SCALE = 0.001;
+
 export class BlackHole extends CelestialBody {
     jet: { points: THREE.Points, positions: Float32Array, velocities: Float32Array, ages: Float32Array, origins: Float32Array, maxAge: number } | null = null;
     dependencies: IStateDependencies;
     accretion: IAccretionDiskState | null = null;
     accretionGlow: THREE.Sprite | null = null;
+    /** Active siphon stream effects, keyed by the source star's id. */
+    siphonEffects: Map<string, MassSiphonEffect> = new Map();
 
     static massToEventHorizonRadius(mass: number) {
         // "Compress" a star's mass into a tiny sphere.
@@ -480,6 +486,87 @@ export class BlackHole extends CelestialBody {
         if (this.accretionGlow) {
             this.accretionGlow.scale.setScalar(this.radius * 10);
         }
+
+        this.updateSiphon(dt);
+    }
+
+    /**
+     * Checks all living, non-white-dwarf stars within EARTH_DIST (1 AU).
+     * Creates / maintains / removes MassSiphonEffect instances and transfers
+     * mass (and fuel) from each in-range star to this black hole.
+     */
+    private updateSiphon(dt: number): void {
+        if (dt === 0 || this._isDisposed) return;
+
+        const absDt = Math.abs(dt);
+        const bodies = this.dependencies.getBodies();
+
+        // Filter to active, non-white-dwarf stars.
+        const stars = bodies.filter(
+            (b): b is typeof b & ISiphonTarget =>
+                !b._isDisposed &&
+                !!(b.bodyType & BodyTypeEnum.Star) &&
+                !(b.bodyType & BodyTypeEnum.WhiteDwarf) &&
+                'triggerStarDeath' in b
+        ) as unknown as ISiphonTarget[];
+
+        const inRangeIds = new Set<string>();
+
+        for (const star of stars) {
+            const dist = star.mesh.position.distanceTo(this.mesh.position);
+            if (dist > EARTH_DIST) continue;
+
+            inRangeIds.add(star.id);
+
+            // Start a new siphon stream if one does not already exist.
+            if (!this.siphonEffects.has(star.id)) {
+                const effect = new MassSiphonEffect(this.dependencies, this.scene, star, this);
+                this.siphonEffects.set(star.id, effect);
+                this.dependencies.addEvent(`${this.name} is siphoning mass from ${star.name}`);
+            }
+
+            // Advance the particle animation each frame.
+            this.siphonEffects.get(star.id)?.update(dt);
+
+            // Gravitational mass-transfer: proportional to G·M_bh·M_star / r².
+            const distSafe = Math.max(dist, 1);
+            const transfer = (G * this.mass * star.mass) / (distSafe * distSafe)
+                * SIPHON_MASS_TRANSFER_SCALE * absDt;
+
+            star.mass = Math.max(0, star.mass - transfer);
+
+            // Fuel drain uses the same ratio as Star's initial fuel assignment:
+            //   maxFuel = mass * 100000 * SCALE_FACTOR
+            if (star.fuel !== null) {
+                star.fuel = Math.max(0, star.fuel - transfer * 100000 * SCALE_FACTOR);
+            }
+
+            // Trigger star death when mass or fuel is fully depleted by the siphon.
+            const massGone = star.mass <= 0;
+            const fuelGone = star.fuel !== null && star.fuel <= 0;
+            if (massGone || fuelGone) {
+                star.mass = 0;
+                if (star.fuel !== null) star.fuel = 0;
+
+                const isMassiveStar = star.initialMass > SUN_MASS * 3.3;
+                star.triggerStarDeath(isMassiveStar);
+
+                const effect = this.siphonEffects.get(star.id);
+                if (effect) {
+                    effect.dispose();
+                    this.siphonEffects.delete(star.id);
+                }
+                inRangeIds.delete(star.id);
+            }
+        }
+
+        // Clean up effects for stars that moved out of range or were disposed externally.
+        for (const [starId, effect] of Array.from(this.siphonEffects.entries())) {
+            if (!inRangeIds.has(starId)) {
+                effect.dispose();
+                this.siphonEffects.delete(starId);
+            }
+        }
     }
 
     die() {
@@ -499,6 +586,12 @@ export class BlackHole extends CelestialBody {
         if (this.accretionGlow) {
             this.scene.remove(this.accretionGlow);
         }
+
+        // Clean up all active siphon streams.
+        for (const effect of this.siphonEffects.values()) {
+            effect.dispose();
+        }
+        this.siphonEffects.clear();
 
         // Call parent die (no explosion for black hole)
         super.die(true);
