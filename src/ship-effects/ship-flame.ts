@@ -19,7 +19,7 @@ const LIFETIME_BASE = 0.5;
 /** Speed (u/s) at which particles drift backward *in the ship's reference frame*.
  *  At any ship speed the inter-particle gap per frame = EXHAUST_DRIFT_SPEED × dt
  *  (≈ 0.8 units at 60 fps), well under one particle radius — no visible gaps. */
-const EXHAUST_DRIFT_SPEED = 50 * SCALE_FACTOR;
+const EXHAUST_DRIFT_SPEED = 50000 * SCALE_FACTOR;
 /** Sentinel: negative life means the slot is unused. */
 const DEAD = -1;
 
@@ -131,7 +131,7 @@ export class ShipFlame implements IShipEffect {
 
         this.outerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 1.6 * SCALE_FACTOR,
+            size: 1 * SCALE_FACTOR,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,

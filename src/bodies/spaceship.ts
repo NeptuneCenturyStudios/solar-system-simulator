@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { Body } from './body.js';
-import { ShipTrail } from '../ship-effects/ship-trail';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 import { IShipEffect } from '../ship-effects/ship-effect-base.js';
+import { ShipFlame } from '../ship-effects/ship-flame.js';
 //import { ShipFlame } from '../ship-effects/ship-flame.js';
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
@@ -63,7 +63,7 @@ export class Spaceship extends Body {
         this.mesh.receiveShadow = true;
 
         // Engine exhaust trail (Line-based, no gaps at any speed)
-        this.trail = new ShipTrail(scene);
+        this.trail = new ShipFlame(scene);
 
         // Keep default label (shows in bodies table) but hide it during flight
         if (this.label) this.label.visible = false;
