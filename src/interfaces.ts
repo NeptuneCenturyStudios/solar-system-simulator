@@ -30,5 +30,6 @@ export interface ISiphonTarget {
     bodyType: BodyTypeEnum;
     baseColor: THREE.Color;
     _isDisposed: boolean;
+    setMass(mass: number): void;
     triggerStarDeath(isMassiveStar: boolean): void;
 }

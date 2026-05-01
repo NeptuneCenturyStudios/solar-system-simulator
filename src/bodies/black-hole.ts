@@ -529,12 +529,13 @@ export class BlackHole extends CelestialBody {
         const absDt = Math.abs(dt);
         const bodies = this.dependencies.getBodies();
 
-        // Filter to active, non-white-dwarf stars.
+        // Filter to active, non-white-dwarf, non-brown-dwarf stars.
         const stars = bodies.filter(
             (b): b is typeof b & ISiphonTarget =>
                 !b._isDisposed &&
                 !!(b.bodyType & BodyTypeEnum.Star) &&
                 !(b.bodyType & BodyTypeEnum.WhiteDwarf) &&
+                !(b.bodyType & BodyTypeEnum.BrownDwarf) &&
                 'triggerStarDeath' in b
         ) as unknown as ISiphonTarget[];
 
@@ -564,24 +565,38 @@ export class BlackHole extends CelestialBody {
                 SIPHON_MASS_TRANSFER_SCALE *
                 absDt;
 
-            star.mass = Math.max(0, star.mass - transfer);
-            totalTransfer += transfer;
+            // Check depletion threshold BEFORE applying the transfer so the frame
+            // that crosses 0.01 M☉ also stops the mass drain.
+            const wouldBeDepleted = star.mass - transfer > 0 && star.mass - transfer < SUN_MASS * 0.01;
+            const wouldBeGone = star.mass - transfer <= 0;
 
-            // Fuel drain uses the same ratio as Star's initial fuel assignment:
-            //   maxFuel = mass * 100000 * SCALE_FACTOR
-            if (star.fuel !== null) {
-                star.fuel = Math.max(0, star.fuel - transfer * 100000 * SCALE_FACTOR);
+            if (!wouldBeDepleted && !wouldBeGone) {
+                star.setMass(Math.max(0, star.mass - transfer));
+                totalTransfer += transfer;
+
+                // Fuel drain uses the same ratio as Star's initial fuel assignment:
+                //   maxFuel = mass * 100000 * SCALE_FACTOR
+                if (star.fuel !== null) {
+                    star.fuel = Math.max(0, star.fuel - transfer * 100000 * SCALE_FACTOR);
+                }
             }
 
-            // Trigger star death when mass or fuel is fully depleted by the siphon.
-            const massGone = star.mass <= 0;
-            const fuelGone = star.fuel !== null && star.fuel <= 0;
-            if (massGone || fuelGone) {
-                star.mass = 0;
-                if (star.fuel !== null) star.fuel = 0;
+            // Stop siphoning when the star has been depleted to brown-dwarf mass —
+            // it becomes a brown dwarf remnant at this point and the siphon ends.
+            const depleted = wouldBeDepleted || (star.mass > 0 && star.mass < SUN_MASS * 0.01);
 
-                const isMassiveStar = star.initialMass > SUN_MASS * 3.3;
-                star.triggerStarDeath(isMassiveStar);
+            // Trigger star death when mass or fuel is fully depleted by the siphon.
+            const massGone = wouldBeGone || star.mass <= 0;
+            const fuelGone = star.fuel !== null && star.fuel <= 0;
+            if (massGone || fuelGone || depleted) {
+                if (massGone) {
+                    star.mass = 0;
+                    if (star.fuel !== null) star.fuel = 0;
+                    const isMassiveStar = star.initialMass > SUN_MASS * 3.3;
+                    star.triggerStarDeath(isMassiveStar);
+                }
+                // If just depleted (brown dwarf remnant), setMass already handled the
+                // visual transition via transitionToBrownDwarf. Just end the siphon.
 
                 const effect = this.siphonEffects.get(star.id);
                 if (effect) {
@@ -589,6 +604,9 @@ export class BlackHole extends CelestialBody {
                     this.siphonEffects.delete(star.id);
                 }
                 inRangeIds.delete(star.id);
+                if (depleted && !massGone) {
+                    this.dependencies.addEvent(`${star.name} siphoned into a brown dwarf remnant`);
+                }
             }
         }
 

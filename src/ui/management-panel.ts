@@ -544,6 +544,17 @@ export class ManagementPanel extends Panel {
                 const value = this.clampMassValue(rawValue);
                 createMassDisplay.textContent = this.formatMassForDisplay(value);
 
+                // For stars, preset the radius slider from mass using the mass-radius relationship.
+                if (
+                    this.getSelectedBodyType() === 'sun' &&
+                    this.createRadiusSlider &&
+                    this.createRadiusDisplay
+                ) {
+                    const starRadius = SUN_RADIUS * Math.pow(Math.max(0, value) / SUN_MASS, 0.8);
+                    this.createRadiusSlider.value = String(starRadius);
+                    this.createRadiusDisplay.textContent = String(Math.round(starRadius * 100) / 100);
+                }
+
                 // For black holes, recompute the radius slider from the new mass
                 if (
                     this.getSelectedBodyType() === 'black_hole' &&
@@ -738,6 +749,18 @@ export class ManagementPanel extends Panel {
                 const value = this.clampMassValue(parseFloat(editMassInput.value));
                 if (this.editMassDisplay) {
                     this.editMassDisplay.textContent = this.formatMassForDisplay(value);
+                }
+
+                // For stars, preset the radius slider from mass using the mass-radius relationship.
+                if (
+                    this.selectedBody &&
+                    isBodyType(this.selectedBody, BodyTypeEnum.Star) &&
+                    this.editRadiusSlider &&
+                    this.editRadiusDisplay
+                ) {
+                    const starRadius = SUN_RADIUS * Math.pow(Math.max(0, value) / SUN_MASS, 0.8);
+                    this.editRadiusSlider.value = String(starRadius);
+                    this.editRadiusDisplay.textContent = String(Math.round(starRadius * 100) / 100);
                 }
 
                 // For black holes, recompute the radius slider from the new mass
@@ -1059,16 +1082,17 @@ export class ManagementPanel extends Panel {
         const temperatureMax = useStarlikeValues ? 12000 : 40000;
         const lightIntensityMin = useStarlikeValues ? 1000000 : 100000;
         const lightIntensityMax = useStarlikeValues ? 5000000000 : 50000000000;
-        const radiusMin = useStarlikeValues ? SUN_RADIUS * 0.15 : MOON_RADIUS * 0.5;
-        const radiusMax = useStarlikeValues ? 200000 * SCALE_FACTOR : MOON_RADIUS * 20;
 
         setValue(this.createMassInput, this.clampMassValue(rand(starMassMin, starMassMax)));
+        // Compute radius from mass using the mass-radius relationship; slider can be adjusted afterwards.
+        const randomMass = parseFloat(this.createMassInput?.value ?? '0');
+        const computedRadius = SUN_RADIUS * Math.pow(Math.max(0, randomMass) / SUN_MASS, 0.8);
+        setValue(this.createRadiusSlider, Math.round(computedRadius * 100) / 100);
         setValue(this.createTemperatureSlider, Math.round(rand(temperatureMin, temperatureMax)));
         setValue(
             this.createLightIntensitySlider,
             Math.round(rand(lightIntensityMin, lightIntensityMax))
         );
-        setValue(this.createRadiusSlider, Math.round(rand(radiusMin, radiusMax)));
     }
 
     toggleCreationForm(): void {

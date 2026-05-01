@@ -82,6 +82,8 @@ export const SHADOW_MAP_SIZE = 8192; // Increased shadow map size for better qua
 // Minimum star mass: fraction of Sun mass (0.08 = ~minimum main-sequence red dwarf)
 export const MIN_SOLAR_MASS_FACTOR = 0.08;
 export const MIN_STAR_MASS = SUN_MASS * MIN_SOLAR_MASS_FACTOR;
+/** Mass threshold below which a star transitions into a brown dwarf (0.08 M☉ — upper bound of the brown-dwarf regime). */
+export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;
 
 export const GIZMO_TUNING = Object.freeze({
     // MUST match CoordinateGizmo.updateVelocityArrow()

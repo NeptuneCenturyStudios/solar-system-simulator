@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SHADOW_MAP_SIZE, SUN_MASS, SCALE_FACTOR, PLUTO_DIST } from '../utilities/consts';
+import { SHADOW_MAP_SIZE, SUN_MASS, SUN_RADIUS, SCALE_FACTOR, PLUTO_DIST, BROWN_DWARF_MASS_THRESHOLD } from '../utilities/consts';
 import { BodyTypeEnum, isBodyType } from '../utilities/utilities';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { BlackHole } from './black-hole';
@@ -38,6 +38,7 @@ export class Star extends CelestialBody {
         whiteStarTexture: THREE.Texture;
         blueStarTexture: THREE.Texture;
         whiteDwarfTexture: THREE.Texture;
+        brownDwarfTexture: THREE.Texture;
     };
     rotation: IRotation;
     fuel: number | null;
@@ -94,6 +95,7 @@ export class Star extends CelestialBody {
             whiteStarTexture: THREE.Texture;
             blueStarTexture: THREE.Texture;
             whiteDwarfTexture: THREE.Texture;
+            brownDwarfTexture: THREE.Texture;
         }
     ) {
         if (!textures) {
@@ -172,6 +174,14 @@ export class Star extends CelestialBody {
         this.birthEffect = null;
         this.isBirthing = false;
         this._startBirthEffect();
+
+        // Apply mass-based visual state immediately (e.g. brown dwarf if mass is too low)
+        this.setMass(this.mass);
+    }
+
+    /** Computes the expected radius for a star of the given mass using a mass-radius power law (R ∝ M^0.8). */
+    static massToRadius(mass: number): number {
+        return SUN_RADIUS * Math.pow(Math.max(0, mass) / SUN_MASS, 0.8);
     }
 
     static temperatureToColor(temp: number) {
@@ -237,7 +247,7 @@ export class Star extends CelestialBody {
     }
 
     static temperatureToEmissiveIntensity(temp: number) {
-        const minTemp = 2000;
+        const minTemp = 1000;
         const maxTemp = 30000;
         const sunTemp = 5778;
 
@@ -557,16 +567,25 @@ export class Star extends CelestialBody {
     }
 
     setTemperature(temp: number) {
-        this.temperature = temp;
-
         if (!isBodyType(this, BodyTypeEnum.Star)) {
+            this.temperature = temp;
             return;
         }
+
+        // Brown dwarfs manage their own fixed visual state; ignore temperature overrides.
+        if (this.bodyType & BodyTypeEnum.BrownDwarf) {
+            return;
+        }
+
+        this.temperature = temp;
 
         let map;
         let glowHex;
 
-        if (temp <= 3000) {
+        if (temp <= 2000) {
+            map = this.textures.brownDwarfTexture;
+            glowHex = 0x8b3a0a;
+        } else if (temp <= 3000) {
             map = this.textures.redStarTexture;
             glowHex = 0xff6644;
         } else if (temp < 4000) {
@@ -588,7 +607,7 @@ export class Star extends CelestialBody {
         material.emissiveMap = map;
         material.needsUpdate = true;
         material.emissive.setHex(0xffffff);
-        material.emissiveIntensity = 1.0;
+        material.emissiveIntensity = Star.temperatureToEmissiveIntensity(temp);
 
         this.baseColor.setHex(glowHex);
 
@@ -621,20 +640,116 @@ export class Star extends CelestialBody {
         }
     }
 
+    /** Transitions this star into a brown dwarf, applying its texture and removing stellar effects. */
+    transitionToBrownDwarf() {
+        if (this.bodyType & BodyTypeEnum.BrownDwarf) return; // already transitioned
+
+        // Use the same proven texture-swap path as all other star types.
+        // Call before setting the BrownDwarf flag so the guard in setTemperature doesn't block it.
+        this.setTemperature(1000);
+        // Update the emmisive intensity to match the brown dwarf's low temperature.
+        
+
+        this.bodyType |= BodyTypeEnum.BrownDwarf;
+
+        if (this.corona) {
+            this.corona.dispose();
+            this.corona = null;
+        }
+
+        if (this.sunGlow) {
+            this.scene.remove(this.sunGlow);
+            this.sunGlow = null;
+        }
+
+        if (this.sunLight) {
+            this.sunLight.intensity = 0.002;
+            this.sunLight.color.setHex(0xff6020);
+        }
+
+        this.fuel = null;
+        this.maxFuel = null;
+
+        if (!this.name.includes('(Brown Dwarf)')) {
+            this.name = this.name + ' (Brown Dwarf)';
+            this.updateLabel(this.name);
+        }
+    }
+
+    /** Reverts a brown dwarf back to a main-sequence star. Temperature must be set by the caller afterwards. */
+    transitionToMainSequence() {
+        if (!(this.bodyType & BodyTypeEnum.BrownDwarf)) return; // not a brown dwarf
+
+        // Clear the flag before any setTemperature call so the guard won't block it.
+        this.bodyType &= ~BodyTypeEnum.BrownDwarf;
+
+        // Restore fuel proportional to current mass.
+        this.maxFuel = this.mass * 100000 * SCALE_FACTOR;
+        this.fuel = this.maxFuel;
+
+        // Restore corona.
+        if (!this.corona) {
+            this.corona = new Corona(this.dependencies, this.scene, this.radius + 1, this.baseColor.getHex());
+        }
+
+        // Restore glow.
+        if (!this.sunGlow) {
+            this.sunGlow = this.createGlow(this.radius, this.baseColor.getHex());
+        }
+
+        // Restore light intensity.
+        if (this.sunLight) {
+            this.sunLight.intensity = Math.max(1.0, this.lightIntensity / 20000000);
+            this.sunLight.color.setHex(0xffffff);
+        }
+
+        // Strip the suffix from the name if present.
+        if (this.name.includes(' (Brown Dwarf)')) {
+            this.name = this.name.replace(' (Brown Dwarf)', '');
+            this.updateLabel(this.name);
+        }
+    }
+
+    setMass(mass: number) {
+        super.setMass(mass);
+
+        if (mass > 0 && mass < BROWN_DWARF_MASS_THRESHOLD) {
+            this.transitionToBrownDwarf();
+        } else if (mass >= BROWN_DWARF_MASS_THRESHOLD && (this.bodyType & BodyTypeEnum.BrownDwarf)) {
+            this.transitionToMainSequence();
+            // Fallback temperature for non-edit paths (e.g. black hole siphon).
+            // applyEdit always calls setTemperature(sliderTemp) after setMass, which overrides this.
+            this.setTemperature(3000);
+        }
+
+        // Keep radius in sync with mass whenever not in a special transition phase.
+        if (
+            !this.isInRedGiantPhase &&
+            !this.isBecomingWhiteDwarf &&
+            !(this.bodyType & BodyTypeEnum.BrownDwarf) &&
+            !(this.bodyType & BodyTypeEnum.WhiteDwarf)
+        ) {
+            const newRadius = Star.massToRadius(mass);
+            if (newRadius > 0 && Math.abs(newRadius - this.radius) / Math.max(this.radius, 1) > 0.005) {
+                this.setRadius(newRadius);
+            }
+        }
+    }
+
     _syncBaselineRadiusIfStable() {
+        if (this.isInRedGiantPhase || this.isBecomingWhiteDwarf) return;
+
+        this.initialRadius = this.radius;
+        if (this.mesh) this.mesh.scale.setScalar(1);
+    }
+
+    get isInRedGiantPhase(): boolean {
         const fuelActive = this.fuel !== null && this.maxFuel !== null && this.maxFuel > 0;
         const fuelPercent =
             fuelActive && this.maxFuel !== null && this.fuel !== null
                 ? this.fuel / this.maxFuel
                 : 1;
-
-        const inRedGiantPhase = fuelActive && fuelPercent < 0.3 && fuelPercent > 0;
-        const inWhiteDwarfShrink = !!this.isBecomingWhiteDwarf;
-
-        if (inRedGiantPhase || inWhiteDwarfShrink) return;
-
-        this.initialRadius = this.radius;
-        if (this.mesh) this.mesh.scale.setScalar(1);
+        return fuelActive && fuelPercent < 0.3 && fuelPercent > 0;
     }
 
     setRadius(newRadius: number) {

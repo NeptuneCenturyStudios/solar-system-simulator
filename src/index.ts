@@ -33,7 +33,6 @@ import {
     G,
     SUN_MASS,
     SUN_RADIUS,
-    MIN_STAR_MASS,
     PLUTO_DIST,
     IO_MASS,
     IO_DIST_FROM_JUPITER,
@@ -118,6 +117,7 @@ const redStarTexture = loadSrgbTexture('./assets/textures/red-star.jpg');
 const orangeStarTexture = loadSrgbTexture('./assets/textures/orange_star.jpg');
 const whiteStarTexture = loadSrgbTexture('./assets/textures/white_star.jpg');
 const whiteDwarfTexture = loadSrgbTexture('./assets/textures/white_dwarf.jpg');
+const brownDwarfTexture = loadSrgbTexture('./assets/textures/brown_dwarf.jpg');
 
 // Background texture (skydome)
 const skydomeTexture = loadSrgbTexture('./assets/textures/stars.jpg');
@@ -2443,6 +2443,7 @@ function createPresetBody(presetKey: string) {
                     whiteStarTexture,
                     blueStarTexture,
                     whiteDwarfTexture,
+                    brownDwarfTexture,
                 }
             );
 
@@ -2640,6 +2641,7 @@ function createNewBody(
                 whiteStarTexture,
                 blueStarTexture,
                 whiteDwarfTexture,
+                brownDwarfTexture,
             }
         );
 
@@ -3089,6 +3091,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             whiteStarTexture,
             blueStarTexture,
             whiteDwarfTexture,
+            brownDwarfTexture,
         }
     );
 
@@ -6804,14 +6807,10 @@ managementPanel.on(
             }
         }
 
-        // Update mass
-        // If this is a star, enforce minimum mass (0.08 solar masses)
-        if (isBodyType(body, BodyTypeEnum.Star)) {
-            mass = Math.max(mass, MIN_STAR_MASS);
-        }
-        body.mass = mass;
+        // Update mass — setMass handles brown dwarf transition for stars
+        body.setMass(mass);
 
-        // Refill fuel for stars based on new mass
+        // Refill fuel for stars based on new mass (skipped automatically for brown dwarfs since fuel is null)
         if (body instanceof Star && body.fuel !== null) {
             body.maxFuel = mass * 100000;
             body.fuel = body.maxFuel;

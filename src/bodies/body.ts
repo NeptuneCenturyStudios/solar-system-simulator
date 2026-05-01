@@ -146,6 +146,10 @@ export class Body {
         }
     }
 
+    setMass(mass: number) {
+        this.mass = mass;
+    }
+
     die() {
         if (this._isDisposed) return;
 
