@@ -2,10 +2,16 @@ import * as THREE from 'three';
 
 // Global scaling factor for siphon stream speed (tweak for visual pacing)
 const SIPHON_SPEED_SCALE = 8;
-import { IEffect } from './effect-base';
+import { IPipelineFeedEffect } from './effect-base';
 import { IStateDependencies, ISiphonTarget } from '../interfaces';
 
+/** Maximum number of simultaneously in-flight siphon particles per stream. */
 const PARTICLE_COUNT = 400;
+
+/** Particles spawned per simulation-second while the siphon is active. */
+const SIPHON_SPAWN_RATE = 20;
+/** Maximum particles spawned in a single update() call regardless of dt (guards against high time-scale bursts). */
+const SIPHON_MAX_SPAWN_PER_FRAME = 5;
 
 // Accretion disk outer colour — particles arriving at the black hole take this colour.
 const BH_R = 0.8;
@@ -19,12 +25,29 @@ const BH_B = 0.05;
  * Path shape: quadratic Bézier with a perpendicular mid-point offset so the stream arcs
  * visually around the black hole (matching the tidal-stream look in the reference image).
  *
+ * Particles spawn continuously at SIPHON_SPAWN_RATE per second while `isSpawning` is true.
+ * When a particle reaches t = 1 (the accretion disk outer edge) it fires `onParticleArrived`
+ * with the disk entry angle, then its slot is freed. No particle ever respawns on its own.
+ *
+ * Calling `stopSpawning()` halts new spawns; the effect sets `active = false` automatically
+ * once every in-flight particle has been handed off downstream.
+ *
  * Particle colour lerps from the star's corona/base colour (t=0) to the BH accretion
  * outer colour (t=1) so each stream naturally reflects its source star's temperature.
  */
-export class MassSiphonEffect implements IEffect {
+export class MassSiphonEffect implements IPipelineFeedEffect {
     dependencies: IStateDependencies;
     active: boolean;
+
+    private _isSpawning: boolean = true;
+    get isSpawning(): boolean {
+        return this._isSpawning;
+    }
+
+    /** Stop spawning new particles. Existing in-flight particles continue draining. */
+    stopSpawning(): void {
+        this._isSpawning = false;
+    }
 
     private scene: THREE.Scene;
     private star: ISiphonTarget;
@@ -45,6 +68,15 @@ export class MassSiphonEffect implements IEffect {
     private tArr: Float32Array;
     /** Per-particle travel speed (units of t per simulation-second). */
     private speedArr: Float32Array;
+    /** 1 = slot is occupied by a live particle, 0 = slot is free. */
+    private activeFlags: Uint8Array;
+    /** Accumulates fractional spawn tokens between frames. */
+    private spawnAccumulator: number = 0;
+    /**
+     * Called with the disk-entry angle (radians) whenever a siphon particle reaches the
+     * accretion disk outer edge. Provided by the BlackHole that owns this effect.
+     */
+    private onParticleArrived: (angle: number) => void;
 
     // Accept accretion disk info if present
     constructor(
@@ -57,46 +89,35 @@ export class MassSiphonEffect implements IEffect {
             radius: number;
             _isDisposed: boolean;
             rotationAxis: THREE.Vector3;
-            accretion?: { maxRadius: number; vels: { radius: number; orbital: number }[] } | null;
-        }
+            accretion?: { maxRadius: number } | null;
+        },
+        onParticleArrived: (angle: number) => void
     ) {
         this.dependencies = dependencies;
         this.active = true;
         this.scene = scene;
         this.star = star;
         this.blackHole = blackHole;
+        this.onParticleArrived = onParticleArrived;
 
-        // Stagger particles across the full stream length from the start.
         this.tArr = new Float32Array(PARTICLE_COUNT);
         this.speedArr = new Float32Array(PARTICLE_COUNT);
+        this.activeFlags = new Uint8Array(PARTICLE_COUNT); // all 0 = all inactive
         this.spawnDirs = [];
 
-        // Use the actual orbital speed at the accretion disk's outer edge if available
-        let diskOrbitalSpeed; // fallback default
-        if (
-            blackHole.accretion &&
-            blackHole.accretion.vels &&
-            blackHole.accretion.vels.length > 0
-        ) {
-            // Find the vels entry with the largest radius
-            let max = blackHole.accretion.vels[0];
-            for (const v of blackHole.accretion.vels) {
-                if (v.radius > max.radius) max = v;
-            }
-            diskOrbitalSpeed = max.orbital;
-        } else {
-            // Fallback to previous calculation
-            const accretionMaxRadius =
-                blackHole.accretion && blackHole.accretion.maxRadius
-                    ? blackHole.accretion.maxRadius
-                    : blackHole.radius * 2 * 32;
-            const bhMass = blackHole.mass || 1;
-            diskOrbitalSpeed = Math.sqrt(bhMass / accretionMaxRadius) * 0.005;
-        }
+        // Derive the target speed at the accretion disk outer edge from Keplerian physics.
+        // The vels-based approach is no longer valid because all accretion slots are
+        // initialised to { orbital: 0 } under the pipeline model and are only populated
+        // when particles are injected — so reading from vels would always give 0.
+        const accretionMaxRadius =
+            blackHole.accretion && blackHole.accretion.maxRadius
+                ? blackHole.accretion.maxRadius
+                : blackHole.radius * 2 * 32;
+        const bhMass = blackHole.mass || 1;
+        const diskOrbitalSpeed = Math.sqrt(bhMass / accretionMaxRadius) * 0.005;
 
-        // Precompute geometry for each particle to get path length for speed normalization
+        // Pre-compute per-slot spawn direction and speed (path length for speed normalisation).
         for (let i = 0; i < PARTICLE_COUNT; i++) {
-            this.tArr[i] = Math.random();
             // Random direction on unit sphere for star surface
             const theta = Math.random() * 2 * Math.PI;
             const phi = Math.acos(2 * Math.random() - 1);
@@ -168,12 +189,12 @@ export class MassSiphonEffect implements IEffect {
             }
             // Set stream speed to match disk orbital speed visually
             this.speedArr[i] =
-                SIPHON_SPEED_SCALE * (diskOrbitalSpeed / pathLen) * (0.95 + Math.random() * 0.1);
+                SIPHON_SPEED_SCALE * (diskOrbitalSpeed / pathLen) * (0.5 + Math.random() * 1.0);
         }
 
         const positions = new Float32Array(PARTICLE_COUNT * 3);
         const colors = new Float32Array(PARTICLE_COUNT * 3);
-        const alphas = new Float32Array(PARTICLE_COUNT); // per-particle alpha
+        const alphas = new Float32Array(PARTICLE_COUNT); // per-particle alpha — all start at 0
 
         this.geometry = new THREE.BufferGeometry();
         this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -250,6 +271,39 @@ export class MassSiphonEffect implements IEffect {
         scene.add(this.points);
     }
 
+    // ── Private slot helpers ──────────────────────────────────────────────────
+
+    /** Returns the index of the first free slot, or -1 if the pool is full. */
+    private getAvailableSlot(): number {
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            if (this.activeFlags[i] === 0) return i;
+        }
+        return -1;
+    }
+
+    /** Activates slot `i` at a small random t offset with a fresh random spawn direction. */
+    private activateParticle(i: number): void {
+        this.activeFlags[i] = 1;
+        // Spread newly spawned particles across a wider initial t range so back-to-back
+        // spawns don't all clump together at the star surface.
+        this.tArr[i] = Math.random() * 0.25;
+        const theta = Math.random() * 2 * Math.PI;
+        const phi = Math.acos(2 * Math.random() - 1);
+        this.spawnDirs[i] = new THREE.Vector3(
+            Math.sin(phi) * Math.cos(theta),
+            Math.cos(phi),
+            Math.sin(phi) * Math.sin(theta)
+        );
+    }
+
+    /** Deactivates slot `i` and hides its particle. */
+    private deactivateParticle(i: number): void {
+        this.activeFlags[i] = 0;
+        (this.geometry.attributes.alpha.array as Float32Array)[i] = 0;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     update(dt: number): void {
         if (this.star._isDisposed || this.blackHole._isDisposed) {
             this.active = false;
@@ -257,36 +311,77 @@ export class MassSiphonEffect implements IEffect {
         }
 
         const absDt = Math.abs(dt);
-        // We'll compute start/end/mid for each particle
 
-        // Star corona colour (source end of the stream).
+        // ── Spawn new particles ───────────────────────────────────────────────
+        if (this._isSpawning && absDt > 0) {
+            this.spawnAccumulator += SIPHON_SPAWN_RATE * absDt;
+            // Cap how many can actually spawn this frame to avoid time-scale bursts.
+            const spawnThisFrame = Math.min(Math.floor(this.spawnAccumulator), SIPHON_MAX_SPAWN_PER_FRAME);
+            this.spawnAccumulator -= spawnThisFrame;
+            for (let s = 0; s < spawnThisFrame; s++) {
+                const slot = this.getAvailableSlot();
+                if (slot !== -1) this.activateParticle(slot);
+            }
+        }
+
+        // ── Check for full drain (no spawning + nothing alive) ────────────────
+        if (!this._isSpawning) {
+            let anyActive = false;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                if (this.activeFlags[i] === 1) { anyActive = true; break; }
+            }
+            if (!anyActive) {
+                this.active = false;
+                return;
+            }
+        }
+
+        // ── Per-particle update ───────────────────────────────────────────────
         const starR = this.star.baseColor.r;
         const starG = this.star.baseColor.g;
         const starB = this.star.baseColor.b;
 
-        // Angle offset in radians for disk rotation (clockwise = negative)
-        const DISK_ROTATION_OFFSET = Math.PI / 2; // 90 degrees, adjust as needed
+        const DISK_ROTATION_OFFSET = Math.PI / 2;
         const posArr = this.geometry.attributes.position.array as Float32Array;
         const colArr = this.geometry.attributes.color.array as Float32Array;
         const alphaArr = this.geometry.attributes.alpha.array as Float32Array;
         const tValArr = this.geometry.attributes.tval.array as Float32Array;
 
         for (let i = 0; i < PARTICLE_COUNT; i++) {
+            if (this.activeFlags[i] === 0) continue; // skip inactive slots
+
             this.tArr[i] += this.speedArr[i] * absDt;
+
             if (this.tArr[i] >= 1.0) {
-                // Respawn just beyond the star so the stream is continuous.
-                this.tArr[i] = Math.random() * 0.05;
-                // New random direction for next spawn
-                const theta = Math.random() * 2 * Math.PI;
-                const phi = Math.acos(2 * Math.random() - 1);
-                this.spawnDirs[i] = new THREE.Vector3(
-                    Math.sin(phi) * Math.cos(theta),
-                    Math.cos(phi),
-                    Math.sin(phi) * Math.sin(theta)
-                );
+                // ── Hand off to accretion disk ────────────────────────────────
+                // Compute the disk-entry angle so the accretion disk places the
+                // incoming particle at the correct position on its outer ring.
+                const starCenter = this.star.mesh.position;
+                const bhCenter = this.blackHole.mesh.position;
+                const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
+                const diskNormal = this.blackHole.rotationAxis
+                    ? this.blackHole.rotationAxis.clone().normalize()
+                    : new THREE.Vector3(0, 1, 0);
+                const toBH_proj = toBH
+                    .clone()
+                    .sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal)))
+                    .normalize();
+                const offsetDir = toBH_proj
+                    .clone()
+                    .applyAxisAngle(diskNormal, DISK_ROTATION_OFFSET)
+                    .normalize();
+                const angle = Math.atan2(offsetDir.z, offsetDir.x);
+
+                // Add a small random angular spread so successive arrivals don't all
+                // stack at the exact same point on the disk outer ring.
+                const angleJitter = (Math.random() - 0.5) * 0.6; // ±0.3 rad (~±17°)
+                this.onParticleArrived(angle + angleJitter);
+                this.deactivateParticle(i);
+                tValArr[i] = 0;
+                continue;
             }
 
-            // Start: star surface
+            // ── Recompute Bézier path geometry ────────────────────────────────
             const starCenter = this.star.mesh.position;
             const starRadius = this.star.radius;
             const spawnDir = this.spawnDirs[i];
@@ -294,24 +389,19 @@ export class MassSiphonEffect implements IEffect {
                 .copy(starCenter)
                 .addScaledVector(spawnDir, starRadius);
 
-            // End: offset point on accretion disk outer edge in direction of rotation (in disk plane)
             const accretionMaxRadius =
                 this.blackHole.accretion && this.blackHole.accretion.maxRadius
                     ? this.blackHole.accretion.maxRadius
                     : this.blackHole.radius * 2 * 32;
             const bhCenter = this.blackHole.mesh.position;
-            // Direction from star to black hole
             const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
-            // Disk normal (rotation axis)
             const diskNormal = this.blackHole.rotationAxis
                 ? this.blackHole.rotationAxis.clone().normalize()
                 : new THREE.Vector3(0, 1, 0);
-            // Project toBH onto the disk plane
             const toBH_proj = toBH
                 .clone()
                 .sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal)))
                 .normalize();
-            // Rotate the projected vector around the disk normal by the offset angle
             const offsetDir = toBH_proj
                 .clone()
                 .applyAxisAngle(diskNormal, DISK_ROTATION_OFFSET)
@@ -320,14 +410,11 @@ export class MassSiphonEffect implements IEffect {
                 .copy(bhCenter)
                 .addScaledVector(offsetDir, accretionMaxRadius);
 
-            // Bézier mid-point: curve to merge with disk tangent at entry
             const dir = new THREE.Vector3().subVectors(end, start);
             const dist = dir.length();
-            // Disk tangent at entry: cross(diskNormal, offsetDir) (direction of disk rotation)
             const diskTangent = new THREE.Vector3().crossVectors(diskNormal, offsetDir).normalize();
-            // Place mid-point closer to the disk, offset along the tangent for a smooth merge
-            const mergeFrac = 0.7; // 0 = at start, 1 = at end; closer to disk for sharper merge
-            const tangentStrength = dist * 0.5; // adjust for more/less curve
+            const mergeFrac = 0.7;
+            const tangentStrength = dist * 0.5;
             const midBase = new THREE.Vector3().lerpVectors(start, end, mergeFrac);
             const mid = midBase.clone().addScaledVector(diskTangent, tangentStrength);
 
@@ -336,12 +423,12 @@ export class MassSiphonEffect implements IEffect {
             tValArr[i] = t;
 
             // Quadratic Bézier: P = s²·start + 2·s·t·mid + t²·end
-            posArr[i * 3] = s * s * start.x + 2 * s * t * mid.x + t * t * end.x;
+            posArr[i * 3]     = s * s * start.x + 2 * s * t * mid.x + t * t * end.x;
             posArr[i * 3 + 1] = s * s * start.y + 2 * s * t * mid.y + t * t * end.y;
             posArr[i * 3 + 2] = s * s * start.z + 2 * s * t * mid.z + t * t * end.z;
 
             // Colour: star base colour → BH accretion outer orange/red.
-            colArr[i * 3] = starR + (BH_R - starR) * t;
+            colArr[i * 3]     = starR + (BH_R - starR) * t;
             colArr[i * 3 + 1] = starG + (BH_G - starG) * t;
             colArr[i * 3 + 2] = starB + (BH_B - starB) * t;
 

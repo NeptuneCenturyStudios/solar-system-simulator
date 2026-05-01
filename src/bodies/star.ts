@@ -489,7 +489,8 @@ export class Star extends CelestialBody {
                     blackHoleMass,
                     uniqueBHId,
                     'Black Hole',
-                    this.rotation
+                    this.rotation,
+                    true
                 );
 
                 if (this.dependencies?.addBody) {

@@ -4,6 +4,7 @@ import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body.js';
 import { IRotation } from '../physics/physics.js';
 import { IStateDependencies, ISiphonTarget } from '../interfaces.js';
+import { IPipelineFeedEffect } from '../effects/effect-base.js';
 import { MassSiphonEffect } from '../effects/mass-siphon.js';
 
 interface IAccretionDiskState {
@@ -13,6 +14,8 @@ interface IAccretionDiskState {
     minRadius: number;
     maxRadius: number;
     opacities: Float32Array; // Per-particle opacity
+    /** 1 = slot is occupied by a live particle, 0 = slot is free. */
+    activeFlags: Uint8Array;
 }
 
 declare module './black-hole.js' {
@@ -23,8 +26,11 @@ declare module './black-hole.js' {
 }
 
 const BLACK_HOLE_JET_POINT_SIZE = 4;
-const BLACK_HOLE_JET_SPEED_BASE = 2000; // Base speed for jet particles, scaled by radius
-const BLACK_HOLE_ACCRETION_DISK_POINT_SIZE = 4; // Angular spread for jet particles (as a fraction of speed)
+const BLACK_HOLE_JET_SPEED_BASE = 120; // Base speed for jet particles, scaled by radius
+const BLACK_HOLE_ACCRETION_DISK_POINT_SIZE = 4;
+/** How many jet particles are injected for each accretion-disk particle that reaches the event horizon.
+ *  >1 reflects the energy amplification of relativistic jets vs. the infalling matter stream. */
+const JET_PARTICLES_PER_ACCRETION = 10;
 
 /** Multiplier for the gravitational mass-transfer formula. Tune to taste. */
 const SIPHON_MASS_TRANSFER_SCALE = 0.001;
@@ -37,12 +43,13 @@ export class BlackHole extends CelestialBody {
         ages: Float32Array;
         origins: Float32Array;
         maxAge: number;
+        activeFlags: Uint8Array;
     } | null = null;
     dependencies: IStateDependencies;
     accretion: IAccretionDiskState | null = null;
     accretionGlow: THREE.Sprite | null = null;
     /** Active siphon stream effects, keyed by the source star's id. */
-    siphonEffects: Map<string, MassSiphonEffect> = new Map();
+    siphonEffects: Map<string, IPipelineFeedEffect> = new Map();
 
     static massToEventHorizonRadius(mass: number) {
         // "Compress" a star's mass into a tiny sphere.
@@ -65,7 +72,8 @@ export class BlackHole extends CelestialBody {
         mass: number,
         id = 'blackHole',
         name = 'Black Hole',
-        rotation: IRotation
+        rotation: IRotation,
+        spawnedFromSupernova = false
     ) {
         const EVENT_HORIZON_RADIUS = BlackHole.massToEventHorizonRadius(mass);
         const BLACK_HOLE_COLOR = 0x000000; // Pure black
@@ -105,6 +113,17 @@ export class BlackHole extends CelestialBody {
 
         // Create continuous jet effect
         this.jet = this.createJet();
+
+        // Seed the accretion disk with remnant particles when born from a supernova.
+        // These represent the collapsing stellar envelope — they spiral inward and eject
+        // through the jet naturally, giving the newborn black hole immediate visual activity.
+        if (spawnedFromSupernova) {
+            const SEED_COUNT = 80;
+            for (let i = 0; i < SEED_COUNT; i++) {
+                const angle = i * ((2 * Math.PI) / SEED_COUNT);
+                this.injectIntoAccretionDisk(angle);
+            }
+        }
     }
 
     createAccretionGlow() {
@@ -143,56 +162,30 @@ export class BlackHole extends CelestialBody {
     }
 
     createAccretionDisk() {
-        const count = 400;
+        const count = 800;
         const geo = new THREE.BufferGeometry();
         const pArr = new Float32Array(count * 3);
         const colors = new Float32Array(count * 3);
-        const opacities = new Float32Array(count); // Per-particle opacity
+        const opacities = new Float32Array(count); // Per-particle opacity — all start at 0
+        const activeFlags = new Uint8Array(count); // all 0 = all inactive
         const vels = [];
         const angularPositions = []; // Track angle for spiral motion
 
         const minRadius = this.radius * 2;
         const maxRadius = minRadius * 32;
 
-        // Opacity: more opaque near center, more transparent at outer edge
-        const minOpacity = 0.05;
-        const maxOpacity = 1.0;
-
         for (let i = 0; i < count; i++) {
-            // Start particles in a disk around black hole
-            const angle = Math.random() * Math.PI * 2;
-            const radius = minRadius + Math.random() * (maxRadius - minRadius);
-            const verticalSpread = (Math.random() - 0.5) * this.radius * 0.75;
-
-            pArr[i * 3] = Math.cos(angle) * radius;
-            pArr[i * 3 + 1] = verticalSpread;
-            pArr[i * 3 + 2] = Math.sin(angle) * radius;
-
-            // Store angular position for spiral motion
-            angularPositions.push(angle);
-
-            // Velocity: spiral inward + orbital motion
-            const inwardSpeed = (0.12 + Math.random() * 0.1) * SCALE_FACTOR;
-            const orbitalSpeed = Math.sqrt(this.mass / radius) * 0.005; // Keplerian orbital velocity
-
-            vels.push({
-                inward: inwardSpeed,
-                orbital: orbitalSpeed,
-                radius: radius,
-            });
-
-            // Color: white-hot to orange gradient
-            const t = (radius - minRadius) / (maxRadius - minRadius);
-            // Outer: dark orange/red (e.g., RGB 0.8, 0.2, 0.05), Inner: white (1.0, 1.0, 0.95)
-            const r = 1.0; // Red
-            const g = 1.0; // Green
-            const b = 0.95; // Blue
-            colors[i * 3] = r;
-            colors[i * 3 + 1] = g;
-            colors[i * 3 + 2] = b;
-
-            // Opacity: more opaque near center, more transparent at outer edge
-            opacities[i] = maxOpacity - t * (maxOpacity - minOpacity);
+            // All slots start inactive — placed at origin, invisible. They are activated via
+            // injectIntoAccretionDisk() once particles arrive from the siphon stream.
+            angularPositions.push(0);
+            vels.push({ inward: 0, orbital: 0, radius: maxRadius });
+            pArr[i * 3] = 0;
+            pArr[i * 3 + 1] = 0;
+            pArr[i * 3 + 2] = 0;
+            colors[i * 3] = 0.8;
+            colors[i * 3 + 1] = 0.2;
+            colors[i * 3 + 2] = 0.05;
+            opacities[i] = 0;
         }
 
         geo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
@@ -255,29 +248,65 @@ export class BlackHole extends CelestialBody {
         points.frustumCulled = false;
         this.scene.add(points);
 
-        return { points, vels, angularPositions, minRadius, maxRadius, opacities };
+        return { points, vels, angularPositions, minRadius, maxRadius, opacities, activeFlags };
+    }
+
+    /**
+     * Injects one particle into the accretion disk at the given angle on the outer edge.
+     * Called by the siphon stream callback when a siphon particle completes its path.
+     */
+    injectIntoAccretionDisk(angle: number): void {
+        if (!this.accretion) return;
+
+        // Find a free slot.
+        let slot = -1;
+        for (let i = 0; i < this.accretion.activeFlags.length; i++) {
+            if (this.accretion.activeFlags[i] === 0) { slot = i; break; }
+        }
+        if (slot === -1) return; // pool full — drop silently
+
+        const { maxRadius, vels, angularPositions, opacities } = this.accretion;
+        const p = this.accretion.points.geometry.attributes.position.array as Float32Array;
+        const colors = this.accretion.points.geometry.attributes.color.array as Float32Array;
+        const verticalSpread = (Math.random() - 0.5) * this.radius * 0.75;
+
+        p[slot * 3]     = Math.cos(angle) * maxRadius;
+        p[slot * 3 + 1] = verticalSpread;
+        p[slot * 3 + 2] = Math.sin(angle) * maxRadius;
+
+        angularPositions[slot] = angle;
+
+        const inwardSpeed = (0.12 + Math.random() * 0.1) * SCALE_FACTOR;
+        const orbitalSpeed = Math.sqrt(this.mass / maxRadius) * 0.005;
+        vels[slot] = { inward: inwardSpeed, orbital: orbitalSpeed, radius: maxRadius };
+
+        // Outer-edge colour (dim orange/red) and opacity.
+        // Particles always enter at maxRadius (t=1), so opacity starts at its minimum (most transparent).
+        colors[slot * 3]     = 0.8;
+        colors[slot * 3 + 1] = 0.2;
+        colors[slot * 3 + 2] = 0.05;
+        opacities[slot] = 0.2; // outer-edge minimum — updateAccretion() ramps this up as it spirals in
+
+        this.accretion.activeFlags[slot] = 1;
+
+        this.accretion.points.geometry.attributes.position.needsUpdate = true;
+        this.accretion.points.geometry.attributes.color.needsUpdate = true;
+        this.accretion.points.geometry.attributes.alpha.needsUpdate = true;
     }
 
     createJet() {
-        const jetCount = 100;
+        const jetCount = 200;
         const velocities = new Float32Array(jetCount * 3);
         const ages = new Float32Array(jetCount);
-        const origins = new Float32Array(jetCount * 3); // Store spawn origin for each particle
-        const maxAge = 0.7; // seconds (shorter lifetime for straighter jet)
+        const origins = new Float32Array(jetCount * 3);
+        const activeFlags = new Uint8Array(jetCount); // all 0 = all inactive
+        const maxAge = 0.7; // seconds
         const r = this.radius;
+        // Initialise all slots as inactive — particles are injected via injectIntoJet().
         for (let i = 0; i < jetCount; i++) {
-            // Alternate between top and bottom pole
-            const up = i % 2 === 0 ? 1 : -1;
-            // Jet velocity: mostly along Y, with slight random XZ spread, scaled by radius
-            const speed = BLACK_HOLE_JET_SPEED_BASE * r;
-            const spread = 0.08; // constant angular fraction — keeps jet narrow at all radii
-            velocities[i * 3] = (Math.random() - 0.5) * spread * speed;
-            velocities[i * 3 + 1] = up * speed;
-            velocities[i * 3 + 2] = (Math.random() - 0.5) * spread * speed;
-            ages[i] = Math.random() * maxAge;
-            // Spawn at pole offset by radius
-            origins[i * 3] = this.mesh.position.x;
-            origins[i * 3 + 1] = this.mesh.position.y + up * r;
+            ages[i] = maxAge + 1; // mark as "past max age" so they are never rendered
+            origins[i * 3]     = this.mesh.position.x;
+            origins[i * 3 + 1] = this.mesh.position.y;
             origins[i * 3 + 2] = this.mesh.position.z;
         }
         const geo = new THREE.BufferGeometry();
@@ -292,9 +321,9 @@ export class BlackHole extends CelestialBody {
             colors[i * 3 + 2] = 1.0; // B (more blue)
         }
         geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        // Opacity: fade out with age
+        // Opacity: all start at 0 (invisible until activated)
         const opacities = new Float32Array(jetCount);
-        for (let i = 0; i < jetCount; i++) opacities[i] = 1.0;
+        for (let i = 0; i < jetCount; i++) opacities[i] = 0;
         geo.setAttribute('alpha', new THREE.BufferAttribute(opacities, 1));
         const mat = new THREE.PointsMaterial({
             size: BLACK_HOLE_JET_POINT_SIZE * r,
@@ -339,7 +368,36 @@ export class BlackHole extends CelestialBody {
         const points = new THREE.Points(geo, mat);
         points.frustumCulled = false;
         this.scene.add(points);
-        return { points, positions, velocities, ages, origins, maxAge };
+        return { points, positions, velocities, ages, origins, maxAge, activeFlags };
+    }
+
+    /**
+     * Injects one particle into the jet from the pole chosen by `up` (1 = north, -1 = south).
+     * If `up` is omitted a pole is chosen at random. Called from updateAccretion() when an
+     * accretion-disk particle reaches the inner edge.
+     */
+    injectIntoJet(up?: number): void {
+        if (!this.jet) return;
+
+        // Find a free slot.
+        let slot = -1;
+        for (let i = 0; i < this.jet.activeFlags.length; i++) {
+            if (this.jet.activeFlags[i] === 0) { slot = i; break; }
+        }
+        if (slot === -1) return; // pool full — drop silently
+
+        const r = this.radius;
+        const direction = up !== undefined ? up : (Math.random() < 0.5 ? 1 : -1);
+        const speed = BLACK_HOLE_JET_SPEED_BASE * r;
+        const spread = 0.08;
+        this.jet.velocities[slot * 3]     = (Math.random() - 0.5) * spread * speed;
+        this.jet.velocities[slot * 3 + 1] = direction * speed;
+        this.jet.velocities[slot * 3 + 2] = (Math.random() - 0.5) * spread * speed;
+        this.jet.ages[slot] = 0;
+        this.jet.origins[slot * 3]     = this.mesh.position.x;
+        this.jet.origins[slot * 3 + 1] = this.mesh.position.y + direction * r;
+        this.jet.origins[slot * 3 + 2] = this.mesh.position.z;
+        this.jet.activeFlags[slot] = 1;
     }
 
     setRadius(newRadius: number) {
@@ -354,9 +412,16 @@ export class BlackHole extends CelestialBody {
             mat.size = BLACK_HOLE_JET_POINT_SIZE * newRadius;
         }
 
-        // Recreate accretion disk so particle count and radii match the new size
-        this.disposeAccretionDisk();
-        this.accretion = this.createAccretionDisk();
+        // Update accretion disk radii and point size in-place so that in-flight particles
+        // are preserved. Recreating the disk would destroy every particle currently spiraling in.
+        if (this.accretion) {
+            const mat = this.accretion.points.material as THREE.PointsMaterial;
+            mat.size = BLACK_HOLE_ACCRETION_DISK_POINT_SIZE * newRadius;
+            this.accretion.minRadius = newRadius * 2;
+            this.accretion.maxRadius = newRadius * 2 * 32;
+        } else {
+            this.accretion = this.createAccretionDisk();
+        }
     }
 
     disposeAccretionDisk() {
@@ -384,6 +449,8 @@ export class BlackHole extends CelestialBody {
         const colors = this.accretion.points.geometry.attributes.color.array;
 
         for (let i = 0; i < count; i++) {
+            if (this.accretion.activeFlags[i] === 0) continue; // skip inactive slots
+
             // Get current position relative to black hole
             const dx = p[i * 3];
             const dz = p[i * 3 + 2];
@@ -391,49 +458,33 @@ export class BlackHole extends CelestialBody {
 
             // Spiral inward
             const vel = this.accretion.vels[i];
-            // Inward speed increases as radius decreases (e.g., proportional to 1/r)
+            // Inward speed increases as radius decreases (proportional to 1/r)
             const inwardSpeed = vel.inward * (maxRadius / Math.max(radius, 1));
             const newRadius = radius - inwardSpeed * absDt;
 
             // Color/heat mapping: t=0 (inner) is white/yellow, t=1 (outer) is dim red/orange
             const t = (newRadius - minRadius) / (maxRadius - minRadius);
-            // Outer: dark orange/red (e.g., RGB 0.8, 0.2, 0.05), Inner: white/yellow (1.0, 0.95, 0.7)
-            const r = 0.8 + (1.0 - 0.8) * (1 - t); // 0.8→1.0
-            const g = 0.2 + (0.95 - 0.2) * (1 - t); // 0.2→0.95
-            const b = 0.05 + (0.7 - 0.05) * (1 - t); // 0.05→0.7
-            colors[i * 3] = r;
+            const r = 0.8 + (1.0 - 0.8) * (1 - t);
+            const g = 0.2 + (0.95 - 0.2) * (1 - t);
+            const b = 0.05 + (0.7 - 0.05) * (1 - t);
+            colors[i * 3]     = r;
             colors[i * 3 + 1] = g;
             colors[i * 3 + 2] = b;
 
-            // If particle reaches the inner buffer, respawn at outer edge
+            // If particle reaches the inner edge, hand off to the jet and deactivate.
             if (newRadius < this.radius + 2 * SCALE_FACTOR) {
-                // Respawn at outer edge
-                const angle = Math.random() * Math.PI * 2;
-                const respawnRadius = maxRadius;
-                p[i * 3] = Math.cos(angle) * respawnRadius;
-                p[i * 3 + 1] = (Math.random() - 0.5) * this.radius * 0.75;
-                p[i * 3 + 2] = Math.sin(angle) * respawnRadius;
-                this.accretion.angularPositions[i] = angle;
-                // Reset velocity to match initial spawn logic
-                const inwardSpeed0 = (0.12 + Math.random() * 0.1) * SCALE_FACTOR;
-                const orbitalSpeed = Math.sqrt(this.mass / respawnRadius) * 0.005;
-                this.accretion.vels[i] = {
-                    inward: inwardSpeed0,
-                    orbital: orbitalSpeed,
-                    radius: respawnRadius,
-                };
-                // Reset opacity to min at respawn (most transparent at outer edge)
-                opacities[i] = minOpacity;
-                // Reset color to outer color
-                colors[i * 3] = 0.8;
-                colors[i * 3 + 1] = 0.2;
-                colors[i * 3 + 2] = 0.05;
+                // Inject multiple jet particles per accretion arrival, alternating poles.
+                for (let j = 0; j < JET_PARTICLES_PER_ACCRETION; j++) {
+                    this.injectIntoJet(j % 2 === 0 ? 1 : -1);
+                }
+                this.accretion.activeFlags[i] = 0;
+                opacities[i] = 0;
             } else {
                 // Update orbital position (spiral motion)
                 this.accretion.angularPositions[i] += vel.orbital * absDt;
                 const angle = this.accretion.angularPositions[i];
 
-                p[i * 3] = Math.cos(angle) * newRadius;
+                p[i * 3]     = Math.cos(angle) * newRadius;
                 p[i * 3 + 2] = Math.sin(angle) * newRadius;
                 // Y stays roughly the same but flatten toward disk as it approaches
                 p[i * 3 + 1] = p[i * 3 + 1] * 0.98;
@@ -474,29 +525,23 @@ export class BlackHole extends CelestialBody {
                 mat.size = BLACK_HOLE_JET_POINT_SIZE * r;
             }
             if (absDt > 0) {
-                const { points, velocities, ages, origins, maxAge } = this.jet;
+                const { points, velocities, ages, origins, maxAge, activeFlags } = this.jet;
                 const posAttr = points.geometry.attributes.position;
                 const alphaAttr = points.geometry.attributes.alpha;
                 for (let i = 0; i < velocities.length / 3; i++) {
+                    if (activeFlags[i] === 0) continue; // skip inactive slots
+
                     ages[i] += absDt;
                     if (ages[i] > maxAge) {
-                        // Respawn at pole, offset by radius
-                        const up = i % 2 === 0 ? 1 : -1;
-                        const speed = 120 * r;
-                        const spread = 0.08; // constant angular fraction — keeps jet narrow at all radii
-                        velocities[i * 3] = (Math.random() - 0.5) * spread * speed;
-                        velocities[i * 3 + 1] = up * speed;
-                        velocities[i * 3 + 2] = (Math.random() - 0.5) * spread * speed;
-                        ages[i] = 0;
-                        // Store new origin at current black hole position, offset by radius
-                        origins[i * 3] = this.mesh.position.x;
-                        origins[i * 3 + 1] = this.mesh.position.y + up * r;
-                        origins[i * 3 + 2] = this.mesh.position.z;
+                        // Particle has completed its flight — deactivate permanently.
+                        activeFlags[i] = 0;
+                        alphaAttr.array[i] = 0;
+                        continue;
                     }
                     // Fade out with age
                     alphaAttr.array[i] = 1.0 - ages[i] / maxAge;
                     // Compute world position: origin + velocity * age
-                    posAttr.array[i * 3] = origins[i * 3] + velocities[i * 3] * ages[i];
+                    posAttr.array[i * 3]     = origins[i * 3]     + velocities[i * 3]     * ages[i];
                     posAttr.array[i * 3 + 1] = origins[i * 3 + 1] + velocities[i * 3 + 1] * ages[i];
                     posAttr.array[i * 3 + 2] = origins[i * 3 + 2] + velocities[i * 3 + 2] * ages[i];
                 }
@@ -550,13 +595,16 @@ export class BlackHole extends CelestialBody {
 
             // Start a new siphon stream if one does not already exist.
             if (!this.siphonEffects.has(star.id)) {
-                const effect = new MassSiphonEffect(this.dependencies, this.scene, star, this);
+                const effect = new MassSiphonEffect(
+                    this.dependencies,
+                    this.scene,
+                    star,
+                    this,
+                    (angle) => this.injectIntoAccretionDisk(angle)
+                );
                 this.siphonEffects.set(star.id, effect);
                 this.dependencies.addEvent(`${this.name} is siphoning mass from ${star.name}`);
             }
-
-            // Advance the particle animation each frame.
-            this.siphonEffects.get(star.id)?.update(dt);
 
             // Gravitational mass-transfer: proportional to G·M_bh·M_star / r².
             const distSafe = Math.max(dist, 1);
@@ -595,14 +643,8 @@ export class BlackHole extends CelestialBody {
                     const isMassiveStar = star.initialMass > SUN_MASS * 3.3;
                     star.triggerStarDeath(isMassiveStar);
                 }
-                // If just depleted (brown dwarf remnant), setMass already handled the
-                // visual transition via transitionToBrownDwarf. Just end the siphon.
-
-                const effect = this.siphonEffects.get(star.id);
-                if (effect) {
-                    effect.dispose();
-                    this.siphonEffects.delete(star.id);
-                }
+                // Stop spawning for this star's siphon — in-flight particles continue draining.
+                this.siphonEffects.get(star.id)?.stopSpawning();
                 inRangeIds.delete(star.id);
                 if (depleted && !massGone) {
                     this.dependencies.addEvent(`${star.name} siphoned into a brown dwarf remnant`);
@@ -619,9 +661,17 @@ export class BlackHole extends CelestialBody {
             }
         }
 
-        // Clean up effects for stars that moved out of range or were disposed externally.
+        // ── Loop 2: update ALL effects (both actively spawning and draining). ───────
+        // Effects for out-of-range/depleted stars have already had stopSpawning() called
+        // above; we let them continue updating until all in-flight particles drain out,
+        // at which point active becomes false and we dispose.
         for (const [starId, effect] of Array.from(this.siphonEffects.entries())) {
             if (!inRangeIds.has(starId)) {
+                // Star is no longer in range — stop spawning if not already stopped.
+                effect.stopSpawning();
+            }
+            effect.update(dt);
+            if (!effect.active) {
                 effect.dispose();
                 this.siphonEffects.delete(starId);
             }
