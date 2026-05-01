@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
 import { MERCURY_DIST, MERCURY_MASS, MERCURY_RADIUS, SUN_MASS } from '../utilities/consts.js';
-import { BodyType, createUniqueId } from '../utilities/utilities.js';
+import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { CelestialBody } from './celestial-body.js';
 import { IStateDependencies } from '../interfaces.js';
@@ -31,7 +31,7 @@ export class Mercury extends CelestialBody {
             MERCURY_MASS,
             createUniqueId('mercury'),
             'Mercury',
-            BodyType.Planet,
+            BodyTypeEnum.Planet,
             0xaaaaaa,
             2000,
             false,

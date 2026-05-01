@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body.js';
-import { BodyType } from '../utilities/utilities.js';
+import { BodyTypeEnum } from '../utilities/utilities.js';
 import { IStateDependencies } from '../interfaces.js';
 
 export interface IAsteroidOptions {
@@ -80,7 +80,7 @@ export class Asteroid extends CelestialBody {
             mass,
             id ?? `asteroid-${Math.random().toString(36).slice(2)}`,
             name ?? 'Asteroid',
-            BodyType.Asteroid,
+            BodyTypeEnum.Asteroid,
             trailColor,
             maxTrail,
             false,

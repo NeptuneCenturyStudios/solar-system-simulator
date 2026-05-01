@@ -69,7 +69,6 @@ import {
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo.js';
 import {
     isBodyType,
-    BodyType,
     pickRandom,
     createUniqueId,
     BodyTypeEnum,
@@ -2697,10 +2696,10 @@ function createNewBody(
               : fictionalTextures;
 
         const customPlanetBodyType = isGasGiant
-            ? BodyType.GasGiant
+            ? BodyTypeEnum.GasGiant
             : isIceGiant
-              ? BodyType.IceGiant
-              : BodyType.Planet;
+              ? BodyTypeEnum.IceGiant
+              : BodyTypeEnum.Planet;
 
         const planetMaterial = new THREE.MeshStandardMaterial({
             map: pickRandom(planetTexturePool),
@@ -2837,7 +2836,7 @@ function createNewBody(
                 moonMass,
                 createUniqueId('moon'),
                 generateIAUName(BodyTypeEnum.Moon, focusedBody),
-                BodyType.Moon,
+                BodyTypeEnum.Moon,
                 0x666666,
                 1000,
                 false,
@@ -4423,7 +4422,7 @@ function animate() {
 
     // Update material brightness based on distance from star (inverse square law)
     const sunBody = simulationState.bodies.find(
-        (b) => b && !b._isDisposed && isBodyType(b, BodyType.Star)
+        (b) => b && !b._isDisposed && isBodyType(b, BodyTypeEnum.Star)
     );
     if (sunBody) {
         for (const body of simulationState.bodies) {
@@ -4432,7 +4431,7 @@ function animate() {
                 !body._isDisposed &&
                 body.mesh &&
                 body instanceof CelestialBody &&
-                !isBodyType(body, BodyType.Star)
+                !isBodyType(body, BodyTypeEnum.Star)
             ) {
                 // Calculate distance from sun
                 const dx = body.mesh.position.x - sunBody.mesh.position.x;
@@ -4901,16 +4900,16 @@ function getFocusObject() {
 
 function getBodyTypeLabel(b: Body) {
     if (!b) return 'Unknown';
-    if (b.bodyType & BodyType.BlackHole) return 'Black Hole';
-    if (isBodyType(b, BodyType.Star)) return 'Star';
-    if (b.bodyType && b.bodyType & BodyType.GasGiant) return 'Gas Giant';
-    if (b.bodyType && b.bodyType & BodyType.IceGiant) return 'Ice Giant';
-    if (b.bodyType && b.bodyType & BodyType.DwarfPlanet) return 'Dwarf Planet';
-    if (b.bodyType && b.bodyType & BodyType.Planet) return 'Planet';
-    if (b.bodyType && b.bodyType & BodyType.Moon) return 'Moon';
-    if (b.bodyType && b.bodyType & BodyType.Asteroid) return 'Asteroid';
-    if (b.bodyType && b.bodyType & BodyType.Comet) return 'Comet';
-    if (b.bodyType && b.bodyType & BodyType.SpaceShip) return 'Spaceship';
+    if (b.bodyType & BodyTypeEnum.BlackHole) return 'Black Hole';
+    if (isBodyType(b, BodyTypeEnum.Star)) return 'Star';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.GasGiant) return 'Gas Giant';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.IceGiant) return 'Ice Giant';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.DwarfPlanet) return 'Dwarf Planet';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.Planet) return 'Planet';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.Moon) return 'Moon';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.Asteroid) return 'Asteroid';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.Comet) return 'Comet';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.SpaceShip) return 'Spaceship';
     return 'Unknown';
 }
 
@@ -5145,7 +5144,7 @@ const surfaceState = {
 function isSurfaceEligibleBody(body: Body | null) {
     if (!body || !simulationState.bodies.includes(body) || body._isDisposed || !body.mesh)
         return false;
-    if (isBodyType(body, BodyType.Star)) return false;
+    if (isBodyType(body, BodyTypeEnum.Star)) return false;
     if (body instanceof BlackHole) return false;
     // require some minimum radius so we don't go crazy on tiny asteroids
     return (body.radius || 0) >= 1.0;
@@ -6807,7 +6806,7 @@ managementPanel.on(
 
         // Update mass
         // If this is a star, enforce minimum mass (0.08 solar masses)
-        if (isBodyType(body, BodyType.Star)) {
+        if (isBodyType(body, BodyTypeEnum.Star)) {
             mass = Math.max(mass, MIN_STAR_MASS);
         }
         body.mass = mass;
@@ -6841,7 +6840,7 @@ managementPanel.on(
         // Preserve special non-spherical asteroid geometry when editing low-mass asteroids.
         try {
             const isLowMassAsteroid =
-                isBodyType(body, BodyType.Asteroid) &&
+                isBodyType(body, BodyTypeEnum.Asteroid) &&
                 typeof body.mass === 'number' &&
                 body.mass < 1;
 
@@ -6886,7 +6885,7 @@ managementPanel.on(
         }
 
         // Apply color change if provided and if body is not a star
-        if (color && !isBodyType(body, BodyType.Star)) {
+        if (color && !isBodyType(body, BodyTypeEnum.Star)) {
             try {
                 // Convert hex string to THREE.Color
                 const col = new THREE.Color(color);
@@ -6926,7 +6925,7 @@ function deleteSelectedBody() {
 
     // For stars: delete immediately with NO supernova / black hole.
     // (Natural star death still triggers those effects via the fuel system.)
-    const deletingStar = isBodyType(bodyToDelete, BodyType.Star);
+    const deletingStar = isBodyType(bodyToDelete, BodyTypeEnum.Star);
 
     if (deletingStar) {
         // Star.die(true) is the single cleanup path (no supernova/black hole for manual deletion).

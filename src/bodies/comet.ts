@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { SCALE_FACTOR } from '../utilities/consts.js';
-import { BodyType } from '../utilities/utilities.js';
+import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body.js';
 import { IStateDependencies } from '../interfaces.js';
 
@@ -70,7 +70,7 @@ export class Comet extends CelestialBody {
             options.mass,
             options.id,
             options.name,
-            BodyType.Comet,
+            BodyTypeEnum.Comet,
             0xaaaaaa,
             5000,
             false,

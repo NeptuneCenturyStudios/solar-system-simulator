@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body.js';
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyType, createUniqueId } from '../utilities/utilities.js';
+import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { SATURN_DIST, SATURN_MASS, SUN_MASS, SATURN_RADIUS } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
@@ -33,7 +33,7 @@ export class Saturn extends CelestialBody {
             SATURN_MASS,
             createUniqueId('saturn'),
             'Saturn',
-            BodyType.GasGiant,
+            BodyTypeEnum.GasGiant,
             0xffeebb,
             12000,
             true,

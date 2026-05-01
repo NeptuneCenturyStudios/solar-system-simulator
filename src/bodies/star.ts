@@ -1,14 +1,14 @@
 import * as THREE from 'three';
-import { SHADOW_MAP_SIZE, SUN_MASS, SCALE_FACTOR, PLUTO_DIST } from '../utilities/consts.js';
-import { BodyType, BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
-import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body.js';
-import { BlackHole } from './black-hole.js';
-import { triggerScreenFlash } from '../effects/screen-flash.js';
-import { Corona } from '../effects/corona.js';
-import { IStateDependencies } from '../interfaces.js';
-import { StarBirth } from '../effects/star-birth.js';
-import { IRotation } from '../physics/physics.js';
-import { Supernova } from '../effects/supernova.js';
+import { SHADOW_MAP_SIZE, SUN_MASS, SCALE_FACTOR, PLUTO_DIST } from '../utilities/consts';
+import { BodyTypeEnum, isBodyType } from '../utilities/utilities';
+import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
+import { BlackHole } from './black-hole';
+import { triggerScreenFlash } from '../effects/screen-flash';
+import { Corona } from '../effects/corona';
+import { IStateDependencies } from '../interfaces';
+import { StarBirth } from '../effects/star-birth';
+import { IRotation } from '../physics/physics';
+import { Supernova } from '../effects/supernova';
 
 /**
  * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.
@@ -123,7 +123,7 @@ export class Star extends CelestialBody {
             options.mass,
             options.id,
             options.name,
-            BodyType.Star,
+            BodyTypeEnum.Star,
             0xffffff,
             500,
             false,
@@ -559,7 +559,7 @@ export class Star extends CelestialBody {
     setTemperature(temp: number) {
         this.temperature = temp;
 
-        if (!isBodyType(this, BodyType.Star)) {
+        if (!isBodyType(this, BodyTypeEnum.Star)) {
             return;
         }
 

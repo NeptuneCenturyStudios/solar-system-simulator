@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Body, IBodyCreationOptions } from './body.js';
 import { moonTexture, fictionalTextures } from '../drawing/textures.js';
-import { BodyType, pickRandom, BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
+import { pickRandom, BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
 import { calculateTrajectory, IRotation } from '../physics/physics.js';
 import { ParticleExplosion } from '../effects/particle-explosion.js';
 import { triggerScreenFlash } from '../effects/screen-flash.js';
@@ -303,7 +303,7 @@ export class CelestialBody extends Body {
 
         // Update cast/receive shadow
         if (this.mesh) {
-            const isBodyStar = isBodyType(this, BodyType.Star);
+            const isBodyStar = isBodyType(this, BodyTypeEnum.Star);
             this.mesh.castShadow = !isBodyStar;
             this.mesh.receiveShadow = !isBodyStar;
         }
@@ -510,7 +510,7 @@ export class CelestialBody extends Body {
             config.mass,
             config.id,
             moonName,
-            BodyType.Moon,
+            BodyTypeEnum.Moon,
             config.trailColor || 0xffffff,
             config.maxTrail || 1500,
             false,

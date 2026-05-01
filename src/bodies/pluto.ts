@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body.js';
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyType, createUniqueId } from '../utilities/utilities.js';
+import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { PLUTO_DIST, PLUTO_MASS, SUN_MASS, PLUTO_RADIUS } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
@@ -29,7 +29,7 @@ export class Pluto extends CelestialBody {
             PLUTO_MASS,
             createUniqueId('pluto'),
             'Pluto',
-            BodyType.DwarfPlanet,
+            BodyTypeEnum.DwarfPlanet,
             0xddbb99,
             20000,
             false,

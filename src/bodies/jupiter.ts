@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body.js';
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyType, createUniqueId } from '../utilities/utilities.js';
+import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { SUN_MASS, JUPITER_DIST, JUPITER_MASS, JUPITER_RADIUS } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
@@ -33,7 +33,7 @@ export class Jupiter extends CelestialBody {
             JUPITER_MASS,
             createUniqueId('jupiter'),
             'Jupiter',
-            BodyType.GasGiant,
+            BodyTypeEnum.GasGiant,
             0xffcc88,
             5000,
             false,

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CelestialBody } from './celestial-body.js';
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyType, createUniqueId } from '../utilities/utilities.js';
+import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { CERES_DISTANCE, CERES_MASS, CERES_RADIUS, SUN_MASS } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
@@ -28,7 +28,7 @@ export class Ceres extends CelestialBody {
             CERES_MASS,
             createUniqueId('ceres'),
             'Ceres',
-            BodyType.DwarfPlanet,
+            BodyTypeEnum.DwarfPlanet,
             0xcccccc,
             2000,
             false,

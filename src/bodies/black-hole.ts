@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G } from '../utilities/consts.js';
-import { BodyType, BodyTypeEnum } from '../utilities/utilities.js';
+import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body.js';
 import { IRotation } from '../physics/physics.js';
 import { IStateDependencies, ISiphonTarget } from '../interfaces.js';
@@ -80,7 +80,7 @@ export class BlackHole extends CelestialBody {
             mass,
             id,
             name,
-            BodyType.BlackHole,
+            BodyTypeEnum.BlackHole,
             0xffffff,
             500,
             false,
@@ -539,6 +539,7 @@ export class BlackHole extends CelestialBody {
         ) as unknown as ISiphonTarget[];
 
         const inRangeIds = new Set<string>();
+        let totalTransfer = 0;
 
         for (const star of stars) {
             const dist = star.mesh.position.distanceTo(this.mesh.position);
@@ -564,6 +565,7 @@ export class BlackHole extends CelestialBody {
                 absDt;
 
             star.mass = Math.max(0, star.mass - transfer);
+            totalTransfer += transfer;
 
             // Fuel drain uses the same ratio as Star's initial fuel assignment:
             //   maxFuel = mass * 100000 * SCALE_FACTOR
@@ -587,6 +589,15 @@ export class BlackHole extends CelestialBody {
                     this.siphonEffects.delete(star.id);
                 }
                 inRangeIds.delete(star.id);
+            }
+        }
+
+        // Grow the black hole by the total mass siphoned this frame.
+        if (totalTransfer > 0) {
+            this.mass += totalTransfer;
+            const newRadius = BlackHole.massToEventHorizonRadius(this.mass);
+            if (Math.abs(newRadius - this.radius) / this.radius > 0.005) {
+                this.setRadius(newRadius);
             }
         }
 
