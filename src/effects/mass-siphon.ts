@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+
+// Global scaling factor for siphon stream speed (tweak for visual pacing)
+const SIPHON_SPEED_SCALE = 8;
 import { IEffect } from './effect-base';
 import { IStateDependencies, ISiphonTarget } from '../interfaces';
 
@@ -25,7 +28,13 @@ export class MassSiphonEffect implements IEffect {
 
     private scene: THREE.Scene;
     private star: ISiphonTarget;
-    private blackHole: { mesh: THREE.Mesh; radius: number; _isDisposed: boolean; rotationAxis: THREE.Vector3; accretion?: { maxRadius: number } | null };
+    private blackHole: {
+        mesh: THREE.Mesh;
+        radius: number;
+        _isDisposed: boolean;
+        rotationAxis: THREE.Vector3;
+        accretion?: { maxRadius: number } | null;
+    };
 
     private geometry: THREE.BufferGeometry;
     private material: THREE.PointsMaterial;
@@ -42,7 +51,14 @@ export class MassSiphonEffect implements IEffect {
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         star: ISiphonTarget,
-        blackHole: { mesh: THREE.Mesh; radius: number; _isDisposed: boolean; rotationAxis: THREE.Vector3; accretion?: { maxRadius: number } | null }
+        blackHole: {
+            mesh: THREE.Mesh;
+            mass: number;
+            radius: number;
+            _isDisposed: boolean;
+            rotationAxis: THREE.Vector3;
+            accretion?: { maxRadius: number; vels: { radius: number; orbital: number }[] } | null;
+        }
     ) {
         this.dependencies = dependencies;
         this.active = true;
@@ -53,13 +69,34 @@ export class MassSiphonEffect implements IEffect {
         // Stagger particles across the full stream length from the start.
         this.tArr = new Float32Array(PARTICLE_COUNT);
         this.speedArr = new Float32Array(PARTICLE_COUNT);
-        // For each particle, store a random direction for star surface spawn
         this.spawnDirs = [];
-        // ...existing code...
+
+        // Use the actual orbital speed at the accretion disk's outer edge if available
+        let diskOrbitalSpeed; // fallback default
+        if (
+            blackHole.accretion &&
+            blackHole.accretion.vels &&
+            blackHole.accretion.vels.length > 0
+        ) {
+            // Find the vels entry with the largest radius
+            let max = blackHole.accretion.vels[0];
+            for (const v of blackHole.accretion.vels) {
+                if (v.radius > max.radius) max = v;
+            }
+            diskOrbitalSpeed = max.orbital;
+        } else {
+            // Fallback to previous calculation
+            const accretionMaxRadius =
+                blackHole.accretion && blackHole.accretion.maxRadius
+                    ? blackHole.accretion.maxRadius
+                    : blackHole.radius * 2 * 32;
+            const bhMass = blackHole.mass || 1;
+            diskOrbitalSpeed = Math.sqrt(bhMass / accretionMaxRadius) * 0.005;
+        }
+
+        // Precompute geometry for each particle to get path length for speed normalization
         for (let i = 0; i < PARTICLE_COUNT; i++) {
             this.tArr[i] = Math.random();
-            // Stream travel time varies ~8–20 simulation-seconds to spread density.
-            this.speedArr[i] = 0.05 + Math.random() * 0.095;
             // Random direction on unit sphere for star surface
             const theta = Math.random() * 2 * Math.PI;
             const phi = Math.acos(2 * Math.random() - 1);
@@ -68,6 +105,69 @@ export class MassSiphonEffect implements IEffect {
                 Math.cos(phi),
                 Math.sin(phi) * Math.sin(theta)
             );
+
+            // --- Compute Bézier path length for this particle ---
+            // Start: star surface
+            const starCenter = star.mesh.position;
+            const starRadius = star.radius;
+            const spawnDir = this.spawnDirs[i];
+            const start = new THREE.Vector3()
+                .copy(starCenter)
+                .addScaledVector(spawnDir, starRadius);
+
+            // End: offset point on accretion disk outer edge in direction of rotation (in disk plane)
+            const accretionMaxRadius =
+                blackHole.accretion && blackHole.accretion.maxRadius
+                    ? blackHole.accretion.maxRadius
+                    : blackHole.radius * 2 * 32;
+            const bhCenter = blackHole.mesh.position;
+            // Direction from star to black hole
+            const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
+            // Disk normal (rotation axis)
+            const diskNormal = blackHole.rotationAxis
+                ? blackHole.rotationAxis.clone().normalize()
+                : new THREE.Vector3(0, 1, 0);
+            // Project toBH onto the disk plane
+            const toBH_proj = toBH
+                .clone()
+                .sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal)))
+                .normalize();
+            // Rotate the projected vector around the disk normal by the offset angle
+            const DISK_ROTATION_OFFSET = Math.PI / 2;
+            const offsetDir = toBH_proj
+                .clone()
+                .applyAxisAngle(diskNormal, DISK_ROTATION_OFFSET)
+                .normalize();
+            const end = new THREE.Vector3()
+                .copy(bhCenter)
+                .addScaledVector(offsetDir, accretionMaxRadius);
+
+            // Bézier mid-point: curve to merge with disk tangent at entry
+            const dir = new THREE.Vector3().subVectors(end, start);
+            const dist = dir.length();
+            const diskTangent = new THREE.Vector3().crossVectors(diskNormal, offsetDir).normalize();
+            const mergeFrac = 0.7;
+            const tangentStrength = dist * 0.5;
+            const midBase = new THREE.Vector3().lerpVectors(start, end, mergeFrac);
+            const mid = midBase.clone().addScaledVector(diskTangent, tangentStrength);
+
+            // Approximate Bézier curve length by sampling points
+            let pathLen = 0;
+            let prev = start.clone();
+            const steps = 10;
+            for (let j = 1; j <= steps; j++) {
+                const t = j / steps;
+                const s = 1.0 - t;
+                const pt = new THREE.Vector3(
+                    s * s * start.x + 2 * s * t * mid.x + t * t * end.x,
+                    s * s * start.y + 2 * s * t * mid.y + t * t * end.y,
+                    s * s * start.z + 2 * s * t * mid.z + t * t * end.z
+                );
+                pathLen += pt.distanceTo(prev);
+                prev = pt;
+            }
+            // Set stream speed to match disk orbital speed visually
+            this.speedArr[i] = SIPHON_SPEED_SCALE * (diskOrbitalSpeed / pathLen) * (0.95 + Math.random() * 0.1);
         }
 
         const positions = new Float32Array(PARTICLE_COUNT * 3);
@@ -78,7 +178,7 @@ export class MassSiphonEffect implements IEffect {
         this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
         this.material = new THREE.PointsMaterial({
-            size: 6,
+            size: 4 * blackHole.radius,
             vertexColors: true,
             transparent: true,
             blending: THREE.AdditiveBlending,
@@ -106,8 +206,8 @@ export class MassSiphonEffect implements IEffect {
         const starG = this.star.baseColor.g;
         const starB = this.star.baseColor.b;
 
-            // Angle offset in radians for disk rotation (clockwise = negative)
-            const DISK_ROTATION_OFFSET = Math.PI / 2; // 90 degrees, adjust as needed
+        // Angle offset in radians for disk rotation (clockwise = negative)
+        const DISK_ROTATION_OFFSET = Math.PI / 2; // 90 degrees, adjust as needed
         const posArr = this.geometry.attributes.position.array as Float32Array;
         const colArr = this.geometry.attributes.color.array as Float32Array;
 
@@ -130,20 +230,35 @@ export class MassSiphonEffect implements IEffect {
             const starCenter = this.star.mesh.position;
             const starRadius = this.star.radius;
             const spawnDir = this.spawnDirs[i];
-            const start = new THREE.Vector3().copy(starCenter).addScaledVector(spawnDir, starRadius);
+            const start = new THREE.Vector3()
+                .copy(starCenter)
+                .addScaledVector(spawnDir, starRadius);
 
             // End: offset point on accretion disk outer edge in direction of rotation (in disk plane)
-            const accretionMaxRadius = (this.blackHole.accretion && this.blackHole.accretion.maxRadius) ? this.blackHole.accretion.maxRadius : (this.blackHole.radius * 2 * 32);
+            const accretionMaxRadius =
+                this.blackHole.accretion && this.blackHole.accretion.maxRadius
+                    ? this.blackHole.accretion.maxRadius
+                    : this.blackHole.radius * 2 * 32;
             const bhCenter = this.blackHole.mesh.position;
             // Direction from star to black hole
             const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
             // Disk normal (rotation axis)
-            const diskNormal = this.blackHole.rotationAxis ? this.blackHole.rotationAxis.clone().normalize() : new THREE.Vector3(0, 1, 0);
+            const diskNormal = this.blackHole.rotationAxis
+                ? this.blackHole.rotationAxis.clone().normalize()
+                : new THREE.Vector3(0, 1, 0);
             // Project toBH onto the disk plane
-            const toBH_proj = toBH.clone().sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal))).normalize();
+            const toBH_proj = toBH
+                .clone()
+                .sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal)))
+                .normalize();
             // Rotate the projected vector around the disk normal by the offset angle
-            const offsetDir = toBH_proj.clone().applyAxisAngle(diskNormal, DISK_ROTATION_OFFSET).normalize();
-            const end = new THREE.Vector3().copy(bhCenter).addScaledVector(offsetDir, accretionMaxRadius);
+            const offsetDir = toBH_proj
+                .clone()
+                .applyAxisAngle(diskNormal, DISK_ROTATION_OFFSET)
+                .normalize();
+            const end = new THREE.Vector3()
+                .copy(bhCenter)
+                .addScaledVector(offsetDir, accretionMaxRadius);
 
             // Bézier mid-point: curve to merge with disk tangent at entry
             const dir = new THREE.Vector3().subVectors(end, start);
@@ -160,12 +275,12 @@ export class MassSiphonEffect implements IEffect {
             const s = 1.0 - t;
 
             // Quadratic Bézier: P = s²·start + 2·s·t·mid + t²·end
-            posArr[i * 3]     = s * s * start.x + 2 * s * t * mid.x + t * t * end.x;
+            posArr[i * 3] = s * s * start.x + 2 * s * t * mid.x + t * t * end.x;
             posArr[i * 3 + 1] = s * s * start.y + 2 * s * t * mid.y + t * t * end.y;
             posArr[i * 3 + 2] = s * s * start.z + 2 * s * t * mid.z + t * t * end.z;
 
             // Colour: star base colour → BH accretion outer orange/red.
-            colArr[i * 3]     = starR + (BH_R - starR) * t;
+            colArr[i * 3] = starR + (BH_R - starR) * t;
             colArr[i * 3 + 1] = starG + (BH_G - starG) * t;
             colArr[i * 3 + 2] = starB + (BH_B - starB) * t;
         }
