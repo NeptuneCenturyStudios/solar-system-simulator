@@ -38,7 +38,7 @@ export class MassSiphonEffect implements IEffect {
     };
 
     private geometry: THREE.BufferGeometry;
-    private material: THREE.ShaderMaterial;
+    private material: THREE.PointsMaterial;
     private points: THREE.Points;
     private spawnDirs: THREE.Vector3[];
 
@@ -184,45 +184,63 @@ export class MassSiphonEffect implements IEffect {
         const tVals = new Float32Array(PARTICLE_COUNT);
         this.geometry.setAttribute('tval', new THREE.BufferAttribute(tVals, 1));
 
-        this.material = new THREE.ShaderMaterial({
-            uniforms: {
-                pointSize: { value: 4 * blackHole.radius },
-                sizeNearStar: { value: 8 * blackHole.radius },
-                BRIGHTNESS: { value: 2.0 },
-            },
-            vertexShader: `
-                uniform float pointSize;
-                uniform float sizeNearStar;
-                attribute float alpha;
-                attribute vec3 color;
-                attribute float tval;
-                varying vec3 vColor;
-                varying float vAlpha;
-                void main() {
-                    vColor = color;
-                    vAlpha = alpha;
-                    float t = tval;
-                    float size = mix(sizeNearStar, pointSize, t);
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                    gl_PointSize = size;
-                }
-            `,
-            fragmentShader: `
-                uniform float BRIGHTNESS;
-                varying vec3 vColor;
-                varying float vAlpha;
-                void main() {
-                    float dist = length(gl_PointCoord - vec2(0.5));
-                    float alpha = vAlpha * (1.0 - smoothstep(0.4, 0.5, dist));
-                    if (alpha < 0.01) discard;
-                    gl_FragColor = vec4(vColor * BRIGHTNESS, alpha);
-                }
-            `,
+        this.material = new THREE.PointsMaterial({
+            sizeAttenuation: false, // Keeps particles same size regardless of distance
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             depthTest: true,
+            vertexColors: true
         });
+
+        this.material.onBeforeCompile = (shader) => {
+            // 1. Add your custom uniforms
+            shader.uniforms.pointSize = { value: 4 * blackHole.radius };
+            shader.uniforms.sizeNearStar = { value: 8 * blackHole.radius };
+            shader.uniforms.BRIGHTNESS = { value: 2.0 };
+
+            // 2. Vertex Shader: Custom Size & Alpha Injection
+            shader.vertexShader = `
+                attribute float alpha;
+                attribute float tval;
+                varying float vAlpha;
+                uniform float pointSize;
+                uniform float sizeNearStar;
+            ` + shader.vertexShader;
+
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <begin_vertex>',
+                `#include <begin_vertex>
+                vAlpha = alpha;`
+            );
+
+            // Replace the default size logic with your mix() logic
+            shader.vertexShader = shader.vertexShader.replace(
+                'gl_PointSize = size;',
+                'gl_PointSize = mix(sizeNearStar, pointSize, tval);'
+            );
+
+            // 3. Fragment Shader: The "Square Killer" & Alpha Gradient
+            shader.fragmentShader = `
+                varying float vAlpha;
+                uniform float BRIGHTNESS;
+            ` + shader.fragmentShader;
+
+            // Use a regex-style replace to ensure we hit the right main() block
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'void main() {',
+                `void main() {
+                    float dist = length(gl_PointCoord - vec2(0.5));
+                    if (dist > 0.5) discard; // This KILLS the squares seen in image_823d61.jpg
+                    float mask = 1.0 - smoothstep(0.4, 0.5, dist);`
+            );
+
+            // Force the final color to use your brightness and the CPU-sent alpha gradient
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'gl_FragColor = vec4( outgoingLight, diffuseColor.a );',
+                'gl_FragColor = vec4( outgoingLight * BRIGHTNESS, vAlpha * mask );'
+            );
+        };
 
         this.points = new THREE.Points(this.geometry, this.material);
         this.points.frustumCulled = false;

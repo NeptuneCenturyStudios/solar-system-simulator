@@ -30,7 +30,14 @@ const BLACK_HOLE_ACCRETION_DISK_POINT_SIZE = 4; // Angular spread for jet partic
 const SIPHON_MASS_TRANSFER_SCALE = 0.001;
 
 export class BlackHole extends CelestialBody {
-    jet: { points: THREE.Points, positions: Float32Array, velocities: Float32Array, ages: Float32Array, origins: Float32Array, maxAge: number } | null = null;
+    jet: {
+        points: THREE.Points;
+        positions: Float32Array;
+        velocities: Float32Array;
+        ages: Float32Array;
+        origins: Float32Array;
+        maxAge: number;
+    } | null = null;
     dependencies: IStateDependencies;
     accretion: IAccretionDiskState | null = null;
     accretionGlow: THREE.Sprite | null = null;
@@ -193,43 +200,57 @@ export class BlackHole extends CelestialBody {
         geo.setAttribute('alpha', new THREE.BufferAttribute(opacities, 1));
 
         // Custom ShaderMaterial for per-particle color and alpha
-        const mat = new THREE.ShaderMaterial({
-            uniforms: {
-                pointSize: { value: BLACK_HOLE_ACCRETION_DISK_POINT_SIZE * this.radius },
-            },
-            vertexShader: `
-                precision mediump float;
-                attribute vec3 color;
-                attribute float alpha;
-                varying vec3 vColor;
-                varying float vAlpha;
-                uniform float pointSize;
-                void main() {
-                    vColor = color;
-                    vAlpha = alpha;
-                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                    gl_PointSize = pointSize * (300.0 / -mvPosition.z);
-                    gl_Position = projectionMatrix * mvPosition;
-                }
-            `,
-            fragmentShader: `
-                precision mediump float;
-                varying vec3 vColor;
-                varying float vAlpha;
-                void main() {
-                    float dist = length(gl_PointCoord - vec2(0.5));
-                    // Sharper edge: solid circle with only edge fading out
-                    float alpha = vAlpha * smoothstep(0.5, 0.48, 0.5 - dist);
-                    gl_FragColor = vec4(vColor, alpha);
-                    if (gl_FragColor.a < 0.01) discard;
-                }
-            `,
+
+        const mat = new THREE.PointsMaterial({
+            size: BLACK_HOLE_ACCRETION_DISK_POINT_SIZE * this.radius,
+            vertexColors: true,
             transparent: true,
             blending: THREE.AdditiveBlending,
-            depthWrite: false,
+            depthWrite: false, // Prevents particles from cutting "holes" in each other
+            depthTest: true, // Allows the black hole sphere to hide particles behind it
         });
 
+        // Inject your custom shader logic
+        mat.onBeforeCompile = (shader) => {
+            // 1. Add your uniforms
+            shader.uniforms.pointSize = {
+                value: BLACK_HOLE_ACCRETION_DISK_POINT_SIZE * this.radius,
+            };
+
+            // 2. Vertex Shader: Inject size attenuation or custom logic
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <common>',
+                `#include <common>
+         attribute float alpha; // If you still want to use your custom attributes
+         varying float vAlpha;`
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                'void main() {',
+                `void main() {
+         vAlpha = alpha;`
+            );
+
+            // 3. Fragment Shader: Fix the "Squares" (Circular Discard)
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                `#include <common>
+         varying float vAlpha;`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'void main() {',
+                `void main() {
+         float dist = length(gl_PointCoord - vec2(0.5));
+         if (dist > 0.5) discard; // Hard-kills the square corners
+         float strength = smoothstep(0.5, 0.1, dist);`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'gl_FragColor = vec4( outgoingLight, diffuseColor.a );',
+                'gl_FragColor = vec4( outgoingLight, vAlpha * strength );'
+            );
+        };
+
         const points = new THREE.Points(geo, mat);
+        points.renderOrder = 999;
         points.frustumCulled = false;
         this.scene.add(points);
 
@@ -265,9 +286,9 @@ export class BlackHole extends CelestialBody {
         // Jet color: white-hot
         const colors = new Float32Array(jetCount * 3);
         for (let i = 0; i < jetCount; i++) {
-            colors[i * 3] = 0.85;   // R
+            colors[i * 3] = 0.85; // R
             colors[i * 3 + 1] = 0.95; // G
-            colors[i * 3 + 2] = 1.0;  // B (more blue)
+            colors[i * 3 + 2] = 1.0; // B (more blue)
         }
         geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         // Opacity: fade out with age
@@ -365,7 +386,7 @@ export class BlackHole extends CelestialBody {
             const vel = this.accretion.vels[i];
             // Inward speed increases as radius decreases (e.g., proportional to 1/r)
             const inwardSpeed = vel.inward * (maxRadius / Math.max(radius, 1));
-            const newRadius = radius - inwardSpeed * (absDt);
+            const newRadius = radius - inwardSpeed * absDt;
 
             // Color/heat mapping: t=0 (inner) is white/yellow, t=1 (outer) is dim red/orange
             const t = (newRadius - minRadius) / (maxRadius - minRadius);
@@ -402,7 +423,7 @@ export class BlackHole extends CelestialBody {
                 colors[i * 3 + 2] = 0.05;
             } else {
                 // Update orbital position (spiral motion)
-                this.accretion.angularPositions[i] += vel.orbital * (absDt);
+                this.accretion.angularPositions[i] += vel.orbital * absDt;
                 const angle = this.accretion.angularPositions[i];
 
                 p[i * 3] = Math.cos(angle) * newRadius;
@@ -466,7 +487,7 @@ export class BlackHole extends CelestialBody {
                         origins[i * 3 + 2] = this.mesh.position.z;
                     }
                     // Fade out with age
-                    alphaAttr.array[i] = 1.0 - (ages[i] / maxAge);
+                    alphaAttr.array[i] = 1.0 - ages[i] / maxAge;
                     // Compute world position: origin + velocity * age
                     posAttr.array[i * 3] = origins[i * 3] + velocities[i * 3] * ages[i];
                     posAttr.array[i * 3 + 1] = origins[i * 3 + 1] + velocities[i * 3 + 1] * ages[i];
@@ -530,8 +551,10 @@ export class BlackHole extends CelestialBody {
 
             // Gravitational mass-transfer: proportional to G·M_bh·M_star / r².
             const distSafe = Math.max(dist, 1);
-            const transfer = (G * this.mass * star.mass) / (distSafe * distSafe)
-                * SIPHON_MASS_TRANSFER_SCALE * absDt;
+            const transfer =
+                ((G * this.mass * star.mass) / (distSafe * distSafe)) *
+                SIPHON_MASS_TRANSFER_SCALE *
+                absDt;
 
             star.mass = Math.max(0, star.mass - transfer);
 
