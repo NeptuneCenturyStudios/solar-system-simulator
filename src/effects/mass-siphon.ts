@@ -1,3 +1,4 @@
+
 import * as THREE from 'three';
 
 // Global scaling factor for siphon stream speed (tweak for visual pacing)
@@ -5,7 +6,7 @@ const SIPHON_SPEED_SCALE = 8;
 import { IEffect } from './effect-base';
 import { IStateDependencies, ISiphonTarget } from '../interfaces';
 
-const PARTICLE_COUNT = 300;
+const PARTICLE_COUNT = 400;
 
 // Accretion disk outer colour — particles arriving at the black hole take this colour.
 const BH_R = 0.8;
@@ -37,7 +38,7 @@ export class MassSiphonEffect implements IEffect {
     };
 
     private geometry: THREE.BufferGeometry;
-    private material: THREE.PointsMaterial;
+    private material: THREE.ShaderMaterial;
     private points: THREE.Points;
     private spawnDirs: THREE.Vector3[];
 
@@ -170,25 +171,62 @@ export class MassSiphonEffect implements IEffect {
             this.speedArr[i] = SIPHON_SPEED_SCALE * (diskOrbitalSpeed / pathLen) * (0.95 + Math.random() * 0.1);
         }
 
+
         const positions = new Float32Array(PARTICLE_COUNT * 3);
         const colors = new Float32Array(PARTICLE_COUNT * 3);
+        const alphas = new Float32Array(PARTICLE_COUNT); // per-particle alpha
 
         this.geometry = new THREE.BufferGeometry();
         this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        this.geometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
+        // Add per-particle t attribute for progress along the stream
+        const tVals = new Float32Array(PARTICLE_COUNT);
+        this.geometry.setAttribute('tval', new THREE.BufferAttribute(tVals, 1));
 
-        this.material = new THREE.PointsMaterial({
-            size: 4 * blackHole.radius,
-            vertexColors: true,
+        this.material = new THREE.ShaderMaterial({
+            uniforms: {
+                pointSize: { value: 4 * blackHole.radius },
+                sizeNearStar: { value: 8 * blackHole.radius },
+                BRIGHTNESS: { value: 2.0 },
+            },
+            vertexShader: `
+                uniform float pointSize;
+                uniform float sizeNearStar;
+                attribute float alpha;
+                attribute vec3 color;
+                attribute float tval;
+                varying vec3 vColor;
+                varying float vAlpha;
+                void main() {
+                    vColor = color;
+                    vAlpha = alpha;
+                    float t = tval;
+                    float size = mix(sizeNearStar, pointSize, t);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = size;
+                }
+            `,
+            fragmentShader: `
+                uniform float BRIGHTNESS;
+                varying vec3 vColor;
+                varying float vAlpha;
+                void main() {
+                    float dist = length(gl_PointCoord - vec2(0.5));
+                    float alpha = vAlpha * (1.0 - smoothstep(0.4, 0.5, dist));
+                    if (alpha < 0.01) discard;
+                    gl_FragColor = vec4(vColor * BRIGHTNESS, alpha);
+                }
+            `,
             transparent: true,
             blending: THREE.AdditiveBlending,
-            opacity: 0.95,
-            sizeAttenuation: true,
             depthWrite: false,
+            depthTest: true,
         });
 
         this.points = new THREE.Points(this.geometry, this.material);
         this.points.frustumCulled = false;
+        this.points.renderOrder = 20; // render after the star (higher value)
         scene.add(this.points);
     }
 
@@ -210,6 +248,8 @@ export class MassSiphonEffect implements IEffect {
         const DISK_ROTATION_OFFSET = Math.PI / 2; // 90 degrees, adjust as needed
         const posArr = this.geometry.attributes.position.array as Float32Array;
         const colArr = this.geometry.attributes.color.array as Float32Array;
+        const alphaArr = this.geometry.attributes.alpha.array as Float32Array;
+        const tValArr = this.geometry.attributes.tval.array as Float32Array;
 
         for (let i = 0; i < PARTICLE_COUNT; i++) {
             this.tArr[i] += this.speedArr[i] * absDt;
@@ -273,6 +313,7 @@ export class MassSiphonEffect implements IEffect {
 
             const t = this.tArr[i];
             const s = 1.0 - t;
+            tValArr[i] = t;
 
             // Quadratic Bézier: P = s²·start + 2·s·t·mid + t²·end
             posArr[i * 3] = s * s * start.x + 2 * s * t * mid.x + t * t * end.x;
@@ -283,8 +324,13 @@ export class MassSiphonEffect implements IEffect {
             colArr[i * 3] = starR + (BH_R - starR) * t;
             colArr[i * 3 + 1] = starG + (BH_G - starG) * t;
             colArr[i * 3 + 2] = starB + (BH_B - starB) * t;
+
+            // Opacity: 1.0 (star) → 0.12 (disk)
+            alphaArr[i] = 1.0 - 0.88 * t;
         }
 
+        this.geometry.attributes.alpha.needsUpdate = true;
+        this.geometry.attributes.tval.needsUpdate = true;
         this.geometry.attributes.position.needsUpdate = true;
         this.geometry.attributes.color.needsUpdate = true;
     }

@@ -23,7 +23,7 @@ declare module './black-hole.js' {
 }
 
 const BLACK_HOLE_JET_POINT_SIZE = 4;
-const BLACK_HOLE_JET_SPEED_BASE = 1200; // Base speed for jet particles, scaled by radius
+const BLACK_HOLE_JET_SPEED_BASE = 2000; // Base speed for jet particles, scaled by radius
 const BLACK_HOLE_ACCRETION_DISK_POINT_SIZE = 4; // Angular spread for jet particles (as a fraction of speed)
 
 /** Multiplier for the gravitational mass-transfer formula. Tune to taste. */
