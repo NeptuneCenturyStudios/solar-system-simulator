@@ -192,7 +192,12 @@ function collisionScoreEscapeVelocity(body: Body) {
     // Winner heuristic: compare escape velocity (constants cancel):
     //   v_esc = sqrt(2GM/R)  => ordering is equivalent to M/R
     const m = Math.max(0, body?.mass || 0);
-    const r = Math.max(1e-6, typeof body?.radius === 'number' && isFinite(body.radius) && body.radius > 0 ? body.radius : 0);
+    const r = Math.max(
+        1e-6,
+        typeof body?.radius === 'number' && isFinite(body.radius) && body.radius > 0
+            ? body.radius
+            : 0
+    );
 
     return m / r;
 }

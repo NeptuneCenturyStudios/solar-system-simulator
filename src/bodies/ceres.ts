@@ -19,14 +19,19 @@ export class Ceres extends CelestialBody {
         });
 
         super(
-            dependencies, scene,
-            CERES_RADIUS, 0xffffff,
-            trajectory.pos, trajectory.vel,
+            dependencies,
+            scene,
+            CERES_RADIUS,
+            0xffffff,
+            trajectory.pos,
+            trajectory.vel,
             CERES_MASS,
             createUniqueId('ceres'),
             'Ceres',
             BodyType.DwarfPlanet,
-            0xcccccc, 2000, false,
+            0xcccccc,
+            2000,
+            false,
             { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 },
             undefined,
             material

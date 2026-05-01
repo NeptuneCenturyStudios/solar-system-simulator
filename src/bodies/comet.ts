@@ -2,10 +2,7 @@ import * as THREE from 'three';
 
 import { SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyType } from '../utilities/utilities.js';
-import {
-    CelestialBody,
-    ICelestialBodyCreationOptions,
-} from './celestial-body.js';
+import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body.js';
 import { IStateDependencies } from '../interfaces.js';
 
 //export interface ICometCreationOptions extends ICelestialBodyCreationOptions {
@@ -42,7 +39,9 @@ export class Comet extends CelestialBody {
     private tailPos: Float32Array | null;
     private tailColors: Float32Array | null;
     private tailOpacities: Float32Array | null;
-    private tailVelocities: { life: number; lifeIncrement: number; vel: THREE.Vector3; isBlue: boolean }[] | null;
+    private tailVelocities:
+        | { life: number; lifeIncrement: number; vel: THREE.Vector3; isBlue: boolean }[]
+        | null;
 
     constructor(
         deps: IStateDependencies,
@@ -125,7 +124,7 @@ export class Comet extends CelestialBody {
             this.tailColors[idx + 2] = color.b;
 
             // this.tailOpacities[i] = (1 - life) * 0.5; // Initial fade
-             this.tailVelocities[i] = { life: life, lifeIncrement: 0.001, vel: velVec, isBlue };
+            this.tailVelocities[i] = { life: life, lifeIncrement: 0.001, vel: velVec, isBlue };
         }
 
         this.tailGeo.setAttribute('position', new THREE.BufferAttribute(this.tailPos, 3));
@@ -142,7 +141,7 @@ export class Comet extends CelestialBody {
         });
         this.tailParticles = new THREE.Points(this.tailGeo, this.tailMat);
         this.tailParticles.frustumCulled = false;
-        
+
         this.scene.add(this.tailParticles);
     }
 
@@ -176,7 +175,7 @@ export class Comet extends CelestialBody {
         // Scale tail intensity based on distance (closer = brighter/longer)
         // Intesity at known distance: 20000000000 * SCALE_FACTOR
         // Apply the inverse square law.
-        const tailIntensity = Math.min(1, 20000000000 * SCALE_FACTOR / distToSunSq);
+        const tailIntensity = Math.min(1, (20000000000 * SCALE_FACTOR) / distToSunSq);
 
         // Direction away from sun (normalized once)
         const invDistToSun = 1 / distToSun;
@@ -239,7 +238,7 @@ export class Comet extends CelestialBody {
         this.tailGeo.attributes.position.needsUpdate = true;
         this.tailGeo.attributes.color.needsUpdate = true;
         // Make material opacity and size scale with distance
-        this.tailMat.opacity = 0.01 + tailIntensity * .8
+        this.tailMat.opacity = 0.01 + tailIntensity * 0.8;
         // Larger particles when closer to sun for denser appearance
         this.tailMat.size = 2.5 + tailIntensity * 5;
     }

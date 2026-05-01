@@ -16,8 +16,13 @@ export class ParticleExplosion implements IEffect {
     positions: Float32Array;
     opacity: number;
 
-
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, pos: THREE.Vector3, color: number, radius = 10) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        pos: THREE.Vector3,
+        color: number,
+        radius = 10
+    ) {
         this.dependencies = dependencies;
         this.count = 800; // 4x more particles
         this.geometry = new THREE.BufferGeometry();
@@ -81,7 +86,10 @@ export class ParticleExplosion implements IEffect {
         if (this.flashSphere) {
             if (this.flashOpacity > 0) {
                 this.flashOpacity -= 0.05 * (dt * 60);
-                ((this.flashSphere.material) as THREE.MeshBasicMaterial).opacity = Math.max(0, this.flashOpacity);
+                (this.flashSphere.material as THREE.MeshBasicMaterial).opacity = Math.max(
+                    0,
+                    this.flashOpacity
+                );
                 this.flashSphere.scale.setScalar(1 + (1 - this.flashOpacity) * 2); // Expand as it fades
             }
 

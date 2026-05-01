@@ -7,7 +7,11 @@ import { NEPTUNE_DIST, NEPTUNE_MASS, SUN_MASS, NEPTUNE_RADIUS } from '../utiliti
 import { IStateDependencies } from '../interfaces.js';
 
 export class Neptune extends CelestialBody {
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, neptuneTexture: THREE.Texture) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        neptuneTexture: THREE.Texture
+    ) {
         const trajectory = calculateTrajectory(NEPTUNE_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({

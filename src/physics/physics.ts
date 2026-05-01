@@ -9,7 +9,6 @@ export interface IRotation {
     speed: number;
 }
 
-
 /**
  * Calculate position and velocity for a circular orbit around a parent body
  * @param {number} distance The distance from the parent body at which the orbit is calculated

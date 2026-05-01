@@ -31,7 +31,12 @@ export class StarBirth implements IEffect {
      * @param {THREE.Vector3} pos
      * @param {number} radius
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, pos: THREE.Vector3, radius: number) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        pos: THREE.Vector3,
+        radius: number
+    ) {
         this.dependencies = dependencies;
         this.active = true;
         this.count = 1500; // Particles converging to form star

@@ -7,7 +7,7 @@ export class CoordinateGizmo {
     arrows: THREE.ArrowHelper[];
     velocityArrow: THREE.ArrowHelper;
     gravityArrow: THREE.ArrowHelper;
-    target: Body | null;  // The body this gizmo is attached to
+    target: Body | null; // The body this gizmo is attached to
     velocityHeadLength: number;
     velocityHeadWidth: number;
     gravityHeadLength: number;

@@ -1,4 +1,3 @@
-
 import * as THREE from 'three';
 
 // Global scaling factor for siphon stream speed (tweak for visual pacing)
@@ -168,9 +167,9 @@ export class MassSiphonEffect implements IEffect {
                 prev = pt;
             }
             // Set stream speed to match disk orbital speed visually
-            this.speedArr[i] = SIPHON_SPEED_SCALE * (diskOrbitalSpeed / pathLen) * (0.95 + Math.random() * 0.1);
+            this.speedArr[i] =
+                SIPHON_SPEED_SCALE * (diskOrbitalSpeed / pathLen) * (0.95 + Math.random() * 0.1);
         }
-
 
         const positions = new Float32Array(PARTICLE_COUNT * 3);
         const colors = new Float32Array(PARTICLE_COUNT * 3);
@@ -190,7 +189,7 @@ export class MassSiphonEffect implements IEffect {
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             depthTest: true,
-            vertexColors: true
+            vertexColors: true,
         });
 
         this.material.onBeforeCompile = (shader) => {
@@ -200,7 +199,8 @@ export class MassSiphonEffect implements IEffect {
             shader.uniforms.BRIGHTNESS = { value: 2.0 };
 
             // 2. Vertex Shader: Custom Size & Alpha Injection
-            shader.vertexShader = `
+            shader.vertexShader =
+                `
                 attribute float alpha;
                 attribute float tval;
                 varying float vAlpha;
@@ -221,7 +221,8 @@ export class MassSiphonEffect implements IEffect {
             );
 
             // 3. Fragment Shader: The "Square Killer" & Alpha Gradient
-            shader.fragmentShader = `
+            shader.fragmentShader =
+                `
                 varying float vAlpha;
                 uniform float BRIGHTNESS;
             ` + shader.fragmentShader;
@@ -235,9 +236,10 @@ export class MassSiphonEffect implements IEffect {
                     float mask = 1.0 - smoothstep(0.4, 0.5, dist);`
             );
 
-            // Force the final color to use your brightness and the CPU-sent alpha gradient
+            // Force the final color to use your brightness and the CPU-sent alpha gradient.
+            // This version of Three.js uses #include <opaque_fragment> (not <output_fragment>).
             shader.fragmentShader = shader.fragmentShader.replace(
-                'gl_FragColor = vec4( outgoingLight, diffuseColor.a );',
+                '#include <opaque_fragment>',
                 'gl_FragColor = vec4( outgoingLight * BRIGHTNESS, vAlpha * mask );'
             );
         };

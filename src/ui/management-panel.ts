@@ -203,8 +203,12 @@ export class ManagementPanel extends Panel {
         this.moonValidationMessage = document.getElementById('moonValidationMessage');
         this.planetTypeGroup = document.getElementById('planetTypeGroup');
         this.hasAtmosphereRow = document.getElementById('hasAtmosphereRow');
-        this.hasAtmosphereCheckbox = document.getElementById('hasAtmosphere') as HTMLInputElement | null;
-        this.randomizeCreateBtn = document.getElementById('randomizeCreateBtn') as HTMLButtonElement | null;
+        this.hasAtmosphereCheckbox = document.getElementById(
+            'hasAtmosphere'
+        ) as HTMLInputElement | null;
+        this.randomizeCreateBtn = document.getElementById(
+            'randomizeCreateBtn'
+        ) as HTMLButtonElement | null;
         this.randomizeCreateRow = document.getElementById('randomizeCreateRow');
 
         // Create numeric inputs (custom planets/moons/stars)
@@ -212,17 +216,25 @@ export class ManagementPanel extends Panel {
         this.createMassInput = document.getElementById('createMass') as HTMLInputElement | null;
         this.createMassDisplay = document.getElementById('create-mass-val');
         this.createTemperatureGroup = document.getElementById('createTemperatureGroup');
-        this.createTemperatureSlider = document.getElementById('createTemperature') as HTMLInputElement | null;
+        this.createTemperatureSlider = document.getElementById(
+            'createTemperature'
+        ) as HTMLInputElement | null;
         this.createTemperatureDisplay = document.getElementById('create-temp-val');
         this.createLightIntensityGroup = document.getElementById('createLightIntensityGroup');
-        this.createLightIntensitySlider = document.getElementById('createLightIntensity') as HTMLInputElement | null;
+        this.createLightIntensitySlider = document.getElementById(
+            'createLightIntensity'
+        ) as HTMLInputElement | null;
         this.createLightIntensityDisplay = document.getElementById('create-light-intensity-val');
         this.createRadiusGroup = document.getElementById('createRadiusGroup');
-        this.createRadiusSlider = document.getElementById('createRadius') as HTMLInputElement | null;
+        this.createRadiusSlider = document.getElementById(
+            'createRadius'
+        ) as HTMLInputElement | null;
         this.createRadiusDisplay = document.getElementById('create-radius-val');
 
         this.createBodyBtn = document.getElementById('createBodyBtn') as HTMLButtonElement | null;
-        this.cancelCreateBtn = document.getElementById('cancelCreateBtn') as HTMLButtonElement | null;
+        this.cancelCreateBtn = document.getElementById(
+            'cancelCreateBtn'
+        ) as HTMLButtonElement | null;
         this.randomizeCreateRow = document.getElementById('randomizeCreateRow');
 
         this.editBodyBtn = document.getElementById('editBodyBtn') as HTMLButtonElement | null;
@@ -237,23 +249,33 @@ export class ManagementPanel extends Panel {
         this.editTempGroup = document.getElementById('editTempGroup');
         this.editColorInput = document.getElementById('editColor') as HTMLInputElement | null;
         this.editLightIntensityGroup = document.getElementById('editLightIntensityGroup');
-        this.editLightIntensitySlider = document.getElementById('editLightIntensity') as HTMLInputElement | null;
+        this.editLightIntensitySlider = document.getElementById(
+            'editLightIntensity'
+        ) as HTMLInputElement | null;
         this.editLightIntensityDisplay = document.getElementById('edit-light-intensity-val');
         this.editRadiusGroup = document.getElementById('editRadiusGroup');
         this.editRadiusSlider = document.getElementById('editRadius') as HTMLInputElement | null;
         this.editRadiusDisplay = document.getElementById('edit-radius-val');
-        this.editVelocitySlider = document.getElementById('editVelocity') as HTMLInputElement | null;
+        this.editVelocitySlider = document.getElementById(
+            'editVelocity'
+        ) as HTMLInputElement | null;
         this.editVelocityDisplay = document.getElementById('edit-velocity-val');
-        this.editOrbitalAngleSlider = document.getElementById('editOrbitalAngle') as HTMLInputElement | null;
+        this.editOrbitalAngleSlider = document.getElementById(
+            'editOrbitalAngle'
+        ) as HTMLInputElement | null;
         this.editOrbitalAngleDisplay = document.getElementById('edit-orbital-angle-val');
-        this.editInclinationSlider = document.getElementById('editInclination') as HTMLInputElement | null;
+        this.editInclinationSlider = document.getElementById(
+            'editInclination'
+        ) as HTMLInputElement | null;
         this.editInclinationDisplay = document.getElementById('edit-inclination-val');
         this.applyEditBtn = document.getElementById('applyEditBtn') as HTMLButtonElement | null;
         this.deleteBodyBtn = document.getElementById('deleteBodyBtn') as HTMLButtonElement | null;
         this.cancelEditBtn = document.getElementById('cancelEditBtn') as HTMLButtonElement | null;
 
         // Environment toggles (owned by ManagementPanel)
-        this.enableKuiperBeltCheckbox = document.getElementById('enableKuiperBelt') as HTMLInputElement | null;
+        this.enableKuiperBeltCheckbox = document.getElementById(
+            'enableKuiperBelt'
+        ) as HTMLInputElement | null;
 
         if (this.enableKuiperBeltCheckbox) {
             const kuiperBeltCheckbox = this.enableKuiperBeltCheckbox;
@@ -413,13 +435,15 @@ export class ManagementPanel extends Panel {
                 if (this.createMassGroup) this.createMassGroup.style.display = 'block';
                 if (this.createRadiusGroup) this.createRadiusGroup.style.display = 'block';
                 if (this.createTemperatureGroup) this.createTemperatureGroup.style.display = 'none';
-                if (this.createLightIntensityGroup) this.createLightIntensityGroup.style.display = 'none';
+                if (this.createLightIntensityGroup)
+                    this.createLightIntensityGroup.style.display = 'none';
                 if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'none';
                 if (this.inclinationGroup) this.inclinationGroup.style.display = 'none';
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
                 if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
-                if (this.moonValidationMessage) this.moonValidationMessage.classList.remove('visible');
+                if (this.moonValidationMessage)
+                    this.moonValidationMessage.classList.remove('visible');
                 if (this.createBodyBtn) this.createBodyBtn.disabled = false;
 
                 syncCreateDisplay(this.createMassInput, this.createMassDisplay, (value) =>
@@ -521,7 +545,11 @@ export class ManagementPanel extends Panel {
                 createMassDisplay.textContent = this.formatMassForDisplay(value);
 
                 // For black holes, recompute the radius slider from the new mass
-                if (this.getSelectedBodyType() === 'black_hole' && this.createRadiusSlider && this.createRadiusDisplay) {
+                if (
+                    this.getSelectedBodyType() === 'black_hole' &&
+                    this.createRadiusSlider &&
+                    this.createRadiusDisplay
+                ) {
                     const BH_BASE_MASS = 3 * SUN_MASS;
                     const BH_BASE_RADIUS = 1 * SCALE_FACTOR;
                     const bhRadius = Math.max(
@@ -1061,7 +1089,9 @@ export class ManagementPanel extends Panel {
 
     getSelectedOrbitType(): string {
         const circularRadio = document.getElementById('orbitCircular') as HTMLInputElement | null;
-        const ellipticalRadio = document.getElementById('orbitElliptical') as HTMLInputElement | null;
+        const ellipticalRadio = document.getElementById(
+            'orbitElliptical'
+        ) as HTMLInputElement | null;
         if (circularRadio && circularRadio.checked) return 'circular';
         if (ellipticalRadio && ellipticalRadio.checked) return 'elliptical';
         return 'circular';
@@ -1069,8 +1099,12 @@ export class ManagementPanel extends Panel {
 
     getSelectedPlanetType(): string {
         const solidRadio = document.getElementById('planetTypeSolid') as HTMLInputElement | null;
-        const gasGiantRadio = document.getElementById('planetTypeGasGiant') as HTMLInputElement | null;
-        const iceGiantRadio = document.getElementById('planetTypeIceGiant') as HTMLInputElement | null;
+        const gasGiantRadio = document.getElementById(
+            'planetTypeGasGiant'
+        ) as HTMLInputElement | null;
+        const iceGiantRadio = document.getElementById(
+            'planetTypeIceGiant'
+        ) as HTMLInputElement | null;
 
         if (gasGiantRadio && gasGiantRadio.checked) return 'gas_giant';
         if (iceGiantRadio && iceGiantRadio.checked) return 'ice_giant';
@@ -1102,7 +1136,11 @@ export class ManagementPanel extends Panel {
     setSelectedBody(body: Body | null): void {
         this.selectedBody = body;
 
-        const setGroupVisible = (el: HTMLElement | null, visible: boolean, display = 'block'): void => {
+        const setGroupVisible = (
+            el: HTMLElement | null,
+            visible: boolean,
+            display = 'block'
+        ): void => {
             if (!el) return;
             el.style.display = visible ? display : 'none';
         };
@@ -1225,7 +1263,8 @@ export class ManagementPanel extends Panel {
         }
 
         if (this.editMassInput && this.editMassDisplay) {
-            const mass = typeof body.mass === 'number' && isFinite(body.mass) ? body.mass : this.MASS_MIN;
+            const mass =
+                typeof body.mass === 'number' && isFinite(body.mass) ? body.mass : this.MASS_MIN;
             const clampedMass = this.clampMassValue(mass);
             this.editMassInput.value = String(clampedMass);
             this.editMassInput.min = '0.001';

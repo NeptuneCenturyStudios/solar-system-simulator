@@ -7,7 +7,11 @@ import { SATURN_DIST, SATURN_MASS, SUN_MASS, SATURN_RADIUS } from '../utilities/
 import { IStateDependencies } from '../interfaces.js';
 
 export class Saturn extends CelestialBody {
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, saturnTexture: THREE.Texture) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        saturnTexture: THREE.Texture
+    ) {
         const trajectory = calculateTrajectory(SATURN_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({

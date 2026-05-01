@@ -55,12 +55,8 @@ export class Asteroid extends CelestialBody {
             throw new Error('Asteroid requires { pos, vel }');
         }
 
-        const posVec = Array.isArray(pos)
-            ? new THREE.Vector3(pos[0], pos[1], pos[2])
-            : pos;
-        const velVec = Array.isArray(vel)
-            ? new THREE.Vector3(vel[0], vel[1], vel[2])
-            : vel;
+        const posVec = Array.isArray(pos) ? new THREE.Vector3(pos[0], pos[1], pos[2]) : pos;
+        const velVec = Array.isArray(vel) ? new THREE.Vector3(vel[0], vel[1], vel[2]) : vel;
 
         const material = new THREE.MeshStandardMaterial({
             color: color,
@@ -70,7 +66,9 @@ export class Asteroid extends CelestialBody {
             metalness: metalness,
         });
 
-        console.log(`Creating asteroid with radius ${radius.toFixed(2)}, mass ${mass.toFixed(3)}, color #${Math.floor(color).toString(16)}`);
+        console.log(
+            `Creating asteroid with radius ${radius.toFixed(2)}, mass ${mass.toFixed(3)}, color #${Math.floor(color).toString(16)}`
+        );
 
         super(
             deps,

@@ -24,7 +24,12 @@ export class Corona implements IEffect {
     private material: THREE.PointsMaterial;
     private geometry: THREE.BufferGeometry;
 
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, radius: number, glowHex = 0xffffcc) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        radius: number,
+        glowHex = 0xffffcc
+    ) {
         this.dependencies = dependencies;
         this.scene = scene;
         this.active = true;

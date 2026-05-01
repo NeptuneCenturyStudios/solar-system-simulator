@@ -243,8 +243,9 @@ export class BlackHole extends CelestialBody {
          if (dist > 0.5) discard; // Hard-kills the square corners
          float strength = smoothstep(0.5, 0.1, dist);`
             );
+            // Replace the include directive (the expanded gl_FragColor line doesn't exist in onBeforeCompile)
             shader.fragmentShader = shader.fragmentShader.replace(
-                'gl_FragColor = vec4( outgoingLight, diffuseColor.a );',
+                '#include <opaque_fragment>',
                 'gl_FragColor = vec4( outgoingLight, vAlpha * strength );'
             );
         };
@@ -295,40 +296,46 @@ export class BlackHole extends CelestialBody {
         const opacities = new Float32Array(jetCount);
         for (let i = 0; i < jetCount; i++) opacities[i] = 1.0;
         geo.setAttribute('alpha', new THREE.BufferAttribute(opacities, 1));
-        const mat = new THREE.ShaderMaterial({
-            uniforms: {
-                pointSize: { value: BLACK_HOLE_JET_POINT_SIZE * r },
-            },
-            vertexShader: `
-                precision mediump float;
-                attribute vec3 color;
-                attribute float alpha;
-                varying vec3 vColor;
-                varying float vAlpha;
-                uniform float pointSize;
-                void main() {
-                    vColor = color;
-                    vAlpha = alpha;
-                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                    gl_PointSize = pointSize * (300.0 / -mvPosition.z);
-                    gl_Position = projectionMatrix * mvPosition;
-                }
-            `,
-            fragmentShader: `
-                precision mediump float;
-                varying vec3 vColor;
-                varying float vAlpha;
-                void main() {
-                    float dist = length(gl_PointCoord - vec2(0.5));
-                    float alpha = vAlpha * smoothstep(0.5, 0.48, 0.5 - dist);
-                    gl_FragColor = vec4(vColor, alpha);
-                    if (gl_FragColor.a < 0.01) discard;
-                }
-            `,
+        const mat = new THREE.PointsMaterial({
+            size: BLACK_HOLE_JET_POINT_SIZE * r,
+            sizeAttenuation: true,
+            vertexColors: true,
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
+            depthTest: true,
         });
+
+        mat.onBeforeCompile = (shader) => {
+            // Vertex: pass alpha attribute through to fragment
+            shader.vertexShader =
+                `
+                attribute float alpha;
+                varying float vAlpha;
+            ` + shader.vertexShader;
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <begin_vertex>',
+                `#include <begin_vertex>
+                vAlpha = alpha;`
+            );
+
+            // Fragment: circular discard + per-particle alpha
+            shader.fragmentShader =
+                `
+                varying float vAlpha;
+            ` + shader.fragmentShader;
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'void main() {',
+                `void main() {
+                float dist = length(gl_PointCoord - vec2(0.5));
+                if (dist > 0.5) discard;
+                float jetAlpha = vAlpha * smoothstep(0.5, 0.1, dist);`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <opaque_fragment>',
+                'gl_FragColor = vec4( outgoingLight, jetAlpha );'
+            );
+        };
         const points = new THREE.Points(geo, mat);
         points.frustumCulled = false;
         this.scene.add(points);
@@ -343,8 +350,8 @@ export class BlackHole extends CelestialBody {
         }
 
         if (this.jet) {
-            const mat = this.jet.points.material as THREE.ShaderMaterial;
-            mat.uniforms.pointSize.value = BLACK_HOLE_JET_POINT_SIZE * newRadius;
+            const mat = this.jet.points.material as THREE.PointsMaterial;
+            mat.size = BLACK_HOLE_JET_POINT_SIZE * newRadius;
         }
 
         // Recreate accretion disk so particle count and radii match the new size
@@ -460,11 +467,11 @@ export class BlackHole extends CelestialBody {
         // Update jet
         if (this.jet) {
             const absDt = Math.abs(dt);
-            // Update point size uniform to match current radius
+            // Update point size to match current radius
             const r = this.radius;
-            const mat = this.jet.points.material as THREE.ShaderMaterial;
-            if (mat.uniforms.pointSize.value !== BLACK_HOLE_JET_POINT_SIZE * r) {
-                mat.uniforms.pointSize.value = BLACK_HOLE_JET_POINT_SIZE * r;
+            const mat = this.jet.points.material as THREE.PointsMaterial;
+            if (mat.size !== BLACK_HOLE_JET_POINT_SIZE * r) {
+                mat.size = BLACK_HOLE_JET_POINT_SIZE * r;
             }
             if (absDt > 0) {
                 const { points, velocities, ages, origins, maxAge } = this.jet;

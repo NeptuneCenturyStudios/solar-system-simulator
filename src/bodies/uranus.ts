@@ -7,7 +7,11 @@ import { SUN_MASS, URANUS_DIST, URANUS_MASS, URANUS_RADIUS } from '../utilities/
 import { IStateDependencies } from '../interfaces.js';
 
 export class Uranus extends CelestialBody {
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, uranusTexture: THREE.Texture) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        uranusTexture: THREE.Texture
+    ) {
         const trajectory = calculateTrajectory(URANUS_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({

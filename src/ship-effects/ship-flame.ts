@@ -48,11 +48,11 @@ export class ShipFlame implements IShipEffect {
     private readonly vx: Float32Array;
     private readonly vy: Float32Array;
     private readonly vz: Float32Array;
-    private readonly life:          Float32Array;
+    private readonly life: Float32Array;
     private readonly lifeIncrement: Float32Array;
 
     // ── GPU upload buffers (compacted live-particle data) ─────────────────────
-    private readonly gpuPos:        Float32Array;
+    private readonly gpuPos: Float32Array;
     private readonly gpuColorInner: Float32Array;
     private readonly gpuColorOuter: Float32Array;
 
@@ -67,29 +67,30 @@ export class ShipFlame implements IShipEffect {
     constructor(scene: THREE.Scene) {
         this.scene = scene;
 
-        this.px           = new Float32Array(MAX_PARTICLES);
-        this.py           = new Float32Array(MAX_PARTICLES);
-        this.pz           = new Float32Array(MAX_PARTICLES);
-        this.vx           = new Float32Array(MAX_PARTICLES);
-        this.vy           = new Float32Array(MAX_PARTICLES);
-        this.vz           = new Float32Array(MAX_PARTICLES);
-        this.life          = new Float32Array(MAX_PARTICLES).fill(DEAD);
+        this.px = new Float32Array(MAX_PARTICLES);
+        this.py = new Float32Array(MAX_PARTICLES);
+        this.pz = new Float32Array(MAX_PARTICLES);
+        this.vx = new Float32Array(MAX_PARTICLES);
+        this.vy = new Float32Array(MAX_PARTICLES);
+        this.vz = new Float32Array(MAX_PARTICLES);
+        this.life = new Float32Array(MAX_PARTICLES).fill(DEAD);
         this.lifeIncrement = new Float32Array(MAX_PARTICLES);
 
-        this.gpuPos        = new Float32Array(MAX_PARTICLES * 3);
+        this.gpuPos = new Float32Array(MAX_PARTICLES * 3);
         this.gpuColorInner = new Float32Array(MAX_PARTICLES * 3);
         this.gpuColorOuter = new Float32Array(MAX_PARTICLES * 3);
 
         // ── Shared radial-gradient flame texture ─────────────────────────────
         const tc = document.createElement('canvas');
         const GS = 128;
-        tc.width = GS; tc.height = GS;
+        tc.width = GS;
+        tc.height = GS;
         const ctx = tc.getContext('2d')!;
         const grad = ctx.createRadialGradient(GS / 2, GS / 2, 0, GS / 2, GS / 2, GS / 2);
-        grad.addColorStop(0,    'rgba(255, 255, 255, 1.0)');
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
         grad.addColorStop(0.25, 'rgba(255, 255, 255, 0.8)');
-        grad.addColorStop(0.6,  'rgba(255, 255, 255, 0.3)');
-        grad.addColorStop(1,    'rgba(255, 255, 255, 0.0)');
+        grad.addColorStop(0.6, 'rgba(255, 255, 255, 0.3)');
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, GS, GS);
         const flameTex = new THREE.CanvasTexture(tc);
@@ -97,7 +98,7 @@ export class ShipFlame implements IShipEffect {
         // ── Inner glow (tight, hot core) ─────────────────────────────────────
         this.innerGeo = new THREE.BufferGeometry();
         this.innerGeo.setAttribute('position', new THREE.BufferAttribute(this.gpuPos, 3));
-        this.innerGeo.setAttribute('color',    new THREE.BufferAttribute(this.gpuColorInner, 3));
+        this.innerGeo.setAttribute('color', new THREE.BufferAttribute(this.gpuColorInner, 3));
         this.innerGeo.setDrawRange(0, 0);
 
         this.innerMat = new THREE.PointsMaterial({
@@ -120,7 +121,7 @@ export class ShipFlame implements IShipEffect {
         // ── Outer glow (broad, soft halo) ────────────────────────────────────
         this.outerGeo = new THREE.BufferGeometry();
         this.outerGeo.setAttribute('position', new THREE.BufferAttribute(this.gpuPos, 3));
-        this.outerGeo.setAttribute('color',    new THREE.BufferAttribute(this.gpuColorOuter, 3));
+        this.outerGeo.setAttribute('color', new THREE.BufferAttribute(this.gpuColorOuter, 3));
         this.outerGeo.setDrawRange(0, 0);
 
         this.outerMat = new THREE.PointsMaterial({
@@ -179,16 +180,20 @@ export class ShipFlame implements IShipEffect {
         thrusting: boolean,
         shipVelocity: THREE.Vector3,
         exhaustDir: THREE.Vector3,
-        dt: number,
+        dt: number
     ): void {
         const absDt = Math.abs(dt);
         // speedFactor for brightness: 0 at rest, 1 at maxSpeed
-        const speedFactor = THREE.MathUtils.clamp(Math.abs(speed) / Math.max(maxSpeed * 0.25, 1), 0, 1);
+        const speedFactor = THREE.MathUtils.clamp(
+            Math.abs(speed) / Math.max(maxSpeed * 0.25, 1),
+            0,
+            1
+        );
 
         // ── 1. Age live particles (sim-time based, comet pattern) ─────────────
         for (let i = 0; i < MAX_PARTICLES; i++) {
             if (this.life[i] < 0) continue;
-            this.life[i] += this.lifeIncrement[i] * absDt *32;
+            this.life[i] += this.lifeIncrement[i] * absDt * 32;
             if (this.life[i] >= 1.0) {
                 this.life[i] = DEAD;
             }
@@ -207,16 +212,19 @@ export class ShipFlame implements IShipEffect {
         // ── 3. Emit new particles ─────────────────────────────────────────────
         if (thrusting) {
             // Build a tangent basis perpendicular to exhaustDir for cone spread
-            const upRef = Math.abs(exhaustDir.y) < 0.9
-                ? new THREE.Vector3(0, 1, 0)
-                : new THREE.Vector3(1, 0, 0);
+            const upRef =
+                Math.abs(exhaustDir.y) < 0.9
+                    ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(1, 0, 0);
             const perp1 = new THREE.Vector3().crossVectors(exhaustDir, upRef).normalize();
             const perp2 = new THREE.Vector3().crossVectors(exhaustDir, perp1);
 
             // Emit count scales with speed; no longer driven by travel distance so spawn
             // positions always come from the nozzle regardless of ship movement direction.
-            const nEmit = Math.min(EMIT_MAX, Math.max(EMIT_MIN,
-                Math.round(EMIT_MIN + (EMIT_MAX - EMIT_MIN) * speedFactor)));
+            const nEmit = Math.min(
+                EMIT_MAX,
+                Math.max(EMIT_MIN, Math.round(EMIT_MIN + (EMIT_MAX - EMIT_MIN) * speedFactor))
+            );
 
             // Scale particle lifetime so pool stays under 50% full at any emit rate.
             const adjustedLifetime = Math.min(
@@ -229,13 +237,19 @@ export class ShipFlame implements IShipEffect {
                 if (this.life[i] >= 0) continue; // slot in use
 
                 // Random cone scatter within EXHAUST_SPREAD
-                const phi   = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI * 2;
                 const theta = Math.random() * EXHAUST_SPREAD;
-                const cosT  = Math.cos(theta);
-                const sinT  = Math.sin(theta);
-                const dx = exhaustDir.x * cosT + (perp1.x * Math.cos(phi) + perp2.x * Math.sin(phi)) * sinT;
-                const dy = exhaustDir.y * cosT + (perp1.y * Math.cos(phi) + perp2.y * Math.sin(phi)) * sinT;
-                const dz = exhaustDir.z * cosT + (perp1.z * Math.cos(phi) + perp2.z * Math.sin(phi)) * sinT;
+                const cosT = Math.cos(theta);
+                const sinT = Math.sin(theta);
+                const dx =
+                    exhaustDir.x * cosT +
+                    (perp1.x * Math.cos(phi) + perp2.x * Math.sin(phi)) * sinT;
+                const dy =
+                    exhaustDir.y * cosT +
+                    (perp1.y * Math.cos(phi) + perp2.y * Math.sin(phi)) * sinT;
+                const dz =
+                    exhaustDir.z * cosT +
+                    (perp1.z * Math.cos(phi) + perp2.z * Math.sin(phi)) * sinT;
 
                 // Particle velocity: exhaust direction × drift speed (absolute world space).
                 // Particles always eject opposite the ship's facing direction regardless of
@@ -255,8 +269,8 @@ export class ShipFlame implements IShipEffect {
                 // plume length. Pre-age each particle proportionally so the plume has
                 // uniform density on every frame instead of emitting discrete clumps.
                 const plumeLength = EXHAUST_DRIFT_SPEED * adjustedLifetime;
-                const depthFrac   = Math.random();
-                const depth       = depthFrac * plumeLength;
+                const depthFrac = Math.random();
+                const depth = depthFrac * plumeLength;
                 this.px[i] = nozzle.x + exhaustDir.x * depth;
                 this.py[i] = nozzle.y + exhaustDir.y * depth;
                 this.pz[i] = nozzle.z + exhaustDir.z * depth;
@@ -273,22 +287,22 @@ export class ShipFlame implements IShipEffect {
         let n = 0;
         for (let i = 0; i < MAX_PARTICLES; i++) {
             if (this.life[i] < 0) continue;
-            const t     = this.life[i];       // 0 = birth, 1 = death
+            const t = this.life[i]; // 0 = birth, 1 = death
             const alive = 1 - t;
 
-            this.gpuPos[n * 3]     = this.px[i];
+            this.gpuPos[n * 3] = this.px[i];
             this.gpuPos[n * 3 + 1] = this.py[i];
             this.gpuPos[n * 3 + 2] = this.pz[i];
 
             // Inner core: white-hot at birth → yellow → orange → dim red at death
             const hot = alive * speedFactor;
-            this.gpuColorInner[n * 3]     = hot;                          // R: full
-            this.gpuColorInner[n * 3 + 1] = hot * (0.6 + 0.4 * alive);   // G: high when young (white/yellow), low when old (red)
-            this.gpuColorInner[n * 3 + 2] = hot * 0.15 * alive;          // B: slight white tint only at birth
+            this.gpuColorInner[n * 3] = hot; // R: full
+            this.gpuColorInner[n * 3 + 1] = hot * (0.6 + 0.4 * alive); // G: high when young (white/yellow), low when old (red)
+            this.gpuColorInner[n * 3 + 2] = hot * 0.15 * alive; // B: slight white tint only at birth
 
             // Outer glow: orange halo, fades faster than inner
             const warm = alive * alive * speedFactor;
-            this.gpuColorOuter[n * 3]     = warm;
+            this.gpuColorOuter[n * 3] = warm;
             this.gpuColorOuter[n * 3 + 1] = warm * 0.35;
             this.gpuColorOuter[n * 3 + 2] = 0;
 
@@ -296,9 +310,9 @@ export class ShipFlame implements IShipEffect {
         }
 
         this.innerGeo.attributes.position.needsUpdate = true;
-        this.innerGeo.attributes.color.needsUpdate    = true;
+        this.innerGeo.attributes.color.needsUpdate = true;
         this.outerGeo.attributes.position.needsUpdate = true;
-        this.outerGeo.attributes.color.needsUpdate    = true;
+        this.outerGeo.attributes.color.needsUpdate = true;
         this.innerGeo.setDrawRange(0, n);
         this.outerGeo.setDrawRange(0, n);
 

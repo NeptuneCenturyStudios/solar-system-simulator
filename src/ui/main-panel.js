@@ -326,11 +326,13 @@ export class MainPanel extends Panel {
                                                   const isSel =
                                                       this._selectedBodyRef &&
                                                       r.body === this._selectedBodyRef;
-                                                  const isApTarget = autopilotTarget && r.body === autopilotTarget;
+                                                  const isApTarget =
+                                                      autopilotTarget && r.body === autopilotTarget;
                                                   // Show "Fly Here" only for non-ship bodies when a ship exists
-                                                  const flyBtnHtml = (!r.isShip && hasShip)
-                                                      ? `<td style="padding:2px 4px;"><button class="fly-here-btn${isApTarget ? ' active' : ''}" data-flyhere="1" title="${isApTarget ? 'Cancel autopilot' : 'Fly to this body'}" style="font-size:0.72em;padding:2px 6px;cursor:pointer;">${isApTarget ? '✕' : '✈'}</button></td>`
-                                                      : `<td></td>`;
+                                                  const flyBtnHtml =
+                                                      !r.isShip && hasShip
+                                                          ? `<td style="padding:2px 4px;"><button class="fly-here-btn${isApTarget ? ' active' : ''}" data-flyhere="1" title="${isApTarget ? 'Cancel autopilot' : 'Fly to this body'}" style="font-size:0.72em;padding:2px 6px;cursor:pointer;">${isApTarget ? '✕' : '✈'}</button></td>`
+                                                          : `<td></td>`;
                                                   return `
                                                       <tr class="${isSel ? 'selected' : ''}" data-row="1">
                                                           <td>${escapeHtml(r.name || 'Unnamed')}</td>

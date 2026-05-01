@@ -5,7 +5,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 
 /** Maximum number of recorded path positions kept in the ring buffer. */
-const MAX_HISTORY  = 300;
+const MAX_HISTORY = 300;
 /** Maximum line segments = MAX_HISTORY - 1. */
 const MAX_SEGMENTS = MAX_HISTORY - 1;
 /** How long (sim-seconds) each recorded point persists before expiring from the tail. */
@@ -40,7 +40,7 @@ export class ShipTrail {
 
     // ── Path ring buffer ──────────────────────────────────────────────────────
     private readonly pts: THREE.Vector3[] = [];
-    private readonly ptTimes: number[]    = [];
+    private readonly ptTimes: number[] = [];
     private simTime = 0;
 
     // ── Line2 geometry (two overlapping lines for core + glow) ───────────────
@@ -56,13 +56,13 @@ export class ShipTrail {
     // Each buffer holds MAX_SEGMENTS segment pairs in the format:
     //   [startX, startY, startZ, endX, endY, endZ,  startX, startY, ...]
     // Positions are shared between coreLine and glowLine via the same IB; colours differ.
-    private readonly _posArr:     Float32Array;
+    private readonly _posArr: Float32Array;
     private readonly _colCoreArr: Float32Array;
     private readonly _colGlowArr: Float32Array;
-    private readonly _posIBCore:  THREE.InterleavedBuffer;
-    private readonly _posIBGlow:  THREE.InterleavedBuffer;
-    private readonly _colCoreIB:  THREE.InterleavedBuffer;
-    private readonly _colGlowIB:  THREE.InterleavedBuffer;
+    private readonly _posIBCore: THREE.InterleavedBuffer;
+    private readonly _posIBGlow: THREE.InterleavedBuffer;
+    private readonly _colCoreIB: THREE.InterleavedBuffer;
+    private readonly _colGlowIB: THREE.InterleavedBuffer;
 
     private readonly _onResize: () => void;
 
@@ -72,14 +72,14 @@ export class ShipTrail {
         // ── Pre-allocate working buffers ──────────────────────────────────────
         // Two separate InstancedInterleavedBuffer objects share the SAME underlying
         // Float32Array for positions — updating _posArr updates both cheaply.
-        this._posArr     = new Float32Array(MAX_SEGMENTS * 6);
+        this._posArr = new Float32Array(MAX_SEGMENTS * 6);
         this._colCoreArr = new Float32Array(MAX_SEGMENTS * 6);
         this._colGlowArr = new Float32Array(MAX_SEGMENTS * 6);
 
-        this._posIBCore  = new THREE.InstancedInterleavedBuffer(this._posArr, 6, 1);
-        this._posIBGlow  = new THREE.InstancedInterleavedBuffer(this._posArr, 6, 1);
-        this._colCoreIB  = new THREE.InstancedInterleavedBuffer(this._colCoreArr, 6, 1);
-        this._colGlowIB  = new THREE.InstancedInterleavedBuffer(this._colGlowArr, 6, 1);
+        this._posIBCore = new THREE.InstancedInterleavedBuffer(this._posArr, 6, 1);
+        this._posIBGlow = new THREE.InstancedInterleavedBuffer(this._posArr, 6, 1);
+        this._colCoreIB = new THREE.InstancedInterleavedBuffer(this._colCoreArr, 6, 1);
+        this._colGlowIB = new THREE.InstancedInterleavedBuffer(this._colGlowArr, 6, 1);
 
         // ── Core line (narrow, near-white) ────────────────────────────────────
         // Attributes are set directly so setPositions/setColors are never called,
@@ -87,25 +87,41 @@ export class ShipTrail {
         this.coreGeo = new LineGeometry();
         this.coreGeo.setAttribute(
             'instanceStart',
-            new THREE.InterleavedBufferAttribute(this._posIBCore, 3, 0) as unknown as THREE.BufferAttribute
+            new THREE.InterleavedBufferAttribute(
+                this._posIBCore,
+                3,
+                0
+            ) as unknown as THREE.BufferAttribute
         );
         this.coreGeo.setAttribute(
             'instanceEnd',
-            new THREE.InterleavedBufferAttribute(this._posIBCore, 3, 3) as unknown as THREE.BufferAttribute
+            new THREE.InterleavedBufferAttribute(
+                this._posIBCore,
+                3,
+                3
+            ) as unknown as THREE.BufferAttribute
         );
         this.coreGeo.setAttribute(
             'instanceColorStart',
-            new THREE.InterleavedBufferAttribute(this._colCoreIB, 3, 0) as unknown as THREE.BufferAttribute
+            new THREE.InterleavedBufferAttribute(
+                this._colCoreIB,
+                3,
+                0
+            ) as unknown as THREE.BufferAttribute
         );
         this.coreGeo.setAttribute(
             'instanceColorEnd',
-            new THREE.InterleavedBufferAttribute(this._colCoreIB, 3, 3) as unknown as THREE.BufferAttribute
+            new THREE.InterleavedBufferAttribute(
+                this._colCoreIB,
+                3,
+                3
+            ) as unknown as THREE.BufferAttribute
         );
         this.coreGeo.instanceCount = 0;
 
         this.coreMat = new LineMaterial({
             vertexColors: true,
-            linewidth: 3,           // pixels
+            linewidth: 3, // pixels
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -123,25 +139,41 @@ export class ShipTrail {
         this.glowGeo = new LineGeometry();
         this.glowGeo.setAttribute(
             'instanceStart',
-            new THREE.InterleavedBufferAttribute(this._posIBGlow, 3, 0) as unknown as THREE.BufferAttribute
+            new THREE.InterleavedBufferAttribute(
+                this._posIBGlow,
+                3,
+                0
+            ) as unknown as THREE.BufferAttribute
         );
         this.glowGeo.setAttribute(
             'instanceEnd',
-            new THREE.InterleavedBufferAttribute(this._posIBGlow, 3, 3) as unknown as THREE.BufferAttribute
+            new THREE.InterleavedBufferAttribute(
+                this._posIBGlow,
+                3,
+                3
+            ) as unknown as THREE.BufferAttribute
         );
         this.glowGeo.setAttribute(
             'instanceColorStart',
-            new THREE.InterleavedBufferAttribute(this._colGlowIB, 3, 0) as unknown as THREE.BufferAttribute
+            new THREE.InterleavedBufferAttribute(
+                this._colGlowIB,
+                3,
+                0
+            ) as unknown as THREE.BufferAttribute
         );
         this.glowGeo.setAttribute(
             'instanceColorEnd',
-            new THREE.InterleavedBufferAttribute(this._colGlowIB, 3, 3) as unknown as THREE.BufferAttribute
+            new THREE.InterleavedBufferAttribute(
+                this._colGlowIB,
+                3,
+                3
+            ) as unknown as THREE.BufferAttribute
         );
         this.glowGeo.instanceCount = 0;
 
         this.glowMat = new LineMaterial({
             vertexColors: true,
-            linewidth: 12,          // pixels
+            linewidth: 12, // pixels
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -165,7 +197,7 @@ export class ShipTrail {
 
     /** Clear the path buffer and hide the trail. Call when entering flight mode. */
     init(): void {
-        this.pts.length     = 0;
+        this.pts.length = 0;
         this.ptTimes.length = 0;
         this.simTime = 0;
         this.coreGeo.instanceCount = 0;
@@ -192,7 +224,7 @@ export class ShipTrail {
         recording: boolean,
         _shipVelocity: THREE.Vector3,
         _exhaustDir: THREE.Vector3,
-        dt: number,
+        dt: number
     ): void {
         const absDt = Math.abs(dt);
         this.simTime += absDt;
@@ -200,7 +232,8 @@ export class ShipTrail {
         // speedFactor: 0 at rest → 1 at ≥20% of current speed ceiling
         const speedFactor = THREE.MathUtils.clamp(
             Math.abs(speed) / Math.max(maxSpeed * 0.2, 1),
-            0, 1
+            0,
+            1
         );
 
         // ── 1. Expire old tail points ─────────────────────────────────────────
@@ -222,7 +255,7 @@ export class ShipTrail {
             }
         }
 
-        const n    = this.pts.length;
+        const n = this.pts.length;
         const segs = n - 1;
 
         if (n < 2) {
@@ -234,7 +267,7 @@ export class ShipTrail {
         }
 
         // ── 3. Write segment data into pre-allocated buffers (zero heap alloc) ─
-        const posArr     = this._posArr;
+        const posArr = this._posArr;
         const colCoreArr = this._colCoreArr;
         const colGlowArr = this._colGlowArr;
 
@@ -254,25 +287,33 @@ export class ShipTrail {
             // Fade: age=0 (newest) → t=1 full brightness; age=LIFETIME → t=0 black
             const age0 = this.simTime - this.ptTimes[i];
             const age1 = this.simTime - this.ptTimes[i + 1];
-            const t0   = Math.max(0, 1 - age0 / TRAIL_LIFETIME);
-            const t1   = Math.max(0, 1 - age1 / TRAIL_LIFETIME);
-            const f0   = t0 * t0 * speedFactor;
-            const f1   = t1 * t1 * speedFactor;
+            const t0 = Math.max(0, 1 - age0 / TRAIL_LIFETIME);
+            const t1 = Math.max(0, 1 - age1 / TRAIL_LIFETIME);
+            const f0 = t0 * t0 * speedFactor;
+            const f1 = t1 * t1 * speedFactor;
 
             // Core: bright white/pale-blue
-            colCoreArr[i * 6 + 0] = f0 * 0.85; colCoreArr[i * 6 + 1] = f0 * 0.95; colCoreArr[i * 6 + 2] = f0;
-            colCoreArr[i * 6 + 3] = f1 * 0.85; colCoreArr[i * 6 + 4] = f1 * 0.95; colCoreArr[i * 6 + 5] = f1;
+            colCoreArr[i * 6 + 0] = f0 * 0.85;
+            colCoreArr[i * 6 + 1] = f0 * 0.95;
+            colCoreArr[i * 6 + 2] = f0;
+            colCoreArr[i * 6 + 3] = f1 * 0.85;
+            colCoreArr[i * 6 + 4] = f1 * 0.95;
+            colCoreArr[i * 6 + 5] = f1;
 
             // Glow: soft cyan-blue
-            colGlowArr[i * 6 + 0] = f0 * 0.10; colGlowArr[i * 6 + 1] = f0 * 0.70; colGlowArr[i * 6 + 2] = f0;
-            colGlowArr[i * 6 + 3] = f1 * 0.10; colGlowArr[i * 6 + 4] = f1 * 0.70; colGlowArr[i * 6 + 5] = f1;
+            colGlowArr[i * 6 + 0] = f0 * 0.1;
+            colGlowArr[i * 6 + 1] = f0 * 0.7;
+            colGlowArr[i * 6 + 2] = f0;
+            colGlowArr[i * 6 + 3] = f1 * 0.1;
+            colGlowArr[i * 6 + 4] = f1 * 0.7;
+            colGlowArr[i * 6 + 5] = f1;
         }
 
         // ── 4. Signal GPU re-upload (buffer data changed, no new allocations) ─
-        this._posIBCore.needsUpdate  = true;
-        this._posIBGlow.needsUpdate  = true;
-        this._colCoreIB.needsUpdate  = true;
-        this._colGlowIB.needsUpdate  = true;
+        this._posIBCore.needsUpdate = true;
+        this._posIBGlow.needsUpdate = true;
+        this._colCoreIB.needsUpdate = true;
+        this._colGlowIB.needsUpdate = true;
 
         // ── 5. Set rendered segment count and show lines ──────────────────────
         this.coreGeo.instanceCount = segs;
@@ -283,7 +324,7 @@ export class ShipTrail {
 
     /** Clear the path buffer and hide immediately. Called on flight exit or ship destruction. */
     hide(): void {
-        this.pts.length     = 0;
+        this.pts.length = 0;
         this.ptTimes.length = 0;
         this.simTime = 0;
         this.coreGeo.instanceCount = 0;

@@ -7,7 +7,11 @@ import { SUN_MASS, JUPITER_DIST, JUPITER_MASS, JUPITER_RADIUS } from '../utiliti
 import { IStateDependencies } from '../interfaces.js';
 
 export class Jupiter extends CelestialBody {
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, jupiterTexture: THREE.Texture) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        jupiterTexture: THREE.Texture
+    ) {
         const trajectory = calculateTrajectory(JUPITER_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
