@@ -78,6 +78,7 @@ import { Supernova } from './effects/supernova.js';
 import { ParticleExplosion } from './effects/particle-explosion.js';
 import { WarpEffect } from './effects/warp-effect.js';
 import { triggerScreenFlash } from './effects/screen-flash.js';
+import { GravitationalLensingEffect } from './effects/gravitational-lensing.js';
 import { Body } from './bodies/body.js';
 import { CelestialBody } from './bodies/celestial-body.js';
 import { Mercury } from './bodies/mercury.js';
@@ -662,6 +663,8 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Must be true to initialize shadow infrastructure
 renderer.shadowMap.type = THREE.VSMShadowMap; // Better for large-scale shadows
 document.body.appendChild(renderer.domElement);
+
+const lensingEffect = new GravitationalLensingEffect(renderer);
 
 // Create orthographic camera and scene for 2D UI overlay
 const uiScene = new THREE.Scene();
@@ -4746,14 +4749,24 @@ function animate() {
         warpEffect.setOpacity(0.0);
     }
 
-    // Render 3D scene first, then UI overlay on top
-    renderer.autoClear = true;
+    // Render 3D scene through the gravitational lensing pass, then composite to screen.
+    lensingEffect.beginCapture(renderer);
     try {
         renderer.render(scene, camera);
     } catch (e) {
         console.error('Error during rendering:', e);
         console.log(simulationState.bodies);
     }
+
+    // Gather active black holes and apply lensing warp to the captured frame.
+    const activeBHs = simulationState.bodies.filter(
+        (b) => !b._isDisposed && !!(b.bodyType & BodyTypeEnum.BlackHole)
+    );
+    lensingEffect.applyLensing(
+        renderer,
+        camera,
+        activeBHs.map((b) => ({ position: b.mesh.position, radius: b.radius }))
+    );
 
     renderer.autoClear = false;
     renderer.clearDepth(); // ensure 2D overlay draws on top even after rendering the 3D scene
@@ -7237,6 +7250,7 @@ window.addEventListener('resize', () => {
     }
 
     warpEffect.resize(window.innerWidth, window.innerHeight);
+    lensingEffect.resize(window.innerWidth, window.innerHeight);
 });
 
 // Apply initial background visibility (pre-launch view): kuiper off

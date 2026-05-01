@@ -92,21 +92,15 @@ export class BlackHole extends CelestialBody {
             0xffffff,
             500,
             false,
-            rotation
+            rotation,
+            undefined,
+            new THREE.MeshBasicMaterial({ color: 0x000000 })
         );
 
         this.dependencies = dependencies;
 
-        // Make mesh pitch black and emissive
-        const blackHoleMaterial = this.mesh.material as THREE.MeshStandardMaterial;
-        blackHoleMaterial.color.setHex(0x000000);
-        blackHoleMaterial.emissive.setHex(0x000000);
-        blackHoleMaterial.emissiveIntensity = 0;
-        blackHoleMaterial.metalness = 1;
-        blackHoleMaterial.roughness = 0;
-
-        // Create accretion disk glow (orange ring around black hole)
-        this.createAccretionGlow();
+        // Create accretion disk glow (orange ring around black hole) - Keep for now since we may use it for performance options
+        //this.createAccretionGlow();
 
         // Create continuous particle accretion animation
         this.accretion = this.createAccretionDisk();
@@ -118,7 +112,7 @@ export class BlackHole extends CelestialBody {
         // These represent the collapsing stellar envelope — they spiral inward and eject
         // through the jet naturally, giving the newborn black hole immediate visual activity.
         if (spawnedFromSupernova) {
-            const SEED_COUNT = 80;
+            const SEED_COUNT = 400;
             for (let i = 0; i < SEED_COUNT; i++) {
                 const angle = i * ((2 * Math.PI) / SEED_COUNT);
                 this.injectIntoAccretionDisk(angle);
