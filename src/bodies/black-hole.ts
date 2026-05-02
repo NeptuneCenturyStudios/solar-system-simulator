@@ -119,11 +119,7 @@ export class BlackHole extends CelestialBody {
         // These represent the collapsing stellar envelope — they spiral inward and eject
         // through the jet naturally, giving the newborn black hole immediate visual activity.
         if (spawnedFromSupernova) {
-            const SEED_COUNT = 400;
-            for (let i = 0; i < SEED_COUNT; i++) {
-                const angle = i * ((2 * Math.PI) / SEED_COUNT);
-                this.injectIntoAccretionDisk(angle);
-            }
+            this.seedAccretionDisk(800);
         }
     }
 
@@ -280,7 +276,7 @@ export class BlackHole extends CelestialBody {
 
         angularPositions[slot] = angle;
 
-        const inwardSpeed = (0.12 + Math.random() * 0.1) * SCALE_FACTOR;
+        const inwardSpeed = (5 + Math.random() * 0.1) * SCALE_FACTOR;
         const orbitalSpeed = Math.sqrt(this.mass / maxRadius) * 0.005;
         vels[slot] = { inward: inwardSpeed, orbital: orbitalSpeed, radius: maxRadius };
 
@@ -303,7 +299,7 @@ export class BlackHole extends CelestialBody {
      * Spreads injections evenly around the full disk ring to represent the disrupted stellar
      * material wrapping around the event horizon.
      */
-    injectStarCollision(count: number): void {
+    seedAccretionDisk(count: number): void {
         // Use fully random angles so that if the pool is partially full and some injections
         // are dropped (slot === -1), the successfully placed particles are still spread
         // uniformly around the ring rather than all clustering near angle 0.

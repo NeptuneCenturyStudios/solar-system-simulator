@@ -253,7 +253,7 @@ function absorbBody(winner: Body, victim: Body) {
         setBodyRadius(winner, compressed);
         // Flood the accretion disk — a whole star's worth of material disrupted at once.
         // Use the full pool size (800) to fill the disk with a visible tidal disruption burst.
-        winner.injectStarCollision(800);
+        winner.seedAccretionDisk(800);
     } else if (winner instanceof CelestialBody && victim instanceof CelestialBody) {
         const rw = Math.max(0.0001, winner.radius || 0.0001);
         const rv = Math.max(0.0001, victim.radius || 0.0001);
