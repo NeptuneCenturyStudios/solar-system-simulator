@@ -47,16 +47,47 @@ export class Corona implements IEffect {
 
         this.geometry = new THREE.BufferGeometry();
         this.geometry.setAttribute('position', new THREE.BufferAttribute(this.pArr, 3));
+        this.geometry.setAttribute('life', new THREE.BufferAttribute(this.lives, 1));
 
         this.material = new THREE.PointsMaterial({
             color: glowHex,
             size: particleSize,
             transparent: true,
             blending: THREE.AdditiveBlending,
-            opacity: 0.7,
             depthWrite: false,
             sizeAttenuation: true,
         });
+
+        this.material.onBeforeCompile = (shader) => {
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <common>',
+                `#include <common>
+        attribute float life;
+        varying float vLife;`
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                'void main() {',
+                `void main() {
+        vLife = life;`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                `#include <common>
+        varying float vLife;`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'void main() {',
+                `void main() {
+        float dist = length(gl_PointCoord - vec2(0.5));
+        if (dist > 0.5) discard;
+        float strength = smoothstep(0.5, 0.0, dist);
+        float lifeFade = sin(vLife * 3.14159265);`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <opaque_fragment>',
+                'gl_FragColor = vec4(outgoingLight, lifeFade * strength * 0.9);'
+            );
+        };
 
         this.points = new THREE.Points(this.geometry, this.material);
         this.points.frustumCulled = false;
@@ -72,21 +103,12 @@ export class Corona implements IEffect {
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
         const currentRadius = this.radius;
-        const isReverse = this.lives[i] <= 0.0;
 
-        if (isReverse) {
-            const d = currentRadius * (1.2 + Math.random() * 0.8);
-            this.pArr[i * 3] = d * Math.sin(theta) * Math.cos(phi);
-            this.pArr[i * 3 + 1] = d * Math.sin(theta) * Math.sin(phi);
-            this.pArr[i * 3 + 2] = d * Math.cos(theta);
-            this.lives[i] = 1;
-        } else {
-            const d = currentRadius * 0.98;
-            this.pArr[i * 3] = d * Math.sin(theta) * Math.cos(phi);
-            this.pArr[i * 3 + 1] = d * Math.sin(theta) * Math.sin(phi);
-            this.pArr[i * 3 + 2] = d * Math.cos(theta);
-            this.lives[i] = 0;
-        }
+        const d = currentRadius * 0.98;
+        this.pArr[i * 3] = d * Math.sin(theta) * Math.cos(phi);
+        this.pArr[i * 3 + 1] = d * Math.sin(theta) * Math.sin(phi);
+        this.pArr[i * 3 + 2] = d * Math.cos(theta);
+        this.lives[i] = 0;
 
         this.lifeIncrements[i] = 0.007 * (0.7 + Math.random() * 0.6);
 
@@ -103,6 +125,7 @@ export class Corona implements IEffect {
 
     update(dt: number) {
         if (!dt) return;
+        dt = Math.abs(dt);
 
         const positionAttribute = this.geometry.attributes.position as THREE.BufferAttribute;
         const p = positionAttribute.array as Float32Array;
@@ -113,12 +136,13 @@ export class Corona implements IEffect {
             p[i * 3 + 1] += this.vels[i].y * (dt * 60);
             p[i * 3 + 2] += this.vels[i].z * (dt * 60);
 
-            if (this.lives[i] >= 1.0 || this.lives[i] <= 0.0) {
+            if (this.lives[i] >= 1.0) {
                 this.resetParticle(i);
             }
         }
 
         positionAttribute.needsUpdate = true;
+        (this.geometry.attributes.life as THREE.BufferAttribute).needsUpdate = true;
     }
 
     setRadius(radius: number) {
