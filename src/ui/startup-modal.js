@@ -10,6 +10,7 @@ export class StartupModal extends Panel {
         this.modalEl = document.getElementById('startup-modal');
         this.launchDefaultBtn = null;
         this.launchEmptyBtn = null;
+        this.launchBlackHoleBtn = null;
         this.cancelBtn = null;
 
         this._allowCancel = false;
@@ -18,6 +19,7 @@ export class StartupModal extends Panel {
     initialize() {
         this.launchDefaultBtn = document.getElementById('startupLaunchDefaultBtn');
         this.launchEmptyBtn = document.getElementById('startupLaunchEmptyBtn');
+        this.launchBlackHoleBtn = document.getElementById('startupLaunchBlackHoleBtn');
         this.cancelBtn = document.getElementById('startupCancelBtn');
 
         // Ensure overlay blocks all underlying interactions
@@ -36,6 +38,9 @@ export class StartupModal extends Panel {
         }
         if (this.launchEmptyBtn) {
             this.launchEmptyBtn.onclick = () => this.emit('launchEmpty');
+        }
+        if (this.launchBlackHoleBtn) {
+            this.launchBlackHoleBtn.onclick = () => this.emit('launchBlackHole');
         }
         if (this.cancelBtn) {
             this.cancelBtn.onclick = () => this.emit('cancel');

@@ -33,6 +33,7 @@ import {
     G,
     SUN_MASS,
     SUN_RADIUS,
+    EARTH_DIST,
     PLUTO_DIST,
     IO_MASS,
     IO_DIST_FROM_JUPITER,
@@ -73,6 +74,13 @@ import {
     BodyTypeEnum,
 } from './utilities/utilities.js';
 import { calculateTrajectory } from './physics/physics.js';
+import {
+    randomStarParams,
+    randomBlackHoleParams,
+    randomPlanetParams,
+    randomMoonParams,
+    randomCometParams
+} from './utilities/body-params.js';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
 import { Supernova } from './effects/supernova.js';
 import { ParticleExplosion } from './effects/particle-explosion.js';
@@ -155,18 +163,7 @@ window.addEventListener('beforeunload', (e) => {
     return ''; // Some browsers use the return value
 });
 
-/**
- * Calculate star radius based on mass using mass-radius relationship
- * For main sequence stars: radius ∝ mass^0.8
- * @param {number} mass - Star mass
- * @param {number} baseMass - Reference mass
- * @param {number} baseRadius - Reference radius
- * @returns {number} - Calculated radius
- */
-function calculateStarRadius(mass: number, baseMass: number, baseRadius: number): number {
-    // Use mass-radius relationship for main sequence stars
-    return baseRadius * Math.pow(mass / baseMass, 0.8);
-}
+// calculateStarRadius is imported from './utilities/body-params.js'
 
 /**
  * Set the visual radius for any body. Delegates to the body's setRadius method.
@@ -2418,7 +2415,7 @@ function createPresetBody(presetKey: string) {
 
     const ensureEarth = () =>
         simulationState.bodies.find((b) => b && !b._isDisposed && b.name === 'Earth');
-    let newBody: CelestialBody | null = null;
+    let newBody: CelestialBody | null;
 
     switch (key) {
         case 'sun': {
@@ -2580,35 +2577,8 @@ function createNewBody(
             simulationState.bodies.some((b) => b && !b._isDisposed && b instanceof BlackHole);
         const starPos = _hasCentralBody ? getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
 
-        // Mass range: ~0.08 M☉ (red dwarf limit) up to ~150 M☉ (very massive / hypergiant-ish)
-        // Use log sampling so we get interesting small/medium stars more often.
-        const minMass = SUN_MASS * 0.08;
-        const maxMass = SUN_MASS * 150;
-        const t = Math.random();
-        const randomStarMass = minMass * Math.pow(maxMass / minMass, t);
-        const newStarMass =
-            typeof customMass === 'number' && isFinite(customMass) && customMass > 0
-                ? customMass
-                : randomStarMass;
-
-        // Radius: use mass-radius relationship, but clamp to a wide plausible visual range.
-        // 0.08 M☉ ≈ 0.2 R☉ (very rough), 150 M☉ can be tens of R☉ to hundreds+ (supergiants).
-        // We'll allow an intentionally dramatic spread, but keep within the existing slider max.
-        const minRadius = SUN_RADIUS * 0.15;
-        const maxRadius = 200000 * SCALE_FACTOR;
-        const computedRadius = calculateStarRadius(newStarMass, SUN_MASS, SUN_RADIUS);
-        const newStarRadius =
-            typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
-                ? customRadius
-                : THREE.MathUtils.clamp(computedRadius, minRadius, maxRadius);
-
-        // Temperature: pick a broad range (cool red dwarfs/giants to hot blue stars)
-        // 2000K..30000K matches the edit slider + existing color function.
-        const randomStarTemp = 2000 + Math.random() * (30000 - 2000);
-        const newStarTemp =
-            typeof customTemperature === 'number' && isFinite(customTemperature)
-                ? customTemperature
-                : randomStarTemp;
+        const { mass: newStarMass, radius: newStarRadius, temperature: newStarTemp } =
+            randomStarParams({ mass: customMass, radius: customRadius, temperature: customTemperature });
 
         newBody = new Star(
             dependencies,
@@ -2674,38 +2644,23 @@ function createNewBody(
             inclination
         );
 
-        const resolvedPlanetType = planetType || 'solid';
+        const resolvedPlanetType = (planetType || 'solid') as 'solid' | 'gas_giant' | 'ice_giant';
+        const {
+            mass: planetMass,
+            radius: planetRadius,
+            rotationSpeed: planetRotationSpeed,
+            bodyType: customPlanetBodyType,
+        } = randomPlanetParams(resolvedPlanetType, { mass: customMass, radius: customRadius });
+
         const isGasGiant = resolvedPlanetType === 'gas_giant';
         const isIceGiant = resolvedPlanetType === 'ice_giant';
         const isSolidPlanet = !isGasGiant && !isIceGiant;
-
-        const planetRadius =
-            typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
-                ? customRadius
-                : isSolidPlanet
-                  ? 5 + Math.random() * 10
-                  : 18 + Math.random() * 24;
-
-        const planetMass =
-            typeof customMass === 'number' && isFinite(customMass) && customMass > 0
-                ? customMass
-                : isSolidPlanet
-                  ? 50 + Math.random() * 500
-                  : isGasGiant
-                    ? 4000 + Math.random() * 26000
-                    : 1200 + Math.random() * 7000;
 
         const planetTexturePool = isGasGiant
             ? fictionalGasTextures
             : isIceGiant
               ? fictionalIceTextures
               : fictionalTextures;
-
-        const customPlanetBodyType = isGasGiant
-            ? BodyTypeEnum.GasGiant
-            : isIceGiant
-              ? BodyTypeEnum.IceGiant
-              : BodyTypeEnum.Planet;
 
         const planetMaterial = new THREE.MeshStandardMaterial({
             map: pickRandom(planetTexturePool),
@@ -2730,7 +2685,7 @@ function createNewBody(
             0x888888,
             3000,
             false,
-            { axis: new THREE.Vector3(0, 1, 0), speed: 0.1 + Math.random() * 0.4 },
+            { axis: new THREE.Vector3(0, 1, 0), speed: planetRotationSpeed },
             undefined,
             planetMaterial
         );
@@ -2774,7 +2729,8 @@ function createNewBody(
             const parentVel = focusedBody.velocity.clone();
 
             // Step 2: random distance from parent surface
-            const moonDistance = focusedBody.radius * 5 + Math.random() * focusedBody.radius * 10;
+            const { mass: moonMass, radius: moonRadius, distance: moonDistance, rotationSpeed: moonRotationSpeed } =
+                randomMoonParams(focusedBody.radius, { mass: customMass, radius: customRadius });
 
             // Step 3: random radial direction using uniform sphere sampling
             //   theta ∈ [0, 2π), phi ∈ [0, π] distributed uniformly via inverse CDF
@@ -2813,15 +2769,6 @@ function createNewBody(
             // Moon velocity = parent velocity + orbital velocity
             const moonSpawnVel = parentVel.clone().addScaledVector(orbitDir, orbitSpeed);
 
-            const moonRadius =
-                typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
-                    ? customRadius
-                    : 1 + Math.random() * 3;
-            const moonMass =
-                typeof customMass === 'number' && isFinite(customMass) && customMass > 0
-                    ? customMass
-                    : 0.5 + Math.random() * 2;
-
             // Random texture per custom moon instance
             const moonMaterial = new THREE.MeshStandardMaterial({
                 map: pickRandom(fictionalTextures),
@@ -2846,7 +2793,7 @@ function createNewBody(
                 0x666666,
                 1000,
                 false,
-                { axis: new THREE.Vector3(0, 1, 0), speed: 0.15 + Math.random() * 0.35 },
+                { axis: new THREE.Vector3(0, 1, 0), speed: moonRotationSpeed },
                 undefined,
                 moonMaterial
             );
@@ -2918,8 +2865,7 @@ function createNewBody(
             inclination
         );
 
-        const cometRadius = 1 + Math.random() * 2;
-        const cometMass = 0.5 + Math.random() * 3;
+        const { mass: cometMass, radius: cometRadius } = randomCometParams({ mass: customMass, radius: customRadius });
         const cometMaterial = new THREE.MeshStandardMaterial({
             color: 0x888888,
             emissive: 0x000000,
@@ -2943,16 +2889,7 @@ function createNewBody(
         );
     } else if (bodyType === 'black_hole') {
         const bhSpawnPos = getNearCameraSpawnPos();
-
-        // Mass: use customMass only if it meets the 3-solar-mass minimum
-        const BH_MIN_MASS = 3 * SUN_MASS;
-        const BH_MAX_MASS = 50 * SUN_MASS;
-        const t = Math.random();
-        const randomBhMass = BH_MIN_MASS * Math.pow(BH_MAX_MASS / BH_MIN_MASS, t);
-        const bhMass =
-            typeof customMass === 'number' && isFinite(customMass) && customMass >= BH_MIN_MASS
-                ? customMass
-                : randomBhMass;
+        const { mass: bhMass } = randomBlackHoleParams({ mass: customMass });
 
         newBody = new BlackHole(
             dependencies,
@@ -3012,15 +2949,16 @@ function createNewBody(
 
 function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     // Only touches background visuals + management checkboxes (if already initialized).
-    const isEmpty = mode === SimulationStartMode.Empty;
+    const hideKuiper =
+        mode === SimulationStartMode.Empty || mode === SimulationStartMode.BlackHole;
 
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
-        kuiperBeltPoints.visible = !isEmpty;
+        kuiperBeltPoints.visible = !hideKuiper;
     }
 
     // Keep UI in sync
     if (managementPanel?.enableKuiperBeltCheckbox) {
-        managementPanel.enableKuiperBeltCheckbox.checked = !isEmpty;
+        managementPanel.enableKuiperBeltCheckbox.checked = !hideKuiper;
     }
 }
 
@@ -3072,6 +3010,81 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     // Empty mode: starfield only (no bodies)
     if (mode === SimulationStartMode.Empty) {
         selectedBody = null;
+        return;
+    }
+
+    // Black Hole mode: one random black hole at origin + one randomised orbiting star
+    if (mode === SimulationStartMode.BlackHole) {
+        const { mass: bhMass, radius: bhRadius } = randomBlackHoleParams();
+        const blackHole = new BlackHole(
+            dependencies,
+            scene,
+            new THREE.Vector3(0, 0, 0),
+            bhMass,
+            createUniqueId('black_hole'),
+            'Black Hole',
+            { axis: new THREE.Vector3(0, 1, 0), speed: 0 }
+        );
+        simulationState.bodies = [blackHole];
+
+        // Randomised star
+        const { mass: starMass, radius: starRadius, temperature: starTemp } = randomStarParams();
+
+        // Orbit: 50/50 circular vs elliptical
+        const isElliptical = Math.random() < 0.5;
+        const eccentricity = isElliptical ? 0.1 + Math.random() * 0.5 : 0;
+        const orbitType = isElliptical ? 'elliptical' : 'circular';
+
+        // Orbital distance: far enough so the star doesn't overlap the black hole
+        const minOrbitDist = Math.max(starRadius * 5 + bhRadius, EARTH_DIST * 0.3);
+        const orbitDist = minOrbitDist + Math.random() * (EARTH_DIST * 4 - minOrbitDist);
+
+        const orbitAngle = Math.random() * Math.PI * 2;
+        const starPos = new THREE.Vector3(
+            Math.cos(orbitAngle) * orbitDist,
+            0,
+            Math.sin(orbitAngle) * orbitDist
+        );
+        const starVel = computeOrbitVelocityAtPos(
+            starPos,
+            new THREE.Vector3(0, 0, 0),
+            bhMass,
+            orbitType,
+            eccentricity,
+            0
+        );
+
+        const orbitingStar = new Star(
+            dependencies,
+            scene,
+            {
+                radius: starRadius,
+                pos: starPos,
+                vel: starVel,
+                mass: starMass,
+                id: createUniqueId('star'),
+                name: generateIAUName(BodyTypeEnum.Star),
+                temperature: starTemp,
+                lightIntensity: 500000000,
+                lightDistance: 524400,
+            },
+            {
+                sunTexture,
+                redStarTexture,
+                orangeStarTexture,
+                whiteStarTexture,
+                blueStarTexture,
+                whiteDwarfTexture,
+                brownDwarfTexture,
+            }
+        );
+        simulationState.bodies.push(orbitingStar);
+
+        syncAllStarLightTargets();
+        selectedBody = null;
+
+        const shadowCheckbox = document.getElementById('enableShadows') as HTMLInputElement;
+        toggleShadows(shadowCheckbox ? shadowCheckbox.checked : true);
         return;
     }
 
@@ -7424,6 +7437,13 @@ startupModal.on('launchEmpty', () => {
     managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.Empty });
+    applyDefaultCameraTogglesAfterSpawn();
+});
+
+startupModal.on('launchBlackHole', () => {
+    managementPanel.hide();
+    startupModal.hide();
+    spawn({ mode: SimulationStartMode.BlackHole });
     applyDefaultCameraTogglesAfterSpawn();
 });
 

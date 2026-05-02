@@ -95,4 +95,5 @@ export const GRAV_ARROW_SCALE = 15000;
 export enum SimulationStartMode {
     Default = 0,
     Empty = 1,
+    BlackHole = 2,
 }
