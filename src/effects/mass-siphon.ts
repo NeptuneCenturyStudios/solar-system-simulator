@@ -6,7 +6,7 @@ import { IPipelineFeedEffect } from './effect-base';
 import { IStateDependencies, ISiphonTarget } from '../interfaces';
 
 /** Maximum number of simultaneously in-flight siphon particles per stream. */
-const PARTICLE_COUNT = 400;
+const PARTICLE_COUNT = 800;
 
 /** Particles spawned per simulation-second while the siphon is active. */
 const SIPHON_SPAWN_RATE = 20;

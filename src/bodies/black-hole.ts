@@ -16,6 +16,10 @@ interface IAccretionDiskState {
     opacities: Float32Array; // Per-particle opacity
     /** 1 = slot is occupied by a live particle, 0 = slot is free. */
     activeFlags: Uint8Array;
+    /** Angles waiting to be injected into the disk. */
+    seedQueue: number[];
+    /** Accumulated sim-time until the next particle is popped from the queue. */
+    seedTimer: number;
 }
 
 declare module './black-hole.js' {
@@ -38,10 +42,19 @@ const BLACK_HOLE_JET_BEAM_COLOR = { r: 0.7, g: 0.9, b: 1.0 };
 const BLACK_HOLE_ACCRETION_DISK_POINT_SIZE = 4;
 /** How many jet particles are injected for each accretion-disk particle that reaches the event horizon.
  *  >1 reflects the energy amplification of relativistic jets vs. the infalling matter stream. */
-const JET_PARTICLES_PER_ACCRETION = 10;
+const JET_PARTICLES_PER_ACCRETION = 2;
 
 /** Multiplier for the gravitational mass-transfer formula. Tune to taste. */
 const SIPHON_MASS_TRANSFER_SCALE = 0.0001;
+
+/**
+ * Random interval range (in raw sim-time units) between successive queue injections.
+ * At 1× timewarp, 1 sim-time unit ≈ 1 real second, so these defaults give roughly
+ * a 0.25–0.75 s stagger between each new accretion particle appearance.
+ * Increase both values to slow the build-up; decrease to speed it up.
+ */
+const ACCRETION_INJECT_MIN_INTERVAL = 0.25;
+const ACCRETION_INJECT_MAX_INTERVAL = 0.75;
 
 export class BlackHole extends CelestialBody {
     jet: {
@@ -119,7 +132,7 @@ export class BlackHole extends CelestialBody {
         // These represent the collapsing stellar envelope — they spiral inward and eject
         // through the jet naturally, giving the newborn black hole immediate visual activity.
         if (spawnedFromSupernova) {
-            this.seedAccretionDisk(800);
+            this.seedAccretionDisk(400);
         }
     }
 
@@ -245,14 +258,27 @@ export class BlackHole extends CelestialBody {
         points.frustumCulled = false;
         this.scene.add(points);
 
-        return { points, vels, angularPositions, minRadius, maxRadius, opacities, activeFlags };
+        const seedTimer =
+            ACCRETION_INJECT_MIN_INTERVAL +
+            Math.random() * (ACCRETION_INJECT_MAX_INTERVAL - ACCRETION_INJECT_MIN_INTERVAL);
+        return { points, vels, angularPositions, minRadius, maxRadius, opacities, activeFlags, seedQueue: [], seedTimer };
+    }
+
+    /**
+     * Enqueues one particle angle for later injection into the accretion disk.
+     * All sources (siphon, collision, supernova seed) funnel through here so the
+     * disk always builds up gradually rather than all at once.
+     */
+    enqueueAccretionParticle(angle: number): void {
+        if (!this.accretion) return;
+        this.accretion.seedQueue.push(angle);
     }
 
     /**
      * Injects one particle into the accretion disk at the given angle on the outer edge.
-     * Called by the siphon stream callback when a siphon particle completes its path.
+     * Only called by updateAccretion() when draining the seed queue.
      */
-    injectIntoAccretionDisk(angle: number): void {
+    private injectIntoAccretionDisk(angle: number): void {
         if (!this.accretion) return;
 
         // Find a free slot.
@@ -276,7 +302,7 @@ export class BlackHole extends CelestialBody {
 
         angularPositions[slot] = angle;
 
-        const inwardSpeed = (5 + Math.random() * 0.1) * SCALE_FACTOR;
+        const inwardSpeed = (8 + Math.random() * 0.1) * SCALE_FACTOR;
         const orbitalSpeed = Math.sqrt(this.mass / maxRadius) * 0.005;
         vels[slot] = { inward: inwardSpeed, orbital: orbitalSpeed, radius: maxRadius };
 
@@ -295,16 +321,15 @@ export class BlackHole extends CelestialBody {
     }
 
     /**
-     * Floods the accretion disk with particles when a star is directly absorbed by collision.
-     * Spreads injections evenly around the full disk ring to represent the disrupted stellar
-     * material wrapping around the event horizon.
+     * Floods the accretion disk with particles when a star is directly absorbed by collision
+     * or a supernova occurs. Angles are pushed onto the seed queue and injected one per frame,
+     * producing a spiral build-up rather than an instant ring.
      */
     seedAccretionDisk(count: number): void {
-        // Use fully random angles so that if the pool is partially full and some injections
-        // are dropped (slot === -1), the successfully placed particles are still spread
-        // uniformly around the ring rather than all clustering near angle 0.
-        for (let i = 0; i < count; i++) {
-            this.injectIntoAccretionDisk(Math.random() * 2 * Math.PI);
+        if (!this.accretion) return;
+        const total = Math.round(count * this.radius);
+        for (let i = 0; i < total; i++) {
+            this.accretion.seedQueue.push(Math.random() * 2 * Math.PI);
         }
     }
 
@@ -438,6 +463,27 @@ export class BlackHole extends CelestialBody {
 
     updateAccretion(dt: number) {
         if (!this.accretion) return;
+
+        // Drain the seed queue: accumulate raw sim-time and inject one particle when the
+        // timer fires. Immediately reset to a new random interval so the next particle
+        // arrives at a different time, producing a spiral rather than a steady beat.
+        // If the pool is full the timer still ticks but no injection occurs (it retries
+        // next fire rather than losing the particle).
+        const queue = this.accretion.seedQueue;
+        if (queue.length > 0) {
+            this.accretion.seedTimer -= Math.abs(dt);
+            if (this.accretion.seedTimer <= 0) {
+                // Reset timer regardless of whether injection succeeds (pool-full retry
+                // happens next fire, keeping the interval feel consistent).
+                this.accretion.seedTimer =
+                    ACCRETION_INJECT_MIN_INTERVAL +
+                    Math.random() * (ACCRETION_INJECT_MAX_INTERVAL - ACCRETION_INJECT_MIN_INTERVAL);
+                const freeSlot = this.accretion.activeFlags.indexOf(0);
+                if (freeSlot !== -1) {
+                    this.injectIntoAccretionDisk(queue.shift()!);
+                }
+            }
+        }
 
         const absDt = Math.abs(dt) / 10;
 
@@ -629,7 +675,7 @@ export class BlackHole extends CelestialBody {
                     this.scene,
                     star,
                     this,
-                    (angle) => this.injectIntoAccretionDisk(angle)
+                    (angle) => this.enqueueAccretionParticle(angle)
                 );
                 this.siphonEffects.set(star.id, effect);
                 this.dependencies.addEvent(`${this.name} is siphoning mass from ${star.name}`);
