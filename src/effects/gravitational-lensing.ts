@@ -9,7 +9,7 @@ const MAX_LENSES = 4;
  * The warp scales naturally with zoom — smaller when far, larger when close.
  * Increase to make the ring more dramatic at all distances.
  */
-const EINSTEIN_SCALE = 22.0;
+const EINSTEIN_SCALE = 18.0;
 
 /**
  * Screen-space gravitational lensing post-processing effect.

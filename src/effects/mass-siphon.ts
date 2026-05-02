@@ -433,7 +433,7 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
             colArr[i * 3 + 2] = starB + (BH_B - starB) * t;
 
             // Opacity: 1.0 (star) → 0.12 (disk)
-            alphaArr[i] = 1.0 - 0.88 * t;
+            alphaArr[i] = 1.0 - 0.8 * t;
         }
 
         this.geometry.attributes.alpha.needsUpdate = true;

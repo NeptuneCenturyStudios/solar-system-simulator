@@ -25,20 +25,27 @@ declare module './black-hole.js' {
     }
 }
 
-const BLACK_HOLE_JET_POINT_SIZE = 4;
-const BLACK_HOLE_JET_SPEED_BASE = 120; // Base speed for jet particles, scaled by radius
+/** Speed of jet beam tips in sim-units per sim-second (scaled by event-horizon radius). */
+const BLACK_HOLE_JET_SPEED_BASE = 12.0;
+/**
+ * Maximum age of a jet beam in sim-seconds.
+ * At 100× timewarp, dt ≈ 1.6 sim-sec/real-frame, so 1 real second accumulates ~96 sim-seconds.
+ * Setting maxAge = 100 ensures beams last ~1 real second at the highest supported timewarp.
+ */
+const BLACK_HOLE_JET_MAX_AGE = 200;
+/** Cyan-white beam tip colour components (additive). */
+const BLACK_HOLE_JET_BEAM_COLOR = { r: 0.7, g: 0.9, b: 1.0 };
 const BLACK_HOLE_ACCRETION_DISK_POINT_SIZE = 4;
 /** How many jet particles are injected for each accretion-disk particle that reaches the event horizon.
  *  >1 reflects the energy amplification of relativistic jets vs. the infalling matter stream. */
 const JET_PARTICLES_PER_ACCRETION = 10;
 
 /** Multiplier for the gravitational mass-transfer formula. Tune to taste. */
-const SIPHON_MASS_TRANSFER_SCALE = 0.001;
+const SIPHON_MASS_TRANSFER_SCALE = 0.0001;
 
 export class BlackHole extends CelestialBody {
     jet: {
-        points: THREE.Points;
-        positions: Float32Array;
+        lines: THREE.LineSegments;
         velocities: Float32Array;
         ages: Float32Array;
         origins: Float32Array;
@@ -166,7 +173,7 @@ export class BlackHole extends CelestialBody {
         const angularPositions = []; // Track angle for spiral motion
 
         const minRadius = this.radius * 2;
-        const maxRadius = minRadius * 32;
+        const maxRadius = minRadius * 64;
 
         for (let i = 0; i < count; i++) {
             // All slots start inactive — placed at origin, invisible. They are activated via
@@ -255,7 +262,10 @@ export class BlackHole extends CelestialBody {
         // Find a free slot.
         let slot = -1;
         for (let i = 0; i < this.accretion.activeFlags.length; i++) {
-            if (this.accretion.activeFlags[i] === 0) { slot = i; break; }
+            if (this.accretion.activeFlags[i] === 0) {
+                slot = i;
+                break;
+            }
         }
         if (slot === -1) return; // pool full — drop silently
 
@@ -264,7 +274,7 @@ export class BlackHole extends CelestialBody {
         const colors = this.accretion.points.geometry.attributes.color.array as Float32Array;
         const verticalSpread = (Math.random() - 0.5) * this.radius * 0.75;
 
-        p[slot * 3]     = Math.cos(angle) * maxRadius;
+        p[slot * 3] = Math.cos(angle) * maxRadius;
         p[slot * 3 + 1] = verticalSpread;
         p[slot * 3 + 2] = Math.sin(angle) * maxRadius;
 
@@ -276,7 +286,7 @@ export class BlackHole extends CelestialBody {
 
         // Outer-edge colour (dim orange/red) and opacity.
         // Particles always enter at maxRadius (t=1), so opacity starts at its minimum (most transparent).
-        colors[slot * 3]     = 0.8;
+        colors[slot * 3] = 0.8;
         colors[slot * 3 + 1] = 0.2;
         colors[slot * 3 + 2] = 0.05;
         opacities[slot] = 0.2; // outer-edge minimum — updateAccretion() ramps this up as it spirals in
@@ -288,81 +298,61 @@ export class BlackHole extends CelestialBody {
         this.accretion.points.geometry.attributes.alpha.needsUpdate = true;
     }
 
+    /**
+     * Floods the accretion disk with particles when a star is directly absorbed by collision.
+     * Spreads injections evenly around the full disk ring to represent the disrupted stellar
+     * material wrapping around the event horizon.
+     */
+    injectStarCollision(count: number): void {
+        // Use fully random angles so that if the pool is partially full and some injections
+        // are dropped (slot === -1), the successfully placed particles are still spread
+        // uniformly around the ring rather than all clustering near angle 0.
+        for (let i = 0; i < count; i++) {
+            this.injectIntoAccretionDisk(Math.random() * 2 * Math.PI);
+        }
+    }
+
     createJet() {
         const jetCount = 200;
         const velocities = new Float32Array(jetCount * 3);
         const ages = new Float32Array(jetCount);
         const origins = new Float32Array(jetCount * 3);
         const activeFlags = new Uint8Array(jetCount); // all 0 = all inactive
-        const maxAge = 0.7; // seconds
-        const r = this.radius;
-        // Initialise all slots as inactive — particles are injected via injectIntoJet().
-        for (let i = 0; i < jetCount; i++) {
-            ages[i] = maxAge + 1; // mark as "past max age" so they are never rendered
-            origins[i * 3]     = this.mesh.position.x;
-            origins[i * 3 + 1] = this.mesh.position.y;
-            origins[i * 3 + 2] = this.mesh.position.z;
-        }
+        const maxAge = BLACK_HOLE_JET_MAX_AGE;
+
+        // Each beam is a line segment with 2 vertices: [base, tip].
+        // All start at (0,0,0) with black colour (additive black = invisible).
         const geo = new THREE.BufferGeometry();
-        // We'll fill the position attribute each frame
-        const positions = new Float32Array(jetCount * 3);
+        const positions = new Float32Array(jetCount * 2 * 3); // 2 verts × 3 components
+        const colors = new Float32Array(jetCount * 2 * 3); // all black initially
         geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        // Jet color: white-hot
-        const colors = new Float32Array(jetCount * 3);
-        for (let i = 0; i < jetCount; i++) {
-            colors[i * 3] = 0.85; // R
-            colors[i * 3 + 1] = 0.95; // G
-            colors[i * 3 + 2] = 1.0; // B (more blue)
-        }
         geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        // Opacity: all start at 0 (invisible until activated)
-        const opacities = new Float32Array(jetCount);
-        for (let i = 0; i < jetCount; i++) opacities[i] = 0;
-        geo.setAttribute('alpha', new THREE.BufferAttribute(opacities, 1));
-        const mat = new THREE.PointsMaterial({
-            size: BLACK_HOLE_JET_POINT_SIZE * r,
-            sizeAttenuation: true,
+
+        const mat = new THREE.LineBasicMaterial({
             vertexColors: true,
-            transparent: true,
             blending: THREE.AdditiveBlending,
+            transparent: true,
             depthWrite: false,
             depthTest: true,
         });
 
+        // Boost perceived glow via additive blending: multiplying the output colour well
+        // above 1.0 causes the GPU to saturate adjacent pixels, creating a bloom-like halo
+        // without post-processing. The white hot-core (lum²) makes the brightest tip area
+        // appear plasma-hot; it dims naturally as the vertex colours fade toward black at the base.
         mat.onBeforeCompile = (shader) => {
-            // Vertex: pass alpha attribute through to fragment
-            shader.vertexShader =
-                `
-                attribute float alpha;
-                varying float vAlpha;
-            ` + shader.vertexShader;
-            shader.vertexShader = shader.vertexShader.replace(
-                '#include <begin_vertex>',
-                `#include <begin_vertex>
-                vAlpha = alpha;`
-            );
-
-            // Fragment: circular discard + per-particle alpha
-            shader.fragmentShader =
-                `
-                varying float vAlpha;
-            ` + shader.fragmentShader;
-            shader.fragmentShader = shader.fragmentShader.replace(
-                'void main() {',
-                `void main() {
-                float dist = length(gl_PointCoord - vec2(0.5));
-                if (dist > 0.5) discard;
-                float jetAlpha = vAlpha * smoothstep(0.5, 0.1, dist);`
-            );
             shader.fragmentShader = shader.fragmentShader.replace(
                 '#include <opaque_fragment>',
-                'gl_FragColor = vec4( outgoingLight, jetAlpha );'
+                `float lum = dot(outgoingLight, vec3(0.333));
+                vec3 glowColor = outgoingLight * 5.0 + vec3(lum * lum * 4.0);
+                gl_FragColor = vec4(glowColor, opacity);`
             );
         };
-        const points = new THREE.Points(geo, mat);
-        points.frustumCulled = false;
-        this.scene.add(points);
-        return { points, positions, velocities, ages, origins, maxAge, activeFlags };
+
+        const lines = new THREE.LineSegments(geo, mat);
+        lines.frustumCulled = false;
+        this.scene.add(lines);
+        return { lines, velocities, ages, origins, maxAge, activeFlags };
     }
 
     /**
@@ -376,22 +366,49 @@ export class BlackHole extends CelestialBody {
         // Find a free slot.
         let slot = -1;
         for (let i = 0; i < this.jet.activeFlags.length; i++) {
-            if (this.jet.activeFlags[i] === 0) { slot = i; break; }
+            if (this.jet.activeFlags[i] === 0) {
+                slot = i;
+                break;
+            }
         }
         if (slot === -1) return; // pool full — drop silently
 
         const r = this.radius;
-        const direction = up !== undefined ? up : (Math.random() < 0.5 ? 1 : -1);
+        const direction = up !== undefined ? up : Math.random() < 0.5 ? 1 : -1;
         const speed = BLACK_HOLE_JET_SPEED_BASE * r;
         const spread = 0.08;
-        this.jet.velocities[slot * 3]     = (Math.random() - 0.5) * spread * speed;
+        this.jet.velocities[slot * 3] = (Math.random() - 0.5) * spread * speed;
         this.jet.velocities[slot * 3 + 1] = direction * speed;
         this.jet.velocities[slot * 3 + 2] = (Math.random() - 0.5) * spread * speed;
         this.jet.ages[slot] = 0;
-        this.jet.origins[slot * 3]     = this.mesh.position.x;
-        this.jet.origins[slot * 3 + 1] = this.mesh.position.y + direction * r;
-        this.jet.origins[slot * 3 + 2] = this.mesh.position.z;
+        // Store the pole as a BH-local offset (0, ±r, 0) so the update loop can recompute
+        // the world-space base each frame by adding the BH's current mesh.position.
+        this.jet.origins[slot * 3] = 0;
+        this.jet.origins[slot * 3 + 1] = direction * r;
+        this.jet.origins[slot * 3 + 2] = 0;
         this.jet.activeFlags[slot] = 1;
+
+        // Initialise beam vertices at the pole origin; colours set to base=black, tip=beam colour.
+        // The update loop will extend the tip each frame as the beam ages.
+        const posArr = this.jet.lines.geometry.attributes.position.array as Float32Array;
+        const colArr = this.jet.lines.geometry.attributes.color.array as Float32Array;
+        const ox = this.mesh.position.x + this.jet.origins[slot * 3];
+        const oy = this.mesh.position.y + this.jet.origins[slot * 3 + 1];
+        const oz = this.mesh.position.z + this.jet.origins[slot * 3 + 2];
+        // base vertex
+        posArr[slot * 6] = ox;
+        posArr[slot * 6 + 1] = oy;
+        posArr[slot * 6 + 2] = oz;
+        colArr[slot * 6] = 0;
+        colArr[slot * 6 + 1] = 0;
+        colArr[slot * 6 + 2] = 0;
+        // tip vertex
+        posArr[slot * 6 + 3] = ox;
+        posArr[slot * 6 + 4] = oy;
+        posArr[slot * 6 + 5] = oz;
+        colArr[slot * 6 + 3] = BLACK_HOLE_JET_BEAM_COLOR.r;
+        colArr[slot * 6 + 4] = BLACK_HOLE_JET_BEAM_COLOR.g;
+        colArr[slot * 6 + 5] = BLACK_HOLE_JET_BEAM_COLOR.b;
     }
 
     setRadius(newRadius: number) {
@@ -399,11 +416,6 @@ export class BlackHole extends CelestialBody {
 
         if (this.accretionGlow) {
             this.accretionGlow.scale.setScalar(newRadius * 10);
-        }
-
-        if (this.jet) {
-            const mat = this.jet.points.material as THREE.PointsMaterial;
-            mat.size = BLACK_HOLE_JET_POINT_SIZE * newRadius;
         }
 
         // Update accretion disk radii and point size in-place so that in-flight particles
@@ -461,7 +473,7 @@ export class BlackHole extends CelestialBody {
             const r = 0.8 + (1.0 - 0.8) * (1 - t);
             const g = 0.2 + (0.95 - 0.2) * (1 - t);
             const b = 0.05 + (0.7 - 0.05) * (1 - t);
-            colors[i * 3]     = r;
+            colors[i * 3] = r;
             colors[i * 3 + 1] = g;
             colors[i * 3 + 2] = b;
 
@@ -478,7 +490,7 @@ export class BlackHole extends CelestialBody {
                 this.accretion.angularPositions[i] += vel.orbital * absDt;
                 const angle = this.accretion.angularPositions[i];
 
-                p[i * 3]     = Math.cos(angle) * newRadius;
+                p[i * 3] = Math.cos(angle) * newRadius;
                 p[i * 3 + 2] = Math.sin(angle) * newRadius;
                 // Y stays roughly the same but flatten toward disk as it approaches
                 p[i * 3 + 1] = p[i * 3 + 1] * 0.98;
@@ -490,8 +502,6 @@ export class BlackHole extends CelestialBody {
             }
         }
 
-        // TODO: Jet effect - add/update jet particle system here
-
         this.accretion.points.geometry.attributes.position.needsUpdate = true;
         this.accretion.points.geometry.attributes.alpha.needsUpdate = true;
         this.accretion.points.geometry.attributes.color.needsUpdate = true;
@@ -499,6 +509,67 @@ export class BlackHole extends CelestialBody {
         // Update glow position
         if (this.accretionGlow) {
             this.accretionGlow.position.copy(this.mesh.position);
+        }
+    }
+
+    updateJet(dt: number) {
+        if (this.jet) {
+            const absDt = Math.abs(dt);
+            if (absDt > 0) {
+                const { lines, velocities, ages, origins, maxAge, activeFlags } = this.jet;
+                const posAttr = lines.geometry.attributes.position;
+                const colAttr = lines.geometry.attributes.color;
+                const posArr = posAttr.array as Float32Array;
+                const colArr = colAttr.array as Float32Array;
+                for (let i = 0; i < activeFlags.length; i++) {
+                    if (activeFlags[i] === 0) continue; // skip inactive slots
+
+                    ages[i] += absDt;
+                    // Recompute world-space pole from current BH position + stored local offset.
+                    const ox = this.mesh.position.x + origins[i * 3];
+                    const oy = this.mesh.position.y + origins[i * 3 + 1];
+                    const oz = this.mesh.position.z + origins[i * 3 + 2];
+                    if (ages[i] >= maxAge) {
+                        // Beam has expired — deactivate and collapse both vertices to current pole.
+                        activeFlags[i] = 0;
+                        posArr[i * 6] = ox;
+                        posArr[i * 6 + 1] = oy;
+                        posArr[i * 6 + 2] = oz;
+                        posArr[i * 6 + 3] = ox;
+                        posArr[i * 6 + 4] = oy;
+                        posArr[i * 6 + 5] = oz;
+                        colArr[i * 6] = 0;
+                        colArr[i * 6 + 1] = 0;
+                        colArr[i * 6 + 2] = 0;
+                        colArr[i * 6 + 3] = 0;
+                        colArr[i * 6 + 4] = 0;
+                        colArr[i * 6 + 5] = 0;
+                        continue;
+                    }
+
+                    // t: 0 (just born) → 1 (about to expire). Fade follows a curved falloff.
+                    const t = ages[i] / maxAge;
+                    const fade = Math.pow(1 - t, 1.5);
+                    posArr[i * 6] = ox;
+                    posArr[i * 6 + 1] = oy;
+                    posArr[i * 6 + 2] = oz;
+                    // Tip advances along the velocity direction.
+                    posArr[i * 6 + 3] = ox + velocities[i * 3] * ages[i];
+                    posArr[i * 6 + 4] = oy + velocities[i * 3 + 1] * ages[i];
+                    posArr[i * 6 + 5] = oz + velocities[i * 3 + 2] * ages[i];
+
+                    // Base colour: black (transparent in additive blending).
+                    colArr[i * 6] = 0;
+                    colArr[i * 6 + 1] = 0;
+                    colArr[i * 6 + 2] = 0;
+                    // Tip colour: beam colour scaled by fade.
+                    colArr[i * 6 + 3] = BLACK_HOLE_JET_BEAM_COLOR.r * fade;
+                    colArr[i * 6 + 4] = BLACK_HOLE_JET_BEAM_COLOR.g * fade;
+                    colArr[i * 6 + 5] = BLACK_HOLE_JET_BEAM_COLOR.b * fade;
+                }
+                posAttr.needsUpdate = true;
+                colAttr.needsUpdate = true;
+            }
         }
     }
 
@@ -510,39 +581,7 @@ export class BlackHole extends CelestialBody {
         this.updateAccretion(dt);
 
         // Update jet
-        if (this.jet) {
-            const absDt = Math.abs(dt);
-            // Update point size to match current radius
-            const r = this.radius;
-            const mat = this.jet.points.material as THREE.PointsMaterial;
-            if (mat.size !== BLACK_HOLE_JET_POINT_SIZE * r) {
-                mat.size = BLACK_HOLE_JET_POINT_SIZE * r;
-            }
-            if (absDt > 0) {
-                const { points, velocities, ages, origins, maxAge, activeFlags } = this.jet;
-                const posAttr = points.geometry.attributes.position;
-                const alphaAttr = points.geometry.attributes.alpha;
-                for (let i = 0; i < velocities.length / 3; i++) {
-                    if (activeFlags[i] === 0) continue; // skip inactive slots
-
-                    ages[i] += absDt;
-                    if (ages[i] > maxAge) {
-                        // Particle has completed its flight — deactivate permanently.
-                        activeFlags[i] = 0;
-                        alphaAttr.array[i] = 0;
-                        continue;
-                    }
-                    // Fade out with age
-                    alphaAttr.array[i] = 1.0 - ages[i] / maxAge;
-                    // Compute world position: origin + velocity * age
-                    posAttr.array[i * 3]     = origins[i * 3]     + velocities[i * 3]     * ages[i];
-                    posAttr.array[i * 3 + 1] = origins[i * 3 + 1] + velocities[i * 3 + 1] * ages[i];
-                    posAttr.array[i * 3 + 2] = origins[i * 3 + 2] + velocities[i * 3 + 2] * ages[i];
-                }
-                posAttr.needsUpdate = true;
-                alphaAttr.needsUpdate = true;
-            }
-        }
+        this.updateJet(dt);
 
         // Keep accretion disk centered on black hole
         if (this.accretion && this.accretion.points) {
@@ -609,7 +648,8 @@ export class BlackHole extends CelestialBody {
 
             // Check depletion threshold BEFORE applying the transfer so the frame
             // that crosses 0.01 M☉ also stops the mass drain.
-            const wouldBeDepleted = star.mass - transfer > 0 && star.mass - transfer < SUN_MASS * 0.01;
+            const wouldBeDepleted =
+                star.mass - transfer > 0 && star.mass - transfer < SUN_MASS * 0.01;
             const wouldBeGone = star.mass - transfer <= 0;
 
             if (!wouldBeDepleted && !wouldBeGone) {
@@ -675,9 +715,9 @@ export class BlackHole extends CelestialBody {
     die() {
         // Clean up jet
         if (this.jet) {
-            this.scene.remove(this.jet.points);
-            this.jet.points.geometry.dispose();
-            const jetMat = this.jet.points.material;
+            this.scene.remove(this.jet.lines);
+            this.jet.lines.geometry.dispose();
+            const jetMat = this.jet.lines.material;
             if (!Array.isArray(jetMat)) jetMat.dispose();
             this.jet = null;
         }
