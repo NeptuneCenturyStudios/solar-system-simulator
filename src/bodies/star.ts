@@ -9,6 +9,7 @@ import { IStateDependencies } from '../interfaces';
 import { StarBirth } from '../effects/star-birth';
 import { IRotation } from '../physics/physics';
 import { Supernova } from '../effects/supernova';
+import { SolarFlare, SolarFlareType } from '../effects/solar-flare';
 
 /**
  * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.
@@ -62,6 +63,11 @@ export class Star extends CelestialBody {
     lightIntensity: number;
     ambientLight: THREE.AmbientLight | null;
     sunLight: THREE.DirectionalLight | null;
+
+    // Solar flare state
+    activeSolarFlares: SolarFlare[];
+    _solarFlareTimer: number;
+    _nextFlareInterval: number;
 
     /**
      * @param {object} dependencies - same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
@@ -174,6 +180,11 @@ export class Star extends CelestialBody {
         this.birthEffect = null;
         this.isBirthing = false;
         this._startBirthEffect();
+
+        // Solar flare state
+        this.activeSolarFlares = [];
+        this._solarFlareTimer = 0;
+        this._nextFlareInterval = 5 + Math.random() * 25;
 
         // Apply mass-based visual state immediately (e.g. brown dwarf if mass is too low)
         this.setMass(this.mass);
@@ -450,6 +461,55 @@ export class Star extends CelestialBody {
             if (this.sunLight.castShadow) {
                 this.sunLight.shadow.needsUpdate = true;
             }
+        }
+
+        // Solar flare timer
+        if (
+            !this.isBirthing &&
+            !(this.bodyType & BodyTypeEnum.BrownDwarf) &&
+            !this._isDisposed
+        ) {
+            this._solarFlareTimer += dt;
+            if (this._solarFlareTimer >= this._nextFlareInterval) {
+                this._solarFlareTimer = 0;
+                this._nextFlareInterval = 5 + Math.random() * 25;
+                this._triggerSolarFlare();
+            }
+        }
+
+        // Update active solar flares, dispose finished ones
+        for (let i = this.activeSolarFlares.length - 1; i >= 0; i--) {
+            this.activeSolarFlares[i].update(dt);
+            if (!this.activeSolarFlares[i].active) {
+                this.activeSolarFlares[i].dispose();
+                this.activeSolarFlares.splice(i, 1);
+            }
+        }
+    }
+
+    _triggerSolarFlare() {
+        if (!this.mesh || this._isDisposed) return;
+
+        // 75% small cone burst, 25% large arc loop
+        const type: SolarFlareType = Math.random() < 0.75 ? 'small' : 'large';
+        const colorHex = this.baseColor.getHex();
+
+        try {
+            const flare = new SolarFlare(
+                this.dependencies,
+                this.scene,
+                this.mesh.position,
+                this.radius,
+                type,
+                colorHex
+            );
+            this.activeSolarFlares.push(flare);
+
+            if (type === 'large' && this.dependencies?.addEvent) {
+                this.dependencies.addEvent(`Solar flare erupts on ${this.name}!`);
+            }
+        } catch (e) {
+            console.error('Error triggering solar flare:', e);
         }
     }
 
@@ -840,6 +900,15 @@ export class Star extends CelestialBody {
                 this.corona.dispose();
                 this.corona = null;
             }
+        } catch {
+            // ignore
+        }
+
+        try {
+            for (const flare of this.activeSolarFlares) {
+                flare.dispose();
+            }
+            this.activeSolarFlares = [];
         } catch {
             // ignore
         }

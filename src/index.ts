@@ -67,19 +67,14 @@ import {
     SimulationStartMode,
 } from './utilities/consts.js';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo.js';
-import {
-    isBodyType,
-    pickRandom,
-    createUniqueId,
-    BodyTypeEnum,
-} from './utilities/utilities.js';
+import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities.js';
 import { calculateTrajectory } from './physics/physics.js';
 import {
     randomStarParams,
     randomBlackHoleParams,
     randomPlanetParams,
     randomMoonParams,
-    randomCometParams
+    randomCometParams,
 } from './utilities/body-params.js';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
 import { Supernova } from './effects/supernova.js';
@@ -686,6 +681,8 @@ const EVENT_FADE_START = 3000; // Start fading after 3 seconds
 
 function addEvent(message: string) {
     eventLog.push(new EventLogEntry(message));
+    // Add the event message to the console as well for better visibility
+    console.info(message);
     // Keep only recent events
     while (eventLog.length > MAX_EVENTS) {
         eventLog.shift();
@@ -2427,9 +2424,7 @@ function createPresetBody(presetKey: string) {
             // immediately destroy the new star by placing it at (0,0,0).
             const hasCentralBody =
                 !!primaryStar ||
-                simulationState.bodies.some(
-                    (b) => b && !b._isDisposed && b instanceof BlackHole
-                );
+                simulationState.bodies.some((b) => b && !b._isDisposed && b instanceof BlackHole);
             const pos = hasCentralBody ? getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
 
             newBody = new Star(
@@ -2580,8 +2575,15 @@ function createNewBody(
             simulationState.bodies.some((b) => b && !b._isDisposed && b instanceof BlackHole);
         const starPos = _hasCentralBody ? getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
 
-        const { mass: newStarMass, radius: newStarRadius, temperature: newStarTemp } =
-            randomStarParams({ mass: customMass, radius: customRadius, temperature: customTemperature });
+        const {
+            mass: newStarMass,
+            radius: newStarRadius,
+            temperature: newStarTemp,
+        } = randomStarParams({
+            mass: customMass,
+            radius: customRadius,
+            temperature: customTemperature,
+        });
 
         newBody = new Star(
             dependencies,
@@ -2732,8 +2734,12 @@ function createNewBody(
             const parentVel = focusedBody.velocity.clone();
 
             // Step 2: random distance from parent surface
-            const { mass: moonMass, radius: moonRadius, distance: moonDistance, rotationSpeed: moonRotationSpeed } =
-                randomMoonParams(focusedBody.radius, { mass: customMass, radius: customRadius });
+            const {
+                mass: moonMass,
+                radius: moonRadius,
+                distance: moonDistance,
+                rotationSpeed: moonRotationSpeed,
+            } = randomMoonParams(focusedBody.radius, { mass: customMass, radius: customRadius });
 
             // Step 3: random radial direction using uniform sphere sampling
             //   theta ∈ [0, 2π), phi ∈ [0, π] distributed uniformly via inverse CDF
@@ -2868,7 +2874,10 @@ function createNewBody(
             inclination
         );
 
-        const { mass: cometMass, radius: cometRadius } = randomCometParams({ mass: customMass, radius: customRadius });
+        const { mass: cometMass, radius: cometRadius } = randomCometParams({
+            mass: customMass,
+            radius: customRadius,
+        });
         const cometMaterial = new THREE.MeshStandardMaterial({
             color: 0x888888,
             emissive: 0x000000,
@@ -2952,8 +2961,7 @@ function createNewBody(
 
 function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     // Only touches background visuals + management checkboxes (if already initialized).
-    const hideKuiper =
-        mode === SimulationStartMode.Empty || mode === SimulationStartMode.BlackHole;
+    const hideKuiper = mode === SimulationStartMode.Empty || mode === SimulationStartMode.BlackHole;
 
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = !hideKuiper;
@@ -6906,13 +6914,18 @@ managementPanel.on(
         if (velocity !== null || orbitalAngle !== null || inclination !== null) {
             const currentVel = body.velocity.clone();
             const currentSpeed = currentVel.length();
-            const currentAngleDeg = ((Math.atan2(currentVel.z, currentVel.x) * 180) / Math.PI + 360) % 360;
-            const currentHorizSpeed = Math.sqrt(currentVel.x * currentVel.x + currentVel.z * currentVel.z);
-            const currentInclinationDeg = (Math.atan2(currentVel.y, currentHorizSpeed) * 180) / Math.PI;
+            const currentAngleDeg =
+                ((Math.atan2(currentVel.z, currentVel.x) * 180) / Math.PI + 360) % 360;
+            const currentHorizSpeed = Math.sqrt(
+                currentVel.x * currentVel.x + currentVel.z * currentVel.z
+            );
+            const currentInclinationDeg =
+                (Math.atan2(currentVel.y, currentHorizSpeed) * 180) / Math.PI;
 
             const resolvedSpeed = velocity !== null ? velocity : currentSpeed;
             const resolvedAngleDeg = orbitalAngle !== null ? orbitalAngle : currentAngleDeg;
-            const resolvedInclinationDeg = inclination !== null ? inclination : currentInclinationDeg;
+            const resolvedInclinationDeg =
+                inclination !== null ? inclination : currentInclinationDeg;
 
             const angleRad = (resolvedAngleDeg * Math.PI) / 180;
             const inclinationRad = (resolvedInclinationDeg * Math.PI) / 180;
