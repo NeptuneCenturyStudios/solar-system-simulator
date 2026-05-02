@@ -695,13 +695,14 @@ function createEventLogTexture() {
 
     canvas.width = 600;
     canvas.height = 250;
+    const fontSize = 16;
 
     context.fillStyle = '#aaaaaa';
     context.textAlign = 'left';
     context.textBaseline = 'top';
-    context.font = '27px monospace';
+    context.font = `${fontSize}px monospace`;
 
-    const lineHeight = 40;
+    const lineHeight = fontSize + 8; // 8px padding between lines
     const leftPadding = 10;
     const now = performance.now();
 
@@ -1098,9 +1099,7 @@ const VEL_SCALE = 546; // The multiplier used to visualize speed as arrow length
 
 // --- Shared tuning constants ---
 const SIM = Object.freeze({
-    STEPS_PER_FRAME: 120,
     BASE_FRAME_DT: 0.016, // seconds (approx 60fps)
-    DT_SCALE: 60, // existing convention: multiply by 60 to normalize to "frames"
 });
 
 // Physics accuracy: adjustable substeps per frame (16–128, default 64)

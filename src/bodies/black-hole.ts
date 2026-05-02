@@ -302,7 +302,7 @@ export class BlackHole extends CelestialBody {
 
         angularPositions[slot] = angle;
 
-        const inwardSpeed = (8 + Math.random() * 0.1) * SCALE_FACTOR;
+        const inwardSpeed = (2 + Math.random() * 0.1) * SCALE_FACTOR;
         const orbitalSpeed = Math.sqrt(this.mass / maxRadius) * 0.005;
         vels[slot] = { inward: inwardSpeed, orbital: orbitalSpeed, radius: maxRadius };
 
