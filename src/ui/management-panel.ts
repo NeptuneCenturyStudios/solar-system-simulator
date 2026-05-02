@@ -44,6 +44,8 @@ export class ManagementPanel extends Panel {
     inclinationGroup: HTMLElement | null;
     inclinationSlider: HTMLInputElement | null;
     inclinationDisplay: HTMLElement | null;
+    orbitParentRow: HTMLElement | null;
+    orbitParentDisplay: HTMLElement | null;
     moonValidationMessage: HTMLElement | null;
     planetTypeGroup: HTMLElement | null;
     hasAtmosphereRow: HTMLElement | null;
@@ -96,6 +98,10 @@ export class ManagementPanel extends Panel {
     deleteBodyBtn: HTMLButtonElement | null;
     cancelEditBtn: HTMLButtonElement | null;
 
+    _editSpeedDirty: boolean;
+    _editAngleDirty: boolean;
+    _editInclinationDirty: boolean;
+
     // Environment toggles (owned by ManagementPanel)
     enableKuiperBeltCheckbox: HTMLInputElement | null;
 
@@ -125,6 +131,8 @@ export class ManagementPanel extends Panel {
         this.inclinationGroup = null;
         this.inclinationSlider = null;
         this.inclinationDisplay = null;
+        this.orbitParentRow = null;
+        this.orbitParentDisplay = null;
         this.moonValidationMessage = null;
         this.planetTypeGroup = null;
         this.hasAtmosphereRow = null;
@@ -177,6 +185,10 @@ export class ManagementPanel extends Panel {
         this.deleteBodyBtn = null;
         this.cancelEditBtn = null;
 
+        this._editSpeedDirty = false;
+        this._editAngleDirty = false;
+        this._editInclinationDirty = false;
+
         // Environment toggles (owned by ManagementPanel)
         this.enableKuiperBeltCheckbox = null;
 
@@ -200,6 +212,8 @@ export class ManagementPanel extends Panel {
         this.inclinationGroup = document.getElementById('inclinationGroup');
         this.inclinationSlider = document.getElementById('inclination') as HTMLInputElement | null;
         this.inclinationDisplay = document.getElementById('inclination-val');
+        this.orbitParentRow = document.getElementById('orbitParentRow');
+        this.orbitParentDisplay = document.getElementById('orbitParentDisplay');
         this.moonValidationMessage = document.getElementById('moonValidationMessage');
         this.planetTypeGroup = document.getElementById('planetTypeGroup');
         this.hasAtmosphereRow = document.getElementById('hasAtmosphereRow');
@@ -416,6 +430,7 @@ export class ManagementPanel extends Panel {
             if (isPreset) {
                 if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'none';
                 if (this.inclinationGroup) this.inclinationGroup.style.display = 'none';
+                if (this.orbitParentRow) this.orbitParentRow.style.display = 'none';
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
                 if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
@@ -439,6 +454,7 @@ export class ManagementPanel extends Panel {
                     this.createLightIntensityGroup.style.display = 'none';
                 if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'none';
                 if (this.inclinationGroup) this.inclinationGroup.style.display = 'none';
+                if (this.orbitParentRow) this.orbitParentRow.style.display = 'none';
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
                 if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
@@ -455,6 +471,8 @@ export class ManagementPanel extends Panel {
             } else if (bodyType && bodyType !== 'sun') {
                 if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'block';
                 if (this.inclinationGroup) this.inclinationGroup.style.display = 'block';
+                if (this.orbitParentRow) this.orbitParentRow.style.display = 'block';
+                this.updateOrbitParentDisplay();
 
                 const isCustomPlanet = bodyType === 'planet';
                 if (this.planetTypeGroup)
@@ -505,8 +523,10 @@ export class ManagementPanel extends Panel {
                     formatNumberForDisplay(value)
                 );
 
-                if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'none';
-                if (this.inclinationGroup) this.inclinationGroup.style.display = 'none';
+                if (this.orbitTypeGroup) this.orbitTypeGroup.style.display = 'block';
+                if (this.inclinationGroup) this.inclinationGroup.style.display = 'block';
+                if (this.orbitParentRow) this.orbitParentRow.style.display = 'block';
+                this.updateOrbitParentDisplay();
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
                 if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
@@ -711,6 +731,7 @@ export class ManagementPanel extends Panel {
                     customTemperature,
                     customLightIntensity,
                     customRadius,
+                    orbitParent: this.selectedBody,
                 });
 
                 closeCreationForm();
@@ -827,6 +848,7 @@ export class ManagementPanel extends Panel {
             const editVelocitySlider = this.editVelocitySlider;
             const editVelocityDisplay = this.editVelocityDisplay;
             editVelocitySlider.oninput = () => {
+                this._editSpeedDirty = true;
                 const value = parseFloat(editVelocitySlider.value);
                 editVelocityDisplay.textContent = value.toLocaleString(undefined, {
                     maximumFractionDigits: 1,
@@ -838,6 +860,7 @@ export class ManagementPanel extends Panel {
             const editOrbitalAngleSlider = this.editOrbitalAngleSlider;
             const editOrbitalAngleDisplay = this.editOrbitalAngleDisplay;
             editOrbitalAngleSlider.oninput = () => {
+                this._editAngleDirty = true;
                 const value = parseFloat(editOrbitalAngleSlider.value);
                 editOrbitalAngleDisplay.textContent = value.toFixed(0) + '°';
             };
@@ -847,6 +870,7 @@ export class ManagementPanel extends Panel {
             const editInclinationSlider = this.editInclinationSlider;
             const editInclinationDisplay = this.editInclinationDisplay;
             editInclinationSlider.oninput = () => {
+                this._editInclinationDirty = true;
                 const value = parseFloat(editInclinationSlider.value);
                 editInclinationDisplay.textContent = value.toFixed(0) + '°';
             };
@@ -871,15 +895,15 @@ export class ManagementPanel extends Panel {
                 const radius = this.editRadiusSlider
                     ? parseFloat(this.editRadiusSlider.value)
                     : null;
-                const velocity = this.editVelocitySlider
+                const velocity = this._editSpeedDirty && this.editVelocitySlider
                     ? parseFloat(this.editVelocitySlider.value)
-                    : 0;
-                const orbitalAngle = this.editOrbitalAngleSlider
+                    : null;
+                const orbitalAngle = this._editAngleDirty && this.editOrbitalAngleSlider
                     ? parseFloat(this.editOrbitalAngleSlider.value)
-                    : 0;
-                const inclination = this.editInclinationSlider
+                    : null;
+                const inclination = this._editInclinationDirty && this.editInclinationSlider
                     ? parseFloat(this.editInclinationSlider.value)
-                    : 0;
+                    : null;
                 const color = this.editColorInput ? this.editColorInput.value : null;
 
                 this.emit('applyEdit', {
@@ -1303,29 +1327,60 @@ export class ManagementPanel extends Panel {
         if (this.editVelocitySlider && this.editVelocityDisplay) {
             const editVelocitySlider = this.editVelocitySlider;
             const editVelocityDisplay = this.editVelocityDisplay;
-            editVelocitySlider.oninput = () => {
-                const value = parseFloat(editVelocitySlider.value);
-                editVelocityDisplay.textContent = value.toLocaleString(undefined, {
-                    maximumFractionDigits: 1,
-                });
-            };
-            (editVelocitySlider.oninput as () => void)();
+
+            // Populate from current velocity magnitude
+            const vel = (body as Body & { velocity?: { x: number; y: number; z: number } }).velocity;
+            const currentSpeed = vel
+                ? Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z)
+                : 0;
+            const maxSpeed = parseFloat(editVelocitySlider.max) || 200;
+            editVelocitySlider.value = String(Math.min(currentSpeed, maxSpeed));
+            editVelocityDisplay.textContent = Math.min(currentSpeed, maxSpeed).toLocaleString(undefined, {
+                maximumFractionDigits: 1,
+            });
         }
 
         if (this.editOrbitalAngleSlider && this.editOrbitalAngleDisplay) {
-            this.editOrbitalAngleSlider.value = this.editOrbitalAngleSlider.value || '0';
+            const vel = (body as Body & { velocity?: { x: number; y: number; z: number } }).velocity;
+            if (vel) {
+                const angleDeg = ((Math.atan2(vel.z, vel.x) * 180) / Math.PI + 360) % 360;
+                this.editOrbitalAngleSlider.value = String(Math.round(angleDeg));
+            } else {
+                this.editOrbitalAngleSlider.value = '0';
+            }
             this.editOrbitalAngleDisplay.textContent =
-                this.formatNumberForDisplay(parseFloat(this.editOrbitalAngleSlider.value || '0')) +
-                '°';
+                this.formatNumberForDisplay(parseFloat(this.editOrbitalAngleSlider.value)) + '°';
         }
 
         if (this.editInclinationSlider && this.editInclinationDisplay) {
-            this.editInclinationSlider.value = this.editInclinationSlider.value || '0';
+            const vel = (body as Body & { velocity?: { x: number; y: number; z: number } }).velocity;
+            if (vel) {
+                const horizontalSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+                const inclinationDeg = (Math.atan2(vel.y, horizontalSpeed) * 180) / Math.PI;
+                const maxInclination = parseFloat(this.editInclinationSlider.max) || 90;
+                this.editInclinationSlider.value = String(
+                    Math.min(Math.max(Math.round(inclinationDeg), 0), maxInclination)
+                );
+            } else {
+                this.editInclinationSlider.value = '0';
+            }
             this.editInclinationDisplay.textContent =
-                this.formatNumberForDisplay(parseFloat(this.editInclinationSlider.value || '0')) +
-                '°';
+                this.formatNumberForDisplay(parseFloat(this.editInclinationSlider.value)) + '°';
         }
 
         this.validateMoonCreation();
+        this.updateOrbitParentDisplay();
+        this._editSpeedDirty = false;
+        this._editAngleDirty = false;
+        this._editInclinationDirty = false;
+    }
+
+    updateOrbitParentDisplay(): void {
+        if (!this.orbitParentDisplay) return;
+        if (this.selectedBody && !this.selectedBody._isDisposed) {
+            this.orbitParentDisplay.textContent = this.selectedBody.name || 'Unnamed';
+        } else {
+            this.orbitParentDisplay.textContent = 'None';
+        }
     }
 }

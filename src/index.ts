@@ -2422,8 +2422,15 @@ function createPresetBody(presetKey: string) {
 
     switch (key) {
         case 'sun': {
-            // Spawn an additional Sun near the camera.
-            const pos = getNearCameraSpawnPos();
+            // First star goes to world center; additional stars spawn near the camera.
+            // Also treat an existing black hole as occupying the center so we don't
+            // immediately destroy the new star by placing it at (0,0,0).
+            const hasCentralBody =
+                !!primaryStar ||
+                simulationState.bodies.some(
+                    (b) => b && !b._isDisposed && b instanceof BlackHole
+                );
+            const pos = hasCentralBody ? getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
 
             newBody = new Star(
                 dependencies,
@@ -2472,19 +2479,18 @@ function createPresetBody(presetKey: string) {
             let earth = ensureEarth() as Earth;
             if (!earth) {
                 earth = new Earth(dependencies, scene);
-
                 simulationState.bodies.push(earth);
-
-                newBody = earth.createMoon(scene, {
-                    distance: MOON_DIST_FROM_EARTH,
-                    radius: MOON_RADIUS,
-                    mass: MOON_MASS,
-                    id: createUniqueId('moon'),
-                    name: 'Moon',
-                    trailColor: 0xffffff,
-                    maxTrail: 1500,
-                });
             }
+
+            newBody = earth.createMoon(scene, {
+                distance: MOON_DIST_FROM_EARTH,
+                radius: MOON_RADIUS,
+                mass: MOON_MASS,
+                id: createUniqueId('moon'),
+                name: 'Moon',
+                trailColor: 0xffffff,
+                maxTrail: 1500,
+            });
             break;
         }
         case 'mars': {
@@ -2522,27 +2528,6 @@ function createPresetBody(presetKey: string) {
 
     if (!newBody) return;
 
-    // Reposition non-star preset bodies near the camera with calculated orbital velocity
-    if (key !== 'sun' && key !== 'earth_moon') {
-        const presetSpawnPos = getNearCameraSpawnPos();
-        newBody.mesh.position.copy(presetSpawnPos);
-        const presetStar = getPrimaryStar();
-        const presetStarPos = presetStar
-            ? presetStar.mesh.position.clone()
-            : new THREE.Vector3(0, 0, 0);
-        const presetStarMass = presetStar ? presetStar.mass : SUN_MASS;
-        newBody.velocity.copy(
-            computeOrbitVelocityAtPos(
-                presetSpawnPos,
-                presetStarPos,
-                presetStarMass,
-                'circular',
-                0,
-                0
-            )
-        );
-    }
-
     simulationState.bodies.push(newBody);
 
     // Notify UI / systems that track live bodies
@@ -2578,7 +2563,7 @@ function createNewBody(
     customTemperature: number | null = null,
     customLightIntensity: number | null = null,
     customRadius: number | null = null,
-    moonParent: Body | null = null
+    orbitParent: Body | null = null
 ) {
     let newBody;
     let moonCreationParent: Body | null = null; // tracked so post-creation can re-focus the parent
@@ -2588,7 +2573,12 @@ function createNewBody(
         //
         // Defaults are randomized around star-like values so the user can override them
         // in the creation UI before the body is actually created.
-        const starPos = getNearCameraSpawnPos();
+        // First star goes to world center; additional stars spawn near the camera.
+        // Also treat an existing black hole as occupying the center.
+        const _hasCentralBody =
+            !!getPrimaryStar() ||
+            simulationState.bodies.some((b) => b && !b._isDisposed && b instanceof BlackHole);
+        const starPos = _hasCentralBody ? getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
 
         // Mass range: ~0.08 M☉ (red dwarf limit) up to ~150 M☉ (very massive / hypergiant-ish)
         // Use log sampling so we get interesting small/medium stars more often.
@@ -2626,7 +2616,17 @@ function createNewBody(
             {
                 radius: newStarRadius,
                 pos: starPos,
-                vel: new THREE.Vector3(0, 0, 0),
+                vel:
+                    orbitParent && !orbitParent._isDisposed
+                        ? computeOrbitVelocityAtPos(
+                              starPos,
+                              orbitParent.mesh.position.clone(),
+                              orbitParent.mass,
+                              orbitType,
+                              0.3,
+                              inclination
+                          )
+                        : new THREE.Vector3(0, 0, 0),
                 mass: newStarMass,
                 id: createUniqueId('star'),
                 name: generateIAUName(BodyTypeEnum.Star),
@@ -2657,11 +2657,12 @@ function createNewBody(
         }
     } else if (bodyType === 'planet') {
         // Create a new planet near the camera with appropriate orbital velocity
-        const primaryStar = getPrimaryStar();
-        const starPos = primaryStar
-            ? primaryStar.mesh.position.clone()
+        const planetParentBody =
+            orbitParent && !orbitParent._isDisposed ? orbitParent : getPrimaryStar();
+        const starPos = planetParentBody
+            ? planetParentBody.mesh.position.clone()
             : new THREE.Vector3(0, 0, 0);
-        const starMass = primaryStar ? primaryStar.mass : SUN_MASS;
+        const starMass = planetParentBody ? planetParentBody.mass : SUN_MASS;
 
         const spawnPos = getNearCameraSpawnPos();
         const spawnVel = computeOrbitVelocityAtPos(
@@ -2760,7 +2761,7 @@ function createNewBody(
     } else if (bodyType === 'moon') {
         // Create a moon orbiting the selected body (management panel selection takes priority)
         const focusedBody = (() => {
-            const candidate = moonParent || cameraState.focusBody;
+            const candidate = orbitParent || cameraState.focusBody;
             return candidate && !candidate._isDisposed && simulationState.bodies.includes(candidate)
                 ? candidate
                 : null;
@@ -2880,11 +2881,12 @@ function createNewBody(
     } else if (bodyType === 'asteroid') {
         // Create an asteroid near the camera with appropriate orbital velocity
         const asteroidSpawnPos = getNearCameraSpawnPos();
-        const asteroidPrimaryStar = getPrimaryStar();
-        const asteroidStarPos = asteroidPrimaryStar
-            ? asteroidPrimaryStar.mesh.position.clone()
+        const asteroidParentBody =
+            orbitParent && !orbitParent._isDisposed ? orbitParent : getPrimaryStar();
+        const asteroidStarPos = asteroidParentBody
+            ? asteroidParentBody.mesh.position.clone()
             : new THREE.Vector3(0, 0, 0);
-        const asteroidStarMass = asteroidPrimaryStar ? asteroidPrimaryStar.mass : SUN_MASS;
+        const asteroidStarMass = asteroidParentBody ? asteroidParentBody.mass : SUN_MASS;
         const asteroidVel = computeOrbitVelocityAtPos(
             asteroidSpawnPos,
             asteroidStarPos,
@@ -2901,11 +2903,12 @@ function createNewBody(
     } else if (bodyType === 'comet') {
         // Create a comet near the camera with appropriate orbital velocity
         const cometSpawnPos = getNearCameraSpawnPos();
-        const cometPrimaryStar = getPrimaryStar();
-        const cometStarPos = cometPrimaryStar
-            ? cometPrimaryStar.mesh.position.clone()
+        const cometParentBody =
+            orbitParent && !orbitParent._isDisposed ? orbitParent : getPrimaryStar();
+        const cometStarPos = cometParentBody
+            ? cometParentBody.mesh.position.clone()
             : new THREE.Vector3(0, 0, 0);
-        const cometStarMass = cometPrimaryStar ? cometPrimaryStar.mass : SUN_MASS;
+        const cometStarMass = cometParentBody ? cometParentBody.mass : SUN_MASS;
         const cometOrbitVel = computeOrbitVelocityAtPos(
             cometSpawnPos,
             cometStarPos,
@@ -6715,6 +6718,7 @@ managementPanel.on(
         customTemperature,
         customLightIntensity,
         customRadius,
+        orbitParent,
     }: {
         bodyType: string;
         planetType: string;
@@ -6725,6 +6729,7 @@ managementPanel.on(
         customTemperature: number | null;
         customLightIntensity: number | null;
         customRadius: number | null;
+        orbitParent: Body | null;
     }) => {
         createNewBody(
             bodyType,
@@ -6736,7 +6741,7 @@ managementPanel.on(
             customTemperature,
             customLightIntensity,
             customRadius,
-            bodyType === 'moon' ? (managementPanel.selectedBody ?? null) : null
+            orbitParent ?? null
         );
         refreshBodiesTable();
     }
@@ -6804,9 +6809,9 @@ managementPanel.on(
         mass: number;
         temperature: number | null;
         lightIntensity: number | null;
-        velocity: number;
-        orbitalAngle: number;
-        inclination: number;
+        velocity: number | null;
+        orbitalAngle: number | null;
+        inclination: number | null;
         color: number;
     }) => {
         if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
@@ -6879,18 +6884,26 @@ managementPanel.on(
             console.error('Error applying body radius edit:', e);
         }
 
-        // Apply new trajectory (velocity, orbital angle, and inclination)
-        if (velocity !== undefined && orbitalAngle !== undefined && inclination !== undefined) {
-            // Convert angles to radians
-            const angleRad = (orbitalAngle * Math.PI) / 180;
-            const inclinationRad = (inclination * Math.PI) / 180;
+        // Apply new trajectory (velocity, orbital angle, and inclination) only if explicitly set.
+        // Each control is tracked independently so changing only speed doesn't alter direction
+        // and changing only angle doesn't alter speed.
+        if (velocity !== null || orbitalAngle !== null || inclination !== null) {
+            const currentVel = body.velocity.clone();
+            const currentSpeed = currentVel.length();
+            const currentAngleDeg = ((Math.atan2(currentVel.z, currentVel.x) * 180) / Math.PI + 360) % 360;
+            const currentHorizSpeed = Math.sqrt(currentVel.x * currentVel.x + currentVel.z * currentVel.z);
+            const currentInclinationDeg = (Math.atan2(currentVel.y, currentHorizSpeed) * 180) / Math.PI;
 
-            // Create velocity vector based on angle and inclination
-            // Start with velocity in the XZ plane
-            const horizontalSpeed = velocity * Math.cos(inclinationRad);
-            const verticalSpeed = velocity * Math.sin(inclinationRad);
+            const resolvedSpeed = velocity !== null ? velocity : currentSpeed;
+            const resolvedAngleDeg = orbitalAngle !== null ? orbitalAngle : currentAngleDeg;
+            const resolvedInclinationDeg = inclination !== null ? inclination : currentInclinationDeg;
 
-            // Set velocity components
+            const angleRad = (resolvedAngleDeg * Math.PI) / 180;
+            const inclinationRad = (resolvedInclinationDeg * Math.PI) / 180;
+
+            const horizontalSpeed = resolvedSpeed * Math.cos(inclinationRad);
+            const verticalSpeed = resolvedSpeed * Math.sin(inclinationRad);
+
             body.velocity.x = horizontalSpeed * Math.cos(angleRad);
             body.velocity.y = verticalSpeed;
             body.velocity.z = horizontalSpeed * Math.sin(angleRad);

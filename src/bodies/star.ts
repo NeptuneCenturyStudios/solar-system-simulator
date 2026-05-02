@@ -121,7 +121,7 @@ export class Star extends CelestialBody {
             options.radius,
             color,
             options.pos,
-            new THREE.Vector3(0, 0, 0),
+            options.vel ?? new THREE.Vector3(0, 0, 0),
             options.mass,
             options.id,
             options.name,
