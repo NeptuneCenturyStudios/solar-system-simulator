@@ -4,6 +4,7 @@ import * as THREE from 'three';
 const SIPHON_SPEED_SCALE = 8;
 import { IPipelineFeedEffect } from './effect-base';
 import { IStateDependencies, ISiphonTarget } from '../interfaces';
+import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA } from '../utilities/consts';
 
 /** Maximum number of simultaneously in-flight siphon particles per stream. */
 const PARTICLE_COUNT = 800;
@@ -432,8 +433,8 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
             colArr[i * 3 + 1] = starG + (BH_G - starG) * t;
             colArr[i * 3 + 2] = starB + (BH_B - starB) * t;
 
-            // Opacity: 1.0 (star) → 0.12 (disk)
-            alphaArr[i] = 1.0 - 0.8 * t;
+            // Opacity: MAX_PARTICLE_ALPHA (star) → MIN_PARTICLE_ALPHA (disk)
+            alphaArr[i] = MAX_PARTICLE_ALPHA + (MIN_PARTICLE_ALPHA - MAX_PARTICLE_ALPHA) * t;
         }
 
         this.geometry.attributes.alpha.needsUpdate = true;

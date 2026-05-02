@@ -1,3 +1,15 @@
+// === Particle Alpha Range for Accretion Disk & Siphon Effects ===
+/**
+ * Minimum alpha (opacity) for accretion disk and siphon particles (at disk edge).
+ * Tune this to control how faint the outer disk/stream appears.
+ */
+export const MIN_PARTICLE_ALPHA = 0.5;
+
+/**
+ * Maximum alpha (opacity) for accretion disk and siphon particles (at source/star).
+ * Tune this to control how bright the stream/core appears.
+ */
+export const MAX_PARTICLE_ALPHA = 1.0;
 // Constants - Real-world scale ratios (Earth = 100 mass, 2000 distance, 8 radius)
 export const SCALE_FACTOR = 2;
 

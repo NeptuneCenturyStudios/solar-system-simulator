@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G } from '../utilities/consts.js';
+import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G, MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA } from '../utilities/consts.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body.js';
 import { IRotation } from '../physics/physics.js';
@@ -172,7 +172,7 @@ export class BlackHole extends CelestialBody {
     }
 
     createAccretionDisk() {
-        const count = 800;
+        const count = 200 * this.radius; // Max particles scales with BH size, keeping density roughly consistent across different masses. Tune the multiplier to adjust overall disk fullness.
         const geo = new THREE.BufferGeometry();
         const pArr = new Float32Array(count * 3);
         const colors = new Float32Array(count * 3);
@@ -492,8 +492,9 @@ export class BlackHole extends CelestialBody {
         const count = p.length / 3;
         const minRadius = this.accretion.minRadius;
         const maxRadius = this.accretion.maxRadius;
-        const minOpacity = 0.2;
-        const maxOpacity = 0.9;
+        // Use shared tunable alpha constants for accretion disk opacity
+        const minOpacity = MIN_PARTICLE_ALPHA;
+        const maxOpacity = MAX_PARTICLE_ALPHA;
         const colors = this.accretion.points.geometry.attributes.color.array;
 
         for (let i = 0; i < count; i++) {
@@ -540,7 +541,7 @@ export class BlackHole extends CelestialBody {
                 this.accretion.vels[i].radius = newRadius;
 
                 // Update opacity based on new radius (more opaque near center)
-                opacities[i] = maxOpacity - t * (maxOpacity - minOpacity);
+                opacities[i] = maxOpacity + (minOpacity - maxOpacity) * t;
             }
         }
 
