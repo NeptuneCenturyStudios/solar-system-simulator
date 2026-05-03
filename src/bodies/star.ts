@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { SHADOW_MAP_SIZE, SUN_MASS, SUN_RADIUS, SCALE_FACTOR, PLUTO_DIST, BROWN_DWARF_MASS_THRESHOLD } from '../utilities/consts';
-import { BodyTypeEnum, isBodyType } from '../utilities/utilities';
+import { SHADOW_MAP_SIZE, SUN_MASS, SUN_RADIUS, SCALE_FACTOR, PLUTO_DIST, BROWN_DWARF_MASS_THRESHOLD, MIN_BLACK_HOLE_MASS, MIN_NEUTRON_STAR_MASS } from '../utilities/consts';
+import { BodyTypeEnum, createUniqueId, isBodyType } from '../utilities/utilities';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { BlackHole } from './black-hole';
 import { triggerScreenFlash } from '../effects/screen-flash';
@@ -10,6 +10,7 @@ import { StarBirth } from '../effects/star-birth';
 import { IRotation } from '../physics/physics';
 import { Supernova } from '../effects/supernova';
 import { SolarFlare, SolarFlareType } from '../effects/solar-flare';
+import { Pulsar } from './pulsar';
 
 /**
  * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.
@@ -199,6 +200,25 @@ export class Star extends CelestialBody {
         return SUN_RADIUS * Math.pow(Math.max(0, mass) / SUN_MASS, 0.8);
     }
 
+    /**
+     * Computes the radius of a neutron star for a given mass, using a constant-density approximation.
+     * The radius scales with the cube root of mass, clamped to avoid degenerate geometry.
+     * Uses typical neutron star parameters (very small radius, high density).
+     * @param mass The mass of the neutron star (simulation units)
+     * @returns The radius of the neutron star (simulation units)
+     */
+    static massToNeutronStarRadius(mass: number): number {
+        // Use minimum neutron star mass and a typical neutron star radius as the base
+        // Typical neutron star radius ~12 km, but scale to simulation units
+        const BASE_MASS = MIN_NEUTRON_STAR_MASS;
+        const BASE_RADIUS = 1.5 * SCALE_FACTOR; // Chosen to be much smaller than a white dwarf, but visible
+
+        // Constant-density approximation: radius ∝ (mass)^(1/3)
+        const r = BASE_RADIUS * Math.cbrt(Math.max(0, mass) / BASE_MASS);
+        // Clamp to avoid degenerate geometry
+        return Math.max(0.01 * SCALE_FACTOR, r);
+    }
+
     static temperatureToColor(temp: number) {
         temp = Math.max(1000, Math.min(40000, temp));
 
@@ -371,9 +391,11 @@ export class Star extends CelestialBody {
             this.fuel -= burnRate;
 
             const fuelPercent = this.maxFuel !== null ? this.fuel / this.maxFuel : 0;
-            const isMassiveStar = this.initialMass > SUN_MASS * 3.3;
 
-            if (!isMassiveStar) {
+            // Check if star should start expanding into a red giant (only for stars that won't become neutron stars or black holes)
+            if (this.initialMass < MIN_NEUTRON_STAR_MASS) {
+
+                // Once fuel drops below 30%, start expanding and cooling into a red giant. This is a very simplified model just for visual effect.
                 if (fuelPercent < 0.3 && fuelPercent > 0) {
                     const expansionProgress = 1 - fuelPercent / 0.3;
                     const STAR_MAX_RADIUS = PLUTO_DIST;
@@ -414,9 +436,10 @@ export class Star extends CelestialBody {
                 }
             }
 
+            // Finally, if fuel is completely depleted, trigger star death.
             if (this.fuel <= 0) {
                 this.fuel = 0;
-                this.triggerStarDeath(isMassiveStar);
+                this.triggerStarDeath();
             }
         }
 
@@ -528,8 +551,9 @@ export class Star extends CelestialBody {
         return new StarBirth(this.dependencies, scene, pos, radius);
     }
 
-    triggerStarDeath(isMassiveStar: boolean) {
-        if (isMassiveStar) {
+    triggerStarDeath() {
+
+        if (this.initialMass > MIN_NEUTRON_STAR_MASS) {
             try {
                 this.createSupernova(this.mesh.position.clone(), this.radius, false);
             } catch (e) {
@@ -541,17 +565,36 @@ export class Star extends CelestialBody {
             } catch (e) {
                 console.error('Error triggering screen flash:', e);
             }
+        }
 
-            // TODO: Add random chance for black hole formation based on star mass
+        if (this.initialMass > MIN_NEUTRON_STAR_MASS && this.initialMass < MIN_BLACK_HOLE_MASS) {
+            try{
+                // TODO: Create pulsar instance
+                
+                // TODO: Uncomment wehen pulsar is implemented
+                // if (this.dependencies?.addBody) {
+                //     this.dependencies.addBody(pulsar);
+                // }
+
+                // if (this.dependencies?.addEvent) {
+                //     this.dependencies.addEvent(`Pulsar formed from ${this.name}!`);
+                // }
+            }
+            catch(e) {
+                console.error('Error creating neutron star:', e);
+            }
+
+            this.die(true);
+        }
+        if (this.initialMass >= MIN_BLACK_HOLE_MASS) {
             try {
                 const blackHoleMass = this.mass * 0.9999;
-                const uniqueBHId = `blackHole_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
                 const newBlackHole = new BlackHole(
                     this.dependencies,
                     this.scene,
                     this.mesh.position.clone(),
                     blackHoleMass,
-                    uniqueBHId,
+                    createUniqueId('blackhole'),
                     'Black Hole',
                     this.rotation,
                     true
@@ -713,7 +756,7 @@ export class Star extends CelestialBody {
         // Call before setting the BrownDwarf flag so the guard in setTemperature doesn't block it.
         this.setTemperature(1000);
         // Update the emmisive intensity to match the brown dwarf's low temperature.
-        
+
 
         this.bodyType |= BodyTypeEnum.BrownDwarf;
 
