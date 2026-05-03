@@ -14,6 +14,7 @@ body {
     overflow: hidden;
     background: #000;
     font-family: monospace;
+    font-size: 10pt;
     color: white;
 }
 
@@ -71,7 +72,6 @@ body {
 
 .modal button,
 #startup-modal button {
-    font-size: 0.85em;
 }
 
 #ui-layer,
@@ -156,7 +156,6 @@ body {
 #bodiesTableContainer table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 1em;
 }
 
 #bodiesTableContainer thead th {
@@ -166,7 +165,7 @@ body {
     color: #00ffcc;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    font-size: 0.85em;
+
     padding: 8px 6px;
     border-bottom: 1px solid #224466;
 }
@@ -208,11 +207,9 @@ body {
 }
 
 #editBodyName {
-    font-size: 0.8em;
     color: #00ffcc;
     margin-bottom: 15px;
     text-align: center;
-    font-weight: bold;
 }
 
 select {
@@ -223,7 +220,7 @@ select {
     border: 1px solid #00ffcc;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.9em;
+
     margin-bottom: 10px;
 }
 
@@ -238,7 +235,7 @@ select option {
 
 label {
     display: block;
-    font-size: 1em;
+
     margin-bottom: 4px;
     color: #00ffcc;
     text-transform: uppercase;
@@ -283,7 +280,6 @@ button.btn-slider-reset {
 }
 
 button.btn-slider-reset .material-symbols-outlined {
-    font-size: 16px;
 }
 
 .btn-row {
@@ -305,8 +301,8 @@ button {
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.75em;
-    font-weight: bold;
+
+    
     margin-bottom: 15px;
     transition: all 0.2s ease;
 }
@@ -348,7 +344,6 @@ button:disabled:hover {
     float: right;
     font-family: monospace;
     color: #fff;
-    font-size: 1em;
 }
 
 #resetBtn {
@@ -360,7 +355,6 @@ button:disabled:hover {
     color: white;
     padding: 10px;
     cursor: pointer;
-    font-weight: bold;
 }
 
 #resetBtn:hover {
@@ -395,7 +389,6 @@ button:disabled:hover {
     color: white;
     padding: 10px;
     cursor: pointer;
-    font-weight: bold;
 }
 
 #pauseBtn:hover {
@@ -419,7 +412,6 @@ button:disabled:hover {
 }
 
 .checkbox-row {
-    font-size: 1em;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -432,7 +424,6 @@ button:disabled:hover {
 }
 
 .radio-group label {
-    font-size: 0.65em;
     color: #00ffcc;
     text-transform: uppercase;
     margin-bottom: 6px;
@@ -448,7 +439,7 @@ button:disabled:hover {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.75em;
+
     cursor: pointer;
 }
 
@@ -459,7 +450,7 @@ button:disabled:hover {
 
 .radio-option label {
     cursor: pointer;
-    font-size: 1em;
+
     text-transform: none;
     margin: 0;
 }
@@ -471,7 +462,7 @@ button:disabled:hover {
     color: white;
     border: 1px solid #224466;
     border-radius: 4px;
-    font-size: 0.9em;
+
     font-family: monospace;
     transition: all 0.3s ease;
     box-sizing: border-box;
@@ -521,7 +512,6 @@ button:disabled:hover {
 }
 
 .validation-message {
-    font-size: 0.7em;
     color: #ff6b6b;
     background: rgba(255, 107, 107, 0.1);
     border: 1px solid #ff6b6b;
@@ -543,7 +533,7 @@ button:disabled:hover {
         'wght' 400,
         'GRAD' 0,
         'opsz' 24;
-    font-size: 18px;
+
     line-height: 1;
     vertical-align: middle;
     pointer-events: none;
@@ -558,7 +548,6 @@ button.btn-icon-only {
 }
 
 button.btn-icon-only .material-symbols-outlined {
-    font-size: 20px;
 }
 
 button.btn-with-icon {
@@ -601,7 +590,7 @@ button.btn-with-icon {
     display: grid;
     gap: 10px;
     margin-bottom: 14px;
-    font-size: 1.25em;
+
     line-height: 1.5;
     color: #fff;
 }
@@ -609,7 +598,6 @@ button.btn-with-icon {
 .modal__body a {
     color: #7dd3fc;
     text-decoration: none;
-    font-weight: 700;
     border-bottom: 1px solid rgba(125, 211, 252, 0.35);
     transition:
         color 0.2s ease,
