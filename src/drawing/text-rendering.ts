@@ -1,9 +1,15 @@
 import * as THREE from 'three';
 
-// Function to create text texture from canvas
-export function createTextTexture(text) {
+/**
+ * Creates a THREE.js texture from a string of text, rendered on a canvas with glow effect.
+ * Used for rendering labels or UI text in the 3D scene.
+ * @param text - The text to render.
+ * @returns The resulting texture.
+ */
+export function createTextTexture(text: string): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not get 2D context');
 
     // Set canvas size
     canvas.width = 512;

@@ -2,14 +2,19 @@ import * as THREE from 'three';
 
 import { SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
-import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body.js';
+import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { IStateDependencies } from '../interfaces.js';
 
 //export interface ICometCreationOptions extends ICelestialBodyCreationOptions {
 //// Add any comet-specific options here if needed in the future
 //}
 
-// Helper function to create random polyhedron geometry (comet nucleus)
+/**
+ * Helper function to create a random polyhedron geometry for a comet nucleus.
+ * Distorts an icosahedron to give the nucleus an irregular, icy shape.
+ * @param radius The base radius of the polyhedron.
+ * @returns A THREE.BufferGeometry representing the distorted polyhedron.
+ */
 function createRandomPolyhedron(radius: number) {
     // Start with an icosahedron and distort it for an irregular nucleus
     const geometry = new THREE.IcosahedronGeometry(radius, 0);
@@ -31,6 +36,10 @@ function createRandomPolyhedron(radius: number) {
  * This class represents a comet, which is a type of celestial body with a nucleus and a tail. The tail is created using a particle system that emits particles in the opposite direction
  * of the comet's velocity. The comet's nucleus is represented as a distorted icosahedron to give it an irregular shape.
  */
+/**
+ * Represents a comet in the simulation, including its nucleus and particle tail.
+ * Inherits from CelestialBody and adds comet-specific tail rendering and logic.
+ */
 export class Comet extends CelestialBody {
     private tailCount: number;
     private tailGeo: THREE.BufferGeometry | null;
@@ -43,6 +52,13 @@ export class Comet extends CelestialBody {
         | { life: number; lifeIncrement: number; vel: THREE.Vector3; isBlue: boolean }[]
         | null;
 
+    /**
+     * Constructs a new Comet with a nucleus and initializes its tail particle system.
+     * @param deps State dependencies for the simulation.
+     * @param scene The THREE.Scene to which the comet belongs.
+     * @param options Creation options for the comet.
+     * @param material The material used for rendering the comet nucleus.
+     */
     constructor(
         deps: IStateDependencies,
         scene: THREE.Scene,

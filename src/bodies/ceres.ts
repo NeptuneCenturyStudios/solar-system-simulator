@@ -1,11 +1,21 @@
 import * as THREE from 'three';
-import { CelestialBody } from './celestial-body.js';
+import { CelestialBody } from './celestial-body';
 import { calculateTrajectory } from '../physics/physics.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { CERES_DISTANCE, CERES_MASS, CERES_RADIUS, SUN_MASS } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
+/**
+ * Represents the dwarf planet Ceres in the simulation.
+ * Sets up its trajectory, material, and physical properties.
+ */
 export class Ceres extends CelestialBody {
+    /**
+     * Constructs a new Ceres object with its unique properties and orbit.
+     * @param dependencies State dependencies for the simulation.
+     * @param scene The THREE.Scene to which Ceres belongs.
+     * @param ceresTexture The texture to use for rendering Ceres.
+     */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, ceresTexture: THREE.Texture) {
         const trajectory = calculateTrajectory(CERES_DISTANCE, SUN_MASS);
 

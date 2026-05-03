@@ -8,10 +8,19 @@ import {
     COMET_RADIUS,
 } from '../utilities/consts.js';
 
-import { Comet } from './comet.js';
+import { Comet } from './comet';
 import { IStateDependencies } from '../interfaces.js';
 
+/**
+ * Represents Halley's Comet in the simulation, with a realistic elliptical orbit and physical properties.
+ * Inherits from Comet and sets up Halley-specific trajectory and material.
+ */
 export class Halley extends Comet {
+    /**
+     * Constructs a new Halley object with its unique elliptical orbit and properties.
+     * @param dependencies State dependencies for the simulation.
+     * @param scene The THREE.Scene to which Halley belongs.
+     */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         // Halley-like elliptical orbit
         const perihelion = COMET_PERIHELION_DIST; // Just outside Mars (scaled)

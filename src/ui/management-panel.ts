@@ -1,4 +1,4 @@
-import { Panel } from './panel.js';
+import { Panel } from './panel';
 import {
     EARTH_MASS,
     EARTH_RADIUS,

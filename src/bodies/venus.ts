@@ -3,13 +3,22 @@ import { calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, VENUS_DIST, VENUS_MASS, VENUS_RADIUS } from '../utilities/consts.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
-import { CelestialBody } from './celestial-body.js';
+import { CelestialBody } from './celestial-body';
 import { IStateDependencies } from '../interfaces.js';
 
 const venusTexture = loadSrgbTexture('./assets/textures/venus.jpg');
 const venusAtmosphereTexture = loadSrgbTexture('./assets/textures/venus_atmosphere.jpg');
 
+/**
+ * Represents the planet Venus in the simulation, including its surface and cloud layer.
+ * Sets up Venus's trajectory, material, and cloud rendering.
+ */
 export class Venus extends CelestialBody {
+    /**
+     * Constructs a new Venus object with its unique properties, orbit, and cloud layer.
+     * @param dependencies State dependencies for the simulation.
+     * @param scene The THREE.Scene to which Venus belongs.
+     */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         const trajectory = calculateTrajectory(VENUS_DIST, SUN_MASS);
 

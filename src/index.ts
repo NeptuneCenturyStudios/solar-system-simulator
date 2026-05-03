@@ -65,49 +65,50 @@ import {
     HYGIEA_DISTANCE,
     HYGIEA_RADIUS,
     SimulationStartMode,
-} from './utilities/consts.js';
-import { CoordinateGizmo } from './gizmos/coordinate-gizmo.js';
-import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities.js';
-import { calculateTrajectory } from './physics/physics.js';
+
+} from './utilities/consts';
+import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
+import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities';
+import { calculateTrajectory } from './physics/physics';
 import {
     randomStarParams,
     randomBlackHoleParams,
     randomPlanetParams,
     randomMoonParams,
     randomCometParams,
-} from './utilities/body-params.js';
-import { loadSrgbTexture, fictionalTextures } from './drawing/textures.js';
-import { Supernova } from './effects/supernova.js';
-import { ParticleExplosion } from './effects/particle-explosion.js';
-import { WarpEffect } from './effects/warp-effect.js';
-import { triggerScreenFlash } from './effects/screen-flash.js';
-import { GravitationalLensingEffect } from './effects/gravitational-lensing.js';
-import { Body } from './bodies/body.js';
-import { CelestialBody } from './bodies/celestial-body.js';
-import { Mercury } from './bodies/mercury.js';
-import { Venus } from './bodies/venus.js';
-import { Earth } from './bodies/earth.js';
-import { Mars } from './bodies/mars.js';
-import { Jupiter } from './bodies/jupiter.js';
-import { Saturn } from './bodies/saturn.js';
-import { Uranus } from './bodies/uranus.js';
-import { Neptune } from './bodies/neptune.js';
-import { Pluto } from './bodies/pluto.js';
-import { Ceres } from './bodies/ceres.js';
-import { BlackHole } from './bodies/black-hole.js';
+} from './utilities/body-params';
+import { loadSrgbTexture, fictionalTextures } from './drawing/textures';
+import { Supernova } from './effects/supernova';
+import { ParticleExplosion } from './effects/particle-explosion';
+import { WarpEffect } from './effects/warp-effect';
+import { triggerScreenFlash } from './effects/screen-flash';
+import { GravitationalLensingEffect } from './effects/gravitational-lensing';
+import { Body } from './bodies/body';
+import { CelestialBody } from './bodies/celestial-body';
+import { Mercury } from './bodies/mercury';
+import { Venus } from './bodies/venus';
+import { Earth } from './bodies/earth';
+import { Mars } from './bodies/mars';
+import { Jupiter } from './bodies/jupiter';
+import { Saturn } from './bodies/saturn';
+import { Uranus } from './bodies/uranus';
+import { Neptune } from './bodies/neptune';
+import { Pluto } from './bodies/pluto';
+import { Ceres } from './bodies/ceres';
+import { BlackHole } from './bodies/black-hole';
 import { Star } from './bodies/star';
-import { Asteroid } from './bodies/asteroid.js';
-import { Comet } from './bodies/comet.js';
+import { Asteroid } from './bodies/asteroid';
+import { Comet } from './bodies/comet';
 
-import { Spaceship } from './bodies/spaceship.js';
-import { MainPanel } from './ui/main-panel.js';
-import { ManagementPanel } from './ui/management-panel.js';
-import { FlightControlsPanel } from './ui/flight-controls-panel.js';
-import { StartupModal } from './ui/startup-modal.js';
-import { AboutModal } from './ui/about-modal.js';
-import { EventLogEntry } from './event-log/event-log.js';
-import { Halley } from './bodies/halley.js';
-import { IStateDependencies } from './interfaces.js';
+import { Spaceship } from './bodies/spaceship';
+import { MainPanel } from './ui/main-panel';
+import { ManagementPanel } from './ui/management-panel';
+import { FlightControlsPanel } from './ui/flight-controls-panel';
+import { StartupModal } from './ui/startup-modal';
+import { AboutModal } from './ui/about-modal';
+import { EventLogEntry } from './event-log/event-log';
+import { Halley } from './bodies/halley';
+import { IStateDependencies } from './interfaces';
 
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');

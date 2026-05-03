@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G, MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA } from '../utilities/consts.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
-import { CelestialBody } from './celestial-body.js';
+import { CelestialBody } from './celestial-body';
 import { IRotation } from '../physics/physics.js';
 import { IStateDependencies, ISiphonTarget } from '../interfaces.js';
 import { IPipelineFeedEffect } from '../effects/effect-base.js';
@@ -56,6 +56,10 @@ const SIPHON_MASS_TRANSFER_SCALE = 0.0001;
 const ACCRETION_INJECT_MIN_INTERVAL = 0.25;
 const ACCRETION_INJECT_MAX_INTERVAL = 0.75;
 
+/**
+ * Represents a black hole in the simulation, including accretion disk and jet effects.
+ * Inherits from CelestialBody and adds black hole-specific physics and rendering.
+ */
 export class BlackHole extends CelestialBody {
     jet: {
         lines: THREE.LineSegments;
@@ -136,6 +140,10 @@ export class BlackHole extends CelestialBody {
         }
     }
 
+    /**
+     * Creates a glowing ring sprite at the event horizon edge to visually represent the accretion glow.
+     * This is an optional visual effect for performance tuning.
+     */
     createAccretionGlow() {
         // Glowing ring at event horizon edge
         const canvas = document.createElement('canvas');
@@ -171,6 +179,13 @@ export class BlackHole extends CelestialBody {
         this.scene.add(this.accretionGlow);
     }
 
+    /**
+     * Creates and initializes the accretion disk particle system for the black hole.
+     * Sets up geometry, color, opacity, and custom shader logic for the disk.
+     * The disk is composed of many particles that spiral inward and can be seeded or injected.
+     *
+     * @returns {IAccretionDiskState} The initialized accretion disk state, including geometry, velocities, and control arrays.
+     */
     createAccretionDisk() {
         const count = 200 * this.radius; // Max particles scales with BH size, keeping density roughly consistent across different masses. Tune the multiplier to adjust overall disk fullness.
         const geo = new THREE.BufferGeometry();
@@ -333,6 +348,12 @@ export class BlackHole extends CelestialBody {
         }
     }
 
+    /**
+     * Creates and initializes the relativistic jet particle system for the black hole.
+     * Sets up geometry, color, and shader logic for the jet beams.
+     *
+     * @returns {object} The initialized jet state, including geometry, velocities, and control arrays.
+     */
     createJet() {
         const jetCount = 200;
         const velocities = new Float32Array(jetCount * 3);
@@ -432,6 +453,12 @@ export class BlackHole extends CelestialBody {
         colArr[slot * 6 + 5] = BLACK_HOLE_JET_BEAM_COLOR.b;
     }
 
+    /**
+     * Updates the black hole's radius and rescales all associated visual effects (accretion disk, glow, etc).
+     * Preserves in-flight particles by updating geometry/materials in place.
+     *
+     * @param {number} newRadius - The new radius for the black hole.
+     */
     setRadius(newRadius: number) {
         super.setRadius(newRadius);
 
@@ -451,6 +478,10 @@ export class BlackHole extends CelestialBody {
         }
     }
 
+    /**
+     * Disposes of the accretion disk particle system and associated resources.
+     * Removes the disk from the scene and cleans up geometry/materials.
+     */
     disposeAccretionDisk() {
         if (this.accretion && this.accretion.points) {
             this.scene.remove(this.accretion.points);
@@ -461,6 +492,12 @@ export class BlackHole extends CelestialBody {
         this.accretion = null;
     }
 
+    /**
+     * Updates the accretion disk animation and particle positions for the current simulation step.
+     * Handles particle injection, spiral motion, color/opacity changes, and jet handoff.
+     *
+     * @param {number} dt - The simulation time delta.
+     */
     updateAccretion(dt: number) {
         if (!this.accretion) return;
 
@@ -555,6 +592,12 @@ export class BlackHole extends CelestialBody {
         }
     }
 
+    /**
+     * Updates the jet particle system for the current simulation step.
+     * Advances beam positions, fades expired beams, and updates geometry/colors.
+     *
+     * @param {number} dt - The simulation time delta.
+     */
     updateJet(dt: number) {
         if (this.jet) {
             const absDt = Math.abs(dt);
@@ -616,6 +659,13 @@ export class BlackHole extends CelestialBody {
         }
     }
 
+    /**
+     * Updates the black hole's physics and all associated visual effects for the current simulation step.
+     * Calls parent update, then updates accretion disk, jet, and siphon effects.
+     *
+     * @param {THREE.Vector3} acc - The acceleration vector.
+     * @param {number} dt - The simulation time delta.
+     */
     update(acc: THREE.Vector3, dt: number) {
         // Call parent update for physics
         super.update(acc, dt);
@@ -755,6 +805,10 @@ export class BlackHole extends CelestialBody {
         }
     }
 
+    /**
+     * Cleans up all resources and effects associated with the black hole before removal.
+     * Disposes of jets, accretion disk, glow, and siphon streams, then calls parent die.
+     */
     die() {
         // Clean up jet
         if (this.jet) {

@@ -1,35 +1,40 @@
-import { Panel } from './panel.js';
+import { Panel } from './panel';
 
 /**
- * Startup modal shown before first launch and on reset
+ * Startup modal shown before first launch and on reset.
+ * Handles launch options and modal overlay logic.
  */
 export class StartupModal extends Panel {
-    constructor(elementId) {
-        super(elementId);
+    modalEl: HTMLElement | null;
+    launchDefaultBtn: HTMLButtonElement | null;
+    launchEmptyBtn: HTMLButtonElement | null;
+    launchBlackHoleBtn: HTMLButtonElement | null;
+    cancelBtn: HTMLButtonElement | null;
+    _allowCancel: boolean;
 
+    constructor(elementId: string) {
+        super(elementId);
         this.modalEl = document.getElementById('startup-modal');
         this.launchDefaultBtn = null;
         this.launchEmptyBtn = null;
         this.launchBlackHoleBtn = null;
         this.cancelBtn = null;
-
         this._allowCancel = false;
     }
 
     initialize() {
-        this.launchDefaultBtn = document.getElementById('startupLaunchDefaultBtn');
-        this.launchEmptyBtn = document.getElementById('startupLaunchEmptyBtn');
-        this.launchBlackHoleBtn = document.getElementById('startupLaunchBlackHoleBtn');
-        this.cancelBtn = document.getElementById('startupCancelBtn');
+        this.launchDefaultBtn = document.getElementById('startupLaunchDefaultBtn') as HTMLButtonElement | null;
+        this.launchEmptyBtn = document.getElementById('startupLaunchEmptyBtn') as HTMLButtonElement | null;
+        this.launchBlackHoleBtn = document.getElementById('startupLaunchBlackHoleBtn') as HTMLButtonElement | null;
+        this.cancelBtn = document.getElementById('startupCancelBtn') as HTMLButtonElement | null;
 
-        // Ensure overlay blocks all underlying interactions
         if (this.element) {
-            const stop = (e) => {
+            const stop = (e: Event) => {
                 e.preventDefault();
                 e.stopPropagation();
             };
             ['mousedown', 'mouseup', 'mousemove', 'click', 'wheel', 'keydown', 'keyup'].forEach(
-                (evt) => this.element.addEventListener(evt, stop, { passive: false })
+                (evt) => this.element!.addEventListener(evt, stop, { passive: false })
             );
         }
 
@@ -47,7 +52,7 @@ export class StartupModal extends Panel {
         }
     }
 
-    open({ allowCancel = false } = {}) {
+    open({ allowCancel = false }: { allowCancel?: boolean } = {}) {
         this._allowCancel = !!allowCancel;
         if (this.cancelBtn) {
             this.cancelBtn.style.display = this._allowCancel ? '' : 'none';
@@ -55,7 +60,7 @@ export class StartupModal extends Panel {
         this.show();
     }
 
-    isVisible() {
+    isVisible(): boolean {
         return !!this.element && this.element.classList.contains('visible');
     }
 }

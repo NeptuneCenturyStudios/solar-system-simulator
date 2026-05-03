@@ -1,11 +1,16 @@
-import { Panel } from './panel.js';
+import { Panel } from './panel';
 
 /**
- * Flight Controls panel.
- * Emits: 'spawnShip', 'toggleView', 'exitFlight', 'autopilot'
+ * Flight Controls panel for managing ship controls in the UI.
+ * Emits: 'spawnShip', 'toggleView', 'exitFlight', 'autopilot'.
  */
 export class FlightControlsPanel extends Panel {
-    constructor(elementId) {
+    spawnBtn: HTMLButtonElement | null;
+    toggleViewBtn: HTMLButtonElement | null;
+    exitBtn: HTMLButtonElement | null;
+    autopilotBtn: HTMLButtonElement | null;
+
+    constructor(elementId: string) {
         super(elementId);
         this.spawnBtn = null;
         this.toggleViewBtn = null;
@@ -14,10 +19,10 @@ export class FlightControlsPanel extends Panel {
     }
 
     initialize() {
-        this.spawnBtn = document.getElementById('flightSpawnBtn');
-        this.toggleViewBtn = document.getElementById('flightToggleViewBtn');
-        this.exitBtn = document.getElementById('flightExitBtn');
-        this.autopilotBtn = document.getElementById('flightAutopilotBtn');
+        this.spawnBtn = document.getElementById('flightSpawnBtn') as HTMLButtonElement | null;
+        this.toggleViewBtn = document.getElementById('flightToggleViewBtn') as HTMLButtonElement | null;
+        this.exitBtn = document.getElementById('flightExitBtn') as HTMLButtonElement | null;
+        this.autopilotBtn = document.getElementById('flightAutopilotBtn') as HTMLButtonElement | null;
 
         if (this.spawnBtn) {
             this.spawnBtn.onclick = () => this.emit('spawnShip');
@@ -37,12 +42,10 @@ export class FlightControlsPanel extends Panel {
         this.setAutopilotState(false, false);
     }
 
-    /** Update toggle-view button label to reflect current perspective. */
-    setViewState(isCockpit) {
+    setViewState(isCockpit: boolean) {
         if (!this.toggleViewBtn) return;
         const iconEl = this.toggleViewBtn.querySelector('.material-symbols-outlined');
         if (iconEl) iconEl.textContent = isCockpit ? 'airline_seat_recline_normal' : 'visibility';
-        // Rebuild text node after the icon span
         while (iconEl && iconEl.nextSibling) this.toggleViewBtn.removeChild(iconEl.nextSibling);
         if (iconEl)
             this.toggleViewBtn.appendChild(
@@ -50,19 +53,13 @@ export class FlightControlsPanel extends Panel {
             );
     }
 
-    /** Enable/disable buttons depending on whether a ship is active. */
-    setFlightActive(isActive) {
+    setFlightActive(isActive: boolean) {
         if (this.spawnBtn) this.spawnBtn.disabled = isActive;
         if (this.toggleViewBtn) this.toggleViewBtn.disabled = !isActive;
         if (this.exitBtn) this.exitBtn.disabled = !isActive;
     }
 
-    /**
-     * Update the autopilot button state.
-     * @param {boolean} isEngaged  - Whether autopilot is currently running.
-     * @param {boolean} isEnabled  - Whether the button should be clickable.
-     */
-    setAutopilotState(isEngaged, isEnabled) {
+    setAutopilotState(isEngaged: boolean, isEnabled: boolean) {
         if (!this.autopilotBtn) return;
         this.autopilotBtn.disabled = !isEnabled;
         const iconEl = this.autopilotBtn.querySelector('.material-symbols-outlined');

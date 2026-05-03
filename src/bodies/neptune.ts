@@ -1,12 +1,22 @@
 import * as THREE from 'three';
 
-import { CelestialBody } from './celestial-body.js';
+import { CelestialBody } from './celestial-body';
 import { calculateTrajectory } from '../physics/physics.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { NEPTUNE_DIST, NEPTUNE_MASS, SUN_MASS, NEPTUNE_RADIUS } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
+/**
+ * Represents the planet Neptune in the simulation, including its texture and orbital properties.
+ * Sets up Neptune's trajectory, material, and physical parameters.
+ */
 export class Neptune extends CelestialBody {
+    /**
+     * Constructs a new Neptune object with its unique properties and orbit.
+     * @param dependencies State dependencies for the simulation.
+     * @param scene The THREE.Scene to which Neptune belongs.
+     * @param neptuneTexture The texture to use for rendering Neptune.
+     */
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,

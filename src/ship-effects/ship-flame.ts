@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SCALE_FACTOR } from '../utilities/consts.js';
-import { IShipEffect } from './ship-effect-base.js';
+import { IShipEffect } from './ship-effect-base';
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { CelestialBody } from './celestial-body.js';
+import { CelestialBody } from './celestial-body';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { IStateDependencies } from '../interfaces.js';
 
@@ -18,6 +18,12 @@ export interface IAsteroidOptions {
     metalness?: number;
 }
 
+/**
+ * Creates a random polyhedron geometry by distorting an icosahedron.
+ * Used to give asteroids a more natural, irregular shape.
+ * @param radius The base radius of the polyhedron.
+ * @returns A THREE.BufferGeometry representing the distorted polyhedron.
+ */
 function createRandomPolyhedron(radius: number): THREE.BufferGeometry {
     const geometry = new THREE.IcosahedronGeometry(radius, 0);
     const positions = geometry.attributes.position.array;
@@ -33,6 +39,10 @@ function createRandomPolyhedron(radius: number): THREE.BufferGeometry {
     return geometry;
 }
 
+/**
+ * Represents an asteroid in the simulation, inheriting from CelestialBody.
+ * Randomizes shape, color, and physical properties if not provided.
+ */
 export class Asteroid extends CelestialBody {
     constructor(
         deps: IStateDependencies,

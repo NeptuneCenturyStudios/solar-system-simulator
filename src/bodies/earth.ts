@@ -3,7 +3,7 @@ import { calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, EARTH_MASS, EARTH_DIST, EARTH_RADIUS } from '../utilities/consts.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
-import { CelestialBody } from './celestial-body.js';
+import { CelestialBody } from './celestial-body';
 import { IStateDependencies } from '../interfaces.js';
 
 const earthDayTexture = loadSrgbTexture('./assets/textures/earth_day.jpg');
@@ -11,7 +11,16 @@ const earthCloudsTexture = loadSrgbTexture('./assets/textures/earth_clouds.jpg')
 earthCloudsTexture.wrapS = THREE.RepeatWrapping;
 earthCloudsTexture.wrapT = THREE.RepeatWrapping;
 
+/**
+ * Represents the planet Earth in the simulation, including its surface and cloud layer.
+ * Sets up Earth's trajectory, material, and cloud rendering.
+ */
 export class Earth extends CelestialBody {
+    /**
+     * Constructs a new Earth object with its unique properties, orbit, and cloud layer.
+     * @param dependencies State dependencies for the simulation.
+     * @param scene The THREE.Scene to which Earth belongs.
+     */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         const earthTrajectory = calculateTrajectory(EARTH_DIST, SUN_MASS);
 

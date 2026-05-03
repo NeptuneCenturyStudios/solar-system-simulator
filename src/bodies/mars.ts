@@ -3,12 +3,21 @@ import { calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, MARS_MASS, MARS_DIST, MARS_RADIUS } from '../utilities/consts.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
-import { CelestialBody } from './celestial-body.js';
+import { CelestialBody } from './celestial-body';
 import { IStateDependencies } from '../interfaces.js';
 
 const marsTexture = loadSrgbTexture('./assets/textures/mars.jpg');
 
+/**
+ * Represents the planet Mars in the simulation, including its texture and orbital properties.
+ * Sets up Mars's trajectory, material, and physical parameters.
+ */
 export class Mars extends CelestialBody {
+    /**
+     * Constructs a new Mars object with its unique properties and orbit.
+     * @param dependencies State dependencies for the simulation.
+     * @param scene The THREE.Scene to which Mars belongs.
+     */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         const trajectory = calculateTrajectory(MARS_DIST, SUN_MASS);
 

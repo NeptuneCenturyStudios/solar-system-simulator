@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { Body, IBodyCreationOptions } from './body.js';
-import { moonTexture, fictionalTextures } from '../drawing/textures.js';
-import { pickRandom, BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
-import { calculateTrajectory, IRotation } from '../physics/physics.js';
-import { ParticleExplosion } from '../effects/particle-explosion.js';
-import { triggerScreenFlash } from '../effects/screen-flash.js';
-import { SCALE_FACTOR } from '../utilities/consts.js';
-import { createTextTexture } from '../drawing/text-rendering.js';
-import { IStateDependencies } from '../interfaces.js';
+import { Body, IBodyCreationOptions } from './body';
+import { moonTexture, fictionalTextures } from '../drawing/textures';
+import { pickRandom, BodyTypeEnum, isBodyType } from '../utilities/utilities';
+import { calculateTrajectory, IRotation } from '../physics/physics';
+import { ParticleExplosion } from '../effects/particle-explosion';
+import { triggerScreenFlash } from '../effects/screen-flash';
+import { SCALE_FACTOR } from '../utilities/consts';
+import { createTextTexture } from '../drawing/text-rendering';
+import { IStateDependencies } from '../interfaces';
 
 export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
     pos: THREE.Vector3;
@@ -56,6 +56,20 @@ export class CelestialBody extends Body {
     _tidalLockConfigured: boolean;
     _tidalLockOmegaInitialized: boolean = false;
 
+    /**
+     * Constructs a new CelestialBody with advanced features like trails, rings, clouds, and tidal locking.
+     * @param deps State dependencies for the simulation.
+     * @param scene The THREE.Scene to which the body belongs.
+     * @param mass The mass of the body.
+     * @param radius The radius of the body.
+     * @param pos The initial position of the body.
+     * @param vel The initial velocity of the body.
+     * @param geometry The geometry used for rendering.
+     * @param material The material used for rendering.
+     * @param id Unique identifier for the body.
+     * @param name Name of the body.
+     * @param bodyType The type of the body (enum).
+     */
     constructor(
         deps = {} as IStateDependencies,
         scene: THREE.Scene,

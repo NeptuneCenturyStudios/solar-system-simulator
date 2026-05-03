@@ -1,59 +1,72 @@
-import { Panel } from './panel.js';
-import { escapeHtml } from './html.js';
+import { Panel } from './panel';
+import { escapeHtml } from './html';
+import { Body } from '../bodies/body';
 
 /**
- * Main control panel managing camera, time controls, and settings
+ * Main control panel managing camera, time controls, and settings for the simulation UI.
  */
 export class MainPanel extends Panel {
-    constructor(elementId) {
-        super(elementId);
+    freeCameraBtn: HTMLButtonElement | null;
+    zoomInBtn: HTMLButtonElement | null;
+    zoomOutBtn: HTMLButtonElement | null;
+    bodiesTableContainer: HTMLElement | null;
+    _selectedBodyRef: Body | null;
+    lockToSunCheckbox: HTMLInputElement | null;
+    enableShadowsCheckbox: HTMLInputElement | null;
+    showTrailsCheckbox: HTMLInputElement | null;
+    showNamesCheckbox: HTMLInputElement | null;
+    timeScaleSlider: HTMLInputElement | null;
+    timeScaleDisplay: HTMLElement | null;
+    timeScaleResetBtn: HTMLButtonElement | null;
+    substepsSlider: HTMLInputElement | null;
+    substepsDisplay: HTMLElement | null;
+    substepsResetBtn: HTMLButtonElement | null;
+    pauseBtn: HTMLButtonElement | null;
+    resetBtn: HTMLButtonElement | null;
+    manageSystemBtn: HTMLButtonElement | null;
+    donateBtn: HTMLButtonElement | null;
+    copyrightYearEl: HTMLElement | null;
+    targetBtn: HTMLButtonElement | null;
+    lookAtBtn: HTMLButtonElement | null;
+    surfaceCameraBtn: HTMLButtonElement | null;
 
-        // Camera buttons
+    constructor(elementId: string) {
+        super(elementId);
         this.freeCameraBtn = null;
         this.zoomInBtn = null;
         this.zoomOutBtn = null;
-
-        // Bodies list/table
         this.bodiesTableContainer = null;
         this._selectedBodyRef = null;
-
-        // Checkboxes
         this.lockToSunCheckbox = null;
         this.enableShadowsCheckbox = null;
         this.showTrailsCheckbox = null;
         this.showNamesCheckbox = null;
-
-        // Sliders
         this.timeScaleSlider = null;
         this.timeScaleDisplay = null;
         this.timeScaleResetBtn = null;
         this.substepsSlider = null;
         this.substepsDisplay = null;
         this.substepsResetBtn = null;
-
-        // Buttons
         this.pauseBtn = null;
         this.resetBtn = null;
         this.manageSystemBtn = null;
         this.donateBtn = null;
         this.copyrightYearEl = null;
+        this.targetBtn = null;
+        this.lookAtBtn = null;
+        this.surfaceCameraBtn = null;
     }
 
-    /**
-     * Initialize all UI elements and event listeners
-     */
     initialize() {
-        // New camera / selection controls
         this.bodiesTableContainer = document.getElementById('bodiesTableContainer');
-        this.targetBtn = document.getElementById('camTargetBtn');
-        this.lookAtBtn = document.getElementById('camLookAtBtn');
-        this.freeCameraBtn = document.getElementById('freeCameraBtn');
-        this.surfaceCameraBtn = document.getElementById('surfaceCameraBtn');
-        this.zoomInBtn = document.getElementById('zoomInBtn');
-        this.zoomOutBtn = document.getElementById('zoomOutBtn');
+        this.targetBtn = document.getElementById('camTargetBtn') as HTMLButtonElement | null;
+        this.lookAtBtn = document.getElementById('camLookAtBtn') as HTMLButtonElement | null;
+        this.freeCameraBtn = document.getElementById('freeCameraBtn') as HTMLButtonElement | null;
+        this.surfaceCameraBtn = document.getElementById('surfaceCameraBtn') as HTMLButtonElement | null;
+        this.zoomInBtn = document.getElementById('zoomInBtn') as HTMLButtonElement | null;
+        this.zoomOutBtn = document.getElementById('zoomOutBtn') as HTMLButtonElement | null;
 
         if (this.bodiesTableContainer) {
-            // Initial empty table render
             this.renderBodiesTable([]);
         }
 
@@ -76,57 +89,54 @@ export class MainPanel extends Panel {
             this.zoomOutBtn.onclick = () => this.emit('zoomOut');
         }
 
-        // Existing toggles/sliders/buttons
-        this.lockToSunCheckbox = document.getElementById('lockToSun');
-        this.enableShadowsCheckbox = document.getElementById('enableShadows');
-        this.showTrailsCheckbox = document.getElementById('showTrails');
-        this.showNamesCheckbox = document.getElementById('showNames');
-        this.timeScaleSlider = document.getElementById('timeScale');
+        this.lockToSunCheckbox = document.getElementById('lockToSun') as HTMLInputElement | null;
+        this.enableShadowsCheckbox = document.getElementById('enableShadows') as HTMLInputElement | null;
+        this.showTrailsCheckbox = document.getElementById('showTrails') as HTMLInputElement | null;
+        this.showNamesCheckbox = document.getElementById('showNames') as HTMLInputElement | null;
+        this.timeScaleSlider = document.getElementById('timeScale') as HTMLInputElement | null;
         this.timeScaleDisplay = document.getElementById('speed-val');
-        this.pauseBtn = document.getElementById('pauseBtn');
-        this.resetBtn = document.getElementById('resetBtn');
-        this.manageSystemBtn = document.getElementById('manageSystemBtn');
-        this.donateBtn = document.getElementById('donateBtn');
+        this.pauseBtn = document.getElementById('pauseBtn') as HTMLButtonElement | null;
+        this.resetBtn = document.getElementById('resetBtn') as HTMLButtonElement | null;
+        this.manageSystemBtn = document.getElementById('manageSystemBtn') as HTMLButtonElement | null;
+        this.donateBtn = document.getElementById('donateBtn') as HTMLButtonElement | null;
         this.copyrightYearEl = document.getElementById('copyrightYear');
 
         if (this.copyrightYearEl) {
-            this.copyrightYearEl.textContent = new Date().getFullYear();
+            this.copyrightYearEl.textContent = new Date().getFullYear().toString();
         }
 
-        // Wire up checkboxes
         if (this.lockToSunCheckbox) {
             this.lockToSunCheckbox.onchange = () => {
-                this.emit('lockToSunChange', { checked: this.lockToSunCheckbox.checked });
+                this.emit('lockToSunChange', { checked: this.lockToSunCheckbox!.checked });
             };
         }
 
         if (this.enableShadowsCheckbox) {
             this.enableShadowsCheckbox.onchange = () => {
-                this.emit('shadowsChange', { checked: this.enableShadowsCheckbox.checked });
+                this.emit('shadowsChange', { checked: this.enableShadowsCheckbox!.checked });
             };
         }
 
         if (this.showTrailsCheckbox) {
             this.showTrailsCheckbox.onchange = () => {
-                this.emit('trailsChange', { checked: this.showTrailsCheckbox.checked });
+                this.emit('trailsChange', { checked: this.showTrailsCheckbox!.checked });
             };
         }
 
         if (this.showNamesCheckbox) {
             this.showNamesCheckbox.onchange = () => {
-                this.emit('namesChange', { checked: this.showNamesCheckbox.checked });
+                this.emit('namesChange', { checked: this.showNamesCheckbox!.checked });
             };
         }
 
-        // Wire up sliders
         if (this.timeScaleSlider) {
             this.timeScaleSlider.oninput = () => {
-                const value = parseFloat(this.timeScaleSlider.value);
+                const value = parseFloat(this.timeScaleSlider!.value);
                 this.emit('timeScaleChange', { value });
             };
         }
 
-        this.timeScaleResetBtn = document.getElementById('timeScaleResetBtn');
+        this.timeScaleResetBtn = document.getElementById('timeScaleResetBtn') as HTMLButtonElement | null;
         if (this.timeScaleResetBtn) {
             this.timeScaleResetBtn.onclick = () => {
                 if (this.timeScaleSlider) this.timeScaleSlider.value = '1';
@@ -134,17 +144,17 @@ export class MainPanel extends Panel {
             };
         }
 
-        this.substepsSlider = document.getElementById('substepsSlider');
+        this.substepsSlider = document.getElementById('substepsSlider') as HTMLInputElement | null;
         this.substepsDisplay = document.getElementById('substeps-val');
         if (this.substepsSlider) {
             this.substepsSlider.oninput = () => {
-                const value = parseInt(this.substepsSlider.value, 10);
+                const value = parseInt(this.substepsSlider!.value, 10);
                 if (this.substepsDisplay) this.substepsDisplay.textContent = `${value}`;
                 this.emit('substepsChange', { value });
             };
         }
 
-        this.substepsResetBtn = document.getElementById('substepsResetBtn');
+        this.substepsResetBtn = document.getElementById('substepsResetBtn') as HTMLButtonElement | null;
         if (this.substepsResetBtn) {
             this.substepsResetBtn.onclick = () => {
                 if (this.substepsSlider) this.substepsSlider.value = '64';
@@ -153,7 +163,6 @@ export class MainPanel extends Panel {
             };
         }
 
-        // Wire up buttons
         if (this.pauseBtn) {
             this.pauseBtn.onclick = () => {
                 this.emit('pause');
@@ -179,46 +188,36 @@ export class MainPanel extends Panel {
         }
     }
 
-    /**
-     * Update time scale display
-     */
-    updateTimeScaleDisplay(value) {
+    updateTimeScaleDisplay(value: string) {
         if (this.timeScaleDisplay) {
             this.timeScaleDisplay.textContent = `${value}`;
         }
     }
 
-    _ensureButtonIconEl(btn) {
+    _ensureButtonIconEl(btn: HTMLElement | null): HTMLElement | null {
         if (!btn) return null;
         return btn.querySelector('.material-symbols-outlined');
     }
 
-    _setButtonIcon(btn, iconName) {
+    _setButtonIcon(btn: HTMLElement | null, iconName: string) {
         const iconEl = this._ensureButtonIconEl(btn);
         if (iconEl) iconEl.textContent = iconName;
     }
 
-    _setButtonLabel(btn, labelText) {
+    _setButtonLabel(btn: HTMLElement | null, labelText: string) {
         if (!btn) return;
-        // For "text + icon" buttons, update the label portion while preserving the icon span.
-        // Convention: icon span is first child, label is a text node after it.
         const iconEl = btn.querySelector('.material-symbols-outlined');
         if (!iconEl) {
             btn.textContent = labelText;
             return;
         }
-
-        // Remove everything after icon span and rebuild label.
         while (iconEl.nextSibling) {
             btn.removeChild(iconEl.nextSibling);
         }
         btn.appendChild(document.createTextNode(' ' + labelText));
     }
 
-    /**
-     * Set pause button state
-     */
-    setPauseState(isPaused) {
+    setPauseState(isPaused: boolean) {
         if (this.pauseBtn) {
             if (isPaused) {
                 this.pauseBtn.classList.add('paused');
@@ -232,10 +231,7 @@ export class MainPanel extends Panel {
         }
     }
 
-    /**
-     * Set free camera button state
-     */
-    setFreeCameraState(isActive) {
+    setFreeCameraState(isActive: boolean) {
         if (this.freeCameraBtn) {
             if (isActive) {
                 this.freeCameraBtn.classList.add('active');
@@ -249,11 +245,9 @@ export class MainPanel extends Panel {
         }
     }
 
-    setSurfaceCameraState({ isActive, isEnabled }) {
+    setSurfaceCameraState({ isActive, isEnabled }: { isActive: boolean; isEnabled: boolean }) {
         if (!this.surfaceCameraBtn) return;
-
         this.surfaceCameraBtn.disabled = !isEnabled;
-
         if (isActive) {
             this.surfaceCameraBtn.classList.add('active');
             this._setButtonIcon(this.surfaceCameraBtn, 'directions_walk');
@@ -265,10 +259,7 @@ export class MainPanel extends Panel {
         }
     }
 
-    /**
-     * Set look-at button state (toggle)
-     */
-    setLookAtState(isActive) {
+    setLookAtState(isActive: boolean) {
         if (!this.lookAtBtn) return;
         if (isActive) {
             this.lookAtBtn.classList.add('active');
@@ -281,10 +272,7 @@ export class MainPanel extends Panel {
         }
     }
 
-    /**
-     * Set target button state (toggle)
-     */
-    setTargetState(isActive) {
+    setTargetState(isActive: boolean) {
         if (!this.targetBtn) return;
         if (isActive) {
             this.targetBtn.classList.add('active');
@@ -297,68 +285,55 @@ export class MainPanel extends Panel {
         }
     }
 
-    /**
-     * Render/update the bodies table.
-     * @param {Array<{name:string,typeLabel:string,body:any,isShip:boolean}>} rows
-     * @param {boolean} hasShip - Whether a spaceship exists (enables Fly Here buttons).
-     * @param {any|null} autopilotTarget - The body currently being tracked by autopilot (or null).
-     */
-    renderBodiesTable(rows, hasShip = false, autopilotTarget = null) {
+    renderBodiesTable(
+        rows: Array<{ name: string; typeLabel: string; body: Body; isShip: boolean }>,
+        hasShip = false,
+        autopilotTarget: Body | null = null
+    ) {
         if (!this.bodiesTableContainer) return;
-
         const safeRows = Array.isArray(rows) ? rows : [];
-
         const html = `
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style="width: 50%">Name</th>
-                                    <th style="width: 30%">Type</th>
-                                    <th style="width: 20%"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${
-                                    safeRows.length === 0
-                                        ? `<tr><td colspan="3" style="opacity:0.7; padding:10px 6px;">No bodies</td></tr>`
-                                        : safeRows
-                                              .map((r) => {
-                                                  const isSel =
-                                                      this._selectedBodyRef &&
-                                                      r.body === this._selectedBodyRef;
-                                                  const isApTarget =
-                                                      autopilotTarget && r.body === autopilotTarget;
-                                                  // Show "Fly Here" only for non-ship bodies when a ship exists
-                                                  const flyBtnHtml =
-                                                      !r.isShip && hasShip
-                                                          ? `<td style="padding:2px 4px;"><button class="fly-here-btn${isApTarget ? ' active' : ''}" data-flyhere="1" title="${isApTarget ? 'Cancel autopilot' : 'Fly to this body'}" style="font-size:0.72em;padding:2px 6px;cursor:pointer;">${isApTarget ? '✕' : '✈'}</button></td>`
-                                                          : `<td></td>`;
-                                                  return `
-                                                      <tr class="${isSel ? 'selected' : ''}" data-row="1">
-                                                          <td>${escapeHtml(r.name || 'Unnamed')}</td>
-                                                          <td>${escapeHtml(r.typeLabel || 'Unknown')}</td>
-                                                          ${flyBtnHtml}
-                                                      </tr>
-                                                  `;
-                                              })
-                                              .join('')
-                                }
-                            </tbody>
-                        </table>
-                    `;
-
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50%">Name</th>
+                        <th style="width: 30%">Type</th>
+                        <th style="width: 20%"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${
+                        safeRows.length === 0
+                            ? `<tr><td colspan="3" style="opacity:0.7; padding:10px 6px;">No bodies</td></tr>`
+                            : safeRows
+                                  .map((r) => {
+                                      const isSel =
+                                          this._selectedBodyRef && r.body === this._selectedBodyRef;
+                                      const isApTarget =
+                                          autopilotTarget && r.body === autopilotTarget;
+                                      const flyBtnHtml =
+                                          !r.isShip && hasShip
+                                              ? `<td style="padding:2px 4px;"><button class="fly-here-btn${isApTarget ? ' active' : ''}" data-flyhere="1" title="${isApTarget ? 'Cancel autopilot' : 'Fly to this body'}" style="font-size:0.72em;padding:2px 6px;cursor:pointer;">${isApTarget ? '✕' : '✈'}</button></td>`
+                                              : `<td></td>`;
+                                      return `
+                                          <tr class="${isSel ? 'selected' : ''}" data-row="1">
+                                              <td>${escapeHtml(r.name || 'Unnamed')}</td>
+                                              <td>${escapeHtml(r.typeLabel || 'Unknown')}</td>
+                                              ${flyBtnHtml}
+                                          </tr>
+                                      `;
+                                  })
+                                  .join('')
+                    }
+                </tbody>
+            </table>
+        `;
         this.bodiesTableContainer.innerHTML = html;
-
-        // Bind clicks
         const tbody = this.bodiesTableContainer.querySelector('tbody');
         if (!tbody) return;
-
         const trList = Array.from(tbody.querySelectorAll('tr'));
         trList.forEach((tr, idx) => {
-            // Skip empty placeholder row (no bodies)
             if (!safeRows[idx]) return;
-
-            // "Fly Here" button — stop row-select propagation
             const flyBtn = tr.querySelector('[data-flyhere]');
             if (flyBtn) {
                 flyBtn.addEventListener('click', (e) => {
@@ -368,7 +343,6 @@ export class MainPanel extends Panel {
                     this.emit('autopilot', { body: row.body });
                 });
             }
-
             tr.addEventListener('click', () => {
                 const row = safeRows[idx];
                 if (!row || !row.body) return;
@@ -378,12 +352,7 @@ export class MainPanel extends Panel {
         });
     }
 
-    /**
-     * Update which body is highlighted in the table.
-     */
-    setSelectedBody(body) {
-        this._selectedBodyRef = body || null;
-        // Re-render will update selected class
-        // (caller should pass rows again if needed; we keep selection state)
+    setSelectedBody(body: Body | null) {
+        this._selectedBodyRef = body;
     }
 }

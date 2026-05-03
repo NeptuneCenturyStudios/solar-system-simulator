@@ -27,6 +27,20 @@ export class Body {
     protected labelHeight = 0;
     tempAcc?: THREE.Vector3;
 
+    /**
+     * Constructs a new Body with physical and visual properties.
+     * @param dependencies External dependencies for the body.
+     * @param scene The THREE.Scene to which the body belongs.
+     * @param mass The mass of the body.
+     * @param radius The radius of the body.
+     * @param position The initial position of the body.
+     * @param velocity The initial velocity of the body.
+     * @param geometry The geometry used for rendering.
+     * @param material The material used for rendering.
+     * @param id Unique identifier for the body.
+     * @param name Name of the body.
+     * @param bodyType The type of the body (enum).
+     */
     constructor(
         dependencies: object,
         scene: THREE.Scene,

@@ -30,6 +30,10 @@ export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
  * Note: This file intentionally does NOT import textures directly. They are injected via `textures`
  * so `main.js` remains the single place that loads texture assets.
  */
+/**
+ * Represents a star (e.g. Sun) in the simulation, including visuals like corona, glow, and light.
+ * Handles star-specific physics, rendering, and lifecycle events.
+ */
 export class Star extends CelestialBody {
     dependencies: IStateDependencies;
     textures: {

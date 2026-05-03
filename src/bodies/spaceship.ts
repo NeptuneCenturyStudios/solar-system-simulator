@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
-import { Body } from './body.js';
+import { Body } from './body';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 import { IShipEffect } from '../ship-effects/ship-effect-base.js';
@@ -26,6 +26,14 @@ export class Spaceship extends Body {
     /** Glowing engine exhaust trail rendered as a connected line in world space. */
     trail: IShipEffect;
 
+    /**
+     * Constructs a new Spaceship object with camera offsets and placeholder geometry.
+     * @param dependencies External dependencies for the spaceship.
+     * @param scene The THREE.Scene to which the spaceship belongs.
+     * @param position The initial position of the spaceship.
+     * @param velocity The initial velocity of the spaceship.
+     * @param id Unique identifier for the spaceship.
+     */
     constructor(
         dependencies: object,
         scene: THREE.Scene,
