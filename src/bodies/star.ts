@@ -3,9 +3,7 @@ import { SHADOW_MAP_SIZE, SUN_MASS, SUN_RADIUS, SCALE_FACTOR, MIN_NEUTRON_STAR_M
 import { BodyTypeEnum, isBodyType } from '../utilities/utilities';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
-import { Corona } from '../effects/corona';
 import { IStateDependencies } from '../interfaces';
-import { StarBirth } from '../effects/star-birth';
 import { IRotation } from '../physics/physics';
 
 /**
@@ -15,17 +13,18 @@ export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
     temperature: number;
     lightIntensity: number;
     lightDistance: number;
+    rotation: IRotation;
 }
 
 /**
  * Star (e.g. Sun). Owns star-only visuals:
  * - emissive surface material with temperature-based texture bins
- * - corona particle system
- * - glow sprite
  * - directional light + ambient light
  *
  * Note: This file intentionally does NOT import textures directly. They are injected via `textures`
  * so `main.js` remains the single place that loads texture assets.
+ *
+ * Main-sequence-specific visuals (glow, corona, solar flares, birth effect) live in MainSequenceStar.
  */
 /**
  * Represents a star (e.g. Sun) in the simulation, including visuals like corona, glow, and light.
@@ -42,14 +41,8 @@ export class Star extends CelestialBody {
         whiteDwarfTexture: THREE.Texture | null;
         brownDwarfTexture: THREE.Texture | null;
     };
-    rotation: IRotation;
-    temperature: number;
 
-    visualTime: number;
-    corona: Corona | null;
-    isBirthing: boolean;
-    birthEffect: StarBirth | null;
-    sunGlow: THREE.Sprite<THREE.Object3DEventMap> | null;
+    temperature: number;
 
     // Lighting effects
     lightIntensity: number;
@@ -106,8 +99,6 @@ export class Star extends CelestialBody {
             shininess: 10,
         });
 
-        const rotation: IRotation = { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 };
-
         super(
             dependencies,
             scene,
@@ -122,14 +113,13 @@ export class Star extends CelestialBody {
             0xffffff,
             500,
             false,
-            rotation,
+            options.rotation,
             undefined,
             starMaterial
         );
 
         this.dependencies = dependencies;
         this.textures = textures;
-        this.rotation = rotation;
         this.lightIntensity = options.lightIntensity;
 
         this.temperature = options.temperature;
@@ -139,8 +129,6 @@ export class Star extends CelestialBody {
             this.mesh.material.emissiveIntensity = 1.0;
         }
 
-        this.corona = new Corona(dependencies, scene, options.radius + 1, this.baseColor.getHex());
-        this.sunGlow = this.createGlow(options.radius, this.baseColor.getHex());
         this.sunLight = this.createLight(
             options.pos,
             options.lightIntensity,
@@ -150,12 +138,7 @@ export class Star extends CelestialBody {
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
         scene.add(this.ambientLight);
 
-        this.visualTime = 0;
-
         this.setTemperature(options.temperature);
-
-        this.birthEffect = null;
-        this.isBirthing = false;
     }
 
     /** Computes the expected radius for a star of the given mass using a mass-radius power law (R ∝ M^0.8). */
@@ -249,6 +232,8 @@ export class Star extends CelestialBody {
         const maxTemp = 30000;
         const sunTemp = 5778;
 
+        temp = Math.max(minTemp, Math.min(maxTemp, temp));
+
         const lowTempIntensity = 1;
         const midTempIntensity = 10;
         const highTempIntensity = 1;
@@ -263,51 +248,7 @@ export class Star extends CelestialBody {
             intensity = midTempIntensity - progress * (midTempIntensity - highTempIntensity);
         }
 
-        return Math.min(2.0, intensity);
-    }
-
-    createGlow(radius: number, glowHex = 0xffffcc) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            return null;
-        }
-
-        ctx.clearRect(0, 0, 128, 128);
-
-        const c = new THREE.Color(glowHex);
-        const r = Math.round(c.r * 255);
-        const g = Math.round(c.g * 255);
-        const b = Math.round(c.b * 255);
-
-        const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        grad.addColorStop(0.2, `rgba(${r}, ${g}, ${b}, 0.85)`);
-        grad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.22)`);
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 128, 128);
-
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.needsUpdate = true;
-
-        const glowMat = new THREE.SpriteMaterial({
-            map: tex,
-            color: glowHex,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            opacity: 0.85,
-            depthWrite: false,
-            depthTest: true,
-        });
-
-        const glow = new THREE.Sprite(glowMat);
-        glow.scale.set(radius * 5, radius * 5, 1);
-        this.scene.add(glow);
-
-        return glow;
+        return Math.max(0, Math.min(2.0, intensity));
     }
 
     createLight(pos: THREE.Vector3, intensity: number, distance: number) {
@@ -341,26 +282,7 @@ export class Star extends CelestialBody {
     update(acc: THREE.Vector3, dt: number) {
         if (this._isDisposed) return;
 
-        this._updateBirthEffect(dt);
-
-        this.visualTime += dt;
-
         super.update(acc, dt);
-
-        if (this.corona) {
-            this.corona.update(dt);
-        }
-
-        if (this.sunGlow) {
-            this.sunGlow.scale.setScalar(
-                this.radius * 4.6 + Math.sin(this.visualTime * 0.0015 * 60) * (this.radius * 0.4)
-            );
-            this.sunGlow.position.copy(this.mesh.position);
-        }
-
-        if (this.corona?.points) {
-            this.corona.points.position.copy(this.mesh.position);
-        }
 
         if (this.sunLight) {
             this.sunLight.position.copy(this.mesh.position);
@@ -369,10 +291,6 @@ export class Star extends CelestialBody {
             }
         }
 
-    }
-
-    createStarBirth(scene: THREE.Scene, pos: THREE.Vector3, radius: number) {
-        return new StarBirth(this.dependencies, scene, pos, radius);
     }
 
     setShadowsEnabled(enabled: boolean) {
@@ -407,63 +325,20 @@ export class Star extends CelestialBody {
 
         this.temperature = temp;
 
-        let map;
-        let glowHex;
-
-        if (temp <= 2000) {
-            map = this.textures.brownDwarfTexture;
-            glowHex = 0x8b3a0a;
-        } else if (temp <= 3000) {
-            map = this.textures.redStarTexture;
-            glowHex = 0xff6644;
-        } else if (temp < 4000) {
-            map = this.textures.orangeStarTexture;
-            glowHex = 0xffaa55;
-        } else if (temp < 10000) {
-            map = this.textures.sunTexture;
-            glowHex = 0xffffcc;
-        } else if (temp < 25000) {
-            map = this.textures.whiteStarTexture;
-            glowHex = 0xffffff;
-        } else {
-            map = this.textures.blueStarTexture;
-            glowHex = 0xaaccff;
-        }
-
-        if (!map) return;
+        let glowHex: number;
+        if (temp <= 2000)       glowHex = 0x8b3a0a;
+        else if (temp <= 3000)  glowHex = 0xff6644;
+        else if (temp < 4000)   glowHex = 0xffaa55;
+        else if (temp < 10000)  glowHex = 0xffffcc;
+        else if (temp < 25000)  glowHex = 0xffffff;
+        else                    glowHex = 0xaaccff;
 
         const material = this.mesh.material as THREE.MeshPhongMaterial;
-        material.map = map;
-        material.emissiveMap = map;
-        material.needsUpdate = true;
         material.emissive.setHex(0xffffff);
         material.emissiveIntensity = Star.temperatureToEmissiveIntensity(temp);
+        material.needsUpdate = true;
 
         this.baseColor.setHex(glowHex);
-
-        if (this.sunGlow && this.sunGlow.material) {
-            this.sunGlow.material.color.setHex(glowHex);
-
-            try {
-                const oldMap = this.sunGlow.material.map;
-                if (oldMap && typeof oldMap.dispose === 'function') oldMap.dispose();
-
-                const newGlow = this.createGlow(this.radius, glowHex);
-                if (newGlow) {
-                    newGlow.position.copy(this.sunGlow.position);
-                    newGlow.scale.copy(this.sunGlow.scale);
-                    newGlow.visible = this.sunGlow.visible;
-                }
-                this.scene.remove(this.sunGlow);
-                this.sunGlow = newGlow;
-            } catch {
-                // ignore
-            }
-        }
-
-        if (this.corona) {
-            this.corona.setColor(glowHex);
-        }
 
         if (this.sunLight) {
             this.sunLight.color.setHex(glowHex);
@@ -472,14 +347,6 @@ export class Star extends CelestialBody {
 
     setRadius(newRadius: number) {
         super.setRadius(newRadius);
-
-        if (this.sunGlow) {
-            this.sunGlow.scale.setScalar(newRadius * 4.6);
-        }
-
-        if (this.corona) {
-            this.corona.setRadius(newRadius + 1);
-        }
     }
 
     setLightDistance(distance: number) {
@@ -515,16 +382,6 @@ export class Star extends CelestialBody {
         if (this._isDisposed) return;
 
         try {
-            if (this.birthEffect) {
-                this.birthEffect.dispose();
-                this.birthEffect = null;
-            }
-            this.isBirthing = false;
-        } catch {
-            // ignore
-        }
-
-        try {
             if (this.trail) {
                 this.trail.visible = false;
                 this.scene.remove(this.trail);
@@ -545,30 +402,6 @@ export class Star extends CelestialBody {
                 this.mesh.geometry?.dispose?.();
                 (this.mesh.material as THREE.Material)?.dispose?.();
                 //this.mesh = null;
-            }
-        } catch {
-            // ignore
-        }
-
-        try {
-            if (this.corona) {
-                this.corona.dispose();
-                this.corona = null;
-            }
-        } catch {
-            // ignore
-        }
-
-        try {
-            if (this.sunGlow) {
-                this.sunGlow.visible = false;
-                this.scene.remove(this.sunGlow);
-
-                const map = this.sunGlow.material?.map;
-                map?.dispose?.();
-                this.sunGlow.material?.dispose?.();
-
-                this.sunGlow = null;
             }
         } catch {
             // ignore
@@ -617,68 +450,4 @@ export class Star extends CelestialBody {
         super.die(true);
     }
 
-    _setBirthVisibility(visible: boolean) {
-        try {
-            if (this.mesh) this.mesh.visible = visible;
-            if (this.trail) this.trail.visible = visible;
-            if (this.sunGlow) this.sunGlow.visible = visible;
-            if (this.corona && this.corona.points) this.corona.points.visible = visible;
-            if (this.sunLight) this.sunLight.visible = visible;
-            if (this.ambientLight) this.ambientLight.visible = visible;
-        } catch {
-            // ignore
-        }
-    }
-
-    _startBirthEffect() {
-        try {
-            this._setBirthVisibility(false);
-
-            const pos = this.mesh?.position?.clone?.() || new THREE.Vector3();
-            const radius = this.radius || 1;
-            this.birthEffect = this.createStarBirth(this.scene, pos, radius);
-            this.isBirthing = !!this.birthEffect;
-        } catch {
-            this.birthEffect = null;
-            this.isBirthing = false;
-            this._setBirthVisibility(true);
-        }
-    }
-
-    _updateBirthEffect(dt: number) {
-        if (!this.isBirthing || !this.birthEffect) return;
-
-        try {
-            this.birthEffect.update?.(dt);
-        } catch {
-            try {
-                this.birthEffect.dispose();
-            } catch {
-                // ignore
-            }
-            this.birthEffect = null;
-            this.isBirthing = false;
-            this._setBirthVisibility(true);
-            return;
-        }
-
-        if (this.birthEffect.isComplete) {
-            this._setBirthVisibility(true);
-
-            try {
-                triggerScreenFlash();
-            } catch {
-                // ignore
-            }
-
-            try {
-                this.birthEffect.dispose();
-            } catch {
-                // ignore
-            }
-
-            this.birthEffect = null;
-            this.isBirthing = false;
-        }
-    }
 }

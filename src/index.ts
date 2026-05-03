@@ -415,8 +415,8 @@ function createSpeedTexture(
     const glow = isWarp
         ? 'rgba(255,68,136,0.9)'
         : isBoosting
-          ? 'rgba(255,153,68,0.85)'
-          : 'rgba(0,255,204,0.85)';
+            ? 'rgba(255,153,68,0.85)'
+            : 'rgba(0,255,204,0.85)';
     const dim = 'rgba(0,255,204,0.5)';
 
     ctx.textAlign = 'right';
@@ -553,7 +553,7 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
         drawStat(
             'Temperature: ',
             formatNumber(body.temperature, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-                'K',
+            'K',
             y
         );
         y += lineHeight;
@@ -1054,8 +1054,8 @@ const AUTOPILOT_APPROACH_MIN_DISTANCE =
  *  plus AUTOPILOT_BOOST_THRESHOLD (the runway still needed once warp ends). */
 const AUTOPILOT_WARP_THRESHOLD =
     1.5 *
-        ((FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
-            (2 * AUTOPILOT_WARP_DECEL)) +
+    ((FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
+        (2 * AUTOPILOT_WARP_DECEL)) +
     AUTOPILOT_BOOST_THRESHOLD;
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
@@ -2301,21 +2301,21 @@ function syncAllStarLightTargets() {
 
     const activeLightTarget =
         (selectedBody &&
-        !selectedBody._isDisposed &&
-        !(selectedBody instanceof Star) &&
-        simulationState.bodies.includes(selectedBody)
+            !selectedBody._isDisposed &&
+            !(selectedBody instanceof Star) &&
+            simulationState.bodies.includes(selectedBody)
             ? selectedBody
             : manuallySelectedBody &&
                 !manuallySelectedBody._isDisposed &&
                 !(manuallySelectedBody instanceof Star) &&
                 simulationState.bodies.includes(manuallySelectedBody)
-              ? manuallySelectedBody
-              : cameraState.focusBody &&
-                  !cameraState.focusBody._isDisposed &&
-                  !(cameraState.focusBody instanceof Star) &&
-                  simulationState.bodies.includes(cameraState.focusBody)
-                ? cameraState.focusBody
-                : _closestNonStarBody) ?? null;
+                ? manuallySelectedBody
+                : cameraState.focusBody &&
+                    !cameraState.focusBody._isDisposed &&
+                    !(cameraState.focusBody instanceof Star) &&
+                    simulationState.bodies.includes(cameraState.focusBody)
+                    ? cameraState.focusBody
+                    : _closestNonStarBody) ?? null;
 
     // Shadows are only needed when: the user has them enabled, we're not in free cam (user
     // requirement), and there is a non-star body to project shadows onto.
@@ -2433,6 +2433,7 @@ function createPresetBody(presetKey: string) {
                     temperature: 5778,
                     lightIntensity: 500000000,
                     lightDistance: 524400,
+                    rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 }
                 }
             );
 
@@ -2578,13 +2579,13 @@ function createNewBody(
                 vel:
                     orbitParent && !orbitParent._isDisposed
                         ? computeOrbitVelocityAtPos(
-                              starPos,
-                              orbitParent.mesh.position.clone(),
-                              orbitParent.mass,
-                              orbitType,
-                              0.3,
-                              inclination
-                          )
+                            starPos,
+                            orbitParent.mesh.position.clone(),
+                            orbitParent.mass,
+                            orbitType,
+                            0.3,
+                            inclination
+                        )
                         : new THREE.Vector3(0, 0, 0),
                 mass: newStarMass,
                 id: createUniqueId('star'),
@@ -2595,6 +2596,7 @@ function createNewBody(
                         ? customLightIntensity
                         : 500000000,
                 lightDistance: 524400,
+                rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 }
             }
         );
 
@@ -2639,8 +2641,8 @@ function createNewBody(
         const planetTexturePool = isGasGiant
             ? fictionalGasTextures
             : isIceGiant
-              ? fictionalIceTextures
-              : fictionalTextures;
+                ? fictionalIceTextures
+                : fictionalTextures;
 
         const planetMaterial = new THREE.MeshStandardMaterial({
             map: pickRandom(planetTexturePool),
@@ -3053,6 +3055,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
                 temperature: starTemp,
                 lightIntensity: 500000000,
                 lightDistance: 524400,
+                rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 }
             }
         );
         simulationState.bodies.push(orbitingStar);
@@ -3079,6 +3082,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             temperature: 5778,
             lightIntensity: 500000000,
             lightDistance: 524400,
+            rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 }
         }
     );
 
@@ -3542,8 +3546,8 @@ function onMouseDown(event: MouseEvent) {
             activeAxis === 'x'
                 ? new THREE.Vector3(1, 0, 0)
                 : activeAxis === 'y'
-                  ? new THREE.Vector3(0, 1, 0)
-                  : new THREE.Vector3(0, 0, 1);
+                    ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(0, 0, 1);
 
         // Camera direction (from camera into the scene)
         const cameraDirection = new THREE.Vector3();
@@ -3609,8 +3613,8 @@ function onMouseDown(event: MouseEvent) {
             //    - Clicking a DIFFERENT body should zoom.
             const prevSelectedBody =
                 selectedBody &&
-                simulationState.bodies.includes(selectedBody) &&
-                !selectedBody._isDisposed
+                    simulationState.bodies.includes(selectedBody) &&
+                    !selectedBody._isDisposed
                     ? selectedBody
                     : null;
 
@@ -3801,8 +3805,8 @@ function onMouseMove(event: MouseEvent) {
             activeAxis === 'x'
                 ? new THREE.Vector3(1, 0, 0)
                 : activeAxis === 'y'
-                  ? new THREE.Vector3(0, 1, 0)
-                  : new THREE.Vector3(0, 0, 1);
+                    ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(0, 0, 1);
 
         const startI = interactionState.dragStartIntersection || intersection;
         const startPos = interactionState.dragStartPosition || gizmo.target.mesh.position.clone();
@@ -4646,8 +4650,8 @@ function animate() {
         const trailMaxSpeed = autopilotState.isWarpActive
             ? FLIGHT_WARP_SPEED
             : keys.shift || flightState.boostDecelerating || autopilotState.isBoostActive
-              ? FLIGHT_BOOST_MAX_SPEED
-              : FLIGHT_MAX_SPEED;
+                ? FLIGHT_BOOST_MAX_SPEED
+                : FLIGHT_MAX_SPEED;
         trailShip.trail.update(
             nozzle,
             trailSpeed,
@@ -5156,8 +5160,8 @@ function updateSurfaceButtonEnabled() {
             ? selectedBody
             : null) ||
         (manuallySelectedBody &&
-        simulationState.bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
+            simulationState.bodies.includes(manuallySelectedBody) &&
+            !manuallySelectedBody._isDisposed
             ? manuallySelectedBody
             : null);
 
@@ -5387,16 +5391,16 @@ function updateAutopilot(dt: number) {
     const effectiveStopDist =
         approachSpeed > FLIGHT_BOOST_MAX_SPEED
             ? (approachSpeed * approachSpeed - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
-                  (2 * AUTOPILOT_WARP_DECEL) +
-              (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
-                  FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
-                  (2 * AUTOPILOT_BOOST_DECEL) +
-              (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
+            (2 * AUTOPILOT_WARP_DECEL) +
+            (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
+                FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+            (2 * AUTOPILOT_BOOST_DECEL) +
+            (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
             : approachSpeed > FLIGHT_MAX_SPEED
-              ? (approachSpeed * approachSpeed - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
-                    (2 * AUTOPILOT_BOOST_DECEL) +
+                ? (approachSpeed * approachSpeed - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+                (2 * AUTOPILOT_BOOST_DECEL) +
                 (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
-              : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
+                : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
     const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
     if (autopilotState.phase === 'WARP') {
@@ -5506,11 +5510,11 @@ function updateAutopilot(dt: number) {
                 ? approachSpeed > FLIGHT_BOOST_MAX_SPEED
                     ? AUTOPILOT_WARP_DECEL
                     : approachSpeed > FLIGHT_MAX_SPEED
-                      ? AUTOPILOT_BOOST_DECEL
-                      : AUTOPILOT_DECEL
+                        ? AUTOPILOT_BOOST_DECEL
+                        : AUTOPILOT_DECEL
                 : useBoost
-                  ? FLIGHT_BOOST_ACCEL
-                  : AUTOPILOT_ACCEL;
+                    ? FLIGHT_BOOST_ACCEL
+                    : AUTOPILOT_ACCEL;
             const accelMag = Math.min(rate * dt, deltaLen);
             ship.velocity.addScaledVector(accelDir, accelMag);
         }
@@ -6000,8 +6004,8 @@ function updateFlightControls(dt: number) {
     const rollTarget = flightState.rollLeft
         ? -FLIGHT_ROLL_SPEED
         : flightState.rollRight
-          ? FLIGHT_ROLL_SPEED
-          : 0;
+            ? FLIGHT_ROLL_SPEED
+            : 0;
     if (manualInput && (flightState.rollLeft || flightState.rollRight)) {
         // Ramp up toward target
         const dir = rollTarget > 0 ? 1 : -1;
@@ -6369,8 +6373,8 @@ mainPanel.on('surfaceCameraToggle', () => {
             ? selectedBody
             : null) ||
         (manuallySelectedBody &&
-        simulationState.bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
+            simulationState.bodies.includes(manuallySelectedBody) &&
+            !manuallySelectedBody._isDisposed
             ? manuallySelectedBody
             : null);
 
@@ -6399,8 +6403,8 @@ mainPanel.on('freeCameraToggle', () => {
             ? selectedBody
             : null) ||
         (manuallySelectedBody &&
-        simulationState.bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
+            simulationState.bodies.includes(manuallySelectedBody) &&
+            !manuallySelectedBody._isDisposed
             ? manuallySelectedBody
             : null);
 
@@ -6572,8 +6576,8 @@ mainPanel.on('targetToggle', () => {
             : manuallySelectedBody &&
                 simulationState.bodies.includes(manuallySelectedBody) &&
                 !manuallySelectedBody._isDisposed
-              ? manuallySelectedBody
-              : null;
+                ? manuallySelectedBody
+                : null;
 
     if (turningOn) {
         if (b) {
@@ -6615,14 +6619,14 @@ mainPanel.on('lookAtToggle', () => {
     if (turningOn) {
         const b =
             selectedBody &&
-            simulationState.bodies.includes(selectedBody) &&
-            !selectedBody._isDisposed
+                simulationState.bodies.includes(selectedBody) &&
+                !selectedBody._isDisposed
                 ? selectedBody
                 : manuallySelectedBody &&
                     simulationState.bodies.includes(manuallySelectedBody) &&
                     !manuallySelectedBody._isDisposed
-                  ? manuallySelectedBody
-                  : null;
+                    ? manuallySelectedBody
+                    : null;
 
         // Look-at mode requires OrbitControls, so exit free camera mode if active
         if (isFreeCameraMode) {
@@ -6673,14 +6677,14 @@ mainPanel.on('lookAtToggle', () => {
         if (cameraState.isTargetMode) {
             const b =
                 selectedBody &&
-                simulationState.bodies.includes(selectedBody) &&
-                !selectedBody._isDisposed
+                    simulationState.bodies.includes(selectedBody) &&
+                    !selectedBody._isDisposed
                     ? selectedBody
                     : manuallySelectedBody &&
                         simulationState.bodies.includes(manuallySelectedBody) &&
                         !manuallySelectedBody._isDisposed
-                      ? manuallySelectedBody
-                      : null;
+                        ? manuallySelectedBody
+                        : null;
             if (b) gizmo.attach(b);
         }
     }
@@ -7268,8 +7272,8 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
     // We still clear selection pointers for the dead body.
     const collisionHandoffTarget =
         cameraState?.pendingCollisionFocusBody &&
-        simulationState.bodies.includes(cameraState.pendingCollisionFocusBody) &&
-        !cameraState.pendingCollisionFocusBody._isDisposed
+            simulationState.bodies.includes(cameraState.pendingCollisionFocusBody) &&
+            !cameraState.pendingCollisionFocusBody._isDisposed
             ? cameraState.pendingCollisionFocusBody
             : null;
 

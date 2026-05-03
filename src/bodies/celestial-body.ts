@@ -36,8 +36,7 @@ export class CelestialBody extends Body {
     deps: IStateDependencies;
     scene: THREE.Scene;
     color: number;
-    rotationAxis: THREE.Vector3;
-    rotationSpeed: number;
+    rotation: IRotation;
     baseColor: THREE.Color;
     maxTrail: number;
     history: THREE.Vector3[];
@@ -55,6 +54,9 @@ export class CelestialBody extends Body {
     tidalLockAngularSpeed: number;
     _tidalLockConfigured: boolean;
     _tidalLockOmegaInitialized: boolean = false;
+    // Private properties for internal state management
+    rotationAxis: THREE.Vector3;
+    rotationSpeed: number;
 
     /**
      * Constructs a new CelestialBody with advanced features like trails, rings, clouds, and tidal locking.
@@ -115,6 +117,7 @@ export class CelestialBody extends Body {
         this.mass = mass;
         this.color = color;
         this.bodyType = bodyType;
+        this.rotation = rotation;
 
         // Axial rotation (spin). Uses simulation dt so it follows timeScale and reverses when time runs backwards.
         // rotation.speed is in radians per simulated second.
@@ -489,21 +492,21 @@ export class CelestialBody extends Body {
         const moonMaterial =
             moonName === 'Moon'
                 ? new THREE.MeshStandardMaterial({
-                      map: moonTexture,
-                      color: 0xffffff,
-                      emissive: 0x000000,
-                      emissiveIntensity: 0,
-                      roughness: 0.7,
-                      metalness: 0.7,
-                  })
+                    map: moonTexture,
+                    color: 0xffffff,
+                    emissive: 0x000000,
+                    emissiveIntensity: 0,
+                    roughness: 0.7,
+                    metalness: 0.7,
+                })
                 : new THREE.MeshStandardMaterial({
-                      map: pickRandom(fictionalTextures),
-                      color: 0xffffff, // keep texture untinted
-                      emissive: 0x000000,
-                      emissiveIntensity: 0,
-                      roughness: 0.7,
-                      metalness: 0.7,
-                  });
+                    map: pickRandom(fictionalTextures),
+                    color: 0xffffff, // keep texture untinted
+                    emissive: 0x000000,
+                    emissiveIntensity: 0,
+                    roughness: 0.7,
+                    metalness: 0.7,
+                });
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²

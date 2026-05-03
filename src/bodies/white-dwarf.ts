@@ -32,6 +32,7 @@ export class WhiteDwarf extends Star {
             temperature: WHITE_DWARF_TEMPERATURE,
             lightIntensity: WHITE_DWARF_LIGHT_INTENSITY,
             lightDistance: WHITE_DWARF_LIGHT_DISTANCE,
+            rotation
         };
 
         const textures = {
@@ -47,18 +48,5 @@ export class WhiteDwarf extends Star {
         super(dependencies, scene, options, textures);
 
         this.bodyType = BodyTypeEnum.WhiteDwarf | BodyTypeEnum.Star;
-        this.fuel = null;
-        this.maxFuel = null;
-
-        if (this.corona) {
-            this.corona.dispose();
-            this.corona = null;
-        }
-
-        if (this.sunGlow) {
-            this.sunGlow.visible = false;
-            scene.remove(this.sunGlow);
-            this.sunGlow = null;
-        }
     }
 }
