@@ -97,6 +97,7 @@ import { Pluto } from './bodies/pluto';
 import { Ceres } from './bodies/ceres';
 import { BlackHole } from './bodies/black-hole';
 import { Star } from './bodies/star';
+import { MainSequenceStar } from './bodies/main-sequence-star';
 import { Asteroid } from './bodies/asteroid';
 import { Comet } from './bodies/comet';
 
@@ -116,13 +117,6 @@ const uranusTexture = loadSrgbTexture('./assets/textures/uranus.jpg');
 const neptuneTexture = loadSrgbTexture('./assets/textures/neptune.jpg');
 const plutoTexture = loadSrgbTexture('./assets/textures/pluto.jpg');
 const ceresTexture = loadSrgbTexture('./assets/textures/ceres.jpg');
-const sunTexture = loadSrgbTexture('./assets/textures/sun.jpg');
-const blueStarTexture = loadSrgbTexture('./assets/textures/blue-star.jpg');
-const redStarTexture = loadSrgbTexture('./assets/textures/red-star.jpg');
-const orangeStarTexture = loadSrgbTexture('./assets/textures/orange_star.jpg');
-const whiteStarTexture = loadSrgbTexture('./assets/textures/white_star.jpg');
-const whiteDwarfTexture = loadSrgbTexture('./assets/textures/white_dwarf.jpg');
-const brownDwarfTexture = loadSrgbTexture('./assets/textures/brown_dwarf.jpg');
 
 // Background texture (skydome)
 const skydomeTexture = loadSrgbTexture('./assets/textures/stars.jpg');
@@ -235,8 +229,8 @@ function absorbBody(winner: Body, victim: Body) {
 
     // Stars: transfer remaining fuel + capacity (when fuel system is active)
     if (
-        winner instanceof Star &&
-        victim instanceof Star &&
+        winner instanceof MainSequenceStar &&
+        victim instanceof MainSequenceStar &&
         winner.fuel !== null &&
         victim.fuel !== null
     ) {
@@ -568,7 +562,7 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     // Fuel (for stars with fuel system, only if star death is enabled)
     const starDeathEnabled =
         (document.getElementById('enableStarDeath') as HTMLInputElement)?.checked || false;
-    if (starDeathEnabled && body instanceof Star && body.fuel !== null && body.maxFuel !== null) {
+    if (starDeathEnabled && body instanceof MainSequenceStar && body.fuel !== null && body.maxFuel !== null) {
         const fuelPercent = ((body.fuel / body.maxFuel) * 100).toFixed(1);
         drawStat('Fuel: ', `${fuelPercent}%`, y);
         y += lineHeight;
@@ -2426,7 +2420,7 @@ function createPresetBody(presetKey: string) {
                 simulationState.bodies.some((b) => b && !b._isDisposed && b instanceof BlackHole);
             const pos = hasCentralBody ? getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
 
-            newBody = new Star(
+            newBody = new MainSequenceStar(
                 dependencies,
                 scene,
                 {
@@ -2439,15 +2433,6 @@ function createPresetBody(presetKey: string) {
                     temperature: 5778,
                     lightIntensity: 500000000,
                     lightDistance: 524400,
-                },
-                {
-                    sunTexture,
-                    redStarTexture,
-                    orangeStarTexture,
-                    whiteStarTexture,
-                    blueStarTexture,
-                    whiteDwarfTexture,
-                    brownDwarfTexture,
                 }
             );
 
@@ -2584,7 +2569,7 @@ function createNewBody(
             temperature: customTemperature,
         });
 
-        newBody = new Star(
+        newBody = new MainSequenceStar(
             dependencies,
             scene,
             {
@@ -2610,15 +2595,6 @@ function createNewBody(
                         ? customLightIntensity
                         : 500000000,
                 lightDistance: 524400,
-            },
-            {
-                sunTexture,
-                redStarTexture,
-                orangeStarTexture,
-                whiteStarTexture,
-                blueStarTexture,
-                whiteDwarfTexture,
-                brownDwarfTexture,
             }
         );
 
@@ -3064,7 +3040,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             0
         );
 
-        const orbitingStar = new Star(
+        const orbitingStar = new MainSequenceStar(
             dependencies,
             scene,
             {
@@ -3077,15 +3053,6 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
                 temperature: starTemp,
                 lightIntensity: 500000000,
                 lightDistance: 524400,
-            },
-            {
-                sunTexture,
-                redStarTexture,
-                orangeStarTexture,
-                whiteStarTexture,
-                blueStarTexture,
-                whiteDwarfTexture,
-                brownDwarfTexture,
             }
         );
         simulationState.bodies.push(orbitingStar);
@@ -3099,7 +3066,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     }
 
     // Recreate the primary star for default mode (local, not global)
-    const sun = new Star(
+    const sun = new MainSequenceStar(
         dependencies,
         scene,
         {
@@ -3112,15 +3079,6 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             temperature: 5778,
             lightIntensity: 500000000,
             lightDistance: 524400,
-        },
-        {
-            sunTexture,
-            redStarTexture,
-            orangeStarTexture,
-            whiteStarTexture,
-            blueStarTexture,
-            whiteDwarfTexture,
-            brownDwarfTexture,
         }
     );
 
@@ -6852,7 +6810,7 @@ managementPanel.on(
         body.setMass(mass);
 
         // Refill fuel for stars based on new mass (skipped automatically for brown dwarfs since fuel is null)
-        if (body instanceof Star && body.fuel !== null) {
+        if (body instanceof MainSequenceStar && body.fuel !== null) {
             body.maxFuel = mass * 100000;
             body.fuel = body.maxFuel;
             // Reset to initial state (in case it was in red giant phase)
@@ -6861,7 +6819,7 @@ managementPanel.on(
         }
 
         // Star-only updates (temperature, light) — radius handled globally below
-        if (body instanceof Star) {
+        if (body instanceof MainSequenceStar) {
             // Update temperature if provided
             if (temperature !== null) {
                 body.setTemperature(temperature);
