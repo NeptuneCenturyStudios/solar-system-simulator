@@ -14,6 +14,7 @@ export enum BodyTypeEnum {
     WhiteDwarf = 1 << 9,
     SpaceShip = 1 << 10,
     BrownDwarf = 1 << 11,
+    Pulsar = 1 << 12,
 }
 
 // Shared body-type helper. Checks bodyType flags only.

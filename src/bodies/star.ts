@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SHADOW_MAP_SIZE, SUN_MASS, SUN_RADIUS, SCALE_FACTOR, MIN_NEUTRON_STAR_MASS } from '../utilities/consts';
+import { SHADOW_MAP_SIZE, SUN_MASS, SUN_RADIUS } from '../utilities/consts';
 import { BodyTypeEnum, isBodyType } from '../utilities/utilities';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
@@ -144,25 +144,6 @@ export class Star extends CelestialBody {
     /** Computes the expected radius for a star of the given mass using a mass-radius power law (R ∝ M^0.8). */
     static massToRadius(mass: number): number {
         return SUN_RADIUS * Math.pow(Math.max(0, mass) / SUN_MASS, 0.8);
-    }
-
-    /**
-     * Computes the radius of a neutron star for a given mass, using a constant-density approximation.
-     * The radius scales with the cube root of mass, clamped to avoid degenerate geometry.
-     * Uses typical neutron star parameters (very small radius, high density).
-     * @param mass The mass of the neutron star (simulation units)
-     * @returns The radius of the neutron star (simulation units)
-     */
-    static massToNeutronStarRadius(mass: number): number {
-        // Use minimum neutron star mass and a typical neutron star radius as the base
-        // Typical neutron star radius ~12 km, but scale to simulation units
-        const BASE_MASS = MIN_NEUTRON_STAR_MASS;
-        const BASE_RADIUS = 1.5 * SCALE_FACTOR; // Chosen to be much smaller than a white dwarf, but visible
-
-        // Constant-density approximation: radius ∝ (mass)^(1/3)
-        const r = BASE_RADIUS * Math.cbrt(Math.max(0, mass) / BASE_MASS);
-        // Clamp to avoid degenerate geometry
-        return Math.max(0.01 * SCALE_FACTOR, r);
     }
 
     static temperatureToColor(temp: number) {

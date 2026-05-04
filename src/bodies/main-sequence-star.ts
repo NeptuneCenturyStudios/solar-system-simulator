@@ -7,11 +7,12 @@ import { BodyTypeEnum, createUniqueId } from '../utilities/utilities';
 import { SCALE_FACTOR, PLUTO_DIST, BROWN_DWARF_MASS_THRESHOLD, MIN_BLACK_HOLE_MASS, MIN_NEUTRON_STAR_MASS } from '../utilities/consts';
 import { BlackHole } from './black-hole';
 import { WhiteDwarf } from './white-dwarf';
-//import { Pulsar } from './pulsar';
+import { Pulsar } from './pulsar';
 import { Supernova } from '../effects/supernova';
 import { SolarFlare, SolarFlareType } from '../effects/solar-flare';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { Corona } from '../effects/corona';
+import { StarGlow } from '../effects/star-glow';
 import { StarBirth } from '../effects/star-birth';
 
 export class MainSequenceStar extends Star {
@@ -27,8 +28,7 @@ export class MainSequenceStar extends Star {
     _solarFlareTimer: number;
     _nextFlareInterval: number;
     corona: Corona | null;
-    sunGlow: THREE.Sprite<THREE.Object3DEventMap> | null;
-    visualTime: number;
+    sunGlow: StarGlow | null;
     isBirthing: boolean;
     birthEffect: StarBirth | null;
 
@@ -49,7 +49,7 @@ export class MainSequenceStar extends Star {
         super(dependencies, scene, options, textures);
 
         this.corona = new Corona(dependencies, scene, options.radius + 1, this.baseColor.getHex());
-        this.sunGlow = this.createGlow(options.radius, this.baseColor.getHex());
+        this.sunGlow = new StarGlow(dependencies, scene, options.radius, this.baseColor.getHex(), this.mesh.position);
 
         this.initialMass = options.mass;
         this.initialRadius = options.radius;
@@ -66,7 +66,6 @@ export class MainSequenceStar extends Star {
         this._solarFlareTimer = 0;
         this._nextFlareInterval = 5 + Math.random() * 25;
 
-        this.visualTime = 0;
         this.isBirthing = false;
         this.birthEffect = null;
 
@@ -79,7 +78,6 @@ export class MainSequenceStar extends Star {
         if (this._isDisposed) return;
 
         this._updateBirthEffect(dt);
-        this.visualTime += dt;
 
         if (this.corona) {
             this.corona.update(dt);
@@ -152,10 +150,8 @@ export class MainSequenceStar extends Star {
         super.update(acc, dt);
 
         if (this.sunGlow) {
-            this.sunGlow.scale.setScalar(
-                this.radius * 4.6 + Math.sin(this.visualTime * 0.0015 * 60) * (this.radius * 0.4)
-            );
-            this.sunGlow.position.copy(this.mesh.position);
+            this.sunGlow.setPosition(this.mesh.position);
+            this.sunGlow.update(dt);
         }
 
         // Solar flare timer
@@ -188,7 +184,7 @@ export class MainSequenceStar extends Star {
             this.corona.setRadius(newRadius + 1);
         }
         if (this.sunGlow) {
-            this.sunGlow.scale.setScalar(newRadius * 4.6);
+            this.sunGlow.setRadius(newRadius);
         }
         this._syncBaselineRadiusIfStable();
     }
@@ -206,13 +202,7 @@ export class MainSequenceStar extends Star {
 
         try {
             if (this.sunGlow) {
-                this.sunGlow.visible = false;
-                this.scene.remove(this.sunGlow);
-
-                const map = this.sunGlow.material?.map;
-                map?.dispose?.();
-                this.sunGlow.material?.dispose?.();
-
+                this.sunGlow.dispose();
                 this.sunGlow = null;
             }
         } catch {
@@ -267,21 +257,9 @@ export class MainSequenceStar extends Star {
             this.corona.setColor(glowHex);
         }
 
-        if (this.sunGlow && this.sunGlow.material) {
-            this.sunGlow.material.color.setHex(glowHex);
-
+        if (this.sunGlow) {
             try {
-                const oldMap = this.sunGlow.material.map;
-                if (oldMap && typeof oldMap.dispose === 'function') oldMap.dispose();
-
-                const newGlow = this.createGlow(this.radius, glowHex);
-                if (newGlow) {
-                    newGlow.position.copy(this.sunGlow.position);
-                    newGlow.scale.copy(this.sunGlow.scale);
-                    newGlow.visible = this.sunGlow.visible;
-                }
-                this.scene.remove(this.sunGlow);
-                this.sunGlow = newGlow;
+                this.sunGlow.setColor(glowHex);
             } catch {
                 // ignore
             }
@@ -292,7 +270,7 @@ export class MainSequenceStar extends Star {
         try {
             if (this.mesh) this.mesh.visible = visible;
             if (this.trail) this.trail.visible = visible;
-            if (this.sunGlow) this.sunGlow.visible = visible;
+            if (this.sunGlow) this.sunGlow.setVisible(visible);
             if (this.sunLight) this.sunLight.visible = visible;
             if (this.ambientLight) this.ambientLight.visible = visible;
         } catch {
@@ -345,50 +323,6 @@ export class MainSequenceStar extends Star {
 
         this.initialRadius = this.radius;
         if (this.mesh) this.mesh.scale.setScalar(1);
-    }
-
-    createGlow(radius: number, glowHex = 0xffffcc) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            return null;
-        }
-
-        ctx.clearRect(0, 0, 128, 128);
-
-        const c = new THREE.Color(glowHex);
-        const r = Math.round(c.r * 255);
-        const g = Math.round(c.g * 255);
-        const b = Math.round(c.b * 255);
-
-        const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        grad.addColorStop(0.2, `rgba(${r}, ${g}, ${b}, 0.85)`);
-        grad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.22)`);
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 128, 128);
-
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.needsUpdate = true;
-
-        const glowMat = new THREE.SpriteMaterial({
-            map: tex,
-            color: glowHex,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            opacity: 0.85,
-            depthWrite: false,
-            depthTest: true,
-        });
-
-        const glow = new THREE.Sprite(glowMat);
-        glow.scale.set(radius * 5, radius * 5, 1);
-        this.scene.add(glow);
-
-        return glow;
     }
 
     createStarBirth(scene: THREE.Scene, pos: THREE.Vector3, radius: number) {
@@ -493,18 +427,26 @@ export class MainSequenceStar extends Star {
 
         if (this.initialMass > MIN_NEUTRON_STAR_MASS && this.initialMass < MIN_BLACK_HOLE_MASS) {
             try {
-                // TODO: Create pulsar instance
+                const pulsar = new Pulsar(
+                    this.dependencies,
+                    this.scene,
+                    this.mesh.position.clone(),
+                    this.mass,
+                    createUniqueId('pulsar'),
+                    this.name + ' (Pulsar)',
+                    this.rotation,
+                    this.initialRadius
+                );
 
-                // TODO: Uncomment when pulsar is implemented
-                // if (this.dependencies?.addBody) {
-                //     this.dependencies.addBody(pulsar);
-                // }
+                if (this.dependencies?.addBody) {
+                    this.dependencies.addBody(pulsar);
+                }
 
-                // if (this.dependencies?.addEvent) {
-                //     this.dependencies.addEvent(`Pulsar formed from ${this.name}!`);
-                // }
+                if (this.dependencies?.addEvent) {
+                    this.dependencies.addEvent(`Pulsar formed from ${this.name}!`);
+                }
             } catch (e) {
-                console.error('Error creating neutron star:', e);
+                console.error('Error creating pulsar:', e);
             }
 
             this.die(true);
@@ -577,7 +519,7 @@ export class MainSequenceStar extends Star {
         }
 
         if (this.sunGlow) {
-            this.scene.remove(this.sunGlow);
+            this.sunGlow.dispose();
             this.sunGlow = null;
         }
 
@@ -613,7 +555,7 @@ export class MainSequenceStar extends Star {
 
         // Restore glow.
         if (!this.sunGlow) {
-            this.sunGlow = this.createGlow(this.radius, this.baseColor.getHex());
+            this.sunGlow = new StarGlow(this.dependencies, this.scene, this.radius, this.baseColor.getHex(), this.mesh.position);
         }
 
         // Restore light intensity.
