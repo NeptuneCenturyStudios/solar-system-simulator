@@ -69,7 +69,7 @@ import {
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities';
-import { calculateTrajectory } from './physics/physics';
+import { calculateTrajectory, IAutopilotState, updateSimulation } from './physics/physics';
 import {
     randomStarParams,
     randomBlackHoleParams,
@@ -945,11 +945,10 @@ const flightState = {
 };
 
 // --- Autopilot state ---
-type AutopilotPhase = 'WARP_CHARGING' | 'WARP' | 'APPROACH' | 'BRAKE' | 'CIRCULARIZE';
-const autopilotState = {
+const autopilotState: IAutopilotState = {
     isActive: false,
-    targetBody: null as Body | null,
-    phase: null as AutopilotPhase | null,
+    targetBody: null,
+    phase: null,
     /** Stable-orbit notification timer (seconds remaining to display). */
     orbitNotifyTimer: 0,
     /** True while the autopilot WARP phase is active (post-charge). */
@@ -3282,22 +3281,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     toggleShadows(shadowCheckbox ? shadowCheckbox.checked : true);
 }
 
-function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number) {
-    const diff = new THREE.Vector3().subVectors(p2, p1);
-    const r = diff.length();
 
-    // Prevent division by zero
-    if (r < 0.01) return new THREE.Vector3(0, 0, 0);
-
-    // Gravitational acceleration: a = G * m / r²
-    const accMag = (G * m2) / (r * r);
-
-    // Normalize and scale
-    diff.normalize();
-
-    // Return acceleration vector
-    return diff.multiplyScalar(accMag);
-}
 
 function togglePause() {
     isPaused = !isPaused;
@@ -4307,39 +4291,7 @@ function animate() {
     const oldPos = focusObj && focusObj.mesh ? focusObj.mesh.position.clone() : new THREE.Vector3();
 
     // Physics integration loop
-    for (let i = 0; i < steps; i++) {
-        // Calculate accelerations for all bodies
-        for (const body of simulationState.bodies) {
-            const totalAcc = new THREE.Vector3(0, 0, 0);
-
-            // Calculate pull from ALL OTHER bodies (n-body simulation)
-            for (const other of simulationState.bodies) {
-                if (other !== body && !other?._isDisposed && other.mesh) {
-                    const accFromOther = getAcc(
-                        body.mesh.position,
-                        other.mesh.position,
-                        other.mass
-                    );
-                    totalAcc.add(accFromOther);
-                }
-            }
-
-            // Store the accumulated force to apply in the update step
-            body.tempAcc = totalAcc;
-        }
-
-        // Apply autopilot thrust impulse each substep so it scales correctly with timeScale.
-        // Running once per frame at BASE_FRAME_DT would let the ship fly through brake zones
-        // at high time-warp without ever triggering phase transitions.
-        if (autopilotState.isActive) updateAutopilot(dt);
-
-        // Apply accelerations to positions
-        for (const body of simulationState.bodies) {
-            if (body && !body._isDisposed && body.mesh && body.tempAcc) {
-                body.update(body.tempAcc, dt);
-            }
-        }
-    }
+    updateSimulation(simulationState, autopilotState, steps, dt, updateAutopilot)
 
     // Collision detection and trail updates (outside integration loop for performance)
     if (!isRepositioning) {

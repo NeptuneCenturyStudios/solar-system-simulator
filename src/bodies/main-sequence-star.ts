@@ -465,9 +465,6 @@ export class MainSequenceStar extends Star {
             );
             this.activeSolarFlares.push(flare);
 
-            if (type === 'large' && this.dependencies?.addEvent) {
-                this.dependencies.addEvent(`Solar flare erupts on ${this.name}!`);
-            }
         } catch (e) {
             console.error('Error triggering solar flare:', e);
         }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
+import { performanceSettings } from '../utilities/consts';
 
 export type SolarFlareType = 'small' | 'large';
 
@@ -266,6 +267,15 @@ export class SolarFlare implements IEffect {
 
     update(dt: number): void {
         if (!this.active) return;
+        // Check if particles are enabled
+        if (!performanceSettings.particleEffectsEnabled){
+            this.points.visible = false;
+            return;
+        } else
+        {
+            this.points.visible = true;
+        }
+
         dt = Math.abs(dt);
         this.age += dt;
 
