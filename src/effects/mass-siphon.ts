@@ -4,7 +4,7 @@ import * as THREE from 'three';
 const SIPHON_SPEED_SCALE = 8;
 import { IPipelineFeedEffect } from './effect-base';
 import { IStateDependencies, ISiphonTarget } from '../interfaces';
-import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA } from '../utilities/consts';
+import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, performanceSettings } from '../utilities/consts';
 
 /** Maximum number of simultaneously in-flight siphon particles per stream. */
 const PARTICLE_COUNT = 800;
@@ -64,6 +64,13 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
     private material: THREE.PointsMaterial;
     private points: THREE.Points;
     private spawnDirs: THREE.Vector3[];
+
+    /** Bézier line shown in place of particles when particle effects are disabled. */
+    private _bezierLine: THREE.Line | null = null;
+    private _bezierLineGeo: THREE.BufferGeometry | null = null;
+    private _bezierLineMat: THREE.LineBasicMaterial | null = null;
+    /** Tracks last-known particle effects state to detect toggling. */
+    private _lastParticlesEnabled: boolean = true;
 
     /** Progress along the stream [0, 1] for each particle. */
     private tArr: Float32Array;
@@ -272,6 +279,88 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
         scene.add(this.points);
     }
 
+    // ── Bézier line helpers (particle-effects-off fallback) ──────────────────
+
+    private _buildBezierPoints(): THREE.Vector3[] {
+        const starCenter = this.star.mesh.position;
+        const starRadius = this.star.radius;
+        const bhCenter = this.blackHole.mesh.position;
+        const diskNormal = this.blackHole.rotationAxis
+            ? this.blackHole.rotationAxis.clone().normalize()
+            : new THREE.Vector3(0, 1, 0);
+        const accretionMaxRadius =
+            this.blackHole.accretion && this.blackHole.accretion.maxRadius
+                ? this.blackHole.accretion.maxRadius
+                : this.blackHole.radius * 2 * 32;
+        const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
+        const toBH_proj = toBH
+            .clone()
+            .sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal)))
+            .normalize();
+        const DISK_ROTATION_OFFSET = Math.PI / 2;
+        const offsetDir = toBH_proj.clone().applyAxisAngle(diskNormal, DISK_ROTATION_OFFSET).normalize();
+
+        const start = starCenter.clone().addScaledVector(toBH, starRadius);
+        const end = bhCenter.clone().addScaledVector(offsetDir, accretionMaxRadius);
+        const dir = new THREE.Vector3().subVectors(end, start);
+        const dist = dir.length();
+        const diskTangent = new THREE.Vector3().crossVectors(diskNormal, offsetDir).normalize();
+        const mergeFrac = 0.7;
+        const tangentStrength = dist * 0.5;
+        const midBase = new THREE.Vector3().lerpVectors(start, end, mergeFrac);
+        const mid = midBase.clone().addScaledVector(diskTangent, tangentStrength);
+
+        const STEPS = 48;
+        const pts: THREE.Vector3[] = [];
+        for (let i = 0; i <= STEPS; i++) {
+            const t = i / STEPS;
+            const s = 1 - t;
+            pts.push(new THREE.Vector3(
+                s * s * start.x + 2 * s * t * mid.x + t * t * end.x,
+                s * s * start.y + 2 * s * t * mid.y + t * t * end.y,
+                s * s * start.z + 2 * s * t * mid.z + t * t * end.z,
+            ));
+        }
+        return pts;
+    }
+
+    private _showBezierLine(): void {
+        if (!this._bezierLine) {
+            const pts = this._buildBezierPoints();
+            this._bezierLineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+            this._bezierLineMat = new THREE.LineBasicMaterial({
+                color: new THREE.Color(
+                    this.star.baseColor.r * 0.8 + BH_R * 0.2,
+                    this.star.baseColor.g * 0.8 + BH_G * 0.2,
+                    this.star.baseColor.b * 0.8 + BH_B * 0.2,
+                ),
+                transparent: true,
+                opacity: 0.75,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+            });
+            this._bezierLine = new THREE.Line(this._bezierLineGeo, this._bezierLineMat);
+            this._bezierLine.frustumCulled = false;
+            this._bezierLine.renderOrder = 20;
+            this.scene.add(this._bezierLine);
+        } else {
+            // Update existing line to follow moving bodies
+            const pts = this._buildBezierPoints();
+            this._bezierLineGeo!.setFromPoints(pts);
+        }
+    }
+
+    private _removeBezierLine(): void {
+        if (this._bezierLine) {
+            this.scene.remove(this._bezierLine);
+            this._bezierLineGeo?.dispose();
+            this._bezierLineMat?.dispose();
+            this._bezierLine = null;
+            this._bezierLineGeo = null;
+            this._bezierLineMat = null;
+        }
+    }
+
     // ── Private slot helpers ──────────────────────────────────────────────────
 
     /** Returns the index of the first free slot, or -1 if the pool is full. */
@@ -308,6 +397,32 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
     update(dt: number): void {
         if (this.star._isDisposed || this.blackHole._isDisposed) {
             this.active = false;
+            return;
+        }
+
+        const particlesEnabled = performanceSettings.particleEffectsEnabled;
+
+        // ── Handle toggling between particles and line ────────────────────────
+        if (particlesEnabled !== this._lastParticlesEnabled) {
+            this._lastParticlesEnabled = particlesEnabled;
+            if (!particlesEnabled) {
+                // Switching to line mode: hide particle mesh
+                this.material.visible = false;
+                this._showBezierLine();
+            } else {
+                // Switching back to particle mode
+                this.material.visible = true;
+                this._removeBezierLine();
+            }
+        }
+
+        // ── Line mode: update line position each frame and skip particles ─────
+        if (!particlesEnabled) {
+            this._showBezierLine();
+            // Still run drain logic so the effect deactivates when stopSpawning() is called
+            if (!this._isSpawning) {
+                this.active = false;
+            }
             return;
         }
 
@@ -444,6 +559,7 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
     }
 
     dispose(): void {
+        this._removeBezierLine();
         this.scene.remove(this.points);
         this.geometry.dispose();
         this.material.dispose();

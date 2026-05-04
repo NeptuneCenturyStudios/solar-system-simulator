@@ -1,3 +1,13 @@
+// === Global Performance Settings ===
+/**
+ * Controls whether particle effects are rendered.
+ * When false, effects fall back to simpler line-based representations.
+ * Mutated directly by the UI; imported by effect classes.
+ */
+export const performanceSettings = {
+    particleEffectsEnabled: true,
+};
+
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===
 /**
  * Minimum alpha (opacity) for accretion disk and siphon particles (at disk edge).

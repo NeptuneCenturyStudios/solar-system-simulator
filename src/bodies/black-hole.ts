@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G, MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA } from '../utilities/consts.js';
+import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G, MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, performanceSettings } from '../utilities/consts.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body';
 import { IRotation } from '../physics/physics.js';
@@ -74,6 +74,18 @@ export class BlackHole extends CelestialBody {
     accretionGlow: THREE.Sprite | null = null;
     /** Active siphon stream effects, keyed by the source star's id. */
     siphonEffects: Map<string, IPipelineFeedEffect> = new Map();
+
+    /** Spiral line shown in place of accretion disk particles when particle effects are disabled. */
+    private _spiralLine: THREE.Line | null = null;
+    private _spiralLineGeo: THREE.BufferGeometry | null = null;
+    private _spiralLineMat: THREE.LineBasicMaterial | null = null;
+    private _lastAccretionParticlesEnabled: boolean = true;
+
+    /** Simple bi-directional jet line shown when particle effects are disabled. */
+    private _jetLine: THREE.Line | null = null;
+    private _jetLineGeo: THREE.BufferGeometry | null = null;
+    private _jetLineMat: THREE.LineBasicMaterial | null = null;
+    private _lastJetParticlesEnabled: boolean = true;
 
     static massToEventHorizonRadius(mass: number) {
         // "Compress" a star's mass into a tiny sphere.
@@ -286,6 +298,7 @@ export class BlackHole extends CelestialBody {
      */
     enqueueAccretionParticle(angle: number): void {
         if (!this.accretion) return;
+        if (!performanceSettings.particleEffectsEnabled) return;
         this.accretion.seedQueue.push(angle);
     }
 
@@ -342,6 +355,7 @@ export class BlackHole extends CelestialBody {
      */
     seedAccretionDisk(count: number): void {
         if (!this.accretion) return;
+        if (!performanceSettings.particleEffectsEnabled) return;
         const total = Math.round(count * this.radius);
         for (let i = 0; i < total; i++) {
             this.accretion.seedQueue.push(Math.random() * 2 * Math.PI);
@@ -483,6 +497,7 @@ export class BlackHole extends CelestialBody {
      * Removes the disk from the scene and cleans up geometry/materials.
      */
     disposeAccretionDisk() {
+        this._removeSpiralLine();
         if (this.accretion && this.accretion.points) {
             this.scene.remove(this.accretion.points);
             this.accretion.points.geometry.dispose();
@@ -492,6 +507,104 @@ export class BlackHole extends CelestialBody {
         this.accretion = null;
     }
 
+    // ── Spiral line helpers (particle-effects-off fallback) ──────────────────
+
+    private _buildSpiralLine(): void {
+        if (!this.accretion) return;
+        const { minRadius, maxRadius } = this.accretion;
+
+        // Derive the start angle from the first active siphon stream so the spiral
+        // begins where the siphon Bézier line terminates on the accretion disk outer edge.
+        // Matches the offsetDir calculation in MassSiphonEffect exactly.
+        let startAngle = 0;
+        if (this.siphonEffects.size > 0) {
+            const starId = this.siphonEffects.keys().next().value as string;
+            const star = this.dependencies.getBodies().find(b => b.id === starId && !b._isDisposed);
+            if (star?.mesh) {
+                const diskNormal = this.rotationAxis
+                    ? this.rotationAxis.clone().normalize()
+                    : new THREE.Vector3(0, 1, 0);
+                const toBH = new THREE.Vector3()
+                    .subVectors(this.mesh.position, star.mesh.position)
+                    .normalize();
+                const toBH_proj = toBH
+                    .clone()
+                    .sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal)))
+                    .normalize();
+                const offsetDir = toBH_proj.clone().applyAxisAngle(diskNormal, Math.PI / 2).normalize();
+                startAngle = Math.atan2(offsetDir.z, offsetDir.x);
+            }
+        }
+
+        const TURNS = 6;
+        const STEPS = 240;
+        const totalAngle = TURNS * 2 * Math.PI;
+        const vertCount = STEPS + 1;
+
+        if (!this._spiralLine) {
+            // First creation — allocate typed arrays and build geometry
+            const positions = new Float32Array(vertCount * 3);
+            const colors = new Float32Array(vertCount * 3);
+
+            for (let i = 0; i < vertCount; i++) {
+                const t = i / STEPS;
+                const theta = startAngle + totalAngle * t;
+                const r = maxRadius * (1 - t) + minRadius * t;
+                positions[i * 3]     = Math.cos(theta) * r;
+                positions[i * 3 + 1] = 0;
+                positions[i * 3 + 2] = Math.sin(theta) * r;
+                colors[i * 3]     = 0.8 + (1.0 - 0.8) * t;
+                colors[i * 3 + 1] = 0.2 + (0.95 - 0.2) * t;
+                colors[i * 3 + 2] = 0.05 + (0.7 - 0.05) * t;
+            }
+
+            this._spiralLineGeo = new THREE.BufferGeometry();
+            this._spiralLineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            this._spiralLineGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            this._spiralLineMat = new THREE.LineBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.85,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            });
+            this._spiralLine = new THREE.Line(this._spiralLineGeo, this._spiralLineMat);
+            this._spiralLine.frustumCulled = false;
+            this._spiralLine.renderOrder = 999;
+            this.scene.add(this._spiralLine);
+        } else {
+            // Subsequent frames — rewrite buffer attributes in-place so the spiral
+            // follows the moving star without allocating new objects
+            const posAttr = this._spiralLineGeo!.attributes.position as THREE.BufferAttribute;
+            const posArr = posAttr.array as Float32Array;
+            for (let i = 0; i < vertCount; i++) {
+                const t = i / STEPS;
+                const theta = startAngle + totalAngle * t;
+                const r = maxRadius * (1 - t) + minRadius * t;
+                posArr[i * 3]     = Math.cos(theta) * r;
+                posArr[i * 3 + 1] = 0;
+                posArr[i * 3 + 2] = Math.sin(theta) * r;
+            }
+            posAttr.needsUpdate = true;
+            // Colors don't depend on startAngle so no need to update them
+        }
+
+        this._spiralLine.position.copy(this.mesh.position);
+    }
+
+    private _removeSpiralLine(): void {
+        if (this._spiralLine) {
+            this.scene.remove(this._spiralLine);
+            this._spiralLineGeo?.dispose();
+            this._spiralLineMat?.dispose();
+            this._spiralLine = null;
+            this._spiralLineGeo = null;
+            this._spiralLineMat = null;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * Updates the accretion disk animation and particle positions for the current simulation step.
      * Handles particle injection, spiral motion, color/opacity changes, and jet handoff.
@@ -500,6 +613,27 @@ export class BlackHole extends CelestialBody {
      */
     updateAccretion(dt: number) {
         if (!this.accretion) return;
+
+        const particlesEnabled = performanceSettings.particleEffectsEnabled;
+
+        // ── Handle toggling between particles and spiral line ─────────────────
+        if (particlesEnabled !== this._lastAccretionParticlesEnabled) {
+            this._lastAccretionParticlesEnabled = particlesEnabled;
+            const mat = this.accretion.points.material as THREE.Material;
+            if (!particlesEnabled) {
+                mat.visible = false;
+                this._buildSpiralLine();
+            } else {
+                mat.visible = true;
+                this._removeSpiralLine();
+            }
+        }
+
+        // ── Line mode: update spiral position and skip all particle work ──────
+        if (!particlesEnabled) {
+            this._buildSpiralLine();
+            return;
+        }
 
         // Drain the seed queue: accumulate raw sim-time and inject one particle when the
         // timer fires. Immediately reset to a new random interval so the next particle
@@ -599,6 +733,29 @@ export class BlackHole extends CelestialBody {
      * @param {number} dt - The simulation time delta.
      */
     updateJet(dt: number) {
+        if (!this.jet) return;
+
+        const particlesEnabled = performanceSettings.particleEffectsEnabled;
+
+        // ── Handle toggling between particles and jet line ────────────────────
+        if (particlesEnabled !== this._lastJetParticlesEnabled) {
+            this._lastJetParticlesEnabled = particlesEnabled;
+            const mat = this.jet.lines.material as THREE.Material;
+            if (!particlesEnabled) {
+                mat.visible = false;
+                this._buildJetLine();
+            } else {
+                mat.visible = true;
+                this._removeJetLine();
+            }
+        }
+
+        // ── Line mode: update jet line position and skip particle work ────────
+        if (!particlesEnabled) {
+            this._buildJetLine();
+            return;
+        }
+
         if (this.jet) {
             const absDt = Math.abs(dt);
             if (absDt > 0) {
@@ -658,6 +815,71 @@ export class BlackHole extends CelestialBody {
             }
         }
     }
+
+    // ── Jet line helpers (particle-effects-off fallback) ──────────────────────
+
+    private _buildJetLine(): void {
+        if (!this.mesh) return;
+        // The jet extends along the rotation axis (or world Y if none defined).
+        const axis = this.rotationAxis
+            ? this.rotationAxis.clone().normalize()
+            : new THREE.Vector3(0, 1, 0);
+        // Length matches the furthest a jet beam tip can travel in its lifetime.
+        const length = BLACK_HOLE_JET_SPEED_BASE * this.radius * BLACK_HOLE_JET_MAX_AGE;
+        const bhPos = this.mesh.position;
+        const north = bhPos.clone().addScaledVector(axis,  length);
+        const south = bhPos.clone().addScaledVector(axis, -length);
+        const { r, g, b } = BLACK_HOLE_JET_BEAM_COLOR;
+
+        if (!this._jetLine) {
+            // 3 points: south tip → BH centre → north tip
+            const positions = new Float32Array([
+                south.x, south.y, south.z,
+                bhPos.x, bhPos.y, bhPos.z,
+                north.x, north.y, north.z,
+            ]);
+            // Colour: tips are full beam colour, centre fades to black (additive = invisible)
+            const colors = new Float32Array([
+                r, g, b,
+                0, 0, 0,
+                r, g, b,
+            ]);
+            this._jetLineGeo = new THREE.BufferGeometry();
+            this._jetLineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            this._jetLineGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            this._jetLineMat = new THREE.LineBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            });
+            this._jetLine = new THREE.Line(this._jetLineGeo, this._jetLineMat);
+            this._jetLine.frustumCulled = false;
+            this._jetLine.renderOrder = 999;
+            this.scene.add(this._jetLine);
+        } else {
+            // Update positions in-place to follow the moving BH
+            const posArr = this._jetLineGeo!.attributes.position.array as Float32Array;
+            posArr[0] = south.x; posArr[1] = south.y; posArr[2] = south.z;
+            posArr[3] = bhPos.x; posArr[4] = bhPos.y; posArr[5] = bhPos.z;
+            posArr[6] = north.x; posArr[7] = north.y; posArr[8] = north.z;
+            (this._jetLineGeo!.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+        }
+    }
+
+    private _removeJetLine(): void {
+        if (this._jetLine) {
+            this.scene.remove(this._jetLine);
+            this._jetLineGeo?.dispose();
+            this._jetLineMat?.dispose();
+            this._jetLine = null;
+            this._jetLineGeo = null;
+            this._jetLineMat = null;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Updates the black hole's physics and all associated visual effects for the current simulation step.
@@ -810,6 +1032,9 @@ export class BlackHole extends CelestialBody {
      * Disposes of jets, accretion disk, glow, and siphon streams, then calls parent die.
      */
     die() {
+        // Clean up jet line fallback
+        this._removeJetLine();
+
         // Clean up jet
         if (this.jet) {
             this.scene.remove(this.jet.lines);

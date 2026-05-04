@@ -107,6 +107,7 @@ import { ManagementPanel } from './ui/management-panel';
 import { FlightControlsPanel } from './ui/flight-controls-panel';
 import { StartupModal } from './ui/startup-modal';
 import { AboutModal } from './ui/about-modal';
+import { PerformancePanel } from './ui/performance-panel';
 import { EventLogEntry } from './event-log/event-log';
 import { Halley } from './bodies/halley';
 import { IStateDependencies } from './interfaces';
@@ -4956,6 +4957,7 @@ function setF(id: string) {
 const startupModal = new StartupModal('startup-overlay');
 const mainPanel = new MainPanel('ui-layer');
 const aboutModal = new AboutModal('about-overlay', 'aboutBtn', 'aboutCloseBtn');
+const performancePanel = new PerformancePanel('performance-panel');
 const managementPanel = new ManagementPanel('management-panel', {
     getFocusObject: () => {
         const body = cameraState.focusBody;
@@ -4967,6 +4969,7 @@ const flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
 startupModal.initialize();
 mainPanel.initialize();
 aboutModal.initialize();
+performancePanel.initialize();
 managementPanel.initialize();
 flightControlsPanel.initialize();
 
@@ -4978,6 +4981,13 @@ flightControlsPanel.initialize();
             flightControlsPanel.toggle();
             // Update spawn button label to reflect whether there is a re-enterable ship
             updateFlightSpawnBtnLabel();
+        };
+    }
+
+    const performanceOptionsBtn = document.getElementById('performanceOptionsBtn');
+    if (performanceOptionsBtn) {
+        performanceOptionsBtn.onclick = () => {
+            performancePanel.toggle();
         };
     }
     flightControlsPanel.on('spawnShip', () => spawnShip());
@@ -6451,7 +6461,7 @@ mainPanel.on('lockToSunChange', ({ checked }: { checked: boolean }) => {
     cameraState.lockToSun = checked;
 });
 
-mainPanel.on('shadowsChange', ({ checked }: { checked: boolean }) => {
+performancePanel.on('shadowsChange', ({ checked }: { checked: boolean }) => {
     toggleShadows(checked);
 });
 

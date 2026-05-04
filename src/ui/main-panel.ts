@@ -12,7 +12,6 @@ export class MainPanel extends Panel {
     bodiesTableContainer: HTMLElement | null;
     _selectedBodyRef: Body | null;
     lockToSunCheckbox: HTMLInputElement | null;
-    enableShadowsCheckbox: HTMLInputElement | null;
     showTrailsCheckbox: HTMLInputElement | null;
     showNamesCheckbox: HTMLInputElement | null;
     timeScaleSlider: HTMLInputElement | null;
@@ -38,7 +37,6 @@ export class MainPanel extends Panel {
         this.bodiesTableContainer = null;
         this._selectedBodyRef = null;
         this.lockToSunCheckbox = null;
-        this.enableShadowsCheckbox = null;
         this.showTrailsCheckbox = null;
         this.showNamesCheckbox = null;
         this.timeScaleSlider = null;
@@ -90,7 +88,6 @@ export class MainPanel extends Panel {
         }
 
         this.lockToSunCheckbox = document.getElementById('lockToSun') as HTMLInputElement | null;
-        this.enableShadowsCheckbox = document.getElementById('enableShadows') as HTMLInputElement | null;
         this.showTrailsCheckbox = document.getElementById('showTrails') as HTMLInputElement | null;
         this.showNamesCheckbox = document.getElementById('showNames') as HTMLInputElement | null;
         this.timeScaleSlider = document.getElementById('timeScale') as HTMLInputElement | null;
@@ -108,12 +105,6 @@ export class MainPanel extends Panel {
         if (this.lockToSunCheckbox) {
             this.lockToSunCheckbox.onchange = () => {
                 this.emit('lockToSunChange', { checked: this.lockToSunCheckbox!.checked });
-            };
-        }
-
-        if (this.enableShadowsCheckbox) {
-            this.enableShadowsCheckbox.onchange = () => {
-                this.emit('shadowsChange', { checked: this.enableShadowsCheckbox!.checked });
             };
         }
 

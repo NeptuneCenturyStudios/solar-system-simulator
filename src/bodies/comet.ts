@@ -4,6 +4,7 @@ import { SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { IStateDependencies } from '../interfaces.js';
+import { performanceSettings } from '../utilities/consts';
 
 //export interface ICometCreationOptions extends ICelestialBodyCreationOptions {
 //// Add any comet-specific options here if needed in the future
@@ -179,6 +180,14 @@ export class Comet extends CelestialBody {
         ) {
             return;
         }
+
+        // If particle effects are disabled, skip tail updates for performance
+        if (!performanceSettings.particleEffectsEnabled) {
+            this.tailParticles.visible = false; 
+            return;
+        } else {
+            this.tailParticles.visible = true;
+        }   
 
         // Calculate distance to sun (optimized with squared distance)
         const distToSunSq =

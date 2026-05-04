@@ -106,9 +106,6 @@
                 <div id="bodiesTableContainer"></div>
 
                 <label class="checkbox-row">
-                    <input type="checkbox" id="enableShadows" checked /> Enable Shadows
-                </label>
-                <label class="checkbox-row">
                     <input type="checkbox" id="showTrails" checked /> Show Orbit Trails
                 </label>
                 <label class="checkbox-row">
@@ -195,6 +192,14 @@
                         DONATE
                     </button>
                     <button
+                        id="performanceOptionsBtn"
+                        class="btn-icon-only"
+                        title="Performance Options"
+                        aria-label="Performance Options"
+                    >
+                        <span class="material-symbols-outlined">speed</span>
+                    </button>
+                    <button
                         id="aboutBtn"
                         class="btn-with-icon"
                         title="About this simulator"
@@ -205,6 +210,16 @@
                     </button>
                 </div>
                 <div class="footer-note">© <span id="copyrightYear"></span> Neptune Century</div>
+            </div>
+
+            <div id="performance-panel">
+                <div class="panel-header">Performance Options</div>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="enableShadows" /> Enable Shadows
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="enableParticleEffects" checked /> Enable Particle Effects
+                </label>
             </div>
 
             <div id="flight-controls-panel">

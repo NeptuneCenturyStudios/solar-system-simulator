@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
+import { performanceSettings } from '../utilities/consts';
 
 /**
  * Reusable star corona particle effect.
@@ -23,6 +24,7 @@ export class Corona implements IEffect {
     velocityVariation: number;
     private material: THREE.PointsMaterial;
     private geometry: THREE.BufferGeometry;
+    private _lastParticlesEnabled: boolean = true;
 
     constructor(
         dependencies: IStateDependencies,
@@ -125,6 +127,14 @@ export class Corona implements IEffect {
 
     update(dt: number) {
         if (!dt) return;
+
+        const particlesEnabled = performanceSettings.particleEffectsEnabled;
+        if (particlesEnabled !== this._lastParticlesEnabled) {
+            this._lastParticlesEnabled = particlesEnabled;
+            this.material.visible = particlesEnabled;
+        }
+        if (!particlesEnabled) return;
+
         dt = Math.abs(dt);
 
         const positionAttribute = this.geometry.attributes.position as THREE.BufferAttribute;
