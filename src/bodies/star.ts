@@ -146,6 +146,11 @@ export class Star extends CelestialBody {
         return SUN_RADIUS * Math.pow(Math.max(0, mass) / SUN_MASS, 0.8);
     }
 
+    /**
+     * Calculates the RGB color corresponding to a given surface temperature using an approximation of blackbody radiation.
+     * @param temp The surface temperature of the star in Kelvin.
+     * @returns The RGB color as a hexadecimal number.
+     */
     static temperatureToColor(temp: number) {
         temp = Math.max(1000, Math.min(40000, temp));
 
