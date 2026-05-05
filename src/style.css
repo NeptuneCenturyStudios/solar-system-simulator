@@ -276,15 +276,6 @@ button:active {
     box-shadow: 0 1px 3px rgba(0, 255, 204, 0.2);
 }
 
-button.active {
-    background: #00ffcc;
-    color: #000;
-}
-
-button.active:hover {
-    background: #00ddaa;
-}
-
 button:disabled {
     background: #333;
     color: #666;
@@ -298,29 +289,49 @@ button:disabled:hover {
     box-shadow: none;
 }
 
+/* Toggled active state */
+button.active {
+    background: #00ffcc;
+    color: #000;
+}
+
+button.active:hover {
+    background: #00ddaa;
+}
+
+
+/* Warning / destructive actions */
+.btn-warning {
+    background: #e67e22;
+    color: white;
+}
+.btn-warning:hover {
+    background: #f39c12;
+    box-shadow: 0 2px 8px rgba(243, 157, 18, 0.3);
+}
+
+.btn-warning:active {
+    box-shadow: 0 2px 8px rgba(243, 157, 18, 0.2);
+}
+
+/* Dark button */
+.btn-dark {
+    background: #1a0a2e;
+    color: white;
+}
+.btn-dark:hover {
+    background: #2c114d;
+    box-shadow: 0 2px 8px rgba(44, 17, 77, 0.3);
+}
+
+.btn-dark:active {
+    box-shadow: 0 2px 8px rgba(44, 17, 77, 0.3);
+}
+
 .val-display {
     float: right;
     font-family: monospace;
     color: #fff;
-}
-
-#resetBtn {
-    width: 100%;
-    background: #e67e22;
-    margin-bottom: 15px;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    padding: 10px;
-    cursor: pointer;
-}
-
-#resetBtn:hover {
-    background: #f39c12;
-}
-
-#resetBtn:active {
-    background: #d35400;
 }
 
 .btn-with-icon--donate {
