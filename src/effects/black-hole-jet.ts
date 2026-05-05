@@ -265,7 +265,10 @@ gl_FragColor = vec4(outgoingLight * alpha, alpha);`
                 this._orientSlot(staticSlot);
                 this._setSlotAlpha(staticSlot, JET_PERSISTENT_ALPHA);
             }
-            // Switching back to particles: slot 0 will fade naturally once flash() picks it up.
+            // Switching back to particles: clear the persistent slot so it fades out cleanly.
+            if (particlesEnabled) {
+                this._setSlotAlpha(this._slots[0], 0);
+            }
         }
 
         if (!particlesEnabled) {
