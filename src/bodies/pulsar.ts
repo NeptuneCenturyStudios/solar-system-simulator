@@ -119,7 +119,7 @@ export class Pulsar extends Star {
             dependencies,
             scene,
             pulsarRadius * 1000,
-            0xd6f0ff,
+            this.baseColor.getHex(),
             this.mesh.position.clone(),
             0.15,
             20
