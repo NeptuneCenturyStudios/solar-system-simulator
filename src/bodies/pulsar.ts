@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import { Star, IStarCreationOptions } from './star';
-import { IStateDependencies } from '../interfaces';
+import { IStateDependencies, ISiphonTarget, IMassTransferBody } from '../interfaces';
 import { loadSrgbTexture } from '../drawing/textures';
 import { BodyTypeEnum } from '../utilities/utilities';
 import { IRotation } from '../physics/physics';
-import { SCALE_FACTOR, SUN_MASS } from '../utilities/consts';
+import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G } from '../utilities/consts';
 import { PulsarBeam } from '../effects/pulsar-beam';
 import { StarGlow } from '../effects/star-glow';
+import { AccretionDiskEffect, PULSAR_DISK_COLORS } from '../effects/accretion-disk';
+import { PulsarMagneticField } from '../effects/pulsar-magnetic-field';
+import { MassSiphonEffect } from '../effects/mass-siphon';
+import { IPipelineFeedEffect } from '../effects/effect-base';
 
 /**
  * Base radius constant used in the neutron-star mass-to-radius formula.
@@ -40,6 +44,9 @@ const PULSAR_LIGHT_DISTANCE = 1_000_000 * SCALE_FACTOR;
 const PULSAR_MIN_SPIN = Math.PI * 2; // 1 rotation / sim-sec
 const PULSAR_MAX_SPIN = Math.PI * 3.5; // max speed allowed to avoid weird looking beam
 
+/** Multiplier for the gravitational mass-transfer formula (same as black hole). */
+const SIPHON_MASS_TRANSFER_SCALE = 0.0001;
+
 /**
  * A pulsar: a rapidly spinning neutron star that emits narrow beams of electromagnetic
  * radiation from its magnetic poles, which are offset from its rotation axis.
@@ -48,10 +55,15 @@ const PULSAR_MAX_SPIN = Math.PI * 3.5; // max speed allowed to avoid weird looki
  *  - Mass compressed via neutron-star degenerate-matter radius formula
  *  - Spin-up via angular momentum conservation: ω_new = ω_old × (R_progenitor / R_pulsar)²
  *  - Rotating magnetic-axis beam effect (PulsarBeam)
+ *  - Dipole magnetic field loop effect (PulsarMagneticField)
+ *  - Mass siphoning from nearby stars into an accretion disk (AccretionDiskEffect + MassSiphonEffect)
  */
-export class Pulsar extends Star {
+export class Pulsar extends Star implements IMassTransferBody {
     private beam: PulsarBeam;
     private glow: StarGlow;
+    private magneticField: PulsarMagneticField;
+    accretionDisk: AccretionDiskEffect;
+    siphonEffects: Map<string, IPipelineFeedEffect> = new Map();
 
     constructor(
         dependencies: IStateDependencies,
@@ -124,6 +136,33 @@ export class Pulsar extends Star {
             0.15,
             20
         );
+
+        // Magnetic field dipole loops — shares the same rotation axis/speed as the beam
+        this.magneticField = new PulsarMagneticField(
+            dependencies,
+            scene,
+            this.mesh.position.clone(),
+            pulsarRadius,
+            newRotation.axis,
+            newSpeed
+        );
+
+        // Accretion disk with pulsar color preset (light blue outer → bright white inner).
+        // onParticleConsumed is a no-op: the rotating beam already provides visual activity
+        // at the poles; a secondary effect here would be visually redundant.
+        this.accretionDisk = new AccretionDiskEffect(
+            dependencies,
+            scene,
+            pulsarRadius,
+            mass,
+            pos,
+            PULSAR_DISK_COLORS,
+            () => { /* no-op: beam sweeps handle the pole visual */ }
+        );
+    }
+
+    enqueueAccretionParticle(angle: number): void {
+        this.accretionDisk.enqueueAccretionParticle(angle);
     }
 
     override update(acc: THREE.Vector3, dt: number): void {
@@ -133,6 +172,111 @@ export class Pulsar extends Star {
         this.beam.update(dt);
         this.glow.setPosition(this.mesh.position);
         this.glow.update(dt);
+        this.magneticField.setPosition(this.mesh.position);
+        this.magneticField.update(dt);
+        this.accretionDisk.setPosition(this.mesh.position);
+        this.accretionDisk.update(dt);
+        this._updateSiphon(dt);
+    }
+
+    /**
+     * Checks all living, non-compact stars within EARTH_DIST.
+     * Creates / maintains / removes MassSiphonEffect instances and transfers
+     * mass from each in-range star into this pulsar's accretion disk.
+     */
+    private _updateSiphon(dt: number): void {
+        if (dt === 0 || this._isDisposed) return;
+
+        const absDt = Math.abs(dt);
+        const bodies = this.deps.getBodies();
+
+        const stars = bodies.filter(
+            (b): b is typeof b & ISiphonTarget =>
+                !b._isDisposed &&
+                !!(b.bodyType & BodyTypeEnum.Star) &&
+                !(b.bodyType & BodyTypeEnum.WhiteDwarf) &&
+                !(b.bodyType & BodyTypeEnum.BrownDwarf) &&
+                !(b.bodyType & BodyTypeEnum.Pulsar) &&
+                b.id !== this.id &&
+                'triggerStarDeath' in b
+        ) as unknown as ISiphonTarget[];
+
+        const inRangeIds = new Set<string>();
+        let totalTransfer = 0;
+
+        for (const star of stars) {
+            const dist = star.mesh.position.distanceTo(this.mesh.position);
+            if (dist > EARTH_DIST) continue;
+
+            inRangeIds.add(star.id);
+
+            if (!this.siphonEffects.has(star.id)) {
+                const effect = new MassSiphonEffect(
+                    this.deps,
+                    this.scene,
+                    star,
+                    this,
+                    (angle) => this.enqueueAccretionParticle(angle),
+                    // Pulsar disk arrival color: light blue outer edge
+                    { r: 0.5, g: 0.85, b: 1.0 }
+                );
+                this.siphonEffects.set(star.id, effect);
+                this.deps.addEvent(`${this.name} is siphoning mass from ${star.name}`);
+            }
+
+            const distSafe = Math.max(dist, 1);
+            const transfer =
+                ((G * this.mass * star.mass) / (distSafe * distSafe)) *
+                SIPHON_MASS_TRANSFER_SCALE *
+                absDt;
+
+            const wouldBeDepleted =
+                star.mass - transfer > 0 && star.mass - transfer < SUN_MASS * 0.01;
+            const wouldBeGone = star.mass - transfer <= 0;
+
+            if (!wouldBeDepleted && !wouldBeGone) {
+                star.setMass(Math.max(0, star.mass - transfer));
+                totalTransfer += transfer;
+                if (star.fuel !== null) {
+                    star.fuel = Math.max(0, star.fuel - transfer * 100000 * SCALE_FACTOR);
+                }
+            }
+
+            const depleted = wouldBeDepleted || (star.mass > 0 && star.mass < SUN_MASS * 0.01);
+            const massGone = wouldBeGone || star.mass <= 0;
+            const fuelGone = star.fuel !== null && star.fuel <= 0;
+
+            if (massGone || fuelGone || depleted) {
+                if (massGone) {
+                    star.mass = 0;
+                    if (star.fuel !== null) star.fuel = 0;
+                    const isMassiveStar = star.initialMass > SUN_MASS * 3.3;
+                    star.triggerStarDeath(isMassiveStar);
+                }
+                this.siphonEffects.get(star.id)?.stopSpawning();
+                inRangeIds.delete(star.id);
+                if (depleted && !massGone) {
+                    this.deps.addEvent(`${star.name} siphoned into a brown dwarf remnant`);
+                }
+            }
+        }
+
+        // Neutron stars accrete mass but their radius is constrained by degenerate matter —
+        // no setRadius() call here (unlike black holes which grow).
+        if (totalTransfer > 0) {
+            this.mass += totalTransfer;
+        }
+
+        for (const [starId, effect] of Array.from(this.siphonEffects.entries())) {
+            if (!inRangeIds.has(starId)) {
+                effect.stopSpawning();
+            }
+            effect.update(dt);
+            if (!effect.active) {
+                effect.dispose();
+                this.siphonEffects.delete(starId);
+            }
+        }
     }
 
     override die(skipExplosion = false): void {
@@ -146,6 +290,24 @@ export class Pulsar extends Star {
         } catch {
             // ignore
         }
+        try {
+            this.magneticField?.dispose();
+        } catch {
+            // ignore
+        }
+        try {
+            this.accretionDisk?.dispose();
+        } catch {
+            // ignore
+        }
+        for (const effect of this.siphonEffects.values()) {
+            try {
+                effect.dispose();
+            } catch {
+                // ignore
+            }
+        }
+        this.siphonEffects.clear();
         super.die(skipExplosion);
     }
 }

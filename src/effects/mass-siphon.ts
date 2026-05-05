@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // Global scaling factor for siphon stream speed (tweak for visual pacing)
 const SIPHON_SPEED_SCALE = 8;
 import { IPipelineFeedEffect } from './effect-base';
-import { IStateDependencies, ISiphonTarget } from '../interfaces';
+import { IStateDependencies, ISiphonTarget, IAccretionTarget } from '../interfaces';
 import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, performanceSettings } from '../utilities/consts';
 
 /** Maximum number of simultaneously in-flight siphon particles per stream. */
@@ -14,10 +14,8 @@ const SIPHON_SPAWN_RATE = 20;
 /** Maximum particles spawned in a single update() call regardless of dt (guards against high time-scale bursts). */
 const SIPHON_MAX_SPAWN_PER_FRAME = 5;
 
-// Accretion disk outer colour — particles arriving at the black hole take this colour.
-const BH_R = 0.8;
-const BH_G = 0.2;
-const BH_B = 0.05;
+/** Default accretion disk arrival colour (dark orange/red for black holes). */
+const DEFAULT_ARRIVAL_COLOR = { r: 0.8, g: 0.2, b: 0.05 };
 
 /**
  * Renders a curved particle stream flowing from a star to a black hole's accretion disk.
@@ -33,8 +31,9 @@ const BH_B = 0.05;
  * Calling `stopSpawning()` halts new spawns; the effect sets `active = false` automatically
  * once every in-flight particle has been handed off downstream.
  *
- * Particle colour lerps from the star's corona/base colour (t=0) to the BH accretion
- * outer colour (t=1) so each stream naturally reflects its source star's temperature.
+ * Particle colour lerps from the star's corona/base colour (t=0) to the accretion disk
+ * outer colour (t=1) so each stream naturally reflects its source star's temperature and
+ * the consuming body's disk color preset.
  */
 export class MassSiphonEffect implements IPipelineFeedEffect {
     dependencies: IStateDependencies;
@@ -52,13 +51,9 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
 
     private scene: THREE.Scene;
     private star: ISiphonTarget;
-    private blackHole: {
-        mesh: THREE.Mesh;
-        radius: number;
-        _isDisposed: boolean;
-        rotationAxis: THREE.Vector3;
-        accretion?: { maxRadius: number } | null;
-    };
+    private consumer: IAccretionTarget;
+    /** Arrival colour at the disk outer edge (t=1). Defaults to dark orange/red. */
+    private arrivalColor: { r: number; g: number; b: number };
 
     private geometry: THREE.BufferGeometry;
     private material: THREE.PointsMaterial;
@@ -86,26 +81,21 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
      */
     private onParticleArrived: (angle: number) => void;
 
-    // Accept accretion disk info if present
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         star: ISiphonTarget,
-        blackHole: {
-            mesh: THREE.Mesh;
-            mass: number;
-            radius: number;
-            _isDisposed: boolean;
-            rotationAxis: THREE.Vector3;
-            accretion?: { maxRadius: number } | null;
-        },
-        onParticleArrived: (angle: number) => void
+        consumer: IAccretionTarget,
+        onParticleArrived: (angle: number) => void,
+        /** Optional override for the arrival colour at the disk outer edge. */
+        diskArrivalColor?: { r: number; g: number; b: number }
     ) {
         this.dependencies = dependencies;
         this.active = true;
         this.scene = scene;
         this.star = star;
-        this.blackHole = blackHole;
+        this.consumer = consumer;
+        this.arrivalColor = diskArrivalColor ?? DEFAULT_ARRIVAL_COLOR;
         this.onParticleArrived = onParticleArrived;
 
         this.tArr = new Float32Array(PARTICLE_COUNT);
@@ -118,10 +108,10 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
         // initialised to { orbital: 0 } under the pipeline model and are only populated
         // when particles are injected — so reading from vels would always give 0.
         const accretionMaxRadius =
-            blackHole.accretion && blackHole.accretion.maxRadius
-                ? blackHole.accretion.maxRadius
-                : blackHole.radius * 2 * 32;
-        const bhMass = blackHole.mass || 1;
+            consumer.accretionDisk && consumer.accretionDisk.maxRadius
+                ? consumer.accretionDisk.maxRadius
+                : consumer.radius * 2 * 32;
+        const bhMass = consumer.mass || 1;
         const diskOrbitalSpeed = Math.sqrt(bhMass / accretionMaxRadius) * 0.005;
 
         // Pre-compute per-slot spawn direction and speed (path length for speed normalisation).
@@ -146,15 +136,15 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
 
             // End: offset point on accretion disk outer edge in direction of rotation (in disk plane)
             const accretionMaxRadius =
-                blackHole.accretion && blackHole.accretion.maxRadius
-                    ? blackHole.accretion.maxRadius
-                    : blackHole.radius * 2 * 32;
-            const bhCenter = blackHole.mesh.position;
+                consumer.accretionDisk && consumer.accretionDisk.maxRadius
+                    ? consumer.accretionDisk.maxRadius
+                    : consumer.radius * 2 * 32;
+            const bhCenter = consumer.mesh.position;
             // Direction from star to black hole
             const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
             // Disk normal (rotation axis)
-            const diskNormal = blackHole.rotationAxis
-                ? blackHole.rotationAxis.clone().normalize()
+            const diskNormal = consumer.rotationAxis
+                ? consumer.rotationAxis.clone().normalize()
                 : new THREE.Vector3(0, 1, 0);
             // Project toBH onto the disk plane
             const toBH_proj = toBH
@@ -213,7 +203,7 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
         this.geometry.setAttribute('tval', new THREE.BufferAttribute(tVals, 1));
 
         this.material = new THREE.PointsMaterial({
-            sizeAttenuation: false, // Keeps particles same size regardless of distance
+            sizeAttenuation: true, // Sizes scale with depth so particles grow when zoomed in
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
@@ -223,8 +213,8 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
 
         this.material.onBeforeCompile = (shader) => {
             // 1. Add your custom uniforms
-            shader.uniforms.pointSize = { value: 4 * blackHole.radius };
-            shader.uniforms.sizeNearStar = { value: 8 * blackHole.radius };
+            shader.uniforms.pointSize = { value: 4 * consumer.radius };
+            shader.uniforms.sizeNearStar = { value: 8 * consumer.radius };
             shader.uniforms.BRIGHTNESS = { value: 2.0 };
 
             // 2. Vertex Shader: Custom Size & Alpha Injection
@@ -284,14 +274,14 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
     private _buildBezierPoints(): THREE.Vector3[] {
         const starCenter = this.star.mesh.position;
         const starRadius = this.star.radius;
-        const bhCenter = this.blackHole.mesh.position;
-        const diskNormal = this.blackHole.rotationAxis
-            ? this.blackHole.rotationAxis.clone().normalize()
+        const bhCenter = this.consumer.mesh.position;
+        const diskNormal = this.consumer.rotationAxis
+            ? this.consumer.rotationAxis.clone().normalize()
             : new THREE.Vector3(0, 1, 0);
         const accretionMaxRadius =
-            this.blackHole.accretion && this.blackHole.accretion.maxRadius
-                ? this.blackHole.accretion.maxRadius
-                : this.blackHole.radius * 2 * 32;
+            this.consumer.accretionDisk && this.consumer.accretionDisk.maxRadius
+                ? this.consumer.accretionDisk.maxRadius
+                : this.consumer.radius * 2 * 32;
         const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
         const toBH_proj = toBH
             .clone()
@@ -335,9 +325,9 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
             this._bezierLineGeo = new THREE.BufferGeometry().setFromPoints(pts);
             this._bezierLineMat = new THREE.LineBasicMaterial({
                 color: new THREE.Color(
-                    this.star.baseColor.r * 0.8 + BH_R * 0.2,
-                    this.star.baseColor.g * 0.8 + BH_G * 0.2,
-                    this.star.baseColor.b * 0.8 + BH_B * 0.2
+                    this.star.baseColor.r * 0.8 + this.arrivalColor.r * 0.2,
+                    this.star.baseColor.g * 0.8 + this.arrivalColor.g * 0.2,
+                    this.star.baseColor.b * 0.8 + this.arrivalColor.b * 0.2
                 ),
                 transparent: true,
                 opacity: 0.75,
@@ -400,7 +390,7 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
     // ─────────────────────────────────────────────────────────────────────────
 
     update(dt: number): void {
-        if (this.star._isDisposed || this.blackHole._isDisposed) {
+        if (this.star._isDisposed || this.consumer._isDisposed) {
             this.active = false;
             return;
         }
@@ -484,10 +474,10 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
                 // Compute the disk-entry angle so the accretion disk places the
                 // incoming particle at the correct position on its outer ring.
                 const starCenter = this.star.mesh.position;
-                const bhCenter = this.blackHole.mesh.position;
+                const bhCenter = this.consumer.mesh.position;
                 const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
-                const diskNormal = this.blackHole.rotationAxis
-                    ? this.blackHole.rotationAxis.clone().normalize()
+                const diskNormal = this.consumer.rotationAxis
+                    ? this.consumer.rotationAxis.clone().normalize()
                     : new THREE.Vector3(0, 1, 0);
                 const toBH_proj = toBH
                     .clone()
@@ -517,13 +507,13 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
                 .addScaledVector(spawnDir, starRadius);
 
             const accretionMaxRadius =
-                this.blackHole.accretion && this.blackHole.accretion.maxRadius
-                    ? this.blackHole.accretion.maxRadius
-                    : this.blackHole.radius * 2 * 32;
-            const bhCenter = this.blackHole.mesh.position;
+                this.consumer.accretionDisk && this.consumer.accretionDisk.maxRadius
+                    ? this.consumer.accretionDisk.maxRadius
+                    : this.consumer.radius * 2 * 32;
+            const bhCenter = this.consumer.mesh.position;
             const toBH = new THREE.Vector3().subVectors(bhCenter, starCenter).normalize();
-            const diskNormal = this.blackHole.rotationAxis
-                ? this.blackHole.rotationAxis.clone().normalize()
+            const diskNormal = this.consumer.rotationAxis
+                ? this.consumer.rotationAxis.clone().normalize()
                 : new THREE.Vector3(0, 1, 0);
             const toBH_proj = toBH
                 .clone()
@@ -554,10 +544,10 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
             posArr[i * 3 + 1] = s * s * start.y + 2 * s * t * mid.y + t * t * end.y;
             posArr[i * 3 + 2] = s * s * start.z + 2 * s * t * mid.z + t * t * end.z;
 
-            // Colour: star base colour → BH accretion outer orange/red.
-            colArr[i * 3] = starR + (BH_R - starR) * t;
-            colArr[i * 3 + 1] = starG + (BH_G - starG) * t;
-            colArr[i * 3 + 2] = starB + (BH_B - starB) * t;
+            // Colour: star base colour → disk arrival colour.
+            colArr[i * 3] = starR + (this.arrivalColor.r - starR) * t;
+            colArr[i * 3 + 1] = starG + (this.arrivalColor.g - starG) * t;
+            colArr[i * 3 + 2] = starB + (this.arrivalColor.b - starB) * t;
 
             // Opacity: MAX_PARTICLE_ALPHA (star) → MIN_PARTICLE_ALPHA (disk)
             alphaArr[i] = MAX_PARTICLE_ALPHA + (MIN_PARTICLE_ALPHA - MAX_PARTICLE_ALPHA) * t;

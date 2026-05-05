@@ -13,7 +13,7 @@ export const performanceSettings = {
  * Minimum alpha (opacity) for accretion disk and siphon particles (at disk edge).
  * Tune this to control how faint the outer disk/stream appears.
  */
-export const MIN_PARTICLE_ALPHA = 0.5;
+export const MIN_PARTICLE_ALPHA = 0.7;
 
 /**
  * Maximum alpha (opacity) for accretion disk and siphon particles (at source/star).

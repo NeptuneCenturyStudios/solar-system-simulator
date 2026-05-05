@@ -4,6 +4,7 @@ import { ParticleExplosion } from './effects/particle-explosion';
 import { Supernova } from './effects/supernova';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { BodyTypeEnum } from './utilities/utilities';
+import { IPipelineFeedEffect } from './effects/effect-base';
 
 export interface IStateDependencies {
     addEvent: (message: string) => void;
@@ -32,4 +33,28 @@ export interface ISiphonTarget {
     _isDisposed: boolean;
     setMass(mass: number): void;
     triggerStarDeath(isMassiveStar: boolean): void;
+}
+
+/**
+ * Structural interface for a body that can consume mass via an accretion disk.
+ * Used by MassSiphonEffect to avoid circular imports.
+ */
+export interface IAccretionTarget {
+    mesh: THREE.Mesh;
+    mass: number;
+    radius: number;
+    _isDisposed: boolean;
+    rotationAxis: THREE.Vector3;
+    /** The accretion disk's outer radius; null when no disk is active. */
+    accretionDisk: { maxRadius: number } | null;
+}
+
+/**
+ * Extends IAccretionTarget for bodies that actively manage siphon streams and
+ * queue incoming particles into their accretion disk. Implemented by BlackHole
+ * and Pulsar.
+ */
+export interface IMassTransferBody extends IAccretionTarget {
+    siphonEffects: Map<string, IPipelineFeedEffect>;
+    enqueueAccretionParticle(angle: number): void;
 }
