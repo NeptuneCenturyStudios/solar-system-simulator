@@ -213,7 +213,7 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
 
         this.material.onBeforeCompile = (shader) => {
             // 1. Add your custom uniforms
-            shader.uniforms.pointSize = { value: 4 * consumer.radius };
+            shader.uniforms.pointSize = { value: 2 * consumer.radius };
             shader.uniforms.sizeNearStar = { value: 8 * consumer.radius };
             shader.uniforms.BRIGHTNESS = { value: 2.0 };
 

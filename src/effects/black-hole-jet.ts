@@ -22,8 +22,8 @@ const JET_BASE_RADIUS_FRAC = 0.5;
 /** Beam hex color — same blue-white as PulsarBeam. */
 const JET_BEAM_COLOR = 0xd6f0ff;
 
-/** Line-mode fallback color (RGB for vertex colors). */
-const JET_BEAM_RGB = { r: 0.84, g: 0.94, b: 1.0 };
+/** Alpha for the always-on persistent beam shown when particle effects are disabled. */
+const JET_PERSISTENT_ALPHA = 0.8;
 
 interface IJetSlot {
     meshNorth: THREE.Mesh;
@@ -47,7 +47,8 @@ interface IJetSlot {
  * shader. The key difference is that there is no lighthouse sweep — the beams are
  * locked to the rotation axis and driven purely by accretion events.
  *
- * When particle effects are disabled, falls back to a static bi-directional line.
+ * When particle effects are disabled, slot 0 is held at a constant alpha as a
+ * persistent always-on beam — same cone geometry and rim-glow shader, no flash.
  */
 export class BlackHoleJetEffect implements IEffect {
     active = true;
@@ -61,11 +62,6 @@ export class BlackHoleJetEffect implements IEffect {
 
     private _geo: THREE.CylinderGeometry | null = null;
     private _slots: IJetSlot[] = [];
-
-    // Particle-effects-off line fallback
-    private _jetLine: THREE.Line | null = null;
-    private _jetLineGeo: THREE.BufferGeometry | null = null;
-    private _jetLineMat: THREE.LineBasicMaterial | null = null;
     private _particlesWereEnabled = true;
 
     constructor(
@@ -211,13 +207,6 @@ gl_FragColor = vec4(outgoingLight * alpha, alpha);`
         slot.matSouth.userData.uAlpha.value = alpha;
     }
 
-    private _setConeMeshesVisible(visible: boolean): void {
-        for (const slot of this._slots) {
-            slot.meshNorth.visible = visible;
-            slot.meshSouth.visible = visible;
-        }
-    }
-
     /** Rebuilds cone geometry after a radius/beamLength change. */
     private _rebuildGeometry(): void {
         this._geo?.dispose();
@@ -233,57 +222,6 @@ gl_FragColor = vec4(outgoingLight * alpha, alpha);`
             slot.meshNorth.geometry = this._geo;
             slot.meshSouth.geometry = this._geo;
             this._orientSlot(slot);
-        }
-    }
-
-    // ── line fallback ─────────────────────────────────────────────────────────
-
-    private _buildOrUpdateJetLine(): void {
-        const axis = this.rotationAxis;
-        const length = this.beamLength;
-        const pos = this.position;
-        const north = pos.clone().addScaledVector(axis, length);
-        const south = pos.clone().addScaledVector(axis, -length);
-        const { r, g, b } = JET_BEAM_RGB;
-
-        if (!this._jetLine) {
-            const positions = new Float32Array([
-                south.x, south.y, south.z,
-                pos.x, pos.y, pos.z,
-                north.x, north.y, north.z,
-            ]);
-            const colors = new Float32Array([r, g, b, 0, 0, 0, r, g, b]);
-            this._jetLineGeo = new THREE.BufferGeometry();
-            this._jetLineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            this._jetLineGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-            this._jetLineMat = new THREE.LineBasicMaterial({
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.75,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-            });
-            this._jetLine = new THREE.Line(this._jetLineGeo, this._jetLineMat);
-            this._jetLine.frustumCulled = false;
-            this._jetLine.renderOrder = 999;
-            this.scene.add(this._jetLine);
-        } else {
-            const posArr = this._jetLineGeo!.attributes.position.array as Float32Array;
-            posArr[0] = south.x; posArr[1] = south.y; posArr[2] = south.z;
-            posArr[3] = pos.x;   posArr[4] = pos.y;   posArr[5] = pos.z;
-            posArr[6] = north.x; posArr[7] = north.y; posArr[8] = north.z;
-            (this._jetLineGeo!.attributes.position as THREE.BufferAttribute).needsUpdate = true;
-        }
-    }
-
-    private _removeJetLine(): void {
-        if (this._jetLine) {
-            this.scene.remove(this._jetLine);
-            this._jetLineGeo?.dispose();
-            this._jetLineMat?.dispose();
-            this._jetLine = null;
-            this._jetLineGeo = null;
-            this._jetLineMat = null;
         }
     }
 
@@ -317,16 +255,22 @@ gl_FragColor = vec4(outgoingLight * alpha, alpha);`
 
         if (particlesEnabled !== this._particlesWereEnabled) {
             this._particlesWereEnabled = particlesEnabled;
-            this._setConeMeshesVisible(particlesEnabled);
             if (!particlesEnabled) {
-                this._buildOrUpdateJetLine();
-            } else {
-                this._removeJetLine();
+                // Switch to persistent mode: fade out all flash slots, hold slot 0 at constant alpha.
+                for (const slot of this._slots) {
+                    slot.active = false;
+                    this._setSlotAlpha(slot, 0);
+                }
+                const staticSlot = this._slots[0];
+                this._orientSlot(staticSlot);
+                this._setSlotAlpha(staticSlot, JET_PERSISTENT_ALPHA);
             }
+            // Switching back to particles: slot 0 will fade naturally once flash() picks it up.
         }
 
         if (!particlesEnabled) {
-            this._buildOrUpdateJetLine();
+            // Keep the persistent slot oriented as the black hole moves.
+            this._orientSlot(this._slots[0]);
             return;
         }
 
@@ -353,7 +297,6 @@ gl_FragColor = vec4(outgoingLight * alpha, alpha);`
         for (const slot of this._slots) {
             this._orientSlot(slot);
         }
-        if (this._jetLine) this._buildOrUpdateJetLine();
     }
 
     setRotationAxis(axis: THREE.Vector3): void {
@@ -361,7 +304,6 @@ gl_FragColor = vec4(outgoingLight * alpha, alpha);`
         for (const slot of this._slots) {
             this._orientSlot(slot);
         }
-        if (this._jetLine) this._buildOrUpdateJetLine();
     }
 
     setRadius(radius: number): void {
@@ -369,12 +311,10 @@ gl_FragColor = vec4(outgoingLight * alpha, alpha);`
         this.radius = radius;
         this.beamLength = Math.max(300_000 * radius, radius * 50);
         this._rebuildGeometry();
-        if (this._jetLine) this._buildOrUpdateJetLine();
     }
 
     dispose(): void {
         this.active = false;
-        this._removeJetLine();
         for (const slot of this._slots) {
             this.scene.remove(slot.meshNorth);
             this.scene.remove(slot.meshSouth);

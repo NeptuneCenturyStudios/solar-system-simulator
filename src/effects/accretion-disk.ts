@@ -304,7 +304,6 @@ export class AccretionDiskEffect implements IEffect {
         const vels: { inward: number; orbital: number; radius: number }[] = [];
         const angularPositions: number[] = [];
 
-        const minRadius = this._minRadius;
         const maxRadius = this._maxRadius;
         const outer = this._colors.outer;
 
@@ -364,7 +363,7 @@ export class AccretionDiskEffect implements IEffect {
             );
             shader.fragmentShader = shader.fragmentShader.replace(
                 '#include <opaque_fragment>',
-                'gl_FragColor = vec4( outgoingLight, vAlpha * strength );'
+                'gl_FragColor = vec4( outgoingLight * 2.0, vAlpha * strength );'
             );
         };
 
