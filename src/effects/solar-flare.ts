@@ -111,14 +111,15 @@ export class SolarFlare implements IEffect {
             const perpB = new THREE.Vector3().crossVectors(surfaceNormal, perpA);
 
             for (let i = 0; i < this.count; i++) {
-                this.positions[i * 3]     = surfacePoint.x;
+                this.positions[i * 3] = surfacePoint.x;
                 this.positions[i * 3 + 1] = surfacePoint.y;
                 this.positions[i * 3 + 2] = surfacePoint.z;
 
                 // uniform distribution within 45° half-angle cone
                 const coneAngle = (Math.PI / 4) * Math.sqrt(Math.random());
                 const rotAngle = Math.random() * Math.PI * 2;
-                const dir = surfaceNormal.clone()
+                const dir = surfaceNormal
+                    .clone()
                     .multiplyScalar(Math.cos(coneAngle))
                     .addScaledVector(perpA, Math.sin(coneAngle) * Math.cos(rotAngle))
                     .addScaledVector(perpB, Math.sin(coneAngle) * Math.sin(rotAngle))
@@ -128,12 +129,12 @@ export class SolarFlare implements IEffect {
                 this.velocities.push(dir.multiplyScalar(speed));
 
                 // start white-hot; update() blends toward corona color
-                this.colors[i * 3]     = 1.0;
+                this.colors[i * 3] = 1.0;
                 this.colors[i * 3 + 1] = 1.0;
                 this.colors[i * 3 + 2] = 1.0;
             }
 
-        // ── LARGE ARC FLARE ─────────────────────────────────────────────────────
+            // ── LARGE ARC FLARE ─────────────────────────────────────────────────────
         } else {
             this.count = 400;
             this.duration = 5.0;
@@ -165,7 +166,8 @@ export class SolarFlare implements IEffect {
             // surface point B — 45°–75° away from A on the sphere
             const sepAngle = Math.PI / 3 + (Math.random() - 0.5) * (Math.PI / 6);
             const rotAngleB = Math.random() * Math.PI * 2;
-            const dirB = dirA.clone()
+            const dirB = dirA
+                .clone()
                 .multiplyScalar(Math.cos(sepAngle))
                 .addScaledVector(perpA2, Math.sin(sepAngle) * Math.cos(rotAngleB))
                 .addScaledVector(perpB2, Math.sin(sepAngle) * Math.sin(rotAngleB))
@@ -196,20 +198,23 @@ export class SolarFlare implements IEffect {
             for (let i = 0; i < this.count; i++) {
                 const angle = Math.random() * Math.PI * 2;
                 const r = Math.sqrt(Math.random()) * scatterRadius; // uniform disk distribution
-                this.arcOffsets[i * 3]     = (scatterAxis1.x * Math.cos(angle) + scatterAxis2.x * Math.sin(angle)) * r;
-                this.arcOffsets[i * 3 + 1] = (scatterAxis1.y * Math.cos(angle) + scatterAxis2.y * Math.sin(angle)) * r;
-                this.arcOffsets[i * 3 + 2] = (scatterAxis1.z * Math.cos(angle) + scatterAxis2.z * Math.sin(angle)) * r;
+                this.arcOffsets[i * 3] =
+                    (scatterAxis1.x * Math.cos(angle) + scatterAxis2.x * Math.sin(angle)) * r;
+                this.arcOffsets[i * 3 + 1] =
+                    (scatterAxis1.y * Math.cos(angle) + scatterAxis2.y * Math.sin(angle)) * r;
+                this.arcOffsets[i * 3 + 2] =
+                    (scatterAxis1.z * Math.cos(angle) + scatterAxis2.z * Math.sin(angle)) * r;
             }
 
             for (let i = 0; i < this.count; i++) {
                 const startPt = this.starPosRef.clone().add(this.arcA_local);
-                this.positions[i * 3]     = startPt.x;
+                this.positions[i * 3] = startPt.x;
                 this.positions[i * 3 + 1] = startPt.y;
                 this.positions[i * 3 + 2] = startPt.z;
                 // stagger speeds so particles arrive at different times
                 this.speeds[i] = 0.15 + Math.random() * 0.15;
                 // start at corona color; update() brightens toward white at arc peak
-                this.colors[i * 3]     = this._cr;
+                this.colors[i * 3] = this._cr;
                 this.colors[i * 3 + 1] = this._cg;
                 this.colors[i * 3 + 2] = this._cb;
             }
@@ -217,8 +222,8 @@ export class SolarFlare implements IEffect {
 
         this.geometry = new THREE.BufferGeometry();
         this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-        this.geometry.setAttribute('color',    new THREE.BufferAttribute(this.colors, 3));
-        this.geometry.setAttribute('life',     new THREE.BufferAttribute(this.lives, 1));
+        this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+        this.geometry.setAttribute('life', new THREE.BufferAttribute(this.lives, 1));
 
         this.material = new THREE.PointsMaterial({
             size: (type === 'small' ? 3.5 : 5.0) * scaleFactor,
@@ -268,11 +273,10 @@ export class SolarFlare implements IEffect {
     update(dt: number): void {
         if (!this.active) return;
         // Check if particles are enabled
-        if (!performanceSettings.particleEffectsEnabled){
+        if (!performanceSettings.particleEffectsEnabled) {
             this.points.visible = false;
             return;
-        } else
-        {
+        } else {
             this.points.visible = true;
         }
 
@@ -285,16 +289,16 @@ export class SolarFlare implements IEffect {
             return;
         }
 
-        const posAttr  = this.geometry.attributes.position as THREE.BufferAttribute;
-        const colAttr  = this.geometry.attributes.color    as THREE.BufferAttribute;
-        const lifeAttr = this.geometry.attributes.life     as THREE.BufferAttribute;
-        const p = posAttr.array  as Float32Array;
-        const c = colAttr.array  as Float32Array;
+        const posAttr = this.geometry.attributes.position as THREE.BufferAttribute;
+        const colAttr = this.geometry.attributes.color as THREE.BufferAttribute;
+        const lifeAttr = this.geometry.attributes.life as THREE.BufferAttribute;
+        const p = posAttr.array as Float32Array;
+        const c = colAttr.array as Float32Array;
         const l = lifeAttr.array as Float32Array;
 
         if (this.type === 'small' && this.velocities) {
             for (let i = 0; i < this.count; i++) {
-                p[i * 3]     += this.velocities[i].x * (dt * 60);
+                p[i * 3] += this.velocities[i].x * (dt * 60);
                 p[i * 3 + 1] += this.velocities[i].y * (dt * 60);
                 p[i * 3 + 2] += this.velocities[i].z * (dt * 60);
 
@@ -303,11 +307,10 @@ export class SolarFlare implements IEffect {
 
                 // white-hot at birth → corona color as it cools
                 const blend = Math.min(1.0, lifeFrac * 2.5);
-                c[i * 3]     = 1.0 + blend * (this._cr - 1.0);
+                c[i * 3] = 1.0 + blend * (this._cr - 1.0);
                 c[i * 3 + 1] = 1.0 + blend * (this._cg - 1.0);
                 c[i * 3 + 2] = 1.0 + blend * (this._cb - 1.0);
             }
-
         } else if (
             this.type === 'large' &&
             this.speeds &&
@@ -327,23 +330,35 @@ export class SolarFlare implements IEffect {
 
                 // quadratic bezier: A → C → B, plus per-particle scatter (max at arc peak)
                 const scatter = Math.sin(t * Math.PI);
-                p[i * 3]     = mt * mt * this._wA.x + 2 * mt * t * this._wC.x + t * t * this._wB.x + this.arcOffsets![i * 3]     * scatter;
-                p[i * 3 + 1] = mt * mt * this._wA.y + 2 * mt * t * this._wC.y + t * t * this._wB.y + this.arcOffsets![i * 3 + 1] * scatter;
-                p[i * 3 + 2] = mt * mt * this._wA.z + 2 * mt * t * this._wC.z + t * t * this._wB.z + this.arcOffsets![i * 3 + 2] * scatter;
+                p[i * 3] =
+                    mt * mt * this._wA.x +
+                    2 * mt * t * this._wC.x +
+                    t * t * this._wB.x +
+                    this.arcOffsets![i * 3] * scatter;
+                p[i * 3 + 1] =
+                    mt * mt * this._wA.y +
+                    2 * mt * t * this._wC.y +
+                    t * t * this._wB.y +
+                    this.arcOffsets![i * 3 + 1] * scatter;
+                p[i * 3 + 2] =
+                    mt * mt * this._wA.z +
+                    2 * mt * t * this._wC.z +
+                    t * t * this._wB.z +
+                    this.arcOffsets![i * 3 + 2] * scatter;
 
                 // per-particle life = t so each particle fades in as it departs and out as it arrives
                 l[i] = t;
 
                 // corona color near surface, white-hot at arc peak
                 const arcFrac = Math.sin(t * Math.PI);
-                c[i * 3]     = this._cr + arcFrac * (1.0 - this._cr);
+                c[i * 3] = this._cr + arcFrac * (1.0 - this._cr);
                 c[i * 3 + 1] = this._cg + arcFrac * (1.0 - this._cg);
                 c[i * 3 + 2] = this._cb + arcFrac * (1.0 - this._cb);
             }
         }
 
-        posAttr.needsUpdate  = true;
-        colAttr.needsUpdate  = true;
+        posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
         lifeAttr.needsUpdate = true;
     }
 

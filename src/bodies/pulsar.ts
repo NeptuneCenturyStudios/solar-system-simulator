@@ -28,17 +28,17 @@ function massToNeutronStarRadius(mass: number): number {
     return PULSAR_BASE_RADIUS * Math.pow(SUN_MASS / mass, 1 / 3);
 }
 
-const PULSAR_TEMPERATURE      = 1_000_000;
-const PULSAR_LIGHT_INTENSITY  = 50_000_000;
-const PULSAR_LIGHT_DISTANCE   = 800;
+const PULSAR_TEMPERATURE = 1_000_000;
+const PULSAR_LIGHT_INTENSITY = 1_000_000_000;
+const PULSAR_LIGHT_DISTANCE = 1_000_000 * SCALE_FACTOR;
 
 /**
  * Minimum / maximum spin rates for visual clarity (radians per sim-second).
  * The physically correct value from angular momentum conservation would be many
  * orders of magnitude faster; we clamp to a lighthouse-sweep range instead.
  */
-const PULSAR_MIN_SPIN = Math.PI * 2;        // 1 rotation / sim-sec
-const PULSAR_MAX_SPIN = Math.PI * 3.2;       // max speed allowed to avoid weird looking beam
+const PULSAR_MIN_SPIN = Math.PI * 2; // 1 rotation / sim-sec
+const PULSAR_MAX_SPIN = Math.PI * 3.2; // max speed allowed to avoid weird looking beam
 
 /**
  * A pulsar: a rapidly spinning neutron star that emits narrow beams of electromagnetic
@@ -64,36 +64,36 @@ export class Pulsar extends Star {
         progenitorRadius: number
     ) {
         const pulsarTexture = loadSrgbTexture('./assets/textures/pulsar.jpg');
-        const pulsarRadius  = massToNeutronStarRadius(mass);
+        const pulsarRadius = massToNeutronStarRadius(mass);
 
         // Angular momentum conservation: I * ω = const, I ∝ R²
         // ω_new = ω_old * (R_old / R_new)²
-        const rawSpinUp   = progenitorRotation.speed * Math.pow(progenitorRadius / pulsarRadius, 2);
-        const newSpeed    = Math.max(PULSAR_MIN_SPIN, Math.min(PULSAR_MAX_SPIN, rawSpinUp));
+        const rawSpinUp = progenitorRotation.speed * Math.pow(progenitorRadius / pulsarRadius, 2);
+        const newSpeed = Math.max(PULSAR_MIN_SPIN, Math.min(PULSAR_MAX_SPIN, rawSpinUp));
         const newRotation: IRotation = {
-            axis:  progenitorRotation.axis.clone(),
+            axis: progenitorRotation.axis.clone(),
             speed: newSpeed,
         };
 
         const options: IStarCreationOptions = {
             pos,
-            vel:           new THREE.Vector3(0, 0, 0),
+            vel: new THREE.Vector3(0, 0, 0),
             mass,
-            radius:        pulsarRadius,
+            radius: pulsarRadius,
             id,
             name,
-            temperature:   PULSAR_TEMPERATURE,
+            temperature: PULSAR_TEMPERATURE,
             lightIntensity: PULSAR_LIGHT_INTENSITY,
-            lightDistance:  PULSAR_LIGHT_DISTANCE,
-            rotation:      newRotation,
+            lightDistance: PULSAR_LIGHT_DISTANCE,
+            rotation: newRotation,
         };
 
         const textures = {
-            sunTexture:        pulsarTexture,
-            redStarTexture:    null,
+            sunTexture: pulsarTexture,
+            redStarTexture: null,
             orangeStarTexture: null,
-            whiteStarTexture:  null,
-            blueStarTexture:   null,
+            whiteStarTexture: null,
+            blueStarTexture: null,
             whiteDwarfTexture: null,
             brownDwarfTexture: null,
         };
@@ -149,4 +149,3 @@ export class Pulsar extends Star {
         super.die(skipExplosion);
     }
 }
-

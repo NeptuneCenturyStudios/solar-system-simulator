@@ -28,11 +28,13 @@ export interface StarParams {
  * Returns randomised (or override-applied) mass/radius/temperature for a new star.
  * Any field in `opts` that is a finite positive number is used as-is instead of randomising.
  */
-export function randomStarParams(opts: {
-    mass?: number | null;
-    radius?: number | null;
-    temperature?: number | null;
-} = {}): StarParams {
+export function randomStarParams(
+    opts: {
+        mass?: number | null;
+        radius?: number | null;
+        temperature?: number | null;
+    } = {}
+): StarParams {
     const minMass = SUN_MASS * 0.08;
     const maxMass = SUN_MASS * 150;
     const mass =
@@ -70,10 +72,12 @@ export interface BlackHoleParams {
  * Mass is log-sampled over [3 M☉, 50 M☉]; radius is derived from the static
  * event-horizon formula so it stays consistent with the live growth path.
  */
-export function randomBlackHoleParams(opts: {
-    mass?: number | null;
-    radius?: number | null;
-} = {}): BlackHoleParams {
+export function randomBlackHoleParams(
+    opts: {
+        mass?: number | null;
+        radius?: number | null;
+    } = {}
+): BlackHoleParams {
     const BH_MIN_MASS = 3 * SUN_MASS;
     const BH_MAX_MASS = 50 * SUN_MASS;
     const mass =
@@ -116,23 +120,23 @@ export function randomPlanetParams(
         typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
             ? opts.radius
             : isSolid
-                ? 5 + Math.random() * 10
-                : 18 + Math.random() * 24;
+              ? 5 + Math.random() * 10
+              : 18 + Math.random() * 24;
 
     const mass =
         typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0
             ? opts.mass
             : isSolid
-                ? 50 + Math.random() * 500
-                : isGasGiant
-                    ? 4000 + Math.random() * 26000
-                    : 1200 + Math.random() * 7000;
+              ? 50 + Math.random() * 500
+              : isGasGiant
+                ? 4000 + Math.random() * 26000
+                : 1200 + Math.random() * 7000;
 
     const bodyType = isGasGiant
         ? BodyTypeEnum.GasGiant
         : isIceGiant
-            ? BodyTypeEnum.IceGiant
-            : BodyTypeEnum.Planet;
+          ? BodyTypeEnum.IceGiant
+          : BodyTypeEnum.Planet;
 
     return {
         mass,
@@ -192,10 +196,12 @@ export interface CometParams {
 }
 
 /** Returns randomised (or override-applied) mass/radius for a new custom comet. */
-export function randomCometParams(opts: {
-    mass?: number | null;
-    radius?: number | null;
-} = {}): CometParams {
+export function randomCometParams(
+    opts: {
+        mass?: number | null;
+        radius?: number | null;
+    } = {}
+): CometParams {
     const mass =
         typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0
             ? opts.mass

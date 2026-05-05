@@ -276,7 +276,6 @@ export class Star extends CelestialBody {
                 this.sunLight.shadow.needsUpdate = true;
             }
         }
-
     }
 
     setShadowsEnabled(enabled: boolean) {
@@ -312,12 +311,12 @@ export class Star extends CelestialBody {
         this.temperature = temp;
 
         let glowHex: number;
-        if (temp <= 2000)       glowHex = 0x8b3a0a;
-        else if (temp <= 3000)  glowHex = 0xff6644;
-        else if (temp < 4000)   glowHex = 0xffaa55;
-        else if (temp < 10000)  glowHex = 0xffffcc;
-        else if (temp < 25000)  glowHex = 0xffffff;
-        else                    glowHex = 0xaaccff;
+        if (temp <= 2000) glowHex = 0x8b3a0a;
+        else if (temp <= 3000) glowHex = 0xff6644;
+        else if (temp < 4000) glowHex = 0xffaa55;
+        else if (temp < 10000) glowHex = 0xffffcc;
+        else if (temp < 25000) glowHex = 0xffffff;
+        else glowHex = 0xaaccff;
 
         const material = this.mesh.material as THREE.MeshPhongMaterial;
         material.emissive.setHex(0xffffff);
@@ -435,5 +434,4 @@ export class Star extends CelestialBody {
 
         super.die(true);
     }
-
 }

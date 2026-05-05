@@ -77,10 +77,10 @@ export class StarGlow implements IEffect {
         const b = Math.round(c.b * 255);
 
         const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-        grad.addColorStop(0,   'rgba(255, 255, 255, 1)');
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
         grad.addColorStop(0.2, `rgba(${r}, ${g}, ${b}, 0.85)`);
         grad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.22)`);
-        grad.addColorStop(1,   'rgba(0, 0, 0, 0)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 128, 128);
 
@@ -88,13 +88,13 @@ export class StarGlow implements IEffect {
         tex.needsUpdate = true;
 
         const mat = new THREE.SpriteMaterial({
-            map:         tex,
-            color:       this._colorHex,
+            map: tex,
+            color: this._colorHex,
             transparent: true,
-            blending:    THREE.AdditiveBlending,
-            opacity:     0.85,
-            depthWrite:  false,
-            depthTest:   true,
+            blending: THREE.AdditiveBlending,
+            opacity: 0.85,
+            depthWrite: false,
+            depthTest: true,
         });
 
         this._sprite = new THREE.Sprite(mat);
@@ -111,9 +111,10 @@ export class StarGlow implements IEffect {
         this._visualTime += dt;
 
         const baseScale = this._radius * this._scaleMultiplier;
-        const pulse     = this._pulseAmplitude > 0
-            ? Math.sin(this._visualTime * 0.0015 * 60) * (this._radius * this._pulseAmplitude)
-            : 0;
+        const pulse =
+            this._pulseAmplitude > 0
+                ? Math.sin(this._visualTime * 0.0015 * 60) * (this._radius * this._pulseAmplitude)
+                : 0;
 
         this._sprite.scale.setScalar(baseScale + pulse);
         this._sprite.position.copy(this._position);
@@ -150,7 +151,7 @@ export class StarGlow implements IEffect {
     setColor(colorHex: number): void {
         this._colorHex = colorHex;
         const prevPosition = this._sprite?.position.clone() ?? this._position.clone();
-        const prevVisible  = this._sprite?.visible ?? true;
+        const prevVisible = this._sprite?.visible ?? true;
         this._buildSprite();
         if (this._sprite) {
             this._sprite.position.copy(prevPosition);

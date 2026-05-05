@@ -492,21 +492,21 @@ export class CelestialBody extends Body {
         const moonMaterial =
             moonName === 'Moon'
                 ? new THREE.MeshStandardMaterial({
-                    map: moonTexture,
-                    color: 0xffffff,
-                    emissive: 0x000000,
-                    emissiveIntensity: 0,
-                    roughness: 0.7,
-                    metalness: 0.7,
-                })
+                      map: moonTexture,
+                      color: 0xffffff,
+                      emissive: 0x000000,
+                      emissiveIntensity: 0,
+                      roughness: 0.7,
+                      metalness: 0.7,
+                  })
                 : new THREE.MeshStandardMaterial({
-                    map: pickRandom(fictionalTextures),
-                    color: 0xffffff, // keep texture untinted
-                    emissive: 0x000000,
-                    emissiveIntensity: 0,
-                    roughness: 0.7,
-                    metalness: 0.7,
-                });
+                      map: pickRandom(fictionalTextures),
+                      color: 0xffffff, // keep texture untinted
+                      emissive: 0x000000,
+                      emissiveIntensity: 0,
+                      roughness: 0.7,
+                      metalness: 0.7,
+                  });
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²

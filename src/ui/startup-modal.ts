@@ -23,9 +23,15 @@ export class StartupModal extends Panel {
     }
 
     initialize() {
-        this.launchDefaultBtn = document.getElementById('startupLaunchDefaultBtn') as HTMLButtonElement | null;
-        this.launchEmptyBtn = document.getElementById('startupLaunchEmptyBtn') as HTMLButtonElement | null;
-        this.launchBlackHoleBtn = document.getElementById('startupLaunchBlackHoleBtn') as HTMLButtonElement | null;
+        this.launchDefaultBtn = document.getElementById(
+            'startupLaunchDefaultBtn'
+        ) as HTMLButtonElement | null;
+        this.launchEmptyBtn = document.getElementById(
+            'startupLaunchEmptyBtn'
+        ) as HTMLButtonElement | null;
+        this.launchBlackHoleBtn = document.getElementById(
+            'startupLaunchBlackHoleBtn'
+        ) as HTMLButtonElement | null;
         this.cancelBtn = document.getElementById('startupCancelBtn') as HTMLButtonElement | null;
 
         if (this.element) {

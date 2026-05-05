@@ -107,7 +107,7 @@ export const MIN_STAR_MASS = SUN_MASS * MIN_SOLAR_MASS_FACTOR;
 /** Mass threshold below which a star transitions into a brown dwarf (0.08 M☉ — upper bound of the brown-dwarf regime). */
 export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;
 
-export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4 ; // Approximate Chandrasekhar limit
+export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4; // Approximate Chandrasekhar limit
 export const MAX_NEUTRON_STAR_MASS = SUN_MASS * 3;
 
 export const MIN_BLACK_HOLE_MASS = SUN_MASS * 3; // Rough lower limit for stellar black holes

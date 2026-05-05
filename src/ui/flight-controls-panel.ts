@@ -20,9 +20,13 @@ export class FlightControlsPanel extends Panel {
 
     initialize() {
         this.spawnBtn = document.getElementById('flightSpawnBtn') as HTMLButtonElement | null;
-        this.toggleViewBtn = document.getElementById('flightToggleViewBtn') as HTMLButtonElement | null;
+        this.toggleViewBtn = document.getElementById(
+            'flightToggleViewBtn'
+        ) as HTMLButtonElement | null;
         this.exitBtn = document.getElementById('flightExitBtn') as HTMLButtonElement | null;
-        this.autopilotBtn = document.getElementById('flightAutopilotBtn') as HTMLButtonElement | null;
+        this.autopilotBtn = document.getElementById(
+            'flightAutopilotBtn'
+        ) as HTMLButtonElement | null;
 
         if (this.spawnBtn) {
             this.spawnBtn.onclick = () => this.emit('spawnShip');

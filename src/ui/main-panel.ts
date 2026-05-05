@@ -60,7 +60,9 @@ export class MainPanel extends Panel {
         this.targetBtn = document.getElementById('camTargetBtn') as HTMLButtonElement | null;
         this.lookAtBtn = document.getElementById('camLookAtBtn') as HTMLButtonElement | null;
         this.freeCameraBtn = document.getElementById('freeCameraBtn') as HTMLButtonElement | null;
-        this.surfaceCameraBtn = document.getElementById('surfaceCameraBtn') as HTMLButtonElement | null;
+        this.surfaceCameraBtn = document.getElementById(
+            'surfaceCameraBtn'
+        ) as HTMLButtonElement | null;
         this.zoomInBtn = document.getElementById('zoomInBtn') as HTMLButtonElement | null;
         this.zoomOutBtn = document.getElementById('zoomOutBtn') as HTMLButtonElement | null;
 
@@ -94,7 +96,9 @@ export class MainPanel extends Panel {
         this.timeScaleDisplay = document.getElementById('speed-val');
         this.pauseBtn = document.getElementById('pauseBtn') as HTMLButtonElement | null;
         this.resetBtn = document.getElementById('resetBtn') as HTMLButtonElement | null;
-        this.manageSystemBtn = document.getElementById('manageSystemBtn') as HTMLButtonElement | null;
+        this.manageSystemBtn = document.getElementById(
+            'manageSystemBtn'
+        ) as HTMLButtonElement | null;
         this.donateBtn = document.getElementById('donateBtn') as HTMLButtonElement | null;
         this.copyrightYearEl = document.getElementById('copyrightYear');
 
@@ -127,7 +131,9 @@ export class MainPanel extends Panel {
             };
         }
 
-        this.timeScaleResetBtn = document.getElementById('timeScaleResetBtn') as HTMLButtonElement | null;
+        this.timeScaleResetBtn = document.getElementById(
+            'timeScaleResetBtn'
+        ) as HTMLButtonElement | null;
         if (this.timeScaleResetBtn) {
             this.timeScaleResetBtn.onclick = () => {
                 if (this.timeScaleSlider) this.timeScaleSlider.value = '1';
@@ -145,7 +151,9 @@ export class MainPanel extends Panel {
             };
         }
 
-        this.substepsResetBtn = document.getElementById('substepsResetBtn') as HTMLButtonElement | null;
+        this.substepsResetBtn = document.getElementById(
+            'substepsResetBtn'
+        ) as HTMLButtonElement | null;
         if (this.substepsResetBtn) {
             this.substepsResetBtn.onclick = () => {
                 if (this.substepsSlider) this.substepsSlider.value = '64';

@@ -15,7 +15,9 @@ export class PerformancePanel extends Panel {
     }
 
     initialize() {
-        this.enableShadowsCheckbox = document.getElementById('enableShadows') as HTMLInputElement | null;
+        this.enableShadowsCheckbox = document.getElementById(
+            'enableShadows'
+        ) as HTMLInputElement | null;
 
         if (this.enableShadowsCheckbox) {
             this.enableShadowsCheckbox.onchange = () => {
@@ -23,14 +25,17 @@ export class PerformancePanel extends Panel {
             };
         }
 
-        this.enableParticleEffectsCheckbox = document.getElementById('enableParticleEffects') as HTMLInputElement | null;
+        this.enableParticleEffectsCheckbox = document.getElementById(
+            'enableParticleEffects'
+        ) as HTMLInputElement | null;
 
         if (this.enableParticleEffectsCheckbox) {
             // Sync global state to checkbox initial value
             performanceSettings.particleEffectsEnabled = this.enableParticleEffectsCheckbox.checked;
 
             this.enableParticleEffectsCheckbox.onchange = () => {
-                performanceSettings.particleEffectsEnabled = this.enableParticleEffectsCheckbox!.checked;
+                performanceSettings.particleEffectsEnabled =
+                    this.enableParticleEffectsCheckbox!.checked;
             };
         }
     }

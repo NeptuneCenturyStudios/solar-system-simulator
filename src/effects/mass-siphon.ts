@@ -298,7 +298,10 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
             .sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal)))
             .normalize();
         const DISK_ROTATION_OFFSET = Math.PI / 2;
-        const offsetDir = toBH_proj.clone().applyAxisAngle(diskNormal, DISK_ROTATION_OFFSET).normalize();
+        const offsetDir = toBH_proj
+            .clone()
+            .applyAxisAngle(diskNormal, DISK_ROTATION_OFFSET)
+            .normalize();
 
         const start = starCenter.clone().addScaledVector(toBH, starRadius);
         const end = bhCenter.clone().addScaledVector(offsetDir, accretionMaxRadius);
@@ -315,11 +318,13 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
         for (let i = 0; i <= STEPS; i++) {
             const t = i / STEPS;
             const s = 1 - t;
-            pts.push(new THREE.Vector3(
-                s * s * start.x + 2 * s * t * mid.x + t * t * end.x,
-                s * s * start.y + 2 * s * t * mid.y + t * t * end.y,
-                s * s * start.z + 2 * s * t * mid.z + t * t * end.z,
-            ));
+            pts.push(
+                new THREE.Vector3(
+                    s * s * start.x + 2 * s * t * mid.x + t * t * end.x,
+                    s * s * start.y + 2 * s * t * mid.y + t * t * end.y,
+                    s * s * start.z + 2 * s * t * mid.z + t * t * end.z
+                )
+            );
         }
         return pts;
     }
@@ -332,7 +337,7 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
                 color: new THREE.Color(
                     this.star.baseColor.r * 0.8 + BH_R * 0.2,
                     this.star.baseColor.g * 0.8 + BH_G * 0.2,
-                    this.star.baseColor.b * 0.8 + BH_B * 0.2,
+                    this.star.baseColor.b * 0.8 + BH_B * 0.2
                 ),
                 transparent: true,
                 opacity: 0.75,
@@ -432,7 +437,10 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
         if (this._isSpawning && absDt > 0) {
             this.spawnAccumulator += SIPHON_SPAWN_RATE * absDt;
             // Cap how many can actually spawn this frame to avoid time-scale bursts.
-            const spawnThisFrame = Math.min(Math.floor(this.spawnAccumulator), SIPHON_MAX_SPAWN_PER_FRAME);
+            const spawnThisFrame = Math.min(
+                Math.floor(this.spawnAccumulator),
+                SIPHON_MAX_SPAWN_PER_FRAME
+            );
             this.spawnAccumulator -= spawnThisFrame;
             for (let s = 0; s < spawnThisFrame; s++) {
                 const slot = this.getAvailableSlot();
@@ -444,7 +452,10 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
         if (!this._isSpawning) {
             let anyActive = false;
             for (let i = 0; i < PARTICLE_COUNT; i++) {
-                if (this.activeFlags[i] === 1) { anyActive = true; break; }
+                if (this.activeFlags[i] === 1) {
+                    anyActive = true;
+                    break;
+                }
             }
             if (!anyActive) {
                 this.active = false;
@@ -539,12 +550,12 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
             tValArr[i] = t;
 
             // Quadratic Bézier: P = s²·start + 2·s·t·mid + t²·end
-            posArr[i * 3]     = s * s * start.x + 2 * s * t * mid.x + t * t * end.x;
+            posArr[i * 3] = s * s * start.x + 2 * s * t * mid.x + t * t * end.x;
             posArr[i * 3 + 1] = s * s * start.y + 2 * s * t * mid.y + t * t * end.y;
             posArr[i * 3 + 2] = s * s * start.z + 2 * s * t * mid.z + t * t * end.z;
 
             // Colour: star base colour → BH accretion outer orange/red.
-            colArr[i * 3]     = starR + (BH_R - starR) * t;
+            colArr[i * 3] = starR + (BH_R - starR) * t;
             colArr[i * 3 + 1] = starG + (BH_G - starG) * t;
             colArr[i * 3 + 2] = starB + (BH_B - starB) * t;
 

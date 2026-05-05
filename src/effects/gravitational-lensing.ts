@@ -27,12 +27,12 @@ export class GravitationalLensingEffect {
     private quadCamera: THREE.OrthographicCamera;
     private quadMesh: THREE.Mesh;
     private uniforms: {
-        tScene:          { value: THREE.Texture | null };
-        uResolution:     { value: THREE.Vector2 };
-        uLensCount:      { value: number };
-        uLensPositions:  { value: THREE.Vector2[] };
-        uLensRadii:      { value: number[] };   // actual projected event-horizon radius (black disc)
-        uLensWarpRadii:  { value: number[] };   // einstein warp radius (floored to MIN_WARP_RADIUS)
+        tScene: { value: THREE.Texture | null };
+        uResolution: { value: THREE.Vector2 };
+        uLensCount: { value: number };
+        uLensPositions: { value: THREE.Vector2[] };
+        uLensRadii: { value: number[] }; // actual projected event-horizon radius (black disc)
+        uLensWarpRadii: { value: number[] }; // einstein warp radius (floored to MIN_WARP_RADIUS)
     };
 
     constructor(renderer: THREE.WebGLRenderer) {
@@ -47,9 +47,9 @@ export class GravitationalLensingEffect {
         });
 
         // Pre-allocate arrays for the fixed-size lens uniforms.
-        const positions:  THREE.Vector2[] = [];
-        const radii:      number[] = [];
-        const warpRadii:  number[] = [];
+        const positions: THREE.Vector2[] = [];
+        const radii: number[] = [];
+        const warpRadii: number[] = [];
         for (let i = 0; i < MAX_LENSES; i++) {
             positions.push(new THREE.Vector2(0, 0));
             radii.push(0);
@@ -57,24 +57,24 @@ export class GravitationalLensingEffect {
         }
 
         this.uniforms = {
-            tScene:          { value: this.rt.texture },
-            uResolution:     { value: new THREE.Vector2(w, h) },
-            uLensCount:      { value: 0 },
-            uLensPositions:  { value: positions },
-            uLensRadii:      { value: radii },
-            uLensWarpRadii:  { value: warpRadii },
+            tScene: { value: this.rt.texture },
+            uResolution: { value: new THREE.Vector2(w, h) },
+            uLensCount: { value: 0 },
+            uLensPositions: { value: positions },
+            uLensRadii: { value: radii },
+            uLensWarpRadii: { value: warpRadii },
         };
 
         const material = new THREE.ShaderMaterial({
             uniforms: this.uniforms as unknown as { [key: string]: THREE.IUniform },
-            vertexShader: /* glsl */`
+            vertexShader: /* glsl */ `
                 varying vec2 vUv;
                 void main() {
                     vUv = uv;
                     gl_Position = vec4(position.xy, 0.0, 1.0);
                 }
             `,
-            fragmentShader: /* glsl */`
+            fragmentShader: /* glsl */ `
                 uniform sampler2D tScene;
                 uniform vec2  uResolution;
                 uniform int   uLensCount;
@@ -116,13 +116,13 @@ export class GravitationalLensingEffect {
                     gl_FragColor = texture2D(tScene, warpedUV);
                 }
             `,
-            depthTest:  false,
+            depthTest: false,
             depthWrite: false,
         });
 
         this.quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-        this.quadScene  = new THREE.Scene();
-        this.quadMesh   = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+        this.quadScene = new THREE.Scene();
+        this.quadMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
         this.quadMesh.frustumCulled = false;
         this.quadScene.add(this.quadMesh);
     }
@@ -151,7 +151,7 @@ export class GravitationalLensingEffect {
         const count = Math.min(lenses.length, MAX_LENSES);
         this.uniforms.uLensCount.value = count;
 
-        const _ndc  = new THREE.Vector3();
+        const _ndc = new THREE.Vector3();
         const _edge = new THREE.Vector3();
 
         for (let i = 0; i < count; i++) {
@@ -160,24 +160,20 @@ export class GravitationalLensingEffect {
             // Project world position to NDC [-1, 1].
             _ndc.copy(position).project(camera);
             // Convert to UV [0, 1].
-            this.uniforms.uLensPositions.value[i].set(
-                (_ndc.x + 1) * 0.5,
-                (_ndc.y + 1) * 0.5
-            );
+            this.uniforms.uLensPositions.value[i].set((_ndc.x + 1) * 0.5, (_ndc.y + 1) * 0.5);
 
             // Compute the event-horizon radius in UV units by projecting an offset point.
             // We offset by `radius` along the camera's right vector in world space.
-            _edge.copy(position).addScaledVector(
-                camera.getWorldDirection(new THREE.Vector3())
-                    .cross(camera.up).normalize(),
-                radius
-            );
+            _edge
+                .copy(position)
+                .addScaledVector(
+                    camera.getWorldDirection(new THREE.Vector3()).cross(camera.up).normalize(),
+                    radius
+                );
             _edge.project(camera);
             const edgeUVx = (_edge.x + 1) * 0.5;
-            const projectedRadius = Math.abs(
-                edgeUVx - this.uniforms.uLensPositions.value[i].x
-            );
-            this.uniforms.uLensRadii.value[i]     = projectedRadius;
+            const projectedRadius = Math.abs(edgeUVx - this.uniforms.uLensPositions.value[i].x);
+            this.uniforms.uLensRadii.value[i] = projectedRadius;
             this.uniforms.uLensWarpRadii.value[i] = projectedRadius * EINSTEIN_SCALE;
         }
 

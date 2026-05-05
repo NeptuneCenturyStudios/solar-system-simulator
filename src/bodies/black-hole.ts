@@ -1,5 +1,13 @@
 import * as THREE from 'three';
-import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G, MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, performanceSettings } from '../utilities/consts.js';
+import {
+    SCALE_FACTOR,
+    SUN_MASS,
+    EARTH_DIST,
+    G,
+    MIN_PARTICLE_ALPHA,
+    MAX_PARTICLE_ALPHA,
+    performanceSettings,
+} from '../utilities/consts.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body';
 import { IRotation } from '../physics/physics.js';
@@ -288,7 +296,17 @@ export class BlackHole extends CelestialBody {
         const seedTimer =
             ACCRETION_INJECT_MIN_INTERVAL +
             Math.random() * (ACCRETION_INJECT_MAX_INTERVAL - ACCRETION_INJECT_MIN_INTERVAL);
-        return { points, vels, angularPositions, minRadius, maxRadius, opacities, activeFlags, seedQueue: [], seedTimer };
+        return {
+            points,
+            vels,
+            angularPositions,
+            minRadius,
+            maxRadius,
+            opacities,
+            activeFlags,
+            seedQueue: [],
+            seedTimer,
+        };
     }
 
     /**
@@ -519,7 +537,9 @@ export class BlackHole extends CelestialBody {
         let startAngle = 0;
         if (this.siphonEffects.size > 0) {
             const starId = this.siphonEffects.keys().next().value as string;
-            const star = this.dependencies.getBodies().find(b => b.id === starId && !b._isDisposed);
+            const star = this.dependencies
+                .getBodies()
+                .find((b) => b.id === starId && !b._isDisposed);
             if (star?.mesh) {
                 const diskNormal = this.rotationAxis
                     ? this.rotationAxis.clone().normalize()
@@ -531,7 +551,10 @@ export class BlackHole extends CelestialBody {
                     .clone()
                     .sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal)))
                     .normalize();
-                const offsetDir = toBH_proj.clone().applyAxisAngle(diskNormal, Math.PI / 2).normalize();
+                const offsetDir = toBH_proj
+                    .clone()
+                    .applyAxisAngle(diskNormal, Math.PI / 2)
+                    .normalize();
                 startAngle = Math.atan2(offsetDir.z, offsetDir.x);
             }
         }
@@ -550,10 +573,10 @@ export class BlackHole extends CelestialBody {
                 const t = i / STEPS;
                 const theta = startAngle + totalAngle * t;
                 const r = maxRadius * (1 - t) + minRadius * t;
-                positions[i * 3]     = Math.cos(theta) * r;
+                positions[i * 3] = Math.cos(theta) * r;
                 positions[i * 3 + 1] = 0;
                 positions[i * 3 + 2] = Math.sin(theta) * r;
-                colors[i * 3]     = 0.8 + (1.0 - 0.8) * t;
+                colors[i * 3] = 0.8 + (1.0 - 0.8) * t;
                 colors[i * 3 + 1] = 0.2 + (0.95 - 0.2) * t;
                 colors[i * 3 + 2] = 0.05 + (0.7 - 0.05) * t;
             }
@@ -581,7 +604,7 @@ export class BlackHole extends CelestialBody {
                 const t = i / STEPS;
                 const theta = startAngle + totalAngle * t;
                 const r = maxRadius * (1 - t) + minRadius * t;
-                posArr[i * 3]     = Math.cos(theta) * r;
+                posArr[i * 3] = Math.cos(theta) * r;
                 posArr[i * 3 + 1] = 0;
                 posArr[i * 3 + 2] = Math.sin(theta) * r;
             }
@@ -827,23 +850,25 @@ export class BlackHole extends CelestialBody {
         // Length matches the furthest a jet beam tip can travel in its lifetime.
         const length = BLACK_HOLE_JET_SPEED_BASE * this.radius * BLACK_HOLE_JET_MAX_AGE;
         const bhPos = this.mesh.position;
-        const north = bhPos.clone().addScaledVector(axis,  length);
+        const north = bhPos.clone().addScaledVector(axis, length);
         const south = bhPos.clone().addScaledVector(axis, -length);
         const { r, g, b } = BLACK_HOLE_JET_BEAM_COLOR;
 
         if (!this._jetLine) {
             // 3 points: south tip → BH centre → north tip
             const positions = new Float32Array([
-                south.x, south.y, south.z,
-                bhPos.x, bhPos.y, bhPos.z,
-                north.x, north.y, north.z,
+                south.x,
+                south.y,
+                south.z,
+                bhPos.x,
+                bhPos.y,
+                bhPos.z,
+                north.x,
+                north.y,
+                north.z,
             ]);
             // Colour: tips are full beam colour, centre fades to black (additive = invisible)
-            const colors = new Float32Array([
-                r, g, b,
-                0, 0, 0,
-                r, g, b,
-            ]);
+            const colors = new Float32Array([r, g, b, 0, 0, 0, r, g, b]);
             this._jetLineGeo = new THREE.BufferGeometry();
             this._jetLineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             this._jetLineGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -861,9 +886,15 @@ export class BlackHole extends CelestialBody {
         } else {
             // Update positions in-place to follow the moving BH
             const posArr = this._jetLineGeo!.attributes.position.array as Float32Array;
-            posArr[0] = south.x; posArr[1] = south.y; posArr[2] = south.z;
-            posArr[3] = bhPos.x; posArr[4] = bhPos.y; posArr[5] = bhPos.z;
-            posArr[6] = north.x; posArr[7] = north.y; posArr[8] = north.z;
+            posArr[0] = south.x;
+            posArr[1] = south.y;
+            posArr[2] = south.z;
+            posArr[3] = bhPos.x;
+            posArr[4] = bhPos.y;
+            posArr[5] = bhPos.z;
+            posArr[6] = north.x;
+            posArr[7] = north.y;
+            posArr[8] = north.z;
             (this._jetLineGeo!.attributes.position as THREE.BufferAttribute).needsUpdate = true;
         }
     }

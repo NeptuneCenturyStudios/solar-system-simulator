@@ -16,7 +16,7 @@ const WHITE_DWARF_RADIUS = 8 * SCALE_FACTOR;
  * @returns The radius of the white dwarf (simulation units)
  */
 function massToWhiteDwarfRadius(mass: number): number {
-    return WHITE_DWARF_RADIUS * Math.pow(SUN_MASS / mass, 1/3);
+    return WHITE_DWARF_RADIUS * Math.pow(SUN_MASS / mass, 1 / 3);
 }
 
 const WHITE_DWARF_TEMPERATURE = 10000;
@@ -48,7 +48,7 @@ export class WhiteDwarf extends Star {
             temperature: WHITE_DWARF_TEMPERATURE,
             lightIntensity: WHITE_DWARF_LIGHT_INTENSITY,
             lightDistance: WHITE_DWARF_LIGHT_DISTANCE,
-            rotation
+            rotation,
         };
 
         const textures = {

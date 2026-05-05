@@ -183,11 +183,11 @@ export class Comet extends CelestialBody {
 
         // If particle effects are disabled, skip tail updates for performance
         if (!performanceSettings.particleEffectsEnabled) {
-            this.tailParticles.visible = false; 
+            this.tailParticles.visible = false;
             return;
         } else {
             this.tailParticles.visible = true;
-        }   
+        }
 
         // Calculate distance to sun (optimized with squared distance)
         const distToSunSq =

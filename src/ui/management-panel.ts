@@ -572,7 +572,9 @@ export class ManagementPanel extends Panel {
                 ) {
                     const starRadius = SUN_RADIUS * Math.pow(Math.max(0, value) / SUN_MASS, 0.8);
                     this.createRadiusSlider.value = String(starRadius);
-                    this.createRadiusDisplay.textContent = String(Math.round(starRadius * 100) / 100);
+                    this.createRadiusDisplay.textContent = String(
+                        Math.round(starRadius * 100) / 100
+                    );
                 }
 
                 // For black holes, recompute the radius slider from the new mass
@@ -895,15 +897,18 @@ export class ManagementPanel extends Panel {
                 const radius = this.editRadiusSlider
                     ? parseFloat(this.editRadiusSlider.value)
                     : null;
-                const velocity = this._editSpeedDirty && this.editVelocitySlider
-                    ? parseFloat(this.editVelocitySlider.value)
-                    : null;
-                const orbitalAngle = this._editAngleDirty && this.editOrbitalAngleSlider
-                    ? parseFloat(this.editOrbitalAngleSlider.value)
-                    : null;
-                const inclination = this._editInclinationDirty && this.editInclinationSlider
-                    ? parseFloat(this.editInclinationSlider.value)
-                    : null;
+                const velocity =
+                    this._editSpeedDirty && this.editVelocitySlider
+                        ? parseFloat(this.editVelocitySlider.value)
+                        : null;
+                const orbitalAngle =
+                    this._editAngleDirty && this.editOrbitalAngleSlider
+                        ? parseFloat(this.editOrbitalAngleSlider.value)
+                        : null;
+                const inclination =
+                    this._editInclinationDirty && this.editInclinationSlider
+                        ? parseFloat(this.editInclinationSlider.value)
+                        : null;
                 const color = this.editColorInput ? this.editColorInput.value : null;
 
                 this.emit('applyEdit', {
@@ -1329,19 +1334,22 @@ export class ManagementPanel extends Panel {
             const editVelocityDisplay = this.editVelocityDisplay;
 
             // Populate from current velocity magnitude
-            const vel = (body as Body & { velocity?: { x: number; y: number; z: number } }).velocity;
-            const currentSpeed = vel
-                ? Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z)
-                : 0;
+            const vel = (body as Body & { velocity?: { x: number; y: number; z: number } })
+                .velocity;
+            const currentSpeed = vel ? Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z) : 0;
             const maxSpeed = parseFloat(editVelocitySlider.max) || 200;
             editVelocitySlider.value = String(Math.min(currentSpeed, maxSpeed));
-            editVelocityDisplay.textContent = Math.min(currentSpeed, maxSpeed).toLocaleString(undefined, {
-                maximumFractionDigits: 1,
-            });
+            editVelocityDisplay.textContent = Math.min(currentSpeed, maxSpeed).toLocaleString(
+                undefined,
+                {
+                    maximumFractionDigits: 1,
+                }
+            );
         }
 
         if (this.editOrbitalAngleSlider && this.editOrbitalAngleDisplay) {
-            const vel = (body as Body & { velocity?: { x: number; y: number; z: number } }).velocity;
+            const vel = (body as Body & { velocity?: { x: number; y: number; z: number } })
+                .velocity;
             if (vel) {
                 const angleDeg = ((Math.atan2(vel.z, vel.x) * 180) / Math.PI + 360) % 360;
                 this.editOrbitalAngleSlider.value = String(Math.round(angleDeg));
@@ -1353,7 +1361,8 @@ export class ManagementPanel extends Panel {
         }
 
         if (this.editInclinationSlider && this.editInclinationDisplay) {
-            const vel = (body as Body & { velocity?: { x: number; y: number; z: number } }).velocity;
+            const vel = (body as Body & { velocity?: { x: number; y: number; z: number } })
+                .velocity;
             if (vel) {
                 const horizontalSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
                 const inclinationDeg = (Math.atan2(vel.y, horizontalSpeed) * 180) / Math.PI;

@@ -1,10 +1,15 @@
-
 import * as THREE from 'three';
 import { Star, IStarCreationOptions } from './star';
 import { IStateDependencies } from '../interfaces';
 import { loadSrgbTexture } from '../drawing/textures';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities';
-import { SCALE_FACTOR, PLUTO_DIST, BROWN_DWARF_MASS_THRESHOLD, MIN_BLACK_HOLE_MASS, MIN_NEUTRON_STAR_MASS } from '../utilities/consts';
+import {
+    SCALE_FACTOR,
+    PLUTO_DIST,
+    BROWN_DWARF_MASS_THRESHOLD,
+    MIN_BLACK_HOLE_MASS,
+    MIN_NEUTRON_STAR_MASS,
+} from '../utilities/consts';
 import { BlackHole } from './black-hole';
 import { WhiteDwarf } from './white-dwarf';
 import { Pulsar } from './pulsar';
@@ -49,7 +54,13 @@ export class MainSequenceStar extends Star {
         super(dependencies, scene, options, textures);
 
         this.corona = new Corona(dependencies, scene, options.radius + 1, this.baseColor.getHex());
-        this.sunGlow = new StarGlow(dependencies, scene, options.radius, this.baseColor.getHex(), this.mesh.position);
+        this.sunGlow = new StarGlow(
+            dependencies,
+            scene,
+            options.radius,
+            this.baseColor.getHex(),
+            this.mesh.position
+        );
 
         this.initialMass = options.mass;
         this.initialRadius = options.radius;
@@ -98,7 +109,6 @@ export class MainSequenceStar extends Star {
 
             // Check if star should start expanding into a red giant (only for stars that won't become neutron stars or black holes)
             if (this.initialMass < MIN_NEUTRON_STAR_MASS) {
-
                 // Once fuel drops below 30%, start expanding and cooling into a red giant.
                 if (fuelPercent < 0.3 && fuelPercent > 0) {
                     const expansionProgress = 1 - fuelPercent / 0.3;
@@ -155,11 +165,7 @@ export class MainSequenceStar extends Star {
         }
 
         // Solar flare timer
-        if (
-            !this.isBirthing &&
-            !(this.bodyType & BodyTypeEnum.BrownDwarf) &&
-            !this._isDisposed
-        ) {
+        if (!this.isBirthing && !(this.bodyType & BodyTypeEnum.BrownDwarf) && !this._isDisposed) {
             this._solarFlareTimer += dt;
             if (this._solarFlareTimer >= this._nextFlareInterval) {
                 this._solarFlareTimer = 0;
@@ -236,12 +242,12 @@ export class MainSequenceStar extends Star {
 
         // Apply temperature-appropriate texture (main-sequence stars change texture bins with temperature)
         let map: THREE.Texture | null;
-        if (temp <= 2000)       map = this.textures.brownDwarfTexture;
-        else if (temp <= 3000)  map = this.textures.redStarTexture;
-        else if (temp < 4000)   map = this.textures.orangeStarTexture;
-        else if (temp < 10000)  map = this.textures.sunTexture;
-        else if (temp < 25000)  map = this.textures.whiteStarTexture;
-        else                    map = this.textures.blueStarTexture;
+        if (temp <= 2000) map = this.textures.brownDwarfTexture;
+        else if (temp <= 3000) map = this.textures.redStarTexture;
+        else if (temp < 4000) map = this.textures.orangeStarTexture;
+        else if (temp < 10000) map = this.textures.sunTexture;
+        else if (temp < 25000) map = this.textures.whiteStarTexture;
+        else map = this.textures.blueStarTexture;
 
         if (map) {
             const material = this.mesh.material as THREE.MeshPhongMaterial;
@@ -288,7 +294,7 @@ export class MainSequenceStar extends Star {
 
         if (mass > 0 && mass < BROWN_DWARF_MASS_THRESHOLD) {
             this.transitionToBrownDwarf();
-        } else if (mass >= BROWN_DWARF_MASS_THRESHOLD && (this.bodyType & BodyTypeEnum.BrownDwarf)) {
+        } else if (mass >= BROWN_DWARF_MASS_THRESHOLD && this.bodyType & BodyTypeEnum.BrownDwarf) {
             this.transitionToMainSequence();
             // Fallback temperature for non-edit paths (e.g. black hole siphon).
             // applyEdit always calls setTemperature(sliderTemp) after setMass, which overrides this.
@@ -303,7 +309,10 @@ export class MainSequenceStar extends Star {
             !(this.bodyType & BodyTypeEnum.WhiteDwarf)
         ) {
             const newRadius = Star.massToRadius(mass);
-            if (newRadius > 0 && Math.abs(newRadius - this.radius) / Math.max(this.radius, 1) > 0.005) {
+            if (
+                newRadius > 0 &&
+                Math.abs(newRadius - this.radius) / Math.max(this.radius, 1) > 0.005
+            ) {
                 this.setRadius(newRadius);
             }
         }
@@ -398,7 +407,6 @@ export class MainSequenceStar extends Star {
                 colorHex
             );
             this.activeSolarFlares.push(flare);
-
         } catch (e) {
             console.error('Error triggering solar flare:', e);
         }
@@ -550,12 +558,23 @@ export class MainSequenceStar extends Star {
 
         // Restore corona.
         if (!this.corona) {
-            this.corona = new Corona(this.dependencies, this.scene, this.radius + 1, this.baseColor.getHex());
+            this.corona = new Corona(
+                this.dependencies,
+                this.scene,
+                this.radius + 1,
+                this.baseColor.getHex()
+            );
         }
 
         // Restore glow.
         if (!this.sunGlow) {
-            this.sunGlow = new StarGlow(this.dependencies, this.scene, this.radius, this.baseColor.getHex(), this.mesh.position);
+            this.sunGlow = new StarGlow(
+                this.dependencies,
+                this.scene,
+                this.radius,
+                this.baseColor.getHex(),
+                this.mesh.position
+            );
         }
 
         // Restore light intensity.
@@ -571,4 +590,3 @@ export class MainSequenceStar extends Star {
         }
     }
 }
-
