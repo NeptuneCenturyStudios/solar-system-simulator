@@ -29,14 +29,22 @@ body {
     pointer-events: none;
 }
 
-/* Prevent flex items from stretching to match tallest panel */
-.ui-panel,
-#ui-layer,
-#management-panel,
-#flight-controls-panel,
-#performance-panel {
+/* Main ui panels */
+.ui-panel {
     align-self: flex-start;
     width: 20rem;
+    pointer-events: auto;
+    background: rgba(5, 10, 25, 0.5);
+    backdrop-filter: blur(10px);
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #224466;
+    box-shadow: var(--panel-box-shadow);
+    display: none;
+}
+
+.ui-panel.visible {
+    display: block;
 }
 
 /* --- Startup / Reset modal overlay --- */
@@ -69,68 +77,6 @@ body {
     border: 1px solid #224466;
     box-shadow: var(--panel-box-shadow);
     pointer-events: auto;
-}
-
-.modal button,
-#startup-modal button {
-}
-
-#ui-layer,
-#management-panel,
-#flight-controls-panel,
-#performance-panel {
-    pointer-events: auto;
-}
-
-#ui-layer {
-    background: rgba(5, 10, 25, 0.5);
-    backdrop-filter: blur(10px);
-    padding: 15px;
-    border-radius: 12px;
-    border: 1px solid #224466;
-    box-shadow: var(--panel-box-shadow);
-}
-
-#management-panel {
-    background: rgba(5, 10, 25, 0.5);
-    backdrop-filter: blur(10px);
-    padding: 15px;
-    border-radius: 12px;
-    border: 1px solid #224466;
-    box-shadow: var(--panel-box-shadow);
-    display: none;
-}
-
-#management-panel.visible {
-    display: block;
-}
-
-#flight-controls-panel {
-    background: rgba(5, 10, 25, 0.5);
-    backdrop-filter: blur(10px);
-    padding: 15px;
-    border-radius: 12px;
-    border: 1px solid #224466;
-    box-shadow: var(--panel-box-shadow);
-    display: none;
-}
-
-#flight-controls-panel.visible {
-    display: block;
-}
-
-#performance-panel {
-    background: rgba(5, 10, 25, 0.5);
-    backdrop-filter: blur(10px);
-    padding: 15px;
-    border-radius: 12px;
-    border: 1px solid #224466;
-    box-shadow: var(--panel-box-shadow);
-    display: none;
-}
-
-#performance-panel.visible {
-    display: block;
 }
 
 /* --- Bodies table (below Camera section) --- */
@@ -293,9 +239,6 @@ button.btn-slider-reset {
     margin-bottom: 0;
     background: #003366;
     line-height: 1;
-}
-
-button.btn-slider-reset .material-symbols-outlined {
 }
 
 .btn-row {
