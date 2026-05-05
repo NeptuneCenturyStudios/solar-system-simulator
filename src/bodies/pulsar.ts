@@ -38,7 +38,7 @@ const PULSAR_LIGHT_DISTANCE = 1_000_000 * SCALE_FACTOR;
  * orders of magnitude faster; we clamp to a lighthouse-sweep range instead.
  */
 const PULSAR_MIN_SPIN = Math.PI * 2; // 1 rotation / sim-sec
-const PULSAR_MAX_SPIN = Math.PI * 3.2; // max speed allowed to avoid weird looking beam
+const PULSAR_MAX_SPIN = Math.PI * 3.5; // max speed allowed to avoid weird looking beam
 
 /**
  * A pulsar: a rapidly spinning neutron star that emits narrow beams of electromagnetic
@@ -118,10 +118,10 @@ export class Pulsar extends Star {
         this.glow = new StarGlow(
             dependencies,
             scene,
-            pulsarRadius * 50,
+            pulsarRadius * 1000,
             0xd6f0ff,
             this.mesh.position.clone(),
-            0.05,
+            0.15,
             20
         );
     }
