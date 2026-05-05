@@ -87,7 +87,8 @@ export class PulsarMagneticField implements IEffect {
         position: THREE.Vector3,
         radius: number,
         rotationAxis: THREE.Vector3,
-        rotationSpeed: number
+        rotationSpeed: number,
+        magneticAxisBase: THREE.Vector3
     ) {
         this.dependencies = dependencies;
         this.scene = scene;
@@ -96,12 +97,7 @@ export class PulsarMagneticField implements IEffect {
         this.rotationAxis = rotationAxis.clone().normalize();
         this.rotationSpeed = rotationSpeed;
         this.fieldLoopRadius = radius * FIELD_LOOP_RADIUS_MULT;
-
-        // Build magnetic axis offset 10–45° from the spin axis (same as PulsarBeam)
-        const offsetAngle = (10 + Math.random() * 35) * (Math.PI / 180);
-        const perp = this._buildPerpendicular(this.rotationAxis);
-        const tiltQuat = new THREE.Quaternion().setFromAxisAngle(perp, offsetAngle);
-        this.magneticAxisBase = this.rotationAxis.clone().applyQuaternion(tiltQuat).normalize();
+        this.magneticAxisBase = magneticAxisBase.clone().normalize();
 
         this._buildParticles();
     }

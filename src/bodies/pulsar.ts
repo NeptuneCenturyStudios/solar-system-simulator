@@ -114,13 +114,27 @@ export class Pulsar extends Star implements IMassTransferBody {
 
         this.bodyType = BodyTypeEnum.Pulsar | BodyTypeEnum.Star;
 
+        // Compute a single shared magnetic axis offset 10–45° from the spin axis.
+        // Both PulsarBeam and PulsarMagneticField must use the same axis so the
+        // beam sweeps exactly through the field-line poles.
+        const _magAxisPerp = new THREE.Vector3(
+            Math.abs(newRotation.axis.x) < 0.9 ? 1 : 0,
+            Math.abs(newRotation.axis.x) < 0.9 ? 0 : 1,
+            0
+        ).cross(newRotation.axis).normalize();
+        const _magOffsetAngle = (Math.random() * 90) * (Math.PI / 180);
+        const magneticAxisBase = newRotation.axis.clone()
+            .applyQuaternion(new THREE.Quaternion().setFromAxisAngle(_magAxisPerp, _magOffsetAngle))
+            .normalize();
+
         this.beam = new PulsarBeam(
             dependencies,
             scene,
             this.mesh.position.clone(),
             pulsarRadius,
             newRotation.axis,
-            newSpeed
+            newSpeed,
+            magneticAxisBase
         );
 
         // Glow: Uses 0xd6f0ff (a bluish white).
@@ -137,14 +151,15 @@ export class Pulsar extends Star implements IMassTransferBody {
             20
         );
 
-        // Magnetic field dipole loops — shares the same rotation axis/speed as the beam
+        // Magnetic field dipole loops — shares the same magnetic axis as the beam
         this.magneticField = new PulsarMagneticField(
             dependencies,
             scene,
             this.mesh.position.clone(),
             pulsarRadius,
             newRotation.axis,
-            newSpeed
+            newSpeed,
+            magneticAxisBase
         );
 
         // Accretion disk with pulsar color preset (light blue outer → bright white inner).

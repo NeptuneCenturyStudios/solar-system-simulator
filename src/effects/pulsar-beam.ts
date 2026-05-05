@@ -50,7 +50,8 @@ export class PulsarBeam implements IEffect {
         position: THREE.Vector3,
         radius: number,
         rotationAxis: THREE.Vector3,
-        rotationSpeed: number
+        rotationSpeed: number,
+        magneticAxisBase: THREE.Vector3
     ) {
         this.dependencies = dependencies;
         this.scene = scene;
@@ -58,14 +59,9 @@ export class PulsarBeam implements IEffect {
         this.radius = radius;
         this.rotationAxis = rotationAxis.clone().normalize();
         this.rotationSpeed = rotationSpeed;
+        this.magneticAxisBase = magneticAxisBase.clone().normalize();
 
         this.beamLength = Math.max(300_000 * radius, radius * 50);
-
-        // Build a random magnetic axis offset 10–45° from the spin axis.
-        const offsetAngle = (10 + Math.random() * 35) * (Math.PI / 180);
-        const perp = this._buildPerpendicular(this.rotationAxis);
-        const tiltQuat = new THREE.Quaternion().setFromAxisAngle(perp, offsetAngle);
-        this.magneticAxisBase = this.rotationAxis.clone().applyQuaternion(tiltQuat).normalize();
 
         this._buildBeamArms();
     }
