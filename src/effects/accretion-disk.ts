@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
-import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, performanceSettings, SCALE_FACTOR } from '../utilities/consts';
+import {
+    MIN_PARTICLE_ALPHA,
+    MAX_PARTICLE_ALPHA,
+    performanceSettings,
+    SCALE_FACTOR,
+} from '../utilities/consts';
 
 /** Color pair defining the gradient from the hot inner edge to the cool outer edge. */
 export interface IAccretionDiskColors {

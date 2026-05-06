@@ -76,7 +76,11 @@ export class PulsarMagneticField implements IEffect {
     private _particleLoop: Uint8Array = new Uint8Array(0);
 
     // ── Line fallback mode ────────────────────────────────────────────────────
-    private _lineObjects: { line: THREE.Line; geo: THREE.BufferGeometry; mat: THREE.LineBasicMaterial }[] = [];
+    private _lineObjects: {
+        line: THREE.Line;
+        geo: THREE.BufferGeometry;
+        mat: THREE.LineBasicMaterial;
+    }[] = [];
     private _linesBuilt: boolean = false;
 
     private _lastParticlesEnabled: boolean = true;

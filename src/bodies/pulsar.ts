@@ -121,9 +121,12 @@ export class Pulsar extends Star implements IMassTransferBody {
             Math.abs(newRotation.axis.x) < 0.9 ? 1 : 0,
             Math.abs(newRotation.axis.x) < 0.9 ? 0 : 1,
             0
-        ).cross(newRotation.axis).normalize();
+        )
+            .cross(newRotation.axis)
+            .normalize();
         const _magOffsetAngle = (10 + Math.random() * 80) * (Math.PI / 180);
-        const magneticAxisBase = newRotation.axis.clone()
+        const magneticAxisBase = newRotation.axis
+            .clone()
             .applyQuaternion(new THREE.Quaternion().setFromAxisAngle(_magAxisPerp, _magOffsetAngle))
             .normalize();
 
@@ -172,7 +175,9 @@ export class Pulsar extends Star implements IMassTransferBody {
             mass,
             pos,
             PULSAR_DISK_COLORS,
-            () => { /* no-op: beam sweeps handle the pole visual */ }
+            () => {
+                /* no-op: beam sweeps handle the pole visual */
+            }
         );
     }
 

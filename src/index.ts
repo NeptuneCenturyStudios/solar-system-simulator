@@ -65,6 +65,17 @@ import {
     HYGIEA_DISTANCE,
     HYGIEA_RADIUS,
     SimulationStartMode,
+    FLIGHT_THRUST_ACCEL,
+    FLIGHT_THRUST_DECEL,
+    FLIGHT_BOOST_DECEL,
+    FLIGHT_BOOST_MAX_SPEED,
+    FLIGHT_MAX_SPEED,
+    FLIGHT_WARP_DECEL,
+    FLIGHT_WARP_SPEED,
+    WARP_FADE_DIST,
+    WARP_FULL_VIS_DIST,
+    WARP_SHAKE_MAG,
+    FLIGHT_BOOST_ACCEL,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities';
@@ -967,21 +978,7 @@ const autopilotState: IAutopilotState = {
     brakeEntryDistance: 0,
 };
 
-// Flight tuning constants
-const FLIGHT_MAX_SPEED = 100 * SCALE_FACTOR; // normal max speed cap (units/s)
-const FLIGHT_BOOST_MAX_SPEED = 10 * FLIGHT_MAX_SPEED; // boost ceiling = 10× normal max speed
-const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED / 10; // acceleration rate while W/S held (u/s²)
-const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED / 10; // deceleration rate while W/S held (u/s²)
-const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED / 10; // acceleration rate while Shift held (u/s²)
-const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED / 10; // decel rate after boost ends (u/s²)
-const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
-const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED / 2; // decel rate after warp ends (u/s²)
-/** Camera distance (u) at which the warp tunnel is still fully opaque. */
-const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
-/** Camera distance (u) at which the warp tunnel has fully faded out. */
-const WARP_FADE_DIST = 200 * SCALE_FACTOR;
-/** Peak camera shake displacement (u) applied each frame during warp. */
-const WARP_SHAKE_MAG = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
+
 
 // Autopilot tuning constants
 /** Thrust acceleration used by autopilot during approach (u/s²). */

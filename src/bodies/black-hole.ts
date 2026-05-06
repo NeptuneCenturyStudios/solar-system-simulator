@@ -1,10 +1,5 @@
 import * as THREE from 'three';
-import {
-    SCALE_FACTOR,
-    SUN_MASS,
-    EARTH_DIST,
-    G,
-} from '../utilities/consts.js';
+import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G } from '../utilities/consts.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body';
 import { IRotation } from '../physics/physics.js';
@@ -13,7 +8,6 @@ import { IPipelineFeedEffect } from '../effects/effect-base.js';
 import { MassSiphonEffect } from '../effects/mass-siphon.js';
 import { AccretionDiskEffect, BLACK_HOLE_DISK_COLORS } from '../effects/accretion-disk.js';
 import { BlackHoleJetEffect } from '../effects/black-hole-jet.js';
-
 
 /** Multiplier for the gravitational mass-transfer formula. Tune to taste. */
 const SIPHON_MASS_TRANSFER_SCALE = 0.0001;
@@ -29,7 +23,6 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
     accretionGlow: THREE.Sprite | null = null;
     /** Active siphon stream effects, keyed by the source star's id. */
     siphonEffects: Map<string, IPipelineFeedEffect> = new Map();
-
 
     static massToEventHorizonRadius(mass: number) {
         // "Compress" a star's mass into a tiny sphere.
@@ -187,7 +180,10 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
             .clone()
             .sub(diskNormal.clone().multiplyScalar(toBH.dot(diskNormal)))
             .normalize();
-        const offsetDir = toBH_proj.clone().applyAxisAngle(diskNormal, Math.PI / 2).normalize();
+        const offsetDir = toBH_proj
+            .clone()
+            .applyAxisAngle(diskNormal, Math.PI / 2)
+            .normalize();
         return Math.atan2(offsetDir.z, offsetDir.x);
     }
 

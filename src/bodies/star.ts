@@ -316,7 +316,7 @@ export class Star extends CelestialBody {
         else if (temp < 4000) glowHex = 0xffaa55;
         else if (temp < 10000) glowHex = 0xffffcc;
         else if (temp < 25000) glowHex = 0xffffff;
-        else if (temp < 40000)glowHex = 0xaaccff;
+        else if (temp < 40000) glowHex = 0xaaccff;
         else glowHex = 0xd6f0ff;
 
         const material = this.mesh.material as THREE.MeshPhongMaterial;

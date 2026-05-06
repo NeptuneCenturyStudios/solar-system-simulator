@@ -165,7 +165,14 @@ gl_FragColor = vec4(outgoingLight * alpha, alpha);`
             meshNorth.frustumCulled = false;
             meshSouth.frustumCulled = false;
 
-            const slot: IJetSlot = { meshNorth, meshSouth, matNorth, matSouth, age: 0, active: false };
+            const slot: IJetSlot = {
+                meshNorth,
+                meshSouth,
+                matNorth,
+                matSouth,
+                age: 0,
+                active: false,
+            };
             this._slots.push(slot);
 
             this._orientSlot(slot);
