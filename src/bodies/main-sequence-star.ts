@@ -9,6 +9,7 @@ import {
     BROWN_DWARF_MASS_THRESHOLD,
     MIN_BLACK_HOLE_MASS,
     MIN_NEUTRON_STAR_MASS,
+    performanceSettings,
 } from '../utilities/consts';
 import { BlackHole } from './black-hole';
 import { WhiteDwarf } from './white-dwarf';
@@ -391,7 +392,9 @@ export class MainSequenceStar extends Star {
     }
 
     _triggerSolarFlare() {
-        if (!this.mesh || this._isDisposed) return;
+        if (!this.mesh || this._isDisposed || !performanceSettings.particleEffectsEnabled) {
+            return;
+        }
 
         // 75% small cone burst, 25% large arc loop
         const type: SolarFlareType = Math.random() < 0.75 ? 'small' : 'large';

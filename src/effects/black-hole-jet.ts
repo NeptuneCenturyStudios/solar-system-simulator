@@ -14,7 +14,7 @@ const JET_POOL_SIZE = 16;
 const JET_FLASH_DURATION = 6.0;
 
 /** Cone tip radius as a fraction of beam length. */
-const JET_TIP_RADIUS_FRAC = 0.04;
+const JET_TIP_RADIUS_FRAC = 0.004;
 
 /** Cone base radius (star end) as a fraction of body radius. */
 const JET_BASE_RADIUS_FRAC = 0.5;

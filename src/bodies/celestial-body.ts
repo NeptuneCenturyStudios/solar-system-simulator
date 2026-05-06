@@ -5,7 +5,7 @@ import { pickRandom, BodyTypeEnum, isBodyType } from '../utilities/utilities';
 import { calculateTrajectory, IRotation } from '../physics/physics';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { triggerScreenFlash } from '../effects/screen-flash';
-import { SCALE_FACTOR } from '../utilities/consts';
+import { SCALE_FACTOR, C } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-rendering';
 import { IStateDependencies } from '../interfaces';
 
@@ -374,8 +374,21 @@ export class CelestialBody extends Body {
         }
     }
 
+    private clampToLightSpeed(): void {
+        const speed = this.velocity.length();
+        if (speed >= C) {
+            this.velocity.multiplyScalar((C * 0.9999) / speed);
+        }
+    }
+
+    setVelocity(v: THREE.Vector3): void {
+        this.velocity.copy(v);
+        this.clampToLightSpeed();
+    }
+
     update(acc: THREE.Vector3, dt: number) {
         super.update(acc, dt);
+        this.clampToLightSpeed();
 
         if (this._isDisposed) return;
 
