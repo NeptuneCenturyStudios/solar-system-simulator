@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { calculateTrajectory } from '../physics/physics.js';
-import { SUN_MASS, EARTH_MASS, EARTH_DIST, EARTH_RADIUS } from '../utilities/consts.js';
+import { calculateTrajectory, IRotation } from '../physics/physics.js';
+import { SUN_MASS, EARTH_MASS, EARTH_DIST, EARTH_RADIUS, EARTH_AXIS, EARTH_ROT_SPEED } from '../utilities/consts.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { CelestialBody } from './celestial-body';
@@ -33,6 +33,14 @@ export class Earth extends CelestialBody {
             metalness: 0.7,
         });
 
+        // Earth's rotation axis is tilted about 23.5 degrees to simulate seasons, and it rotates once per day.
+        // Need to convert the axis degree tilt to a rotation axis vector. The tilt is around the X-axis, so we can calculate the rotation axis as follows:
+        const tiltRad = EARTH_AXIS * Math.PI / 180;
+        const rotation: IRotation = {
+            axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
+            speed: EARTH_ROT_SPEED
+        };
+
         super(
             dependencies,
             scene,
@@ -47,7 +55,7 @@ export class Earth extends CelestialBody {
             0xffffff,
             4500,
             false,
-            { axis: new THREE.Vector3(0, 1, 0), speed: 0.3 },
+            rotation,
             undefined,
             material
         );

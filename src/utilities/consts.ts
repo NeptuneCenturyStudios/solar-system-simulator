@@ -1,3 +1,4 @@
+
 // === Global Performance Settings ===
 /**
  * Controls whether particle effects are rendered.
@@ -77,6 +78,58 @@ export const SATURN_DIST = (1429400000 / DIST_SCALE) * SCALE_FACTOR;
 export const URANUS_DIST = (2870990000 / DIST_SCALE) * SCALE_FACTOR;
 export const NEPTUNE_DIST = (4504000000 / DIST_SCALE) * SCALE_FACTOR;
 export const PLUTO_DIST = (5906380000 / DIST_SCALE) * SCALE_FACTOR;
+
+
+// === Planetary System: Rotation Axis (degrees) ===
+export const MERCURY_AXIS = 0.034;
+export const VENUS_AXIS = 177.4;
+export const EARTH_AXIS = 23.44;
+export const MARS_AXIS = 25.19;
+export const JUPITER_AXIS = 3.13;
+export const SATURN_AXIS = 26.73;
+export const URANUS_AXIS = 97.77;
+export const NEPTUNE_AXIS = 28.32;
+export const PLUTO_AXIS = 119.61;
+
+// === Planetary System: Real Orbital Periods (seconds) ===
+export const MERCURY_ORBITAL_PERIOD_REAL = 87.969 * 24 * 3600; // days to seconds
+export const VENUS_ORBITAL_PERIOD_REAL = 224.701 * 24 * 3600;
+export const EARTH_ORBITAL_PERIOD_REAL = 365.256 * 24 * 3600;
+export const MARS_ORBITAL_PERIOD_REAL = 686.980 * 24 * 3600;
+export const JUPITER_ORBITAL_PERIOD_REAL = 4332.59 * 24 * 3600;
+export const SATURN_ORBITAL_PERIOD_REAL = 10759.22 * 24 * 3600;
+export const URANUS_ORBITAL_PERIOD_REAL = 30685.4 * 24 * 3600;
+export const NEPTUNE_ORBITAL_PERIOD_REAL = 60190.03 * 24 * 3600;
+export const PLUTO_ORBITAL_PERIOD_REAL = 90560 * 24 * 3600;
+
+// === Planetary System: Per-planet Time Scale Factors ===
+// S_time = T_real / T_sim, where T_sim = 2 * PI * r_sim / sqrt(G * M_sun / r_sim)
+function calcSimOrbitalPeriod(r_sim: number, G: number, M_sun: number): number {
+    // T_sim = 2 * PI * sqrt(r_sim^3 / (G * M_sun))
+    return 2 * Math.PI * Math.sqrt(Math.pow(r_sim, 3) / (G * M_sun));
+}
+
+export const MERCURY_TIME_SCALE = MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, G, SUN_MASS);
+export const VENUS_TIME_SCALE = VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, G, SUN_MASS);
+export const EARTH_TIME_SCALE = EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, G, SUN_MASS);
+export const MARS_TIME_SCALE = MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, G, SUN_MASS);
+export const JUPITER_TIME_SCALE = JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, G, SUN_MASS);
+export const SATURN_TIME_SCALE = SATURN_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(SATURN_DIST, G, SUN_MASS);
+export const URANUS_TIME_SCALE = URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, G, SUN_MASS);
+export const NEPTUNE_TIME_SCALE = NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, G, SUN_MASS);
+export const PLUTO_TIME_SCALE = PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, G, SUN_MASS);
+
+// === Planetary System: Rotation Speed (radians/sec, scaled for simulation) ===
+// Angular speed = 2 * PI / (sidereal day in seconds), then scaled by per-planet time scale
+export const MERCURY_ROT_SPEED = (2 * Math.PI / (1407.5 * 3600)) * MERCURY_TIME_SCALE; // ~1.24e-6
+export const VENUS_ROT_SPEED = (-2 * Math.PI / (5832.5 * 3600)) * VENUS_TIME_SCALE; // ~-2.98e-7 (retrograde)
+export const EARTH_ROT_SPEED = (2 * Math.PI / (23.934 * 3600)) * EARTH_TIME_SCALE; // ~7.29e-5
+export const MARS_ROT_SPEED = (2 * Math.PI / (24.623 * 3600)) * MARS_TIME_SCALE; // ~7.09e-5
+export const JUPITER_ROT_SPEED = (2 * Math.PI / (9.925 * 3600)) * JUPITER_TIME_SCALE; // ~1.76e-4
+export const SATURN_ROT_SPEED = (2 * Math.PI / (10.656 * 3600)) * SATURN_TIME_SCALE; // ~1.64e-4
+export const URANUS_ROT_SPEED = (-2 * Math.PI / (17.24 * 3600)) * URANUS_TIME_SCALE; // ~-1.01e-4 (retrograde)
+export const NEPTUNE_ROT_SPEED = (2 * Math.PI / (16.11 * 3600)) * NEPTUNE_TIME_SCALE; // ~1.08e-4
+export const PLUTO_ROT_SPEED = (-2 * Math.PI / (153.3 * 3600)) * PLUTO_TIME_SCALE; // ~-1.14e-5 (retrograde)
 
 // === Asteroids: Mass ===
 export const CERES_MASS = (9.393e20 / MASS_SCALE) * SCALE_FACTOR;

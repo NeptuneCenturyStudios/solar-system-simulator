@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { calculateTrajectory } from '../physics/physics.js';
-import { SUN_MASS, VENUS_DIST, VENUS_MASS, VENUS_RADIUS } from '../utilities/consts.js';
+import { calculateTrajectory, IRotation } from '../physics/physics.js';
+import { SUN_MASS, VENUS_AXIS, VENUS_DIST, VENUS_MASS, VENUS_RADIUS, VENUS_ROT_SPEED } from '../utilities/consts.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { CelestialBody } from './celestial-body';
@@ -31,6 +31,14 @@ export class Venus extends CelestialBody {
             metalness: 0.7,
         });
 
+        // Venus's rotation axis is tilted about 177.4 degrees (retrograde rotation), and it rotates once every 243 Earth days.
+        // Need to convert the axis degree tilt to a rotation axis vector. The tilt is around the X-axis, so we can calculate the rotation axis as follows:
+        const tiltRad = VENUS_AXIS * Math.PI / 180;
+                const rotation: IRotation = {
+                    axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
+                    speed: VENUS_ROT_SPEED
+                };
+
         super(
             dependencies,
             scene,
@@ -45,7 +53,7 @@ export class Venus extends CelestialBody {
             0xffdd88,
             3500,
             false,
-            { axis: new THREE.Vector3(0, 1, 0), speed: -0.08 },
+            rotation,
             undefined,
             material
         );
@@ -66,7 +74,7 @@ export class Venus extends CelestialBody {
         this.clouds.userData = { parentBody: this };
         this.mesh.add(this.clouds);
 
-        this.cloudRotationSpeed = 0.12;
+        this.cloudRotationSpeed = VENUS_ROT_SPEED * 60; // Clouds rotate much faster than the surface
     }
 
     update(acc: THREE.Vector3, dt: number): void {
