@@ -20,7 +20,7 @@ export const MIN_PARTICLE_ALPHA = 0.7;
 export const MAX_PARTICLE_ALPHA = 1.0;
 
 // === Simulation Scale and Physics Constants ===
-export const SCALE_FACTOR = 2;
+export const SCALE_FACTOR = 1;
 // Tuned so that SUN_MASS = 33,000,000 exactly
 export const MASS_SCALE = 6.025757575757576e22;
 export const RADIUS_SCALE = 1000;
@@ -81,6 +81,7 @@ export const PLUTO_DIST = (5906380000 / DIST_SCALE) * SCALE_FACTOR;
 
 
 // === Planetary System: Rotation Axis (degrees) ===
+export const SUN_AXIS = 7.25;
 export const MERCURY_AXIS = 0.034;
 export const VENUS_AXIS = 177.4;
 export const EARTH_AXIS = 23.44;
@@ -109,6 +110,7 @@ function calcSimOrbitalPeriod(r_sim: number, G: number, M_sun: number): number {
     return 2 * Math.PI * Math.sqrt(Math.pow(r_sim, 3) / (G * M_sun));
 }
 
+export const SUN_TIME_SCALE = 1;
 export const MERCURY_TIME_SCALE = MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, G, SUN_MASS);
 export const VENUS_TIME_SCALE = VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, G, SUN_MASS);
 export const EARTH_TIME_SCALE = EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, G, SUN_MASS);
@@ -119,6 +121,8 @@ export const URANUS_TIME_SCALE = URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeri
 export const NEPTUNE_TIME_SCALE = NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, G, SUN_MASS);
 export const PLUTO_TIME_SCALE = PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, G, SUN_MASS);
 
+// === Sun: Rotation Speed ===
+export const SUN_ROT_SPEED = (2 * Math.PI / (25.38 * 3600)) * SUN_TIME_SCALE; // ~2.86e-6 radians/sec
 // === Planetary System: Rotation Speed (radians/sec, scaled for simulation) ===
 // Angular speed = 2 * PI / (sidereal day in seconds), then scaled by per-planet time scale
 export const MERCURY_ROT_SPEED = (2 * Math.PI / (1407.5 * 3600)) * MERCURY_TIME_SCALE; // ~1.24e-6
@@ -157,13 +161,13 @@ export const COMET_PERIHELION_DIST = (88000000 / DIST_SCALE) * SCALE_FACTOR;
 export const COMET_APHELION_DIST = (5250000000 / DIST_SCALE) * SCALE_FACTOR;
 
 // === Flight tuning constants ===
-export const FLIGHT_MAX_SPEED = C / 2; // normal max speed cap (units/s) 50% of light speed, chosen to allow for a good sense of speed while still leaving room for boost and warp speeds above it
-export const FLIGHT_BOOST_MAX_SPEED = 100 * FLIGHT_MAX_SPEED; // boost ceiling = 100× normal max speed
+export const FLIGHT_MAX_SPEED = C * 0.99; // normal max speed cap (units/s) of light speed, chosen to allow for a good sense of speed while still leaving room for boost and warp speeds above it
+export const FLIGHT_BOOST_MAX_SPEED = 50 * FLIGHT_MAX_SPEED; // boost ceiling = 50× normal max speed
 export const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED / 10; // acceleration rate while W/S held (u/s²)
 export const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED / 10; // deceleration rate while W/S held (u/s²)
 export const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED / 10; // acceleration rate while Shift held (u/s²)
 export const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED / 10; // decel rate after boost ends (u/s²)
-export const FLIGHT_WARP_SPEED = 100 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
+export const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
 export const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED / 2; // decel rate after warp ends (u/s²)
 /** Camera distance (u) at which the warp tunnel is still fully opaque. */
 export const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;

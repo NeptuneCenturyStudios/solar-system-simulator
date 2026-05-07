@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body';
-import { calculateTrajectory } from '../physics/physics.js';
+import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
-import { SUN_MASS, URANUS_DIST, URANUS_MASS, URANUS_RADIUS } from '../utilities/consts.js';
+import { SUN_MASS, URANUS_AXIS, URANUS_DIST, URANUS_MASS, URANUS_RADIUS, URANUS_ROT_SPEED } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
 /**
@@ -33,6 +33,9 @@ export class Uranus extends CelestialBody {
             metalness: 0.7,
         });
 
+        // Uranus has an extreme axial tilt of about 98 degrees, meaning it essentially rotates on its side.
+        const rotation = calculateRotation(URANUS_AXIS, URANUS_ROT_SPEED);
+
         super(
             dependencies,
             scene,
@@ -47,7 +50,7 @@ export class Uranus extends CelestialBody {
             0x88ddff,
             15000,
             false,
-            { axis: new THREE.Vector3(0.99, 0.12, 0), speed: 0.42 },
+            rotation,
             undefined,
             material
         );

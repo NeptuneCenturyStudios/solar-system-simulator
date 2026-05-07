@@ -1,9 +1,16 @@
 import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body';
-import { calculateTrajectory } from '../physics/physics.js';
+import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
-import { SUN_MASS, JUPITER_DIST, JUPITER_MASS, JUPITER_RADIUS } from '../utilities/consts.js';
+import {
+    SUN_MASS,
+    JUPITER_DIST,
+    JUPITER_MASS,
+    JUPITER_RADIUS,
+    JUPITER_AXIS,
+    JUPITER_ROT_SPEED,
+} from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
 /**
@@ -33,6 +40,8 @@ export class Jupiter extends CelestialBody {
             metalness: 0.85,
         });
 
+        const rotation = calculateRotation(JUPITER_AXIS, JUPITER_ROT_SPEED);
+
         super(
             dependencies,
             scene,
@@ -47,7 +56,7 @@ export class Jupiter extends CelestialBody {
             0xffcc88,
             5000,
             false,
-            { axis: new THREE.Vector3(0, 1, 0), speed: 0.55 },
+            rotation,
             undefined,
             material
         );

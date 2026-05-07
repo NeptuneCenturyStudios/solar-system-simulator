@@ -69,6 +69,22 @@ export function calculateTrajectory(gForce: number, distance: number, parentMass
 }
 
 /**
+ * Calculate the rotation axis and speed for a celestial body based on its axial tilt and rotational speed.
+ * @param axisDeg The tilt angle of the rotation axis in degrees.
+ * @param speed The rotational speed.
+ * @returns An object representing the rotation axis and speed.
+ */
+export function calculateRotation(axisDeg: number, speed: number): IRotation {
+    const tiltRad = axisDeg * Math.PI / 180;
+        const rotation: IRotation = {
+            axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
+            speed: speed
+        };
+
+        return rotation;
+}
+
+/**
  * Update the physics simulation for all bodies in the simulation state, applying gravitational forces and autopilot thrust as needed.
  * @param simulationState The current state of the simulation, including all bodies and explosions.
  * @param autopilotState The current state of the autopilot, including phase and target information.

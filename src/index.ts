@@ -32,7 +32,6 @@ import {
     SCALE_FACTOR,
     G,
     SUN_MASS,
-    SUN_RADIUS,
     EARTH_DIST,
     PLUTO_DIST,
     IO_MASS,
@@ -121,6 +120,7 @@ import { PerformancePanel } from './ui/performance-panel';
 import { EventLogEntry } from './event-log/event-log';
 import { Halley } from './bodies/halley';
 import { IStateDependencies } from './interfaces';
+import { Sun } from './bodies/sun';
 
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
@@ -657,7 +657,7 @@ const CAMERA_FAR_PLANE = PLUTO_DIST + 300000 * SCALE_FACTOR + 2000000 * SCALE_FA
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
-    1,
+    0.1,
     CAMERA_FAR_PLANE
 );
 const MAX_ZOOM_OUT_DISTANCE = camera.far * 0.8;
@@ -2415,26 +2415,7 @@ function createPresetBody(presetKey: string) {
 
     switch (key) {
         case 'sun': {
-            // First star goes to world center; additional stars spawn near the camera.
-            // Also treat an existing black hole as occupying the center so we don't
-            // immediately destroy the new star by placing it at (0,0,0).
-            const hasCentralBody =
-                !!primaryStar ||
-                simulationState.bodies.some((b) => b && !b._isDisposed && b instanceof BlackHole);
-            const pos = hasCentralBody ? getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
-
-            newBody = new MainSequenceStar(dependencies, scene, {
-                radius: SUN_RADIUS,
-                pos,
-                vel: new THREE.Vector3(0, 0, 0),
-                mass: SUN_MASS,
-                id: createUniqueId('sun'),
-                name: 'Sun',
-                temperature: 5778,
-                lightIntensity: 500000000,
-                lightDistance: 524400,
-                rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 },
-            });
+            newBody = new Sun(dependencies, scene);
 
             break;
         }
@@ -3060,18 +3041,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     }
 
     // Recreate the primary star for default mode (local, not global)
-    const sun = new MainSequenceStar(dependencies, scene, {
-        radius: SUN_RADIUS,
-        pos: new THREE.Vector3(0, 0, 0),
-        vel: new THREE.Vector3(0, 0, 0),
-        mass: SUN_MASS,
-        id: createUniqueId('sun'),
-        name: 'Sun',
-        temperature: 5778,
-        lightIntensity: 500000000,
-        lightDistance: 524400,
-        rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 },
-    });
+    const sun = new Sun(dependencies, scene);
 
     // Default mode: build the solar system
     simulationState.bodies = [sun];

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { calculateTrajectory, IRotation } from '../physics/physics.js';
+import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, VENUS_AXIS, VENUS_DIST, VENUS_MASS, VENUS_RADIUS, VENUS_ROT_SPEED } from '../utilities/consts.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
@@ -33,11 +33,7 @@ export class Venus extends CelestialBody {
 
         // Venus's rotation axis is tilted about 177.4 degrees (retrograde rotation), and it rotates once every 243 Earth days.
         // Need to convert the axis degree tilt to a rotation axis vector. The tilt is around the X-axis, so we can calculate the rotation axis as follows:
-        const tiltRad = VENUS_AXIS * Math.PI / 180;
-        const rotation: IRotation = {
-            axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
-            speed: VENUS_ROT_SPEED
-        };
+        const rotation = calculateRotation(VENUS_AXIS, VENUS_ROT_SPEED);
 
         super(
             dependencies,

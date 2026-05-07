@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { calculateTrajectory, IRotation } from '../physics/physics.js';
+import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, EARTH_MASS, EARTH_DIST, EARTH_RADIUS, EARTH_AXIS, EARTH_ROT_SPEED } from '../utilities/consts.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
@@ -35,11 +35,7 @@ export class Earth extends CelestialBody {
 
         // Earth's rotation axis is tilted about 23.5 degrees to simulate seasons, and it rotates once per day.
         // Need to convert the axis degree tilt to a rotation axis vector. The tilt is around the X-axis, so we can calculate the rotation axis as follows:
-        const tiltRad = EARTH_AXIS * Math.PI / 180;
-        const rotation: IRotation = {
-            axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
-            speed: EARTH_ROT_SPEED
-        };
+        const rotation = calculateRotation(EARTH_AXIS, EARTH_ROT_SPEED);
 
         super(
             dependencies,
@@ -80,7 +76,7 @@ export class Earth extends CelestialBody {
         this.mesh.add(this.clouds);
 
         // Clouds rotate slightly faster than Earth to simulate moving atmosphere.
-        this.cloudRotationSpeed = 0.18;
+        this.cloudRotationSpeed = EARTH_ROT_SPEED * 1.3;
     }
 
     update(acc: THREE.Vector3, dt: number) {

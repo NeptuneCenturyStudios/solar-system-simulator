@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { calculateTrajectory } from '../physics/physics.js';
-import { SUN_MASS, MARS_MASS, MARS_DIST, MARS_RADIUS } from '../utilities/consts.js';
+import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
+import { SUN_MASS, MARS_MASS, MARS_DIST, MARS_RADIUS, MARS_AXIS, MARS_ROT_SPEED } from '../utilities/consts.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { CelestialBody } from './celestial-body';
@@ -30,6 +30,8 @@ export class Mars extends CelestialBody {
             metalness: 0.7,
         });
 
+        const rotation = calculateRotation(MARS_AXIS, MARS_ROT_SPEED);
+
         super(
             dependencies,
             scene,
@@ -44,7 +46,7 @@ export class Mars extends CelestialBody {
             0xff8888,
             3000,
             false,
-            { axis: new THREE.Vector3(0, 1, 0), speed: 0.26 },
+            rotation,
             undefined,
             material
         );

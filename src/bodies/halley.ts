@@ -6,6 +6,7 @@ import {
     COMET_PERIHELION_DIST,
     COMET_APHELION_DIST,
     COMET_RADIUS,
+    COMET_MASS,
 } from '../utilities/consts.js';
 
 import { Comet } from './comet';
@@ -59,7 +60,7 @@ export class Halley extends Comet {
             {
                 pos: new THREE.Vector3(x, y, z),
                 vel: new THREE.Vector3(velX, velY, velZ),
-                mass: 0.01,
+                mass: COMET_MASS,
                 id: 'halley',
                 name: 'Halley',
                 radius: COMET_RADIUS,
