@@ -45,7 +45,7 @@ export class Spaceship extends Body {
         const placeholderGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
         const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
 
-        const radius = 0.6 * SF; // Approximate half-wingspan for collision purposes
+        const radius = 0.01 * SF; // Approximate half-wingspan for collision purposes
 
         // ── Base class ────────────────────────────────────────────────────────
         super(

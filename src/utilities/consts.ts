@@ -162,12 +162,12 @@ export const COMET_APHELION_DIST = (5250000000 / DIST_SCALE) * SCALE_FACTOR;
 
 // === Flight tuning constants ===
 export const FLIGHT_MAX_SPEED = C * 0.99; // normal max speed cap (units/s) of light speed, chosen to allow for a good sense of speed while still leaving room for boost and warp speeds above it
-export const FLIGHT_BOOST_MAX_SPEED = 50 * FLIGHT_MAX_SPEED; // boost ceiling = 50× normal max speed
+export const FLIGHT_BOOST_MAX_SPEED = 20 * FLIGHT_MAX_SPEED; // boost ceiling = 10× normal max speed
 export const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED / 10; // acceleration rate while W/S held (u/s²)
 export const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED / 10; // deceleration rate while W/S held (u/s²)
 export const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED / 10; // acceleration rate while Shift held (u/s²)
 export const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED / 10; // decel rate after boost ends (u/s²)
-export const FLIGHT_WARP_SPEED = 10 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
+export const FLIGHT_WARP_SPEED = 20 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
 export const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED / 2; // decel rate after warp ends (u/s²)
 /** Camera distance (u) at which the warp tunnel is still fully opaque. */
 export const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
