@@ -20,7 +20,7 @@ export const MIN_PARTICLE_ALPHA = 0.7;
 export const MAX_PARTICLE_ALPHA = 1.0;
 
 // === Simulation Scale and Physics Constants ===
-export const SCALE_FACTOR = 1;
+export const SCALE_FACTOR = 2;
 // Tuned so that SUN_MASS = 33,000,000 exactly
 export const MASS_SCALE = 6.025757575757576e22;
 export const RADIUS_SCALE = 1000;

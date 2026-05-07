@@ -465,16 +465,20 @@ export class CelestialBody extends Body {
             this.rings.rotation.y += 0.001 * (dt * 60);
         }
     }
-    updateTrail() {
+    updateTrail(cameraPos: THREE.Vector3) {
         if (this._isDisposed) return;
         this.history.push(this.mesh.position.clone());
         if (this.history.length > this.maxTrail) this.history.shift();
 
-        // Copy history into the preallocated buffer and update draw range.
+        // Anchor the trail Line at cameraPos so vertices are stored as camera-relative
+        // offsets. This keeps float32 values small regardless of world distance, eliminating
+        // the stair-step precision artefact visible at large distances from the origin.
+        if (this.trail) this.trail.position.copy(cameraPos);
+        const cx = cameraPos.x, cy = cameraPos.y, cz = cameraPos.z;
         for (let i = 0; i < this.history.length; i++) {
-            this.trailPositions[i * 3] = this.history[i].x;
-            this.trailPositions[i * 3 + 1] = this.history[i].y;
-            this.trailPositions[i * 3 + 2] = this.history[i].z;
+            this.trailPositions[i * 3]     = this.history[i].x - cx;
+            this.trailPositions[i * 3 + 1] = this.history[i].y - cy;
+            this.trailPositions[i * 3 + 2] = this.history[i].z - cz;
         }
         this.trailGeo.attributes.position.needsUpdate = true;
         this.trailGeo.setDrawRange(0, this.history.length);

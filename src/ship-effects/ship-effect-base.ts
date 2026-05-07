@@ -9,7 +9,8 @@ export interface IShipEffect {
         thrusting: boolean,
         shipVelocity: THREE.Vector3,
         exhaustDir: THREE.Vector3,
-        dt: number
+        dt: number,
+        cameraPos: THREE.Vector3
     ): void;
     hide(): void;
     dispose(): void;

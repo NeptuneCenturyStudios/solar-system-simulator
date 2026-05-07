@@ -4258,7 +4258,7 @@ function animate() {
             if (!b1) continue;
 
             // Update the trail position for b1
-            if (b1 instanceof CelestialBody) b1.updateTrail();
+            if (b1 instanceof CelestialBody) b1.updateTrail(camera.position);
 
             // Skip disposed bodies in collision detection
             if (b1._isDisposed || !b1.mesh) continue;
@@ -4567,7 +4567,8 @@ function animate() {
             true,
             trailShip.velocity,
             exhaustDir,
-            dtTotal
+            dtTotal,
+            camera.position
         );
     }
 

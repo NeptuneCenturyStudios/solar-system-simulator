@@ -42,9 +42,11 @@ export class ShipFlame implements IShipEffect {
     // vx/vy/vz: world-space velocity (u/s) — integrated each frame.
     // life:          sim-time ratio 0→1 (DEAD = unused).
     // lifeIncrement: how fast life advances per second (= 1/lifetime).
-    private readonly px: Float32Array;
-    private readonly py: Float32Array;
-    private readonly pz: Float32Array;
+    // Float64Array for px/py/pz: absolute world coords at large distances lose
+    // float32 precision, causing particle drift to vanish in integration.
+    private readonly px: Float64Array;
+    private readonly py: Float64Array;
+    private readonly pz: Float64Array;
     private readonly vx: Float32Array;
     private readonly vy: Float32Array;
     private readonly vz: Float32Array;
@@ -67,9 +69,9 @@ export class ShipFlame implements IShipEffect {
     constructor(scene: THREE.Scene) {
         this.scene = scene;
 
-        this.px = new Float32Array(MAX_PARTICLES);
-        this.py = new Float32Array(MAX_PARTICLES);
-        this.pz = new Float32Array(MAX_PARTICLES);
+        this.px = new Float64Array(MAX_PARTICLES);
+        this.py = new Float64Array(MAX_PARTICLES);
+        this.pz = new Float64Array(MAX_PARTICLES);
         this.vx = new Float32Array(MAX_PARTICLES);
         this.vy = new Float32Array(MAX_PARTICLES);
         this.vz = new Float32Array(MAX_PARTICLES);
@@ -180,7 +182,8 @@ export class ShipFlame implements IShipEffect {
         thrusting: boolean,
         shipVelocity: THREE.Vector3,
         exhaustDir: THREE.Vector3,
-        dt: number
+        dt: number,
+        cameraPos: THREE.Vector3
     ): void {
         const absDt = Math.abs(dt);
         // speedFactor for brightness: 0 at rest, 1 at maxSpeed
@@ -283,16 +286,21 @@ export class ShipFlame implements IShipEffect {
             }
         }
 
-        // ── 4. Compact live particles into GPU buffers ────────────────────────
+        // ── 4. Compact live particles into GPU buffers (camera-relative) ─────────
+        // Flame meshes are positioned at cameraPos; vertices are stored relative to
+        // cameraPos so float32 values are small and precise regardless of distance.
+        this.glowInner.position.copy(cameraPos);
+        this.glowOuter.position.copy(cameraPos);
+        const cpx = cameraPos.x, cpy = cameraPos.y, cpz = cameraPos.z;
         let n = 0;
         for (let i = 0; i < MAX_PARTICLES; i++) {
             if (this.life[i] < 0) continue;
             const t = this.life[i]; // 0 = birth, 1 = death
             const alive = 1 - t;
 
-            this.gpuPos[n * 3] = this.px[i];
-            this.gpuPos[n * 3 + 1] = this.py[i];
-            this.gpuPos[n * 3 + 2] = this.pz[i];
+            this.gpuPos[n * 3]     = this.px[i] - cpx;
+            this.gpuPos[n * 3 + 1] = this.py[i] - cpy;
+            this.gpuPos[n * 3 + 2] = this.pz[i] - cpz;
 
             // Inner core: white-hot at birth → yellow → orange → dim red at death
             const hot = alive * speedFactor;
