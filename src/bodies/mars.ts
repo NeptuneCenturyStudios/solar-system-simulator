@@ -19,7 +19,7 @@ export class Mars extends CelestialBody {
      * @param scene The THREE.Scene to which Mars belongs.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-        const trajectory = calculateTrajectory(MARS_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), MARS_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: marsTexture,

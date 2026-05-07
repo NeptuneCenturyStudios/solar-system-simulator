@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G } from '../utilities/consts.js';
+import { SCALE_FACTOR, SUN_MASS, EARTH_DIST } from '../utilities/consts.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body';
 import { IRotation } from '../physics/physics.js';
@@ -297,7 +297,7 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
             // Gravitational mass-transfer: proportional to G·M_bh·M_star / r².
             const distSafe = Math.max(dist, 1);
             const transfer =
-                ((G * this.mass * star.mass) / (distSafe * distSafe)) *
+                ((this.dependencies.getG() * this.mass * star.mass) / (distSafe * distSafe)) *
                 SIPHON_MASS_TRANSFER_SCALE *
                 absDt;
 

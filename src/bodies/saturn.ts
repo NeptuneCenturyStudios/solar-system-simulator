@@ -22,7 +22,7 @@ export class Saturn extends CelestialBody {
         scene: THREE.Scene,
         saturnTexture: THREE.Texture
     ) {
-        const trajectory = calculateTrajectory(SATURN_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), SATURN_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: saturnTexture,

@@ -104,6 +104,8 @@ export class ManagementPanel extends Panel {
 
     // Environment toggles (owned by ManagementPanel)
     enableKuiperBeltCheckbox: HTMLInputElement | null;
+    gravitationalConstantSlider: HTMLInputElement | null;
+    gravitationalConstantDisplay: HTMLElement | null;
 
     selectedBody: Body | null;
 
@@ -191,6 +193,8 @@ export class ManagementPanel extends Panel {
 
         // Environment toggles (owned by ManagementPanel)
         this.enableKuiperBeltCheckbox = null;
+        this.gravitationalConstantSlider = null;
+        this.gravitationalConstantDisplay = null;
 
         this.selectedBody = null;
     }
@@ -296,6 +300,22 @@ export class ManagementPanel extends Panel {
             kuiperBeltCheckbox.onchange = () => {
                 this.emit('kuiperBeltChange', { checked: kuiperBeltCheckbox.checked });
             };
+        }
+
+        this.gravitationalConstantSlider = document.getElementById(
+            'gravitationalConstantSlider'
+        ) as HTMLInputElement | null;
+        this.gravitationalConstantDisplay = document.getElementById('gravitational-constant-val');
+
+        if (this.gravitationalConstantSlider && this.gravitationalConstantDisplay) {
+            const slider = this.gravitationalConstantSlider;
+            const display = this.gravitationalConstantDisplay;
+            slider.oninput = () => {
+                const value = parseFloat(slider.value);
+                display.textContent = value.toFixed(5);
+                this.emit('gChange', { value });
+            };
+            (slider.oninput as () => void)();
         }
 
         this.createSliderInitState = {

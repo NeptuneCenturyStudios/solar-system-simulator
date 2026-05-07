@@ -22,7 +22,7 @@ export class Neptune extends CelestialBody {
         scene: THREE.Scene,
         neptuneTexture: THREE.Texture
     ) {
-        const trajectory = calculateTrajectory(NEPTUNE_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), NEPTUNE_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: neptuneTexture,

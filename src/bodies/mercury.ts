@@ -19,7 +19,7 @@ export class Mercury extends CelestialBody {
      * @param scene The THREE.Scene to which Mercury belongs.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-        const trajectory = calculateTrajectory(MERCURY_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), MERCURY_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: mercuryTexture,

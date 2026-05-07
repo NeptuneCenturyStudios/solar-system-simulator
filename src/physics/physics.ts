@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { G } from '../utilities/consts';
 import { Body } from '../bodies/body';
 import { ParticleExplosion } from '../effects/particle-explosion';
 
@@ -22,6 +21,7 @@ export interface ISimulationState {
     bodies: Body[];
     explosions: ParticleExplosion[];
     showNames: boolean;
+    G: number;
 }
 
 /**
@@ -56,8 +56,8 @@ export interface IAutopilotState {
  * @param {number} parentMass The mass of the parent body around which the orbit is calculated
  * @returns An object containing the position and velocity vectors for the circular orbit
  */
-export function calculateTrajectory(distance: number, parentMass: number) {
-    const speed = Math.sqrt((G * parentMass) / distance);
+export function calculateTrajectory(gForce: number, distance: number, parentMass: number) {
+    const speed = Math.sqrt((gForce * parentMass) / distance);
 
     // Position body on the X axis
     const pos = new THREE.Vector3(distance, 0, 0);
@@ -110,7 +110,7 @@ export function updateSimulation(
  * @param m2 The mass of the body exerting the gravitational force.
  * @returns The gravitational acceleration vector.
  */
-function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number) {
+function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number, G: number) {
     const diff = new THREE.Vector3().subVectors(p2, p1);
     const r = diff.length();
 
@@ -139,7 +139,7 @@ function updatePhysics(simulationState: ISimulationState) {
         // Calculate pull from ALL OTHER bodies (n-body simulation)
         for (const other of simulationState.bodies) {
             if (other !== body && !other?._isDisposed && other.mesh) {
-                const accFromOther = getAcc(body.mesh.position, other.mesh.position, other.mass);
+                const accFromOther = getAcc(body.mesh.position, other.mesh.position, other.mass, simulationState.G);
                 totalAcc.add(accFromOther);
             }
         }

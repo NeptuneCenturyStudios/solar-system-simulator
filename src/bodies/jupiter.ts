@@ -22,7 +22,7 @@ export class Jupiter extends CelestialBody {
         scene: THREE.Scene,
         jupiterTexture: THREE.Texture
     ) {
-        const trajectory = calculateTrajectory(JUPITER_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), JUPITER_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: jupiterTexture,

@@ -22,7 +22,7 @@ export class Earth extends CelestialBody {
      * @param scene The THREE.Scene to which Earth belongs.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-        const earthTrajectory = calculateTrajectory(EARTH_DIST, SUN_MASS);
+        const earthTrajectory = calculateTrajectory(dependencies.getG(), EARTH_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: earthDayTexture,

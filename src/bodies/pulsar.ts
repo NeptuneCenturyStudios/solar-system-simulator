@@ -4,7 +4,7 @@ import { IStateDependencies, ISiphonTarget, IMassTransferBody } from '../interfa
 import { loadSrgbTexture } from '../drawing/textures';
 import { BodyTypeEnum } from '../utilities/utilities';
 import { IRotation } from '../physics/physics';
-import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, G } from '../utilities/consts';
+import { SCALE_FACTOR, SUN_MASS, EARTH_DIST } from '../utilities/consts';
 import { PulsarBeam } from '../effects/pulsar-beam';
 import { StarGlow } from '../effects/star-glow';
 import { AccretionDiskEffect, PULSAR_DISK_COLORS } from '../effects/accretion-disk';
@@ -246,7 +246,7 @@ export class Pulsar extends Star implements IMassTransferBody {
 
             const distSafe = Math.max(dist, 1);
             const transfer =
-                ((G * this.mass * star.mass) / (distSafe * distSafe)) *
+                ((this.deps.getG() * this.mass * star.mass) / (distSafe * distSafe)) *
                 SIPHON_MASS_TRANSFER_SCALE *
                 absDt;
 

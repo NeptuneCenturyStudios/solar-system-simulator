@@ -17,7 +17,7 @@ export class Ceres extends CelestialBody {
      * @param ceresTexture The texture to use for rendering Ceres.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, ceresTexture: THREE.Texture) {
-        const trajectory = calculateTrajectory(CERES_DISTANCE, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), CERES_DISTANCE, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: ceresTexture,

@@ -22,7 +22,7 @@ export class Uranus extends CelestialBody {
         scene: THREE.Scene,
         uranusTexture: THREE.Texture
     ) {
-        const trajectory = calculateTrajectory(URANUS_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), URANUS_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: uranusTexture,

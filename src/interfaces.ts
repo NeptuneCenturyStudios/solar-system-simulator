@@ -13,6 +13,7 @@ export interface IStateDependencies {
     addBody: (body: Body) => void;
     gizmo: CoordinateGizmo;
     getBodies: () => Body[];
+    getG: () => number;
 }
 
 /**

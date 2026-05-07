@@ -613,7 +613,7 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
             const diff = new THREE.Vector3().subVectors(other.mesh.position, body.mesh.position);
             const r = diff.length();
             if (r > 0.01) {
-                const force = (G * body.mass * other.mass) / (r * r);
+                const force = (simulationState.G * body.mass * other.mass) / (r * r);
                 totalForceExerted += force;
             }
         }
@@ -907,6 +907,7 @@ const simulationState = {
     bodies: [] as Body[],
     explosions: [] as ParticleExplosion[],
     showNames: false,
+    G,
 };
 
 // --- Flight mode state ---
@@ -1089,6 +1090,7 @@ const dependencies: IStateDependencies = {
         }
     },
     getBodies: () => simulationState.bodies,
+    getG: () => simulationState.G,
 };
 
 const VEL_SCALE = 546; // The multiplier used to visualize speed as arrow length (scaled)
@@ -2380,7 +2382,7 @@ function computeOrbitVelocityAtPos(
 
     if (distance === 0) return new THREE.Vector3();
 
-    const circularSpeed = Math.sqrt((G * parentMass) / distance);
+    const circularSpeed = Math.sqrt((simulationState.G * parentMass) / distance);
     const speed =
         orbitType === 'elliptical'
             ? circularSpeed * Math.sqrt(Math.max(0, 1 - eccentricity))
@@ -2727,7 +2729,7 @@ function createNewBody(
             // Step 5: orbital velocity perpendicular to radialDir
             //   Build a full orthonormal basis in the plane perpendicular to radialDir,
             //   then pick a random direction within it.
-            const circularSpeed = Math.sqrt((G * focusedBody.mass) / moonDistance);
+            const circularSpeed = Math.sqrt((simulationState.G * focusedBody.mass) / moonDistance);
             const orbitSpeed =
                 orbitType === 'elliptical'
                     ? circularSpeed * Math.sqrt(Math.max(0, 1 - 0.3))
@@ -3106,7 +3108,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
 
     // Vesta - second most massive asteroid, ~2.36 AU
     const vestaAngle = Math.random() * Math.PI * 2;
-    const vestaTrajectory = calculateTrajectory(VESTA_DISTANCE, SUN_MASS);
+    const vestaTrajectory = calculateTrajectory(dependencies.getG(), VESTA_DISTANCE, SUN_MASS);
     const vesta = new Asteroid(dependencies, scene, {
         radius: VESTA_RADIUS,
         color: 0xb8a890,
@@ -3131,7 +3133,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
 
     // Pallas - third most massive, ~2.77 AU
     const pallasAngle = Math.random() * Math.PI * 2;
-    const pallasTrajectory = calculateTrajectory(PALLAS_DISTANCE, SUN_MASS);
+    const pallasTrajectory = calculateTrajectory(dependencies.getG(), PALLAS_DISTANCE, SUN_MASS);
     const pallas = new Asteroid(dependencies, scene, {
         radius: PALLAS_RADIUS,
         color: 0x8a8a8a,
@@ -3156,7 +3158,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
 
     // Hygiea - fourth largest, ~3.14 AU
     const hygieaAngle = Math.random() * Math.PI * 2;
-    const hygieaTrajectory = calculateTrajectory(HYGIEA_DISTANCE, SUN_MASS);
+    const hygieaTrajectory = calculateTrajectory(dependencies.getG(), HYGIEA_DISTANCE, SUN_MASS);
     const hygiea = new Asteroid(dependencies, scene, {
         radius: HYGIEA_RADIUS,
         color: 0x7a7a7a,
@@ -5471,7 +5473,8 @@ function updateAutopilot(dt: number) {
         );
         ship.mesh.quaternion.rotateTowards(approachQuat, FLIGHT_MAX_TURN_RATE * dt);
         flightState.thrustActive = deltaLen > 1e-6;
-    } else if (autopilotState.phase === 'BRAKE') {
+    } else if (autopilotState.phase === 'BRAKE' && simulationState.G > 0) {
+
         // ── Trajectory-blend orbital insertion ────────────────────────────────
         // Key insight: both the "stop" vector (target.velocity) and the orbital
         // velocity vector have ZERO radial component in the target frame.  This
@@ -5492,7 +5495,7 @@ function updateAutopilot(dt: number) {
             tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
         }
 
-        const vOrbit = Math.sqrt((G * target.mass) / r);
+        const vOrbit = Math.sqrt((simulationState.G * target.mass) / r);
 
         // α = 0 at brake entry, 1 at orbitRadius.  Smoothstep eases the blend so
         // most of the approach velocity is killed before the hard turn to orbit.
@@ -5522,7 +5525,7 @@ function updateAutopilot(dt: number) {
 
         // Explicit gravity compensation — same taper as CIRCULARIZE.
         // Prevents gravity accumulating inward velocity faster than thrust can counter it.
-        const gravAccel = (G * target.mass) / (r * r);
+        const gravAccel = (simulationState.G * target.mass) / (r * r);
         const tangentialSpeed = relVel.dot(tangential);
         const speedRatio = Math.max(0, Math.min(1, tangentialSpeed / vOrbit));
         const gravCompFraction = 1 - speedRatio * speedRatio;
@@ -5546,7 +5549,7 @@ function updateAutopilot(dt: number) {
         } else {
             flightState.thrustActive = false;
         }
-    } else if (autopilotState.phase === 'CIRCULARIZE') {
+    } else if (autopilotState.phase === 'CIRCULARIZE' && simulationState.G > 0) {
         // ── Gradually steer into circular orbit ───────────────────────────────
         // Compute the desired orbital velocity for the ship's current position,
         // then use the same desired-velocity controller used in APPROACH/BRAKE to
@@ -5566,12 +5569,12 @@ function updateAutopilot(dt: number) {
             tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
         }
 
-        const vOrbit = Math.sqrt((G * target.mass) / r);
+        const vOrbit = Math.sqrt((simulationState.G * target.mass) / r);
 
         // ── Gravity-scaled minimum rate for velocity rotation ─────────────────
         const bodyRadius = target.radius ?? 10;
         const altitude = Math.max(r - bodyRadius, 1);
-        const gravAccel = (G * target.mass) / (r * r);
+        const gravAccel = (simulationState.G * target.mass) / (r * r);
         const safeRate =
             AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN * vOrbit * Math.sqrt(gravAccel / altitude);
         const effectiveRate = Math.max(AUTOPILOT_CIRCULARIZE_RATE, safeRate);
@@ -6404,6 +6407,10 @@ managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = checked;
     }
+});
+
+managementPanel.on('gChange', ({ value }: { value: number }) => {
+    simulationState.G = value;
 });
 
 const enableSkydomeCheckbox = document.getElementById('enableSkydome') as HTMLInputElement;

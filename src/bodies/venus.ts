@@ -20,7 +20,7 @@ export class Venus extends CelestialBody {
      * @param scene The THREE.Scene to which Venus belongs.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-        const trajectory = calculateTrajectory(VENUS_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), VENUS_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: venusTexture,
@@ -34,10 +34,10 @@ export class Venus extends CelestialBody {
         // Venus's rotation axis is tilted about 177.4 degrees (retrograde rotation), and it rotates once every 243 Earth days.
         // Need to convert the axis degree tilt to a rotation axis vector. The tilt is around the X-axis, so we can calculate the rotation axis as follows:
         const tiltRad = VENUS_AXIS * Math.PI / 180;
-                const rotation: IRotation = {
-                    axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
-                    speed: VENUS_ROT_SPEED
-                };
+        const rotation: IRotation = {
+            axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
+            speed: VENUS_ROT_SPEED
+        };
 
         super(
             dependencies,

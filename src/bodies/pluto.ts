@@ -18,7 +18,7 @@ export class Pluto extends CelestialBody {
      * @param plutoTexture The texture to use for rendering Pluto.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, plutoTexture: THREE.Texture) {
-        const trajectory = calculateTrajectory(PLUTO_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), PLUTO_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: plutoTexture,

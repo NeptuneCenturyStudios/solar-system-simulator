@@ -482,7 +482,7 @@ export class CelestialBody extends Body {
 
     createMoon(scene: THREE.Scene, config: IMoonCreationOptions) {
         // Calculate orbital trajectory based on parent's mass
-        const trajectory = calculateTrajectory(config.distance, this.mass);
+        const trajectory = calculateTrajectory(this.deps.getG(), config.distance, this.mass);
 
         // Default angle is 0, but can be specified for multiple moons
         const angle = config.angle !== undefined ? config.angle : 0;
