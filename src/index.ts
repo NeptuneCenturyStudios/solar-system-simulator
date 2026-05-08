@@ -2849,6 +2849,7 @@ function createNewBody(
                 mass: cometMass,
                 id: createUniqueId('comet'),
                 name: generateIAUName(BodyTypeEnum.Comet),
+                rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.05 },
             },
             cometMaterial
         );

@@ -96,12 +96,22 @@ export function randomBlackHoleParams(
 // ---------------------------------------------------------------------------
 // Planet
 // ---------------------------------------------------------------------------
+export enum PlanetTypeEnum {
+    Solid = 'solid',
+    GasGiant = 'gas_giant',
+    IceGiant = 'ice_giant',
+    Volcanic = 'volcanic',
+    Ocean = 'ocean',
+    Frozen = 'frozen',
+    Desert = 'desert',
+}
 
 export interface PlanetParams {
     mass: number;
     radius: number;
     rotationSpeed: number;
     bodyType: BodyTypeEnum;
+    bodySubtype?: PlanetTypeEnum;
 }
 
 /**

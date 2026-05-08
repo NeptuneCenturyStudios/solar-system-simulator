@@ -12,6 +12,9 @@ import { IStateDependencies } from '../interfaces';
 export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
     pos: THREE.Vector3;
     vel: THREE.Vector3;
+    rotation: IRotation;
+    trailColor?: number;
+    maxTrail?: number;
 }
 
 export interface IMoonCreationOptions extends IBodyCreationOptions {
@@ -33,7 +36,7 @@ export interface ITidalLockOptions {
  * This class represents a celestial body with physical properties, rendering capabilities, and optional features like rings, atmosphere, and tidal locking.
  */
 export class CelestialBody extends Body {
-    deps: IStateDependencies;
+    dependencies: IStateDependencies;
     scene: THREE.Scene;
     color: number;
     rotation: IRotation;
@@ -60,7 +63,7 @@ export class CelestialBody extends Body {
 
     /**
      * Constructs a new CelestialBody with advanced features like trails, rings, clouds, and tidal locking.
-     * @param deps State dependencies for the simulation.
+     * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which the body belongs.
      * @param mass The mass of the body.
      * @param radius The radius of the body.
@@ -73,7 +76,7 @@ export class CelestialBody extends Body {
      * @param bodyType The type of the body (enum).
      */
     constructor(
-        deps = {} as IStateDependencies,
+        dependencies: IStateDependencies,
         scene: THREE.Scene,
         radius: number,
         color: number,
@@ -108,10 +111,10 @@ export class CelestialBody extends Body {
                 ? geometryFactory(radius)
                 : new THREE.SphereGeometry(radius, 32, 32);
 
-        super(deps, scene, mass, radius, pos, vel, geometry, material, id, name, bodyType);
+        super(dependencies, scene, mass, radius, pos, vel, geometry, material, id, name, bodyType);
 
         // Set dependencies
-        this.deps = deps || {};
+        this.dependencies = dependencies;
         this.scene = scene;
         this.radius = radius;
         this.mass = mass;
@@ -219,22 +222,22 @@ export class CelestialBody extends Body {
         super.die();
 
         // Log the death event
-        if (typeof this.deps.addEvent !== 'undefined') {
-            this.deps.addEvent(`${this.name} destroyed`);
+        if (typeof this.dependencies.addEvent !== 'undefined') {
+            this.dependencies.addEvent(`${this.name} destroyed`);
         }
 
         // Only create explosion if not skipped (sun uses supernova instead)
         if (!skipExplosion) {
             try {
                 const exp = new ParticleExplosion(
-                    this.deps,
+                    this.dependencies,
                     this.scene,
                     this.mesh.position.clone(),
                     this.color,
                     this.radius
                 );
 
-                this.deps.addExplosion(exp);
+                this.dependencies.addExplosion(exp);
 
                 triggerScreenFlash();
             } catch {
@@ -295,8 +298,8 @@ export class CelestialBody extends Body {
 
         // Hide velocity arrow and gizmo if this body was selected
         try {
-            if (this.deps?.gizmo?.target === this) {
-                this.deps.gizmo.attach(null);
+            if (this.dependencies?.gizmo?.target === this) {
+                this.dependencies.gizmo.attach(null);
             }
         } catch {
             // ignore
@@ -486,7 +489,7 @@ export class CelestialBody extends Body {
 
     createMoon(scene: THREE.Scene, config: IMoonCreationOptions) {
         // Calculate orbital trajectory based on parent's mass
-        const trajectory = calculateTrajectory(this.deps.getG(), config.distance, this.mass);
+        const trajectory = calculateTrajectory(this.dependencies.getG(), config.distance, this.mass);
 
         // Default angle is 0, but can be specified for multiple moons
         const angle = config.angle !== undefined ? config.angle : 0;
@@ -535,7 +538,7 @@ export class CelestialBody extends Body {
         const omega = r0.clone().cross(vrel0).length() / rLenSq;
 
         const moon = new CelestialBody(
-            this.deps,
+            this.dependencies,
             scene,
             config.radius,
             0xffffff, // Color is determined by texture, so keep material color white

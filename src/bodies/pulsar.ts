@@ -208,7 +208,7 @@ export class Pulsar extends Star implements IMassTransferBody {
         if (dt === 0 || this._isDisposed) return;
 
         const absDt = Math.abs(dt);
-        const bodies = this.deps.getBodies();
+        const bodies = this.dependencies.getBodies();
 
         const stars = bodies.filter(
             (b): b is typeof b & ISiphonTarget =>
@@ -232,7 +232,7 @@ export class Pulsar extends Star implements IMassTransferBody {
 
             if (!this.siphonEffects.has(star.id)) {
                 const effect = new MassSiphonEffect(
-                    this.deps,
+                    this.dependencies,
                     this.scene,
                     star,
                     this,
@@ -241,12 +241,12 @@ export class Pulsar extends Star implements IMassTransferBody {
                     { r: 0.5, g: 0.85, b: 1.0 }
                 );
                 this.siphonEffects.set(star.id, effect);
-                this.deps.addEvent(`${this.name} is siphoning mass from ${star.name}`);
+                this.dependencies.addEvent(`${this.name} is siphoning mass from ${star.name}`);
             }
 
             const distSafe = Math.max(dist, 1);
             const transfer =
-                ((this.deps.getG() * this.mass * star.mass) / (distSafe * distSafe)) *
+                ((this.dependencies.getG() * this.mass * star.mass) / (distSafe * distSafe)) *
                 SIPHON_MASS_TRANSFER_SCALE *
                 absDt;
 
@@ -276,7 +276,7 @@ export class Pulsar extends Star implements IMassTransferBody {
                 this.siphonEffects.get(star.id)?.stopSpawning();
                 inRangeIds.delete(star.id);
                 if (depleted && !massGone) {
-                    this.deps.addEvent(`${star.name} siphoned into a brown dwarf remnant`);
+                    this.dependencies.addEvent(`${star.name} siphoned into a brown dwarf remnant`);
                 }
             }
         }

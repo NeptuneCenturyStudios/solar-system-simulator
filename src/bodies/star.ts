@@ -4,7 +4,6 @@ import { BodyTypeEnum, isBodyType } from '../utilities/utilities';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { IStateDependencies } from '../interfaces';
-import { IRotation } from '../physics/physics';
 
 /**
  * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.
@@ -13,7 +12,6 @@ export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
     temperature: number;
     lightIntensity: number;
     lightDistance: number;
-    rotation: IRotation;
 }
 
 /**
@@ -31,7 +29,6 @@ export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
  * Handles star-specific physics, rendering, and lifecycle events.
  */
 export class Star extends CelestialBody {
-    dependencies: IStateDependencies;
     textures: {
         sunTexture: THREE.Texture;
         redStarTexture: THREE.Texture | null;
@@ -118,7 +115,6 @@ export class Star extends CelestialBody {
             starMaterial
         );
 
-        this.dependencies = dependencies;
         this.textures = textures;
         this.lightIntensity = options.lightIntensity;
 
@@ -293,7 +289,7 @@ export class Star extends CelestialBody {
     setLightIntensity(intensity: number) {
         this.lightIntensity = intensity;
         if (this.sunLight) {
-            this.sunLight.intensity = intensity / 100000000;
+            this.sunLight.intensity = intensity / 20000000  ;
         }
     }
 

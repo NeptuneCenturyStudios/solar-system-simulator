@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, EARTH_MASS, EARTH_DIST, EARTH_RADIUS, EARTH_AXIS, EARTH_ROT_SPEED } from '../utilities/consts.js';
-import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
+import { createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
-import { CelestialBody } from './celestial-body';
 import { IStateDependencies } from '../interfaces.js';
+import { Planet } from './planet.js';
+import { PlanetTypeEnum } from '../utilities/body-params.js';
 
 const earthDayTexture = loadSrgbTexture('./assets/textures/earth_day.jpg');
 const earthCloudsTexture = loadSrgbTexture('./assets/textures/earth_clouds.jpg');
@@ -15,7 +16,7 @@ earthCloudsTexture.wrapT = THREE.RepeatWrapping;
  * Represents the planet Earth in the simulation, including its surface and cloud layer.
  * Sets up Earth's trajectory, material, and cloud rendering.
  */
-export class Earth extends CelestialBody {
+export class Earth extends Planet {
     /**
      * Constructs a new Earth object with its unique properties, orbit, and cloud layer.
      * @param dependencies State dependencies for the simulation.
@@ -40,19 +41,18 @@ export class Earth extends CelestialBody {
         super(
             dependencies,
             scene,
-            EARTH_RADIUS,
-            0x2266ff,
-            earthTrajectory.pos,
-            earthTrajectory.vel,
-            EARTH_MASS, // Mass
-            createUniqueId('earth'),
-            'Earth',
-            BodyTypeEnum.Planet,
-            0xffffff,
-            4500,
-            false,
-            rotation,
-            undefined,
+            {
+                id: createUniqueId('earth'),
+                name: 'Earth',
+                mass: EARTH_MASS,
+                radius: EARTH_RADIUS,
+                pos: earthTrajectory.pos,
+                vel: earthTrajectory.vel,
+                rotation,
+                trailColor: 0x88ccff,
+                maxTrail: 4500,
+                bodySubtype: PlanetTypeEnum.Solid,
+            },
             material
         );
 

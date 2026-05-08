@@ -88,10 +88,10 @@ export class Comet extends CelestialBody {
             options.id,
             options.name,
             BodyTypeEnum.Comet,
-            0xaaaaaa,
-            5000,
+            options.trailColor ?? 0xaaaaaa,
+            options.maxTrail ?? 2000,
             false,
-            { axis: new THREE.Vector3(0, 1, 0), speed: 0.35 },
+            options.rotation,
             (r) => createRandomPolyhedron(r),
             material
         );
