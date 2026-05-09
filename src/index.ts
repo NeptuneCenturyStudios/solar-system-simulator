@@ -4248,7 +4248,7 @@ function animate() {
     const oldPos = focusObj && focusObj.mesh ? focusObj.mesh.position.clone() : new THREE.Vector3();
 
     // Physics integration loop
-    updateSimulation(simulationState, autopilotState, steps, dt, updateAutopilot, camera.position);
+    updateSimulation(simulationState, autopilotState, steps, dt, updateAutopilot);
 
     // Collision detection and trail updates (outside integration loop for performance)
     if (!isRepositioning) {

@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { G } from '../utilities/consts';
-import { Comet } from '../bodies/comet';
 
 /**
  * Represents the rotation of a body in 3D space
@@ -99,8 +98,7 @@ export function updateSimulation(
     autopilotState: IAutopilotState,
     steps: number,
     dt: number,
-    updateAutopilot: (dt: number) => void,
-    cameraPosition: THREE.Vector3
+    updateAutopilot: (dt: number) => void
 ) {
     // Physics integration loop
     for (let i = 0; i < steps; i++) {
@@ -115,11 +113,7 @@ export function updateSimulation(
         // Apply accelerations to positions
         for (const body of simulationState.bodies) {
             if (body && !body._isDisposed && body.mesh && body.tempAcc) {
-                if (body instanceof Comet) {
-                    (body as Comet).update(body.tempAcc, dt, cameraPosition);
-                } else {
-                    body.update(body.tempAcc, dt);
-                }
+                body.update(body.tempAcc, dt);
             }
         }
     }

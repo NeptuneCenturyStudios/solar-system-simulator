@@ -162,25 +162,12 @@ export class Comet extends CelestialBody {
         this.scene.add(this.tailParticles);
     }
 
-
-    /**
-     * Updates the comet's state and tail, using camera-relative rendering for the tail.
-     * @param acc Acceleration vector.
-     * @param dt Delta time.
-     * @param cameraPos The current camera position (for camera-relative rendering).
-     */
-    update(acc: THREE.Vector3, dt: number, cameraPos?: THREE.Vector3) {
+    update(acc: THREE.Vector3, dt: number) {
         super.update(acc, dt);
-        // Pass cameraPos to updateTail if provided, else fallback to world origin
-        this.updateTail(dt, cameraPos ?? new THREE.Vector3(0, 0, 0));
+        this.updateTail(dt);
     }
 
-    /**
-     * Updates the comet's tail, rendering particles relative to the camera position.
-     * @param dt Delta time.
-     * @param cameraPos The current camera position (for camera-relative rendering).
-     */
-    updateTail(dt: number, cameraPos: THREE.Vector3) {
+    updateTail(dt: number) {
         if (
             !this.mesh ||
             !this.tailParticles ||
@@ -201,10 +188,6 @@ export class Comet extends CelestialBody {
         } else {
             this.tailParticles.visible = true;
         }
-
-        // Camera-relative rendering: anchor tailParticles at cameraPos
-        this.tailParticles.position.copy(cameraPos);
-        const cx = cameraPos.x, cy = cameraPos.y, cz = cameraPos.z;
 
         // Calculate distance to sun (optimized with squared distance)
         const distToSunSq =
@@ -247,7 +230,6 @@ export class Comet extends CelestialBody {
 
             // Move particle
             const idx = i * 3;
-            // Update world position
             this.tailPos[idx] += vel.vel.x * dtScaled;
             this.tailPos[idx + 1] += vel.vel.y * dtScaled;
             this.tailPos[idx + 2] += vel.vel.z * dtScaled;
@@ -273,14 +255,6 @@ export class Comet extends CelestialBody {
                 this.tailColors[idx + 1] = color.g;
                 this.tailColors[idx + 2] = color.b;
             }
-
-            // Store camera-relative position for rendering
-            this.tailGeo.attributes.position.setXYZ(
-                i,
-                this.tailPos[idx] - cx,
-                this.tailPos[idx + 1] - cy,
-                this.tailPos[idx + 2] - cz
-            );
 
             // Fade based on life ratio and intensity
             this.tailOpacities[i] = (1 - vel.life) * tailIntensity;
