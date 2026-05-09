@@ -1,4 +1,3 @@
-
 // === Global Performance Settings ===
 /**
  * Controls whether particle effects are rendered.
@@ -20,13 +19,20 @@ export const MIN_PARTICLE_ALPHA = 0.7;
 export const MAX_PARTICLE_ALPHA = 1.0;
 
 // === Simulation Scale and Physics Constants ===
-export const SCALE_FACTOR = 2;
+export const SCALE_FACTOR = 1;
+export const G_SCALE = 1;//1000000;
 // Tuned so that SUN_MASS = 33,000,000 exactly
 export const MASS_SCALE = 6.025757575757576e22;
-export const RADIUS_SCALE = 1000;
-export const DIST_SCALE = 1000;
-export const G = 0.00408;
-export const C = (299792.458 / DIST_SCALE) * SCALE_FACTOR; // Speed of light in vacuum (units/s)
+export const RADIUS_SCALE = 1;
+export const DIST_SCALE = 1;
+// 1. Keep the physically-derived base time scale
+export const BASE_TIME_SCALE = Math.sqrt(DIST_SCALE ** 3 / MASS_SCALE);
+// 2. Choose a user multiplier so that at warp 1, dt matches the old behavior
+export const USER_TIME_MULTIPLIER = 1 / BASE_TIME_SCALE;
+// 3. Final TIME_SCALE used in dt
+export const TIME_SCALE = BASE_TIME_SCALE * USER_TIME_MULTIPLIER; // ≈ 1
+export const G = 6.6743e-20 * (MASS_SCALE / DIST_SCALE ** 3) * SCALE_FACTOR * G_SCALE; //0.00408; // 6.67430e-20; // km^3 / kg / s^2 //
+export const C = (299792.458 / DIST_SCALE) * SCALE_FACTOR; // * Math.sqrt(G_SCALE) Speed of light in vacuum (units/s)
 
 // === Planetary System: Mass ===
 // Masses use: (real-world mass in kg / MASS_SCALE) * SCALE_FACTOR
@@ -79,7 +85,6 @@ export const URANUS_DIST = (2870990000 / DIST_SCALE) * SCALE_FACTOR;
 export const NEPTUNE_DIST = (4504000000 / DIST_SCALE) * SCALE_FACTOR;
 export const PLUTO_DIST = (5906380000 / DIST_SCALE) * SCALE_FACTOR;
 
-
 // === Planetary System: Rotation Axis (degrees) ===
 export const SUN_AXIS = 7.25;
 export const MERCURY_AXIS = 0.034;
@@ -96,7 +101,7 @@ export const PLUTO_AXIS = 119.61;
 export const MERCURY_ORBITAL_PERIOD_REAL = 87.969 * 24 * 3600; // days to seconds
 export const VENUS_ORBITAL_PERIOD_REAL = 224.701 * 24 * 3600;
 export const EARTH_ORBITAL_PERIOD_REAL = 365.256 * 24 * 3600;
-export const MARS_ORBITAL_PERIOD_REAL = 686.980 * 24 * 3600;
+export const MARS_ORBITAL_PERIOD_REAL = 686.98 * 24 * 3600;
 export const JUPITER_ORBITAL_PERIOD_REAL = 4332.59 * 24 * 3600;
 export const SATURN_ORBITAL_PERIOD_REAL = 10759.22 * 24 * 3600;
 export const URANUS_ORBITAL_PERIOD_REAL = 30685.4 * 24 * 3600;
@@ -111,29 +116,38 @@ function calcSimOrbitalPeriod(r_sim: number, G: number, M_sun: number): number {
 }
 
 export const SUN_TIME_SCALE = 1;
-export const MERCURY_TIME_SCALE = MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, G, SUN_MASS);
-export const VENUS_TIME_SCALE = VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, G, SUN_MASS);
-export const EARTH_TIME_SCALE = EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, G, SUN_MASS);
-export const MARS_TIME_SCALE = MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, G, SUN_MASS);
-export const JUPITER_TIME_SCALE = JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, G, SUN_MASS);
-export const SATURN_TIME_SCALE = SATURN_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(SATURN_DIST, G, SUN_MASS);
-export const URANUS_TIME_SCALE = URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, G, SUN_MASS);
-export const NEPTUNE_TIME_SCALE = NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, G, SUN_MASS);
-export const PLUTO_TIME_SCALE = PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, G, SUN_MASS);
+export const MERCURY_TIME_SCALE =
+    MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, G, SUN_MASS);
+export const VENUS_TIME_SCALE =
+    VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, G, SUN_MASS);
+export const EARTH_TIME_SCALE =
+    EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, G, SUN_MASS);
+export const MARS_TIME_SCALE =
+    MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, G, SUN_MASS);
+export const JUPITER_TIME_SCALE =
+    JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, G, SUN_MASS);
+export const SATURN_TIME_SCALE =
+    SATURN_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(SATURN_DIST, G, SUN_MASS);
+export const URANUS_TIME_SCALE =
+    URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, G, SUN_MASS);
+export const NEPTUNE_TIME_SCALE =
+    NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, G, SUN_MASS);
+export const PLUTO_TIME_SCALE =
+    PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, G, SUN_MASS);
 
 // === Sun: Rotation Speed ===
-export const SUN_ROT_SPEED = (2 * Math.PI / (25.38 * 3600)) * SUN_TIME_SCALE; // ~2.86e-6 radians/sec
+export const SUN_ROT_SPEED = ((2 * Math.PI) / (25.38 * 3600)) * SUN_TIME_SCALE; // ~2.86e-6 radians/sec
 // === Planetary System: Rotation Speed (radians/sec, scaled for simulation) ===
 // Angular speed = 2 * PI / (sidereal day in seconds), then scaled by per-planet time scale
-export const MERCURY_ROT_SPEED = (2 * Math.PI / (1407.5 * 3600)) * MERCURY_TIME_SCALE; // ~1.24e-6
-export const VENUS_ROT_SPEED = (-2 * Math.PI / (5832.5 * 3600)) * VENUS_TIME_SCALE; // ~-2.98e-7 (retrograde)
-export const EARTH_ROT_SPEED = (2 * Math.PI / (23.934 * 3600)) * EARTH_TIME_SCALE; // ~7.29e-5
-export const MARS_ROT_SPEED = (2 * Math.PI / (24.623 * 3600)) * MARS_TIME_SCALE; // ~7.09e-5
-export const JUPITER_ROT_SPEED = (2 * Math.PI / (9.925 * 3600)) * JUPITER_TIME_SCALE; // ~1.76e-4
-export const SATURN_ROT_SPEED = (2 * Math.PI / (10.656 * 3600)) * SATURN_TIME_SCALE; // ~1.64e-4
-export const URANUS_ROT_SPEED = (-2 * Math.PI / (17.24 * 3600)) * URANUS_TIME_SCALE; // ~-1.01e-4 (retrograde)
-export const NEPTUNE_ROT_SPEED = (2 * Math.PI / (16.11 * 3600)) * NEPTUNE_TIME_SCALE; // ~1.08e-4
-export const PLUTO_ROT_SPEED = (-2 * Math.PI / (153.3 * 3600)) * PLUTO_TIME_SCALE; // ~-1.14e-5 (retrograde)
+export const MERCURY_ROT_SPEED = ((2 * Math.PI) / (1407.5 * 3600)) * MERCURY_TIME_SCALE; // ~1.24e-6
+export const VENUS_ROT_SPEED = ((-2 * Math.PI) / (5832.5 * 3600)) * VENUS_TIME_SCALE; // ~-2.98e-7 (retrograde)
+export const EARTH_ROT_SPEED = ((2 * Math.PI) / (23.934 * 3600)) * EARTH_TIME_SCALE; // ~7.29e-5
+export const MARS_ROT_SPEED = ((2 * Math.PI) / (24.623 * 3600)) * MARS_TIME_SCALE; // ~7.09e-5
+export const JUPITER_ROT_SPEED = ((2 * Math.PI) / (9.925 * 3600)) * JUPITER_TIME_SCALE; // ~1.76e-4
+export const SATURN_ROT_SPEED = ((2 * Math.PI) / (10.656 * 3600)) * SATURN_TIME_SCALE; // ~1.64e-4
+export const URANUS_ROT_SPEED = ((-2 * Math.PI) / (17.24 * 3600)) * URANUS_TIME_SCALE; // ~-1.01e-4 (retrograde)
+export const NEPTUNE_ROT_SPEED = ((2 * Math.PI) / (16.11 * 3600)) * NEPTUNE_TIME_SCALE; // ~1.08e-4
+export const PLUTO_ROT_SPEED = ((-2 * Math.PI) / (153.3 * 3600)) * PLUTO_TIME_SCALE; // ~-1.14e-5 (retrograde)
 
 // === Asteroids: Mass ===
 export const CERES_MASS = (9.393e20 / MASS_SCALE) * SCALE_FACTOR;
@@ -161,13 +175,13 @@ export const COMET_PERIHELION_DIST = (88000000 / DIST_SCALE) * SCALE_FACTOR;
 export const COMET_APHELION_DIST = (5250000000 / DIST_SCALE) * SCALE_FACTOR;
 
 // === Flight tuning constants ===
-export const FLIGHT_MAX_SPEED = C * 0.99; // normal max speed cap (units/s) of light speed, chosen to allow for a good sense of speed while still leaving room for boost and warp speeds above it
-export const FLIGHT_BOOST_MAX_SPEED = 20 * FLIGHT_MAX_SPEED; // boost ceiling = 10× normal max speed
+export const FLIGHT_MAX_SPEED = C * 0.5; // normal max speed cap (units/s) of light speed, chosen to allow for a good sense of speed while still leaving room for boost and warp speeds above it
+export const FLIGHT_BOOST_MAX_SPEED = C * 10; // boost ceiling = 10× normal max speed
 export const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED / 10; // acceleration rate while W/S held (u/s²)
 export const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED / 10; // deceleration rate while W/S held (u/s²)
 export const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED / 10; // acceleration rate while Shift held (u/s²)
 export const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED / 10; // decel rate after boost ends (u/s²)
-export const FLIGHT_WARP_SPEED = 20 * FLIGHT_BOOST_MAX_SPEED; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
+export const FLIGHT_WARP_SPEED = C * 100; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
 export const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED / 2; // decel rate after warp ends (u/s²)
 /** Camera distance (u) at which the warp tunnel is still fully opaque. */
 export const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;

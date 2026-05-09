@@ -121,7 +121,7 @@
                             id="timeScale"
                             min="-1000.0"
                             max="1000.0"
-                            step="0.01"
+                            step=".01"
                             value="1"
                         />
                         <button class="btn-slider-reset" id="timeScaleResetBtn" title="Reset to 1x">
@@ -139,8 +139,8 @@
                         <input
                             type="range"
                             id="substepsSlider"
-                            min="16"
-                            max="128"
+                            min="8"
+                            max="512"
                             step="8"
                             value="64"
                             title="Controls how many physics steps are calculated per frame. Higher values improve orbital accuracy but use more CPU. Lower values are faster but less precise."
@@ -259,16 +259,16 @@
                     <input type="checkbox" id="enableStarDeath" /> Enable Natural Star Death
                 </label>
                 <div class="control-group">
-                    <label>Gravitational Constant (G)
-                        <span id="gravitational-constant-val" class="val-display">0.00408</span>
+                    <label>Gravitational Constant Multiplier (G)
+                        <span id="gravitational-constant-val" class="val-display">1</span>
                     </label>
                     <input
                         type="range"
                         id="gravitationalConstantSlider"
                         min="0"
                         max="10"
-                        step="0.00001"
-                        value="0.00408"
+                        step="0.1"
+                        value="1"
                     />
                 </div>
                 <button id="addBodyBtn" class="btn-with-icon">

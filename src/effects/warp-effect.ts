@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SCALE_FACTOR } from '../utilities/consts.js';
+import { DIST_SCALE, SCALE_FACTOR } from '../utilities/consts.js';
 
 // ─── Tunnel geometry constants ───────────────────────────────────────────────
 const SF = SCALE_FACTOR;
@@ -7,21 +7,21 @@ const SF = SCALE_FACTOR;
 const N_STREAKS = 750;
 
 // How far ahead of the ship (along its +Z axis) new streaks spawn.
-const FAR_SPAWN_Z = 3000 * SF;
+const FAR_SPAWN_Z = (3000000 / DIST_SCALE) * SF;
 // Past-the-ship Z at which a streak is fully gone and re-seeded.
-const EXPIRE_Z = -2000 * SF;
+const EXPIRE_Z = (-2000000 / DIST_SCALE) * SF;
 
 // Radial extents of the tunnel cylinder.
-const INNER_R = 10 * SF;
-const OUTER_R = 200 * SF;
+const INNER_R = (10000 / DIST_SCALE) * SF;
+const OUTER_R = (200000 / DIST_SCALE) * SF;
 
 // Per-streak length range (along Z axis).
-const MIN_LEN = 40 * SF;
-const MAX_LEN = 200 * SF;
+const MIN_LEN = (40000 / DIST_SCALE) * SF;
+const MAX_LEN = (200000 / DIST_SCALE) * SF;
 
 // Per-streak travel speed toward the camera (u/s, along -Z in ship space).
-const MIN_SPD = 500 * SF;
-const MAX_SPD = 1500 * SF;
+const MIN_SPD = (500000 / DIST_SCALE) * SF;
+const MAX_SPD = (1500000 / DIST_SCALE) * SF;
 
 // Band split: fraction of streaks allocated to the dense outer ring.
 const OUTER_BAND_FRAC = 0.7;

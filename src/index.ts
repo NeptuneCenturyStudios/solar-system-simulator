@@ -75,6 +75,7 @@ import {
     WARP_FULL_VIS_DIST,
     WARP_SHAKE_MAG,
     FLIGHT_BOOST_ACCEL,
+    TIME_SCALE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities';
@@ -613,7 +614,7 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
             const diff = new THREE.Vector3().subVectors(other.mesh.position, body.mesh.position);
             const r = diff.length();
             if (r > 0.01) {
-                const force = (simulationState.G * body.mass * other.mass) / (r * r);
+                const force = (G * simulationState.gMultiplier * body.mass * other.mass) / (r * r);
                 totalForceExerted += force;
             }
         }
@@ -657,7 +658,7 @@ const CAMERA_FAR_PLANE = PLUTO_DIST + 300000 * SCALE_FACTOR + 2000000 * SCALE_FA
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
-    0.1,
+    0.01,
     CAMERA_FAR_PLANE
 );
 const MAX_ZOOM_OUT_DISTANCE = camera.far * 0.8;
@@ -907,7 +908,7 @@ const simulationState = {
     bodies: [] as Body[],
     explosions: [] as ParticleExplosion[],
     showNames: false,
-    G,
+    gMultiplier: 1,
 };
 
 // --- Flight mode state ---
@@ -978,8 +979,6 @@ const autopilotState: IAutopilotState = {
      *  'orbital velocity' as the ship closes on the orbit radius. */
     brakeEntryDistance: 0,
 };
-
-
 
 // Autopilot tuning constants
 /** Thrust acceleration used by autopilot during approach (u/s²). */
@@ -1090,7 +1089,7 @@ const dependencies: IStateDependencies = {
         }
     },
     getBodies: () => simulationState.bodies,
-    getG: () => simulationState.G,
+    getG: () => G * simulationState.gMultiplier,
 };
 
 const VEL_SCALE = 546; // The multiplier used to visualize speed as arrow length (scaled)
@@ -2382,7 +2381,7 @@ function computeOrbitVelocityAtPos(
 
     if (distance === 0) return new THREE.Vector3();
 
-    const circularSpeed = Math.sqrt((simulationState.G * parentMass) / distance);
+    const circularSpeed = Math.sqrt((G * simulationState.gMultiplier * parentMass) / distance);
     const speed =
         orbitType === 'elliptical'
             ? circularSpeed * Math.sqrt(Math.max(0, 1 - eccentricity))
@@ -2710,7 +2709,9 @@ function createNewBody(
             // Step 5: orbital velocity perpendicular to radialDir
             //   Build a full orthonormal basis in the plane perpendicular to radialDir,
             //   then pick a random direction within it.
-            const circularSpeed = Math.sqrt((simulationState.G * focusedBody.mass) / moonDistance);
+            const circularSpeed = Math.sqrt(
+                (G * simulationState.gMultiplier * focusedBody.mass) / moonDistance
+            );
             const orbitSpeed =
                 orbitType === 'elliptical'
                     ? circularSpeed * Math.sqrt(Math.max(0, 1 - 0.3))
@@ -4073,7 +4074,7 @@ function animate() {
     requestAnimationFrame(animate);
     const tScale = timeScale;
     const steps = stepsPerFrame;
-    const dt = (SIM.BASE_FRAME_DT * tScale) / steps;
+    const dt = (SIM.BASE_FRAME_DT * TIME_SCALE * tScale) / steps;
     const dtTotal = dt * steps;
 
     // Surface camera transform update.
@@ -4247,7 +4248,7 @@ function animate() {
     const oldPos = focusObj && focusObj.mesh ? focusObj.mesh.position.clone() : new THREE.Vector3();
 
     // Physics integration loop
-    updateSimulation(simulationState, autopilotState, steps, dt, updateAutopilot);
+    updateSimulation(simulationState, autopilotState, steps, dt, updateAutopilot, camera.position);
 
     // Collision detection and trail updates (outside integration loop for performance)
     if (!isRepositioning) {
@@ -5445,8 +5446,7 @@ function updateAutopilot(dt: number) {
         );
         ship.mesh.quaternion.rotateTowards(approachQuat, FLIGHT_MAX_TURN_RATE * dt);
         flightState.thrustActive = deltaLen > 1e-6;
-    } else if (autopilotState.phase === 'BRAKE' && simulationState.G > 0) {
-
+    } else if (autopilotState.phase === 'BRAKE' && G * simulationState.gMultiplier > 0) {
         // ── Trajectory-blend orbital insertion ────────────────────────────────
         // Key insight: both the "stop" vector (target.velocity) and the orbital
         // velocity vector have ZERO radial component in the target frame.  This
@@ -5467,7 +5467,7 @@ function updateAutopilot(dt: number) {
             tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
         }
 
-        const vOrbit = Math.sqrt((simulationState.G * target.mass) / r);
+        const vOrbit = Math.sqrt((G * simulationState.gMultiplier * target.mass) / r);
 
         // α = 0 at brake entry, 1 at orbitRadius.  Smoothstep eases the blend so
         // most of the approach velocity is killed before the hard turn to orbit.
@@ -5497,7 +5497,7 @@ function updateAutopilot(dt: number) {
 
         // Explicit gravity compensation — same taper as CIRCULARIZE.
         // Prevents gravity accumulating inward velocity faster than thrust can counter it.
-        const gravAccel = (simulationState.G * target.mass) / (r * r);
+        const gravAccel = (G * simulationState.gMultiplier * target.mass) / (r * r);
         const tangentialSpeed = relVel.dot(tangential);
         const speedRatio = Math.max(0, Math.min(1, tangentialSpeed / vOrbit));
         const gravCompFraction = 1 - speedRatio * speedRatio;
@@ -5521,7 +5521,7 @@ function updateAutopilot(dt: number) {
         } else {
             flightState.thrustActive = false;
         }
-    } else if (autopilotState.phase === 'CIRCULARIZE' && simulationState.G > 0) {
+    } else if (autopilotState.phase === 'CIRCULARIZE' && G * simulationState.gMultiplier > 0) {
         // ── Gradually steer into circular orbit ───────────────────────────────
         // Compute the desired orbital velocity for the ship's current position,
         // then use the same desired-velocity controller used in APPROACH/BRAKE to
@@ -5541,12 +5541,12 @@ function updateAutopilot(dt: number) {
             tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
         }
 
-        const vOrbit = Math.sqrt((simulationState.G * target.mass) / r);
+        const vOrbit = Math.sqrt((G * simulationState.gMultiplier * target.mass) / r);
 
         // ── Gravity-scaled minimum rate for velocity rotation ─────────────────
         const bodyRadius = target.radius ?? 10;
         const altitude = Math.max(r - bodyRadius, 1);
-        const gravAccel = (simulationState.G * target.mass) / (r * r);
+        const gravAccel = (G * simulationState.gMultiplier * target.mass) / (r * r);
         const safeRate =
             AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN * vOrbit * Math.sqrt(gravAccel / altitude);
         const effectiveRate = Math.max(AUTOPILOT_CIRCULARIZE_RATE, safeRate);
@@ -6382,7 +6382,7 @@ managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
 });
 
 managementPanel.on('gChange', ({ value }: { value: number }) => {
-    simulationState.G = value;
+    simulationState.gMultiplier = value;
 });
 
 const enableSkydomeCheckbox = document.getElementById('enableSkydome') as HTMLInputElement;

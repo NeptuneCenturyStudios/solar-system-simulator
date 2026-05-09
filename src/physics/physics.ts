@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { ParticleExplosion } from '../effects/particle-explosion';
+import { G } from '../utilities/consts';
+import { Comet } from '../bodies/comet';
 
 /**
  * Represents the rotation of a body in 3D space
@@ -21,7 +23,7 @@ export interface ISimulationState {
     bodies: Body[];
     explosions: ParticleExplosion[];
     showNames: boolean;
-    G: number;
+    gMultiplier: number;
 }
 
 /**
@@ -75,13 +77,13 @@ export function calculateTrajectory(gForce: number, distance: number, parentMass
  * @returns An object representing the rotation axis and speed.
  */
 export function calculateRotation(axisDeg: number, speed: number): IRotation {
-    const tiltRad = axisDeg * Math.PI / 180;
-        const rotation: IRotation = {
-            axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
-            speed: speed
-        };
+    const tiltRad = (axisDeg * Math.PI) / 180;
+    const rotation: IRotation = {
+        axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
+        speed: speed,
+    };
 
-        return rotation;
+    return rotation;
 }
 
 /**
@@ -97,7 +99,8 @@ export function updateSimulation(
     autopilotState: IAutopilotState,
     steps: number,
     dt: number,
-    updateAutopilot: (dt: number) => void
+    updateAutopilot: (dt: number) => void,
+    cameraPosition: THREE.Vector3
 ) {
     // Physics integration loop
     for (let i = 0; i < steps; i++) {
@@ -112,7 +115,11 @@ export function updateSimulation(
         // Apply accelerations to positions
         for (const body of simulationState.bodies) {
             if (body && !body._isDisposed && body.mesh && body.tempAcc) {
-                body.update(body.tempAcc, dt);
+                if (body instanceof Comet) {
+                    (body as Comet).update(body.tempAcc, dt, cameraPosition);
+                } else {
+                    body.update(body.tempAcc, dt);
+                }
             }
         }
     }
@@ -127,19 +134,19 @@ export function updateSimulation(
  * @returns The gravitational acceleration vector.
  */
 function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number, G: number) {
+    // 1. Compute scaled distance vector
     const diff = new THREE.Vector3().subVectors(p2, p1);
+
+    // 2. Scaled distance magnitude
     const r = diff.length();
 
-    // Prevent division by zero
     if (r < 0.01) return new THREE.Vector3(0, 0, 0);
 
-    // Gravitational acceleration: a = G * m / r²
+    // 3. Gravitational acceleration in scaled units
     const accMag = (G * m2) / (r * r);
 
-    // Normalize and scale
+    // 4. Normalize and scale
     diff.normalize();
-
-    // Return acceleration vector
     return diff.multiplyScalar(accMag);
 }
 
@@ -155,7 +162,12 @@ function updatePhysics(simulationState: ISimulationState) {
         // Calculate pull from ALL OTHER bodies (n-body simulation)
         for (const other of simulationState.bodies) {
             if (other !== body && !other?._isDisposed && other.mesh) {
-                const accFromOther = getAcc(body.mesh.position, other.mesh.position, other.mass, simulationState.G);
+                const accFromOther = getAcc(
+                    body.mesh.position,
+                    other.mesh.position,
+                    other.mass,
+                    G * simulationState.gMultiplier
+                );
                 totalAcc.add(accFromOther);
             }
         }

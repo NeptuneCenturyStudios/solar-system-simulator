@@ -81,12 +81,12 @@ export class Spaceship extends Body {
         const mtlLoader = new MTLLoader();
         mtlLoader.setPath('./assets/models/');
         mtlLoader
-            .loadAsync('spaceship.mtl')
+            .loadAsync('Lo_poly_Spaceship_01_by_Liz_Reddington.mtl')
             .then((materials) => {
                 materials.preload();
                 const objLoader = new OBJLoader();
                 objLoader.setMaterials(materials);
-                return objLoader.loadAsync('./assets/models/spaceship.obj');
+                return objLoader.loadAsync('./assets/models/Lo_poly_Spaceship_01_by_Liz_Reddington.obj');
             })
             .then((group) => {
                 // Compute bounding box of the unscaled model (group at world origin, no parent).
