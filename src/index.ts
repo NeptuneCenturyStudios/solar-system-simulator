@@ -77,6 +77,7 @@ import {
     FLIGHT_BOOST_ACCEL,
     TIME_SCALE,
     SUN_RADIUS,
+    DIST_SCALE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities';
@@ -645,7 +646,7 @@ const scene = new THREE.Scene();
 // --- Skydome background ---
 // A huge inverted sphere that always follows the camera, giving a textured space background.
 // This is separate from the point-starfield so users can toggle each independently.
-const skydomeGeometry = new THREE.SphereGeometry(3000000, 48, 24);
+const skydomeGeometry = new THREE.SphereGeometry(3_000_000_000 / DIST_SCALE, 48, 24);
 const skydomeMaterial = new THREE.MeshBasicMaterial({
     map: skydomeTexture,
     side: THREE.BackSide,
