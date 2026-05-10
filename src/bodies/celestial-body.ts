@@ -215,6 +215,12 @@ export class CelestialBody extends Body {
                     opacity: 0.3,
                 })
             );
+            // Orient the rings to match the planet's tilt (YZ plane)
+            if (rotation && typeof rotation.tilt === 'number') {
+                const tiltRad = (rotation.tilt * Math.PI) / 180;
+                // Rotate around X axis to match tilt (so rings are coplanar with equator)
+                this.rings.rotation.x = tiltRad;
+            }
             scene.add(this.rings);
         }
     }
