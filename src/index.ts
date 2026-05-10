@@ -76,6 +76,7 @@ import {
     WARP_SHAKE_MAG,
     FLIGHT_BOOST_ACCEL,
     TIME_SCALE,
+    SUN_RADIUS,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities';
@@ -663,7 +664,7 @@ const camera = new THREE.PerspectiveCamera(
 );
 const MAX_ZOOM_OUT_DISTANCE = camera.far * 0.8;
 const MAX_CAMERA_VIEW_DISTANCE = camera.far * 0.98;
-const INITIAL_CAMERA_DISTANCE = 16388 * SCALE_FACTOR;
+const INITIAL_CAMERA_DISTANCE = SUN_RADIUS * 8 * SCALE_FACTOR;
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); // Better depth precision at extreme scales
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Must be true to initialize shadow infrastructure
