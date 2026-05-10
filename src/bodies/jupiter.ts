@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body';
-import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
+import { calculateTrajectory } from '../physics/physics.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import {
     SUN_MASS,
@@ -40,8 +40,6 @@ export class Jupiter extends CelestialBody {
             metalness: 0.85,
         });
 
-        const rotation = calculateRotation(JUPITER_AXIS, JUPITER_ROT_SPEED);
-
         super(
             dependencies,
             scene,
@@ -56,7 +54,10 @@ export class Jupiter extends CelestialBody {
             0xffcc88,
             5000,
             false,
-            rotation,
+            {
+                tilt: JUPITER_AXIS,
+                speed: JUPITER_ROT_SPEED,
+            },
             undefined,
             material
         );

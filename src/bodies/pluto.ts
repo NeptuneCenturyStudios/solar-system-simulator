@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body';
-import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
+import { calculateTrajectory } from '../physics/physics.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { PLUTO_DIST, PLUTO_MASS, SUN_MASS, PLUTO_RADIUS, PLUTO_AXIS, PLUTO_ROT_SPEED,  } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
@@ -29,9 +29,6 @@ export class Pluto extends CelestialBody {
             metalness: 0.95,
         });
 
-        // Pluto has an axial tilt of about 122.5 degrees, which means it rotates on its side with a retrograde rotation.
-        const rotation = calculateRotation(PLUTO_AXIS, PLUTO_ROT_SPEED);
-                
         super(
             dependencies,
             scene,
@@ -46,7 +43,10 @@ export class Pluto extends CelestialBody {
             0xddbb99,
             20000,
             false,
-            rotation,
+            {
+                tilt: PLUTO_AXIS,
+                speed: PLUTO_ROT_SPEED,
+            },
             undefined,
             material
         );

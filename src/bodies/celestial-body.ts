@@ -58,8 +58,8 @@ export class CelestialBody extends Body {
     _tidalLockConfigured: boolean;
     _tidalLockOmegaInitialized: boolean = false;
     // Private properties for internal state management
-    rotationAxis: THREE.Vector3;
     rotationSpeed: number;
+    rotationAxis: THREE.Vector3;
 
     /**
      * Constructs a new CelestialBody with advanced features like trails, rings, clouds, and tidal locking.
@@ -89,7 +89,7 @@ export class CelestialBody extends Body {
         trailColor = 0xffffff,
         maxTrail = 500,
         hasRings = false,
-        rotation: IRotation = { axis: new THREE.Vector3(0, 1, 0), speed: 0 },
+        rotation: IRotation = { tilt: 0, speed: 0 },
         geometryFactory?: (radius: number) => THREE.BufferGeometry,
         material?: THREE.Material,
         tidalLock?: ITidalLockOptions
@@ -122,10 +122,18 @@ export class CelestialBody extends Body {
         this.bodyType = bodyType;
         this.rotation = rotation;
 
-        // Axial rotation (spin). Uses simulation dt so it follows timeScale and reverses when time runs backwards.
-        // rotation.speed is in radians per simulated second.
-        this.rotationAxis = new THREE.Vector3(...(rotation?.axis || [0, 1, 0])).normalize();
+        // Set rotation speed and axis based on provided rotation info
         this.rotationSpeed = typeof rotation?.speed === 'number' ? rotation.speed : 0;
+
+        // Orient the mesh so its texture "north" matches Saturn's spin axis
+
+        const up = new THREE.Vector3(0, 1, 0);
+        const tiltRad = (rotation.tilt * Math.PI) / 180;
+        const spinAxis = new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad)); // YZ plane
+        this.mesh.quaternion.setFromUnitVectors(up, spinAxis);
+        // Fix: set rotationAxis to local Y for correct spinning
+        this.rotationAxis = new THREE.Vector3(0, 1, 0);
+
 
         // Optional: tidal-lock behavior (compute spin speed at spawn; do not re-compute later).
         // If the moon's orbit is changed later, it keeps rotating at the spawn speed.
@@ -453,7 +461,7 @@ export class CelestialBody extends Body {
         } else {
             // Axial rotation (spin) - tied to sim time (dt includes timeScale and can be negative).
             if (this.rotationSpeed !== 0) {
-                this.mesh.rotateOnAxis(this.rotationAxis, this.rotationSpeed * dt);
+                this.mesh.rotateOnAxis(new THREE.Vector3(0, 1, 0), this.rotationSpeed * dt);
             }
         }
 
@@ -479,7 +487,7 @@ export class CelestialBody extends Body {
         if (this.trail) this.trail.position.copy(cameraPos);
         const cx = cameraPos.x, cy = cameraPos.y, cz = cameraPos.z;
         for (let i = 0; i < this.history.length; i++) {
-            this.trailPositions[i * 3]     = this.history[i].x - cx;
+            this.trailPositions[i * 3] = this.history[i].x - cx;
             this.trailPositions[i * 3 + 1] = this.history[i].y - cy;
             this.trailPositions[i * 3 + 2] = this.history[i].z - cz;
         }
@@ -512,21 +520,21 @@ export class CelestialBody extends Body {
         const moonMaterial =
             moonName === 'Moon'
                 ? new THREE.MeshStandardMaterial({
-                      map: moonTexture,
-                      color: 0xffffff,
-                      emissive: 0x000000,
-                      emissiveIntensity: 0,
-                      roughness: 0.7,
-                      metalness: 0.7,
-                  })
+                    map: moonTexture,
+                    color: 0xffffff,
+                    emissive: 0x000000,
+                    emissiveIntensity: 0,
+                    roughness: 0.7,
+                    metalness: 0.7,
+                })
                 : new THREE.MeshStandardMaterial({
-                      map: pickRandom(fictionalTextures),
-                      color: 0xffffff, // keep texture untinted
-                      emissive: 0x000000,
-                      emissiveIntensity: 0,
-                      roughness: 0.7,
-                      metalness: 0.7,
-                  });
+                    map: pickRandom(fictionalTextures),
+                    color: 0xffffff, // keep texture untinted
+                    emissive: 0x000000,
+                    emissiveIntensity: 0,
+                    roughness: 0.7,
+                    metalness: 0.7,
+                });
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²
@@ -551,7 +559,7 @@ export class CelestialBody extends Body {
             config.trailColor || 0xffffff,
             config.maxTrail || 1500,
             false,
-            { axis: new THREE.Vector3(0, 1, 0), speed: 0.15 + Math.random() * 0.35 },
+            { tilt: 0, speed: 0.15 + Math.random() * 0.35 },
             undefined,
             moonMaterial,
             {

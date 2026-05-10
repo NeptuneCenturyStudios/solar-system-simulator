@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CelestialBody } from './celestial-body';
 import { calculateTrajectory } from '../physics/physics.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
-import { CERES_DISTANCE, CERES_MASS, CERES_RADIUS, SUN_MASS } from '../utilities/consts.js';
+import { CERES_AXIS, CERES_DISTANCE, CERES_MASS, CERES_RADIUS, CERES_ROT_SPEED, SUN_MASS } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
 /**
@@ -42,7 +42,7 @@ export class Ceres extends CelestialBody {
             0xcccccc,
             2000,
             false,
-            { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 },
+            { tilt: CERES_AXIS, speed: CERES_ROT_SPEED },
             undefined,
             material
         );

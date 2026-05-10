@@ -4,9 +4,9 @@ import { loadSrgbTexture } from '../drawing/textures';
 import { BodyTypeEnum } from '../utilities/utilities';
 import { IRotation } from '../physics/physics';
 import * as THREE from 'three';
-import { SCALE_FACTOR, SUN_MASS } from '../utilities/consts';
+import { EARTH_RADIUS, SUN_MASS } from '../utilities/consts';
 
-const WHITE_DWARF_RADIUS = 8 * SCALE_FACTOR;
+const WHITE_DWARF_RADIUS = EARTH_RADIUS;
 
 /**
  * Computes the radius of a white dwarf for a given mass using the inverse cubic root relationship:

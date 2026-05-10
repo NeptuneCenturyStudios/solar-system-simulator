@@ -95,15 +95,19 @@ export class Asteroid extends CelestialBody {
             maxTrail,
             false,
             {
-                axis: new THREE.Vector3(
-                    Math.random() - 0.5,
-                    Math.random() - 0.5,
-                    Math.random() - 0.5
-                ),
-                speed: 0.6 + Math.random() * 1.2,
+                tilt: 0,
+                speed: 0,
             },
             (r) => createRandomPolyhedron(r),
             material
         );
+
+        // Override the axis and speed for a more random tumbling motion
+        this.rotationAxis = new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+        ).normalize();
+        this.rotationSpeed = 0.6 + Math.random() * 1.2;
     }
 }

@@ -64,7 +64,7 @@ export class Halley extends Comet {
                 id: 'halley',
                 name: 'Halley',
                 radius: COMET_RADIUS,
-                rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.05 },
+                rotation: { tilt: 0, speed: 0.05 },
                 trailColor: 0xaaaaaa,
                 maxTrail: 2000,
             },

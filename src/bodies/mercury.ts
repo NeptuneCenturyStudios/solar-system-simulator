@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
+import { calculateTrajectory } from '../physics/physics.js';
 import { MERCURY_AXIS, MERCURY_DIST, MERCURY_MASS, MERCURY_RADIUS, MERCURY_ROT_SPEED, SUN_MASS } from '../utilities/consts.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
@@ -30,9 +30,6 @@ export class Mercury extends CelestialBody {
             metalness: 0.7,
         });
 
-        // Mercury has a very small axial tilt of about 0.034 degrees, meaning it rotates almost perfectly upright.
-        const rotation = calculateRotation(MERCURY_AXIS, MERCURY_ROT_SPEED);
-
         super(
             dependencies,
             scene,
@@ -47,7 +44,10 @@ export class Mercury extends CelestialBody {
             0xaaaaaa,
             2000,
             false,
-            rotation,
+            {
+                tilt: MERCURY_AXIS,
+                speed: MERCURY_ROT_SPEED,
+            },
             undefined,
             material
         );

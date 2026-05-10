@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
+import { calculateTrajectory } from '../physics/physics.js';
 import { SUN_MASS, EARTH_MASS, EARTH_DIST, EARTH_RADIUS, EARTH_AXIS, EARTH_ROT_SPEED } from '../utilities/consts.js';
 import { createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
@@ -34,10 +34,6 @@ export class Earth extends Planet {
             metalness: 0.7,
         });
 
-        // Earth's rotation axis is tilted about 23.5 degrees to simulate seasons, and it rotates once per day.
-        // Need to convert the axis degree tilt to a rotation axis vector. The tilt is around the X-axis, so we can calculate the rotation axis as follows:
-        const rotation = calculateRotation(EARTH_AXIS, EARTH_ROT_SPEED);
-
         super(
             dependencies,
             scene,
@@ -48,7 +44,10 @@ export class Earth extends Planet {
                 radius: EARTH_RADIUS,
                 pos: earthTrajectory.pos,
                 vel: earthTrajectory.vel,
-                rotation,
+                rotation: {
+                    tilt: EARTH_AXIS,
+                    speed: EARTH_ROT_SPEED,
+                },
                 trailColor: 0x88ccff,
                 maxTrail: 4500,
                 bodySubtype: PlanetTypeEnum.Solid,

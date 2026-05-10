@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body';
-import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
+import { calculateTrajectory } from '../physics/physics.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import { NEPTUNE_DIST, NEPTUNE_MASS, SUN_MASS, NEPTUNE_RADIUS, NEPTUNE_AXIS, NEPTUNE_ROT_SPEED } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
@@ -33,9 +33,6 @@ export class Neptune extends CelestialBody {
             metalness: 0.7,
         });
 
-        // Neptune has an axial tilt of about 28.3 degrees, which is similar to Earth's but with a much longer rotation period.
-        const rotation = calculateRotation(NEPTUNE_AXIS, NEPTUNE_ROT_SPEED);
-
         super(
             dependencies,
             scene,
@@ -50,7 +47,10 @@ export class Neptune extends CelestialBody {
             0x6688ff,
             18000,
             false,
-            rotation,
+            {
+                tilt: NEPTUNE_AXIS,
+                speed: NEPTUNE_ROT_SPEED,
+            },
             undefined,
             material
         );

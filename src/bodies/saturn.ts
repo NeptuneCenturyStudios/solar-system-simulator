@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body';
-import { calculateRotation, calculateTrajectory } from '../physics/physics.js';
+import { calculateTrajectory } from '../physics/physics.js';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
 import {
     SATURN_DIST,
@@ -40,9 +40,6 @@ export class Saturn extends CelestialBody {
             metalness: 0.7,
         });
 
-        // Calculate Saturn's rotation based on its axial tilt and rotation speed.
-        const rotation = calculateRotation(SATURN_AXIS, SATURN_ROT_SPEED);
-
         super(
             dependencies,
             scene,
@@ -57,19 +54,14 @@ export class Saturn extends CelestialBody {
             0xffeebb,
             12000,
             true,
-            rotation,
+            {
+                tilt: SATURN_AXIS,
+                speed: SATURN_ROT_SPEED,
+            },
             undefined,
             material
         );
 
-        // Orient the mesh so its texture "north" matches Saturn's spin axis
-        if (this.mesh) {
-            const up = new THREE.Vector3(0, 1, 0);
-            const tiltRad = (SATURN_AXIS * Math.PI) / 180;
-            const spinAxis = new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad)); // YZ plane
-            this.mesh.quaternion.setFromUnitVectors(up, spinAxis);
-            // Fix: set rotationAxis to local Y for correct spinning
-            this.rotationAxis = new THREE.Vector3(0, 1, 0);
-        }
+        
     }
 }

@@ -7,8 +7,9 @@ import { G } from '../utilities/consts';
  * Represents the rotation of a body in 3D space
  */
 export interface IRotation {
-    axis: THREE.Vector3;
-    speed: number;
+    // axis: THREE.Vector3;
+    tilt: number; // in degrees
+    speed: number; // in degrees per second
 }
 
 /**
@@ -67,22 +68,6 @@ export function calculateTrajectory(gForce: number, distance: number, parentMass
     const vel = new THREE.Vector3(0, 0, speed);
 
     return { pos, vel };
-}
-
-/**
- * Calculate the rotation axis and speed for a celestial body based on its axial tilt and rotational speed.
- * @param axisDeg The tilt angle of the rotation axis in degrees.
- * @param speed The rotational speed.
- * @returns An object representing the rotation axis and speed.
- */
-export function calculateRotation(axisDeg: number, speed: number): IRotation {
-    const tiltRad = (axisDeg * Math.PI) / 180;
-    const rotation: IRotation = {
-        axis: new THREE.Vector3(Math.sin(tiltRad), Math.cos(tiltRad), 0).normalize(),
-        speed: speed,
-    };
-
-    return rotation;
 }
 
 /**

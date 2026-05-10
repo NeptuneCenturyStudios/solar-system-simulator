@@ -167,6 +167,12 @@ export const VESTA_DISTANCE = (353400000 / DIST_SCALE) * SCALE_FACTOR;
 export const PALLAS_DISTANCE = (414500000 / DIST_SCALE) * SCALE_FACTOR;
 export const HYGIEA_DISTANCE = (470300000 / DIST_SCALE) * SCALE_FACTOR;
 
+// == Asteroids: Axial Tilt ===
+export const CERES_AXIS = 4.0;
+
+// === Asteroids: Rotation ===
+export const CERES_ROT_SPEED = ((2 * Math.PI) / (9.074 * 3600)) * SUN_TIME_SCALE; // ~1.92e-4
+
 // === Comet (Halley): Mass, Radius, Distance ===
 // Halley's Comet: 2.2e14 kg
 export const COMET_MASS = (2.2e14 / MASS_SCALE) * SCALE_FACTOR;

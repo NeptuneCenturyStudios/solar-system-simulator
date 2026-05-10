@@ -80,12 +80,15 @@ export class Pulsar extends Star implements IMassTransferBody {
 
         // Angular momentum conservation: I * ω = const, I ∝ R²
         // ω_new = ω_old * (R_old / R_new)²
+
         const rawSpinUp = progenitorRotation.speed * Math.pow(progenitorRadius / pulsarRadius, 2);
         const newSpeed = Math.max(PULSAR_MIN_SPIN, Math.min(PULSAR_MAX_SPIN, rawSpinUp));
+        // Inherit tilt from progenitor
         const newRotation: IRotation = {
-            axis: progenitorRotation.axis.clone(),
+            tilt: progenitorRotation.tilt,
             speed: newSpeed,
         };
+
 
         const options: IStarCreationOptions = {
             pos,
@@ -114,28 +117,34 @@ export class Pulsar extends Star implements IMassTransferBody {
 
         this.bodyType = BodyTypeEnum.Pulsar | BodyTypeEnum.Star;
 
+
+        // Compute spin axis from tilt (YZ plane, as in CelestialBody)
+        const tiltRad = (newRotation.tilt * Math.PI) / 180;
+        const spinAxis = new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad));
+
         // Compute a single shared magnetic axis offset 10–90° from the spin axis.
         // Both PulsarBeam and PulsarMagneticField must use the same axis so the
         // beam sweeps exactly through the field-line poles.
         const _magAxisPerp = new THREE.Vector3(
-            Math.abs(newRotation.axis.x) < 0.9 ? 1 : 0,
-            Math.abs(newRotation.axis.x) < 0.9 ? 0 : 1,
+            Math.abs(spinAxis.x) < 0.9 ? 1 : 0,
+            Math.abs(spinAxis.x) < 0.9 ? 0 : 1,
             0
         )
-            .cross(newRotation.axis)
+            .cross(spinAxis)
             .normalize();
         const _magOffsetAngle = (10 + Math.random() * 80) * (Math.PI / 180);
-        const magneticAxisBase = newRotation.axis
+        const magneticAxisBase = spinAxis
             .clone()
             .applyQuaternion(new THREE.Quaternion().setFromAxisAngle(_magAxisPerp, _magOffsetAngle))
             .normalize();
+
 
         this.beam = new PulsarBeam(
             dependencies,
             scene,
             this.mesh.position.clone(),
             pulsarRadius,
-            newRotation.axis,
+            spinAxis,
             newSpeed,
             magneticAxisBase
         );
@@ -155,12 +164,13 @@ export class Pulsar extends Star implements IMassTransferBody {
         );
 
         // Magnetic field dipole loops — shares the same magnetic axis as the beam
+
         this.magneticField = new PulsarMagneticField(
             dependencies,
             scene,
             this.mesh.position.clone(),
             pulsarRadius,
-            newRotation.axis,
+            spinAxis,
             newSpeed,
             magneticAxisBase
         );
