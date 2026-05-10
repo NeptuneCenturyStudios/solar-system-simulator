@@ -1,15 +1,25 @@
 import * as THREE from 'three';
-import { CelestialBody } from './celestial-body';
+
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
-import { CERES_AXIS, CERES_DISTANCE, CERES_MASS, CERES_RADIUS, CERES_ROT_SPEED, SUN_MASS } from '../utilities/consts.js';
+import { createUniqueId } from '../utilities/utilities.js';
+import {
+    CERES_AXIS,
+    CERES_DISTANCE,
+    CERES_MASS,
+    CERES_RADIUS,
+    CERES_ROT_SPEED,
+    SUN_MASS,
+} from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
+
+import { DwarfPlanet } from './dwarf-planet';
+import { PlanetTypeEnum } from '../utilities/body-params.js';
 
 /**
  * Represents the dwarf planet Ceres in the simulation.
  * Sets up its trajectory, material, and physical properties.
  */
-export class Ceres extends CelestialBody {
+export class Ceres extends DwarfPlanet {
     /**
      * Constructs a new Ceres object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
@@ -31,19 +41,19 @@ export class Ceres extends CelestialBody {
         super(
             dependencies,
             scene,
-            CERES_RADIUS,
-            0xffffff,
-            trajectory.pos,
-            trajectory.vel,
-            CERES_MASS,
-            createUniqueId('ceres'),
-            'Ceres',
-            BodyTypeEnum.DwarfPlanet,
-            0xcccccc,
-            2000,
-            false,
-            { tilt: CERES_AXIS, speed: CERES_ROT_SPEED },
-            undefined,
+            {
+                id: createUniqueId('ceres'),
+                name: 'Ceres',
+                mass: CERES_MASS,
+                radius: CERES_RADIUS,
+                pos: trajectory.pos,
+                vel: trajectory.vel,
+                bodySubtype: PlanetTypeEnum.Solid,
+                trailColor: 0xcccccc,
+                maxTrail: 2000,
+                hasRings: false,
+                rotation: { tilt: CERES_AXIS, speed: CERES_ROT_SPEED },
+            },
             material
         );
     }

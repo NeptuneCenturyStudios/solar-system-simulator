@@ -12,12 +12,14 @@ import {
     JUPITER_ROT_SPEED,
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
+import { Planet } from './planet';
+import { PlanetTypeEnum } from '../utilities/body-params';
 
 /**
  * Represents the planet Jupiter in the simulation, including its texture and orbital properties.
  * Sets up Jupiter's trajectory, material, and physical parameters.
  */
-export class Jupiter extends CelestialBody {
+export class Jupiter extends Planet {
     /**
      * Constructs a new Jupiter object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
@@ -43,22 +45,19 @@ export class Jupiter extends CelestialBody {
         super(
             dependencies,
             scene,
-            JUPITER_RADIUS,
-            0xffaa33,
-            trajectory.pos,
-            trajectory.vel,
-            JUPITER_MASS,
-            createUniqueId('jupiter'),
-            'Jupiter',
-            BodyTypeEnum.GasGiant,
-            0xffcc88,
-            5000,
-            false,
             {
-                tilt: JUPITER_AXIS,
-                speed: JUPITER_ROT_SPEED,
+                id: createUniqueId('jupiter'),
+                name: 'Jupiter',
+                mass: JUPITER_MASS,
+                radius: JUPITER_RADIUS,
+                pos: trajectory.pos,
+                vel: trajectory.vel,
+                bodySubtype: PlanetTypeEnum.GasGiant,
+                trailColor: 0xffcc88,
+                maxTrail: 5000,
+                hasRings: false,
+                rotation: { tilt: JUPITER_AXIS, speed: JUPITER_ROT_SPEED },
             },
-            undefined,
             material
         );
     }

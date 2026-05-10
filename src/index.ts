@@ -2573,7 +2573,7 @@ function createNewBody(
                     ? customLightIntensity
                     : 500000000,
             lightDistance: 524400,
-            rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 },
+            rotation: { tilt: 0, speed: 0.08 },
         });
 
         if (typeof customLightIntensity === 'number' && isFinite(customLightIntensity)) {
@@ -2643,7 +2643,7 @@ function createNewBody(
             0x888888,
             3000,
             false,
-            { axis: new THREE.Vector3(0, 1, 0), speed: planetRotationSpeed },
+            { tilt: 0, speed: planetRotationSpeed },
             undefined,
             planetMaterial
         );
@@ -2757,7 +2757,7 @@ function createNewBody(
                 0x666666,
                 1000,
                 false,
-                { axis: new THREE.Vector3(0, 1, 0), speed: moonRotationSpeed },
+                { tilt: 0, speed: moonRotationSpeed },
                 undefined,
                 moonMaterial
             );
@@ -2851,7 +2851,7 @@ function createNewBody(
                 mass: cometMass,
                 id: createUniqueId('comet'),
                 name: generateIAUName(BodyTypeEnum.Comet),
-                rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.05 },
+                rotation: { tilt: 0, speed: 0.05 },
             },
             cometMaterial
         );
@@ -2866,7 +2866,7 @@ function createNewBody(
             bhMass,
             createUniqueId('black_hole'),
             generateIAUName(BodyTypeEnum.BlackHole),
-            { axis: new THREE.Vector3(0, 1, 0), speed: 0 }
+            { tilt: 0, speed: 0 }
         );
 
         // Apply custom radius if the user overrode the slider
@@ -2990,7 +2990,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             bhMass,
             createUniqueId('black_hole'),
             'Black Hole',
-            { axis: new THREE.Vector3(0, 1, 0), speed: 0 }
+            { tilt: 0, speed: 0 }
         );
         simulationState.bodies = [blackHole];
 
@@ -3031,7 +3031,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             temperature: starTemp,
             lightIntensity: 500000000,
             lightDistance: 524400,
-            rotation: { axis: new THREE.Vector3(0, 1, 0), speed: 0.08 },
+            rotation: { tilt: 0, speed: 0.08 },
         });
         simulationState.bodies.push(orbitingStar);
 
