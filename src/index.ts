@@ -1992,6 +1992,8 @@ const kuiperBeltMat = new THREE.PointsMaterial({
     sizeAttenuation: false,
     transparent: true,
     opacity: 0.4,
+    depthTest: true,
+    depthWrite: false,
 });
 const kuiperBeltPoints = new THREE.Points(kuiperBeltGeo, kuiperBeltMat);
 scene.add(kuiperBeltPoints);

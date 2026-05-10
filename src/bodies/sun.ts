@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { IStateDependencies } from '../interfaces';
 import { createUniqueId } from '../utilities/utilities';
-import { SUN_AXIS, SUN_MASS, SUN_RADIUS, SUN_ROT_SPEED } from '../utilities/consts';
+import { DIST_SCALE, SUN_AXIS, SUN_MASS, SUN_RADIUS, SUN_ROT_SPEED } from '../utilities/consts';
 import { MainSequenceStar } from './main-sequence-star';
 
 export class Sun extends MainSequenceStar {
@@ -16,7 +16,7 @@ export class Sun extends MainSequenceStar {
             name: 'Sun',
             temperature: 5778,
             lightIntensity: 500000000,
-            lightDistance: 524400,
+            lightDistance: 5_000_000_000 / DIST_SCALE,
             rotation: { tilt: SUN_AXIS, speed: SUN_ROT_SPEED },
         });
     }
