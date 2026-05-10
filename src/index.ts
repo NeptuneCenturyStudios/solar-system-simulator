@@ -4261,6 +4261,8 @@ function animate() {
 
             // Update the trail position for b1
             if (b1 instanceof CelestialBody) b1.updateTrail(camera.position);
+            // Update comet tail with camera-relative rendering (dtTotal = full frame delta)
+            if (b1 instanceof Comet) b1.updateTail(dtTotal, camera.position);
 
             // Skip disposed bodies in collision detection
             if (b1._isDisposed || !b1.mesh) continue;

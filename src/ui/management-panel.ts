@@ -106,6 +106,7 @@ export class ManagementPanel extends Panel {
     enableKuiperBeltCheckbox: HTMLInputElement | null;
     gravitationalConstantSlider: HTMLInputElement | null;
     gravitationalConstantDisplay: HTMLElement | null;
+    gravitationalConstantResetBtn: HTMLButtonElement | null;
 
     selectedBody: Body | null;
 
@@ -195,6 +196,7 @@ export class ManagementPanel extends Panel {
         this.enableKuiperBeltCheckbox = null;
         this.gravitationalConstantSlider = null;
         this.gravitationalConstantDisplay = null;
+        this.gravitationalConstantResetBtn = null;
 
         this.selectedBody = null;
     }
@@ -316,6 +318,19 @@ export class ManagementPanel extends Panel {
                 this.emit('gChange', { value });
             };
             (slider.oninput as () => void)();
+        }
+
+        this.gravitationalConstantResetBtn = document.getElementById(
+            'gravitationalConstantResetBtn'
+        ) as HTMLButtonElement | null;
+        if (this.gravitationalConstantResetBtn && this.gravitationalConstantSlider && this.gravitationalConstantDisplay) {
+            const slider = this.gravitationalConstantSlider;
+            const display = this.gravitationalConstantDisplay;
+            this.gravitationalConstantResetBtn.onclick = () => {
+                slider.value = '1';
+                display.textContent = '1.00000';
+                this.emit('gChange', { value: 1 });
+            };
         }
 
         this.createSliderInitState = {
