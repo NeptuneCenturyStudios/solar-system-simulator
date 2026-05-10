@@ -48,7 +48,7 @@ export class Ceres extends DwarfPlanet {
                 radius: CERES_RADIUS,
                 pos: trajectory.pos,
                 vel: trajectory.vel,
-                bodySubtype: PlanetTypeEnum.Solid,
+                bodySubtype: PlanetTypeEnum.Terrestrial,
                 trailColor: 0xcccccc,
                 maxTrail: 2000,
                 hasRings: false,

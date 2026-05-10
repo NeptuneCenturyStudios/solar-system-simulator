@@ -50,7 +50,7 @@ export class Earth extends Planet {
                 },
                 trailColor: 0x88ccff,
                 maxTrail: 4500,
-                bodySubtype: PlanetTypeEnum.Solid,
+                bodySubtype: PlanetTypeEnum.Terrestrial,
             },
             material
         );

@@ -1,8 +1,6 @@
 import * as THREE from 'three';
-
-import { CelestialBody } from './celestial-body';
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
+import { createUniqueId } from '../utilities/utilities.js';
 import {
     SUN_MASS,
     JUPITER_DIST,

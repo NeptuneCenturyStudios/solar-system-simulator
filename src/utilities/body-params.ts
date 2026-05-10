@@ -97,7 +97,7 @@ export function randomBlackHoleParams(
 // Planet
 // ---------------------------------------------------------------------------
 export enum PlanetTypeEnum {
-    Solid = 'solid',
+    Terrestrial = 'solid',
     GasGiant = 'gas_giant',
     IceGiant = 'ice_giant',
     Volcanic = 'volcanic',
