@@ -22,7 +22,7 @@ export const MAX_PARTICLE_ALPHA = 1.0;
 export const SCALE_FACTOR = 1;
 export const G_SCALE = 1; // 1000000;
 // Tuned so that SUN_MASS = 33,000,000 exactly
-export const MASS_SCALE = 1;//6.025757575757576e22;
+export const MASS_SCALE = 6.025757575757576e22;
 export const RADIUS_SCALE = 1;
 export const DIST_SCALE = 1;
 // 1. Keep the physically-derived base time scale
@@ -156,7 +156,7 @@ export const ISS_MASS = (419725 / MASS_SCALE) * SCALE_FACTOR;
 export const ISS_RADIUS = (0.1 / RADIUS_SCALE) * SCALE_FACTOR;
 
 // === Satellites: Distance from Earth ===
-export const ISS_DIST_FROM_EARTH = (EARTH_RADIUS + 400 / DIST_SCALE) * SCALE_FACTOR;
+export const ISS_DIST_FROM_EARTH = (EARTH_RADIUS + 410 / DIST_SCALE) * SCALE_FACTOR;
 
 // === Asteroids: Mass ===
 export const CERES_MASS = (9.393e20 / MASS_SCALE) * SCALE_FACTOR;
