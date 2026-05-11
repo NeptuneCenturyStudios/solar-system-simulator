@@ -78,9 +78,12 @@ import {
     TIME_SCALE,
     SUN_RADIUS,
     DIST_SCALE,
+    ISS_MASS,
+    ISS_DIST_FROM_EARTH,
+    ISS_RADIUS,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
-import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum } from './utilities/utilities';
+import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum, createSatellite } from './utilities/utilities';
 import { calculateTrajectory, IAutopilotState, updateSimulation } from './physics/physics';
 import {
     randomStarParams,
@@ -558,7 +561,7 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     // Check for planet type property (Planet or DwarfPlanet class or similar)
     if (
         body.bodyType &&
-        ((body.bodyType & BodyTypeEnum.Planet) || (body.bodyType & BodyTypeEnum.DwarfPlanet)) &&
+        (body.bodyType & BodyTypeEnum.Planet || body.bodyType & BodyTypeEnum.DwarfPlanet) &&
         'planetType' in body &&
         body.planetType
     ) {
@@ -3103,10 +3106,23 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
     simulationState.bodies.push(
         earth.createMoon(scene, {
             distance: MOON_DIST_FROM_EARTH,
-            radius: MOON_RADIUS, // 0.273 × Earth
+            radius: MOON_RADIUS,
             mass: MOON_MASS,
-            id: 'camMoon',
+            id: 'moon',
             name: 'Moon',
+            trailColor: 0xffffff,
+            maxTrail: 1500,
+        })
+    );
+
+    // Satellite
+    simulationState.bodies.push(
+        createSatellite(scene, earth, {
+            distance: ISS_DIST_FROM_EARTH,
+            radius: ISS_RADIUS,
+            mass: ISS_MASS,
+            id: 'iss',
+            name: 'ISS',
             trailColor: 0xffffff,
             maxTrail: 1500,
         })
@@ -4867,6 +4883,8 @@ function getBodyTypeLabel(b: Body) {
     if (b.bodyType && b.bodyType & BodyTypeEnum.Asteroid) return 'Asteroid';
     if (b.bodyType && b.bodyType & BodyTypeEnum.Comet) return 'Comet';
     if (b.bodyType && b.bodyType & BodyTypeEnum.SpaceShip) return 'Spaceship';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.Satellite) return 'Satellite';
+    
     return 'Unknown';
 }
 

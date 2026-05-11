@@ -21,7 +21,7 @@ export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptio
     mesh?: THREE.Mesh;
 }
 
-export interface IMoonCreationOptions extends IBodyCreationOptions {
+export interface ISatelliteBasicCreationOptions extends IBodyCreationOptions {
     distance: number;
     angle?: number; // optional initial angle for multiple moons
     yVariation?: number; // optional random Y variation for non-coplanar orbits
@@ -528,7 +528,7 @@ export class CelestialBody extends Body {
         this.trailGeo.setDrawRange(0, this.history.length);
     }
 
-    createMoon(scene: THREE.Scene, config: IMoonCreationOptions) {
+    createMoon(scene: THREE.Scene, config: ISatelliteBasicCreationOptions) {
         // Calculate orbital trajectory based on parent's mass
         const trajectory = calculateTrajectory(
             this.dependencies.getG(),

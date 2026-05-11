@@ -20,9 +20,9 @@ export const MAX_PARTICLE_ALPHA = 1.0;
 
 // === Simulation Scale and Physics Constants ===
 export const SCALE_FACTOR = 1;
-export const G_SCALE = 1000000;
+export const G_SCALE = 1; // 1000000;
 // Tuned so that SUN_MASS = 33,000,000 exactly
-export const MASS_SCALE = 6.025757575757576e22;
+export const MASS_SCALE = 1;//6.025757575757576e22;
 export const RADIUS_SCALE = 1;
 export const DIST_SCALE = 1;
 // 1. Keep the physically-derived base time scale
@@ -148,6 +148,15 @@ export const SATURN_ROT_SPEED = ((2 * Math.PI) / (10.656 * 3600)) * SATURN_TIME_
 export const URANUS_ROT_SPEED = ((-2 * Math.PI) / (17.24 * 3600)) * URANUS_TIME_SCALE; // ~-1.01e-4 (retrograde)
 export const NEPTUNE_ROT_SPEED = ((2 * Math.PI) / (16.11 * 3600)) * NEPTUNE_TIME_SCALE; // ~1.08e-4
 export const PLUTO_ROT_SPEED = ((-2 * Math.PI) / (153.3 * 3600)) * PLUTO_TIME_SCALE; // ~-1.14e-5 (retrograde)
+
+// === Satellites: Mass ===
+export const ISS_MASS = (419725 / MASS_SCALE) * SCALE_FACTOR;
+
+// === Satellites: Radius ===
+export const ISS_RADIUS = (0.1 / RADIUS_SCALE) * SCALE_FACTOR;
+
+// === Satellites: Distance from Earth ===
+export const ISS_DIST_FROM_EARTH = (EARTH_RADIUS + 400 / DIST_SCALE) * SCALE_FACTOR;
 
 // === Asteroids: Mass ===
 export const CERES_MASS = (9.393e20 / MASS_SCALE) * SCALE_FACTOR;
