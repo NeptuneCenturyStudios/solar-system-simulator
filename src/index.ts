@@ -503,7 +503,8 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
 
     // Set canvas size
     canvas.width = 700;
-    canvas.height = 640;
+    // Increased height to fit Planet Type stat if needed
+    canvas.height = 700;
 
     // Setup text style
     context.fillStyle = '#aaaaaa'; // Light gray
@@ -550,8 +551,50 @@ function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
     y += lineHeight;
 
     // Body Type
-    drawStat('Body Type: ', getBodyTypeLabel(body), y);
+    drawStat('Type: ', getBodyTypeLabel(body), y);
     y += lineHeight;
+
+    // Planet Type (if planet or dwarf planet)
+    // Check for planet type property (Planet or DwarfPlanet class or similar)
+    if (
+        body.bodyType &&
+        ((body.bodyType & BodyTypeEnum.Planet) || (body.bodyType & BodyTypeEnum.DwarfPlanet)) &&
+        'planetType' in body &&
+        body.planetType
+    ) {
+        // Map enum/string to display label
+        let planetTypeLabel: string;
+        switch (body.planetType) {
+            case 'gas_giant':
+            case 'GasGiant':
+                planetTypeLabel = 'Gas Giant';
+                break;
+            case 'ice_giant':
+            case 'IceGiant':
+                planetTypeLabel = 'Ice Giant';
+                break;
+            case 'solid':
+            case 'Terrestrial':
+                planetTypeLabel = 'Terrestrial';
+                break;
+            case 'volcanic':
+                planetTypeLabel = 'Volcanic';
+                break;
+            case 'ocean':
+                planetTypeLabel = 'Ocean';
+                break;
+            case 'frozen':
+                planetTypeLabel = 'Frozen';
+                break;
+            case 'desert':
+                planetTypeLabel = 'Desert';
+                break;
+            default:
+                planetTypeLabel = String(body.planetType);
+        }
+        drawStat('Sub Type: ', planetTypeLabel, y);
+        y += lineHeight;
+    }
 
     // Mass
     drawStat('Mass: ', formatNumber(body.mass), y);
