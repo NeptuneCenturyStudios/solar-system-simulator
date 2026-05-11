@@ -23,7 +23,7 @@ export class Earth extends Planet {
      * @param scene The THREE.Scene to which Earth belongs.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-        const earthTrajectory = calculateTrajectory(dependencies.getG(), EARTH_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(dependencies.getG(), EARTH_DIST, SUN_MASS);
 
         const material = new THREE.MeshStandardMaterial({
             map: earthDayTexture,
@@ -42,8 +42,8 @@ export class Earth extends Planet {
                 name: 'Earth',
                 mass: EARTH_MASS,
                 radius: EARTH_RADIUS,
-                pos: earthTrajectory.pos,
-                vel: earthTrajectory.vel,
+                pos: trajectory.pos,
+                vel: trajectory.vel,
                 rotation: {
                     tilt: EARTH_AXIS,
                     speed: EARTH_ROT_SPEED,
