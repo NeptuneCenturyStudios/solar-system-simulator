@@ -260,7 +260,7 @@
                 </label>
                 <div class="control-group">
                     <label
-                        >Gravitational Constant Multiplier (G)
+                        >Gravity Multiplier (G)
                         <span id="gravitational-constant-val" class="val-display">1</span>
                     </label>
                     <div class="slider-row">
@@ -374,10 +374,11 @@
                             <span id="create-radius-val" class="val-display">8</span></label
                         >
                         <input
-                            type="range"
+                            type="number"
                             id="createRadius"
-                            min="1"
-                            max="200000"
+                            class="text-input"
+                            min=".01"
+                            max="4000000000"
                             step="1"
                             value="874"
                         />
@@ -569,10 +570,11 @@
                                 <span id="edit-radius-val" class="val-display">874</span></label
                             >
                             <input
-                                type="range"
+                                type="number"
                                 id="editRadius"
-                                min="1"
-                                max="200000"
+                                class="text-input"
+                                min=".01"
+                                max="5000000000"
                                 step="1"
                                 value="874"
                             />

@@ -314,7 +314,7 @@ export class ManagementPanel extends Panel {
             const display = this.gravitationalConstantDisplay;
             slider.oninput = () => {
                 const value = parseFloat(slider.value);
-                display.textContent = value.toFixed(5);
+                display.textContent = value.toFixed(2);
                 this.emit('gChange', { value });
             };
             (slider.oninput as () => void)();
