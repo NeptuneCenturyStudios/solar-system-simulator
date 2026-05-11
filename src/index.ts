@@ -208,6 +208,10 @@ function collisionScoreEscapeVelocity(body: Body) {
 }
 
 function chooseCollisionWinner(b1: Body, b2: Body) {
+    // Spaceships always lose — they should never absorb anything.
+    if (b1 instanceof Spaceship) return { winner: b2, victim: b1 };
+    if (b2 instanceof Spaceship) return { winner: b1, victim: b2 };
+
     const s1 = collisionScoreEscapeVelocity(b1);
     const s2 = collisionScoreEscapeVelocity(b2);
 

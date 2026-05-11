@@ -190,8 +190,8 @@ export const COMET_PERIHELION_DIST = (88000000 / DIST_SCALE) * SCALE_FACTOR;
 export const COMET_APHELION_DIST = (5250000000 / DIST_SCALE) * SCALE_FACTOR;
 
 // === Flight tuning constants ===
-export const FLIGHT_MAX_SPEED = C * 0.5; // normal max speed cap (units/s) of light speed, chosen to allow for a good sense of speed while still leaving room for boost and warp speeds above it
-export const FLIGHT_BOOST_MAX_SPEED = C * 10; // boost ceiling = 10× normal max speed
+export const FLIGHT_MAX_SPEED = C * 0.02; // normal max speed cap (units/s) of light speed, chosen to allow for a good sense of speed while still leaving room for boost and warp speeds above it
+export const FLIGHT_BOOST_MAX_SPEED = C * 1; // boost ceiling = 5x light speed
 export const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED / 10; // acceleration rate while W/S held (u/s²)
 export const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED / 10; // deceleration rate while W/S held (u/s²)
 export const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED / 10; // acceleration rate while Shift held (u/s²)
