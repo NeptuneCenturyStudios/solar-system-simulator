@@ -1,16 +1,23 @@
 import * as THREE from 'three';
-
-import { CelestialBody } from './celestial-body';
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
-import { PLUTO_DIST, PLUTO_MASS, SUN_MASS, PLUTO_RADIUS, PLUTO_AXIS, PLUTO_ROT_SPEED,  } from '../utilities/consts.js';
+import { createUniqueId } from '../utilities/utilities.js';
+import {
+    PLUTO_DIST,
+    PLUTO_MASS,
+    SUN_MASS,
+    PLUTO_RADIUS,
+    PLUTO_AXIS,
+    PLUTO_ROT_SPEED,
+} from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
+import { PlanetTypeEnum } from '../utilities/body-params';
+import { DwarfPlanet } from './dwarf-planet';
 
 /**
  * Represents the dwarf planet Pluto in the simulation, including its texture and orbital properties.
  * Sets up Pluto's trajectory, material, and physical parameters.
  */
-export class Pluto extends CelestialBody {
+export class Pluto extends DwarfPlanet {
     /**
      * Constructs a new Pluto object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
@@ -32,22 +39,19 @@ export class Pluto extends CelestialBody {
         super(
             dependencies,
             scene,
-            PLUTO_RADIUS,
-            0xffffff,
-            trajectory.pos,
-            trajectory.vel,
-            PLUTO_MASS,
-            createUniqueId('pluto'),
-            'Pluto',
-            BodyTypeEnum.DwarfPlanet,
-            0xddbb99,
-            20000,
-            false,
             {
-                tilt: PLUTO_AXIS,
-                speed: PLUTO_ROT_SPEED,
+                id: createUniqueId('pluto'),
+                name: 'Pluto',
+                mass: PLUTO_MASS,
+                radius: PLUTO_RADIUS,
+                pos: trajectory.pos,
+                vel: trajectory.vel,
+                bodySubtype: PlanetTypeEnum.Terrestrial,
+                trailColor: 0xddbb99,
+                maxTrail: 20000,
+                hasRings: false,
+                rotation: { tilt: PLUTO_AXIS, speed: PLUTO_ROT_SPEED },
             },
-            undefined,
             material
         );
     }

@@ -1,8 +1,6 @@
 import * as THREE from 'three';
-
-import { CelestialBody } from './celestial-body';
 import { calculateTrajectory } from '../physics/physics.js';
-import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
+import { createUniqueId } from '../utilities/utilities.js';
 import {
     SATURN_DIST,
     SATURN_MASS,
@@ -12,12 +10,14 @@ import {
     SATURN_ROT_SPEED,
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
+import { Planet } from './planet';
+import { PlanetTypeEnum } from '../utilities/body-params';
 
 /**
  * Represents the planet Saturn in the simulation, including its texture and orbital properties.
  * Sets up Saturn's trajectory, material, and physical parameters.
  */
-export class Saturn extends CelestialBody {
+export class Saturn extends Planet {
     /**
      * Constructs a new Saturn object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
@@ -43,25 +43,20 @@ export class Saturn extends CelestialBody {
         super(
             dependencies,
             scene,
-            SATURN_RADIUS,
-            0xe6cc80,
-            trajectory.pos,
-            trajectory.vel,
-            SATURN_MASS,
-            createUniqueId('saturn'),
-            'Saturn',
-            BodyTypeEnum.GasGiant,
-            0xffeebb,
-            12000,
-            true,
             {
-                tilt: SATURN_AXIS,
-                speed: SATURN_ROT_SPEED,
+                id: createUniqueId('saturn'),
+                name: 'Saturn',
+                mass: SATURN_MASS,
+                radius: SATURN_RADIUS,
+                pos: trajectory.pos,
+                vel: trajectory.vel,
+                bodySubtype: PlanetTypeEnum.GasGiant,
+                trailColor: 0xffeebb,
+                maxTrail: 12000,
+                hasRings: true,
+                rotation: { tilt: SATURN_AXIS, speed: SATURN_ROT_SPEED },
             },
-            undefined,
             material
         );
-
-        
     }
 }
