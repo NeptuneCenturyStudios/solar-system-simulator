@@ -9,12 +9,16 @@ import { SCALE_FACTOR, C } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-rendering';
 import { IStateDependencies } from '../interfaces';
 
-export interface ICelestialBodyCreationOptions extends IBodyCreationOptions {
+export interface IOrbitalBodyCreationOptions extends IBodyCreationOptions {
     pos: THREE.Vector3;
     vel: THREE.Vector3;
     rotation: IRotation;
     trailColor?: number;
     maxTrail?: number;
+}
+
+export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptions {
+    mesh?: THREE.Mesh;
 }
 
 export interface IMoonCreationOptions extends IBodyCreationOptions {
@@ -57,9 +61,8 @@ export class CelestialBody extends Body {
     tidalLockAngularSpeed: number;
     _tidalLockConfigured: boolean;
     _tidalLockOmegaInitialized: boolean = false;
-    // Private properties for internal state management
-    private rotationSpeed!: number;
-    private rotationAxis!: THREE.Vector3;
+    rotationSpeed!: number;
+    rotationAxis!: THREE.Vector3;
 
     /**
      * Constructs a new CelestialBody with advanced features like trails, rings, clouds, and tidal locking.
@@ -90,28 +93,24 @@ export class CelestialBody extends Body {
         maxTrail = 500,
         hasRings = false,
         rotation: IRotation = { tilt: 0, speed: 0 },
-        geometryFactory?: (radius: number) => THREE.BufferGeometry,
-        material?: THREE.Material,
+        mesh?: THREE.Mesh,
         tidalLock?: ITidalLockOptions
     ) {
         // Create a simple material if one isn't provided, using the specified color.
-        if (!material) {
-            material = new THREE.MeshStandardMaterial({
-                color: color,
-                emissive: 0x000000,
-                emissiveIntensity: 0,
-                roughness: 0.7,
-                metalness: 0.7,
-            });
+        if (!mesh) {
+            mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(radius, 32, 32),
+                new THREE.MeshStandardMaterial({
+                    color: color,
+                    emissive: 0x000000,
+                    emissiveIntensity: 0,
+                    roughness: 0.7,
+                    metalness: 0.7,
+                })
+            );
         }
 
-        // Default geometry is a sphere. Special bodies (e.g. Asteroids) can inject geometry via `geometryFactory`.
-        const geometry =
-            typeof geometryFactory === 'function'
-                ? geometryFactory(radius)
-                : new THREE.SphereGeometry(radius, 32, 32);
-
-        super(dependencies, scene, mass, radius, pos, vel, geometry, material, id, name, bodyType);
+        super(dependencies, scene, mass, radius, pos, vel, mesh, id, name, bodyType);
 
         // Set dependencies
         this.dependencies = dependencies;
@@ -554,7 +553,7 @@ export class CelestialBody extends Body {
 
         // Create the moon
         const moonName = config.name || 'Moon';
-
+        const moonGeometry = new THREE.SphereGeometry(config.radius, 32, 32);
         const moonMaterial =
             moonName === 'Moon'
                 ? new THREE.MeshStandardMaterial({
@@ -573,6 +572,8 @@ export class CelestialBody extends Body {
                       roughness: 0.7,
                       metalness: 0.7,
                   });
+
+        const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²
@@ -598,8 +599,7 @@ export class CelestialBody extends Body {
             config.maxTrail || 1500,
             false,
             { tilt: 0, speed: 0.15 + Math.random() * 0.35 },
-            undefined,
-            moonMaterial,
+            moonMesh,
             {
                 target: this,
                 spinAxisWorld: new THREE.Vector3(0, 1, 0),

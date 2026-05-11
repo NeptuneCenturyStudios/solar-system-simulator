@@ -1,10 +1,18 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
-import { SUN_MASS, VENUS_AXIS, VENUS_DIST, VENUS_MASS, VENUS_RADIUS, VENUS_ROT_SPEED } from '../utilities/consts.js';
-import { BodyTypeEnum, createUniqueId } from '../utilities/utilities.js';
+import {
+    SUN_MASS,
+    VENUS_AXIS,
+    VENUS_DIST,
+    VENUS_MASS,
+    VENUS_RADIUS,
+    VENUS_ROT_SPEED,
+} from '../utilities/consts.js';
+import { createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
-import { CelestialBody } from './celestial-body';
 import { IStateDependencies } from '../interfaces.js';
+import { Planet } from './planet.js';
+import { PlanetTypeEnum } from '../utilities/body-params.js';
 
 const venusTexture = loadSrgbTexture('./assets/textures/venus.jpg');
 const venusAtmosphereTexture = loadSrgbTexture('./assets/textures/venus_atmosphere.jpg');
@@ -13,7 +21,7 @@ const venusAtmosphereTexture = loadSrgbTexture('./assets/textures/venus_atmosphe
  * Represents the planet Venus in the simulation, including its surface and cloud layer.
  * Sets up Venus's trajectory, material, and cloud rendering.
  */
-export class Venus extends CelestialBody {
+export class Venus extends Planet {
     /**
      * Constructs a new Venus object with its unique properties, orbit, and cloud layer.
      * @param dependencies State dependencies for the simulation.
@@ -21,7 +29,7 @@ export class Venus extends CelestialBody {
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         const trajectory = calculateTrajectory(dependencies.getG(), VENUS_DIST, SUN_MASS);
-
+        const geometry = new THREE.SphereGeometry(VENUS_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: venusTexture,
             color: 0xffffff,
@@ -30,28 +38,22 @@ export class Venus extends CelestialBody {
             roughness: 0.7,
             metalness: 0.7,
         });
+        const mesh = new THREE.Mesh(geometry, material);
 
-        super(
-            dependencies,
-            scene,
-            VENUS_RADIUS,
-            0xffc649,
-            trajectory.pos,
-            trajectory.vel,
-            VENUS_MASS,
-            createUniqueId('venus'),
-            'Venus',
-            BodyTypeEnum.Planet,
-            0xffdd88,
-            3500,
-            false,
-            {
-                tilt: VENUS_AXIS,
-                speed: VENUS_ROT_SPEED,
-            },
-            undefined,
-            material
-        );
+        super(dependencies, scene, {
+            id: createUniqueId('venus'),
+            name: 'Venus',
+            mass: VENUS_MASS,
+            radius: VENUS_RADIUS,
+            pos: trajectory.pos,
+            vel: trajectory.vel,
+            bodySubtype: PlanetTypeEnum.Terrestrial,
+            trailColor: 0xffdd88,
+            maxTrail: 3500,
+            hasRings: false,
+            rotation: { tilt: VENUS_AXIS, speed: VENUS_ROT_SPEED },
+            mesh: mesh,
+        });
 
         const cloudsMat = new THREE.MeshStandardMaterial({
             map: venusAtmosphereTexture,

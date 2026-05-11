@@ -124,6 +124,7 @@ import { EventLogEntry } from './event-log/event-log';
 import { Halley } from './bodies/halley';
 import { IStateDependencies } from './interfaces';
 import { Sun } from './bodies/sun';
+import { GenericComet } from './bodies/generic-comet';
 
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
@@ -2577,6 +2578,7 @@ function createNewBody(
                     : 500000000,
             lightDistance: 524400,
             rotation: { tilt: 0, speed: 0.08 },
+            mesh: undefined, // use default star material/mesh
         });
 
         if (typeof customLightIntensity === 'number' && isFinite(customLightIntensity)) {
@@ -2623,6 +2625,7 @@ function createNewBody(
               ? fictionalIceTextures
               : fictionalTextures;
 
+        const geometry = new THREE.SphereGeometry(planetRadius, 32, 32);
         const planetMaterial = new THREE.MeshStandardMaterial({
             map: pickRandom(planetTexturePool),
             color: 0xffffff, // keep texture untinted
@@ -2631,6 +2634,7 @@ function createNewBody(
             roughness: 0.7,
             metalness: 0.7,
         });
+        const mesh = new THREE.Mesh(geometry, planetMaterial);
 
         newBody = new CelestialBody(
             dependencies,
@@ -2647,8 +2651,7 @@ function createNewBody(
             3000,
             false,
             { tilt: 0, speed: planetRotationSpeed },
-            undefined,
-            planetMaterial
+            mesh
         );
 
         // Optional atmosphere/cloud layer (checkbox-driven for custom solid planets only)
@@ -2736,6 +2739,7 @@ function createNewBody(
             // Moon velocity = parent velocity + orbital velocity
             const moonSpawnVel = parentVel.clone().addScaledVector(orbitDir, orbitSpeed);
 
+            const geometry = new THREE.SphereGeometry(moonRadius, 32, 32);
             // Random texture per custom moon instance
             const moonMaterial = new THREE.MeshStandardMaterial({
                 map: pickRandom(fictionalTextures),
@@ -2745,6 +2749,7 @@ function createNewBody(
                 roughness: 0.7,
                 metalness: 0.7,
             });
+            const mesh = new THREE.Mesh(geometry, moonMaterial);
 
             newBody = new CelestialBody(
                 dependencies,
@@ -2761,8 +2766,7 @@ function createNewBody(
                 1000,
                 false,
                 { tilt: 0, speed: moonRotationSpeed },
-                undefined,
-                moonMaterial
+                mesh
             );
 
             // Optional atmosphere/cloud layer (checkbox-driven for custom bodies)
@@ -2836,28 +2840,16 @@ function createNewBody(
             mass: customMass,
             radius: customRadius,
         });
-        const cometMaterial = new THREE.MeshStandardMaterial({
-            color: 0x888888,
-            emissive: 0x000000,
-            emissiveIntensity: 0,
-            roughness: 0.7,
-            metalness: 0.6,
-        });
 
-        newBody = new Comet(
-            dependencies,
-            scene,
-            {
-                radius: cometRadius,
-                pos: cometSpawnPos,
-                vel: cometOrbitVel,
-                mass: cometMass,
-                id: createUniqueId('comet'),
-                name: generateIAUName(BodyTypeEnum.Comet),
-                rotation: { tilt: 0, speed: 0.05 },
-            },
-            cometMaterial
-        );
+        newBody = new GenericComet(dependencies, scene, {
+            radius: cometRadius,
+            pos: cometSpawnPos,
+            vel: cometOrbitVel,
+            mass: cometMass,
+            id: createUniqueId('comet'),
+            name: generateIAUName(BodyTypeEnum.Comet),
+            rotation: { tilt: 0, speed: 0.05 },
+        });
     } else if (bodyType === 'black_hole') {
         const bhSpawnPos = getNearCameraSpawnPos();
         const { mass: bhMass } = randomBlackHoleParams({ mass: customMass });
@@ -3035,6 +3027,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             lightIntensity: 500000000,
             lightDistance: 524400,
             rotation: { tilt: 0, speed: 0.08 },
+            mesh: undefined, // use default star material/mesh
         });
         simulationState.bodies.push(orbitingStar);
 

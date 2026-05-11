@@ -50,6 +50,10 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
     ) {
         const EVENT_HORIZON_RADIUS = BlackHole.massToEventHorizonRadius(mass);
         const BLACK_HOLE_COLOR = 0x000000; // Pure black
+        // The mesh is a simple sphere; the visual complexity comes from the accretion disk and jet effects.
+        const geometry = new THREE.SphereGeometry(EVENT_HORIZON_RADIUS, 32, 32);
+        const material = new THREE.MeshBasicMaterial({ color: BLACK_HOLE_COLOR });
+        const mesh = new THREE.Mesh(geometry, material);
 
         super(
             dependencies,
@@ -66,8 +70,7 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
             500,
             false,
             rotation,
-            undefined,
-            new THREE.MeshBasicMaterial({ color: 0x000000 })
+            mesh
         );
 
         this.dependencies = dependencies;

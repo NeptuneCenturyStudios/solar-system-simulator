@@ -89,6 +89,26 @@ export class Pulsar extends Star implements IMassTransferBody {
             speed: newSpeed,
         };
 
+        const textures = {
+            sunTexture: pulsarTexture,
+            redStarTexture: null,
+            orangeStarTexture: null,
+            whiteStarTexture: null,
+            blueStarTexture: null,
+            whiteDwarfTexture: null,
+            brownDwarfTexture: null,
+        };
+
+        const geometry = new THREE.SphereGeometry(pulsarRadius, 32, 32);
+        const material = new THREE.MeshStandardMaterial({
+            map: pulsarTexture,
+            color: 0xffffff,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.7,
+            metalness: 0.95,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
 
         const options: IStarCreationOptions = {
             pos,
@@ -101,22 +121,12 @@ export class Pulsar extends Star implements IMassTransferBody {
             lightIntensity: PULSAR_LIGHT_INTENSITY,
             lightDistance: PULSAR_LIGHT_DISTANCE,
             rotation: newRotation,
-        };
-
-        const textures = {
-            sunTexture: pulsarTexture,
-            redStarTexture: null,
-            orangeStarTexture: null,
-            whiteStarTexture: null,
-            blueStarTexture: null,
-            whiteDwarfTexture: null,
-            brownDwarfTexture: null,
+            mesh: mesh,
         };
 
         super(dependencies, scene, options, textures);
 
         this.bodyType = BodyTypeEnum.Pulsar | BodyTypeEnum.Star;
-
 
         // Compute spin axis from tilt (YZ plane, as in CelestialBody)
         const tiltRad = (newRotation.tilt * Math.PI) / 180;
@@ -137,7 +147,6 @@ export class Pulsar extends Star implements IMassTransferBody {
             .clone()
             .applyQuaternion(new THREE.Quaternion().setFromAxisAngle(_magAxisPerp, _magOffsetAngle))
             .normalize();
-
 
         this.beam = new PulsarBeam(
             dependencies,

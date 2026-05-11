@@ -30,7 +30,7 @@ export class Uranus extends Planet {
         uranusTexture: THREE.Texture
     ) {
         const trajectory = calculateTrajectory(dependencies.getG(), URANUS_DIST, SUN_MASS);
-
+        const geometry = new THREE.SphereGeometry(URANUS_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: uranusTexture,
             color: 0xffffff,
@@ -39,24 +39,21 @@ export class Uranus extends Planet {
             roughness: 0.7,
             metalness: 0.7,
         });
+        const mesh = new THREE.Mesh(geometry, material);
 
-        super(
-            dependencies,
-            scene,
-            {
-                id: createUniqueId('uranus'),
-                name: 'Uranus',
-                mass: URANUS_MASS,
-                radius: URANUS_RADIUS,
-                pos: trajectory.pos,
-                vel: trajectory.vel,
-                bodySubtype: PlanetTypeEnum.IceGiant,
-                trailColor: 0x88ddff,
-                maxTrail: 15000,
-                hasRings: false,
-                rotation: { tilt: URANUS_AXIS, speed: URANUS_ROT_SPEED },
-            },
-            material
-        );
+        super(dependencies, scene, {
+            id: createUniqueId('uranus'),
+            name: 'Uranus',
+            mass: URANUS_MASS,
+            radius: URANUS_RADIUS,
+            pos: trajectory.pos,
+            vel: trajectory.vel,
+            bodySubtype: PlanetTypeEnum.IceGiant,
+            trailColor: 0x88ddff,
+            maxTrail: 15000,
+            hasRings: false,
+            rotation: { tilt: URANUS_AXIS, speed: URANUS_ROT_SPEED },
+            mesh: mesh,
+        });
     }
 }

@@ -44,6 +44,7 @@ export class Spaceship extends Body {
         // Invisible placeholder mesh — replaced by the loaded OBJ group once ready.
         const placeholderGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
         const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
+        const placeholderMesh = new THREE.Mesh(placeholderGeometry, placeholderMaterial);
 
         const radius = 0.01 * SF; // Approximate half-wingspan for collision purposes
 
@@ -55,8 +56,7 @@ export class Spaceship extends Body {
             radius,
             position,
             velocity,
-            placeholderGeometry,
-            placeholderMaterial,
+            placeholderMesh,
             id,
             'Spaceship',
             BodyTypeEnum.SpaceShip
@@ -86,7 +86,9 @@ export class Spaceship extends Body {
                 materials.preload();
                 const objLoader = new OBJLoader();
                 objLoader.setMaterials(materials);
-                return objLoader.loadAsync('./assets/models/Lo_poly_Spaceship_01_by_Liz_Reddington.obj');
+                return objLoader.loadAsync(
+                    './assets/models/Lo_poly_Spaceship_01_by_Liz_Reddington.obj'
+                );
             })
             .then((group) => {
                 // Compute bounding box of the unscaled model (group at world origin, no parent).

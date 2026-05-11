@@ -1,4 +1,4 @@
-import { Star, IStarCreationOptions } from './star';
+import { Star } from './star';
 import { IStateDependencies } from '../interfaces';
 import { loadSrgbTexture } from '../drawing/textures';
 import { BodyTypeEnum } from '../utilities/utilities';
@@ -38,18 +38,16 @@ export class WhiteDwarf extends Star {
         // Mass to radius relationship for white dwarfs (no clamping)
         const radius = massToWhiteDwarfRadius(mass);
 
-        const options: IStarCreationOptions = {
-            pos,
-            vel: new THREE.Vector3(0, 0, 0),
-            mass,
-            radius,
-            id,
-            name,
-            temperature: WHITE_DWARF_TEMPERATURE,
-            lightIntensity: WHITE_DWARF_LIGHT_INTENSITY,
-            lightDistance: WHITE_DWARF_LIGHT_DISTANCE,
-            rotation,
-        };
+        const geometry = new THREE.SphereGeometry(radius, 32, 32);
+        const material = new THREE.MeshStandardMaterial({
+            map: whiteDwarfTexture,
+            color: 0xffffff,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.7,
+            metalness: 0.95,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
 
         const textures = {
             sunTexture: whiteDwarfTexture,
@@ -61,7 +59,24 @@ export class WhiteDwarf extends Star {
             brownDwarfTexture: null,
         };
 
-        super(dependencies, scene, options, textures);
+        super(
+            dependencies,
+            scene,
+            {
+                pos,
+                vel: new THREE.Vector3(0, 0, 0),
+                mass,
+                radius,
+                id,
+                name,
+                temperature: WHITE_DWARF_TEMPERATURE,
+                lightIntensity: WHITE_DWARF_LIGHT_INTENSITY,
+                lightDistance: WHITE_DWARF_LIGHT_DISTANCE,
+                rotation,
+                mesh: mesh,
+            },
+            textures
+        );
 
         this.bodyType = BodyTypeEnum.WhiteDwarf | BodyTypeEnum.Star;
     }

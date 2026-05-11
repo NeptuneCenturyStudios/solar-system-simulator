@@ -87,14 +87,19 @@ export class Star extends CelestialBody {
 
         const color = Star.temperatureToColor(options.temperature);
 
-        const starMaterial = new THREE.MeshPhongMaterial({
-            map: textures.sunTexture,
-            color: 0xffffff,
-            emissive: 0xffffff,
-            emissiveMap: textures.sunTexture,
-            emissiveIntensity: 1.0,
-            shininess: 10,
-        });
+        // TODO: Move mesh creation to MainSequenceStar and other derived classes.
+        if (!options.mesh) {
+            const geometry = new THREE.SphereGeometry(options.radius, 64, 64);
+            const starMaterial = new THREE.MeshPhongMaterial({
+                map: textures.sunTexture,
+                color: 0xffffff,
+                emissive: 0xffffff,
+                emissiveMap: textures.sunTexture,
+                emissiveIntensity: 1.0,
+                shininess: 10,
+            });
+            options.mesh = new THREE.Mesh(geometry, starMaterial);
+        }
 
         super(
             dependencies,
@@ -111,8 +116,7 @@ export class Star extends CelestialBody {
             500,
             false,
             options.rotation,
-            undefined,
-            starMaterial
+            options.mesh
         );
 
         this.textures = textures;
@@ -289,7 +293,7 @@ export class Star extends CelestialBody {
     setLightIntensity(intensity: number) {
         this.lightIntensity = intensity;
         if (this.sunLight) {
-            this.sunLight.intensity = intensity / 20000000  ;
+            this.sunLight.intensity = intensity / 20000000;
         }
     }
 

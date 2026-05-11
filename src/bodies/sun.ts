@@ -6,7 +6,6 @@ import { MainSequenceStar } from './main-sequence-star';
 
 export class Sun extends MainSequenceStar {
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-
         super(dependencies, scene, {
             radius: SUN_RADIUS,
             pos: new THREE.Vector3(0, 0, 0),
@@ -18,6 +17,7 @@ export class Sun extends MainSequenceStar {
             lightIntensity: 500000000,
             lightDistance: 5_000_000_000 / DIST_SCALE,
             rotation: { tilt: SUN_AXIS, speed: SUN_ROT_SPEED },
+            mesh: undefined, // Todo, implment star material/mesh in MainSequenceStar and use here
         });
     }
 }

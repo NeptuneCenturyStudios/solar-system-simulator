@@ -30,7 +30,7 @@ export class Jupiter extends Planet {
         jupiterTexture: THREE.Texture
     ) {
         const trajectory = calculateTrajectory(dependencies.getG(), JUPITER_DIST, SUN_MASS);
-
+        const geometry = new THREE.SphereGeometry(JUPITER_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: jupiterTexture,
             color: 0xffffff,
@@ -39,24 +39,21 @@ export class Jupiter extends Planet {
             roughness: 0.7,
             metalness: 0.85,
         });
+        const mesh = new THREE.Mesh(geometry, material);
 
-        super(
-            dependencies,
-            scene,
-            {
-                id: createUniqueId('jupiter'),
-                name: 'Jupiter',
-                mass: JUPITER_MASS,
-                radius: JUPITER_RADIUS,
-                pos: trajectory.pos,
-                vel: trajectory.vel,
-                bodySubtype: PlanetTypeEnum.GasGiant,
-                trailColor: 0xffcc88,
-                maxTrail: 5000,
-                hasRings: false,
-                rotation: { tilt: JUPITER_AXIS, speed: JUPITER_ROT_SPEED },
-            },
-            material
-        );
+        super(dependencies, scene, {
+            id: createUniqueId('jupiter'),
+            name: 'Jupiter',
+            mass: JUPITER_MASS,
+            radius: JUPITER_RADIUS,
+            pos: trajectory.pos,
+            vel: trajectory.vel,
+            bodySubtype: PlanetTypeEnum.GasGiant,
+            trailColor: 0xffcc88,
+            maxTrail: 5000,
+            hasRings: false,
+            rotation: { tilt: JUPITER_AXIS, speed: JUPITER_ROT_SPEED },
+            mesh: mesh,
+        });
     }
 }

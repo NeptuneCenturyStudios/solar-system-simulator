@@ -323,7 +323,11 @@ export class ManagementPanel extends Panel {
         this.gravitationalConstantResetBtn = document.getElementById(
             'gravitationalConstantResetBtn'
         ) as HTMLButtonElement | null;
-        if (this.gravitationalConstantResetBtn && this.gravitationalConstantSlider && this.gravitationalConstantDisplay) {
+        if (
+            this.gravitationalConstantResetBtn &&
+            this.gravitationalConstantSlider &&
+            this.gravitationalConstantDisplay
+        ) {
             const slider = this.gravitationalConstantSlider;
             const display = this.gravitationalConstantDisplay;
             this.gravitationalConstantResetBtn.onclick = () => {

@@ -26,7 +26,7 @@ export class Pluto extends DwarfPlanet {
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, plutoTexture: THREE.Texture) {
         const trajectory = calculateTrajectory(dependencies.getG(), PLUTO_DIST, SUN_MASS);
-
+        const geometry = new THREE.SphereGeometry(PLUTO_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
             map: plutoTexture,
             color: 0xffffff,
@@ -35,24 +35,21 @@ export class Pluto extends DwarfPlanet {
             roughness: 0.7,
             metalness: 0.95,
         });
+        const mesh = new THREE.Mesh(geometry, material);
 
-        super(
-            dependencies,
-            scene,
-            {
-                id: createUniqueId('pluto'),
-                name: 'Pluto',
-                mass: PLUTO_MASS,
-                radius: PLUTO_RADIUS,
-                pos: trajectory.pos,
-                vel: trajectory.vel,
-                bodySubtype: PlanetTypeEnum.Terrestrial,
-                trailColor: 0xddbb99,
-                maxTrail: 20000,
-                hasRings: false,
-                rotation: { tilt: PLUTO_AXIS, speed: PLUTO_ROT_SPEED },
-            },
-            material
-        );
+        super(dependencies, scene, {
+            id: createUniqueId('pluto'),
+            name: 'Pluto',
+            mass: PLUTO_MASS,
+            radius: PLUTO_RADIUS,
+            pos: trajectory.pos,
+            vel: trajectory.vel,
+            bodySubtype: PlanetTypeEnum.Terrestrial,
+            trailColor: 0xddbb99,
+            maxTrail: 20000,
+            hasRings: false,
+            rotation: { tilt: PLUTO_AXIS, speed: PLUTO_ROT_SPEED },
+            mesh: mesh,
+        });
     }
 }

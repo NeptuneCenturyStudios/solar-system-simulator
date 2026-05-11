@@ -48,8 +48,7 @@ export class Body {
         radius: number,
         position: THREE.Vector3,
         velocity: THREE.Vector3,
-        geometry: THREE.BufferGeometry,
-        material: THREE.Material,
+        mesh: THREE.Mesh,
         id: string,
         name: string,
         bodyType: BodyTypeEnum
@@ -61,8 +60,7 @@ export class Body {
         this.id = id;
         this.name = name;
         this.bodyType = bodyType;
-
-        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh = mesh;
 
         if (position instanceof THREE.Vector3) {
             this.mesh.position.copy(position);

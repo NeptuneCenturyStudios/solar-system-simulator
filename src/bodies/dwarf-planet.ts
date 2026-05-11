@@ -5,7 +5,6 @@ import { CelestialBody } from './celestial-body';
 import { BodyTypeEnum } from '../utilities/utilities';
 import { IPlanetCreationOptions } from './planet';
 
-
 /**
  * Planet class representing a planet in the solar system simulator.
  * Inherits from CelestialBody and can be extended with planet-specific properties and methods.
@@ -16,8 +15,7 @@ export class DwarfPlanet extends CelestialBody {
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        options: IPlanetCreationOptions,
-        material: THREE.Material
+        options: IPlanetCreationOptions
     ) {
         {
             super(
@@ -35,8 +33,7 @@ export class DwarfPlanet extends CelestialBody {
                 options.maxTrail ?? 500,
                 options.hasRings ?? false,
                 options.rotation,
-                undefined,
-                material
+                options.mesh
             );
 
             this.planetType = options.bodySubtype;

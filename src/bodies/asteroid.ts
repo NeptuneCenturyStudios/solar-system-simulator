@@ -25,11 +25,7 @@ export class Asteroid extends CelestialBody {
      * Represents an asteroid in the simulation, inheriting from CelestialBody.
      * Randomizes shape, color, and physical properties if not provided.
      */
-    constructor(
-        deps: IStateDependencies,
-        scene: THREE.Scene,
-        options: IAsteroidOptions
-    ) {
+    constructor(deps: IStateDependencies, scene: THREE.Scene, options: IAsteroidOptions) {
         const {
             radius = 0.5 + Math.random() * 2,
             color = 0x666666 + Math.random() * 0x444444,
@@ -52,6 +48,7 @@ export class Asteroid extends CelestialBody {
         // Geometry factory returns a placeholder geometry until OBJ loads
         const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
         const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
+        const placeholderMesh = new THREE.Mesh(geometryFactory(), placeholderMaterial);
 
         super(
             deps,
@@ -68,8 +65,7 @@ export class Asteroid extends CelestialBody {
             maxTrail,
             false,
             { tilt: 0, speed: 0 },
-            geometryFactory,
-            placeholderMaterial
+            placeholderMesh
         );
 
         // Async OBJ + MTL load for Asteroid model
@@ -120,7 +116,7 @@ export class Asteroid extends CelestialBody {
             Math.random() - 0.5,
             Math.random() - 0.5
         ).normalize();
-        
+
         const rotationSpeed = 0.6 + Math.random() * 1.2;
 
         this.updateRotation(rotationAxis, rotationSpeed);

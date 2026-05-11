@@ -291,14 +291,16 @@ export class ShipFlame implements IShipEffect {
         // cameraPos so float32 values are small and precise regardless of distance.
         this.glowInner.position.copy(cameraPos);
         this.glowOuter.position.copy(cameraPos);
-        const cpx = cameraPos.x, cpy = cameraPos.y, cpz = cameraPos.z;
+        const cpx = cameraPos.x,
+            cpy = cameraPos.y,
+            cpz = cameraPos.z;
         let n = 0;
         for (let i = 0; i < MAX_PARTICLES; i++) {
             if (this.life[i] < 0) continue;
             const t = this.life[i]; // 0 = birth, 1 = death
             const alive = 1 - t;
 
-            this.gpuPos[n * 3]     = this.px[i] - cpx;
+            this.gpuPos[n * 3] = this.px[i] - cpx;
             this.gpuPos[n * 3 + 1] = this.py[i] - cpy;
             this.gpuPos[n * 3 + 2] = this.pz[i] - cpz;
 

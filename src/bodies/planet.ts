@@ -19,8 +19,7 @@ export class Planet extends CelestialBody {
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        options: IPlanetCreationOptions,
-        material: THREE.Material
+        options: IPlanetCreationOptions
     ) {
         {
             super(
@@ -38,8 +37,7 @@ export class Planet extends CelestialBody {
                 options.maxTrail ?? 500,
                 options.hasRings ?? false,
                 options.rotation,
-                undefined,
-                material
+                options.mesh
             );
 
             this.planetType = options.bodySubtype;

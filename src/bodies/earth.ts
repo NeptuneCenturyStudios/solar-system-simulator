@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
-import { SUN_MASS, EARTH_MASS, EARTH_DIST, EARTH_RADIUS, EARTH_AXIS, EARTH_ROT_SPEED } from '../utilities/consts.js';
+import {
+    SUN_MASS,
+    EARTH_MASS,
+    EARTH_DIST,
+    EARTH_RADIUS,
+    EARTH_AXIS,
+    EARTH_ROT_SPEED,
+} from '../utilities/consts.js';
 import { createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
@@ -24,7 +31,7 @@ export class Earth extends Planet {
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         const trajectory = calculateTrajectory(dependencies.getG(), EARTH_DIST, SUN_MASS);
-
+        const geometry = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: earthDayTexture,
             color: 0xffffff,
@@ -33,27 +40,24 @@ export class Earth extends Planet {
             roughness: 0.7,
             metalness: 0.7,
         });
+        const mesh = new THREE.Mesh(geometry, material);
 
-        super(
-            dependencies,
-            scene,
-            {
-                id: createUniqueId('earth'),
-                name: 'Earth',
-                mass: EARTH_MASS,
-                radius: EARTH_RADIUS,
-                pos: trajectory.pos,
-                vel: trajectory.vel,
-                rotation: {
-                    tilt: EARTH_AXIS,
-                    speed: EARTH_ROT_SPEED,
-                },
-                trailColor: 0x88ccff,
-                maxTrail: 4500,
-                bodySubtype: PlanetTypeEnum.Terrestrial,
+        super(dependencies, scene, {
+            id: createUniqueId('earth'),
+            name: 'Earth',
+            mass: EARTH_MASS,
+            radius: EARTH_RADIUS,
+            pos: trajectory.pos,
+            vel: trajectory.vel,
+            rotation: {
+                tilt: EARTH_AXIS,
+                speed: EARTH_ROT_SPEED,
             },
-            material
-        );
+            trailColor: 0x88ccff,
+            maxTrail: 4500,
+            bodySubtype: PlanetTypeEnum.Terrestrial,
+            mesh: mesh,
+        });
 
         // Cloud layer (UV sphere slightly above surface)
         const cloudsMat = new THREE.MeshStandardMaterial({

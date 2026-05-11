@@ -30,7 +30,7 @@ export class Saturn extends Planet {
         saturnTexture: THREE.Texture
     ) {
         const trajectory = calculateTrajectory(dependencies.getG(), SATURN_DIST, SUN_MASS);
-
+        const geometry = new THREE.SphereGeometry(SATURN_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: saturnTexture,
             color: 0xffffff,
@@ -39,24 +39,21 @@ export class Saturn extends Planet {
             roughness: 0.7,
             metalness: 0.7,
         });
+        const mesh = new THREE.Mesh(geometry, material);
 
-        super(
-            dependencies,
-            scene,
-            {
-                id: createUniqueId('saturn'),
-                name: 'Saturn',
-                mass: SATURN_MASS,
-                radius: SATURN_RADIUS,
-                pos: trajectory.pos,
-                vel: trajectory.vel,
-                bodySubtype: PlanetTypeEnum.GasGiant,
-                trailColor: 0xffeebb,
-                maxTrail: 12000,
-                hasRings: true,
-                rotation: { tilt: SATURN_AXIS, speed: SATURN_ROT_SPEED },
-            },
-            material
-        );
+        super(dependencies, scene, {
+            id: createUniqueId('saturn'),
+            name: 'Saturn',
+            mass: SATURN_MASS,
+            radius: SATURN_RADIUS,
+            pos: trajectory.pos,
+            vel: trajectory.vel,
+            bodySubtype: PlanetTypeEnum.GasGiant,
+            trailColor: 0xffeebb,
+            maxTrail: 12000,
+            hasRings: true,
+            rotation: { tilt: SATURN_AXIS, speed: SATURN_ROT_SPEED },
+            mesh: mesh,
+        });
     }
 }

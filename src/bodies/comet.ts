@@ -5,7 +5,6 @@ import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { IStateDependencies } from '../interfaces.js';
 import { performanceSettings } from '../utilities/consts';
-import { MTLLoader, OBJLoader } from 'three/examples/jsm/Addons.js';
 
 /**
  * This class represents a comet, which is a type of celestial body with a nucleus and a tail. The tail is created using a particle system that emits particles in the opposite direction
@@ -15,7 +14,7 @@ import { MTLLoader, OBJLoader } from 'three/examples/jsm/Addons.js';
  * Represents a comet in the simulation, including its nucleus and particle tail.
  * Inherits from CelestialBody and adds comet-specific tail rendering and logic.
  */
-export class Comet extends CelestialBody {
+export abstract class Comet extends CelestialBody {
     private tailCount: number;
     private tailGeo: THREE.BufferGeometry | null;
     private tailMat: THREE.PointsMaterial | null;
@@ -44,10 +43,6 @@ export class Comet extends CelestialBody {
         scene: THREE.Scene,
         options: ICelestialBodyCreationOptions
     ) {
-        // Geometry factory returns a placeholder geometry until OBJ loads
-        const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
-        const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
-
         super(
             deps,
             scene,
@@ -63,51 +58,8 @@ export class Comet extends CelestialBody {
             options.maxTrail ?? 2000,
             false,
             options.rotation,
-            geometryFactory,
-            placeholderMaterial
+            options.mesh
         );
-
-        // Async OBJ + MTL load for Comet model
-        const mtlLoader = new MTLLoader();
-        mtlLoader.setPath('./assets/models/');
-        mtlLoader
-            .loadAsync('Asteroid1.mtl')
-            .then((materials) => {
-                materials.preload();
-                const objLoader = new OBJLoader();
-                objLoader.setMaterials(materials);
-                return objLoader.loadAsync('./assets/models/asteroid.obj');
-            })
-            .then((group) => {
-                // Compute bounding box of the unscaled model
-                const bbox = new THREE.Box3().setFromObject(group);
-                const size = new THREE.Vector3();
-                bbox.getSize(size);
-                const longestDim = Math.max(size.x, size.y, size.z);
-                // Use this.radius to match the instance's radius
-                const scale = this.radius / (longestDim * 0.5);
-                group.scale.setScalar(scale);
-
-                // Re-compute bbox after scaling to find the center
-                group.updateMatrixWorld(true);
-                const scaledBbox = new THREE.Box3().setFromObject(group);
-                const center = new THREE.Vector3();
-                scaledBbox.getCenter(center);
-                group.position.sub(center);
-
-                // Enable shadows on every sub-mesh
-                group.traverse((child) => {
-                    if ((child as THREE.Mesh).isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
-                });
-
-                this.mesh.add(group);
-            })
-            .catch((e) => {
-                console.warn('asteroid1 OBJ/MTL load failed — using placeholder mesh', e);
-            });
 
         this.tailCount = 1200;
         this.tailGeo = new THREE.BufferGeometry();
@@ -295,7 +247,8 @@ float alpha = vLife * strength;`
         // Scale tail intensity based on distance (closer = brighter/longer)
         // Intensity reference: full tail at Earth-orbit distance (~1.5e8 km)^2 = 2.25e16.
         // Apply the inverse square law.
-        const tailIntensity = Math.min(1, (2.25e16 * SCALE_FACTOR) / distToSunSq);
+        //2.25e16
+        const tailIntensity = Math.min(1, (10000 * SCALE_FACTOR) / distToSunSq);
 
         // Direction away from sun (normalized once)
         const invDistToSun = 1 / distToSun;
@@ -308,12 +261,12 @@ float alpha = vLife * strength;`
         // intensityBonus=35000 → up to ~5,000,000 km extra near perihelion (Earth-orbit)
         // velocityBonus        → small extra length proportional to comet speed
         const baseTailLength = 3500 * SCALE_FACTOR;
-        const intensityBonus = tailIntensity * 35000 * SCALE_FACTOR;
-        const velocityBonus = cometSpeed * 200 * SCALE_FACTOR;
+        const intensityBonus = tailIntensity * 2 * SCALE_FACTOR;
+        const velocityBonus = cometSpeed * 1 * SCALE_FACTOR;
         const targetTailLength = baseTailLength + intensityBonus + velocityBonus;
 
         // Convert tail length to life increment
-        const avgParticleSpeed = 0.35;
+        const avgParticleSpeed = 0.7;
         const lifeIncrement = (avgParticleSpeed * 60) / targetTailLength;
 
         const dtScaled = Math.abs(dt) * 6000;
