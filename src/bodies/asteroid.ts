@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
 import { IStateDependencies } from '../interfaces.js';
 
@@ -18,36 +20,17 @@ export interface IAsteroidOptions {
     metalness?: number;
 }
 
-/**
- * Creates a random polyhedron geometry by distorting an icosahedron.
- * Used to give asteroids a more natural, irregular shape.
- * @param radius The base radius of the polyhedron.
- * @returns A THREE.BufferGeometry representing the distorted polyhedron.
- */
-function createRandomPolyhedron(radius: number): THREE.BufferGeometry {
-    const geometry = new THREE.IcosahedronGeometry(radius, 0);
-    const positions = geometry.attributes.position.array;
-
-    for (let i = 0; i < positions.length; i += 3) {
-        const distortionFactor = 0.3 + Math.random() * 0.4;
-        positions[i] *= distortionFactor;
-        positions[i + 1] *= distortionFactor;
-        positions[i + 2] *= distortionFactor;
-    }
-
-    geometry.computeVertexNormals();
-    return geometry;
-}
-
-/**
- * Represents an asteroid in the simulation, inheriting from CelestialBody.
- * Randomizes shape, color, and physical properties if not provided.
- */
 export class Asteroid extends CelestialBody {
+    /**
+     * Represents an asteroid in the simulation, inheriting from CelestialBody.
+     * Randomizes shape, color, and physical properties if not provided.
+     */
     constructor(
         deps: IStateDependencies,
         scene: THREE.Scene,
-        {
+        options: IAsteroidOptions
+    ) {
+        const {
             radius = 0.5 + Math.random() * 2,
             color = 0x666666 + Math.random() * 0x444444,
             pos,
@@ -57,10 +40,8 @@ export class Asteroid extends CelestialBody {
             name = null,
             trailColor = 0x888888,
             maxTrail = 1500,
-            roughness = 0.9,
-            metalness = 0.1,
-        }: IAsteroidOptions
-    ) {
+        } = options;
+
         if (!pos || !vel) {
             throw new Error('Asteroid requires { pos, vel }');
         }
@@ -68,17 +49,9 @@ export class Asteroid extends CelestialBody {
         const posVec = Array.isArray(pos) ? new THREE.Vector3(pos[0], pos[1], pos[2]) : pos;
         const velVec = Array.isArray(vel) ? new THREE.Vector3(vel[0], vel[1], vel[2]) : vel;
 
-        const material = new THREE.MeshStandardMaterial({
-            color: color,
-            emissive: 0x000000,
-            emissiveIntensity: 0,
-            roughness: roughness,
-            metalness: metalness,
-        });
-
-        console.log(
-            `Creating asteroid with radius ${radius.toFixed(2)}, mass ${mass.toFixed(3)}, color #${Math.floor(color).toString(16)}`
-        );
+        // Geometry factory returns a placeholder geometry until OBJ loads
+        const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
+        const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
 
         super(
             deps,
@@ -94,20 +67,62 @@ export class Asteroid extends CelestialBody {
             trailColor,
             maxTrail,
             false,
-            {
-                tilt: 0,
-                speed: 0,
-            },
-            (r) => createRandomPolyhedron(r),
-            material
+            { tilt: 0, speed: 0 },
+            geometryFactory,
+            placeholderMaterial
         );
 
+        // Async OBJ + MTL load for Asteroid model
+        const mtlLoader = new MTLLoader();
+        mtlLoader.setPath('./assets/models/');
+        mtlLoader
+            .loadAsync('Asteroid.mtl')
+            .then((materials) => {
+                materials.preload();
+                const objLoader = new OBJLoader();
+                objLoader.setMaterials(materials);
+                return objLoader.loadAsync('./assets/models/Asteroid.obj');
+            })
+            .then((group) => {
+                // Compute bounding box of the unscaled model
+                const bbox = new THREE.Box3().setFromObject(group);
+                const size = new THREE.Vector3();
+                bbox.getSize(size);
+                const longestDim = Math.max(size.x, size.y, size.z);
+                // Use this.radius to match the instance's radius
+                const scale = this.radius / (longestDim * 0.5);
+                group.scale.setScalar(scale);
+
+                // Re-compute bbox after scaling to find the center
+                group.updateMatrixWorld(true);
+                const scaledBbox = new THREE.Box3().setFromObject(group);
+                const center = new THREE.Vector3();
+                scaledBbox.getCenter(center);
+                group.position.sub(center);
+
+                // Enable shadows on every sub-mesh
+                group.traverse((child) => {
+                    if ((child as THREE.Mesh).isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+
+                this.mesh.add(group);
+            })
+            .catch((e) => {
+                console.warn('Asteroid OBJ/MTL load failed — using placeholder mesh', e);
+            });
+
         // Override the axis and speed for a more random tumbling motion
-        this.rotationAxis = new THREE.Vector3(
+        const rotationAxis = new THREE.Vector3(
             Math.random() - 0.5,
             Math.random() - 0.5,
             Math.random() - 0.5
         ).normalize();
-        this.rotationSpeed = 0.6 + Math.random() * 1.2;
+        
+        const rotationSpeed = 0.6 + Math.random() * 1.2;
+
+        this.updateRotation(rotationAxis, rotationSpeed);
     }
 }

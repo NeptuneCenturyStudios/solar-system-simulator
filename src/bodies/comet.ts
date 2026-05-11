@@ -5,33 +5,7 @@ import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { IStateDependencies } from '../interfaces.js';
 import { performanceSettings } from '../utilities/consts';
-
-//export interface ICometCreationOptions extends ICelestialBodyCreationOptions {
-//// Add any comet-specific options here if needed in the future
-//}
-
-/**
- * Helper function to create a random polyhedron geometry for a comet nucleus.
- * Distorts an icosahedron to give the nucleus an irregular, icy shape.
- * @param radius The base radius of the polyhedron.
- * @returns A THREE.BufferGeometry representing the distorted polyhedron.
- */
-function createRandomPolyhedron(radius: number) {
-    // Start with an icosahedron and distort it for an irregular nucleus
-    const geometry = new THREE.IcosahedronGeometry(radius, 0);
-    const positions = geometry.attributes.position.array;
-
-    for (let i = 0; i < positions.length; i += 3) {
-        // Slightly less distortion than asteroids; comets are typically smoother/icy
-        const distortionFactor = 0.6 + Math.random() * 0.5; // 0.6..1.1
-        positions[i] *= distortionFactor;
-        positions[i + 1] *= distortionFactor;
-        positions[i + 2] *= distortionFactor;
-    }
-
-    geometry.computeVertexNormals();
-    return geometry;
-}
+import { MTLLoader, OBJLoader } from 'three/examples/jsm/Addons.js';
 
 /**
  * This class represents a comet, which is a type of celestial body with a nucleus and a tail. The tail is created using a particle system that emits particles in the opposite direction
@@ -68,19 +42,11 @@ export class Comet extends CelestialBody {
     constructor(
         deps: IStateDependencies,
         scene: THREE.Scene,
-        options: ICelestialBodyCreationOptions,
-        material: THREE.Material
+        options: ICelestialBodyCreationOptions
     ) {
-        // Create default material if none provided
-        if (!material) {
-            material = new THREE.MeshStandardMaterial({
-                color: 0x888888,
-                emissive: 0x000000,
-                emissiveIntensity: 0,
-                roughness: 0.7,
-                metalness: 0.6,
-            });
-        }
+        // Geometry factory returns a placeholder geometry until OBJ loads
+        const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
+        const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
 
         super(
             deps,
@@ -97,9 +63,51 @@ export class Comet extends CelestialBody {
             options.maxTrail ?? 2000,
             false,
             options.rotation,
-            (r) => createRandomPolyhedron(r),
-            material
+            geometryFactory,
+            placeholderMaterial
         );
+
+        // Async OBJ + MTL load for Comet model
+        const mtlLoader = new MTLLoader();
+        mtlLoader.setPath('./assets/models/');
+        mtlLoader
+            .loadAsync('Asteroid1.mtl')
+            .then((materials) => {
+                materials.preload();
+                const objLoader = new OBJLoader();
+                objLoader.setMaterials(materials);
+                return objLoader.loadAsync('./assets/models/asteroid.obj');
+            })
+            .then((group) => {
+                // Compute bounding box of the unscaled model
+                const bbox = new THREE.Box3().setFromObject(group);
+                const size = new THREE.Vector3();
+                bbox.getSize(size);
+                const longestDim = Math.max(size.x, size.y, size.z);
+                // Use this.radius to match the instance's radius
+                const scale = this.radius / (longestDim * 0.5);
+                group.scale.setScalar(scale);
+
+                // Re-compute bbox after scaling to find the center
+                group.updateMatrixWorld(true);
+                const scaledBbox = new THREE.Box3().setFromObject(group);
+                const center = new THREE.Vector3();
+                scaledBbox.getCenter(center);
+                group.position.sub(center);
+
+                // Enable shadows on every sub-mesh
+                group.traverse((child) => {
+                    if ((child as THREE.Mesh).isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+
+                this.mesh.add(group);
+            })
+            .catch((e) => {
+                console.warn('asteroid1 OBJ/MTL load failed — using placeholder mesh', e);
+            });
 
         this.tailCount = 1200;
         this.tailGeo = new THREE.BufferGeometry();
@@ -167,7 +175,7 @@ export class Comet extends CelestialBody {
             color: 0xffffff,
             size: 2.5,
             transparent: true,
-            opacity: 1.0,           // per-fragment alpha comes from the shader
+            opacity: 1.0, // per-fragment alpha comes from the shader
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             depthTest: true,
@@ -263,7 +271,9 @@ float alpha = vLife * strength;`
         // Anchor the Points mesh at cameraPos so GPU buffer vertices are camera-relative offsets.
         // This is identical to the pattern used by orbit trails and ship-flame.
         this.tailParticles.position.copy(cameraPos);
-        const cx = cameraPos.x, cy = cameraPos.y, cz = cameraPos.z;
+        const cx = cameraPos.x,
+            cy = cameraPos.y,
+            cz = cameraPos.z;
 
         // Camera-to-comet distance drives particle world-space size.
         // With sizeAttenuation:true, screen_pixels = size * (viewportHeight/2) / cameraDepth.
@@ -310,7 +320,9 @@ float alpha = vLife * strength;`
         const spread = this.radius * 3 * SCALE_FACTOR;
 
         // Nucleus world position — read once outside the loop (float64, exact).
-        const nx = this.mesh.position.x, ny = this.mesh.position.y, nz = this.mesh.position.z;
+        const nx = this.mesh.position.x,
+            ny = this.mesh.position.y,
+            nz = this.mesh.position.z;
 
         // Floor opacity so the tail stays visible even at aphelion (~5.25e9 km), where
         // tailIntensity by inverse-square law drops to ~0.001.  Without this floor the
@@ -359,7 +371,7 @@ float alpha = vLife * strength;`
                 //   → world offset at life L = vel * 6000 * L / lifeIncrement
                 const newLife = Math.random();
                 vel.life = newLife;
-                const posAdv = 6000 * newLife / vel.lifeIncrement;
+                const posAdv = (6000 * newLife) / vel.lifeIncrement;
                 this.tailPx[i] = nx + (Math.random() - 0.5) * spread + vel.vel.x * posAdv;
                 this.tailPy[i] = ny + (Math.random() - 0.5) * spread + vel.vel.y * posAdv;
                 this.tailPz[i] = nz + (Math.random() - 0.5) * spread + vel.vel.z * posAdv;
@@ -368,7 +380,7 @@ float alpha = vLife * strength;`
             // GPU write: subtract camera position from world position in float64, then narrow
             // to float32. The result is always small (distance from camera to particle) so
             // float32 is precise regardless of where in the solar system the comet is.
-            this.tailGpuBuf[idx]     = this.tailPx[i] - cx;
+            this.tailGpuBuf[idx] = this.tailPx[i] - cx;
             this.tailGpuBuf[idx + 1] = this.tailPy[i] - cy;
             this.tailGpuBuf[idx + 2] = this.tailPz[i] - cz;
 

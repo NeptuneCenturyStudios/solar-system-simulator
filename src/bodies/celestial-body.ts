@@ -58,8 +58,8 @@ export class CelestialBody extends Body {
     _tidalLockConfigured: boolean;
     _tidalLockOmegaInitialized: boolean = false;
     // Private properties for internal state management
-    rotationSpeed: number;
-    rotationAxis: THREE.Vector3;
+    private rotationSpeed!: number;
+    private rotationAxis!: THREE.Vector3;
 
     /**
      * Constructs a new CelestialBody with advanced features like trails, rings, clouds, and tidal locking.
@@ -122,18 +122,8 @@ export class CelestialBody extends Body {
         this.bodyType = bodyType;
         this.rotation = rotation;
 
-        // Set rotation speed and axis based on provided rotation info
-        this.rotationSpeed = typeof rotation?.speed === 'number' ? rotation.speed : 0;
-
-        // Orient the mesh so its texture "north" matches Saturn's spin axis
-
-        const up = new THREE.Vector3(0, 1, 0);
-        const tiltRad = (rotation.tilt * Math.PI) / 180;
-        const spinAxis = new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad)); // YZ plane
-        this.mesh.quaternion.setFromUnitVectors(up, spinAxis);
-        // Fix: set rotationAxis to local Y for correct spinning
-        this.rotationAxis = new THREE.Vector3(0, 1, 0);
-
+        // Se the rotation
+        this.setRotation(rotation);
 
         // Optional: tidal-lock behavior (compute spin speed at spawn; do not re-compute later).
         // If the moon's orbit is changed later, it keeps rotating at the spawn speed.
@@ -320,6 +310,42 @@ export class CelestialBody extends Body {
         }
     }
 
+    /**
+     * Sets the rotation of the celestial body, including tilt and spin speed.
+     * @param rotation The rotation parameters, including tilt and speed.
+     */
+    setRotation(rotation: IRotation) {
+        // Orient the mesh so its texture "north" matches Saturn's spin axis
+        const tiltRad = (rotation.tilt * Math.PI) / 180;
+        const spinAxis = new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad)); // YZ plane
+        // Orient the mesh so its texture "north" matches the provided spin axis
+        const up = new THREE.Vector3(0, 1, 0);
+        this.mesh.quaternion.setFromUnitVectors(up, spinAxis);
+        // Set rotationAxis to local Y for correct spinning
+        this.rotationAxis = new THREE.Vector3(0, 1, 0);
+        // Set rotation speed and axis based on provided rotation info
+        this.rotationSpeed = rotation.speed;
+    }
+
+    /**
+     * Updates the rotation of the celestial body based on its rotation speed and optional tidal locking behavior.
+     * @param spinAxis The axis around which the body should spin (in world coordinates).
+     * @param speed The rotation speed of the body.
+     */
+    updateRotation(spinAxis: THREE.Vector3, speed: number) {
+        // Orient the mesh so its texture "north" matches the provided spin axis
+        const up = new THREE.Vector3(0, 1, 0);
+        this.mesh.quaternion.setFromUnitVectors(up, spinAxis);
+        // Set rotationAxis to local Y for correct spinning
+        this.rotationAxis = new THREE.Vector3(0, 1, 0);
+        // Set rotation speed based on provided speed
+        this.rotationSpeed = speed;
+    }
+
+    /**
+     * Sets the radius of the celestial body, updating its mesh geometry and related properties accordingly.
+     * @param newRadius The new radius for the celestial body.
+     */
     setRadius(newRadius: number) {
         const oldRadius = this.radius || 1;
 
@@ -491,7 +517,9 @@ export class CelestialBody extends Body {
         // offsets. This keeps float32 values small regardless of world distance, eliminating
         // the stair-step precision artefact visible at large distances from the origin.
         if (this.trail) this.trail.position.copy(cameraPos);
-        const cx = cameraPos.x, cy = cameraPos.y, cz = cameraPos.z;
+        const cx = cameraPos.x,
+            cy = cameraPos.y,
+            cz = cameraPos.z;
         for (let i = 0; i < this.history.length; i++) {
             this.trailPositions[i * 3] = this.history[i].x - cx;
             this.trailPositions[i * 3 + 1] = this.history[i].y - cy;
@@ -503,7 +531,11 @@ export class CelestialBody extends Body {
 
     createMoon(scene: THREE.Scene, config: IMoonCreationOptions) {
         // Calculate orbital trajectory based on parent's mass
-        const trajectory = calculateTrajectory(this.dependencies.getG(), config.distance, this.mass);
+        const trajectory = calculateTrajectory(
+            this.dependencies.getG(),
+            config.distance,
+            this.mass
+        );
 
         // Default angle is 0, but can be specified for multiple moons
         const angle = config.angle !== undefined ? config.angle : 0;
@@ -526,21 +558,21 @@ export class CelestialBody extends Body {
         const moonMaterial =
             moonName === 'Moon'
                 ? new THREE.MeshStandardMaterial({
-                    map: moonTexture,
-                    color: 0xffffff,
-                    emissive: 0x000000,
-                    emissiveIntensity: 0,
-                    roughness: 0.7,
-                    metalness: 0.7,
-                })
+                      map: moonTexture,
+                      color: 0xffffff,
+                      emissive: 0x000000,
+                      emissiveIntensity: 0,
+                      roughness: 0.7,
+                      metalness: 0.7,
+                  })
                 : new THREE.MeshStandardMaterial({
-                    map: pickRandom(fictionalTextures),
-                    color: 0xffffff, // keep texture untinted
-                    emissive: 0x000000,
-                    emissiveIntensity: 0,
-                    roughness: 0.7,
-                    metalness: 0.7,
-                });
+                      map: pickRandom(fictionalTextures),
+                      color: 0xffffff, // keep texture untinted
+                      emissive: 0x000000,
+                      emissiveIntensity: 0,
+                      roughness: 0.7,
+                      metalness: 0.7,
+                  });
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²
