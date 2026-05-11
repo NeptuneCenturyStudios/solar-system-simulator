@@ -4409,10 +4409,10 @@ function animate() {
                     (referenceDistance * referenceDistance) / (distanceFromSun * distanceFromSun)
                 );
 
-                // Apply brightness to material color
-                (body.mesh.material as THREE.MeshStandardMaterial).color
-                    .copy(body.baseColor)
-                    .multiplyScalar(brightness);
+                // Apply brightness to material color (ShaderMaterial bodies handle their own lighting)
+                if (body.mesh.material instanceof THREE.MeshStandardMaterial) {
+                    body.mesh.material.color.copy(body.baseColor).multiplyScalar(brightness);
+                }
             }
         }
     }
