@@ -5470,7 +5470,20 @@ function updateAutopilot(dt: number) {
         ship.mesh.quaternion.rotateTowards(warpQuat, FLIGHT_MAX_TURN_RATE * dt);
     } else if (autopilotState.phase === 'APPROACH') {
         // Use boost speed when far away; switch to normal approach speed close in.
-        const useBoost = distance > AUTOPILOT_BOOST_THRESHOLD;
+        // The global AUTOPILOT_BOOST_THRESHOLD is computed without knowing the target orbit
+        // radius, so for large bodies (e.g. the Sun) the brake zone can extend beyond it —
+        // leaving the ship at boost speed when BRAKE begins, which AUTOPILOT_DECEL cannot
+        // stop in the available runway.  Add the orbit-specific boost-to-normal decel runway
+        // so the ship always finishes shedding boost speed before the brake zone starts.
+        const boostDecelDist =
+            (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
+                FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+            (2 * AUTOPILOT_BOOST_DECEL);
+        const effectiveBoostThreshold = Math.max(
+            AUTOPILOT_BOOST_THRESHOLD,
+            orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE + boostDecelDist
+        );
+        const useBoost = distance > effectiveBoostThreshold;
         autopilotState.isBoostActive = useBoost;
         const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
 
@@ -5549,10 +5562,19 @@ function updateAutopilot(dt: number) {
         // around Jupiter instead of 131u).  The inward term keeps the ship spiralling toward
         // orbitRadius so alpha and inward both reach their final values at the same point.
         //
-        // Cap the inward speed to what AUTOPILOT_DECEL can stop in the available brakeSpan.
-        // Without this cap, short-distance entries (e.g. Moon → Earth) target FLIGHT_MAX_SPEED
-        // inward but only have ~86 u to stop — causing the ship to crash through the target.
-        const maxInwardForSpan = Math.sqrt(2 * AUTOPILOT_DECEL * brakeSpan);
+        // Cap the inward speed to what the appropriate decel rate can stop in the available
+        // brakeSpan.  Use a speed-aware decel (matching the three-tier logic in effectiveStopDist)
+        // so that if the ship enters BRAKE with residual boost/warp speed — e.g. when targeting
+        // a very large body whose brake zone begins before the boost threshold — the cap and
+        // the thrust magnitude both scale correctly instead of under-braking and crashing.
+        const brakeApproachSpeed = relVel.length();
+        const brakeDecel =
+            brakeApproachSpeed > FLIGHT_BOOST_MAX_SPEED
+                ? AUTOPILOT_WARP_DECEL
+                : brakeApproachSpeed > FLIGHT_MAX_SPEED
+                  ? AUTOPILOT_BOOST_DECEL
+                  : AUTOPILOT_DECEL;
+        const maxInwardForSpan = Math.sqrt(2 * brakeDecel * brakeSpan);
         const inwardSpeed = Math.min(FLIGHT_MAX_SPEED, maxInwardForSpan) * (1 - alpha);
         const desiredVel = new THREE.Vector3()
             .copy(target.velocity)
@@ -5573,7 +5595,7 @@ function updateAutopilot(dt: number) {
 
         if (deltaLen > 1e-6) {
             const thrustDir = velDelta.clone().normalize();
-            const brakeMag = Math.min(AUTOPILOT_DECEL * dt, deltaLen);
+            const brakeMag = Math.min(brakeDecel * dt, deltaLen);
             ship.velocity.addScaledVector(thrustDir, brakeMag);
 
             const targetQuat = new THREE.Quaternion().setFromUnitVectors(
