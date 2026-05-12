@@ -81,7 +81,6 @@ import {
     ISS_MASS,
     ISS_DIST_FROM_EARTH,
     ISS_RADIUS,
-    C,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum, createSatellite } from './utilities/utilities';
