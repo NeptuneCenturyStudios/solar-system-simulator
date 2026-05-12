@@ -81,6 +81,7 @@ import {
     ISS_MASS,
     ISS_DIST_FROM_EARTH,
     ISS_RADIUS,
+    C,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum, createSatellite } from './utilities/utilities';
@@ -1034,6 +1035,7 @@ const autopilotState: IAutopilotState = {
 };
 
 // Autopilot tuning constants
+const AUTOPILOT_APPROACH_SPEED = FLIGHT_MAX_SPEED; // u/s
 /** Thrust acceleration used by autopilot during approach (u/s²). */
 const AUTOPILOT_ACCEL = FLIGHT_THRUST_ACCEL;
 /** Braking deceleration — moderate so the stop feels gradual rather than jarring. */
@@ -1050,11 +1052,11 @@ const AUTOPILOT_CIRCULARIZE_RATE = 2 * SCALE_FACTOR;
  *  velocity at the aesthetic rate above.  This factor scales a gravity-derived floor:
  *  effectiveRate = max(CIRCULARIZE_RATE, GRAVITY_MARGIN × v_orbit × sqrt(g / altitude))
  *  Raise to give more headroom; lower to allow a more gradual arc near large bodies. */
-const AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN = 16 * SCALE_FACTOR;
+const AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN = 4 * SCALE_FACTOR;
 /** Safety pad multiplier on brake distance. Higher = start braking earlier / more gradually.
- *  At 1.2 the ship begins braking at 1.2× the theoretical stopping distance — smooth
- *  but ends up at approximately orbitRadius + 0.2×stoppingDist from the target. */
-const AUTOPILOT_BRAKE_PAD = 1.2;
+ *  At 1.1 the ship begins braking at 1.1× the theoretical stopping distance — smooth
+ *  but ends up at approximately orbitRadius + 0.1×stoppingDist from the target. */
+const AUTOPILOT_BRAKE_PAD = 1.07;
 /** Target orbit altitude expressed as a multiple of the target body's radius.
  *  1.5 = tight low orbit just above the surface (moon-like proximity). */
 const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 1.5;
@@ -1089,20 +1091,20 @@ const FLIGHT_BANK_LERP_RATE = 0.08;
  *  Computed as 1.5× the two-phase stopping distance: first shed boost speed at
  *  AUTOPILOT_BOOST_DECEL, then shed normal speed at AUTOPILOT_DECEL.  This
  *  guarantees the ship always has enough runway to fully brake before the orbit. */
-const AUTOPILOT_BOOST_THRESHOLD =
+const AUTOPILOT_BOOST_THRESHOLD = 
     1.5 *
-    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
         (2 * AUTOPILOT_BOOST_DECEL) +
-        (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL));
+        (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL));
 /** Deceleration rate used to scrub warp speed during autopilot approach.
  *  Matches FLIGHT_WARP_DECEL so the feel is consistent with manual warp decel. */
 const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
 /** Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop.
  *  When the gap between the ship and orbitRadius is shorter than this, autopilot skips
  *  APPROACH and enters BRAKE directly so the ship doesn't arrive with too much speed.
- *  Derived from: BRAKE_PAD × v² / (2 × decel) at FLIGHT_MAX_SPEED. */
+ *  Derived from: BRAKE_PAD × v² / (2 × decel) at AUTOPILOT_APPROACH_SPEED. */
 const AUTOPILOT_APPROACH_MIN_DISTANCE =
-    AUTOPILOT_BRAKE_PAD * ((FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL));
+    AUTOPILOT_BRAKE_PAD * ((AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL));
 /** Distance (u) above which autopilot engages warp for fast transit.
  *  Computed as 1.5× the stopping distance from warp speed down to boost speed,
  *  plus AUTOPILOT_BOOST_THRESHOLD (the runway still needed once warp ends). */
@@ -5377,13 +5379,13 @@ function updateAutopilot(dt: number) {
             ? (approachSpeed * approachSpeed - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
                   (2 * AUTOPILOT_WARP_DECEL) +
               (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
-                  FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+                  AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
                   (2 * AUTOPILOT_BOOST_DECEL) +
-              (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
-            : approachSpeed > FLIGHT_MAX_SPEED
-              ? (approachSpeed * approachSpeed - FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+              (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL)
+            : approachSpeed > AUTOPILOT_APPROACH_SPEED
+              ? (approachSpeed * approachSpeed - AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
                     (2 * AUTOPILOT_BOOST_DECEL) +
-                (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * AUTOPILOT_DECEL)
+                (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL)
               : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
     const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
@@ -5472,7 +5474,7 @@ function updateAutopilot(dt: number) {
         // Use boost speed when far away; switch to normal approach speed close in.
         const useBoost = distance > AUTOPILOT_BOOST_THRESHOLD;
         autopilotState.isBoostActive = useBoost;
-        const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
+        const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : AUTOPILOT_APPROACH_SPEED;
 
         // Desired velocity: move at targetSpeed toward the target in the target's frame.
         const desiredVel = new THREE.Vector3()
@@ -5493,7 +5495,7 @@ function updateAutopilot(dt: number) {
             const rate = needsDecel
                 ? approachSpeed > FLIGHT_BOOST_MAX_SPEED
                     ? AUTOPILOT_WARP_DECEL
-                    : approachSpeed > FLIGHT_MAX_SPEED
+                    : approachSpeed > AUTOPILOT_APPROACH_SPEED
                       ? AUTOPILOT_BOOST_DECEL
                       : AUTOPILOT_DECEL
                 : useBoost
@@ -5550,14 +5552,14 @@ function updateAutopilot(dt: number) {
         // orbitRadius so alpha and inward both reach their final values at the same point.
         //
         // Cap the inward speed to what AUTOPILOT_DECEL can stop in the available brakeSpan.
-        // Without this cap, short-distance entries (e.g. Moon → Earth) target FLIGHT_MAX_SPEED
+        // Without this cap, short-distance entries (e.g. Moon → Earth) target AUTOPILOT_APPROACH_SPEED
         // inward but only have ~86 u to stop — causing the ship to crash through the target.
         const maxInwardForSpan = Math.sqrt(2 * AUTOPILOT_DECEL * brakeSpan);
-        const inwardSpeed = Math.min(FLIGHT_MAX_SPEED, maxInwardForSpan) * (1 - alpha);
+        const inwardSpeed = Math.min(AUTOPILOT_APPROACH_SPEED, maxInwardForSpan) * (1 - alpha);
         const desiredVel = new THREE.Vector3()
             .copy(target.velocity)
             .addScaledVector(tangential, vOrbit * alpha) // tangential: 0 → vOrbit
-            .addScaledVector(toTargetDir, inwardSpeed); // inward: FLIGHT_MAX_SPEED → 0
+            .addScaledVector(toTargetDir, inwardSpeed); // inward: AUTOPILOT_APPROACH_SPEED → 0
 
         // Explicit gravity compensation — same taper as CIRCULARIZE.
         // Prevents gravity accumulating inward velocity faster than thrust can counter it.
