@@ -4,7 +4,7 @@ import { IStateDependencies, ISiphonTarget, IMassTransferBody } from '../interfa
 import { loadSrgbTexture } from '../drawing/textures';
 import { BodyTypeEnum } from '../utilities/utilities';
 import { IRotation } from '../physics/physics';
-import { SCALE_FACTOR, SUN_MASS, EARTH_DIST } from '../utilities/consts';
+import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, DIST_SCALE } from '../utilities/consts';
 import { PulsarBeam } from '../effects/pulsar-beam';
 import { StarGlow } from '../effects/star-glow';
 import { AccretionDiskEffect, PULSAR_DISK_COLORS } from '../effects/accretion-disk';
@@ -22,7 +22,7 @@ import { IPipelineFeedEffect } from '../effects/effect-base';
  * This is considerably more compressed than a white dwarf (base 8 × SCALE_FACTOR)
  * but still larger than a stellar black hole (~1 × SCALE_FACTOR).
  */
-const PULSAR_BASE_RADIUS = 2 * SCALE_FACTOR;
+const PULSAR_BASE_RADIUS = (10 / DIST_SCALE) * SCALE_FACTOR;
 
 /**
  * Computes the radius of a neutron star for a given mass.
@@ -100,13 +100,12 @@ export class Pulsar extends Star implements IMassTransferBody {
         };
 
         const geometry = new THREE.SphereGeometry(pulsarRadius, 32, 32);
-        const material = new THREE.MeshStandardMaterial({
+        const material = new THREE.MeshPhongMaterial({
             map: pulsarTexture,
             color: 0xffffff,
             emissive: 0x000000,
+            emissiveMap: pulsarTexture,
             emissiveIntensity: 0,
-            roughness: 0.7,
-            metalness: 0.95,
         });
         const mesh = new THREE.Mesh(geometry, material);
 

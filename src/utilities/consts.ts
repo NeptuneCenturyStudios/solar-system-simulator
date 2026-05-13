@@ -15,7 +15,7 @@ export enum SimulationStartMode {
 }
 
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===
-export const MIN_PARTICLE_ALPHA = 0.7;
+export const MIN_PARTICLE_ALPHA = 0.8;
 export const MAX_PARTICLE_ALPHA = 1.0;
 
 // === Simulation Scale and Physics Constants ===

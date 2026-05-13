@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
 // Global scaling factor for siphon stream speed (tweak for visual pacing)
-const SIPHON_SPEED_SCALE = 8;
+const SIPHON_SPEED_SCALE = 800 / DIST_SCALE;
 import { IPipelineFeedEffect } from './effect-base';
 import { IStateDependencies, ISiphonTarget, IAccretionTarget } from '../interfaces';
-import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, performanceSettings } from '../utilities/consts';
+import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, performanceSettings, DIST_SCALE } from '../utilities/consts';
 
 /** Maximum number of simultaneously in-flight siphon particles per stream. */
 const PARTICLE_COUNT = 800;
@@ -214,7 +214,7 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
         this.material.onBeforeCompile = (shader) => {
             // 1. Add your custom uniforms
             shader.uniforms.pointSize = { value: 2 * consumer.radius };
-            shader.uniforms.sizeNearStar = { value: 8 * consumer.radius };
+            shader.uniforms.sizeNearStar = { value: 0.3 * star.radius };
             shader.uniforms.BRIGHTNESS = { value: 2.0 };
 
             // 2. Vertex Shader: Custom Size & Alpha Injection

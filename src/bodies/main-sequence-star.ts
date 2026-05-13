@@ -461,8 +461,7 @@ export class MainSequenceStar extends Star {
             }
 
             this.die(true);
-        }
-        if (this.initialMass >= MIN_BLACK_HOLE_MASS) {
+        } else if (this.initialMass >= MIN_BLACK_HOLE_MASS) {
             try {
                 const blackHoleMass = this.mass * 0.9999;
                 const newBlackHole = new BlackHole(

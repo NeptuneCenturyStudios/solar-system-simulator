@@ -1,6 +1,7 @@
 ﻿import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
+import { DIST_SCALE } from '../utilities/consts';
 
 /**
  * Renders the twin electromagnetic beams emitted by a pulsar along its magnetic axis.
@@ -61,7 +62,7 @@ export class PulsarBeam implements IEffect {
         this.rotationSpeed = rotationSpeed;
         this.magneticAxisBase = magneticAxisBase.clone().normalize();
 
-        this.beamLength = Math.max(300_000 * radius, radius * 50);
+        this.beamLength = Math.max((100_000_000 / DIST_SCALE) * radius, radius * 50);
 
         this._buildBeamArms();
     }
@@ -132,7 +133,7 @@ float rim   = 1.0 - abs(dot(normalize(vNorm), normalize(vViewDir)));
 rim = max(0.5, pow(rim, 1.4));
 
 // Fade: tiny ramp-in at star end, smooth fade-out over last 40% at tip
-float fade  = smoothstep(0.00, 0.01, vBeamFrac) * smoothstep(1.0, 0.60, vBeamFrac);
+float fade  = smoothstep(0.00, 0.000001, vBeamFrac) * smoothstep(1.0, 0.60, vBeamFrac);
 
 // Pulsing sweep along the beam
 float pulse = 0.82 + 0.18 * sin(uTime * 5.0 + vBeamFrac * 12.566);
