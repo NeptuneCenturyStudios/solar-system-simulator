@@ -228,7 +228,7 @@ export class PulsarMagneticField implements IEffect {
         this._particleGeo.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
 
         this._particleMat = new THREE.PointsMaterial({
-            size: Math.max(2, this.radius * 0.6),
+            size: this.radius * 0.6,
             vertexColors: true,
             transparent: true,
             blending: THREE.AdditiveBlending,
