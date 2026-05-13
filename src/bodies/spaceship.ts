@@ -3,7 +3,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { Body } from './body';
 import { BodyTypeEnum } from '../utilities/utilities.js';
-import { SCALE_FACTOR } from '../utilities/consts.js';
+import { SCALE_FACTOR, SPACESHIP_MASS, SPACESHIP_RADIUS } from '../utilities/consts.js';
 import { IShipEffect } from '../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../ship-effects/ship-flame.js';
 //import { ShipFlame } from '../ship-effects/ship-flame.js';
@@ -46,14 +46,12 @@ export class Spaceship extends Body {
         const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
         const placeholderMesh = new THREE.Mesh(placeholderGeometry, placeholderMaterial);
 
-        const radius = 0.01 * SF; // Approximate half-wingspan for collision purposes
-
         // ── Base class ────────────────────────────────────────────────────────
         super(
             dependencies,
             scene,
-            /* mass — tiny so it barely perturbs celestial orbits */ 0.001,
-            radius,
+            SPACESHIP_MASS,
+            SPACESHIP_RADIUS,
             position,
             velocity,
             placeholderMesh,
@@ -65,7 +63,7 @@ export class Spaceship extends Body {
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
         this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF, -0.9 * SF);
-        this.thirdPersonOffset = new THREE.Vector3(0, 0.4 * SF, -2.2 * SF);
+        this.thirdPersonOffset = new THREE.Vector3(0, SPACESHIP_RADIUS * 0.4, -SPACESHIP_RADIUS * 1.5);
 
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
@@ -96,7 +94,7 @@ export class Spaceship extends Body {
                 const size = new THREE.Vector3();
                 bbox.getSize(size);
                 const longestDim = Math.max(size.x, size.y, size.z);
-                const scale = (0.6 * SF) / longestDim;
+                const scale = SPACESHIP_RADIUS / longestDim;
                 group.scale.setScalar(scale);
 
                 // Re-compute bbox after scaling to find the center.

@@ -23,8 +23,8 @@ export const SCALE_FACTOR = 1;
 export const G_SCALE = 1; // 1000000;
 // Tuned so that SUN_MASS = 33,000,000 exactly
 export const MASS_SCALE = 6.025757575757576e22;
-export const RADIUS_SCALE = 1;
-export const DIST_SCALE = 1;
+export const RADIUS_SCALE = 100;
+export const DIST_SCALE = 100;
 // 1. Keep the physically-derived base time scale
 export const BASE_TIME_SCALE = Math.sqrt(DIST_SCALE ** 3 / MASS_SCALE);
 // 2. Choose a user multiplier so that at warp 1, dt matches the old behavior
@@ -149,6 +149,12 @@ export const URANUS_ROT_SPEED = ((-2 * Math.PI) / (17.24 * 3600)) * URANUS_TIME_
 export const NEPTUNE_ROT_SPEED = ((2 * Math.PI) / (16.11 * 3600)) * NEPTUNE_TIME_SCALE; // ~1.08e-4
 export const PLUTO_ROT_SPEED = ((-2 * Math.PI) / (153.3 * 3600)) * PLUTO_TIME_SCALE; // ~-1.14e-5 (retrograde)
 
+// === Spaceship: Mass ===
+export const SPACESHIP_MASS = (75000 / MASS_SCALE) * SCALE_FACTOR;
+
+// === Spaceship: Radius ===
+export const SPACESHIP_RADIUS = (0.037 / RADIUS_SCALE) * SCALE_FACTOR;
+
 // === Satellites: Mass ===
 export const ISS_MASS = (419725 / MASS_SCALE) * SCALE_FACTOR;
 
@@ -203,7 +209,7 @@ export const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
 /** Camera distance (u) at which the warp tunnel has fully faded out. */
 export const WARP_FADE_DIST = 200 * SCALE_FACTOR;
 /** Peak camera shake displacement (u) applied each frame during warp. */
-export const WARP_SHAKE_MAG = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
+export const WARP_SHAKE_MAG = 0.002 * SPACESHIP_RADIUS; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
 
 // === Miscellaneous & Simulation Parameters ===
 export const ASTEROID_SPAWN_MIN_DIST = 50000 * SCALE_FACTOR;

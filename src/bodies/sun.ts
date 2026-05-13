@@ -14,7 +14,7 @@ export class Sun extends MainSequenceStar {
             id: createUniqueId('sun'),
             name: 'Sun',
             temperature: 5778,
-            lightIntensity: 3_000_000_000,
+            lightIntensity: 2_000_000_000,
             lightDistance: 1_500_000_000 / DIST_SCALE,
             rotation: { tilt: SUN_AXIS, speed: SUN_ROT_SPEED },
             mesh: undefined, // Todo, implment star material/mesh in MainSequenceStar and use here

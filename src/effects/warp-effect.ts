@@ -4,7 +4,7 @@ import { DIST_SCALE, SCALE_FACTOR } from '../utilities/consts.js';
 // ─── Tunnel geometry constants ───────────────────────────────────────────────
 const SF = SCALE_FACTOR;
 
-const N_STREAKS = 750;
+const N_STREAKS = 500;
 
 // How far ahead of the ship (along its +Z axis) new streaks spawn.
 const FAR_SPAWN_Z = (3000000 / DIST_SCALE) * SF;
@@ -212,8 +212,8 @@ export class WarpEffect {
 
         const speed = shipVelocity.length();
 
-        // Opacity ramps linearly: 0 at rest → 1 at maxSpeed.
-        this.speedOpacity = Math.min(speed / maxSpeed, 1);
+        // Opacity ramps linearly: 0 at rest → 1 at 3% maxSpeed.
+        this.speedOpacity = Math.min(speed / (maxSpeed / 33.33), 1);
         this._applyOpacity();
 
         // Orient tunnel along velocity direction.

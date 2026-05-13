@@ -39,11 +39,7 @@ export class ISS extends Satellite {
 
         options.mesh = placeholderMesh;
         // ── Base class ────────────────────────────────────────────────────────
-        super(
-            dependencies,
-            scene,
-            options,
-        );
+        super(dependencies, scene, options);
 
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
@@ -85,6 +81,11 @@ export class ISS extends Satellite {
                         child.castShadow = true;
                     }
                 });
+
+                // Orient ISS so its long axis points north/south (Z axis)
+                //group.rotation.y = Math.PI / 2; // Adjust as needed based on your model
+                group.rotation.x = Math.PI / 2; // Adjust as needed based on your model
+                group.rotation.z = Math.PI; // Adjust as needed based on your model
 
                 this.mesh.add(group);
             })

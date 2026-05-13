@@ -1,11 +1,8 @@
 import * as THREE from 'three';
-import { performanceSettings, SCALE_FACTOR } from '../utilities/consts.js';
+import { performanceSettings, SPACESHIP_RADIUS } from '../utilities/consts.js';
 import { IShipEffect } from './ship-effect-base';
-
-const SF = SCALE_FACTOR / SCALE_FACTOR;
-
 /** Maximum number of live particles in the pool. */
-const MAX_PARTICLES = 1200;
+const MAX_PARTICLES = 120;
 /** Half-angle of the exhaust cone in radians. */
 const EXHAUST_SPREAD = 0.22;
 /** Minimum particles emitted per frame while thrusting. */
@@ -13,11 +10,11 @@ const EMIT_MIN = 8;
 /** Maximum particles emitted per frame. */
 const EMIT_MAX = 256;
 /** Base particle lifetime in seconds. Actual lifetime is randomised ±30% around this. */
-const LIFETIME_BASE = 128 * SF;
+const LIFETIME_BASE = 128 * SPACESHIP_RADIUS;
 /** Speed (u/s) at which exhaust particles travel in world space.
  *  plumeLength ≈ EXHAUST_DRIFT_SPEED × LIFETIME_BASE; keep this a few ship-lengths
  *  (ship radius ≈ 0.6 u, so targeting ~3 u plume). */
-const EXHAUST_DRIFT_SPEED = 4 * SF;
+const EXHAUST_DRIFT_SPEED = 16 * SPACESHIP_RADIUS; // 4 u/s gives a nice plume length without needing super long lifetimes
 /** Sentinel: negative life means the slot is unused. */
 const DEAD = -1;
 
@@ -105,7 +102,7 @@ export class ShipFlame implements IShipEffect {
 
         this.innerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 0.08 * SF,
+            size: SPACESHIP_RADIUS * 0.4,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -128,7 +125,7 @@ export class ShipFlame implements IShipEffect {
 
         this.outerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: 0.22 * SF,
+            size: SPACESHIP_RADIUS * 0.5,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,

@@ -83,7 +83,13 @@ import {
     ISS_RADIUS,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
-import { isBodyType, pickRandom, createUniqueId, BodyTypeEnum, createSatellite } from './utilities/utilities';
+import {
+    isBodyType,
+    pickRandom,
+    createUniqueId,
+    BodyTypeEnum,
+    createSatellite,
+} from './utilities/utilities';
 import { calculateTrajectory, IAutopilotState, updateSimulation } from './physics/physics';
 import {
     randomStarParams,
@@ -716,12 +722,12 @@ const CAMERA_FAR_PLANE = PLUTO_DIST + 300000 * SCALE_FACTOR + 2000000 * SCALE_FA
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
-    0.01,
+    0.00001,
     CAMERA_FAR_PLANE
 );
 const MAX_ZOOM_OUT_DISTANCE = camera.far * 0.8;
 const MAX_CAMERA_VIEW_DISTANCE = camera.far * 0.98;
-const INITIAL_CAMERA_DISTANCE = SUN_RADIUS * 8 * SCALE_FACTOR;
+const INITIAL_CAMERA_DISTANCE = SUN_RADIUS * 8;
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); // Better depth precision at extreme scales
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true; // Must be true to initialize shadow infrastructure
@@ -1095,9 +1101,10 @@ const FLIGHT_BANK_LERP_RATE = 0.08;
  *  Computed as 1.5× the two-phase stopping distance: first shed boost speed at
  *  AUTOPILOT_BOOST_DECEL, then shed normal speed at AUTOPILOT_DECEL.  This
  *  guarantees the ship always has enough runway to fully brake before the orbit. */
-const AUTOPILOT_BOOST_THRESHOLD = 
+const AUTOPILOT_BOOST_THRESHOLD =
     1.5 *
-    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
+    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
+        AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
         (2 * AUTOPILOT_BOOST_DECEL) +
         (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL));
 /** Deceleration rate used to scrub warp speed during autopilot approach.
@@ -1108,7 +1115,7 @@ const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
  *  APPROACH and enters BRAKE directly so the ship doesn't arrive with too much speed.
  *  Derived from: BRAKE_PAD × v² / (2 × decel) at AUTOPILOT_APPROACH_SPEED. */
 const AUTOPILOT_APPROACH_MIN_DISTANCE =
-    AUTOPILOT_BRAKE_PAD * ((AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL));
+    AUTOPILOT_BRAKE_PAD * (AUTOPILOT_APPROACH_SPEED / (2 * AUTOPILOT_DECEL));
 /** Distance (u) above which autopilot engages warp for fast transit.
  *  Computed as 1.5× the stopping distance from warp speed down to boost speed,
  *  plus AUTOPILOT_BOOST_THRESHOLD (the runway still needed once warp ends). */
@@ -4078,7 +4085,7 @@ function calcFitDistanceForBody(body: Body | null) {
     const margin = 1.6;
     const dist = (radius * margin) / Math.tan(fovRad / 2);
 
-    const minDist = Math.max(radius * 2.2, 10);
+    const minDist = radius * 2.2;
     const maxDist = MAX_ZOOM_OUT_DISTANCE;
     const worldRadius = body?.mesh ? body.mesh.position.length() + radius : radius;
     const farMargin = Math.max(worldRadius * 2, radius * 20, 100000 * SCALE_FACTOR);
@@ -4607,7 +4614,10 @@ function animate() {
     //       : null;
 
     // Get the ship whose trail we should update. The trail should always be visible for the active/known ship, even if the player has exited the cockpit view.
-    const trailShip = flightState.activeShip ?? flightState.knownShip ?? null;
+    // But it should not be visible while warping normal or autopilot.
+    const trailShip = !(flightState.warpActive || autopilotState.isWarpActive)
+        ? (flightState.activeShip ?? flightState.knownShip)
+        : null;
 
     if (trailShip && trailShip.mesh) {
         const nozzle = trailShip.thrusterOffset
@@ -4894,7 +4904,7 @@ function getBodyTypeLabel(b: Body) {
     if (b.bodyType && b.bodyType & BodyTypeEnum.Comet) return 'Comet';
     if (b.bodyType && b.bodyType & BodyTypeEnum.SpaceShip) return 'Spaceship';
     if (b.bodyType && b.bodyType & BodyTypeEnum.Satellite) return 'Satellite';
-    
+
     return 'Unknown';
 }
 
@@ -5080,8 +5090,8 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
         Math.max(targetDistance * 2, targetDistance + 500000 * SCALE_FACTOR, maxDist)
     );
 
-    const zoomInLimit =
-        target && simulationState.bodies.includes(target) && !target._isDisposed ? 0.001 : 0.01;
+    const zoomInLimit = 0;
+    //     target && simulationState.bodies.includes(target) && !target._isDisposed ? 0.001 : 0.01;
     const zoomOutLimit = farLimit;
 
     const newDist = THREE.MathUtils.clamp(currentDist * factor, zoomInLimit, zoomOutLimit);
@@ -5388,7 +5398,8 @@ function updateAutopilot(dt: number) {
                   (2 * AUTOPILOT_BOOST_DECEL) +
               (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL)
             : approachSpeed > AUTOPILOT_APPROACH_SPEED
-              ? (approachSpeed * approachSpeed - AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
+              ? (approachSpeed * approachSpeed -
+                    AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
                     (2 * AUTOPILOT_BOOST_DECEL) +
                 (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL)
               : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
@@ -5748,7 +5759,12 @@ function engageAutopilot(target: Body) {
     }
 
     // Guard: refuse to engage while manual warp is live.
-    if (flightState.warpActive || flightState.warpDecelerating || flightState.warpCharging) {
+    if (
+        autopilotState.isWarpActive ||
+        flightState.warpActive ||
+        flightState.warpDecelerating ||
+        flightState.warpCharging
+    ) {
         addEvent('Autopilot: disengage warp before engaging autopilot.');
         return;
     }
@@ -6167,6 +6183,13 @@ function spawnShip() {
             new THREE.Vector3(),
             createUniqueId('spaceship')
         );
+
+        // Orient the ship to the same direction the camera is facing
+        const cameraQuat = camera.quaternion.clone();
+        ship.mesh.quaternion.copy(cameraQuat);
+        // Rotate 180° around the Y axis to flip the ship
+        ship.mesh.rotateY(Math.PI);
+
         simulationState.bodies.push(ship);
         try {
             window.dispatchEvent(
