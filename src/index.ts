@@ -1115,7 +1115,7 @@ const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
  *  APPROACH and enters BRAKE directly so the ship doesn't arrive with too much speed.
  *  Derived from: BRAKE_PAD × v² / (2 × decel) at AUTOPILOT_APPROACH_SPEED. */
 const AUTOPILOT_APPROACH_MIN_DISTANCE =
-    AUTOPILOT_BRAKE_PAD * (AUTOPILOT_APPROACH_SPEED / (2 * AUTOPILOT_DECEL));
+    AUTOPILOT_BRAKE_PAD * (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED / (2 * AUTOPILOT_DECEL));
 /** Distance (u) above which autopilot engages warp for fast transit.
  *  Computed as 1.5× the stopping distance from warp speed down to boost speed,
  *  plus AUTOPILOT_BOOST_THRESHOLD (the runway still needed once warp ends). */
@@ -5402,7 +5402,7 @@ function updateAutopilot(dt: number) {
                     AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
                     (2 * AUTOPILOT_BOOST_DECEL) +
                 (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL)
-              : (approachSpeed * approachSpeed) / (2 * AUTOPILOT_DECEL);
+              : (Math.max(approachSpeed, AUTOPILOT_APPROACH_SPEED) ** 2) / (2 * AUTOPILOT_DECEL);
     const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
     if (autopilotState.phase === 'WARP') {
