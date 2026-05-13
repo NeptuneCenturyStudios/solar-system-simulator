@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
-import { performanceSettings } from '../utilities/consts';
+import { DIST_SCALE, performanceSettings } from '../utilities/consts';
 
 /** Number of simultaneous flash beam pairs in the pool. */
 const JET_POOL_SIZE = 16;
@@ -76,7 +76,7 @@ export class BlackHoleJetEffect implements IEffect {
         this.position = position.clone();
         this.radius = radius;
         this.rotationAxis = (rotationAxis ?? new THREE.Vector3(0, 1, 0)).clone().normalize();
-        this.beamLength = Math.max(300_000 * radius, radius * 50);
+        this.beamLength = Math.max((100_000_000 / DIST_SCALE) * radius, radius * 50);
 
         this._buildPool();
     }
@@ -136,7 +136,7 @@ float rim  = 1.0 - abs(dot(normalize(vNorm), normalize(vViewDir)));
 rim = max(0.5, pow(rim, 1.4));
 
 // Fade: small ramp-in at base, smooth fade-out over last 40% toward tip
-float fade = smoothstep(0.00, 0.001, vBeamFrac) * smoothstep(1.0, 0.60, vBeamFrac);
+float fade = smoothstep(0.00, 0.000001, vBeamFrac) * smoothstep(1.0, 0.60, vBeamFrac);
 
 float alpha = clamp(rim * fade * uAlpha * 1.4, 0.0, 1.0);
 gl_FragColor = vec4(outgoingLight * alpha, alpha);`

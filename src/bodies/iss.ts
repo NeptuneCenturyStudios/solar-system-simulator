@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
-import { SCALE_FACTOR } from '../utilities/consts.js';
+import { SCALE_FACTOR, ISS_RADIUS } from '../utilities/consts.js';
 import { ICelestialBodyCreationOptions, ITidalLockOptions } from './celestial-body';
 import { IStateDependencies } from '../interfaces';
 import { Satellite } from './satellite.js';
@@ -65,7 +65,7 @@ export class ISS extends Satellite {
                 const size = new THREE.Vector3();
                 bbox.getSize(size);
                 const longestDim = Math.max(size.x, size.y, size.z);
-                const scale = (0.6 * SF) / longestDim;
+                const scale = (ISS_RADIUS * SF) / longestDim;
                 group.scale.setScalar(scale);
 
                 // Re-compute bbox after scaling to find the center.

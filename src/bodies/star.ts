@@ -242,7 +242,7 @@ export class Star extends CelestialBody {
         light.position.set(pos.x, pos.y, pos.z);
 
         light.target = new THREE.Object3D();
-        light.target.position.set(21850, 0, 0);
+        light.target.position.set(0, 0, 0); //21850
         this.scene.add(light.target);
 
         light.castShadow = true;
@@ -314,7 +314,7 @@ export class Star extends CelestialBody {
         if (temp <= 2000) glowHex = 0x8b3a0a;
         else if (temp <= 3000) glowHex = 0xff6644;
         else if (temp < 4000) glowHex = 0xffaa55;
-        else if (temp < 10000) glowHex = 0xffffcc;
+        else if (temp < 10000) glowHex = 0xffffee;
         else if (temp < 25000) glowHex = 0xffffff;
         else if (temp < 40000) glowHex = 0xaaccff;
         else glowHex = 0xd6f0ff;

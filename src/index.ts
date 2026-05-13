@@ -707,6 +707,11 @@ const skydome = new THREE.Mesh(skydomeGeometry, skydomeMaterial);
 skydome.renderOrder = -1000;
 scene.add(skydome);
 
+// === Ambient light from stars (base level of illumination) ===
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
+
+// --- Camera and renderer setup ---
 const CAMERA_FAR_PLANE = PLUTO_DIST + 300000 * SCALE_FACTOR + 2000000 * SCALE_FACTOR;
 const camera = new THREE.PerspectiveCamera(
     60,
@@ -5056,7 +5061,8 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
 
     // Direction from target -> camera
     const dir = new THREE.Vector3().subVectors(camera.position, targetPos);
-    const currentDist = Math.max(1, dir.length());
+    //const currentDist = Math.max(1, dir.length());
+    const currentDist = dir.length();
     dir.normalize();
 
     // Keep a sensible minimum distance so we don't clip into the body (only if we have a body target)
@@ -5075,7 +5081,7 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
     );
 
     const zoomInLimit =
-        target && simulationState.bodies.includes(target) && !target._isDisposed ? 0.01 : 10;
+        target && simulationState.bodies.includes(target) && !target._isDisposed ? 0.001 : 0.01;
     const zoomOutLimit = farLimit;
 
     const newDist = THREE.MathUtils.clamp(currentDist * factor, zoomInLimit, zoomOutLimit);

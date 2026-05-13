@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SCALE_FACTOR } from '../utilities/consts.js';
+import { performanceSettings, SCALE_FACTOR } from '../utilities/consts.js';
 import { IShipEffect } from './ship-effect-base';
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
@@ -185,6 +185,13 @@ export class ShipFlame implements IShipEffect {
         dt: number,
         cameraPos: THREE.Vector3
     ): void {
+
+        // Check if particles are enabled
+        if (!performanceSettings.particleEffectsEnabled){
+            this.hide();
+            return;
+        }
+
         const absDt = Math.abs(dt);
         // speedFactor for brightness: 0 at rest, 1 at maxSpeed
         const speedFactor = THREE.MathUtils.clamp(
