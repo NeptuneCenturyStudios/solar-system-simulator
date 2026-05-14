@@ -232,7 +232,7 @@ input[type='range'] {
     width: auto;
 }
 
-button.btn-slider-reset {
+button.old-ui.btn-slider-reset {
     width: auto;
     flex-shrink: 0;
     padding: 4px 6px;
@@ -248,11 +248,11 @@ button.btn-slider-reset {
     margin-bottom: 8px;
 }
 
-.btn-row button {
+.btn-row button.old-ui {
     margin-bottom: 0;
 }
 
-button {
+button.old-ui {
     width: 100%;
     padding: 8px 8px;
     background: #004488;
@@ -265,32 +265,32 @@ button {
     transition: all 0.2s ease;
 }
 
-button:hover {
+button.old-ui:hover {
     background: #0066cc;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 255, 204, 0.3);
 }
 
-button:active {
+button.old-ui:active {
     transform: translateY(0);
     box-shadow: 0 1px 3px rgba(0, 255, 204, 0.2);
 }
 
-button:disabled {
+button.old-ui:disabled {
     background: #333;
     color: #666;
     cursor: not-allowed;
     opacity: 0.5;
 }
 
-button:disabled:hover {
+button.old-ui:disabled:hover {
     background: #333;
     transform: none;
     box-shadow: none;
 }
 
 /* Toggled active state */
-button.active {
+button.old-ui.active {
     background: #00ffcc;
     color: #000;
 }
@@ -447,7 +447,7 @@ button.active:hover {
 
 .text-input:focus {
     outline: none;
-    border-color: #00ffcc;
+    border: 1px solid #00ffcc;
     background: rgba(0, 68, 136, 0.8);
     box-shadow:
         0 0 12px rgba(0, 255, 204, 0.4),
@@ -589,3 +589,28 @@ button.btn-with-icon {
     display: flex;
     justify-content: flex-end;
 }
+
+/* New UI theme */
+button.new-ui.menu-toggle-button {
+    position: fixed;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    width: 3rem;
+    height: 3rem;
+    background: #649dd660;
+    color: #fff;
+    border: 1px solid #649dd6;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 0.5rem #649dd680;
+    transition: all 0.2s ease;
+}
+
+button.new-ui.menu-toggle-button:hover {
+    background: #649dd680;
+    box-shadow: 0 0 1rem #649dd6b2;
+}   
