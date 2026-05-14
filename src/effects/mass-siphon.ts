@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 // Global scaling factor for siphon stream speed (tweak for visual pacing)
-const SIPHON_SPEED_SCALE = 800 / DIST_SCALE;
+const SIPHON_SPEED_SCALE = 8000 / DIST_SCALE;
 import { IPipelineFeedEffect } from './effect-base';
 import { IStateDependencies, ISiphonTarget, IAccretionTarget } from '../interfaces';
 import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, performanceSettings, DIST_SCALE } from '../utilities/consts';
