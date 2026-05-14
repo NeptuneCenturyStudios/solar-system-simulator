@@ -134,6 +134,7 @@ import { Halley } from './bodies/halley';
 import { IStateDependencies } from './interfaces';
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
+import { MainMenu } from './ui/main-menu';
 
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
@@ -4955,6 +4956,7 @@ function setF(id: string) {
 // --- UI PANEL INITIALIZATION ---
 
 // Create and initialize panels
+const mainMenu = new MainMenu('main-menu');
 const startupModal = new StartupModal('startup-overlay');
 const mainPanel = new MainPanel('ui-layer');
 const aboutModal = new AboutModal('about-overlay', 'aboutBtn', 'aboutCloseBtn');
@@ -4967,6 +4969,7 @@ const managementPanel = new ManagementPanel('management-panel', {
 });
 const flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
 
+mainMenu.initialize();
 startupModal.initialize();
 mainPanel.initialize();
 aboutModal.initialize();
