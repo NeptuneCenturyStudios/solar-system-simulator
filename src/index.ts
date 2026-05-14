@@ -1056,7 +1056,7 @@ const AUTOPILOT_DECEL = FLIGHT_THRUST_DECEL;
 const AUTOPILOT_BOOST_DECEL = FLIGHT_BOOST_DECEL;
 /** Orbit-insertion rate — gentler than AUTOPILOT_DECEL so the turn into orbit is
  *  visually smooth rather than a sharp snap.  Lower = longer arc, higher = snappier. */
-const AUTOPILOT_CIRCULARIZE_RATE = 2 * SCALE_FACTOR;
+const AUTOPILOT_CIRCULARIZE_RATE = 1.1 * SCALE_FACTOR;
 /** Safety multiplier for the physics-derived minimum circularize rate.  Near massive bodies
  *  (like the Sun) gravity is strong enough to swallow the ship before it builds orbital
  *  velocity at the aesthetic rate above.  This factor scales a gravity-derived floor:
@@ -1064,14 +1064,15 @@ const AUTOPILOT_CIRCULARIZE_RATE = 2 * SCALE_FACTOR;
  *  Raise to give more headroom; lower to allow a more gradual arc near large bodies. */
 const AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN = 4 * SCALE_FACTOR;
 /** Safety pad multiplier on brake distance. Higher = start braking earlier / more gradually.
- *  At 1.1 the ship begins braking at 1.1× the theoretical stopping distance — smooth
- *  but ends up at approximately orbitRadius + 0.1×stoppingDist from the target. */
-const AUTOPILOT_BRAKE_PAD = 1.07;
+ *  Must be ≥ 1.5 for the smoothstep blend controller to be able to track the desired
+ *  deceleration profile: the blend's peak rate is 0.75×V²/S which must not exceed DECEL.
+ *  Solving: BRAKE_PAD ≥ 1.5.  2.0 gives a ~25% margin over that theoretical minimum. */
+const AUTOPILOT_BRAKE_PAD = 2.0;
 /** Target orbit altitude expressed as a multiple of the target body's radius.
  *  1.5 = tight low orbit just above the surface (moon-like proximity). */
 const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 1.5;
 /** Relative-speed threshold at which BRAKE hands off to CIRCULARIZE (u/s). */
-const AUTOPILOT_BRAKE_DONE_SPEED = 5 * SCALE_FACTOR;
+const AUTOPILOT_BRAKE_DONE_SPEED = 2 * SCALE_FACTOR;
 /** Maximum timeScale at which autopilot may engage. Above this it refuses with a warning. */
 const AUTOPILOT_MAX_TIMESCALE = 50;
 /** Duration (seconds) to show the "Stable Orbit" HUD notification. */
@@ -1113,9 +1114,19 @@ const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
 /** Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop.
  *  When the gap between the ship and orbitRadius is shorter than this, autopilot skips
  *  APPROACH and enters BRAKE directly so the ship doesn't arrive with too much speed.
- *  Derived from: BRAKE_PAD × v² / (2 × decel) at AUTOPILOT_APPROACH_SPEED. */
+ *  Uses (APPROACH_SPEED + BRAKE_DONE_SPEED)² so the span is sized for the maximum speed
+ *  the ship can carry into BRAKE (the controller's hysteresis lets it run up to that sum
+ *  before decelerating), preventing a crash when FLIGHT_MAX_SPEED is very small. */
 const AUTOPILOT_APPROACH_MIN_DISTANCE =
-    AUTOPILOT_BRAKE_PAD * (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED / (2 * AUTOPILOT_DECEL));
+    AUTOPILOT_BRAKE_PAD *
+    ((AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) *
+        (AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) /
+        (2 * AUTOPILOT_DECEL));
+/** Target arc length (u) for the BRAKE blend.  The ship begins its orbit-insertion blend
+ *  this far from the orbit radius so the spiral-in is long enough to see smoothly.  When
+ *  the physics stopping distance is already larger (e.g. after warp/boost), physics wins.
+ *  Sized as AUTOPILOT_APPROACH_SPEED × 10 s ≈ 10 seconds of travel at approach speed. */
+const AUTOPILOT_BRAKE_ARC_DIST = AUTOPILOT_APPROACH_SPEED * 10;
 /** Distance (u) above which autopilot engages warp for fast transit.
  *  Computed as 1.5× the stopping distance from warp speed down to boost speed,
  *  plus AUTOPILOT_BOOST_THRESHOLD (the runway still needed once warp ends). */
@@ -5415,7 +5426,17 @@ function updateAutopilot(dt: number) {
     }
 
     if (autopilotState.phase === 'APPROACH') {
-        if (distance <= orbitRadius + brakeDistance) {
+        // Only transition to BRAKE once the ship is near normal approach speed.  If the ship
+        // still has boost or warp speed, effectiveStopDist is large enough that the check
+        // would fire immediately — bypassing APPROACH deceleration and entering BRAKE with
+        // far more speed than the available runway can absorb.  Waiting until the ship is
+        // close to AUTOPILOT_APPROACH_SPEED ensures brakeDistance is sized for that speed.
+        const nearApproachSpeed = approachSpeed <= AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED;
+        // Use the larger of the physics stopping distance and the visual arc distance so the
+        // blend spiral is long enough to be perceptible.  Physics wins when entering BRAKE from
+        // boost/warp decel (already handled by nearApproachSpeed guard above).
+        const brakeEntryTrigger = orbitRadius + Math.max(brakeDistance, AUTOPILOT_BRAKE_ARC_DIST);
+        if (nearApproachSpeed && distance <= brakeEntryTrigger) {
             autopilotState.phase = 'BRAKE';
             // Record entry distance so BRAKE can compute how far through the blend it is.
             autopilotState.brakeEntryDistance = distance;
@@ -5497,10 +5518,11 @@ function updateAutopilot(dt: number) {
             (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
                 FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
             (2 * AUTOPILOT_BOOST_DECEL);
-        const effectiveBoostThreshold = Math.max(
-            AUTOPILOT_BOOST_THRESHOLD,
-            orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE + boostDecelDist
-        );
+        // Use only the orbit-specific formula so boost ends at exactly the right distance
+        // for the target's orbit radius.  The old max(AUTOPILOT_BOOST_THRESHOLD, ...) kept
+        // the ship at boost-threshold distance even for small bodies, causing it to decelerate
+        // from boost and then crawl the remaining ~0.5×boostDecelDist at FLIGHT_MAX_SPEED.
+        const effectiveBoostThreshold = orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE + boostDecelDist;
         const useBoost = distance > effectiveBoostThreshold;
         autopilotState.isBoostActive = useBoost;
         const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : AUTOPILOT_APPROACH_SPEED;
