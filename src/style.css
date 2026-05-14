@@ -16,6 +16,7 @@ body {
     font-family: monospace;
     font-size: 10pt;
     color: white;
+    height: 100%;
 }
 
 #ui-container {
@@ -592,11 +593,9 @@ button.btn-with-icon {
 
 /* New UI theme */
 button.new-ui.menu-toggle-button {
-    position: fixed;
-    bottom: 0.5rem;
-    left: 0.5rem;
-    width: 3rem;
-    height: 3rem;
+    padding: 1rem;
+    /* Only margin left and bottom */
+    margin: 0 0 0.5rem 0.5rem;
     background: #649dd660;
     color: #fff;
     border: 1px solid #649dd6;
@@ -613,4 +612,48 @@ button.new-ui.menu-toggle-button {
 button.new-ui.menu-toggle-button:hover {
     background: #649dd680;
     box-shadow: 0 0 1rem #649dd6b2;
-}   
+}
+
+.toolbar {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height:auto;
+    gap: 0.5rem;
+    height: 100%;
+    padding: 0.5rem;
+    margin: 0.5rem;
+    background: #649dd660;
+    color: #fff;
+    border: 1px solid #649dd6;
+    border-radius: 0.5rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 0.5rem #649dd680;
+}
+
+.toolbar.toolbar-left {
+    /* Only margin left and top */
+    margin: 0.5rem 0 0 0.5rem;
+}
+
+button.btn.toolbar-btn {
+    background: transparent;
+    color: inherit;
+    
+    /* border: 1px solid #649dd6; */
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+button.btn.toolbar-btn:hover {
+    /* slight opacity change and glow on hover */
+    background: rgba(100, 157, 214, 0.5);
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 1rem #649dd680;
+}
