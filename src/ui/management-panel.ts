@@ -16,10 +16,6 @@ import { BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
 import { Star } from '../bodies/star.js';
 import { Body } from '../bodies/body.js';
 
-interface ManagementPanelDeps {
-    getFocusObject?: () => Body | null;
-}
-
 interface CreateSliderInitState {
     mass: number | null;
     temperature: number | null;
@@ -117,11 +113,10 @@ export class ManagementPanel extends Panel {
     formatLightIntensityForDisplay!: (value: number) => string;
     clampMassValue!: (value: number) => number;
 
-    constructor(elementId: string | HTMLElement, deps: ManagementPanelDeps = {}) {
+    constructor(elementId: string | HTMLElement) {
         super(elementId);
 
-        this.getFocusObject =
-            typeof deps.getFocusObject === 'function' ? deps.getFocusObject : () => null;
+        this.getFocusObject = function () { return null; };
 
         this.addBodyBtn = null;
         this.bodyCreationForm = null;
@@ -977,6 +972,10 @@ export class ManagementPanel extends Panel {
                 closeEditForm();
             };
         }
+    }
+
+    registerGetFocusObject(fn: () => Body | null): void {
+        this.getFocusObject = fn;
     }
 
     randomizeCreateBodyInputs(bodyType?: string | null): void {

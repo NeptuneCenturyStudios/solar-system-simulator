@@ -14,16 +14,10 @@ export class MainPanel extends Panel {
     lockToSunCheckbox: HTMLInputElement | null;
     showTrailsCheckbox: HTMLInputElement | null;
     showNamesCheckbox: HTMLInputElement | null;
-    timeScaleSlider: HTMLInputElement | null;
     timeScaleDisplay: HTMLElement | null;
-    timeScaleResetBtn: HTMLButtonElement | null;
     substepsSlider: HTMLInputElement | null;
     substepsDisplay: HTMLElement | null;
     substepsResetBtn: HTMLButtonElement | null;
-    pauseBtn: HTMLButtonElement | null;
-    resetBtn: HTMLButtonElement | null;
-    manageSystemBtn: HTMLButtonElement | null;
-    donateBtn: HTMLButtonElement | null;
     copyrightYearEl: HTMLElement | null;
     targetBtn: HTMLButtonElement | null;
     lookAtBtn: HTMLButtonElement | null;
@@ -39,16 +33,10 @@ export class MainPanel extends Panel {
         this.lockToSunCheckbox = null;
         this.showTrailsCheckbox = null;
         this.showNamesCheckbox = null;
-        this.timeScaleSlider = null;
         this.timeScaleDisplay = null;
-        this.timeScaleResetBtn = null;
         this.substepsSlider = null;
         this.substepsDisplay = null;
         this.substepsResetBtn = null;
-        this.pauseBtn = null;
-        this.resetBtn = null;
-        this.manageSystemBtn = null;
-        this.donateBtn = null;
         this.copyrightYearEl = null;
         this.targetBtn = null;
         this.lookAtBtn = null;
@@ -92,14 +80,7 @@ export class MainPanel extends Panel {
         this.lockToSunCheckbox = document.getElementById('lockToSun') as HTMLInputElement | null;
         this.showTrailsCheckbox = document.getElementById('showTrails') as HTMLInputElement | null;
         this.showNamesCheckbox = document.getElementById('showNames') as HTMLInputElement | null;
-        this.timeScaleSlider = document.getElementById('timeScale') as HTMLInputElement | null;
         this.timeScaleDisplay = document.getElementById('speed-val');
-        this.pauseBtn = document.getElementById('pauseBtn') as HTMLButtonElement | null;
-        this.resetBtn = document.getElementById('resetBtn') as HTMLButtonElement | null;
-        this.manageSystemBtn = document.getElementById(
-            'manageSystemBtn'
-        ) as HTMLButtonElement | null;
-        this.donateBtn = document.getElementById('donateBtn') as HTMLButtonElement | null;
         this.copyrightYearEl = document.getElementById('copyrightYear');
 
         if (this.copyrightYearEl) {
@@ -124,23 +105,6 @@ export class MainPanel extends Panel {
             };
         }
 
-        if (this.timeScaleSlider) {
-            this.timeScaleSlider.oninput = () => {
-                const value = parseFloat(this.timeScaleSlider!.value);
-                this.emit('timeScaleChange', { value });
-            };
-        }
-
-        this.timeScaleResetBtn = document.getElementById(
-            'timeScaleResetBtn'
-        ) as HTMLButtonElement | null;
-        if (this.timeScaleResetBtn) {
-            this.timeScaleResetBtn.onclick = () => {
-                if (this.timeScaleSlider) this.timeScaleSlider.value = '1';
-                this.emit('timeScaleChange', { value: 1 });
-            };
-        }
-
         this.substepsSlider = document.getElementById('substepsSlider') as HTMLInputElement | null;
         this.substepsDisplay = document.getElementById('substeps-val');
         if (this.substepsSlider) {
@@ -162,29 +126,6 @@ export class MainPanel extends Panel {
             };
         }
 
-        if (this.pauseBtn) {
-            this.pauseBtn.onclick = () => {
-                this.emit('pause');
-            };
-        }
-
-        if (this.resetBtn) {
-            this.resetBtn.onclick = () => {
-                this.emit('reset');
-            };
-        }
-
-        if (this.manageSystemBtn) {
-            this.manageSystemBtn.onclick = () => {
-                this.emit('manageSystem');
-            };
-        }
-
-        if (this.donateBtn) {
-            this.donateBtn.onclick = () => {
-                window.open('https://ko-fi.com/neptunecentury', '_blank', 'noopener,noreferrer');
-            };
-        }
     }
 
     updateTimeScaleDisplay(value: string) {
@@ -216,19 +157,7 @@ export class MainPanel extends Panel {
         btn.appendChild(document.createTextNode(' ' + labelText));
     }
 
-    setPauseState(isPaused: boolean) {
-        if (this.pauseBtn) {
-            if (isPaused) {
-                this.pauseBtn.classList.add('paused');
-                this._setButtonIcon(this.pauseBtn, 'play_arrow');
-                this._setButtonLabel(this.pauseBtn, 'RESUME SIMULATION');
-            } else {
-                this.pauseBtn.classList.remove('paused');
-                this._setButtonIcon(this.pauseBtn, 'pause');
-                this._setButtonLabel(this.pauseBtn, 'PAUSE SIMULATION');
-            }
-        }
-    }
+    
 
     setFreeCameraState(isActive: boolean) {
         if (this.freeCameraBtn) {

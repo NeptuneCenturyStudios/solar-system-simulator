@@ -75,6 +75,9 @@ export class Panel {
         if (this.element) {
             this.element.classList.toggle('visible');
         }
+
+        // Return the current visibility state after toggling
+        return this.element?.classList.contains('visible') || false;
     }
 
     /**

@@ -1,3 +1,5 @@
+import { Body } from '../bodies/body';
+import { Spaceship } from '../bodies/spaceship';
 import { Panel } from './panel';
 
 /**
@@ -78,5 +80,20 @@ export class FlightControlsPanel extends Panel {
             while (iconEl && iconEl.nextSibling) this.autopilotBtn.removeChild(iconEl.nextSibling);
             if (iconEl) this.autopilotBtn.appendChild(document.createTextNode(' AUTOPILOT'));
         }
+    }
+
+    /** Update the spawn/re-enter button label based on whether a live ship exists. */
+    updateFlightSpawnBtnLabel(ship: Spaceship | null, bodies: Body[]) {
+        const btn = document.getElementById('flightSpawnBtn');
+        if (!btn) return;
+
+        const canReenter = ship && !ship._isDisposed && bodies.includes(ship as Body);
+        const iconEl = btn.querySelector('.material-symbols-outlined');
+        if (iconEl) iconEl.textContent = canReenter ? 'login' : 'rocket_launch';
+        while (iconEl && iconEl.nextSibling) btn.removeChild(iconEl.nextSibling);
+        if (iconEl)
+            btn.appendChild(
+                document.createTextNode(canReenter ? ' ENTER SHIP' : ' SPAWN SPACESHIP')
+            );
     }
 }

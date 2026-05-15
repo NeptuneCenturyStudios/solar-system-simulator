@@ -124,8 +124,6 @@ import { Comet } from './bodies/comet';
 
 import { Spaceship } from './bodies/spaceship';
 import { MainPanel } from './ui/main-panel';
-import { ManagementPanel } from './ui/management-panel';
-import { FlightControlsPanel } from './ui/flight-controls-panel';
 import { StartupModal } from './ui/startup-modal';
 import { AboutModal } from './ui/about-modal';
 import { PerformancePanel } from './ui/performance-panel';
@@ -1120,8 +1118,8 @@ const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
  *  before decelerating), preventing a crash when FLIGHT_MAX_SPEED is very small. */
 const AUTOPILOT_APPROACH_MIN_DISTANCE =
     AUTOPILOT_BRAKE_PAD *
-    ((AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) *
-        (AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) /
+    (((AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) *
+        (AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED)) /
         (2 * AUTOPILOT_DECEL));
 /** Target arc length (u) for the BRAKE blend.  The ship begins its orbit-insertion blend
  *  this far from the orbit radius so the spiral-in is long enough to see smoothly.  When
@@ -2586,7 +2584,7 @@ function createPresetBody(presetKey: string) {
     } else {
         gizmo.attach(null);
     }
-    managementPanel.setSelectedBody(newBody);
+    mainMenu.managementPanel.setSelectedBody(newBody);
 
     setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
     clearCameraPresetHighlights();
@@ -2971,10 +2969,10 @@ function createNewBody(
         // For moons: keep selection/focus on the parent so the user can keep adding
         // moons to the same body without re-selecting it each time.
         if (moonCreationParent) {
-            managementPanel.setSelectedBody(moonCreationParent);
+            mainMenu.managementPanel.setSelectedBody(moonCreationParent);
             setFocusBody(moonCreationParent, { zoom: false });
         } else {
-            managementPanel.setSelectedBody(newBody);
+            mainMenu.managementPanel.setSelectedBody(newBody);
             // Focus selection/camera on the new body (object-based, not id-based)
             setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
         }
@@ -2994,8 +2992,8 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     }
 
     // Keep UI in sync
-    if (managementPanel?.enableKuiperBeltCheckbox) {
-        managementPanel.enableKuiperBeltCheckbox.checked = !hideKuiper;
+    if (mainMenu.managementPanel?.enableKuiperBeltCheckbox) {
+        mainMenu.managementPanel.enableKuiperBeltCheckbox.checked = !hideKuiper;
     }
 }
 
@@ -3332,18 +3330,15 @@ function togglePause() {
         // Remember the current speed and set to 0
         savedTimeScale = timeScale;
         timeScale = 0;
-        const direction = savedTimeScale < 0 ? ' REVERSE' : '';
-        mainPanel.updateTimeScaleDisplay(
-            '0.0x (PAUSED - next: ' + Math.abs(savedTimeScale) + 'x' + direction + ')'
-        );
-        mainPanel.setPauseState(true);
+
+        mainMenu.setPauseState(true);
         // Keep slider enabled so user can adjust speed while paused
     } else {
         // Restore the saved speed (which may have been adjusted while paused)
         timeScale = savedTimeScale;
         const direction = savedTimeScale < 0 ? ' REVERSE' : '';
         mainPanel.updateTimeScaleDisplay(Math.abs(savedTimeScale) + 'x' + direction);
-        mainPanel.setPauseState(false);
+        mainMenu.setPauseState(false);
     }
 }
 
@@ -3648,7 +3643,7 @@ function onMouseDown(event: MouseEvent) {
             selectedBody = clickedBody; // Update global selection
 
             // Update management panel with selected body
-            managementPanel.setSelectedBody(clickedBody);
+            mainMenu.managementPanel.setSelectedBody(clickedBody);
 
             // Update bodies table highlight
             refreshBodiesTable();
@@ -3684,7 +3679,7 @@ function onMouseDown(event: MouseEvent) {
         }
 
         gizmo.attach(null);
-        managementPanel.setSelectedBody(null);
+        mainMenu.managementPanel.setSelectedBody(null);
 
         refreshBodiesTable();
         forceHintRefresh();
@@ -4385,7 +4380,7 @@ function animate() {
                         // Keep camera distance stable; just retarget follow/look-at.
                         setFocusBody(winner, { zoom: false });
                         if (cameraState.isTargetMode) gizmo.attach(winner);
-                        managementPanel?.setSelectedBody?.(winner);
+                        mainMenu.managementPanel?.setSelectedBody?.(winner);
                     }
 
                     absorbBody(winner, victim);
@@ -4958,87 +4953,58 @@ function setF(id: string) {
 // Create and initialize panels
 const mainMenu = new MainMenu('main-menu');
 const startupModal = new StartupModal('startup-overlay');
-const mainPanel = new MainPanel('ui-layer');
+const mainPanel = new MainPanel('system-explorer');
 const aboutModal = new AboutModal('about-overlay', 'aboutBtn', 'aboutCloseBtn');
 const performancePanel = new PerformancePanel('performance-panel');
-const managementPanel = new ManagementPanel('management-panel', {
-    getFocusObject: () => {
-        const body = cameraState.focusBody;
-        return body && !body._isDisposed && simulationState.bodies.includes(body) ? body : null;
-    },
+mainMenu.managementPanel.registerGetFocusObject(() => {
+    const body = cameraState.focusBody;
+    return body && !body._isDisposed && simulationState.bodies.includes(body) ? body : null;
 });
-const flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
 
 mainMenu.initialize();
 startupModal.initialize();
 mainPanel.initialize();
 aboutModal.initialize();
 performancePanel.initialize();
-managementPanel.initialize();
-flightControlsPanel.initialize();
+
 
 // Wire Flight Controls button and panel events
-{
-    const flightControlsBtn = document.getElementById('flightControlsBtn');
-    if (flightControlsBtn) {
-        flightControlsBtn.onclick = () => {
-            flightControlsPanel.toggle();
-            // Update spawn button label to reflect whether there is a re-enterable ship
-            updateFlightSpawnBtnLabel();
-        };
-    }
 
-    const performanceOptionsBtn = document.getElementById('performanceOptionsBtn');
-    if (performanceOptionsBtn) {
-        performanceOptionsBtn.onclick = () => {
-            performancePanel.toggle();
-        };
-    }
-    flightControlsPanel.on('spawnShip', () => spawnShip());
-    flightControlsPanel.on('toggleView', () => {
-        flightState.isCockpitView = !flightState.isCockpitView;
-        flightControlsPanel.setViewState(flightState.isCockpitView);
-    });
-    flightControlsPanel.on('exitFlight', () => exitFlightMode());
-
-    // Autopilot toggle from the flight controls panel (targets currently selected body)
-    flightControlsPanel.on('autopilot', () => {
-        if (autopilotState.isActive) {
-            cancelAutopilot('Autopilot disengaged.');
-            return;
-        }
-        const target = selectedBody || manuallySelectedBody;
-        if (!target || target._isDisposed) {
-            addEvent('Autopilot: select a target body first.');
-            return;
-        }
-        engageAutopilot(target);
-    });
-
-    // Advanced flight mode checkbox
-    const advancedModeChk = document.getElementById(
-        'flightAdvancedMode'
-    ) as HTMLInputElement | null;
-    if (advancedModeChk) {
-        advancedModeChk.checked = flightState.isAdvancedMode;
-        advancedModeChk.addEventListener('change', () => {
-            flightState.isAdvancedMode = advancedModeChk.checked;
-        });
-    }
+const flightControlsPanel = mainMenu.flightControlsPanel;
+const performanceOptionsBtn = document.getElementById('btn-performance-options');
+if (performanceOptionsBtn) {
+    performanceOptionsBtn.onclick = () => {
+        performancePanel.toggle();
+    };
 }
+flightControlsPanel.on('spawnShip', () => spawnShip());
+flightControlsPanel.on('toggleView', () => {
+    flightState.isCockpitView = !flightState.isCockpitView;
+    flightControlsPanel.setViewState(flightState.isCockpitView);
+});
+flightControlsPanel.on('exitFlight', () => exitFlightMode());
 
-/** Update the spawn/re-enter button label based on whether a live ship exists. */
-function updateFlightSpawnBtnLabel() {
-    const btn = document.getElementById('flightSpawnBtn');
-    if (!btn) return;
-    const existing = flightState.knownShip;
-    const canReenter =
-        existing && !existing._isDisposed && simulationState.bodies.includes(existing);
-    const iconEl = btn.querySelector('.material-symbols-outlined');
-    if (iconEl) iconEl.textContent = canReenter ? 'login' : 'rocket_launch';
-    while (iconEl && iconEl.nextSibling) btn.removeChild(iconEl.nextSibling);
-    if (iconEl)
-        btn.appendChild(document.createTextNode(canReenter ? ' ENTER SHIP' : ' SPAWN SPACESHIP'));
+// Autopilot toggle from the flight controls panel (targets currently selected body)
+flightControlsPanel.on('autopilot', () => {
+    if (autopilotState.isActive) {
+        cancelAutopilot('Autopilot disengaged.');
+        return;
+    }
+    const target = selectedBody || manuallySelectedBody;
+    if (!target || target._isDisposed) {
+        addEvent('Autopilot: select a target body first.');
+        return;
+    }
+    engageAutopilot(target);
+});
+
+// Advanced flight mode checkbox
+const advancedModeChk = document.getElementById('flightAdvancedMode') as HTMLInputElement | null;
+if (advancedModeChk) {
+    advancedModeChk.checked = flightState.isAdvancedMode;
+    advancedModeChk.addEventListener('change', () => {
+        flightState.isAdvancedMode = advancedModeChk.checked;
+    });
 }
 
 // Prevent UI clicks and keyboard events from interfering with scene interaction
@@ -5416,7 +5382,7 @@ function updateAutopilot(dt: number) {
                     AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
                     (2 * AUTOPILOT_BOOST_DECEL) +
                 (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL)
-              : (Math.max(approachSpeed, AUTOPILOT_APPROACH_SPEED) ** 2) / (2 * AUTOPILOT_DECEL);
+              : Math.max(approachSpeed, AUTOPILOT_APPROACH_SPEED) ** 2 / (2 * AUTOPILOT_DECEL);
     const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
     if (autopilotState.phase === 'WARP') {
@@ -5434,7 +5400,8 @@ function updateAutopilot(dt: number) {
         // would fire immediately — bypassing APPROACH deceleration and entering BRAKE with
         // far more speed than the available runway can absorb.  Waiting until the ship is
         // close to AUTOPILOT_APPROACH_SPEED ensures brakeDistance is sized for that speed.
-        const nearApproachSpeed = approachSpeed <= AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED;
+        const nearApproachSpeed =
+            approachSpeed <= AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED;
         // Use the larger of the physics stopping distance and the visual arc distance so the
         // blend spiral is long enough to be perceptible.  Physics wins when entering BRAKE from
         // boost/warp decel (already handled by nearApproachSpeed guard above).
@@ -5525,7 +5492,8 @@ function updateAutopilot(dt: number) {
         // for the target's orbit radius.  The old max(AUTOPILOT_BOOST_THRESHOLD, ...) kept
         // the ship at boost-threshold distance even for small bodies, causing it to decelerate
         // from boost and then crawl the remaining ~0.5×boostDecelDist at FLIGHT_MAX_SPEED.
-        const effectiveBoostThreshold = orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE + boostDecelDist;
+        const effectiveBoostThreshold =
+            orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE + boostDecelDist;
         const useBoost = distance > effectiveBoostThreshold;
         autopilotState.isBoostActive = useBoost;
         const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : AUTOPILOT_APPROACH_SPEED;
@@ -6233,10 +6201,10 @@ function spawnShip() {
         cameraState.isLookAtMode = true;
         mainPanel.setLookAtState(true);
         setFocusBody(ship, { zoom: true });
-        managementPanel.setSelectedBody(ship);
+        mainMenu.managementPanel.setSelectedBody(ship);
 
         // Update button label to "RE-ENTER SHIP"
-        updateFlightSpawnBtnLabel();
+        mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(flightState.knownShip, simulationState.bodies);
 
         addEvent('Spaceship spawned. Click RE-ENTER SHIP to pilot it.');
         return;
@@ -6277,7 +6245,7 @@ function spawnShip() {
         selectedBody = null;
         manuallySelectedBody = null;
         gizmo.attach(null);
-        managementPanel.setSelectedBody(null);
+        mainMenu.managementPanel.setSelectedBody(null);
         refreshBodiesTable();
     }
 
@@ -6412,7 +6380,7 @@ function exitFlightMode() {
     // to avoid forward-reference issues in the module execution order.
     setTimeout(() => {
         try {
-            updateFlightSpawnBtnLabel();
+            mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(flightState.knownShip, simulationState.bodies);
         } catch {
             // Empty
         }
@@ -6493,7 +6461,7 @@ mainPanel.on('freeCameraToggle', () => {
     } else {
         gizmo.attach(null);
     }
-    managementPanel.setSelectedBody(selected);
+    mainMenu.managementPanel.setSelectedBody(selected);
 
     refreshBodiesTable();
     updateSurfaceButtonEnabled();
@@ -6516,13 +6484,13 @@ performancePanel.on('shadowsChange', ({ checked }: { checked: boolean }) => {
     toggleShadows(checked);
 });
 
-managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
+mainMenu.managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = checked;
     }
 });
 
-managementPanel.on('gChange', ({ value }: { value: number }) => {
+mainMenu.managementPanel.on('gChange', ({ value }: { value: number }) => {
     simulationState.gMultiplier = value;
 });
 
@@ -6558,7 +6526,7 @@ mainPanel.on('substepsChange', ({ value }: { value: number }) => {
     stepsPerFrame = value;
 });
 
-mainPanel.on('timeScaleChange', ({ value }: { value: number }) => {
+mainMenu.on('timeScaleChange', ({ value }: { value: number }) => {
     const newSpeed = value;
     const direction = newSpeed < 0 ? ' REVERSE' : '';
     const absSpeed = Math.abs(newSpeed);
@@ -6575,18 +6543,14 @@ mainPanel.on('timeScaleChange', ({ value }: { value: number }) => {
     }
 });
 
-mainPanel.on('pause', () => {
+mainMenu.on('pause', () => {
     togglePause();
 });
 
-mainPanel.on('reset', () => {
+mainMenu.on('reset', () => {
     // Auto-close management UI and show launcher with Cancel
-    managementPanel.hide();
+    mainMenu.managementPanel.hide();
     startupModal.open({ allowCancel: true });
-});
-
-mainPanel.on('manageSystem', () => {
-    managementPanel.toggle();
 });
 
 // "Fly Here" button from the bodies table
@@ -6623,7 +6587,7 @@ mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
     } else {
         gizmo.attach(null);
     }
-    managementPanel.setSelectedBody(body);
+    mainMenu.managementPanel.setSelectedBody(body);
 });
 
 // TARGET button (toggle):
@@ -6647,7 +6611,7 @@ mainPanel.on('targetToggle', () => {
     if (turningOn) {
         if (b) {
             gizmo.attach(b);
-            managementPanel.setSelectedBody(b);
+            mainMenu.managementPanel.setSelectedBody(b);
         }
     } else {
         // Hide gizmo but keep selection
@@ -6713,7 +6677,7 @@ mainPanel.on('lookAtToggle', () => {
 
             // No selection => no gizmo attachment (Target still governs showing it later)
             gizmo.attach(null);
-            managementPanel.setSelectedBody(null);
+            mainMenu.managementPanel.setSelectedBody(null);
             refreshBodiesTable();
             return;
         }
@@ -6724,7 +6688,7 @@ mainPanel.on('lookAtToggle', () => {
         } else {
             gizmo.attach(null);
         }
-        managementPanel.setSelectedBody(b);
+        mainMenu.managementPanel.setSelectedBody(b);
 
         setFocusBody(b, { zoom: true });
     } else {
@@ -6756,7 +6720,7 @@ mainPanel.on('lookAtToggle', () => {
 });
 
 // Subscribe to ManagementPanel events
-managementPanel.on(
+mainMenu.managementPanel.on(
     'createBody',
     ({
         bodyType,
@@ -6798,7 +6762,7 @@ managementPanel.on(
 );
 
 // Preset bodies (canonical solar-system objects)
-managementPanel.on('createPresetBody', ({ presetKey }: { presetKey: string }) => {
+mainMenu.managementPanel.on('createPresetBody', ({ presetKey }: { presetKey: string }) => {
     if (!presetKey) return;
     createPresetBody(presetKey);
     refreshBodiesTable();
@@ -6837,11 +6801,11 @@ function keepCameraDistanceOnBodyScaleChange(body: Body, oldRadius: number, newR
     controls.target.copy(targetPos);
 }
 
-managementPanel.on('deleteBody', () => {
+mainMenu.managementPanel.on('deleteBody', () => {
     deleteSelectedBody();
 });
 
-managementPanel.on(
+mainMenu.managementPanel.on(
     'applyEdit',
     ({
         body,
@@ -6870,8 +6834,8 @@ managementPanel.on(
         if (name !== null && name !== '') {
             body.updateLabel(name);
             // Update just the edit form label without repopulating the entire form
-            if (managementPanel.editBodyName) {
-                managementPanel.editBodyName.textContent = body.name;
+            if (mainMenu.managementPanel.editBodyName) {
+                mainMenu.managementPanel.editBodyName.textContent = body.name;
             }
         }
 
@@ -6911,10 +6875,10 @@ managementPanel.on(
                 typeof body.mass === 'number' &&
                 body.mass < 1;
 
-            if (managementPanel && managementPanel.editRadiusSlider) {
+            if (mainMenu.managementPanel && mainMenu.managementPanel.editRadiusSlider) {
                 const oldRadiusAll = body.radius || 1;
                 const newRadiusAll = parseFloat(
-                    (managementPanel.editRadiusSlider as HTMLInputElement).value
+                    (mainMenu.managementPanel.editRadiusSlider as HTMLInputElement).value
                 );
                 if (!isNaN(newRadiusAll) && isFinite(newRadiusAll)) {
                     if (isLowMassAsteroid) {
@@ -7056,7 +7020,7 @@ function deleteSelectedBody() {
 
     // Update UI selection state (match existing empty-space click behavior)
     selectedBody = null;
-    managementPanel?.setSelectedBody?.(null);
+    mainMenu.managementPanel?.setSelectedBody?.(null);
     if (cameraState?.isTargetMode) {
         gizmo.attach(null);
     }
@@ -7323,8 +7287,8 @@ window.addEventListener('resize', () => {
 
 // Apply initial background visibility (pre-launch view): kuiper off
 if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) kuiperBeltPoints.visible = false;
-if (managementPanel.enableKuiperBeltCheckbox)
-    managementPanel.enableKuiperBeltCheckbox.checked = false;
+if (mainMenu.managementPanel.enableKuiperBeltCheckbox)
+    mainMenu.managementPanel.enableKuiperBeltCheckbox.checked = false;
 
 if (skydome) skydome.visible = true;
 if (enableSkydomeCheckbox) enableSkydomeCheckbox.checked = true;
@@ -7374,8 +7338,8 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
     }
 
     // Clear edit panel selection if it is showing this body
-    if (managementPanel && managementPanel.selectedBody === body) {
-        managementPanel.setSelectedBody(null);
+    if (mainMenu.managementPanel && mainMenu.managementPanel.selectedBody === body) {
+        mainMenu.managementPanel.setSelectedBody(null);
     }
 
     // Clear gizmo if it was attached to this body
@@ -7400,7 +7364,7 @@ window.addEventListener('body:removed', (e) => {
         flightState.knownShip = null;
         setTimeout(() => {
             try {
-                updateFlightSpawnBtnLabel();
+                mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(flightState.knownShip, simulationState.bodies);
             } catch {
                 // Empty
             }
@@ -7429,7 +7393,7 @@ window.addEventListener('bodies:reset', () => {
     manuallySelectedBody = null;
     cameraState.focusBody = null;
     gizmo.attach(null);
-    managementPanel.setSelectedBody(null);
+    mainMenu.managementPanel.setSelectedBody(null);
     refreshBodiesTable();
 });
 
@@ -7461,7 +7425,7 @@ function applyDefaultCameraTogglesAfterSpawn() {
 
     // No selection => no gizmo attachment yet.
     gizmo.attach(null);
-    managementPanel.setSelectedBody(null);
+    mainMenu.managementPanel.setSelectedBody(null);
     refreshBodiesTable();
 
     // Hint text depends on toggle state (Target/Look At).
@@ -7469,21 +7433,21 @@ function applyDefaultCameraTogglesAfterSpawn() {
 }
 
 startupModal.on('launchDefault', () => {
-    managementPanel.hide();
+    mainMenu.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.Default });
     applyDefaultCameraTogglesAfterSpawn();
 });
 
 startupModal.on('launchEmpty', () => {
-    managementPanel.hide();
+    mainMenu.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.Empty });
     applyDefaultCameraTogglesAfterSpawn();
 });
 
 startupModal.on('launchBlackHole', () => {
-    managementPanel.hide();
+    mainMenu.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.BlackHole });
     applyDefaultCameraTogglesAfterSpawn();
