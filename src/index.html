@@ -1,464 +1,693 @@
 <!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Solar System Simulator</title>
+        <link rel="icon" href="data:," />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0"
+        />
+        <link rel="stylesheet" href="style.css" />
+    </head>
 
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Solar System Simulator</title>
-    <link rel="icon" href="data:," />
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" />
-    <link rel="stylesheet" href="style.css" />
-</head>
-
-<body>
-    <div id="startup-overlay" class="modal-overlay visible" aria-modal="true" role="dialog">
-        <div id="startup-modal" class="modal">
-            <div class="modal__header">Launch Control</div>
-            <button id="startupLaunchDefaultBtn" class="btn-with-icon">
-                <span class="material-symbols-outlined">rocket_launch</span>
-                LAUNCH SOLAR SYSTEM
-            </button>
-            <button id="startupLaunchEmptyBtn" class="btn-with-icon">
-                <span class="material-symbols-outlined">build</span>
-                BUILD YOUR OWN SYSTEM
-            </button>
-            <button id="startupLaunchBlackHoleBtn" class="btn-dark btn-with-icon">
-                <span class="material-symbols-outlined">workspaces</span>
-                BLACK HOLE
-            </button>
-            <button id="startupCancelBtn" class="cancel-btn btn-with-icon" style="display: none; background: #aa3333">
-                <span class="material-symbols-outlined">close</span>
-                CANCEL
-            </button>
-        </div>
-    </div>
-
-    <div id="about-overlay" class="modal-overlay" aria-modal="true" role="dialog">
-        <div id="about-modal" class="modal">
-            <div class="modal__header">About</div>
-            <div class="modal__body">
-                <p>
-                    Solar System Simulator is a browser-based space simulation focused on
-                    physics, exploration, and interactive body management.
-                </p>
-                <p>
-                    Spaceship by Liz Reddington
-                    <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank">CC-BY</a>
-                    via Poly Pizza
-                    <a href="https://poly.pizza/m/5nWeu4IQXVX" target="_blank">https://poly.pizza/m/5nWeu4IQXVX</a>
-                </p>
-            </div>
-            <div class="modal__actions">
-                <button id="aboutCloseBtn" class="btn-with-icon">
+    <body>
+        <div id="startup-overlay" class="modal-overlay visible" aria-modal="true" role="dialog">
+            <div id="startup-modal" class="modal">
+                <div class="modal__header">Launch Control</div>
+                <button id="startupLaunchDefaultBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">rocket_launch</span>
+                    LAUNCH SOLAR SYSTEM
+                </button>
+                <button id="startupLaunchEmptyBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">build</span>
+                    BUILD YOUR OWN SYSTEM
+                </button>
+                <button id="startupLaunchBlackHoleBtn" class="btn-dark btn-with-icon">
+                    <span class="material-symbols-outlined">workspaces</span>
+                    BLACK HOLE
+                </button>
+                <button
+                    id="startupCancelBtn"
+                    class="cancel-btn btn-with-icon"
+                    style="display: none; background: #aa3333"
+                >
                     <span class="material-symbols-outlined">close</span>
-                    CLOSE
+                    CANCEL
                 </button>
             </div>
         </div>
-    </div>
 
-    <div id="ui-container">
-        <div id="ui-layer" class="ui-panel visible">
-            <div class="panel-header">Mission Control</div>
-
-            <label>Camera:</label>
-            <div class="btn-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr">
-                <button id="camTargetBtn" class="btn-icon-only" title="Target (Off)">
-                    <span class="material-symbols-outlined">location_searching</span>
-                </button>
-                <button id="camLookAtBtn" class="btn-icon-only" title="Look At (Off)">
-                    <span class="material-symbols-outlined">visibility_off</span>
-                </button>
-                <button id="freeCameraBtn" class="btn-icon-only" title="Free Camera (Off)">
-                    <span class="material-symbols-outlined">videogame_asset</span>
-                </button>
-                <button id="surfaceCameraBtn" class="btn-icon-only" title="Surface (Off)" disabled>
-                    <span class="material-symbols-outlined">hiking</span>
-                </button>
-                <button id="zoomInBtn" class="btn-icon-only" title="Zoom In">
-                    <span class="material-symbols-outlined">zoom_in</span>
-                </button>
-                <button id="zoomOutBtn" class="btn-icon-only" title="Zoom Out">
-                    <span class="material-symbols-outlined">zoom_out</span>
-                </button>
-            </div>
-
-            <label class="checkbox-row">
-                <input type="checkbox" id="lockToSun" /> Lock Camera to Sun
-            </label>
-
-            <label>Bodies:</label>
-            <div id="bodiesTableContainer"></div>
-
-            <label class="checkbox-row">
-                <input type="checkbox" id="showTrails" checked /> Show Orbit Trails
-            </label>
-            <label class="checkbox-row">
-                <input type="checkbox" id="showNames" /> Show Planet Names
-                <span style="margin-left: 8px; color: #aaa" aria-hidden="true">(N)</span>
-            </label>
-
-            
-
-            <div class="control-group">
-                <label>Physics Accuracy
-                    <span id="substeps-val" class="val-display">64</span></label>
-                <div class="slider-row">
-                    <input type="range" id="substepsSlider" min="8" max="512" step="8" value="64"
-                        title="Controls how many physics steps are calculated per frame. Higher values improve orbital accuracy but use more CPU. Lower values are faster but less precise." />
-                    <button class="btn-slider-reset" id="substepsResetBtn" title="Reset to default (64)">
-                        <span class="material-symbols-outlined">replay</span>
+        <div id="about-overlay" class="modal-overlay" aria-modal="true" role="dialog">
+            <div id="about-modal" class="modal">
+                <div class="modal__header">About</div>
+                <div class="modal__body">
+                    <p>
+                        Solar System Simulator is a browser-based space simulation focused on
+                        physics, exploration, and interactive body management.
+                    </p>
+                    <p>
+                        Spaceship by Liz Reddington
+                        <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
+                            >CC-BY</a
+                        >
+                        via Poly Pizza
+                        <a href="https://poly.pizza/m/5nWeu4IQXVX" target="_blank"
+                            >https://poly.pizza/m/5nWeu4IQXVX</a
+                        >
+                    </p>
+                </div>
+                <div class="modal__actions">
+                    <button id="aboutCloseBtn" class="btn-with-icon">
+                        <span class="material-symbols-outlined">close</span>
+                        CLOSE
                     </button>
                 </div>
             </div>
-
-            <!-- Light Intensity moved to Solar System Management -> Edit (stars only) -->
-
-            <button id="pauseBtn" class="btn-with-icon">
-                <span class="material-symbols-outlined">pause</span>
-                PAUSE SIMULATION
-                <span style="margin-left: 8px; color: #aaa" aria-hidden="true">(P)</span>
-            </button>
-            <button id="resetBtn" class="btn-warning btn-with-icon">
-                <span class="material-symbols-outlined">refresh</span>
-                RE-LAUNCH SYSTEM
-            </button>
-            <button id="manageSystemBtn" class="btn-with-icon">
-                <span class="material-symbols-outlined">tune</span>
-                MANAGE SOLAR SYSTEM
-            </button>
-            <button id="flightControlsBtn" class="btn-with-icon">
-                <span class="material-symbols-outlined">rocket</span>
-                FLIGHT CONTROLS
-            </button>
-            <div class="btn-row btn-row--action-buttons">
-                <button id="donateBtn" class="btn-with-icon btn-with-icon--donate"
-                    title="Support Neptune Century on Ko-fi">
-                    <span class="material-symbols-outlined">favorite</span>
-                    DONATE
-                </button>
-                <button id="performanceOptionsBtn" class="btn-icon-only" title="Performance Options"
-                    aria-label="Performance Options">
-                    <span class="material-symbols-outlined">speed</span>
-                </button>
-                <button id="aboutBtn" class="btn-with-icon" title="About this simulator"
-                    aria-label="About this simulator">
-                    <span class="material-symbols-outlined">info</span>
-                    ABOUT
-                </button>
-            </div>
-            <div class="footer-note">© <span id="copyrightYear"></span> Neptune Century</div>
         </div>
 
-        <div id="performance-panel" class="ui-panel">
-            <div class="panel-header">Performance Options</div>
-            <label class="checkbox-row">
-                <input type="checkbox" id="enableShadows" /> Enable Shadows
-            </label>
-            <label class="checkbox-row">
-                <input type="checkbox" id="enableParticleEffects" checked /> Enable Particle
-                Effects
-            </label>
-        </div>
+        <div id="ui-container">
+            <div id="ui-layer" class="ui-panel visible">
+                <div class="panel-header">Mission Control</div>
 
-        <div id="flight-controls-panel" class="ui-panel">
-            <div class="panel-header">Flight Controls</div>
-            <p style="color: #aaa; margin: 4px 0 8px">
-                W/S — speed &nbsp; A/D — roll &nbsp; Shift — boost<br />C — view &nbsp; Mouse
-                steers &nbsp; Hold space — warp &nbsp; Esc — exit
-            </p>
-            <label class="checkbox-row" style="margin-bottom: 8px">
-                <input type="checkbox" id="flightAdvancedMode" /> Advanced Flight Mode
-            </label>
-            <button id="flightSpawnBtn" class="btn-with-icon">
-                <span class="material-symbols-outlined">rocket_launch</span>
-                SPAWN SPACESHIP
-            </button>
-            <button id="flightToggleViewBtn" class="btn-with-icon" disabled>
-                <span class="material-symbols-outlined">visibility</span>
-                COCKPIT VIEW
-            </button>
-            <button id="flightAutopilotBtn" class="btn-with-icon" disabled>
-                <span class="material-symbols-outlined">rocket</span>
-                AUTOPILOT
-            </button>
-            <button id="flightExitBtn" class="btn-with-icon" disabled style="background: #883333">
-                <span class="material-symbols-outlined">exit_to_app</span>
-                EXIT FLIGHT MODE
-            </button>
-        </div>
-
-        <div id="management-panel" class="ui-panel">
-            <div class="panel-header">Solar System Management</div>
-            <label class="checkbox-row">
-                <input type="checkbox" id="enableKuiperBelt" checked /> Enable Kuiper Belt
-            </label>
-            <label class="checkbox-row">
-                <input type="checkbox" id="enableSkydome" checked /> Enable Background Texture
-            </label>
-            <label class="checkbox-row">
-                <input type="checkbox" id="enableStarDeath" /> Enable Natural Star Death
-            </label>
-            <div class="control-group">
-                <label>Gravity Multiplier (G)
-                    <span id="gravitational-constant-val" class="val-display">1</span>
-                </label>
-                <div class="slider-row">
-                    <input type="range" id="gravitationalConstantSlider" min="0" max="10" step="0.1" value="1" />
-                    <button class="btn-slider-reset" id="gravitationalConstantResetBtn" title="Reset to 1x">
-                        <span class="material-symbols-outlined">replay</span>
+                <label>Camera:</label>
+                <div class="btn-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr">
+                    <button id="camTargetBtn" class="btn-icon-only" title="Target (Off)">
+                        <span class="material-symbols-outlined">location_searching</span>
+                    </button>
+                    <button id="camLookAtBtn" class="btn-icon-only" title="Look At (Off)">
+                        <span class="material-symbols-outlined">visibility_off</span>
+                    </button>
+                    <button id="freeCameraBtn" class="btn-icon-only" title="Free Camera (Off)">
+                        <span class="material-symbols-outlined">videogame_asset</span>
+                    </button>
+                    <button
+                        id="surfaceCameraBtn"
+                        class="btn-icon-only"
+                        title="Surface (Off)"
+                        disabled
+                    >
+                        <span class="material-symbols-outlined">hiking</span>
+                    </button>
+                    <button id="zoomInBtn" class="btn-icon-only" title="Zoom In">
+                        <span class="material-symbols-outlined">zoom_in</span>
+                    </button>
+                    <button id="zoomOutBtn" class="btn-icon-only" title="Zoom Out">
+                        <span class="material-symbols-outlined">zoom_out</span>
                     </button>
                 </div>
-            </div>
-            <button id="addBodyBtn" class="btn-with-icon">
-                <span class="material-symbols-outlined">add</span>
-                ADD
-            </button>
-            <div class="body-creation-form" id="bodyCreationForm">
-                <label>Add Mode:</label>
-                <select id="addMode">
-                    <option value="preset">Preset</option>
-                    <option value="custom">Custom</option>
-                </select>
 
-                <div id="presetBodyGroup">
-                    <label>Preset Body:</label>
-                    <select id="presetBody">
-                        <option value="sun">Sun</option>
-                        <option value="mercury">Mercury</option>
-                        <option value="venus">Venus</option>
-                        <option value="earth">Earth</option>
-                        <option value="earth_moon">Moon (Earth)</option>
-                        <option value="mars">Mars</option>
-                        <option value="jupiter">Jupiter</option>
-                        <option value="saturn">Saturn</option>
-                        <option value="uranus">Uranus</option>
-                        <option value="neptune">Neptune</option>
-                        <option value="pluto">Pluto</option>
-                    </select>
-                </div>
-
-                <div id="customBodyGroup">
-                    <label>Body Type:</label>
-                    <select id="bodyType">
-                        <option value="sun">Star</option>
-                        <option value="planet">Planet</option>
-                        <option value="moon">Moon</option>
-                        <option value="asteroid">Asteroid</option>
-                        <option value="comet">Comet</option>
-                        <option value="black_hole">Black Hole</option>
-                    </select>
-                </div>
-
-                <div class="control-group" id="createMassGroup" style="display: none">
-                    <label>Mass <span id="create-mass-val" class="val-display">100</span></label>
-                    <input type="number" id="createMass" class="text-input" min="0.001" max="100000000000" step="any"
-                        value="1000000000" />
-                </div>
-
-                <div class="control-group" id="createTemperatureGroup" style="display: none">
-                    <label>Temperature
-                        <span id="create-temp-val" class="val-display">5778K</span></label>
-                    <input type="range" id="createTemperature" min="2000" max="30000" step="100" value="5778" />
-                </div>
-
-                <div class="control-group" id="createLightIntensityGroup" style="display: none">
-                    <label>Light Intensity
-                        <span id="create-light-intensity-val" class="val-display">500M</span></label>
-                    <input type="range" id="createLightIntensity" min="1000000" max="2000000000" step="1000000"
-                        value="500000000" />
-                </div>
-
-                <div class="control-group" id="createRadiusGroup" style="display: none">
-                    <label>Size (Radius)
-                        <span id="create-radius-val" class="val-display">8</span></label>
-                    <input type="number" id="createRadius" class="text-input" min=".01" max="4000000000" step="1"
-                        value="874" />
-                </div>
-
-                <div class="control-group" id="orbitParentRow" style="display: none">
-                    <label>Orbit Parent
-                        <span id="orbitParentDisplay" class="val-display">None</span></label>
-                </div>
-
-                <div class="radio-group" id="orbitTypeGroup" style="display: none">
-                    <label>Orbit Type:</label>
-                    <div class="radio-options">
-                        <div class="radio-option">
-                            <input type="radio" id="orbitCircular" name="orbitType" value="circular" checked />
-                            <label for="orbitCircular">Circular</label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" id="orbitElliptical" name="orbitType" value="elliptical" />
-                            <label for="orbitElliptical">Elliptical</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="control-group" id="inclinationGroup" style="display: none">
-                    <label>Inclination
-                        <span id="inclination-val" class="val-display">0°</span></label>
-                    <input type="range" id="inclination" min="0" max="90" step="1" value="0" />
-                </div>
-
-                <div class="radio-group" id="planetTypeGroup" style="display: none">
-                    <label>Planet Type:</label>
-                    <div class="radio-options">
-                        <div class="radio-option">
-                            <input type="radio" id="planetTypeSolid" name="planetType" value="solid" checked />
-                            <label for="planetTypeSolid">Solid</label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" id="planetTypeGasGiant" name="planetType" value="gas_giant" />
-                            <label for="planetTypeGasGiant">Gas Giant</label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" id="planetTypeIceGiant" name="planetType" value="ice_giant" />
-                            <label for="planetTypeIceGiant">Ice Giant</label>
-                        </div>
-                    </div>
-                </div>
-
-                <label class="checkbox-row" id="hasAtmosphereRow" style="display: none">
-                    <input type="checkbox" id="hasAtmosphere" /> Has Atmosphere
+                <label class="checkbox-row">
+                    <input type="checkbox" id="lockToSun" /> Lock Camera to Sun
                 </label>
 
-                <div id="moonValidationMessage" class="validation-message">
-                    Please select a body first to create a moon
+                <label>Bodies:</label>
+                <div id="bodiesTableContainer"></div>
+
+                <label class="checkbox-row">
+                    <input type="checkbox" id="showTrails" checked /> Show Orbit Trails
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="showNames" /> Show Planet Names
+                    <span style="margin-left: 8px; color: #aaa" aria-hidden="true">(N)</span>
+                </label>
+
+                <div class="control-group">
+                    <label
+                        >Physics Accuracy
+                        <span id="substeps-val" class="val-display">64</span></label
+                    >
+                    <div class="slider-row">
+                        <input
+                            type="range"
+                            id="substepsSlider"
+                            min="8"
+                            max="512"
+                            step="8"
+                            value="64"
+                            title="Controls how many physics steps are calculated per frame. Higher values improve orbital accuracy but use more CPU. Lower values are faster but less precise."
+                        />
+                        <button
+                            class="btn-slider-reset"
+                            id="substepsResetBtn"
+                            title="Reset to default (64)"
+                        >
+                            <span class="material-symbols-outlined">replay</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div class="form-row form-row--actions" id="randomizeCreateRow" hidden>
-                    <button id="randomizeCreateBtn" type="button" class="btn-with-icon">
-                        <span class="material-symbols-outlined">shuffle</span>
-                        RANDOMIZE
-                    </button>
-                </div>
+                <!-- Light Intensity moved to Solar System Management -> Edit (stars only) -->
 
-                <div class="button-group">
-                    <button id="createBodyBtn" class="btn-with-icon">
-                        <span class="material-symbols-outlined">check</span>
-                        CREATE
+                <button id="pauseBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">pause</span>
+                    PAUSE SIMULATION
+                    <span style="margin-left: 8px; color: #aaa" aria-hidden="true">(P)</span>
+                </button>
+                <button id="resetBtn" class="btn-warning btn-with-icon">
+                    <span class="material-symbols-outlined">refresh</span>
+                    RE-LAUNCH SYSTEM
+                </button>
+                <button id="manageSystemBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">tune</span>
+                    MANAGE SOLAR SYSTEM
+                </button>
+                <button id="flightControlsBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">rocket</span>
+                    FLIGHT CONTROLS
+                </button>
+                <div class="btn-row btn-row--action-buttons">
+                    <button
+                        id="donateBtn"
+                        class="btn-with-icon btn-with-icon--donate"
+                        title="Support Neptune Century on Ko-fi"
+                    >
+                        <span class="material-symbols-outlined">favorite</span>
+                        DONATE
                     </button>
-                    <button id="cancelCreateBtn" class="cancel-btn btn-with-icon">
-                        <span class="material-symbols-outlined">cancel</span>
-                        CANCEL
+                    <button
+                        id="performanceOptionsBtn"
+                        class="btn-icon-only"
+                        title="Performance Options"
+                        aria-label="Performance Options"
+                    >
+                        <span class="material-symbols-outlined">speed</span>
+                    </button>
+                    <button
+                        id="aboutBtn"
+                        class="btn-with-icon"
+                        title="About this simulator"
+                        aria-label="About this simulator"
+                    >
+                        <span class="material-symbols-outlined">info</span>
+                        ABOUT
                     </button>
                 </div>
+                <div class="footer-note">© <span id="copyrightYear"></span> Neptune Century</div>
             </div>
 
-            <button id="editBodyBtn" class="btn-with-icon">
-                <span class="material-symbols-outlined">edit</span>
-                EDIT
-            </button>
-            <div class="body-edit-form" id="bodyEditForm">
-                <label id="editBodyName">No body selected</label>
+            <div id="performance-panel" class="ui-panel">
+                <div class="panel-header">Performance Options</div>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="enableShadows" /> Enable Shadows
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="enableParticleEffects" checked /> Enable Particle
+                    Effects
+                </label>
+            </div>
 
-                <div id="editControlsContainer">
-                    <div class="control-group">
-                        <label>Name</label>
-                        <input type="text" id="editName" class="text-input" placeholder="Body name" />
+            <div id="flight-controls-panel" class="ui-panel">
+                <div class="panel-header">Flight Controls</div>
+                <p style="color: #aaa; margin: 4px 0 8px">
+                    W/S — speed &nbsp; A/D — roll &nbsp; Shift — boost<br />C — view &nbsp; Mouse
+                    steers &nbsp; Hold space — warp &nbsp; Esc — exit
+                </p>
+                <label class="checkbox-row" style="margin-bottom: 8px">
+                    <input type="checkbox" id="flightAdvancedMode" /> Advanced Flight Mode
+                </label>
+                <button id="flightSpawnBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">rocket_launch</span>
+                    SPAWN SPACESHIP
+                </button>
+                <button id="flightToggleViewBtn" class="btn-with-icon" disabled>
+                    <span class="material-symbols-outlined">visibility</span>
+                    COCKPIT VIEW
+                </button>
+                <button id="flightAutopilotBtn" class="btn-with-icon" disabled>
+                    <span class="material-symbols-outlined">rocket</span>
+                    AUTOPILOT
+                </button>
+                <button
+                    id="flightExitBtn"
+                    class="btn-with-icon"
+                    disabled
+                    style="background: #883333"
+                >
+                    <span class="material-symbols-outlined">exit_to_app</span>
+                    EXIT FLIGHT MODE
+                </button>
+            </div>
+
+            <div id="management-panel" class="ui-panel">
+                <div class="panel-header">Solar System Management</div>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="enableKuiperBelt" checked /> Enable Kuiper Belt
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="enableSkydome" checked /> Enable Background Texture
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="enableStarDeath" /> Enable Natural Star Death
+                </label>
+                <div class="control-group">
+                    <label
+                        >Gravity Multiplier (G)
+                        <span id="gravitational-constant-val" class="val-display">1</span>
+                    </label>
+                    <div class="slider-row">
+                        <input
+                            type="range"
+                            id="gravitationalConstantSlider"
+                            min="0"
+                            max="10"
+                            step="0.1"
+                            value="1"
+                        />
+                        <button
+                            class="btn-slider-reset"
+                            id="gravitationalConstantResetBtn"
+                            title="Reset to 1x"
+                        >
+                            <span class="material-symbols-outlined">replay</span>
+                        </button>
+                    </div>
+                </div>
+                <button id="addBodyBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">add</span>
+                    ADD
+                </button>
+                <div class="body-creation-form" id="bodyCreationForm">
+                    <label>Add Mode:</label>
+                    <select id="addMode">
+                        <option value="preset">Preset</option>
+                        <option value="custom">Custom</option>
+                    </select>
+
+                    <div id="presetBodyGroup">
+                        <label>Preset Body:</label>
+                        <select id="presetBody">
+                            <option value="sun">Sun</option>
+                            <option value="mercury">Mercury</option>
+                            <option value="venus">Venus</option>
+                            <option value="earth">Earth</option>
+                            <option value="earth_moon">Moon (Earth)</option>
+                            <option value="mars">Mars</option>
+                            <option value="jupiter">Jupiter</option>
+                            <option value="saturn">Saturn</option>
+                            <option value="uranus">Uranus</option>
+                            <option value="neptune">Neptune</option>
+                            <option value="pluto">Pluto</option>
+                        </select>
                     </div>
 
-                    <div class="control-group">
-                        <label>Color</label>
-                        <input type="color" id="editColor" class="color-input" value="#ffffff" />
+                    <div id="customBodyGroup">
+                        <label>Body Type:</label>
+                        <select id="bodyType">
+                            <option value="sun">Star</option>
+                            <option value="planet">Planet</option>
+                            <option value="moon">Moon</option>
+                            <option value="asteroid">Asteroid</option>
+                            <option value="comet">Comet</option>
+                            <option value="black_hole">Black Hole</option>
+                        </select>
                     </div>
 
-                    <div class="control-group">
-                        <label>Mass <span id="edit-mass-val" class="val-display">0</span></label>
-                        <input type="number" id="editMass" class="text-input" min="0.001" max="100000000000" step="any"
-                            value="1" />
+                    <div class="control-group" id="createMassGroup" style="display: none">
+                        <label
+                            >Mass <span id="create-mass-val" class="val-display">100</span></label
+                        >
+                        <input
+                            type="number"
+                            id="createMass"
+                            class="text-input"
+                            min="0.001"
+                            max="100000000000"
+                            step="any"
+                            value="1000000000"
+                        />
                     </div>
 
-                    <div class="control-group" id="editTempGroup" style="display: none">
-                        <label>Temperature
-                            <span id="edit-temp-val" class="val-display">5778K</span></label>
-                        <input type="range" id="editTemperature" min="2000" max="30000" step="100" value="5778" />
+                    <div class="control-group" id="createTemperatureGroup" style="display: none">
+                        <label
+                            >Temperature
+                            <span id="create-temp-val" class="val-display">5778K</span></label
+                        >
+                        <input
+                            type="range"
+                            id="createTemperature"
+                            min="2000"
+                            max="30000"
+                            step="100"
+                            value="5778"
+                        />
                     </div>
 
-                    <div class="control-group" id="editLightIntensityGroup" style="display: none">
-                        <label>Light Intensity
-                            <span id="edit-light-intensity-val" class="val-display">500M</span></label>
-                        <input type="range" id="editLightIntensity" min="1000000" max="2000000000" step="1000000"
-                            value="500000000" />
+                    <div class="control-group" id="createLightIntensityGroup" style="display: none">
+                        <label
+                            >Light Intensity
+                            <span id="create-light-intensity-val" class="val-display"
+                                >500M</span
+                            ></label
+                        >
+                        <input
+                            type="range"
+                            id="createLightIntensity"
+                            min="1000000"
+                            max="2000000000"
+                            step="1000000"
+                            value="500000000"
+                        />
                     </div>
 
-                    <div class="control-group" id="editRadiusGroup" style="display: none">
-                        <label>Size (Radius)
-                            <span id="edit-radius-val" class="val-display">874</span></label>
-                        <input type="number" id="editRadius" class="text-input" min=".01" max="5000000000" step="1"
-                            value="874" />
+                    <div class="control-group" id="createRadiusGroup" style="display: none">
+                        <label
+                            >Size (Radius)
+                            <span id="create-radius-val" class="val-display">8</span></label
+                        >
+                        <input
+                            type="number"
+                            id="createRadius"
+                            class="text-input"
+                            min=".01"
+                            max="4000000000"
+                            step="1"
+                            value="874"
+                        />
                     </div>
 
-                    <div class="control-group">
-                        <label>Velocity
-                            <span id="edit-velocity-val" class="val-display">0</span></label>
-                        <input type="range" id="editVelocity" min="0" max="200" step="0.1" value="0" />
+                    <div class="control-group" id="orbitParentRow" style="display: none">
+                        <label
+                            >Orbit Parent
+                            <span id="orbitParentDisplay" class="val-display">None</span></label
+                        >
                     </div>
 
-                    <div class="control-group">
-                        <label>Orbital Angle
-                            <span id="edit-orbital-angle-val" class="val-display">0°</span></label>
-                        <input type="range" id="editOrbitalAngle" min="0" max="360" step="1" value="0" />
+                    <div class="radio-group" id="orbitTypeGroup" style="display: none">
+                        <label>Orbit Type:</label>
+                        <div class="radio-options">
+                            <div class="radio-option">
+                                <input
+                                    type="radio"
+                                    id="orbitCircular"
+                                    name="orbitType"
+                                    value="circular"
+                                    checked
+                                />
+                                <label for="orbitCircular">Circular</label>
+                            </div>
+                            <div class="radio-option">
+                                <input
+                                    type="radio"
+                                    id="orbitElliptical"
+                                    name="orbitType"
+                                    value="elliptical"
+                                />
+                                <label for="orbitElliptical">Elliptical</label>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="control-group">
-                        <label>Inclination
-                            <span id="edit-inclination-val" class="val-display">0°</span></label>
-                        <input type="range" id="editInclination" min="0" max="90" step="1" value="0" />
+                    <div class="control-group" id="inclinationGroup" style="display: none">
+                        <label
+                            >Inclination
+                            <span id="inclination-val" class="val-display">0°</span></label
+                        >
+                        <input type="range" id="inclination" min="0" max="90" step="1" value="0" />
+                    </div>
+
+                    <div class="radio-group" id="planetTypeGroup" style="display: none">
+                        <label>Planet Type:</label>
+                        <div class="radio-options">
+                            <div class="radio-option">
+                                <input
+                                    type="radio"
+                                    id="planetTypeSolid"
+                                    name="planetType"
+                                    value="solid"
+                                    checked
+                                />
+                                <label for="planetTypeSolid">Solid</label>
+                            </div>
+                            <div class="radio-option">
+                                <input
+                                    type="radio"
+                                    id="planetTypeGasGiant"
+                                    name="planetType"
+                                    value="gas_giant"
+                                />
+                                <label for="planetTypeGasGiant">Gas Giant</label>
+                            </div>
+                            <div class="radio-option">
+                                <input
+                                    type="radio"
+                                    id="planetTypeIceGiant"
+                                    name="planetType"
+                                    value="ice_giant"
+                                />
+                                <label for="planetTypeIceGiant">Ice Giant</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <label class="checkbox-row" id="hasAtmosphereRow" style="display: none">
+                        <input type="checkbox" id="hasAtmosphere" /> Has Atmosphere
+                    </label>
+
+                    <div id="moonValidationMessage" class="validation-message">
+                        Please select a body first to create a moon
+                    </div>
+
+                    <div class="form-row form-row--actions" id="randomizeCreateRow" hidden>
+                        <button id="randomizeCreateBtn" type="button" class="btn-with-icon">
+                            <span class="material-symbols-outlined">shuffle</span>
+                            RANDOMIZE
+                        </button>
                     </div>
 
                     <div class="button-group">
-                        <button id="applyEditBtn" class="btn-with-icon">
-                            <span class="material-symbols-outlined">save</span>
-                            APPLY CHANGES
+                        <button id="createBodyBtn" class="btn-with-icon">
+                            <span class="material-symbols-outlined">check</span>
+                            CREATE
                         </button>
-                        <button id="deleteBodyBtn" class="cancel-btn btn-with-icon" title="Delete selected body">
-                            <span class="material-symbols-outlined">delete</span>
-                            DELETE
-                        </button>
-                        <button id="cancelEditBtn" class="cancel-btn btn-with-icon">
+                        <button id="cancelCreateBtn" class="cancel-btn btn-with-icon">
                             <span class="material-symbols-outlined">cancel</span>
                             CANCEL
                         </button>
                     </div>
                 </div>
+
+                <button id="editBodyBtn" class="btn-with-icon">
+                    <span class="material-symbols-outlined">edit</span>
+                    EDIT
+                </button>
+                <div class="body-edit-form" id="bodyEditForm">
+                    <label id="editBodyName">No body selected</label>
+
+                    <div id="editControlsContainer">
+                        <div class="control-group">
+                            <label>Name</label>
+                            <input
+                                type="text"
+                                id="editName"
+                                class="text-input"
+                                placeholder="Body name"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label>Color</label>
+                            <input
+                                type="color"
+                                id="editColor"
+                                class="color-input"
+                                value="#ffffff"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Mass <span id="edit-mass-val" class="val-display">0</span></label
+                            >
+                            <input
+                                type="number"
+                                id="editMass"
+                                class="text-input"
+                                min="0.001"
+                                max="100000000000"
+                                step="any"
+                                value="1"
+                            />
+                        </div>
+
+                        <div class="control-group" id="editTempGroup" style="display: none">
+                            <label
+                                >Temperature
+                                <span id="edit-temp-val" class="val-display">5778K</span></label
+                            >
+                            <input
+                                type="range"
+                                id="editTemperature"
+                                min="2000"
+                                max="30000"
+                                step="100"
+                                value="5778"
+                            />
+                        </div>
+
+                        <div
+                            class="control-group"
+                            id="editLightIntensityGroup"
+                            style="display: none"
+                        >
+                            <label
+                                >Light Intensity
+                                <span id="edit-light-intensity-val" class="val-display"
+                                    >500M</span
+                                ></label
+                            >
+                            <input
+                                type="range"
+                                id="editLightIntensity"
+                                min="1000000"
+                                max="2000000000"
+                                step="1000000"
+                                value="500000000"
+                            />
+                        </div>
+
+                        <div class="control-group" id="editRadiusGroup" style="display: none">
+                            <label
+                                >Size (Radius)
+                                <span id="edit-radius-val" class="val-display">874</span></label
+                            >
+                            <input
+                                type="number"
+                                id="editRadius"
+                                class="text-input"
+                                min=".01"
+                                max="5000000000"
+                                step="1"
+                                value="874"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Velocity
+                                <span id="edit-velocity-val" class="val-display">0</span></label
+                            >
+                            <input
+                                type="range"
+                                id="editVelocity"
+                                min="0"
+                                max="200"
+                                step="0.1"
+                                value="0"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Orbital Angle
+                                <span id="edit-orbital-angle-val" class="val-display"
+                                    >0°</span
+                                ></label
+                            >
+                            <input
+                                type="range"
+                                id="editOrbitalAngle"
+                                min="0"
+                                max="360"
+                                step="1"
+                                value="0"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Inclination
+                                <span id="edit-inclination-val" class="val-display">0°</span></label
+                            >
+                            <input
+                                type="range"
+                                id="editInclination"
+                                min="0"
+                                max="90"
+                                step="1"
+                                value="0"
+                            />
+                        </div>
+
+                        <div class="button-group">
+                            <button id="applyEditBtn" class="btn-with-icon">
+                                <span class="material-symbols-outlined">save</span>
+                                APPLY CHANGES
+                            </button>
+                            <button
+                                id="deleteBodyBtn"
+                                class="cancel-btn btn-with-icon"
+                                title="Delete selected body"
+                            >
+                                <span class="material-symbols-outlined">delete</span>
+                                DELETE
+                            </button>
+                            <button id="cancelEditBtn" class="cancel-btn btn-with-icon">
+                                <span class="material-symbols-outlined">cancel</span>
+                                CANCEL
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <!-- Close ui-container -->
+        <!-- Close ui-container -->
 
-    <div class="new-ui toolbar-container">
-        <!-- Left side toolbar -->
-        <div id="toolbarLeft" class="toolbar toolbar-left">
-            <button id="performanceOptionsBtn" class="btn toolbar-btn" title="Performance Options">
-                <span class="material-symbols-outlined">speed</span>
-            </button>
+        <div class="new-ui toolbar-container">
+            <!-- Left side toolbar -->
+            <div id="toolbarLeft" class="toolbar toolbar-left">
+                <button
+                    id="performanceOptionsBtn"
+                    class="btn toolbar-btn"
+                    title="Performance Options"
+                >
+                    <span class="material-symbols-outlined">speed</span>
+                </button>
 
-            <button id="editSolarSystemBtn" class="btn toolbar-btn" title="Edit Solar System">
-                <span class="material-symbols-outlined">edit</span>
-            </button>
-        </div>
+                <button id="editSolarSystemBtn" class="btn toolbar-btn" title="Edit Solar System">
+                    <span class="material-symbols-outlined">edit</span>
+                </button>
+            </div>
 
-        <div id="toolbarBottom" class="toolbar toolbar-bottom visible">
-            <button id="toggleMenuBtn" class="btn toolbar-btn" title="Toggle Menu">
-                <span class="material-symbols-outlined">settings</span>
-            </button>
-            <div class="control-group">
-                <label>Time Warp <span id="speed-val" class="val-display">1x</span></label>
-                <div class="slider-row">
-                    <input type="range" id="timeScale" min="-1000.0" max="1000.0" step=".01" value="1" />
-                    <button class="btn-slider-reset" id="timeScaleResetBtn" title="Reset to 1x">
-                        <span class="material-symbols-outlined">replay</span>
-                    </button>
+            <div id="toolbarBottom" class="toolbar toolbar-bottom visible">
+                <!-- Main menu button -->
+                <button id="toggleMenuBtn" class="btn toolbar-btn" title="Toggle Menu">
+                    <span class="material-symbols-outlined">settings</span>
+                </button>
+
+                <!-- Simulation controls -->
+                <button id="btn-reverse-speed" class="btn toolbar-btn" title="Reverse Speed">
+                    <span class="material-symbols-outlined"> fast_rewind </span>
+                </button>
+
+                <button id="btn-pause" class="btn toolbar-btn" title="Pause">
+                    <span class="material-symbols-outlined">pause</span>
+                </button>
+
+                <button id="btn-forward-speed" class="btn toolbar-btn" title="Forward Speed">
+                    <span class="material-symbols-outlined"> fast_forward </span>
+                </button>
+
+                <div class="control-group">
+                    <label>Time Warp <span id="speed-val" class="val-display">1x</span></label>
+                    <div class="slider-row">
+                        <input
+                            type="range"
+                            id="timeScale"
+                            min="-1000.0"
+                            max="1000.0"
+                            step=".01"
+                            value="1"
+                        />
+                        <button class="btn-slider-reset" id="timeScaleResetBtn" title="Reset to 1x">
+                            <span class="material-symbols-outlined">replay</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
-    </div>
-
-    <script type="module" src="index.ts"></script>
-</body>
-
+        <script type="module" src="index.ts"></script>
+    </body>
 </html>
