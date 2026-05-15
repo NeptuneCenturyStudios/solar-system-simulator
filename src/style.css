@@ -299,35 +299,21 @@ button.old-ui.active {
     color: #000;
 }
 
-button.active:hover {
+button.old-ui.active:hover {
     background: #00ddaa;
 }
 
-/* Warning / destructive actions */
-.btn-warning {
-    background: #e67e22;
-    color: white;
-}
-.btn-warning:hover {
-    background: #f39c12;
-    box-shadow: 0 2px 8px rgba(243, 157, 18, 0.3);
-}
-
-.btn-warning:active {
-    box-shadow: 0 2px 8px rgba(243, 157, 18, 0.2);
-}
-
 /* Dark button */
-.btn-dark {
+button.old-ui.btn-dark {
     background: #1a0a2e;
     color: white;
 }
-.btn-dark:hover {
+button.old-ui.btn-dark:hover {
     background: #2c114d;
     box-shadow: 0 2px 8px rgba(44, 17, 77, 0.3);
 }
 
-.btn-dark:active {
+button.old-ui.btn-dark:active {
     box-shadow: 0 2px 8px rgba(44, 17, 77, 0.3);
 }
 
@@ -337,20 +323,6 @@ button.active:hover {
     color: #fff;
 }
 
-.btn-with-icon--donate {
-    background: #f2b6b6;
-    color: #2b1b1b;
-}
-
-.btn-with-icon--donate:hover {
-    background: #e8a2a2;
-    color: #1f1111;
-}
-
-.btn-with-icon--donate:active {
-    background: #d98f8f;
-    color: #1f1111;
-}
 
 .checkbox-row {
     display: flex;
@@ -716,7 +688,12 @@ button.btn.toolbar-btn.btn-care:focus-visible {
         flex-direction: row;
     }
 
+    #bodiesTableContainer {
+        max-height: 30rem;
+    }       
+
     .ui-panel {
+        align-self: flex-start;
         width: 20rem;
     }
 }

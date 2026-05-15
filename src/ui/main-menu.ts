@@ -102,8 +102,6 @@ export class MainMenu extends Panel {
                 this.systemExplorerPanel?.classList.toggle('visible');
                 if (this.systemExplorerPanel?.classList.contains('visible')) {
                     this.btnOpenExplorer?.classList.add('active');
-                    // Close the left toolbar
-                    this.setLeftToolbarVisibility(false);
                 } else {
                     this.btnOpenExplorer?.classList.remove('active');
                 }
@@ -125,8 +123,7 @@ export class MainMenu extends Panel {
                 } else {
                     this.btnEditSolarSystem?.classList.remove('active');
                 }
-                // Hide left toolbar
-                this.setLeftToolbarVisibility(false);
+
             };
         }
 
@@ -135,8 +132,7 @@ export class MainMenu extends Panel {
                 this.flightControlsPanel.toggle();
                 // Update spawn button label to reflect whether there is a re-enterable ship
                 //updateFlightSpawnBtnLabel();
-                // Hide the left toolbar
-                this.setLeftToolbarVisibility(false);
+
             };
         }
 
