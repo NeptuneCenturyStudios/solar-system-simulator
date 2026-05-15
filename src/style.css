@@ -604,11 +604,13 @@ button.btn-with-icon {
 .new-ui.toolbar-container {
     position: fixed;
     left: 0;
+    right: 0;
     top: 0;
     bottom: 0;
     gap: 0.5rem;
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     justify-content: flex-end;
     height: 100%;
 }
@@ -637,9 +639,9 @@ button.new-ui.menu-toggle-button:hover {
 
 .toolbar {
     display: none;
-    flex-direction: column;
-    justify-content: flex-end;
+    
     height: auto;
+    width: auto;
     gap: 0.5rem;
     height: 100%;
     padding: 0.5rem;
@@ -657,12 +659,24 @@ button.new-ui.menu-toggle-button:hover {
 }
 
 .toolbar.toolbar-left {
+    flex-direction: column;
+    justify-content: flex-end;
     /* Only margin left and top */
     margin: 0.5rem 0 0 0.5rem;
 }
 
+.toolbar.toolbar-bottom {
+    flex-direction: row;
+    align-self: stretch;
+    align-items: flex-start;
+    height: auto;
+    /* Only margin left and bottom and right */
+    margin: 0 0.5rem 0.5rem 0.5rem;
+}
+
 button.btn.toolbar-btn {
     background: transparent;
+    width: auto;
     color: inherit;
     border: none;
     border-radius: 0.5rem;
