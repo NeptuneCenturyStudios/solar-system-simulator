@@ -31,7 +31,7 @@
                 <button
                     id="startupCancelBtn"
                     class="old-ui btn-with-icon btn-danger"
-                    style="display: none;"
+                    style="display: none"
                 >
                     <span class="material-symbols-outlined">close</span>
                     CANCEL
@@ -69,9 +69,9 @@
                         >
                     </div>
 
-                    <div    >
-                       Asteroid by J-Toastie
-                       <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
+                    <div>
+                        Asteroid by J-Toastie
+                        <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
                             >CC-BY</a
                         >
                         via Poly Pizza
@@ -288,11 +288,7 @@
                             <span class="material-symbols-outlined">rocket</span>
                             AUTOPILOT
                         </button>
-                        <button
-                            id="flightExitBtn"
-                            class="old-ui btn-with-icon btn-danger"
-                            disabled
-                        >
+                        <button id="flightExitBtn" class="old-ui btn-with-icon btn-danger" disabled>
                             <span class="material-symbols-outlined">exit_to_app</span>
                             EXIT FLIGHT MODE
                         </button>
@@ -540,7 +536,11 @@
                             </div>
 
                             <div class="form-row form-row--actions" id="randomizeCreateRow" hidden>
-                                <button id="randomizeCreateBtn" type="button" class="old-ui btn-with-icon">
+                                <button
+                                    id="randomizeCreateBtn"
+                                    type="button"
+                                    class="old-ui btn-with-icon"
+                                >
                                     <span class="material-symbols-outlined">shuffle</span>
                                     RANDOMIZE
                                 </button>
@@ -748,6 +748,10 @@
                 <button id="btn-toggle-menu" class="btn toolbar-btn" title="Toggle Menu">
                     <span class="material-symbols-outlined">menu</span>
                 </button>
+                <!-- Explorer -->
+                <button id="btn-open-explorer" class="btn toolbar-btn" title="Open System Explorer">
+                    <span class="material-symbols-outlined">travel_explore</span>
+                </button>
 
                 <!-- Simulation controls -->
                 <button id="btn-reverse-speed" class="btn toolbar-btn" title="Slow/Reverse">
@@ -767,15 +771,6 @@
                 </button>
 
                 <span id="speed-val">1x</span>
-
-                <!-- Explorer -->
-                <button
-                    id="btn-open-explorer"
-                    class="btn toolbar-btn toolbar-btn-end"
-                    title="Open Explorer"
-                >
-                    <span class="material-symbols-outlined">travel_explore</span>
-                </button>
             </div>
         </div>
 

@@ -4097,7 +4097,7 @@ function calcFitDistanceForBody(body: Body | null) {
 
     const minDist = radius * 2.2;
     const maxDist = MAX_ZOOM_OUT_DISTANCE;
-    const worldRadius = body?.mesh ? body.mesh.position.length() + radius : radius;
+    const worldRadius = radius;
     const farMargin = Math.max(worldRadius * 2, radius * 20, 100000 * SCALE_FACTOR);
     return THREE.MathUtils.clamp(dist, minDist, Math.min(maxDist, farMargin));
 }
