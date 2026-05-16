@@ -111,6 +111,7 @@ import { Mercury } from './bodies/mercury';
 import { Venus } from './bodies/venus';
 import { Earth } from './bodies/earth';
 import { Mars } from './bodies/mars';
+import { createEarthAtmosphereSky } from './effects/earth-atmosphere-sky';
 import { Jupiter } from './bodies/jupiter';
 import { Saturn } from './bodies/saturn';
 import { Uranus } from './bodies/uranus';
@@ -712,6 +713,8 @@ const skydomeMaterial = new THREE.MeshBasicMaterial({
 const skydome = new THREE.Mesh(skydomeGeometry, skydomeMaterial);
 skydome.renderOrder = -1000;
 scene.add(skydome);
+
+const earthAtmosphereSky = createEarthAtmosphereSky(scene);
 
 // === Ambient light from stars (base level of illumination) ===
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -4166,6 +4169,31 @@ function animate() {
     const isSurfaceModeActive = !!surfaceState?.isActive;
     if (isSurfaceModeActive) {
         updateSurfaceCameraTransform();
+
+        // Earth-only day-side "blue sky" for the atmosphere feel in surface cam.
+        const isEarthSurfaceCam =
+            surfaceState.body instanceof Earth &&
+            !!surfaceState.body &&
+            !surfaceState.body._isDisposed &&
+            simulationState.bodies.includes(surfaceState.body);
+
+        if (isEarthSurfaceCam) {
+            const sunBody = getPrimaryStar();
+            if (sunBody?.mesh) {
+                const sunDirWorld = sunBody.mesh.position.clone().sub(camera.position).normalize();
+                earthAtmosphereSky.mesh.position.copy(camera.position);
+                earthAtmosphereSky.update({ sunDirWorld, upWorld: camera.up });
+                earthAtmosphereSky.setVisible(true);
+            } else {
+                earthAtmosphereSky.setVisible(false);
+            }
+        } else {
+            earthAtmosphereSky.setVisible(false);
+        }
+    } else {
+        // If we’re not in surface mode, explicitly hide the atmosphere sky.
+        // This prevents the blue dome from persisting after exiting surface cam.
+        earthAtmosphereSky.setVisible(false);
     }
 
     // Flight mode camera + controls update.
@@ -4695,6 +4723,25 @@ function animate() {
 
     if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
         controls.update();
+    }
+
+    // Update Earth atmosphere shell (visible in both surface cam and exterior views)
+    const earthBodyForShell = simulationState.bodies.find(
+        (b): b is Earth => b instanceof Earth && !b._isDisposed
+    );
+
+    if (earthBodyForShell?.atmosphereShell) {
+        const sunBody = getPrimaryStar();
+        if (sunBody?.mesh) {
+            const sunDirWorld = sunBody.mesh.position
+                .clone()
+                .sub(earthBodyForShell.mesh.position)
+                .normalize();
+            earthBodyForShell.atmosphereShell.update({
+                sunDirWorld,
+                cameraPosWorld: camera.position,
+            });
+        }
     }
 
     syncAllStarLightTargets();

@@ -13,6 +13,10 @@ import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from '../utilities/body-params.js';
+import {
+    createEarthAtmosphereShell,
+    EarthAtmosphereShellHandle,
+} from '../effects/earth-atmosphere-shell.js';
 
 // Maximum number of stars supported by the day/night shader.
 const MAX_STARS = 8;
@@ -101,6 +105,7 @@ varying vec3 vEarthWorldNormal;`
  */
 export class Earth extends Planet {
     private customUniforms: EarthUniforms;
+    public atmosphereShell: EarthAtmosphereShellHandle | null = null;
 
     /**
      * Constructs a new Earth object with its unique properties, orbit, and cloud layer.
@@ -158,6 +163,10 @@ export class Earth extends Planet {
         // Make cloud sphere selectable (raycaster maps back to owning body)
         this.clouds.userData = { parentBody: this };
         this.mesh.add(this.clouds);
+
+        // Shader-based atmosphere shell (slightly outside the cloud layer).
+        // This stays visible from both inside (surface cam) and outside views.
+        this.atmosphereShell = createEarthAtmosphereShell(scene, this.radius * 1.07, 0x5599ff, this.mesh);
 
         // Clouds rotate slightly faster than Earth to simulate moving atmosphere.
         this.cloudRotationSpeed = EARTH_ROT_SPEED * 1.3;
