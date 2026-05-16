@@ -714,9 +714,6 @@ const skydome = new THREE.Mesh(skydomeGeometry, skydomeMaterial);
 skydome.renderOrder = -1000;
 scene.add(skydome);
 
-// Atmosphere sky dome (surface-cam only)
-//const earthAtmosphereSky = createEarthAtmosphereSky(scene);
-
 // === Ambient light from stars (base level of illumination) ===
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
@@ -4170,58 +4167,6 @@ function animate() {
     const isSurfaceModeActive = !!surfaceState?.isActive;
     if (isSurfaceModeActive) {
         updateSurfaceCameraTransform();
-
-        // // Earth-only day-side "blue sky" for the atmosphere feel in surface cam.
-        // const isEarthSurfaceCam =
-        //     surfaceState.body instanceof Earth &&
-        //     !!surfaceState.body &&
-        //     !surfaceState.body._isDisposed &&
-        //     simulationState.bodies.includes(surfaceState.body);
-
-        // if (isEarthSurfaceCam) {
-        //     const sunBody = getPrimaryStar();
-        //     if (sunBody?.mesh) {
-        //         earthAtmosphereSky.mesh.position.copy(camera.position);
-        //         {
-        //             // Compute per-star sky alignment so additional stars also tint the atmosphere sky.
-        //             const MAX_STARS = 8;
-        //             const starDirsWorld = Array.from(
-        //                 { length: MAX_STARS },
-        //                 () => new THREE.Vector3(1, 0, 0)
-        //             );
-
-        //             let numStars = 0;
-        //             const stars = simulationState.bodies.filter(
-        //                 (b) => b instanceof Star && !b._isDisposed
-        //             );
-
-        //             for (let i = 0; i < stars.length && numStars < MAX_STARS; i++) {
-        //                 const star = stars[i];
-        //                 if (!star.mesh) continue;
-        //                 const dir = star.mesh.position.clone().sub(camera.position);
-        //                 if (dir.lengthSq() < 1e-12) continue;
-        //                 dir.normalize();
-        //                 starDirsWorld[numStars] = dir;
-        //                 numStars++;
-        //             }
-
-        //             earthAtmosphereSky.update({
-        //                 starDirsWorld,
-        //                 numStars,
-        //                 upWorld: camera.up,
-        //             });
-        //         }
-        //         earthAtmosphereSky.setVisible(true);
-        //     } else {
-        //         earthAtmosphereSky.setVisible(false);
-        //     }
-        // } else {
-        //     earthAtmosphereSky.setVisible(false);
-        // }
-    } else {
-        // If we’re not in surface mode, explicitly hide the atmosphere sky.
-        // This prevents the blue dome from persisting after exiting surface cam.
-        //earthAtmosphereSky.setVisible(false);
     }
 
     // Flight mode camera + controls update.
@@ -4760,7 +4705,9 @@ function animate() {
 
     if (earthBodyForShell?.atmosphereShell) {
         // Compute multi-star directions so the atmosphere shell glows on any star-lit side (up to MAX_STARS).
-        const stars = simulationState.bodies.filter((b) => b instanceof Star && !b._isDisposed) as Star[];
+        const stars = simulationState.bodies.filter(
+            (b) => b instanceof Star && !b._isDisposed
+        ) as Star[];
         const MAX_STARS = 8;
 
         const starDirsWorld = Array.from({ length: MAX_STARS }, () => new THREE.Vector3(1, 0, 0));

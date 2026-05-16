@@ -131,12 +131,25 @@ export function createEarthAtmosphereShell(
                 // Extend warm deeper into the bright/day side (broader maxLight range).
                 // Slightly extend warm deeper into the bright/day side ("just a tad more").
                 float sunsetEdge = 1.0 - smoothstep(0.08, 0.46, maxLight);
-                float warmFactor = clamp(sunsetEdge * pow(fres, 1.0), 0.0, 1.0);
+                // Fade warm out on the deeper night side to make room for the dark blue arc.
+                float sunsetNightFade = smoothstep(-0.45, -0.10, maxLight);
+                float warmFactor = clamp(sunsetEdge * pow(fres, 1.0) * sunsetNightFade, 0.0, 1.0);
 
                 vec3 colBlue = uTint * strength;
                 vec3 colWarm = uSunsetTint * strength * 1.08;
 
                 vec3 col = mix(colBlue, colWarm, warmFactor);
+
+                // Dark blue arc: visible just past the warm twilight band, before full darkness.
+                // Peaks roughly at the green-line boundary shown in the reference screenshot.
+                float nightBlueFactor = (1.0 - smoothstep(-0.05, 0.05, maxLight))
+                                      * smoothstep(-0.58, -0.28, maxLight)
+                                      * pow(fres, 1.8);
+                nightBlueFactor = clamp(nightBlueFactor, 0.0, 1.0);
+
+                vec3 colNightBlue = uTint * 0.32;
+                col = mix(col, colNightBlue, nightBlueFactor * 0.82);
+                alpha = clamp(max(alpha, nightBlueFactor * 0.48), 0.0, uAlphaMax);
 
                 gl_FragColor = vec4(col, alpha);
             }
