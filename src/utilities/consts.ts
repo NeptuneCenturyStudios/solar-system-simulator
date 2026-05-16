@@ -161,6 +161,9 @@ export const ISS_MASS = (419725 / MASS_SCALE) * SCALE_FACTOR;
 // === Satellites: Radius ===
 export const ISS_RADIUS = (0.1 / RADIUS_SCALE) * SCALE_FACTOR;
 
+// === Satellites: Inclination ===
+export const ISS_INCLINATION = 51.64;
+
 // === Satellites: Distance from Earth ===
 export const ISS_DIST_FROM_EARTH = (EARTH_RADIUS + 410 / DIST_SCALE) * SCALE_FACTOR;
 

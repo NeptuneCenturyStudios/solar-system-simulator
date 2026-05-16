@@ -24,6 +24,7 @@ export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptio
 export interface ISatelliteBasicCreationOptions extends IBodyCreationOptions {
     distance: number;
     angle?: number; // optional initial angle for multiple moons
+    inclinationDeg?: number;
     yVariation?: number; // optional random Y variation for non-coplanar orbits
     trailColor?: number;
     maxTrail?: number;

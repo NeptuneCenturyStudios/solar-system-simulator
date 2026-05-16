@@ -81,6 +81,7 @@ import {
     ISS_MASS,
     ISS_DIST_FROM_EARTH,
     ISS_RADIUS,
+    ISS_INCLINATION,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -3152,6 +3153,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             name: 'ISS',
             trailColor: 0xffffff,
             maxTrail: 1500,
+            inclinationDeg: ISS_INCLINATION,
         })
     );
 
@@ -4967,7 +4969,6 @@ mainPanel.initialize();
 aboutModal.initialize();
 performancePanel.initialize();
 
-
 // Wire Flight Controls button and panel events
 
 const flightControlsPanel = mainMenu.flightControlsPanel;
@@ -6204,7 +6205,10 @@ function spawnShip() {
         mainMenu.managementPanel.setSelectedBody(ship);
 
         // Update button label to "RE-ENTER SHIP"
-        mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(flightState.knownShip, simulationState.bodies);
+        mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(
+            flightState.knownShip,
+            simulationState.bodies
+        );
 
         addEvent('Spaceship spawned. Click RE-ENTER SHIP to pilot it.');
         return;
@@ -6380,7 +6384,10 @@ function exitFlightMode() {
     // to avoid forward-reference issues in the module execution order.
     setTimeout(() => {
         try {
-            mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(flightState.knownShip, simulationState.bodies);
+            mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(
+                flightState.knownShip,
+                simulationState.bodies
+            );
         } catch {
             // Empty
         }
@@ -7364,7 +7371,10 @@ window.addEventListener('body:removed', (e) => {
         flightState.knownShip = null;
         setTimeout(() => {
             try {
-                mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(flightState.knownShip, simulationState.bodies);
+                mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(
+                    flightState.knownShip,
+                    simulationState.bodies
+                );
             } catch {
                 // Empty
             }

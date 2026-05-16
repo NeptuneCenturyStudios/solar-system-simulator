@@ -47,17 +47,36 @@ export function createSatellite(scene: THREE.Scene, parent: CelestialBody, confi
         // Default angle is 0, but can be specified for multiple moons
         const angle = config.angle !== undefined ? config.angle : 0;
 
-        // Calculate position relative to parent body
-        const posX = parent.mesh.position.x + Math.cos(angle) * config.distance;
-        const posY =
-            config.yVariation !== undefined ? (Math.random() - 0.5) * config.yVariation : 0;
-        const posZ = parent.mesh.position.z + Math.sin(angle) * config.distance;
+        // Calculate position and velocity in orbital plane
+        const localPos = new THREE.Vector3(
+            Math.cos(angle) * config.distance,
+            0,
+            Math.sin(angle) * config.distance
+        );
+        const localVel = new THREE.Vector3(
+            -Math.sin(angle) * trajectory.vel.z,
+            0,
+            Math.cos(angle) * trajectory.vel.z
+        );
 
-        // Calculate velocity relative to parent body
-        // Moon inherits parent's velocity plus its own orbital velocity
-        const velX = parent.velocity.x - Math.sin(angle) * trajectory.vel.z;
-        const velY = 0;
-        const velZ = parent.velocity.z + Math.cos(angle) * trajectory.vel.z;
+        // Apply inclination rotation if specified
+        if (config.inclinationDeg !== undefined) {
+            const inclinationRad = THREE.MathUtils.degToRad(config.inclinationDeg);
+            localPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), inclinationRad);
+            localVel.applyAxisAngle(new THREE.Vector3(1, 0, 0), inclinationRad);
+        }
+        // Optionally add random yVariation
+        if (config.yVariation !== undefined) {
+            localPos.y += (Math.random() - 0.5) * config.yVariation;
+        }
+
+        // Translate to parent position and velocity
+        const posX = parent.mesh.position.x + localPos.x;
+        const posY = parent.mesh.position.y + localPos.y;
+        const posZ = parent.mesh.position.z + localPos.z;
+        const velX = parent.velocity.x + localVel.x;
+        const velY = parent.velocity.y + localVel.y;
+        const velZ = parent.velocity.z + localVel.z;
 
         // Compute initial orbital angular speed about parent (instantaneous, based on spawn r and vrel).
         // ω = |r × v| / |r|²
