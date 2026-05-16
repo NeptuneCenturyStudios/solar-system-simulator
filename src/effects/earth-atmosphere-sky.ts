@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import { DIST_SCALE } from '../utilities/consts.js';
 
+const MAX_STARS = 8;
+
 type EarthAtmosphereSkyUniforms = {
-    uSunDir: { value: THREE.Vector3 };
+    uStarDirs: { value: THREE.Vector3[] };
+    uNumStars: { value: number };
     uUp: { value: THREE.Vector3 };
     uSkyColor: { value: THREE.Color };
     uSunsetTint: { value: THREE.Color };
@@ -12,35 +15,37 @@ type EarthAtmosphereSkyUniforms = {
 
 export type EarthAtmosphereSkyHandle = {
     mesh: THREE.Mesh;
-    update: (opts: { sunDirWorld: THREE.Vector3; upWorld: THREE.Vector3 }) => void;
+    update: (opts: {
+        starDirsWorld: THREE.Vector3[];
+        numStars: number;
+        upWorld: THREE.Vector3;
+    }) => void;
     setVisible: (visible: boolean) => void;
 };
 
 /**
  * Camera-centered "atmosphere sky" dome for Earth surface-cam.
  *
- * Goal:
- * - Keep existing skydome stars visible on the night side.
- * - Add a flat blue sky on the day side, blended by a simple day-factor shader.
- *
- * Implementation:
- * - Dome is centered at the camera by caller (update position every frame).
- * - Fragment alpha is dayAlpha = smoothstep(min,max, dot(viewDir, sunDir)).
- * - Uses camera/surface gravity-up direction to loosely shape the brightness.
+ * Blends a flat blue sky on the day side based on the max alignment
+ * of the view direction with *all* contributing stars (up to MAX_STARS).
  */
 export function createEarthAtmosphereSky(scene: THREE.Scene): EarthAtmosphereSkyHandle {
     const radius = 2_500_000_000 / DIST_SCALE; // matches scale of existing skydome-ish
-
     const geometry = new THREE.SphereGeometry(radius, 48, 24);
 
+    const starDirs = Array.from({ length: MAX_STARS }, () => new THREE.Vector3(1, 0, 0));
+
     const uniforms: EarthAtmosphereSkyUniforms = {
-        uSunDir: { value: new THREE.Vector3(1, 0, 0) },
+        uStarDirs: { value: starDirs },
+        uNumStars: { value: 0 },
         uUp: { value: new THREE.Vector3(0, 1, 0) },
         uSkyColor: { value: new THREE.Color(0.35, 0.62, 1.0) }, // flat, no gradient
         uSunsetTint: { value: new THREE.Color(0xffc38a) },
         // Extend twilight further so it doesn’t become “fully night” too early on the far side.
-        uDayAlphaMin: { value: -0.18 },
-        uDayAlphaMax: { value: 0.40 },
+        // Slightly tighter twilight band + smoother blend.
+        // Start twilight a touch earlier on the sunset side.
+        uDayAlphaMin: { value: -0.26 },
+        uDayAlphaMax: { value: 0.36 },
     };
 
     const material = new THREE.ShaderMaterial({
@@ -57,7 +62,8 @@ export function createEarthAtmosphereSky(scene: THREE.Scene): EarthAtmosphereSky
             }
         `,
         fragmentShader: `
-            uniform vec3 uSunDir;
+            uniform vec3 uStarDirs[${MAX_STARS}];
+            uniform int uNumStars;
             uniform vec3 uUp;
             uniform vec3 uSkyColor;
             uniform vec3 uSunsetTint;
@@ -69,37 +75,57 @@ export function createEarthAtmosphereSky(scene: THREE.Scene): EarthAtmosphereSky
             void main() {
                 vec3 dir = normalize(vDir);
 
-                // sunAlign is [-1..1] where 1 means the ray points at the sun.
-                float sunAlign = dot(dir, normalize(uSunDir));
-                float dayT = smoothstep(uDayAlphaMin, uDayAlphaMax, sunAlign);
+                float maxAlign = -1.0;
+                for (int i = 0; i < ${MAX_STARS}; i++) {
+                    if (i >= uNumStars) break;
+                    vec3 L = normalize(uStarDirs[i]);
+                    maxAlign = max(maxAlign, dot(dir, L));
+                }
 
-                // Make twilight fade smoother and a bit more “extended”.
-                dayT = pow(dayT, 0.50);
+                float dayT = smoothstep(uDayAlphaMin, uDayAlphaMax, maxAlign);
 
-                // Stars fade into sky on the night side too (but very lightly).
-                float skyAlpha = mix(0.02, 1.0, dayT);
+                // Drop the day influence faster on the far side so midnight blue can appear.
+                // Lower exponent => twilight crosses earlier (stronger early warm fade).
+                dayT = pow(dayT, 0.55);
+
+                // Stars fade into sky on the night side too (make baseline more visible for deep midnight blue).
+                float skyAlpha = mix(0.22, 1.0, dayT);
 
                 // Brightness shaping: zenith is brighter than horizon.
                 float upAlign = clamp(dot(dir, normalize(uUp)), 0.0, 1.0);
                 float zenith = pow(upAlign, 1.6);
 
-                // Sunset tint near the horizon/terminator:
-                // - zenith small => closer to horizon
-                // - dayT moderate => around twilight band
-                float horizon = pow(1.0 - upAlign, 1.2);
-                float sunsetEdge = (1.0 - dayT);
-                float warmFactor = clamp(horizon * sunsetEdge * 2.0, 0.0, 1.0);
+                // Sunset tint near the horizon/terminator.
+                // Lower exponent => warmth extends higher in the sky (earlier visually).
+                float horizon = pow(1.0 - upAlign, 1.8);
+
+                // Bandpass the warm/orange tint around the terminator (avoid drifting warm onto the far/night side).
+                // With our current dayT shaping, this higher window should land the warmth on the sun-side glow.
+                // Widen/shift warm band toward the brighter (sun) side by extending the upper dayT cutoff.
+                float sunsetEdge = smoothstep(0.07, 0.22, dayT) * (1.0 - smoothstep(0.22, 0.44, dayT));
+
+                // Warm intensity constrained by limb/horizon.
+                // Slightly stronger near the terminator to start earlier visually.
+                float warmFactor = clamp(horizon * sunsetEdge * 3.0, 0.0, 1.0);
 
                 // Twilight brightness; also tie brightness to dayT.
-                float skyStrength = mix(0.10, 1.0, zenith) * mix(0.22, 1.0, dayT);
+                float skyStrength = mix(0.06, 1.0, zenith) * mix(0.14, 1.0, dayT);
 
+                // Base blue (day-ish)
                 vec3 colBlue = uSkyColor * skyStrength;
-                vec3 colWarm = uSunsetTint * skyStrength * 1.08;
 
-                vec3 skyColor = mix(colWarm, colBlue, zenith); // warm near horizon
+                // Deep midnight blue target for night side (much darker, and visible even when dayT is low).
+                vec3 midnightBlue = vec3(0.012, 0.020, 0.075) * (0.65 + 0.85 * zenith) * (0.70 + 0.30 * dayT);
 
-                // Add additional warm bias right at the edge of twilight.
-                skyColor = mix(skyColor, colWarm, warmFactor * 0.65);
+                // Blend blue->midnight based on dayT so the far side goes to deep blue even when dayT is very low.
+                float blueToNightT = smoothstep(0.0, 0.12, dayT);
+                vec3 colBlueFinal = mix(midnightBlue, colBlue, blueToNightT);
+
+                // Warm/orange near terminator (stronger)
+                vec3 colWarm = uSunsetTint * skyStrength * 1.25;
+
+                // Finally mix warm into the blue band near the horizon (stronger warm dominance)
+                vec3 skyColor = mix(colBlueFinal, colWarm, warmFactor * 0.90);
 
                 gl_FragColor = vec4(skyColor, skyAlpha);
             }
@@ -111,19 +137,26 @@ export function createEarthAtmosphereSky(scene: THREE.Scene): EarthAtmosphereSky
     mesh.frustumCulled = false;
     mesh.visible = false;
 
-    // Start hidden; caller toggles.
     scene.add(mesh);
 
-    const handle: EarthAtmosphereSkyHandle = {
+    return {
         mesh,
-        update: ({ sunDirWorld, upWorld }) => {
-            uniforms.uSunDir.value.copy(sunDirWorld).normalize();
+        update: ({ starDirsWorld, numStars, upWorld }) => {
+            const count = Math.min(MAX_STARS, Math.max(0, numStars));
+            uniforms.uNumStars.value = count;
+
+            for (let i = 0; i < MAX_STARS; i++) {
+                if (i < count && starDirsWorld[i]) {
+                    uniforms.uStarDirs.value[i].copy(starDirsWorld[i]).normalize();
+                } else {
+                    uniforms.uStarDirs.value[i].set(1, 0, 0);
+                }
+            }
+
             uniforms.uUp.value.copy(upWorld).normalize();
         },
         setVisible: (visible: boolean) => {
             mesh.visible = visible;
         },
     };
-
-    return handle;
 }

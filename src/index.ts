@@ -111,7 +111,7 @@ import { Mercury } from './bodies/mercury';
 import { Venus } from './bodies/venus';
 import { Earth } from './bodies/earth';
 import { Mars } from './bodies/mars';
-import { createEarthAtmosphereSky } from './effects/earth-atmosphere-sky';
+//import { createEarthAtmosphereSky } from './effects/earth-atmosphere-sky';
 import { Jupiter } from './bodies/jupiter';
 import { Saturn } from './bodies/saturn';
 import { Uranus } from './bodies/uranus';
@@ -714,7 +714,8 @@ const skydome = new THREE.Mesh(skydomeGeometry, skydomeMaterial);
 skydome.renderOrder = -1000;
 scene.add(skydome);
 
-const earthAtmosphereSky = createEarthAtmosphereSky(scene);
+// Atmosphere sky dome (surface-cam only)
+//const earthAtmosphereSky = createEarthAtmosphereSky(scene);
 
 // === Ambient light from stars (base level of illumination) ===
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -4170,30 +4171,57 @@ function animate() {
     if (isSurfaceModeActive) {
         updateSurfaceCameraTransform();
 
-        // Earth-only day-side "blue sky" for the atmosphere feel in surface cam.
-        const isEarthSurfaceCam =
-            surfaceState.body instanceof Earth &&
-            !!surfaceState.body &&
-            !surfaceState.body._isDisposed &&
-            simulationState.bodies.includes(surfaceState.body);
+        // // Earth-only day-side "blue sky" for the atmosphere feel in surface cam.
+        // const isEarthSurfaceCam =
+        //     surfaceState.body instanceof Earth &&
+        //     !!surfaceState.body &&
+        //     !surfaceState.body._isDisposed &&
+        //     simulationState.bodies.includes(surfaceState.body);
 
-        if (isEarthSurfaceCam) {
-            const sunBody = getPrimaryStar();
-            if (sunBody?.mesh) {
-                const sunDirWorld = sunBody.mesh.position.clone().sub(camera.position).normalize();
-                earthAtmosphereSky.mesh.position.copy(camera.position);
-                earthAtmosphereSky.update({ sunDirWorld, upWorld: camera.up });
-                earthAtmosphereSky.setVisible(true);
-            } else {
-                earthAtmosphereSky.setVisible(false);
-            }
-        } else {
-            earthAtmosphereSky.setVisible(false);
-        }
+        // if (isEarthSurfaceCam) {
+        //     const sunBody = getPrimaryStar();
+        //     if (sunBody?.mesh) {
+        //         earthAtmosphereSky.mesh.position.copy(camera.position);
+        //         {
+        //             // Compute per-star sky alignment so additional stars also tint the atmosphere sky.
+        //             const MAX_STARS = 8;
+        //             const starDirsWorld = Array.from(
+        //                 { length: MAX_STARS },
+        //                 () => new THREE.Vector3(1, 0, 0)
+        //             );
+
+        //             let numStars = 0;
+        //             const stars = simulationState.bodies.filter(
+        //                 (b) => b instanceof Star && !b._isDisposed
+        //             );
+
+        //             for (let i = 0; i < stars.length && numStars < MAX_STARS; i++) {
+        //                 const star = stars[i];
+        //                 if (!star.mesh) continue;
+        //                 const dir = star.mesh.position.clone().sub(camera.position);
+        //                 if (dir.lengthSq() < 1e-12) continue;
+        //                 dir.normalize();
+        //                 starDirsWorld[numStars] = dir;
+        //                 numStars++;
+        //             }
+
+        //             earthAtmosphereSky.update({
+        //                 starDirsWorld,
+        //                 numStars,
+        //                 upWorld: camera.up,
+        //             });
+        //         }
+        //         earthAtmosphereSky.setVisible(true);
+        //     } else {
+        //         earthAtmosphereSky.setVisible(false);
+        //     }
+        // } else {
+        //     earthAtmosphereSky.setVisible(false);
+        // }
     } else {
         // If we’re not in surface mode, explicitly hide the atmosphere sky.
         // This prevents the blue dome from persisting after exiting surface cam.
-        earthAtmosphereSky.setVisible(false);
+        //earthAtmosphereSky.setVisible(false);
     }
 
     // Flight mode camera + controls update.
@@ -4731,18 +4759,66 @@ function animate() {
     );
 
     if (earthBodyForShell?.atmosphereShell) {
-        const sunBody = getPrimaryStar();
-        if (sunBody?.mesh) {
-            const sunDirWorld = sunBody.mesh.position
-                .clone()
-                .sub(earthBodyForShell.mesh.position)
-                .normalize();
-            earthBodyForShell.atmosphereShell.update({
-                sunDirWorld,
-                cameraPosWorld: camera.position,
-            });
+        // Compute multi-star directions so the atmosphere shell glows on any star-lit side (up to MAX_STARS).
+        const stars = simulationState.bodies.filter((b) => b instanceof Star && !b._isDisposed) as Star[];
+        const MAX_STARS = 8;
+
+        const starDirsWorld = Array.from({ length: MAX_STARS }, () => new THREE.Vector3(1, 0, 0));
+        const earthPos = earthBodyForShell.mesh.position;
+
+        const count = Math.min(MAX_STARS, stars.length);
+        for (let i = 0; i < count; i++) {
+            const star = stars[i];
+            if (!star.mesh) continue;
+            const dir = star.mesh.position.clone().sub(earthPos);
+            if (dir.lengthSq() > 1e-12) dir.normalize();
+            starDirsWorld[i].copy(dir);
         }
+
+        earthBodyForShell.atmosphereShell.update({
+            starDirsWorld,
+            numStars: count,
+            cameraPosWorld: camera.position,
+        });
     }
+
+    // // Update Earth sun refraction billboard near the (local) horizon
+    // {
+    //     const sunBody = getPrimaryStar();
+    //     if (
+    //         earthBodyForShell &&
+    //         earthBodyForShell.mesh &&
+    //         sunBody?.mesh &&
+    //         earthSunRefraction
+    //     ) {
+    //         const earthPos = earthBodyForShell.mesh.position;
+    //         const sunPos = sunBody.mesh.position;
+
+    //         const sunDirWorld = sunPos.clone().sub(earthPos);
+    //         if (sunDirWorld.lengthSq() > 1e-12) sunDirWorld.normalize();
+
+    //         // In surface cam, camera.up already matches local gravity-up.
+    //         // Otherwise, approximate local up as pointing from Earth center to camera.
+    //         const isEarthSurfaceCam =
+    //             surfaceState?.isActive && surfaceState.body instanceof Earth;
+
+    //         const upWorld = isEarthSurfaceCam
+    //             ? camera.up.clone()
+    //             : camera.position.clone().sub(earthPos);
+
+    //         if (upWorld.lengthSq() > 1e-12) upWorld.normalize();
+
+    //         earthSunRefraction.update({
+    //             cameraPosWorld: camera.position,
+    //             upWorld,
+    //             sunDirWorld,
+    //             sunColor: sunBody.baseColor,
+    //             sunRadiusWorld: sunBody.radius,
+    //         });
+    //     } else {
+    //         earthSunRefraction.setVisible(false);
+    //     }
+    // }
 
     syncAllStarLightTargets();
 

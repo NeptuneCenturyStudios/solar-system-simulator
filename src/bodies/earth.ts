@@ -74,6 +74,35 @@ uniform vec3 earthPosition;
 varying vec3 vEarthWorldNormal;`
         );
 
+        // Blend day/night textures in the base map for smoother terminator.
+        // vMapUv is declared by Three.js under USE_MAP (guaranteed since map is set).
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <map_fragment>',
+            `{
+    float maxLight = 0.0;
+    for (int i = 0; i < MAX_STARS; i++) {
+        if (i >= numStars) break;
+        vec3  lightDir = normalize(starPositions[i] - earthPosition);
+        float ndotl    = max(dot(vEarthWorldNormal, lightDir), 0.0);
+        maxLight = max(maxLight, ndotl);
+    }
+
+    // Day factor for texture blend (wider than before so sunset/twilight wraps farther).
+    float dayFactor = smoothstep(0.06, 0.35, maxLight);
+
+    vec3 dayColor   = texture2D(map, vMapUv).rgb;
+    vec3 nightColor = texture2D(nightTexture, vMapUv).rgb;
+
+    // Warm tint near the terminator for a sunset-like transition.
+    float twilight = dayFactor * (1.0 - dayFactor); // peaks around 0.5
+    vec3 warmTint = vec3(1.0, 0.72, 0.45);
+    vec3 blended = mix(nightColor, dayColor, dayFactor);
+    blended = mix(blended, blended * warmTint, twilight * 1.25);
+
+    diffuseColor.rgb *= blended;
+}`
+        );
+
         // Add night-side city-light emission to totalEmissiveRadiance.
         // This runs just after emissivemap_fragment, before lighting, so it
         // integrates cleanly with Three.js's PBR pipeline (tone-mapping, fog, etc.).
@@ -89,9 +118,9 @@ varying vec3 vEarthWorldNormal;`
         float ndotl    = max(dot(vEarthWorldNormal, lightDir), 0.0);
         maxLight = max(maxLight, ndotl);
     }
-    float nightFactor = 1.0 - smoothstep(0.0, 0.2, maxLight);
+    float nightFactor = 1.0 - smoothstep(0.06, 0.35, maxLight);
     vec3  nightColor  = texture2D(nightTexture, vMapUv).rgb;
-    totalEmissiveRadiance += nightColor * nightFactor * 1.8;
+    totalEmissiveRadiance += nightColor * nightFactor * 1.6;
 }`
         );
     };
