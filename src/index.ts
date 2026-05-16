@@ -125,7 +125,6 @@ import { Asteroid } from './bodies/asteroid';
 import { Comet } from './bodies/comet';
 
 import { Spaceship } from './bodies/spaceship';
-import { MainPanel } from './ui/main-panel';
 import { StartupModal } from './ui/startup-modal';
 import { AboutModal } from './ui/about-modal';
 import { PerformancePanel } from './ui/performance-panel';
@@ -134,7 +133,7 @@ import { Halley } from './bodies/halley';
 import { IStateDependencies } from './interfaces';
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
-import { MainMenu } from './ui/main-menu';
+import { UIManager } from './ui/ui-manager';
 
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
@@ -2586,7 +2585,7 @@ function createPresetBody(presetKey: string) {
     } else {
         gizmo.attach(null);
     }
-    mainMenu.managementPanel.setSelectedBody(newBody);
+    uiManager.managementPanel.setSelectedBody(newBody);
 
     setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
     clearCameraPresetHighlights();
@@ -2971,10 +2970,10 @@ function createNewBody(
         // For moons: keep selection/focus on the parent so the user can keep adding
         // moons to the same body without re-selecting it each time.
         if (moonCreationParent) {
-            mainMenu.managementPanel.setSelectedBody(moonCreationParent);
+            uiManager.managementPanel.setSelectedBody(moonCreationParent);
             setFocusBody(moonCreationParent, { zoom: false });
         } else {
-            mainMenu.managementPanel.setSelectedBody(newBody);
+            uiManager.managementPanel.setSelectedBody(newBody);
             // Focus selection/camera on the new body (object-based, not id-based)
             setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
         }
@@ -2994,8 +2993,8 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     }
 
     // Keep UI in sync
-    if (mainMenu.managementPanel?.enableKuiperBeltCheckbox) {
-        mainMenu.managementPanel.enableKuiperBeltCheckbox.checked = !hideKuiper;
+    if (uiManager.managementPanel?.enableKuiperBeltCheckbox) {
+        uiManager.managementPanel.enableKuiperBeltCheckbox.checked = !hideKuiper;
     }
 }
 
@@ -3334,14 +3333,14 @@ function togglePause() {
         savedTimeScale = timeScale;
         timeScale = 0;
 
-        mainMenu.setPauseState(true);
+        uiManager.setPauseState(true);
         // Keep slider enabled so user can adjust speed while paused
     } else {
         // Restore the saved speed (which may have been adjusted while paused)
         timeScale = savedTimeScale;
         const direction = savedTimeScale < 0 ? ' REVERSE' : '';
-        mainPanel.updateTimeScaleDisplay(Math.abs(savedTimeScale) + 'x' + direction);
-        mainMenu.setPauseState(false);
+        uiManager.mainPanel.updateTimeScaleDisplay(Math.abs(savedTimeScale) + 'x' + direction);
+        uiManager.setPauseState(false);
     }
 }
 
@@ -3646,7 +3645,7 @@ function onMouseDown(event: MouseEvent) {
             selectedBody = clickedBody; // Update global selection
 
             // Update management panel with selected body
-            mainMenu.managementPanel.setSelectedBody(clickedBody);
+            uiManager.managementPanel.setSelectedBody(clickedBody);
 
             // Update bodies table highlight
             refreshBodiesTable();
@@ -3682,7 +3681,7 @@ function onMouseDown(event: MouseEvent) {
         }
 
         gizmo.attach(null);
-        mainMenu.managementPanel.setSelectedBody(null);
+        uiManager.managementPanel.setSelectedBody(null);
 
         refreshBodiesTable();
         forceHintRefresh();
@@ -4383,7 +4382,7 @@ function animate() {
                         // Keep camera distance stable; just retarget follow/look-at.
                         setFocusBody(winner, { zoom: false });
                         if (cameraState.isTargetMode) gizmo.attach(winner);
-                        mainMenu.managementPanel?.setSelectedBody?.(winner);
+                        uiManager.managementPanel?.setSelectedBody?.(winner);
                     }
 
                     absorbBody(winner, victim);
@@ -4988,7 +4987,7 @@ function getBodyTypeLabel(b: Body) {
 }
 
 function refreshBodiesTable() {
-    if (!mainPanel) return;
+    if (!uiManager.mainPanel) return;
 
     const ship = flightState.knownShip;
     const hasShip = !!(ship && !ship._isDisposed && simulationState.bodies.includes(ship));
@@ -5004,8 +5003,8 @@ function refreshBodiesTable() {
         .sort((a, b) => a.typeLabel.localeCompare(b.typeLabel) || a.name.localeCompare(b.name));
 
     // Keep table highlight in sync with current selection
-    mainPanel.setSelectedBody(selectedBody || manuallySelectedBody || null);
-    mainPanel.renderBodiesTable(rows, hasShip, autopilotState.targetBody);
+    uiManager.mainPanel.setSelectedBody(selectedBody || manuallySelectedBody || null);
+    uiManager.mainPanel.renderBodiesTable(rows, hasShip, autopilotState.targetBody);
 
     // Surface camera enablement depends on selection, so keep it in sync.
     try {
@@ -5023,25 +5022,23 @@ function setF(id: string) {
 // --- UI PANEL INITIALIZATION ---
 
 // Create and initialize panels
-const mainMenu = new MainMenu('main-menu');
+const uiManager = new UIManager('main-menu');
 const startupModal = new StartupModal('startup-overlay');
-const mainPanel = new MainPanel('system-explorer');
 const aboutModal = new AboutModal('about-overlay', 'btn-about', 'aboutCloseBtn');
 const performancePanel = new PerformancePanel('performance-panel');
-mainMenu.managementPanel.registerGetFocusObject(() => {
+uiManager.managementPanel.registerGetFocusObject(() => {
     const body = cameraState.focusBody;
     return body && !body._isDisposed && simulationState.bodies.includes(body) ? body : null;
 });
 
-mainMenu.initialize();
+uiManager.initialize();
 startupModal.initialize();
-mainPanel.initialize();
 aboutModal.initialize();
 performancePanel.initialize();
 
 // Wire Flight Controls button and panel events
 
-const flightControlsPanel = mainMenu.flightControlsPanel;
+const flightControlsPanel = uiManager.flightControlsPanel;
 const performanceOptionsBtn = document.getElementById('btn-performance-options');
 if (performanceOptionsBtn) {
     performanceOptionsBtn.onclick = () => {
@@ -5218,7 +5215,7 @@ function updateSurfaceButtonEnabled() {
             : null);
 
     const isEnabled = isSurfaceEligibleBody(selected);
-    mainPanel.setSurfaceCameraState({ isActive: surfaceState.isActive, isEnabled });
+    uiManager.mainPanel.setSurfaceCameraState({ isActive: surfaceState.isActive, isEnabled });
 }
 
 function exitSurfaceMode() {
@@ -5233,7 +5230,7 @@ function exitSurfaceMode() {
     surfaceState.isActive = false;
     surfaceState.body = null;
 
-    mainPanel.setSurfaceCameraState({ isActive: false, isEnabled: true });
+    uiManager.mainPanel.setSurfaceCameraState({ isActive: false, isEnabled: true });
 
     // restore default (non-free) controls behavior
     controls.enabled = true;
@@ -5260,11 +5257,11 @@ function enterSurfaceMode(body: Body | null) {
     if (cameraState.isFreeCameraMode) {
         isFreeCameraMode = false;
         cameraState.isFreeCameraMode = false;
-        mainPanel.setFreeCameraState(false);
+        uiManager.mainPanel.setFreeCameraState(false);
     }
     if (cameraState.isLookAtMode) {
         cameraState.isLookAtMode = false;
-        mainPanel.setLookAtState(false);
+        uiManager.mainPanel.setLookAtState(false);
     }
 
     controls.enabled = false;
@@ -5294,7 +5291,7 @@ function enterSurfaceMode(body: Body | null) {
     // Immediately apply transform so first frame doesn't "snap".
     updateSurfaceCameraTransform();
 
-    mainPanel.setSurfaceCameraState({ isActive: true, isEnabled: true });
+    uiManager.mainPanel.setSurfaceCameraState({ isActive: true, isEnabled: true });
     forceHintRefresh();
 }
 
@@ -6270,12 +6267,12 @@ function spawnShip() {
 
         // Select the ship as the look-at target (same as clicking it in the bodies list)
         cameraState.isLookAtMode = true;
-        mainPanel.setLookAtState(true);
+        uiManager.mainPanel.setLookAtState(true);
         setFocusBody(ship, { zoom: true });
-        mainMenu.managementPanel.setSelectedBody(ship);
+        uiManager.managementPanel.setSelectedBody(ship);
 
         // Update button label to "RE-ENTER SHIP"
-        mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(
+        uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
             flightState.knownShip,
             simulationState.bodies
         );
@@ -6319,7 +6316,7 @@ function spawnShip() {
         selectedBody = null;
         manuallySelectedBody = null;
         gizmo.attach(null);
-        mainMenu.managementPanel.setSelectedBody(null);
+        uiManager.managementPanel.setSelectedBody(null);
         refreshBodiesTable();
     }
 
@@ -6454,7 +6451,7 @@ function exitFlightMode() {
     // to avoid forward-reference issues in the module execution order.
     setTimeout(() => {
         try {
-            mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(
+            uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
                 flightState.knownShip,
                 simulationState.bodies
             );
@@ -6467,7 +6464,7 @@ function exitFlightMode() {
 
 window.addEventListener('mousemove', onSurfaceMouseMove, { passive: true });
 
-mainPanel.on('surfaceCameraToggle', () => {
+uiManager.mainPanel.on('surfaceCameraToggle', () => {
     if (surfaceState.isActive) {
         exitSurfaceMode();
         updateSurfaceButtonEnabled();
@@ -6489,7 +6486,7 @@ mainPanel.on('surfaceCameraToggle', () => {
     updateSurfaceButtonEnabled();
 });
 
-mainPanel.on('freeCameraToggle', () => {
+uiManager.mainPanel.on('freeCameraToggle', () => {
     // If turning on free camera, surface mode must exit.
     if (!surfaceState.isActive) {
         // noop
@@ -6499,7 +6496,7 @@ mainPanel.on('freeCameraToggle', () => {
 
     isFreeCameraMode = !isFreeCameraMode;
     cameraState.isFreeCameraMode = isFreeCameraMode;
-    mainPanel.setFreeCameraState(isFreeCameraMode);
+    uiManager.mainPanel.setFreeCameraState(isFreeCameraMode);
 
     // Preserve selection and gizmo visibility when toggling free camera:
     // - Selection should NEVER be cleared here.
@@ -6517,14 +6514,14 @@ mainPanel.on('freeCameraToggle', () => {
     if (isFreeCameraMode) {
         // Turning on Free Camera disables Look At (mutually exclusive)
         cameraState.isLookAtMode = false;
-        mainPanel.setLookAtState(false);
+        uiManager.mainPanel.setLookAtState(false);
 
         controls.enabled = false;
     } else {
         // Turning OFF free camera behaves like Look At is OFF:
         // orbit/zoom around the scene center (0,0,0)
         cameraState.isLookAtMode = false;
-        mainPanel.setLookAtState(false);
+        uiManager.mainPanel.setLookAtState(false);
 
         controls.enabled = true;
         focusID = 'camNone';
@@ -6538,22 +6535,22 @@ mainPanel.on('freeCameraToggle', () => {
     } else {
         gizmo.attach(null);
     }
-    mainMenu.managementPanel.setSelectedBody(selected);
+    uiManager.managementPanel.setSelectedBody(selected);
 
     refreshBodiesTable();
     updateSurfaceButtonEnabled();
     forceHintRefresh();
 });
 
-mainPanel.on('zoomIn', () => {
+uiManager.mainPanel.on('zoomIn', () => {
     zoomIn();
 });
 
-mainPanel.on('zoomOut', () => {
+uiManager.mainPanel.on('zoomOut', () => {
     zoomOut();
 });
 
-mainPanel.on('lockToSunChange', ({ checked }: { checked: boolean }) => {
+uiManager.mainPanel.on('lockToSunChange', ({ checked }: { checked: boolean }) => {
     cameraState.lockToSun = checked;
 });
 
@@ -6561,13 +6558,13 @@ performancePanel.on('shadowsChange', ({ checked }: { checked: boolean }) => {
     toggleShadows(checked);
 });
 
-mainMenu.managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
+uiManager.managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = checked;
     }
 });
 
-mainMenu.managementPanel.on('gChange', ({ value }: { value: number }) => {
+uiManager.managementPanel.on('gChange', ({ value }: { value: number }) => {
     simulationState.gMultiplier = value;
 });
 
@@ -6578,7 +6575,7 @@ if (enableSkydomeCheckbox) {
     };
 }
 
-mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
+uiManager.mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
     simulationState.bodies.forEach((body) => {
         if (body && body instanceof CelestialBody && body.trail) {
             body.trail.visible = checked;
@@ -6586,7 +6583,7 @@ mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
     });
 });
 
-mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
+uiManager.mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
     simulationState.showNames = checked;
     simulationState.bodies.forEach((body) => {
         if (body && body.label) {
@@ -6599,45 +6596,45 @@ mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
     });
 });
 
-mainPanel.on('substepsChange', ({ value }: { value: number }) => {
+uiManager.mainPanel.on('substepsChange', ({ value }: { value: number }) => {
     stepsPerFrame = value;
 });
 
-mainMenu.on('timeScaleChange', ({ value }: { value: number }) => {
+uiManager.on('timeScaleChange', ({ value }: { value: number }) => {
     const newSpeed = value;
     const direction = newSpeed < 0 ? ' REVERSE' : '';
     const absSpeed = Math.abs(newSpeed);
     if (isPaused) {
         // When paused, update the saved value that will be used on resume
         savedTimeScale = newSpeed;
-        mainPanel.updateTimeScaleDisplay(
+        uiManager.mainPanel.updateTimeScaleDisplay(
             '0.0x (PAUSED - next: ' + absSpeed + 'x' + direction + ')'
         );
     } else {
         // When running, immediately update the speed
         timeScale = newSpeed;
-        mainPanel.updateTimeScaleDisplay(absSpeed + 'x' + direction);
+        uiManager.mainPanel.updateTimeScaleDisplay(absSpeed + 'x' + direction);
     }
 });
 
-mainMenu.on('pause', () => {
+uiManager.on('pause', () => {
     togglePause();
 });
 
-mainMenu.on('reset', () => {
+uiManager.on('reset', () => {
     // Auto-close management UI and show launcher with Cancel
-    mainMenu.managementPanel.hide();
+    uiManager.managementPanel.hide();
     startupModal.open({ allowCancel: true });
 });
 
 // "Fly Here" button from the bodies table
-mainPanel.on('autopilot', ({ body }: { body: Body }) => {
+uiManager.mainPanel.on('autopilot', ({ body }: { body: Body }) => {
     if (!body || body._isDisposed) return;
     engageAutopilot(body);
 });
 
 // Manual selection from Bodies table
-mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
+uiManager.mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
     if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
 
     // Clear any camera preset highlight (manual selection).
@@ -6650,7 +6647,7 @@ mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
         // If we are in Free Camera mode and the user clicks a body in the list,
         // we KEEP Free Camera mode on (the user can still use Look At / Target buttons explicitly).
         // Just ensure the button highlight stays accurate.
-        mainPanel.setFreeCameraState(true);
+        uiManager.mainPanel.setFreeCameraState(true);
         controls.enabled = false;
     }
 
@@ -6664,17 +6661,17 @@ mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
     } else {
         gizmo.attach(null);
     }
-    mainMenu.managementPanel.setSelectedBody(body);
+    uiManager.managementPanel.setSelectedBody(body);
 });
 
 // TARGET button (toggle):
 // - OFF: selecting bodies does NOT show gizmo, but selection still works
 // - ON: selected body shows gizmo (and switching selection moves gizmo)
 // - Must NOT auto zoom/focus the camera
-mainPanel.on('targetToggle', () => {
+uiManager.mainPanel.on('targetToggle', () => {
     const turningOn = !cameraState.isTargetMode;
     cameraState.isTargetMode = turningOn;
-    mainPanel.setTargetState(turningOn);
+    uiManager.mainPanel.setTargetState(turningOn);
 
     const b =
         selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
@@ -6688,7 +6685,7 @@ mainPanel.on('targetToggle', () => {
     if (turningOn) {
         if (b) {
             gizmo.attach(b);
-            mainMenu.managementPanel.setSelectedBody(b);
+            uiManager.managementPanel.setSelectedBody(b);
         }
     } else {
         // Hide gizmo but keep selection
@@ -6701,7 +6698,7 @@ mainPanel.on('targetToggle', () => {
 
 // LOOK AT button (toggle): when enabled, orbit/zoom around selected body.
 // When disabled, behave like "None camera": orbit/zoom around the scene center.
-mainPanel.on('lookAtToggle', () => {
+uiManager.mainPanel.on('lookAtToggle', () => {
     // Turning Look At ON/OFF exits surface mode (mutually exclusive camera behaviors).
     if (surfaceState?.isActive) {
         exitSurfaceMode();
@@ -6717,7 +6714,7 @@ mainPanel.on('lookAtToggle', () => {
     if (turningOn && isFreeCameraMode) {
         isFreeCameraMode = false;
         cameraState.isFreeCameraMode = false;
-        mainPanel.setFreeCameraState(false);
+        uiManager.mainPanel.setFreeCameraState(false);
         controls.enabled = true;
         forceHintRefresh();
     }
@@ -6737,12 +6734,12 @@ mainPanel.on('lookAtToggle', () => {
         // Look-at mode requires OrbitControls, so exit free camera mode if active
         if (isFreeCameraMode) {
             isFreeCameraMode = false;
-            mainPanel.setFreeCameraState(false);
+            uiManager.mainPanel.setFreeCameraState(false);
             controls.enabled = true;
         }
 
         cameraState.isLookAtMode = true;
-        mainPanel.setLookAtState(true);
+        uiManager.mainPanel.setLookAtState(true);
 
         // If no body is selected, behave like "auto look-at": keep center orbit until selection.
         if (!b) {
@@ -6754,7 +6751,7 @@ mainPanel.on('lookAtToggle', () => {
 
             // No selection => no gizmo attachment (Target still governs showing it later)
             gizmo.attach(null);
-            mainMenu.managementPanel.setSelectedBody(null);
+            uiManager.managementPanel.setSelectedBody(null);
             refreshBodiesTable();
             return;
         }
@@ -6765,12 +6762,12 @@ mainPanel.on('lookAtToggle', () => {
         } else {
             gizmo.attach(null);
         }
-        mainMenu.managementPanel.setSelectedBody(b);
+        uiManager.managementPanel.setSelectedBody(b);
 
         setFocusBody(b, { zoom: true });
     } else {
         cameraState.isLookAtMode = false;
-        mainPanel.setLookAtState(false);
+        uiManager.mainPanel.setLookAtState(false);
 
         // Behave like "None": orbit/zoom around center (but keep selection)
         controls.enabled = true;
@@ -6797,7 +6794,7 @@ mainPanel.on('lookAtToggle', () => {
 });
 
 // Subscribe to ManagementPanel events
-mainMenu.managementPanel.on(
+uiManager.managementPanel.on(
     'createBody',
     ({
         bodyType,
@@ -6839,7 +6836,7 @@ mainMenu.managementPanel.on(
 );
 
 // Preset bodies (canonical solar-system objects)
-mainMenu.managementPanel.on('createPresetBody', ({ presetKey }: { presetKey: string }) => {
+uiManager.managementPanel.on('createPresetBody', ({ presetKey }: { presetKey: string }) => {
     if (!presetKey) return;
     createPresetBody(presetKey);
     refreshBodiesTable();
@@ -6878,11 +6875,11 @@ function keepCameraDistanceOnBodyScaleChange(body: Body, oldRadius: number, newR
     controls.target.copy(targetPos);
 }
 
-mainMenu.managementPanel.on('deleteBody', () => {
+uiManager.managementPanel.on('deleteBody', () => {
     deleteSelectedBody();
 });
 
-mainMenu.managementPanel.on(
+uiManager.managementPanel.on(
     'applyEdit',
     ({
         body,
@@ -6911,8 +6908,8 @@ mainMenu.managementPanel.on(
         if (name !== null && name !== '') {
             body.updateLabel(name);
             // Update just the edit form label without repopulating the entire form
-            if (mainMenu.managementPanel.editBodyName) {
-                mainMenu.managementPanel.editBodyName.textContent = body.name;
+            if (uiManager.managementPanel.editBodyName) {
+                uiManager.managementPanel.editBodyName.textContent = body.name;
             }
         }
 
@@ -6952,10 +6949,10 @@ mainMenu.managementPanel.on(
                 typeof body.mass === 'number' &&
                 body.mass < 1;
 
-            if (mainMenu.managementPanel && mainMenu.managementPanel.editRadiusSlider) {
+            if (uiManager.managementPanel && uiManager.managementPanel.editRadiusSlider) {
                 const oldRadiusAll = body.radius || 1;
                 const newRadiusAll = parseFloat(
-                    (mainMenu.managementPanel.editRadiusSlider as HTMLInputElement).value
+                    (uiManager.managementPanel.editRadiusSlider as HTMLInputElement).value
                 );
                 if (!isNaN(newRadiusAll) && isFinite(newRadiusAll)) {
                     if (isLowMassAsteroid) {
@@ -7097,7 +7094,7 @@ function deleteSelectedBody() {
 
     // Update UI selection state (match existing empty-space click behavior)
     selectedBody = null;
-    mainMenu.managementPanel?.setSelectedBody?.(null);
+    uiManager.managementPanel?.setSelectedBody?.(null);
     if (cameraState?.isTargetMode) {
         gizmo.attach(null);
     }
@@ -7234,7 +7231,7 @@ window.addEventListener('keydown', (e) => {
 
     // Delete key to remove selected body
     if (key === 'n') {
-        const showNamesCheckbox = mainPanel.showNamesCheckbox as HTMLInputElement | null;
+        const showNamesCheckbox = uiManager.mainPanel.showNamesCheckbox as HTMLInputElement | null;
         if (showNamesCheckbox) {
             showNamesCheckbox.checked = !showNamesCheckbox.checked;
             showNamesCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
@@ -7364,8 +7361,8 @@ window.addEventListener('resize', () => {
 
 // Apply initial background visibility (pre-launch view): kuiper off
 if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) kuiperBeltPoints.visible = false;
-if (mainMenu.managementPanel.enableKuiperBeltCheckbox)
-    mainMenu.managementPanel.enableKuiperBeltCheckbox.checked = false;
+if (uiManager.managementPanel.enableKuiperBeltCheckbox)
+    uiManager.managementPanel.enableKuiperBeltCheckbox.checked = false;
 
 if (skydome) skydome.visible = true;
 if (enableSkydomeCheckbox) enableSkydomeCheckbox.checked = true;
@@ -7400,7 +7397,7 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
     if (cameraState.isLookAtMode && wasLookAtTarget && !focusAlreadyMoved) {
         cameraState.isLookAtMode = false;
         try {
-            mainPanel?.setLookAtState(false);
+            uiManager.mainPanel?.setLookAtState(false);
         } catch (e) {
             console.error('Error dispatching body:removed event after deleting body:', e);
         }
@@ -7415,8 +7412,8 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
     }
 
     // Clear edit panel selection if it is showing this body
-    if (mainMenu.managementPanel && mainMenu.managementPanel.selectedBody === body) {
-        mainMenu.managementPanel.setSelectedBody(null);
+    if (uiManager.managementPanel && uiManager.managementPanel.selectedBody === body) {
+        uiManager.managementPanel.setSelectedBody(null);
     }
 
     // Clear gizmo if it was attached to this body
@@ -7441,7 +7438,7 @@ window.addEventListener('body:removed', (e) => {
         flightState.knownShip = null;
         setTimeout(() => {
             try {
-                mainMenu.flightControlsPanel.updateFlightSpawnBtnLabel(
+                uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
                     flightState.knownShip,
                     simulationState.bodies
                 );
@@ -7473,7 +7470,7 @@ window.addEventListener('bodies:reset', () => {
     manuallySelectedBody = null;
     cameraState.focusBody = null;
     gizmo.attach(null);
-    mainMenu.managementPanel.setSelectedBody(null);
+    uiManager.managementPanel.setSelectedBody(null);
     refreshBodiesTable();
 });
 
@@ -7484,10 +7481,10 @@ function applyDefaultCameraTogglesAfterSpawn() {
     // - Look At ON (button shows active), but with NO pre-selected body
     //   so camera still behaves like center-orbit until the user selects a body.
     cameraState.isTargetMode = false;
-    mainPanel.setTargetState(false);
+    uiManager.mainPanel.setTargetState(false);
 
     cameraState.isLookAtMode = true;
-    mainPanel.setLookAtState(true);
+    uiManager.mainPanel.setLookAtState(true);
 
     // No auto-focus/selection.
     cameraState.focusBody = null;
@@ -7505,7 +7502,7 @@ function applyDefaultCameraTogglesAfterSpawn() {
 
     // No selection => no gizmo attachment yet.
     gizmo.attach(null);
-    mainMenu.managementPanel.setSelectedBody(null);
+    uiManager.managementPanel.setSelectedBody(null);
     refreshBodiesTable();
 
     // Hint text depends on toggle state (Target/Look At).
@@ -7513,21 +7510,21 @@ function applyDefaultCameraTogglesAfterSpawn() {
 }
 
 startupModal.on('launchDefault', () => {
-    mainMenu.managementPanel.hide();
+    uiManager.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.Default });
     applyDefaultCameraTogglesAfterSpawn();
 });
 
 startupModal.on('launchEmpty', () => {
-    mainMenu.managementPanel.hide();
+    uiManager.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.Empty });
     applyDefaultCameraTogglesAfterSpawn();
 });
 
 startupModal.on('launchBlackHole', () => {
-    mainMenu.managementPanel.hide();
+    uiManager.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.BlackHole });
     applyDefaultCameraTogglesAfterSpawn();

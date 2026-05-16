@@ -1,17 +1,19 @@
 import { FlightControlsPanel } from './flight-controls-panel';
+import { MainPanel } from './main-panel';
 import { ManagementPanel } from './management-panel';
 import { Panel } from './panel';
 
-export class MainMenu extends Panel {
-    toggleMenuBtn: HTMLButtonElement | null = null;
+export class UIManager extends Panel {
+    toolbarBottom: HTMLElement | null = null;
     toolbarLeft: HTMLElement | null = null;
 
     // Bottom toolbar elements
+    toggleMenuBtn: HTMLButtonElement | null = null;
+    btnOpenExplorer: HTMLButtonElement | null = null;
     btnNormalSpeed: HTMLButtonElement | null = null;
     btnForwardSpeed: HTMLButtonElement | null = null;
     btnReverseSpeed: HTMLButtonElement | null = null;
     btnPause: HTMLButtonElement | null = null;
-    btnOpenExplorer: HTMLButtonElement | null = null;
 
     // Left toolbar buttons
     btnDonate: HTMLButtonElement | null = null;
@@ -20,7 +22,7 @@ export class MainMenu extends Panel {
     btnReset: HTMLButtonElement | null = null;
 
     // Panels
-    systemExplorerPanel: HTMLElement | null = null;
+    mainPanel: MainPanel;
     flightControlsPanel: FlightControlsPanel;
     managementPanel: ManagementPanel;
 
@@ -33,23 +35,25 @@ export class MainMenu extends Panel {
         // Initialize control panels
         this.flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
         this.managementPanel = new ManagementPanel('management-panel');
+        this.mainPanel = new MainPanel('system-explorer');
 
         this.flightControlsPanel.initialize();
         this.managementPanel.initialize();
+        this.mainPanel.initialize();
     }
 
     initialize(): void {
         // Add event listeners for menu buttons
-        this.toggleMenuBtn = document.getElementById('btn-toggle-menu') as HTMLButtonElement;
+        this.toolbarBottom = document.getElementById('toolbar-bottom') as HTMLElement;
         this.toolbarLeft = document.getElementById('toolbar-left') as HTMLElement;
 
         // Bottom toolbar buttons
+        this.toggleMenuBtn = document.getElementById('btn-toggle-menu') as HTMLButtonElement;
+        this.btnOpenExplorer = document.getElementById('btn-open-explorer') as HTMLButtonElement;
         this.btnNormalSpeed = document.getElementById('btn-normal-speed') as HTMLButtonElement;
         this.btnForwardSpeed = document.getElementById('btn-forward-speed') as HTMLButtonElement;
         this.btnReverseSpeed = document.getElementById('btn-reverse-speed') as HTMLButtonElement;
         this.btnPause = document.getElementById('btn-pause') as HTMLButtonElement;
-        this.btnOpenExplorer = document.getElementById('btn-open-explorer') as HTMLButtonElement;
-        this.systemExplorerPanel = document.getElementById('system-explorer') as HTMLElement;
 
         // Bottom toolbar buttons
         this.btnDonate = document.getElementById('btn-donate') as HTMLButtonElement;
@@ -58,6 +62,10 @@ export class MainMenu extends Panel {
         ) as HTMLButtonElement;
         this.btnFlightControls = document.getElementById('flightControlsBtn') as HTMLButtonElement;
         this.btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
+
+        // Block events on UI elements to prevent them from affecting the 3D scene
+        this.blockUIEvents(this.toolbarBottom);
+        this.blockUIEvents(this.toolbarLeft);
 
         // Set up event listeners for buttons and other interactive elements
         if (this.toggleMenuBtn) {
@@ -97,10 +105,10 @@ export class MainMenu extends Panel {
         }
 
         // Explorer button event
-        if (this.btnOpenExplorer && this.systemExplorerPanel) {
+        if (this.btnOpenExplorer && this.mainPanel) {
             this.btnOpenExplorer.onclick = () => {
-                this.systemExplorerPanel?.classList.toggle('visible');
-                if (this.systemExplorerPanel?.classList.contains('visible')) {
+                const visible = this.mainPanel.toggle();
+                if (visible) {
                     this.btnOpenExplorer?.classList.add('active');
                 } else {
                     this.btnOpenExplorer?.classList.remove('active');
@@ -123,7 +131,6 @@ export class MainMenu extends Panel {
                 } else {
                     this.btnEditSolarSystem?.classList.remove('active');
                 }
-
             };
         }
 
@@ -132,7 +139,6 @@ export class MainMenu extends Panel {
                 this.flightControlsPanel.toggle();
                 // Update spawn button label to reflect whether there is a re-enterable ship
                 //updateFlightSpawnBtnLabel();
-
             };
         }
 
@@ -160,6 +166,31 @@ export class MainMenu extends Panel {
             } else {
                 this.toolbarLeft.classList.remove('visible');
             }
+        }
+    }
+
+    /**
+     * Stop mouse and keyboard events from propagating to the 3D scene when interacting with the UI.
+     * @param element The HTML element to block events for.
+     */
+    private blockUIEvents(element: HTMLElement) {
+        if (element) {
+            element.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+            });
+            element.addEventListener('mouseup', (e) => {
+                e.stopPropagation();
+            });
+            element.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            // Prevent keyboard events (WASD, etc.) from triggering camera movement when typing in UI
+            element.addEventListener('keydown', (e) => {
+                e.stopPropagation();
+            });
+            element.addEventListener('keyup', (e) => {
+                e.stopPropagation();
+            });
         }
     }
 }
