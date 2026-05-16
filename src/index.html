@@ -30,8 +30,8 @@
                 </button>
                 <button
                     id="startupCancelBtn"
-                    class="old-ui cancel-btn btn-with-icon"
-                    style="display: none; background: #aa3333"
+                    class="old-ui btn-with-icon btn-danger"
+                    style="display: none;"
                 >
                     <span class="material-symbols-outlined">close</span>
                     CANCEL
@@ -47,7 +47,7 @@
                         Solar System Simulator is a browser-based space simulation focused on
                         physics, exploration, and interactive body management.
                     </p>
-                    <p>
+                    <div>
                         Spaceship by Liz Reddington
                         <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
                             >CC-BY</a
@@ -56,7 +56,40 @@
                         <a href="https://poly.pizza/m/5nWeu4IQXVX" target="_blank"
                             >https://poly.pizza/m/5nWeu4IQXVX</a
                         >
-                    </p>
+                    </div>
+
+                    <div>
+                        International Space Station by Poly by Google
+                        <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
+                            >CC-BY</a
+                        >
+                        via Poly Pizza
+                        <a href="https://poly.pizza/m/d3Fq5H6ne8E" target="_blank"
+                            >https://poly.pizza/m/d3Fq5H6ne8E</a
+                        >
+                    </div>
+
+                    <div    >
+                       Asteroid by J-Toastie
+                       <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
+                            >CC-BY</a
+                        >
+                        via Poly Pizza
+                        <a href="https://poly.pizza/m/YS1jpm3mNr" target="_blank"
+                            >https://poly.pizza/m/YS1jpm3mNr</a
+                        >
+                    </div>
+
+                    <div>
+                        Asteroid 2 by J-Toastie
+                        <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
+                            >CC-BY</a
+                        >
+                        via Poly Pizza
+                        <a href="https://poly.pizza/m/yuCzypJ0w4" target="_blank"
+                            >https://poly.pizza/m/yuCzypJ0w4</a
+                        >
+                    </div>
                 </div>
                 <div class="modal__actions">
                     <button id="aboutCloseBtn" class="old-ui btn-with-icon">
@@ -72,6 +105,15 @@
             <div style="display: flex; flex-direction: row; height: 100%; width: 100%">
                 <!-- Left toolbar -->
                 <div id="toolbar-left" class="toolbar toolbar-left">
+                    <button
+                        id="btn-about"
+                        class="btn toolbar-btn"
+                        title="About this simulator"
+                        aria-label="About this simulator"
+                    >
+                        <span class="material-symbols-outlined">info</span>
+                    </button>
+
                     <button
                         id="btn-donate"
                         class="btn toolbar-btn btn-care"
@@ -154,7 +196,11 @@
                                 <button id="zoomInBtn" class="old-ui btn-icon-only" title="Zoom In">
                                     <span class="material-symbols-outlined">zoom_in</span>
                                 </button>
-                                <button id="zoomOutBtn" class="old-ui btn-icon-only" title="Zoom Out">
+                                <button
+                                    id="zoomOutBtn"
+                                    class="old-ui btn-icon-only"
+                                    title="Zoom Out"
+                                >
                                     <span class="material-symbols-outlined">zoom_out</span>
                                 </button>
                             </div>
@@ -203,17 +249,6 @@
                                     </div>
                                 </div>
 
-                                <div class="btn-row btn-row--action-buttons">
-                                    <button
-                                        id="aboutBtn"
-                                        class="old-ui btn-with-icon"
-                                        title="About this simulator"
-                                        aria-label="About this simulator"
-                                    >
-                                        <span class="material-symbols-outlined">info</span>
-                                        ABOUT
-                                    </button>
-                                </div>
                                 <div class="footer-note">
                                     © <span id="copyrightYear"></span> Neptune Century
                                 </div>
@@ -255,9 +290,8 @@
                         </button>
                         <button
                             id="flightExitBtn"
-                            class="old-ui btn-with-icon"
+                            class="old-ui btn-with-icon btn-danger"
                             disabled
-                            style="background: #883333"
                         >
                             <span class="material-symbols-outlined">exit_to_app</span>
                             EXIT FLIGHT MODE
@@ -506,7 +540,7 @@
                             </div>
 
                             <div class="form-row form-row--actions" id="randomizeCreateRow" hidden>
-                                <button id="randomizeCreateBtn" type="button" class="btn-with-icon">
+                                <button id="randomizeCreateBtn" type="button" class="old-ui btn-with-icon">
                                     <span class="material-symbols-outlined">shuffle</span>
                                     RANDOMIZE
                                 </button>
@@ -517,7 +551,10 @@
                                     <span class="material-symbols-outlined">check</span>
                                     CREATE
                                 </button>
-                                <button id="cancelCreateBtn" class="old-ui cancel-btn btn-with-icon">
+                                <button
+                                    id="cancelCreateBtn"
+                                    class="old-ui btn-with-icon btn-danger"
+                                >
                                     <span class="material-symbols-outlined">cancel</span>
                                     CANCEL
                                 </button>
@@ -686,13 +723,16 @@
                                     </button>
                                     <button
                                         id="deleteBodyBtn"
-                                        class="old-ui cancel-btn btn-with-icon"
+                                        class="old-ui btn-with-icon btn-danger"
                                         title="Delete selected body"
                                     >
                                         <span class="material-symbols-outlined">delete</span>
                                         DELETE
                                     </button>
-                                    <button id="cancelEditBtn" class="old-ui cancel-btn btn-with-icon">
+                                    <button
+                                        id="cancelEditBtn"
+                                        class="old-ui btn-with-icon btn-danger"
+                                    >
                                         <span class="material-symbols-outlined">cancel</span>
                                         CANCEL
                                     </button>

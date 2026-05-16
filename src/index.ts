@@ -4954,7 +4954,7 @@ function setF(id: string) {
 const mainMenu = new MainMenu('main-menu');
 const startupModal = new StartupModal('startup-overlay');
 const mainPanel = new MainPanel('system-explorer');
-const aboutModal = new AboutModal('about-overlay', 'aboutBtn', 'aboutCloseBtn');
+const aboutModal = new AboutModal('about-overlay', 'btn-about', 'aboutCloseBtn');
 const performancePanel = new PerformancePanel('performance-panel');
 mainMenu.managementPanel.registerGetFocusObject(() => {
     const body = cameraState.focusBody;
