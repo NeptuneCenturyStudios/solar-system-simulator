@@ -32,6 +32,16 @@
     --new-ui-btn-care-shadow: 0 0 1rem rgba(242, 182, 182, 0.5);
 }
 
+/* Utility classes */
+.ml-auto {
+    margin-left: auto !important;
+}
+
+.mb-0 {
+    margin-bottom: 0 !important;
+}
+
+/* Reset default styles and set up base styles */
 body {
     margin: 0;
     overflow: hidden;
@@ -42,6 +52,7 @@ body {
     height: 100%;
 }
 
+/* Container for all UI elements */
 #ui-container {
     display: flex;
     flex-direction: column;
@@ -230,10 +241,12 @@ label {
 }
 
 .panel-header {
+    display: flex;
+    align-items: center ;
     font-size: 1.5em;
     font-weight: bold;
     color: #00ffcc;
-    text-align: center;
+    text-align: start;
     margin-bottom: 15px;
     padding-bottom: 10px;
     border-bottom: 1px solid #224466;
@@ -482,7 +495,8 @@ button.btn-icon-only {
     align-items: center;
     justify-content: center;
     gap: 0;
-    padding: 8px 0;
+    /* padding: 8px 0; */
+    width: auto;
 }
 
 button.btn-with-icon {
@@ -617,10 +631,6 @@ button.btn.toolbar-btn {
     justify-content: center;
     border: 1px solid transparent;
     transition: all 0.2s ease;
-}
-
-button.btn.toolbar-btn.toolbar-btn-end {
-    margin-left: auto;
 }
 
 button.btn.toolbar-btn:hover,

@@ -6,44 +6,31 @@ import { Body } from '../bodies/body';
  * Main control panel managing camera, time controls, and settings for the simulation UI.
  */
 export class MainPanel extends Panel {
-    freeCameraBtn: HTMLButtonElement | null;
-    zoomInBtn: HTMLButtonElement | null;
-    zoomOutBtn: HTMLButtonElement | null;
-    bodiesTableContainer: HTMLElement | null;
-    _selectedBodyRef: Body | null;
-    lockToSunCheckbox: HTMLInputElement | null;
-    showTrailsCheckbox: HTMLInputElement | null;
-    showNamesCheckbox: HTMLInputElement | null;
-    timeScaleDisplay: HTMLElement | null;
-    substepsSlider: HTMLInputElement | null;
-    substepsDisplay: HTMLElement | null;
-    substepsResetBtn: HTMLButtonElement | null;
-    copyrightYearEl: HTMLElement | null;
-    targetBtn: HTMLButtonElement | null;
-    lookAtBtn: HTMLButtonElement | null;
-    surfaceCameraBtn: HTMLButtonElement | null;
+    freeCameraBtn: HTMLButtonElement | null = null;
+    zoomInBtn: HTMLButtonElement | null = null;
+    zoomOutBtn: HTMLButtonElement | null = null;
+    bodiesTableContainer: HTMLElement | null = null;
+    _selectedBodyRef: Body | null = null;
+    lockToSunCheckbox: HTMLInputElement | null = null;
+    showTrailsCheckbox: HTMLInputElement | null = null;
+    showNamesCheckbox: HTMLInputElement | null = null;
+    timeScaleDisplay: HTMLElement | null = null;
+    substepsSlider: HTMLInputElement | null = null;
+    substepsDisplay: HTMLElement | null = null;
+    substepsResetBtn: HTMLButtonElement | null = null;
+    copyrightYearEl: HTMLElement | null = null;
+    targetBtn: HTMLButtonElement | null = null;
+    lookAtBtn: HTMLButtonElement | null = null;
+    surfaceCameraBtn: HTMLButtonElement | null = null;
+    btnClose: HTMLButtonElement | null = null;
 
     constructor(elementId: string) {
         super(elementId);
-        this.freeCameraBtn = null;
-        this.zoomInBtn = null;
-        this.zoomOutBtn = null;
-        this.bodiesTableContainer = null;
-        this._selectedBodyRef = null;
-        this.lockToSunCheckbox = null;
-        this.showTrailsCheckbox = null;
-        this.showNamesCheckbox = null;
-        this.timeScaleDisplay = null;
-        this.substepsSlider = null;
-        this.substepsDisplay = null;
-        this.substepsResetBtn = null;
-        this.copyrightYearEl = null;
-        this.targetBtn = null;
-        this.lookAtBtn = null;
-        this.surfaceCameraBtn = null;
+
     }
 
     initialize() {
+        this.btnClose = document.getElementById('btn-close-system-explorer') as HTMLButtonElement | null;
         this.bodiesTableContainer = document.getElementById('bodiesTableContainer');
         this.targetBtn = document.getElementById('camTargetBtn') as HTMLButtonElement | null;
         this.lookAtBtn = document.getElementById('camLookAtBtn') as HTMLButtonElement | null;
@@ -53,6 +40,10 @@ export class MainPanel extends Panel {
         ) as HTMLButtonElement | null;
         this.zoomInBtn = document.getElementById('zoomInBtn') as HTMLButtonElement | null;
         this.zoomOutBtn = document.getElementById('zoomOutBtn') as HTMLButtonElement | null;
+
+        if (this.btnClose) {
+            this.btnClose.onclick = () => this.toggle();
+        }
 
         if (this.bodiesTableContainer) {
             this.renderBodiesTable([]);
