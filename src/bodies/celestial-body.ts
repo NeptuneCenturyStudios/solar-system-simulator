@@ -5,7 +5,7 @@ import { pickRandom, BodyTypeEnum, isBodyType } from '../utilities/utilities';
 import { calculateTrajectory, IRotation } from '../physics/physics';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { triggerScreenFlash } from '../effects/screen-flash';
-import { SCALE_FACTOR, C } from '../utilities/consts';
+import { C, DIST_SCALE } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-rendering';
 import { IStateDependencies } from '../interfaces';
 
@@ -185,7 +185,7 @@ export class CelestialBody extends Body {
         scene.add(this.trail);
 
         if (hasRings) {
-            const ringCount = 3000 * SCALE_FACTOR;
+            const ringCount = 3000000 / DIST_SCALE;
             const ringGeo = new THREE.BufferGeometry();
             const ringPos = new Float32Array(ringCount * 3);
             for (let i = 0; i < ringCount; i++) {

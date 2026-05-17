@@ -233,7 +233,7 @@ export class MainPanel extends Panel {
                                           autopilotTarget && r.body === autopilotTarget;
                                       const flyBtnHtml =
                                           !r.isShip && hasShip
-                                              ? `<td style="padding:2px 4px;"><button class="fly-here-btn${isApTarget ? ' active' : ''}" data-flyhere="1" title="${isApTarget ? 'Cancel autopilot' : 'Fly to this body'}" style="font-size:0.72em;padding:2px 6px;cursor:pointer;">${isApTarget ? '✕' : '✈'}</button></td>`
+                                              ? `<td style="padding:2px 4px;"><button class="old-ui fly-here-btn mb-0${isApTarget ? ' active' : ''}" data-flyhere="1" title="${isApTarget ? 'Cancel autopilot' : 'Fly to this body'}" style="font-size:0.72em;padding:2px 6px;cursor:pointer;">${isApTarget ? '✕' : '✈'}</button></td>`
                                               : `<td></td>`;
                                       return `
                                           <tr class="${isSel ? 'selected' : ''}" data-row="1">
