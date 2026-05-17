@@ -128,7 +128,7 @@ import { Spaceship } from './bodies/spaceship';
 import { StartupModal } from './ui/startup-modal';
 import { AboutModal } from './ui/about-modal';
 import { PerformancePanel } from './ui/performance-panel';
-import { EventLogEntry } from './event-log/event-log';
+import { EventLogEntry, NotificationType } from './event-log/event-log';
 import { Halley } from './bodies/halley';
 import { IStateDependencies } from './interfaces';
 import { Sun } from './bodies/sun';
@@ -285,7 +285,10 @@ function absorbBody(winner: Body, victim: Body) {
 
     // Inform the user
     try {
-        addEvent?.(`${winner.name} absorbed ${victim.name}`);
+        addEvent?.({
+            message: `${winner.name} absorbed ${victim.name}`,
+            notificationType: NotificationType.Alert,
+        });
     } catch (e) {
         console.error('Error dispatching body:added event:', e);
     }
@@ -748,93 +751,32 @@ const uiCamera = new THREE.OrthographicCamera(
 );
 uiCamera.position.z = 10;
 
-// Event log system for tracking body deaths
-const eventLog: EventLogEntry[] = [];
-const MAX_EVENTS = 5;
-const EVENT_DISPLAY_TIME = 5000; // Show for 5 seconds
-const EVENT_FADE_START = 3000; // Start fading after 3 seconds
+import Noty from 'noty';
+import 'noty/lib/noty.css';
 
-function addEvent(message: string) {
-    eventLog.push(new EventLogEntry(message));
+// --- Event notifications (replaces sprite-based event log) ---
+function addEvent(event: { message: string; notificationType: NotificationType }) {
+    const entry = new EventLogEntry(event.message, event.notificationType);
+
     // Add the event message to the console as well for better visibility
-    console.info(message);
-    // Keep only recent events
-    while (eventLog.length > MAX_EVENTS) {
-        eventLog.shift();
-    }
+    console.info(entry.message);
+
+    new Noty({
+        type: entry.notificationType,
+        theme: 'semanticui',
+        layout: 'topCenter',
+        text: entry.message,
+        timeout: 3500,
+        progressBar: false,
+        closeWith: ['click', 'button'],
+        queue: 'solar-event-log',
+        killer: true,
+    }).show();
 }
 
-function createEventLogTexture() {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) return null;
+// Keep queue bounded to avoid a burst of notifications freezing the UI.
+Noty.setMaxVisible(4, 'solar-event-log');
 
-    canvas.width = 600;
-    canvas.height = 250;
-    const fontSize = 16;
-
-    context.fillStyle = '#aaaaaa';
-    context.textAlign = 'left';
-    context.textBaseline = 'top';
-    context.font = `${fontSize}px monospace`;
-
-    const lineHeight = fontSize + 8; // 8px padding between lines
-    const leftPadding = 10;
-    const now = performance.now();
-
-    // Remove old events from array
-    while (eventLog.length > 0 && now - eventLog[0].timestamp > EVENT_DISPLAY_TIME) {
-        eventLog.shift();
-    }
-
-    // Filter active events
-    const activeEvents = eventLog.filter((e) => now - e.timestamp < EVENT_DISPLAY_TIME);
-
-    // Draw from bottom to top (newest at bottom)
-    activeEvents.forEach((event, index) => {
-        const age = now - event.timestamp;
-        let opacity = 1.0;
-
-        // Fade out effect
-        if (age > EVENT_FADE_START) {
-            opacity = 1.0 - (age - EVENT_FADE_START) / (EVENT_DISPLAY_TIME - EVENT_FADE_START);
-        }
-
-        // Calculate y position (from bottom)
-        const yPos = canvas.height - (activeEvents.length - index) * lineHeight;
-
-        // Apply opacity
-        context.fillStyle = `rgba(170, 170, 170, ${opacity})`;
-        context.fillText(event.message, leftPadding, yPos);
-    });
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    return texture;
-}
-
-let eventLogSprite: THREE.Sprite | null = null;
-function createEventLogSprite() {
-    const texture = createEventLogTexture();
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    eventLogSprite = new THREE.Sprite(material);
-    eventLogSprite.scale.set(600, 250, 1);
-
-    // Position at lower-left corner
-    eventLogSprite.position.set(
-        -window.innerWidth / 2 + 300, // Left side
-        -window.innerHeight / 2 + 125, // Bottom
-        0
-    );
-
-    uiScene.add(eventLogSprite);
-}
-createEventLogSprite();
 
 // --- Flight mode steering line (drawn in uiScene screen space) ---
 // A line from the ship's projected aim point to the current pointer offset.
@@ -4970,11 +4912,6 @@ function animate() {
         }
 
         // Update event log
-        if (eventLogSprite) {
-            eventLogSprite.material.map?.dispose();
-            eventLogSprite.material.map = createEventLogTexture();
-            eventLogSprite.material.needsUpdate = true;
-        }
 
         fpsLastUpdate = now;
     }
@@ -5094,7 +5031,10 @@ flightControlsPanel.on('autopilot', () => {
     }
     const target = selectedBody || manuallySelectedBody;
     if (!target || target._isDisposed) {
-        addEvent('Autopilot: select a target body first.');
+        addEvent({
+            message: 'Autopilot: select a target body first.',
+            notificationType: NotificationType.Warning,
+        });
         return;
     }
     engageAutopilot(target);
@@ -5565,7 +5505,10 @@ function updateAutopilot(dt: number) {
             if (warpSprite) warpSprite.visible = false;
             warpEffect.start();
             triggerScreenFlash(200, 0.01, 2.5);
-            addEvent('⚡ Autopilot warp engaged.');
+            addEvent({
+                message: '⚡ Autopilot warp engaged.',
+                notificationType: NotificationType.Success,
+            });
         }
     } else if (autopilotState.phase === 'WARP') {
         // Lock ship velocity to warp speed toward the target, in the target's frame.
@@ -5783,7 +5726,10 @@ function updateAutopilot(dt: number) {
             flightState.thrustActive = false;
 
             const targetName = target.name || 'the body';
-            addEvent(`✓ Autopilot: Stable orbit around ${targetName} achieved.`);
+            addEvent({
+                message: `✓ Autopilot: Stable orbit around ${targetName} achieved.`,
+                notificationType: NotificationType.Success,
+            });
             autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
             showOrbitNotifySprite();
 
@@ -5825,7 +5771,9 @@ function cancelAutopilot(message?: string) {
     autopilotState.phase = null;
     autopilotState.targetBody = null;
     flightState.thrustActive = false;
-    if (message) addEvent(message);
+    if (message) {
+        addEvent({ message, notificationType: NotificationType.Info });
+    }
     // Defer DOM update — this may be called from inside the physics substep loop.
     setTimeout(() => updateAutopilotUI(), 0);
 }
@@ -5836,14 +5784,18 @@ function engageAutopilot(target: Body) {
 
     const ship = flightState.knownShip;
     if (!ship || ship._isDisposed || !simulationState.bodies.includes(ship)) {
-        addEvent('Autopilot: no ship found. Spawn a spaceship first.');
+        addEvent({
+            message: 'Autopilot: no ship found. Spawn a spaceship first.',
+            notificationType: NotificationType.Warning,
+        });
         return;
     }
 
     if (simulationState.timeScale > AUTOPILOT_MAX_TIMESCALE) {
-        addEvent(
-            `Autopilot: time scale is too high (>${AUTOPILOT_MAX_TIMESCALE}×). Reduce time scale first.`
-        );
+        addEvent({
+            message: `Autopilot: time scale is too high (>${AUTOPILOT_MAX_TIMESCALE}×). Reduce time scale first.`,
+            notificationType: NotificationType.Warning,
+        });
         return;
     }
 
@@ -5860,7 +5812,10 @@ function engageAutopilot(target: Body) {
         flightState.warpDecelerating ||
         flightState.warpCharging
     ) {
-        addEvent('Autopilot: disengage warp before engaging autopilot.');
+        addEvent({
+            message: 'Autopilot: disengage warp before engaging autopilot.',
+            notificationType: NotificationType.Warning,
+        });
         return;
     }
 
@@ -5925,9 +5880,12 @@ function engageAutopilot(target: Body) {
             autopilotBlockedNotifyTimer = AUTOPILOT_BLOCKED_NOTIFY_DURATION;
             autopilotBlockedByName = nearestObstruction.name || 'obstruction';
 
-            addEvent(
-                `⚠ Autopilot blocked: ${nearestObstruction.name || 'obstruction'} is in the path to ${target.name || 'target'}.`
-            );
+            addEvent({
+                message: `⚠ Autopilot blocked: ${nearestObstruction.name || 'obstruction'} is in the path to ${
+                    target.name || 'target'
+                }.`,
+                notificationType: NotificationType.Warning,
+            });
             return;
         }
     }
@@ -5950,11 +5908,20 @@ function engageAutopilot(target: Body) {
     flightState.thrustActive = false;
 
     if (startWithWarp) {
-        addEvent(`Autopilot engaged: initiating warp to ${target.name || 'target'}.`);
+        addEvent({
+            message: `Autopilot engaged: initiating warp to ${target.name || 'target'}.`,
+            notificationType: NotificationType.Info,
+        });
     } else if (startInBrake) {
-        addEvent(`Autopilot engaged: direct approach to ${target.name || 'target'}.`);
+        addEvent({
+            message: `Autopilot engaged: direct approach to ${target.name || 'target'}.`,
+            notificationType: NotificationType.Info,
+        });
     } else {
-        addEvent(`Autopilot engaged: flying to ${target.name || 'target'}.`);
+        addEvent({
+            message: `Autopilot engaged: flying to ${target.name || 'target'}.`,
+            notificationType: NotificationType.Info,
+        });
     }
     updateAutopilotUI();
 }
@@ -6074,7 +6041,10 @@ function updateFlightControls(dt: number) {
             flightState.warpCharge = 0;
             warpEffect.start();
             triggerScreenFlash(200, 0.01, 2.5);
-            addEvent('⚡ Warp engaged! Press Space to disengage.');
+            addEvent({
+                message: '⚡ Warp engaged! Press Space to disengage.',
+                notificationType: NotificationType.Success,
+            });
         }
         // Allow normal flight controls while charging (just can't turn on warp mid-turn)
     }
@@ -6367,7 +6337,10 @@ function spawnShip() {
             simulationState.bodies
         );
 
-        addEvent('Spaceship spawned. Click RE-ENTER SHIP to pilot it.');
+        addEvent({
+            message: 'Spaceship spawned. Click RE-ENTER SHIP to pilot it.',
+            notificationType: NotificationType.Info,
+        });
         return;
     }
 
@@ -6435,7 +6408,10 @@ function spawnShip() {
     flightControlsPanel.setAutopilotState(autopilotState.isActive, true);
     refreshBodiesTable();
 
-    addEvent('Entered spaceship.');
+    addEvent({
+        message: 'Entered spaceship.',
+        notificationType: NotificationType.Success,
+    });
 }
 
 /** Exit flight mode and restore normal camera controls. */
@@ -6549,7 +6525,10 @@ function exitFlightMode() {
             // Empty
         }
     }, 0);
-    addEvent('Flight mode exited.');
+    addEvent({
+        message: 'Flight mode exited.',
+        notificationType: NotificationType.Info,
+    });
 }
 
 window.addEventListener('mousemove', onSurfaceMouseMove, { passive: true });
@@ -7153,7 +7132,10 @@ function deleteSelectedBody() {
         }
 
         if (bodyToDelete === getPrimaryStar()) {
-            addEvent?.('Sun deleted');
+            addEvent?.({
+                message: 'Sun deleted',
+                notificationType: NotificationType.Alert,
+            });
         }
     } else {
         bodyToDelete.die();
@@ -7171,7 +7153,10 @@ function deleteSelectedBody() {
         const index = simulationState.bodies.indexOf(bodyToDelete);
         if (index > -1) simulationState.bodies.splice(index, 1);
 
-        addEvent?.(`${bodyToDelete.name} deleted`);
+            addEvent?.({
+                message: `${bodyToDelete.name} deleted`,
+                notificationType: NotificationType.Alert,
+            });
 
         if (wasCameraTarget) {
             setF('camNone');
@@ -7298,7 +7283,10 @@ window.addEventListener('keydown', (e) => {
                 // but steering is restored so the player can redirect during slowdown).
                 flightSteeringLine.visible = true;
                 flightCrosshair.visible = true;
-                addEvent('Warp disengaged. Decelerating...');
+                addEvent({
+                    message: 'Warp disengaged. Decelerating...',
+                    notificationType: NotificationType.Info,
+                });
             } else if (!flightState.warpDecelerating && !autopilotState.isActive) {
                 // Only start charging when not already decelerating from a previous warp,
                 // and not under autopilot control.
@@ -7441,9 +7429,6 @@ window.addEventListener('resize', () => {
     }
 
     // Reposition event log
-    if (eventLogSprite) {
-        eventLogSprite.position.set(-window.innerWidth / 2 + 300, -window.innerHeight / 2 + 125, 0);
-    }
 
     warpEffect.resize(window.innerWidth, window.innerHeight);
     lensingEffect.resize(window.innerWidth, window.innerHeight);

@@ -8,6 +8,7 @@ import { triggerScreenFlash } from '../effects/screen-flash';
 import { C, DIST_SCALE } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-rendering';
 import { IStateDependencies } from '../interfaces';
+import { NotificationType } from '../event-log/event-log';
 
 export interface IOrbitalBodyCreationOptions extends IBodyCreationOptions {
     pos: THREE.Vector3;
@@ -227,7 +228,10 @@ export class CelestialBody extends Body {
 
         // Log the death event
         if (typeof this.dependencies.addEvent !== 'undefined') {
-            this.dependencies.addEvent(`${this.name} destroyed`);
+            this.dependencies.addEvent({
+                message: `${this.name} destroyed`,
+                notificationType: NotificationType.Alert,
+            });
         }
 
         // Only create explosion if not skipped (sun uses supernova instead)

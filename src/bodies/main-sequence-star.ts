@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Star, IStarCreationOptions } from './star';
 import { IStateDependencies } from '../interfaces';
+import { NotificationType } from '../event-log/event-log';
 import { loadSrgbTexture } from '../drawing/textures';
 import { BodyTypeEnum, createUniqueId } from '../utilities/utilities';
 import {
@@ -454,7 +455,10 @@ export class MainSequenceStar extends Star {
                 }
 
                 if (this.dependencies?.addEvent) {
-                    this.dependencies.addEvent(`Pulsar formed from ${this.name}!`);
+                    this.dependencies.addEvent({
+                        message: `Pulsar formed from ${this.name}!`,
+                        notificationType: NotificationType.Success,
+                    });
                 }
             } catch (e) {
                 console.error('Error creating pulsar:', e);
@@ -480,7 +484,10 @@ export class MainSequenceStar extends Star {
                 }
 
                 if (this.dependencies?.addEvent) {
-                    this.dependencies.addEvent(`Black Hole formed from ${this.name}!`);
+                    this.dependencies.addEvent({
+                        message: `Black Hole formed from ${this.name}!`,
+                        notificationType: NotificationType.Alert,
+                    });
                 }
             } catch (e) {
                 console.error('Error creating black hole:', e);
@@ -504,7 +511,10 @@ export class MainSequenceStar extends Star {
                 }
 
                 if (this.dependencies?.addEvent) {
-                    this.dependencies.addEvent(`White Dwarf formed from ${this.name}!`);
+                    this.dependencies.addEvent({
+                        message: `White Dwarf formed from ${this.name}!`,
+                        notificationType: NotificationType.Warning,
+                    });
                 }
             } catch (e) {
                 console.error('Error creating white dwarf:', e);

@@ -8,6 +8,7 @@ import { IPipelineFeedEffect } from '../effects/effect-base.js';
 import { MassSiphonEffect } from '../effects/mass-siphon.js';
 import { AccretionDiskEffect, BLACK_HOLE_DISK_COLORS } from '../effects/accretion-disk.js';
 import { BlackHoleJetEffect } from '../effects/black-hole-jet.js';
+import { NotificationType } from '../event-log/event-log.js';
 
 /** Multiplier for the gravitational mass-transfer formula. Tune to taste. */
 const SIPHON_MASS_TRANSFER_SCALE = 0.0001;
@@ -294,7 +295,10 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
                     (angle) => this.enqueueAccretionParticle(angle)
                 );
                 this.siphonEffects.set(star.id, effect);
-                this.dependencies.addEvent(`${this.name} is siphoning mass from ${star.name}`);
+                this.dependencies.addEvent({
+                    message: `${this.name} is siphoning mass from ${star.name}`,
+                    notificationType: NotificationType.Info,
+                });
             }
 
             // Gravitational mass-transfer: proportional to G·M_bh·M_star / r².
@@ -339,7 +343,10 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
                 this.siphonEffects.get(star.id)?.stopSpawning();
                 inRangeIds.delete(star.id);
                 if (depleted && !massGone) {
-                    this.dependencies.addEvent(`${star.name} siphoned into a brown dwarf remnant`);
+                    this.dependencies.addEvent({
+                        message: `${star.name} siphoned into a brown dwarf remnant`,
+                        notificationType: NotificationType.Alert,
+                    });
                 }
             }
         }

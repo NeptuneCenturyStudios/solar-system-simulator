@@ -5,9 +5,10 @@ import { Supernova } from './effects/supernova';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { BodyTypeEnum } from './utilities/utilities';
 import { IPipelineFeedEffect } from './effects/effect-base';
+import { NotificationType } from './event-log/event-log';
 
 export interface IStateDependencies {
-    addEvent: (message: string) => void;
+    addEvent: (event: { message: string; notificationType: NotificationType }) => void;
     addExplosion: (explosion: ParticleExplosion) => void;
     addSupernova: (supernova: Supernova) => void;
     addBody: (body: Body) => void;

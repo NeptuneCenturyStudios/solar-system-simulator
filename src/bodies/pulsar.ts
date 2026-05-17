@@ -11,6 +11,7 @@ import { AccretionDiskEffect, PULSAR_DISK_COLORS } from '../effects/accretion-di
 import { PulsarMagneticField } from '../effects/pulsar-magnetic-field';
 import { MassSiphonEffect } from '../effects/mass-siphon';
 import { IPipelineFeedEffect } from '../effects/effect-base';
+import { NotificationType } from '../event-log/event-log';
 
 /**
  * Base radius constant used in the neutron-star mass-to-radius formula.
@@ -259,7 +260,10 @@ export class Pulsar extends Star implements IMassTransferBody {
                     { r: 0.5, g: 0.85, b: 1.0 }
                 );
                 this.siphonEffects.set(star.id, effect);
-                this.dependencies.addEvent(`${this.name} is siphoning mass from ${star.name}`);
+                this.dependencies.addEvent({
+                    message: `${this.name} is siphoning mass from ${star.name}`,
+                    notificationType: NotificationType.Info,
+                });
             }
 
             const distSafe = Math.max(dist, 1);
@@ -294,7 +298,10 @@ export class Pulsar extends Star implements IMassTransferBody {
                 this.siphonEffects.get(star.id)?.stopSpawning();
                 inRangeIds.delete(star.id);
                 if (depleted && !massGone) {
-                    this.dependencies.addEvent(`${star.name} siphoned into a brown dwarf remnant`);
+                    this.dependencies.addEvent({
+                        message: `${star.name} siphoned into a brown dwarf remnant`,
+                        notificationType: NotificationType.Alert,
+                    });
                 }
             }
         }
