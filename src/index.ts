@@ -5059,7 +5059,6 @@ flightControlsPanel.on('toggleView', () => {
     flightState.isCockpitView = !flightState.isCockpitView;
     flightControlsPanel.setViewState(flightState.isCockpitView);
 });
-flightControlsPanel.on('exitFlight', () => exitFlightMode());
 
 // Autopilot toggle from the flight controls panel (targets currently selected body)
 flightControlsPanel.on('autopilot', () => {

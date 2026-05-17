@@ -9,7 +9,7 @@ import { Panel } from './panel';
 export class FlightControlsPanel extends Panel {
     spawnBtn: HTMLButtonElement | null;
     toggleViewBtn: HTMLButtonElement | null;
-    exitBtn: HTMLButtonElement | null;
+
     autopilotBtn: HTMLButtonElement | null;
     btnClose: HTMLButtonElement | null;
 
@@ -17,7 +17,7 @@ export class FlightControlsPanel extends Panel {
         super(elementId);
         this.spawnBtn = null;
         this.toggleViewBtn = null;
-        this.exitBtn = null;
+
         this.autopilotBtn = null;
         this.btnClose = null;
     }
@@ -38,7 +38,7 @@ export class FlightControlsPanel extends Panel {
         this.toggleViewBtn = document.getElementById(
             'flightToggleViewBtn'
         ) as HTMLButtonElement | null;
-        this.exitBtn = document.getElementById('flightExitBtn') as HTMLButtonElement | null;
+
         this.autopilotBtn = document.getElementById(
             'flightAutopilotBtn'
         ) as HTMLButtonElement | null;
@@ -49,9 +49,7 @@ export class FlightControlsPanel extends Panel {
         if (this.toggleViewBtn) {
             this.toggleViewBtn.onclick = () => this.emit('toggleView');
         }
-        if (this.exitBtn) {
-            this.exitBtn.onclick = () => this.emit('exitFlight');
-        }
+
         if (this.autopilotBtn) {
             this.autopilotBtn.onclick = () => this.emit('autopilot', {});
         }
@@ -75,7 +73,6 @@ export class FlightControlsPanel extends Panel {
     setFlightActive(isActive: boolean) {
         if (this.spawnBtn) this.spawnBtn.disabled = isActive;
         if (this.toggleViewBtn) this.toggleViewBtn.disabled = !isActive;
-        if (this.exitBtn) this.exitBtn.disabled = !isActive;
     }
 
     setAutopilotState(isEngaged: boolean, isEnabled: boolean) {
