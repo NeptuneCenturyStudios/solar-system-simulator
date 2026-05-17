@@ -136,7 +136,13 @@ export class UIManager extends Panel {
 
         if (this.btnFlightControls) {
             this.btnFlightControls.onclick = () => {
-                this.flightControlsPanel.toggle();
+                const visible = this.flightControlsPanel.toggle();
+                if (visible) {
+                    this.btnFlightControls?.classList.add('active');
+                } else {
+                    this.btnFlightControls?.classList.remove('active');
+                }
+
                 // Update spawn button label to reflect whether there is a re-enterable ship
                 //updateFlightSpawnBtnLabel();
             };
@@ -151,6 +157,14 @@ export class UIManager extends Panel {
         // Listen to panel events to update button states
         this.mainPanel.on('closed', () => {
             this.btnOpenExplorer?.classList.remove('active');
+        });
+
+        this.managementPanel.on('closed', () => {
+            this.btnEditSolarSystem?.classList.remove('active');
+        });
+
+        this.flightControlsPanel.on('closed', () => {
+            this.btnFlightControls?.classList.remove('active');
         });
     }
 

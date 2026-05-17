@@ -11,6 +11,7 @@ export class FlightControlsPanel extends Panel {
     toggleViewBtn: HTMLButtonElement | null;
     exitBtn: HTMLButtonElement | null;
     autopilotBtn: HTMLButtonElement | null;
+    btnClose: HTMLButtonElement | null;
 
     constructor(elementId: string) {
         super(elementId);
@@ -18,9 +19,21 @@ export class FlightControlsPanel extends Panel {
         this.toggleViewBtn = null;
         this.exitBtn = null;
         this.autopilotBtn = null;
+        this.btnClose = null;
     }
 
     initialize() {
+        this.btnClose = document.getElementById(
+            'btn-close-flight-controls-panel'
+        ) as HTMLButtonElement | null;
+
+        if (this.btnClose) {
+            this.btnClose.onclick = () => {
+                this.toggle();
+                this.emit('closed');
+            };
+        }
+
         this.spawnBtn = document.getElementById('flightSpawnBtn') as HTMLButtonElement | null;
         this.toggleViewBtn = document.getElementById(
             'flightToggleViewBtn'

@@ -7,14 +7,27 @@ import { performanceSettings } from '../utilities/consts';
 export class PerformancePanel extends Panel {
     enableShadowsCheckbox: HTMLInputElement | null;
     enableParticleEffectsCheckbox: HTMLInputElement | null;
+    btnClose: HTMLButtonElement | null;
 
     constructor(elementId: string) {
         super(elementId);
         this.enableShadowsCheckbox = null;
         this.enableParticleEffectsCheckbox = null;
+        this.btnClose = null;
     }
 
     initialize() {
+        this.btnClose = document.getElementById(
+            'btn-close-performance-panel'
+        ) as HTMLButtonElement | null;
+
+        if (this.btnClose) {
+            this.btnClose.onclick = () => {
+                this.toggle();
+                this.emit('closed');
+            };
+        }
+
         this.enableShadowsCheckbox = document.getElementById(
             'enableShadows'
         ) as HTMLInputElement | null;

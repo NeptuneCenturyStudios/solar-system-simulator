@@ -5022,7 +5022,7 @@ function setF(id: string) {
 // --- UI PANEL INITIALIZATION ---
 
 // Create and initialize panels
-const uiManager = new UIManager('main-menu');
+const uiManager = new UIManager('ui-container');
 const startupModal = new StartupModal('startup-overlay');
 const aboutModal = new AboutModal('about-overlay', 'btn-about', 'aboutCloseBtn');
 const performancePanel = new PerformancePanel('performance-panel');
@@ -5042,8 +5042,17 @@ const flightControlsPanel = uiManager.flightControlsPanel;
 const performanceOptionsBtn = document.getElementById('btn-performance-options');
 if (performanceOptionsBtn) {
     performanceOptionsBtn.onclick = () => {
-        performancePanel.toggle();
+        const visible = performancePanel.toggle();
+        if (visible) {
+            performanceOptionsBtn.classList.add('active');
+        } else {
+            performanceOptionsBtn.classList.remove('active');
+        }
     };
+
+    performancePanel.on('closed', () => {
+        performanceOptionsBtn.classList.remove('active');
+    });
 }
 flightControlsPanel.on('spawnShip', () => spawnShip());
 flightControlsPanel.on('toggleView', () => {

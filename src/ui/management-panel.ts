@@ -29,6 +29,8 @@ interface CreateSliderInitState {
 export class ManagementPanel extends Panel {
     getFocusObject: () => Body | null;
 
+    btnClose: HTMLButtonElement | null;
+
     addBodyBtn: HTMLButtonElement | null;
     bodyCreationForm: HTMLElement | null;
     bodyTypeSelect: HTMLSelectElement | null;
@@ -118,6 +120,8 @@ export class ManagementPanel extends Panel {
 
         this.getFocusObject = function () { return null; };
 
+        this.btnClose = null;
+
         this.addBodyBtn = null;
         this.bodyCreationForm = null;
         this.bodyTypeSelect = null;
@@ -197,6 +201,17 @@ export class ManagementPanel extends Panel {
     }
 
     initialize(): void {
+        this.btnClose = document.getElementById(
+            'btn-close-management-panel'
+        ) as HTMLButtonElement | null;
+
+        if (this.btnClose) {
+            this.btnClose.onclick = () => {
+                this.toggle();
+                this.emit('closed');
+            };
+        }
+
         this.addBodyBtn = document.getElementById('addBodyBtn') as HTMLButtonElement | null;
         this.bodyCreationForm = document.getElementById('bodyCreationForm');
         this.bodyTypeSelect = document.getElementById('bodyType') as HTMLSelectElement | null;
