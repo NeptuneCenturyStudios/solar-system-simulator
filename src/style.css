@@ -14,6 +14,8 @@
     --new-ui-label-color: #00ffcc;
     --new-ui-panel-header-color: #00ffcc;
     --new-ui-shadow: 0 18px 50px rgba(0, 0, 0, 0.65), 0 0 22px rgba(0, 255, 204, 0.18);
+    --new-ui-button-bg: rgba(0, 68, 136, 0.6);
+    --new-ui-input-bg: rgba(0, 68, 136, 0.6);
     --new-ui-toolbar-button-shadow: 0 0 1rem rgba(78, 123, 168, 0.5);
     --new-ui-toolbar-button-hover-bg: rgba(27, 57, 87, 0.5);
     --new-ui-toolbar-button-active-bg: rgba(27, 57, 87, 0.5);
@@ -294,7 +296,7 @@ button.old-ui.btn-slider-reset {
 button.old-ui {
     width: 100%;
     padding: 8px 8px;
-    background: #00448899;
+    background: var(--new-ui-button-bg);
     color: white;
     border: 1px solid #2a547e;
     border-radius: var(--new-ui-table-border-radius);
@@ -421,7 +423,7 @@ button.old-ui.btn-danger:active {
 .text-input {
     width: 100%;
     padding: 10px 12px;
-    background: rgba(0, 68, 136, 0.5);
+    background: var(--new-ui-input-bg);
     color: white;
     border: 1px solid #224466;
     border-radius: 4px;
