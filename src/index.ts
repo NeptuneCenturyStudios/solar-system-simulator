@@ -5881,7 +5881,9 @@ function engageAutopilot(target: Body) {
             const tUnclamped = toOther.dot(segDir0) / segLen0; // roughly 0..1
             const t = Math.max(0, Math.min(1, tUnclamped));
 
-            const closest = shipPos0.clone().add(segDir0.multiplyScalar(t * segLen0));
+            const closest = shipPos0
+                .clone()
+                .add(segDir0.clone().multiplyScalar(t * segLen0));
             const d = new THREE.Vector3().subVectors(other.mesh.position, closest);
 
             const hitRadius = r + shipRadius0 + padding0;
