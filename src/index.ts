@@ -1077,6 +1077,8 @@ const AUTOPILOT_BRAKE_DONE_SPEED = 2 * SCALE_FACTOR;
 const AUTOPILOT_MAX_TIMESCALE = 50;
 /** Duration (seconds) to show the "Stable Orbit" HUD notification. */
 const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
+/** Duration (seconds) to show the "Autopilot blocked" HUD notification. */
+const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
 // AUTOPILOT_BOOST_THRESHOLD is declared after the FLIGHT_* constants it depends on.
 
 /** Rate at which cross-axis (gravity-accumulated) velocity decays while thrusting in simple mode.
@@ -1546,6 +1548,9 @@ createWarpSprite();
 // confirmation for AUTOPILOT_ORBIT_NOTIFY_DURATION seconds after completion.
 let orbitNotifySprite: THREE.Sprite | null = null;
 
+let autopilotBlockedNotifyTimer = 0;
+let autopilotBlockedByName = '';
+
 type AutopilotHudState =
     | 'APPROACH_WARP'
     | 'APPROACH_BOOST'
@@ -1553,6 +1558,7 @@ type AutopilotHudState =
     | 'BRAKE'
     | 'CIRCULARIZE'
     | 'ORBIT'
+    | 'BLOCKED'
     | 'NONE';
 let _lastAutopilotHudState: AutopilotHudState = 'NONE';
 
@@ -1604,6 +1610,11 @@ function createAutopilotPhaseTexture(
             text = '✓  STABLE ORBIT ESTABLISHED';
             color = '#7ef0ff';
             glow = 'rgba(100,220,255,0.9)';
+            break;
+        case 'BLOCKED':
+            text = '⚠ AUTOPILOT BLOCKED';
+            color = '#ff3344';
+            glow = 'rgba(255,51,68,0.9)';
             break;
         default:
             text = '';
@@ -4885,7 +4896,10 @@ function animate() {
             // Determine desired HUD state
             let desiredHud: AutopilotHudState = 'NONE';
             if (autopilotState.isActive) {
-                if (autopilotState.phase === 'WARP_CHARGING' || autopilotState.phase === 'WARP') {
+                if (
+                    autopilotState.phase === 'WARP_CHARGING' ||
+                    autopilotState.phase === 'WARP'
+                ) {
                     desiredHud = 'APPROACH_WARP';
                 } else if (autopilotState.phase === 'CIRCULARIZE') {
                     desiredHud = 'CIRCULARIZE';
@@ -4896,6 +4910,8 @@ function animate() {
                 } else {
                     desiredHud = 'APPROACH';
                 }
+            } else if (autopilotBlockedNotifyTimer > 0) {
+                desiredHud = 'BLOCKED';
             } else if (autopilotState.orbitNotifyTimer > 0) {
                 desiredHud = 'ORBIT';
             }
@@ -4906,9 +4922,13 @@ function animate() {
             } else {
                 orbitNotifySprite.visible = true;
 
-                // Build distance label whenever autopilot is active.
+                // Build label for the autopilot HUD sprite.
                 let distLabel = '';
-                if (autopilotState.isActive && autopilotState.targetBody?.mesh) {
+                if (desiredHud === 'BLOCKED') {
+                    distLabel = autopilotBlockedByName
+                        ? `Blocked by: ${autopilotBlockedByName}`
+                        : '';
+                } else if (autopilotState.isActive && autopilotState.targetBody?.mesh) {
                     const ship = flightState.knownShip;
                     if (ship?.mesh) {
                         const dist = ship.mesh.position.distanceTo(
@@ -4936,9 +4956,15 @@ function animate() {
                     _lastAutopilotHudState = desiredHud;
                 }
 
-                // Tick down the stable-orbit timer
+                // Tick down the autopilot HUD timers
                 if (desiredHud === 'ORBIT') {
                     autopilotState.orbitNotifyTimer -= (now - lastT) / 1000;
+                } else if (desiredHud === 'BLOCKED') {
+                    autopilotBlockedNotifyTimer -= (now - lastT) / 1000;
+                    if (autopilotBlockedNotifyTimer <= 0) {
+                        autopilotBlockedNotifyTimer = 0;
+                        autopilotBlockedByName = '';
+                    }
                 }
             }
         }
@@ -5896,6 +5922,9 @@ function engageAutopilot(target: Body) {
         }
 
         if (nearestObstruction) {
+            autopilotBlockedNotifyTimer = AUTOPILOT_BLOCKED_NOTIFY_DURATION;
+            autopilotBlockedByName = nearestObstruction.name || 'obstruction';
+
             addEvent(
                 `⚠ Autopilot blocked: ${nearestObstruction.name || 'obstruction'} is in the path to ${target.name || 'target'}.`
             );
