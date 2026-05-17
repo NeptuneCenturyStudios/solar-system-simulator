@@ -147,6 +147,11 @@ export class UIManager extends Panel {
                 this.emit('reset');
             };
         }
+
+        // Listen to panel events to update button states
+        this.mainPanel.on('closed', () => {
+            this.btnOpenExplorer?.classList.remove('active');
+        });
     }
 
     setPauseState(isPaused: boolean) {

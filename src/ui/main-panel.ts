@@ -26,11 +26,12 @@ export class MainPanel extends Panel {
 
     constructor(elementId: string) {
         super(elementId);
-
     }
 
     initialize() {
-        this.btnClose = document.getElementById('btn-close-system-explorer') as HTMLButtonElement | null;
+        this.btnClose = document.getElementById(
+            'btn-close-system-explorer'
+        ) as HTMLButtonElement | null;
         this.bodiesTableContainer = document.getElementById('bodiesTableContainer');
         this.targetBtn = document.getElementById('camTargetBtn') as HTMLButtonElement | null;
         this.lookAtBtn = document.getElementById('camLookAtBtn') as HTMLButtonElement | null;
@@ -42,7 +43,10 @@ export class MainPanel extends Panel {
         this.zoomOutBtn = document.getElementById('zoomOutBtn') as HTMLButtonElement | null;
 
         if (this.btnClose) {
-            this.btnClose.onclick = () => this.toggle();
+            this.btnClose.onclick = () => {
+                this.toggle();
+                this.emit('closed');
+            };
         }
 
         if (this.bodiesTableContainer) {
@@ -116,7 +120,6 @@ export class MainPanel extends Panel {
                 this.emit('substepsChange', { value: 64 });
             };
         }
-
     }
 
     updateTimeScaleDisplay(value: string) {
@@ -147,8 +150,6 @@ export class MainPanel extends Panel {
         }
         btn.appendChild(document.createTextNode(' ' + labelText));
     }
-
-    
 
     setFreeCameraState(isActive: boolean) {
         if (this.freeCameraBtn) {
