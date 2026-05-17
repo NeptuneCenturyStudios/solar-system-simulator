@@ -5849,6 +5849,57 @@ function engageAutopilot(target: Body) {
         ship.mesh && target.mesh ? ship.mesh.position.distanceTo(target.mesh.position) : Infinity;
     const startWithWarp = dist0 > AUTOPILOT_WARP_THRESHOLD;
     const orbitRadius0 = (target.radius ?? 10) * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
+
+    // ── Autopilot obstruction gate (compute once at engagement) ─────────────
+    // If something lies between the ship and the destination, block autopilot.
+    const ship0 = flightState.knownShip;
+    if (!ship0 || ship0._isDisposed || !ship0.mesh || !target.mesh) return;
+
+    const shipPos0 = ship0.mesh.position;
+    const targetPos0 = target.mesh.position;
+    const segVec0 = new THREE.Vector3().subVectors(targetPos0, shipPos0);
+    const segLen0 = segVec0.length();
+
+    if (segLen0 > 1e-6) {
+        const segDir0 = segVec0.clone().divideScalar(segLen0);
+
+        let nearestT01 = Infinity;
+        let nearestObstruction: Body | null = null;
+
+        const shipRadius0 = typeof ship0.radius === 'number' && isFinite(ship0.radius) ? ship0.radius : 0;
+        const padding0 = 0.5 * SCALE_FACTOR;
+
+        for (const other of simulationState.bodies) {
+            if (!other || other._isDisposed) continue;
+            if (other === ship0 || other === target) continue;
+            if (!other.mesh) continue;
+
+            const r = typeof other.radius === 'number' && isFinite(other.radius) ? other.radius : 0;
+
+            // Closest point on segment [0..1] to other.center
+            const toOther = new THREE.Vector3().subVectors(other.mesh.position, shipPos0);
+            const tUnclamped = toOther.dot(segDir0) / segLen0; // roughly 0..1
+            const t = Math.max(0, Math.min(1, tUnclamped));
+
+            const closest = shipPos0.clone().add(segDir0.multiplyScalar(t * segLen0));
+            const d = new THREE.Vector3().subVectors(other.mesh.position, closest);
+
+            const hitRadius = r + shipRadius0 + padding0;
+            if (d.lengthSq() <= hitRadius * hitRadius) {
+                if (t < nearestT01) {
+                    nearestT01 = t;
+                    nearestObstruction = other;
+                }
+            }
+        }
+
+        if (nearestObstruction) {
+            addEvent(
+                `⚠ Autopilot blocked: ${nearestObstruction.name || 'obstruction'} is in the path to ${target.name || 'target'}.`
+            );
+            return;
+        }
+    }
     // Skip APPROACH when the available braking room is shorter than the stopping distance
     // from full normal speed — e.g. Moon → Earth (110 u) where APPROACH would need ~1,200 u.
     const startInBrake = !startWithWarp && dist0 <= orbitRadius0 + AUTOPILOT_APPROACH_MIN_DISTANCE;
