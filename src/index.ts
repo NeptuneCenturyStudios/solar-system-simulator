@@ -868,7 +868,166 @@ controls.mouseButtons = {
 // TWO fingers: pinch/dolly zoom (no pan)
 controls.enablePan = false;
 controls.enableZoom = true;
+// Note: OrbitControls touch support seems unreliable on some mobile browsers.
+// We still set touches here, but we also add our own custom handlers below.
 controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
+
+// -------- Mobile touch controls (1-finger rotate, 2-finger pinch zoom) --------
+const domEl = renderer.domElement;
+
+function getTouchDist(t1: Touch, t2: Touch) {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy);
+}
+
+function applyOrbitRotationDelta(dx: number, dy: number) {
+    // Match existing mouse-look math:
+    // - Free camera: quaternion + clamp pitch
+    // - Normal orbit: spherical.theta/theta + clamp phi
+    // - LookAt: orbit around focus object (or center if none)
+    const rotSpeed = cameraState.rotationSpeed;
+
+    if (isFreeCameraMode) {
+        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        euler.setFromQuaternion(camera.quaternion);
+        euler.y -= dx * rotSpeed;
+        euler.x -= dy * rotSpeed;
+        euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
+        camera.quaternion.setFromEuler(euler);
+        return;
+    }
+
+    const spherical = new THREE.Spherical();
+
+    if (!cameraState.isLookAtMode) {
+        const target = NONE_FOCUS_POSITION.clone();
+        const offset = camera.position.clone().sub(target);
+        spherical.setFromVector3(offset);
+        spherical.theta -= dx * rotSpeed;
+        spherical.phi -= dy * rotSpeed;
+        spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+        offset.setFromSpherical(spherical);
+
+        camera.position.copy(target).add(offset);
+        camera.lookAt(target);
+        controls.target.copy(target);
+        return;
+    }
+
+    const focusObj = getFocusObject();
+    const target = (() => {
+        if (focusObj && simulationState.bodies.includes(focusObj) && !focusObj._isDisposed) {
+            return focusObj.mesh.position.clone();
+        }
+        return NONE_FOCUS_POSITION.clone();
+    })();
+
+    const offset = camera.position.clone().sub(target);
+    spherical.setFromVector3(offset);
+    spherical.theta -= dx * rotSpeed;
+    spherical.phi -= dy * rotSpeed;
+    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+    offset.setFromSpherical(spherical);
+
+    camera.position.copy(target).add(offset);
+    camera.lookAt(target);
+    controls.target.copy(target);
+}
+
+function isTouchOverUI(e: TouchEvent) {
+    const touch = e.touches?.[0] ?? e.changedTouches?.[0];
+    if (!touch) return false;
+
+    // Determine what is actually under the finger.
+    // This avoids blocking touches just because a fixed container overlaps the canvas.
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!(el instanceof Element)) return false;
+
+    // If the finger is on an actual interactive control, allow the click/tap to happen.
+    return Boolean(
+        el.closest('#startup-overlay, #about-overlay, .modal-overlay, .modal') ||
+            el.closest('.ui-panel') ||
+            el.closest('button, input, select, textarea, label, a') ||
+            el.closest('.toolbar-btn') ||
+            el.closest('.old-ui')
+    );
+}
+
+function onTouchStart(e: TouchEvent) {
+    if (flightState.isActive) return;
+    if (surfaceState.isActive) return;
+    if (modalBlocksInput()) return;
+    if (isTouchOverUI(e)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    interactionState.touchIgnoreUntil = Date.now() + 250;
+
+    const touches = e.touches;
+    if (touches.length === 1) {
+        interactionState.isTouchGestureActive = true;
+        interactionState.touchGestureMode = 'rotate';
+        interactionState.lastTouchX = touches[0].clientX;
+        interactionState.lastTouchY = touches[0].clientY;
+        interactionState.lastPinchDist = 0;
+    } else if (touches.length === 2) {
+        interactionState.isTouchGestureActive = true;
+        interactionState.touchGestureMode = 'pinch';
+        interactionState.lastPinchDist = getTouchDist(touches[0], touches[1]);
+    }
+}
+
+function onTouchMove(e: TouchEvent) {
+    if (flightState.isActive) return;
+    if (surfaceState.isActive) return;
+    if (!interactionState.isTouchGestureActive) return;
+    if (modalBlocksInput()) return;
+    if (isTouchOverUI(e)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const touches = e.touches;
+
+    if (interactionState.touchGestureMode === 'rotate' && touches.length === 1) {
+        const x = touches[0].clientX;
+        const y = touches[0].clientY;
+        const dx = x - interactionState.lastTouchX;
+        const dy = y - interactionState.lastTouchY;
+
+        interactionState.lastTouchX = x;
+        interactionState.lastTouchY = y;
+
+        if (dx !== 0 || dy !== 0) applyOrbitRotationDelta(dx, dy);
+    } else if (interactionState.touchGestureMode === 'pinch' && touches.length === 2) {
+        const dist = getTouchDist(touches[0], touches[1]);
+        const lastDist = interactionState.lastPinchDist || dist;
+
+        // Spread (dist increases) => zoom in => factor < 1
+        const ratio = dist / Math.max(1e-6, lastDist);
+        const factor = 1 / ratio;
+
+        // Keep jumps reasonable
+        const clamped = Math.max(0.75, Math.min(1.25, factor));
+        zoomRelativeToTarget(getZoomTarget(), clamped);
+
+        interactionState.lastPinchDist = dist;
+    }
+}
+
+function endTouch() {
+    interactionState.isTouchGestureActive = false;
+    interactionState.touchGestureMode = null;
+    interactionState.lastPinchDist = 0;
+    interactionState.touchIgnoreUntil = Date.now() + 350;
+}
+
+document.addEventListener('touchstart', onTouchStart, { passive: false });
+document.addEventListener('touchmove', onTouchMove, { passive: false });
+document.addEventListener('touchend', endTouch, { passive: true });
+document.addEventListener('touchcancel', endTouch, { passive: true });
 
 // Don't let OrbitControls listen to keyboard - we handle WASD ourselves
 
@@ -3339,6 +3498,9 @@ function toggleShadows(enabled: boolean) {
 }
 
 function onMouseDown(event: MouseEvent) {
+    // Ignore synthetic mouse events immediately after touch gestures.
+    if (Date.now() < interactionState.touchIgnoreUntil) return;
+
     // In flight mode: block all LMB interactions (selection, gizmo, velocity editing).
     // Only allow RMB (which just sets isMouseLookActive that flight mode ignores anyway).
     if (flightState.isActive && event.button !== 2) return;
@@ -3662,6 +3824,9 @@ function onMouseDown(event: MouseEvent) {
 }
 
 function onMouseMove(event: MouseEvent) {
+    // Ignore synthetic mouse events immediately after touch gestures.
+    if (Date.now() < interactionState.touchIgnoreUntil) return;
+
     // Flight mode: capture mouse movement as pointer offset for steering.
     // The pointer is locked during flight, so event.movementX/Y gives reliable deltas.
     if (flightState.isActive && document.pointerLockElement === renderer.domElement) {
@@ -3967,6 +4132,9 @@ function onMouseMove(event: MouseEvent) {
 }
 
 function onMouseUp(event: MouseEvent) {
+    // Ignore synthetic mouse events immediately after touch gestures.
+    if (Date.now() < interactionState.touchIgnoreUntil) return;
+
     // Middle mouse button release
     if (event.button === 1) {
         isMiddleMouseVelocity = false;
