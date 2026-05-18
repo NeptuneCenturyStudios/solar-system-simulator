@@ -99,7 +99,7 @@ import {
     randomMoonParams,
     randomCometParams,
 } from './utilities/body-params';
-import { loadSrgbTexture, fictionalTextures } from './drawing/textures';
+import { loadSrgbTexture, fictionalTextures, fictionalVolcanicTexture } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { WarpEffect } from './effects/warp-effect';
@@ -107,6 +107,7 @@ import { triggerScreenFlash } from './effects/screen-flash';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
 import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
+import { Planet } from './bodies/planet';
 import { Mercury } from './bodies/mercury';
 import { Venus } from './bodies/venus';
 import { Earth } from './bodies/earth';
@@ -872,9 +873,7 @@ controls.enableZoom = true;
 // We still set touches here, but we also add our own custom handlers below.
 controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
 
-// -------- Mobile touch controls (1-finger rotate, 2-finger pinch zoom) --------
-const domEl = renderer.domElement;
-
+ // -------- Mobile touch controls (1-finger rotate, 2-finger pinch zoom) --------
 function getTouchDist(t1: Touch, t2: Touch) {
     const dx = t1.clientX - t2.clientX;
     const dy = t1.clientY - t2.clientY;
@@ -2813,17 +2812,17 @@ function createNewBody(
             inclination
         );
 
-        const resolvedPlanetType = (planetType || 'solid') as 'solid' | 'gas_giant' | 'ice_giant';
+        const resolvedPlanetType = (planetType || 'solid') as 'solid' | 'gas_giant' | 'ice_giant' | 'volcanic';
         const {
             mass: planetMass,
             radius: planetRadius,
             rotationSpeed: planetRotationSpeed,
-            bodyType: customPlanetBodyType,
+            bodySubtype: planetBodySubtype,
         } = randomPlanetParams(resolvedPlanetType, { mass: customMass, radius: customRadius });
 
         const isGasGiant = resolvedPlanetType === 'gas_giant';
         const isIceGiant = resolvedPlanetType === 'ice_giant';
-        const isSolidPlanet = !isGasGiant && !isIceGiant;
+        const isSolidPlanet = resolvedPlanetType === 'solid' || resolvedPlanetType === 'volcanic';
 
         const planetTexturePool = isGasGiant
             ? fictionalGasTextures
@@ -2831,9 +2830,12 @@ function createNewBody(
               ? fictionalIceTextures
               : fictionalTextures;
 
+        const planetTexture =
+            resolvedPlanetType === 'volcanic' ? fictionalVolcanicTexture : pickRandom(planetTexturePool);
+
         const geometry = new THREE.SphereGeometry(planetRadius, 32, 32);
         const planetMaterial = new THREE.MeshStandardMaterial({
-            map: pickRandom(planetTexturePool),
+            map: planetTexture,
             color: 0xffffff, // keep texture untinted
             emissive: 0x000000,
             emissiveIntensity: 0,
@@ -2842,25 +2844,22 @@ function createNewBody(
         });
         const mesh = new THREE.Mesh(geometry, planetMaterial);
 
-        newBody = new CelestialBody(
-            dependencies,
-            scene,
-            planetRadius,
-            0xffffff,
-            spawnPos,
-            spawnVel,
-            planetMass,
-            createUniqueId('planet'),
-            generateIAUName(customPlanetBodyType),
-            customPlanetBodyType,
-            0x888888,
-            3000,
-            false,
-            { tilt: 0, speed: planetRotationSpeed },
-            mesh
-        );
+        newBody = new Planet(dependencies, scene, {
+            radius: planetRadius,
+            pos: spawnPos,
+            vel: spawnVel,
+            mass: planetMass,
+            id: createUniqueId('planet'),
+            name: generateIAUName(BodyTypeEnum.Planet),
+            bodySubtype: planetBodySubtype,
+            trailColor: 0x888888,
+            maxTrail: 3000,
+            hasRings: false,
+            rotation: { tilt: 0, speed: planetRotationSpeed },
+            mesh,
+        });
 
-        // Optional atmosphere/cloud layer (checkbox-driven for custom solid planets only)
+        // Optional atmosphere/cloud layer (checkbox-driven for custom solid + volcanic planets)
         if (hasAtmosphere && isSolidPlanet) {
             const cloudsMat = new THREE.MeshStandardMaterial({
                 map: pickRandom(fictionalAtmosphereTextures),

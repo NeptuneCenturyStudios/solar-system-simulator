@@ -110,49 +110,59 @@ export interface PlanetParams {
     mass: number;
     radius: number;
     rotationSpeed: number;
+    /**
+     * Always BodyTypeEnum.Planet for custom planets.
+     * (Gas/ice/volcanic are expressed via `bodySubtype`.)
+     */
     bodyType: BodyTypeEnum;
-    bodySubtype?: PlanetTypeEnum;
+    bodySubtype: PlanetTypeEnum;
 }
 
 /**
  * Returns randomised (or override-applied) params for a new custom planet.
- * `planetType` drives the mass/radius ranges and the returned `bodyType` flag.
+ * `planetType` drives the mass/radius ranges and the returned `bodySubtype` flag.
+ *
+ * IMPORTANT: `bodyType` is always BodyTypeEnum.Planet. Gas/ice/volcanic are represented
+ * by `bodySubtype`.
  */
 export function randomPlanetParams(
-    planetType: 'solid' | 'gas_giant' | 'ice_giant' = 'solid',
+    planetType: 'solid' | 'gas_giant' | 'ice_giant' | 'volcanic' = 'solid',
     opts: { mass?: number | null; radius?: number | null } = {}
 ): PlanetParams {
     const isGasGiant = planetType === 'gas_giant';
-    const isIceGiant = planetType === 'ice_giant';
-    const isSolid = !isGasGiant && !isIceGiant;
+    const isSolidLike = planetType === 'solid' || planetType === 'volcanic';
 
     const radius =
         typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
             ? opts.radius
-            : isSolid
+            : isSolidLike
               ? 5 + Math.random() * 10
               : 18 + Math.random() * 24;
 
     const mass =
         typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0
             ? opts.mass
-            : isSolid
+            : isSolidLike
               ? 50 + Math.random() * 500
               : isGasGiant
                 ? 4000 + Math.random() * 26000
                 : 1200 + Math.random() * 7000;
 
-    const bodyType = isGasGiant
-        ? BodyTypeEnum.GasGiant
-        : isIceGiant
-          ? BodyTypeEnum.IceGiant
-          : BodyTypeEnum.Planet;
+    const bodySubtype: PlanetTypeEnum =
+        planetType === 'gas_giant'
+            ? PlanetTypeEnum.GasGiant
+            : planetType === 'ice_giant'
+              ? PlanetTypeEnum.IceGiant
+              : planetType === 'volcanic'
+                ? PlanetTypeEnum.Volcanic
+                : PlanetTypeEnum.Terrestrial;
 
     return {
         mass,
         radius,
         rotationSpeed: 0.1 + Math.random() * 0.4,
-        bodyType,
+        bodyType: BodyTypeEnum.Planet,
+        bodySubtype,
     };
 }
 

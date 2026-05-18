@@ -518,38 +518,14 @@
                                 />
                             </div>
 
-                            <div class="radio-group" id="planetTypeGroup" style="display: none">
-                                <label>Planet Type:</label>
-                                <div class="radio-options">
-                                    <div class="radio-option">
-                                        <input
-                                            type="radio"
-                                            id="planetTypeSolid"
-                                            name="planetType"
-                                            value="solid"
-                                            checked
-                                        />
-                                        <label for="planetTypeSolid">Solid</label>
-                                    </div>
-                                    <div class="radio-option">
-                                        <input
-                                            type="radio"
-                                            id="planetTypeGasGiant"
-                                            name="planetType"
-                                            value="gas_giant"
-                                        />
-                                        <label for="planetTypeGasGiant">Gas Giant</label>
-                                    </div>
-                                    <div class="radio-option">
-                                        <input
-                                            type="radio"
-                                            id="planetTypeIceGiant"
-                                            name="planetType"
-                                            value="ice_giant"
-                                        />
-                                        <label for="planetTypeIceGiant">Ice Giant</label>
-                                    </div>
-                                </div>
+                            <div class="control-group" id="planetTypeGroup" style="display: none">
+                                <label for="planetTypeSelect">Planet Type:</label>
+                                <select id="planetTypeSelect">
+                                    <option value="solid" selected>Solid</option>
+                                    <option value="gas_giant">Gas Giant</option>
+                                    <option value="ice_giant">Ice Giant</option>
+                                    <option value="volcanic">Volcanic</option>
+                                </select>
                             </div>
 
                             <label class="checkbox-row" id="hasAtmosphereRow" style="display: none">

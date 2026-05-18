@@ -538,7 +538,9 @@ export class ManagementPanel extends Panel {
 
                 const planetType = this.getSelectedPlanetType();
                 const canHaveAtmosphere =
-                    bodyType === 'moon' || (bodyType === 'planet' && planetType === 'solid');
+                    bodyType === 'moon' ||
+                    (bodyType === 'planet' &&
+                        (planetType === 'solid' || planetType === 'volcanic'));
                 if (this.hasAtmosphereRow)
                     this.hasAtmosphereRow.style.display = canHaveAtmosphere ? 'flex' : 'none';
                 if (this.hasAtmosphereCheckbox && !canHaveAtmosphere)
@@ -596,10 +598,13 @@ export class ManagementPanel extends Panel {
             };
         }
 
-        const planetTypeRadios = document.querySelectorAll('input[name="planetType"]');
-        planetTypeRadios.forEach((radio) => {
-            radio.addEventListener('change', () => updateAddModeVisibility());
-        });
+        const planetTypeSelect = document.getElementById(
+            'planetTypeSelect'
+        ) as HTMLSelectElement | null;
+
+        if (planetTypeSelect) {
+            planetTypeSelect.addEventListener('change', () => updateAddModeVisibility());
+        }
 
         if (this.createMassInput && this.createMassDisplay) {
             const createMassInput = this.createMassInput;
@@ -1022,6 +1027,18 @@ export class ManagementPanel extends Panel {
         }
 
         if (type === 'planet') {
+            // Randomize the planet subtype dropdown first so mass/radius correspond.
+            const planetTypeSelect = document.getElementById(
+                'planetTypeSelect'
+            ) as HTMLSelectElement | null;
+
+            const planetTypes = ['solid', 'gas_giant', 'ice_giant', 'volcanic'] as const;
+            if (planetTypeSelect && planetTypeSelect.options.length > 0) {
+                const randomSubtype =
+                    planetTypes[Math.floor(Math.random() * planetTypes.length)];
+                planetTypeSelect.value = randomSubtype;
+            }
+
             const planetType = this.getSelectedPlanetType();
 
             let massMin: number;
@@ -1029,6 +1046,7 @@ export class ManagementPanel extends Panel {
             let radiusMin: number;
             let radiusMax: number;
 
+            // Volcanic uses the same mass/radius ranges as solid-like terrestrial.
             if (planetType === 'gas_giant') {
                 massMin = JUPITER_MASS;
                 massMax = JUPITER_MASS * 1.8;
@@ -1204,17 +1222,20 @@ export class ManagementPanel extends Panel {
     }
 
     getSelectedPlanetType(): string {
-        const solidRadio = document.getElementById('planetTypeSolid') as HTMLInputElement | null;
-        const gasGiantRadio = document.getElementById(
-            'planetTypeGasGiant'
-        ) as HTMLInputElement | null;
-        const iceGiantRadio = document.getElementById(
-            'planetTypeIceGiant'
-        ) as HTMLInputElement | null;
+        const planetTypeSelect = document.getElementById(
+            'planetTypeSelect'
+        ) as HTMLSelectElement | null;
 
-        if (gasGiantRadio && gasGiantRadio.checked) return 'gas_giant';
-        if (iceGiantRadio && iceGiantRadio.checked) return 'ice_giant';
-        if (solidRadio && solidRadio.checked) return 'solid';
+        const value = planetTypeSelect?.value;
+        if (
+            value === 'solid' ||
+            value === 'gas_giant' ||
+            value === 'ice_giant' ||
+            value === 'volcanic'
+        ) {
+            return value;
+        }
+
         return 'solid';
     }
 
