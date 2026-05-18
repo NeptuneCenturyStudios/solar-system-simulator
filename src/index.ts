@@ -855,11 +855,21 @@ controls.update();
 controls.enableDamping = true;
 // Disable OrbitControls mouse bindings; we handle camera rotation ourselves (RMB mouse-look).
 // Keep MMB disabled (used for velocity edit in our custom handlers).
+// Disable OrbitControls mouse bindings; we handle camera rotation ourselves (RMB mouse-look).
+// Touch gestures will still use OrbitControls' built-in handlers.
 controls.mouseButtons = {
     LEFT: null,
     MIDDLE: null,
     RIGHT: null,
 };
+
+// Touch gestures (mobile)
+// ONE finger: rotate camera
+// TWO fingers: pinch/dolly zoom (no pan)
+controls.enablePan = false;
+controls.enableZoom = true;
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
+
 // Don't let OrbitControls listen to keyboard - we handle WASD ourselves
 
 const raycaster = new THREE.Raycaster();
@@ -885,6 +895,16 @@ const interactionState = {
     // Drag tracking for repositioning
     dragStartIntersection: null as THREE.Vector3 | null,
     dragStartPosition: null as THREE.Vector3 | null,
+
+    // Touch camera gesture state (mobile)
+    isTouchGestureActive: false,
+    touchGestureMode: null as 'rotate' | 'pinch' | null,
+    lastTouchX: 0,
+    lastTouchY: 0,
+    lastPinchDist: 0,
+
+    // Mobile: ignore the synthetic mouse events browsers often emit right after touch.
+    touchIgnoreUntil: 0,
 };
 
 const cameraState = {
