@@ -20,7 +20,7 @@
     --new-ui-toolbar-button-hover-bg: rgba(27, 57, 87, 0.5);
     --new-ui-toolbar-button-active-bg: rgba(27, 57, 87, 0.5);
     --new-ui-toolbar-button-translate: translateY(-2px);
-    --new-ui-toolbar-button-border-radius: 0.5rem; 
+    --new-ui-toolbar-button-border-radius: 0.5rem;
     --new-ui-toolbar-button-pulse-bg: rgba(34, 68, 102, 1);
     --new-ui-toolbar-button-pulse-shadow: 0 0 1rem rgba(100, 157, 214, 0.5);
     --new-ui-table-border-radius: 0.5rem;
@@ -88,9 +88,8 @@ body {
     display: block;
 }
 
-/* --- Startup / Reset modal overlay --- */
-.modal-overlay,
-#startup-overlay {
+/* --- Modals --- */
+.modal-overlay {
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -102,13 +101,11 @@ body {
     pointer-events: auto;
 }
 
-.modal-overlay.visible,
-#startup-overlay.visible {
+.modal-overlay.visible {
     display: flex;
 }
 
-.modal,
-#startup-modal {
+.modal {
     width: 360px;
     max-width: calc(100vw - 40px);
     background: var(--new-ui-bg);
@@ -117,6 +114,54 @@ body {
     border: 1px solid var(--new-ui-border);
     box-shadow: var(--new-ui-shadow);
     pointer-events: auto;
+}
+
+.modal-header {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #00ffcc;
+    text-align: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--new-ui-border);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.modal-body {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 14px;
+
+    line-height: 1.5;
+    color: #fff;
+}
+
+.modal-body a {
+    color: #7dd3fc;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(125, 211, 252, 0.35);
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease,
+        text-shadow 0.2s ease;
+}
+
+.modal-body a:hover {
+    color: #d9f3ff;
+    border-bottom-color: #d9f3ff;
+    text-shadow: 0 0 10px rgba(125, 211, 252, 0.35);
+}
+
+.modal-body a:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 3px;
+    border-bottom-color: transparent;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
 }
 
 /* --- Bodies table (below Camera section) --- */
@@ -244,7 +289,7 @@ label {
 
 .panel-header {
     display: flex;
-    align-items: center ;
+    align-items: center;
     font-size: 1.5em;
     font-weight: bold;
     color: #00ffcc;
@@ -514,65 +559,6 @@ button.btn-with-icon {
     gap: 8px;
 }
 
-.modal {
-    width: 360px;
-    max-width: calc(100vw - 40px);
-    background: var(--new-ui-bg);
-    padding: 18px;
-    border-radius: var(--new-ui-border-radius);
-    border: 1px solid var(--new-ui-border);
-    box-shadow: var(--new-ui-shadow);
-    pointer-events: auto;
-}
-
-.modal__header {
-    font-size: 1.5em;
-    font-weight: bold;
-    color: #00ffcc;
-    text-align: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--new-ui-border);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.modal__body {
-    display: grid;
-    gap: 10px;
-    margin-bottom: 14px;
-
-    line-height: 1.5;
-    color: #fff;
-}
-
-.modal__body a {
-    color: #7dd3fc;
-    text-decoration: none;
-    border-bottom: 1px solid rgba(125, 211, 252, 0.35);
-    transition:
-        color 0.2s ease,
-        border-color 0.2s ease,
-        text-shadow 0.2s ease;
-}
-
-.modal__body a:hover {
-    color: #d9f3ff;
-    border-bottom-color: #d9f3ff;
-    text-shadow: 0 0 10px rgba(125, 211, 252, 0.35);
-}
-
-.modal__body a:focus-visible {
-    outline: 2px solid #7dd3fc;
-    outline-offset: 3px;
-    border-bottom-color: transparent;
-}
-
-.modal__actions {
-    display: flex;
-    justify-content: flex-end;
-}
-
 .new-ui.toolbar-container {
     position: fixed;
     left: 0;
@@ -641,7 +627,7 @@ button.btn.toolbar-btn:focus-visible {
     background: var(--new-ui-toolbar-button-hover-bg);
     border: 1px solid var(--new-ui-border);
     color: var(--new-ui-color);
-    transform: var(--new-ui-toolbar-button-translate);;
+    transform: var(--new-ui-toolbar-button-translate);
     box-shadow: var(--new-ui-toolbar-button-shadow);
     outline: none;
 }
@@ -660,7 +646,7 @@ button.btn.toolbar-btn.active {
 }
 
 button.btn.toolbar-btn.active:hover {
-    transform: var(--new-ui-toolbar-button-translate);;
+    transform: var(--new-ui-toolbar-button-translate);
 }
 
 button.btn.toolbar-btn.btn-warning {
