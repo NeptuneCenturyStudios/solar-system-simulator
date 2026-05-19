@@ -540,7 +540,11 @@ export class ManagementPanel extends Panel {
                 const canHaveAtmosphere =
                     bodyType === 'moon' ||
                     (bodyType === 'planet' &&
-                        (planetType === 'solid' || planetType === 'volcanic'));
+                        (planetType === 'solid' ||
+                            planetType === 'volcanic' ||
+                            planetType === 'ocean' ||
+                            planetType === 'frozen' ||
+                            planetType === 'desert'));
                 if (this.hasAtmosphereRow)
                     this.hasAtmosphereRow.style.display = canHaveAtmosphere ? 'flex' : 'none';
                 if (this.hasAtmosphereCheckbox && !canHaveAtmosphere)
@@ -1032,7 +1036,15 @@ export class ManagementPanel extends Panel {
                 'planetTypeSelect'
             ) as HTMLSelectElement | null;
 
-            const planetTypes = ['solid', 'gas_giant', 'ice_giant', 'volcanic'] as const;
+            const planetTypes = [
+                'solid',
+                'gas_giant',
+                'ice_giant',
+                'volcanic',
+                'ocean',
+                'frozen',
+                'desert',
+            ] as const;
             if (planetTypeSelect && planetTypeSelect.options.length > 0) {
                 const randomSubtype =
                     planetTypes[Math.floor(Math.random() * planetTypes.length)];
@@ -1231,7 +1243,10 @@ export class ManagementPanel extends Panel {
             value === 'solid' ||
             value === 'gas_giant' ||
             value === 'ice_giant' ||
-            value === 'volcanic'
+            value === 'volcanic' ||
+            value === 'ocean' ||
+            value === 'frozen' ||
+            value === 'desert'
         ) {
             return value;
         }

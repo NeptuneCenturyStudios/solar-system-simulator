@@ -126,11 +126,23 @@ export interface PlanetParams {
  * by `bodySubtype`.
  */
 export function randomPlanetParams(
-    planetType: 'solid' | 'gas_giant' | 'ice_giant' | 'volcanic' = 'solid',
+    planetType:
+        | 'solid'
+        | 'gas_giant'
+        | 'ice_giant'
+        | 'volcanic'
+        | 'ocean'
+        | 'frozen'
+        | 'desert' = 'solid',
     opts: { mass?: number | null; radius?: number | null } = {}
 ): PlanetParams {
     const isGasGiant = planetType === 'gas_giant';
-    const isSolidLike = planetType === 'solid' || planetType === 'volcanic';
+    const isSolidLike =
+        planetType === 'solid' ||
+        planetType === 'volcanic' ||
+        planetType === 'ocean' ||
+        planetType === 'frozen' ||
+        planetType === 'desert';
 
     const radius =
         typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
@@ -155,7 +167,13 @@ export function randomPlanetParams(
               ? PlanetTypeEnum.IceGiant
               : planetType === 'volcanic'
                 ? PlanetTypeEnum.Volcanic
-                : PlanetTypeEnum.Terrestrial;
+                : planetType === 'ocean'
+                  ? PlanetTypeEnum.Ocean
+                  : planetType === 'frozen'
+                    ? PlanetTypeEnum.Frozen
+                    : planetType === 'desert'
+                      ? PlanetTypeEnum.Desert
+                      : PlanetTypeEnum.Terrestrial;
 
     return {
         mass,

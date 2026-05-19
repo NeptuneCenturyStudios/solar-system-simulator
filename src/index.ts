@@ -99,7 +99,14 @@ import {
     randomMoonParams,
     randomCometParams,
 } from './utilities/body-params';
-import { loadSrgbTexture, fictionalTextures, fictionalVolcanicTexture } from './drawing/textures';
+import {
+    loadSrgbTexture,
+    fictionalTextures,
+    fictionalVolcanicTexture,
+    fictionalFrozenTexture,
+    fictionalOceanTexture,
+    fictionalDesertTexture,
+} from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { WarpEffect } from './effects/warp-effect';
@@ -2812,7 +2819,14 @@ function createNewBody(
             inclination
         );
 
-        const resolvedPlanetType = (planetType || 'solid') as 'solid' | 'gas_giant' | 'ice_giant' | 'volcanic';
+        const resolvedPlanetType = (planetType || 'solid') as
+            | 'solid'
+            | 'gas_giant'
+            | 'ice_giant'
+            | 'volcanic'
+            | 'ocean'
+            | 'desert'
+            | 'frozen';
         const {
             mass: planetMass,
             radius: planetRadius,
@@ -2822,7 +2836,12 @@ function createNewBody(
 
         const isGasGiant = resolvedPlanetType === 'gas_giant';
         const isIceGiant = resolvedPlanetType === 'ice_giant';
-        const isSolidPlanet = resolvedPlanetType === 'solid' || resolvedPlanetType === 'volcanic';
+        const isSolidPlanet =
+            resolvedPlanetType === 'solid' ||
+            resolvedPlanetType === 'volcanic' ||
+            resolvedPlanetType === 'ocean' ||
+            resolvedPlanetType === 'desert' ||
+            resolvedPlanetType === 'frozen';
 
         const planetTexturePool = isGasGiant
             ? fictionalGasTextures
@@ -2830,8 +2849,16 @@ function createNewBody(
               ? fictionalIceTextures
               : fictionalTextures;
 
-        const planetTexture =
-            resolvedPlanetType === 'volcanic' ? fictionalVolcanicTexture : pickRandom(planetTexturePool);
+            const planetTexture =
+                resolvedPlanetType === 'volcanic'
+                    ? fictionalVolcanicTexture
+                    : resolvedPlanetType === 'ocean'
+                      ? fictionalOceanTexture
+                      : resolvedPlanetType === 'desert'
+                        ? fictionalDesertTexture
+                        : resolvedPlanetType === 'frozen'
+                          ? fictionalFrozenTexture
+                          : pickRandom(planetTexturePool);
 
         const geometry = new THREE.SphereGeometry(planetRadius, 32, 32);
         const planetMaterial = new THREE.MeshStandardMaterial({
@@ -2871,12 +2898,23 @@ function createNewBody(
                 metalness: 0.0,
             });
 
-            const cloudsGeo = new THREE.SphereGeometry(newBody.radius * 1.03, 32, 32);
-            newBody.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
-            newBody.clouds.renderOrder = 2;
+            const cloudsRadius =
+                Number.isFinite(newBody.radius) && newBody.radius > 0
+                    ? newBody.radius * 1.03
+                    : null;
+
+            if (cloudsRadius !== null) {
+                const cloudsGeo = new THREE.SphereGeometry(cloudsRadius, 32, 32);
+                newBody.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
+                newBody.clouds.renderOrder = 2;
+            } else {
+                newBody.clouds = null;
+            }
             // Make cloud sphere selectable (raycaster maps back to owning body)
-            newBody.clouds.userData = { parentBody: newBody };
-            newBody.mesh.add(newBody.clouds);
+            if (newBody.clouds) {
+                newBody.clouds.userData = { parentBody: newBody };
+                newBody.mesh.add(newBody.clouds);
+            }
             newBody.cloudRotationSpeed = 0.12 + Math.random() * 0.12;
         }
 
