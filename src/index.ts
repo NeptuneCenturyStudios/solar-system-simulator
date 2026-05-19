@@ -64,6 +64,20 @@ import {
     HYGIEA_DISTANCE,
     HYGIEA_RADIUS,
     SimulationStartMode,
+
+    // HUD / sim constants moved from index.ts
+    BASE_FRAME_DT,
+    CROSSHAIR_SIZE,
+    VEL_SCALE,
+    VEL_ARC_SEGMENTS,
+    VEL_ARC_COLOR,
+    VEL_ARC_OPACITY,
+    VEL_ARC_ACTIVE_OPACITY,
+    VEL_ARC_LINEWIDTH_PX,
+    VEL_ARC_TIP_RADIUS_MIN,
+    VEL_ARC_TIP_RADIUS_MAX,
+
+    // Flight thrust constants still imported for other derived logic
     FLIGHT_THRUST_ACCEL,
     FLIGHT_THRUST_DECEL,
     FLIGHT_BOOST_DECEL,
@@ -75,6 +89,39 @@ import {
     WARP_FULL_VIS_DIST,
     WARP_SHAKE_MAG,
     FLIGHT_BOOST_ACCEL,
+
+    // Flight feel constants moved from index.ts
+    FLIGHT_PERP_DECAY,
+    FLIGHT_MAX_POINTER_OFFSET,
+    FLIGHT_MAX_TURN_RATE,
+    FLIGHT_ROLL_SPEED,
+    FLIGHT_ROLL_ACCEL,
+    FLIGHT_ROLL_FRICTION,
+    FLIGHT_STEER_SMOOTHING,
+    FLIGHT_STEER_DEADZONE,
+    FLIGHT_WARP_CHARGE_TIME,
+    FLIGHT_MAX_BANK_ANGLE,
+    FLIGHT_MAX_BANK_PITCH,
+    FLIGHT_BANK_LERP_RATE,
+
+    // Autopilot tuning constants moved from index.ts
+    AUTOPILOT_APPROACH_SPEED,
+    AUTOPILOT_ACCEL,
+    AUTOPILOT_DECEL,
+    AUTOPILOT_BOOST_DECEL,
+    AUTOPILOT_CIRCULARIZE_RATE,
+    AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN,
+    AUTOPILOT_BRAKE_PAD,
+    AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
+    AUTOPILOT_BRAKE_DONE_SPEED,
+    AUTOPILOT_MAX_TIMESCALE,
+    AUTOPILOT_ORBIT_NOTIFY_DURATION,
+    AUTOPILOT_BLOCKED_NOTIFY_DURATION,
+    AUTOPILOT_WARP_DECEL,
+    AUTOPILOT_APPROACH_MIN_DISTANCE,
+    AUTOPILOT_BRAKE_ARC_DIST,
+    AUTOPILOT_WARP_THRESHOLD,
+
     TIME_SCALE,
     SUN_RADIUS,
     DIST_SCALE,
@@ -807,7 +854,6 @@ uiScene.add(flightSteeringLine);
 
 // Small static crosshair at the projected aim point (visible even when offset is zero).
 // Four vertices: left–right and top–bottom arm pairs for a + shape.
-const CROSSHAIR_SIZE = 10; // half-arm length in screen pixels
 const crosshairPositions = new Float32Array([
     -CROSSHAIR_SIZE,
     0,
@@ -1171,99 +1217,6 @@ const autopilotState: IAutopilotState = {
     brakeEntryDistance: 0,
 };
 
-// Autopilot tuning constants
-const AUTOPILOT_APPROACH_SPEED = FLIGHT_MAX_SPEED; // u/s
-/** Thrust acceleration used by autopilot during approach (u/s²). */
-const AUTOPILOT_ACCEL = FLIGHT_THRUST_ACCEL;
-/** Braking deceleration — moderate so the stop feels gradual rather than jarring. */
-const AUTOPILOT_DECEL = FLIGHT_THRUST_DECEL;
-/** High deceleration rate used to scrub boost speed quickly during approach.
- *  AUTOPILOT_DECEL alone would take 99,000 u to shed boost speed — BOOST_DECEL
- *  brings that down to a reasonable ~4,000 u. */
-const AUTOPILOT_BOOST_DECEL = FLIGHT_BOOST_DECEL;
-/** Orbit-insertion rate — gentler than AUTOPILOT_DECEL so the turn into orbit is
- *  visually smooth rather than a sharp snap.  Lower = longer arc, higher = snappier. */
-const AUTOPILOT_CIRCULARIZE_RATE = 1.1 * SCALE_FACTOR;
-/** Safety multiplier for the physics-derived minimum circularize rate.  Near massive bodies
- *  (like the Sun) gravity is strong enough to swallow the ship before it builds orbital
- *  velocity at the aesthetic rate above.  This factor scales a gravity-derived floor:
- *  effectiveRate = max(CIRCULARIZE_RATE, GRAVITY_MARGIN × v_orbit × sqrt(g / altitude))
- *  Raise to give more headroom; lower to allow a more gradual arc near large bodies. */
-const AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN = 4 * SCALE_FACTOR;
-/** Safety pad multiplier on brake distance. Higher = start braking earlier / more gradually.
- *  Must be ≥ 1.5 for the smoothstep blend controller to be able to track the desired
- *  deceleration profile: the blend's peak rate is 0.75×V²/S which must not exceed DECEL.
- *  Solving: BRAKE_PAD ≥ 1.5.  2.0 gives a ~25% margin over that theoretical minimum. */
-const AUTOPILOT_BRAKE_PAD = 2.0;
-/** Target orbit altitude expressed as a multiple of the target body's radius.
- *  1.5 = tight low orbit just above the surface (moon-like proximity). */
-const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 1.5;
-/** Relative-speed threshold at which BRAKE hands off to CIRCULARIZE (u/s). */
-const AUTOPILOT_BRAKE_DONE_SPEED = 2 * SCALE_FACTOR;
-/** Maximum timeScale at which autopilot may engage. Above this it refuses with a warning. */
-const AUTOPILOT_MAX_TIMESCALE = 50;
-/** Duration (seconds) to show the "Stable Orbit" HUD notification. */
-const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
-/** Duration (seconds) to show the "Autopilot blocked" HUD notification. */
-const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
-// AUTOPILOT_BOOST_THRESHOLD is declared after the FLIGHT_* constants it depends on.
-
-/** Rate at which cross-axis (gravity-accumulated) velocity decays while thrusting in simple mode.
- *  Higher = quicker normalisation. At 1.5 the perpendicular component halves in ~0.46 s. */
-const FLIGHT_PERP_DECAY = 0.5; // per second
-const FLIGHT_MAX_POINTER_OFFSET = 260; // pixels before reaching full turn rate
-const FLIGHT_MAX_TURN_RATE = 0.6; // radians/s at full pointer deflection
-const FLIGHT_ROLL_SPEED = 2.0; // max roll angular velocity (rad/s)
-const FLIGHT_ROLL_ACCEL = 0.4; // how fast roll ramps up (rad/s²) — lower = slower start
-const FLIGHT_ROLL_FRICTION = 0.4; // how fast roll decays when key released (rad/s²)
-const FLIGHT_STEER_SMOOTHING = 0.004; // lerp factor per frame — lower = heavier feel
-const FLIGHT_STEER_DEADZONE = 0.05; // normalised dead zone (0–1); input below this is zeroed
-const FLIGHT_WARP_CHARGE_TIME = 2.0; // seconds to hold Space before warp engages
-
-/** Maximum visual roll of ship relative to camera at full lateral mouse deflection (rad ~20°). */
-const FLIGHT_MAX_BANK_ANGLE = 0.35;
-/** Maximum visual pitch of ship relative to camera at full vertical mouse deflection (rad ~11.5°). */
-const FLIGHT_MAX_BANK_PITCH = 0.2;
-/** Per-frame lerp factor for banking animation. Higher = snappier return to neutral. */
-const FLIGHT_BANK_LERP_RATE = 0.08;
-
-/** Distance (u) above which autopilot switches to boost speed for faster transit.
- *  Computed as 1.5× the two-phase stopping distance: first shed boost speed at
- *  AUTOPILOT_BOOST_DECEL, then shed normal speed at AUTOPILOT_DECEL.  This
- *  guarantees the ship always has enough runway to fully brake before the orbit. */
-const AUTOPILOT_BOOST_THRESHOLD =
-    1.5 *
-    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
-        AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
-        (2 * AUTOPILOT_BOOST_DECEL) +
-        (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL));
-/** Deceleration rate used to scrub warp speed during autopilot approach.
- *  Matches FLIGHT_WARP_DECEL so the feel is consistent with manual warp decel. */
-const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
-/** Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop.
- *  When the gap between the ship and orbitRadius is shorter than this, autopilot skips
- *  APPROACH and enters BRAKE directly so the ship doesn't arrive with too much speed.
- *  Uses (APPROACH_SPEED + BRAKE_DONE_SPEED)² so the span is sized for the maximum speed
- *  the ship can carry into BRAKE (the controller's hysteresis lets it run up to that sum
- *  before decelerating), preventing a crash when FLIGHT_MAX_SPEED is very small. */
-const AUTOPILOT_APPROACH_MIN_DISTANCE =
-    AUTOPILOT_BRAKE_PAD *
-    (((AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) *
-        (AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED)) /
-        (2 * AUTOPILOT_DECEL));
-/** Target arc length (u) for the BRAKE blend.  The ship begins its orbit-insertion blend
- *  this far from the orbit radius so the spiral-in is long enough to see smoothly.  When
- *  the physics stopping distance is already larger (e.g. after warp/boost), physics wins.
- *  Sized as AUTOPILOT_APPROACH_SPEED × 10 s ≈ 10 seconds of travel at approach speed. */
-const AUTOPILOT_BRAKE_ARC_DIST = AUTOPILOT_APPROACH_SPEED * 10;
-/** Distance (u) above which autopilot engages warp for fast transit.
- *  Computed as 1.5× the stopping distance from warp speed down to boost speed,
- *  plus AUTOPILOT_BOOST_THRESHOLD (the runway still needed once warp ends). */
-const AUTOPILOT_WARP_THRESHOLD =
-    1.5 *
-        ((FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
-            (2 * AUTOPILOT_WARP_DECEL)) +
-    AUTOPILOT_BOOST_THRESHOLD;
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
@@ -1298,11 +1251,11 @@ const dependencies: IStateDependencies = {
     getG: () => G * simulationState.gMultiplier,
 };
 
-const VEL_SCALE = 546; // The multiplier used to visualize speed as arrow length (scaled)
 
-// --- Shared tuning constants ---
+
+/** Shared tuning constants. */
 const SIM = Object.freeze({
-    BASE_FRAME_DT: 0.016, // seconds (approx 60fps)
+    BASE_FRAME_DT,
 });
 
 // Physics accuracy: adjustable substeps per frame (16–128, default 64)
@@ -1310,16 +1263,10 @@ let stepsPerFrame = 64;
 
 // --- Velocity editing arc helpers ---
 // NOTE: We use Line2 (fat lines) because LineBasicMaterial.linewidth is ignored on most WebGL platforms.
-const VEL_ARC_SEGMENTS = 64;
-const VEL_ARC_COLOR = 0x00ff00;
-const VEL_ARC_OPACITY = 0.25;
-const VEL_ARC_ACTIVE_OPACITY = 0.35;
-const VEL_ARC_LINEWIDTH_PX = 22;
-
+// (VEL_ARC_* constants moved to utilities/consts.ts)
+//
 // Arc is centered on the VELOCITY TIP (not the body), and its radius is based on body radius.
 // This creates a "mouse path preview" near where the tip will sweep as you drag.
-const VEL_ARC_TIP_RADIUS_MIN = 80;
-const VEL_ARC_TIP_RADIUS_MAX = 1200;
 
 // Small "preview" arc shown near the velocity handle, not a full circle.
 function createArcLine(segments = VEL_ARC_SEGMENTS, color = VEL_ARC_COLOR) {

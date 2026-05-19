@@ -228,3 +228,95 @@ export const MAX_NEUTRON_STAR_MASS = SUN_MASS * 3;
 export const MIN_BLACK_HOLE_MASS = SUN_MASS * 3;
 export const GIZMO_TUNING = Object.freeze({ VELOCITY_ARROW_SCALE: 50 });
 export const GRAV_ARROW_SCALE = 15000;
+
+// === UI / HUD (canvas + helper geometry) ===
+/** FPS sprite + other HUD assets use tuned scale; keep consistent with index.ts. */
+export const CROSSHAIR_SIZE = 10; // half-arm length in screen pixels
+
+// Velocity HUD tuning
+export const VEL_SCALE = 546; // visual speed-to-arrow scaling (used for velocity normalization/snap)
+export const VEL_ARC_SEGMENTS = 64;
+export const VEL_ARC_COLOR = 0x00ff00;
+export const VEL_ARC_OPACITY = 0.25;
+export const VEL_ARC_ACTIVE_OPACITY = 0.35;
+export const VEL_ARC_LINEWIDTH_PX = 22;
+export const VEL_ARC_TIP_RADIUS_MIN = 80;
+export const VEL_ARC_TIP_RADIUS_MAX = 1200;
+
+// === Simulation / integration timing ===
+/** Base frame dt used for physics integration (approx 60fps). */
+export const BASE_FRAME_DT = 0.016;
+
+// === Flight feel + steering tuning (used by index.ts runtime logic) ===
+export const FLIGHT_PERP_DECAY = 0.5; // per second
+export const FLIGHT_MAX_POINTER_OFFSET = 260; // pixels before reaching full turn rate
+export const FLIGHT_MAX_TURN_RATE = 0.6; // radians/s at full pointer deflection
+export const FLIGHT_ROLL_SPEED = 2.0; // max roll angular velocity (rad/s)
+export const FLIGHT_ROLL_ACCEL = 0.4; // how fast roll ramps up (rad/s²)
+export const FLIGHT_ROLL_FRICTION = 0.4; // how fast roll decays when key released (rad/s²)
+export const FLIGHT_STEER_SMOOTHING = 0.004; // lerp factor per frame — lower = heavier feel
+export const FLIGHT_STEER_DEADZONE = 0.05; // normalised dead zone (0–1)
+export const FLIGHT_WARP_CHARGE_TIME = 2.0; // seconds to hold Space before warp engages
+
+export const FLIGHT_MAX_BANK_ANGLE = 0.35; // max visual roll angle (rad)
+export const FLIGHT_MAX_BANK_PITCH = 0.2; // max visual pitch angle (rad)
+export const FLIGHT_BANK_LERP_RATE = 0.08; // per-frame lerp factor for banking animation
+
+// === Autopilot tuning constants (derived from flight tuning) ===
+// u/s
+export const AUTOPILOT_APPROACH_SPEED = FLIGHT_MAX_SPEED;
+
+/** Thrust acceleration used by autopilot during approach (u/s²). */
+export const AUTOPILOT_ACCEL = FLIGHT_THRUST_ACCEL;
+/** Braking deceleration — moderate so the stop feels gradual rather than jarring. */
+export const AUTOPILOT_DECEL = FLIGHT_THRUST_DECEL;
+/** High deceleration rate used to scrub boost speed quickly during approach. */
+export const AUTOPILOT_BOOST_DECEL = FLIGHT_BOOST_DECEL;
+
+/** Orbit-insertion rate — gentler than AUTOPILOT_DECEL so the turn into orbit is smooth. */
+export const AUTOPILOT_CIRCULARIZE_RATE = 1.1 * SCALE_FACTOR;
+/** Gravity-derived floor multiplier for circularize velocity rotation rate. */
+export const AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN = 4 * SCALE_FACTOR;
+
+/** Safety pad multiplier on brake distance. Must be ≥ 1.5 for smoothstep blend tracking. */
+export const AUTOPILOT_BRAKE_PAD = 2.0;
+
+/** Target orbit altitude expressed as a multiple of the target body's radius. */
+export const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 1.5;
+
+/** Relative-speed threshold at which BRAKE hands off to CIRCULARIZE (u/s). */
+export const AUTOPILOT_BRAKE_DONE_SPEED = 2 * SCALE_FACTOR;
+
+/** Maximum timeScale at which autopilot may engage. Above this it refuses with a warning. */
+export const AUTOPILOT_MAX_TIMESCALE = 50;
+/** Duration (seconds) to show the "Stable Orbit" HUD notification. */
+export const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
+/** Duration (seconds) to show the "Autopilot blocked" HUD notification. */
+export const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
+
+/** Threshold distance for switching from boost to normal approach decel. */
+export const AUTOPILOT_BOOST_THRESHOLD =
+    1.5 *
+    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
+        (2 * AUTOPILOT_BOOST_DECEL) +
+        (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL));
+
+/** Deceleration rate used to scrub warp speed during autopilot approach. */
+export const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
+
+/** Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop. */
+export const AUTOPILOT_APPROACH_MIN_DISTANCE =
+    AUTOPILOT_BRAKE_PAD *
+    (((AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) *
+        (AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED)) /
+        (2 * AUTOPILOT_DECEL));
+
+/** Target arc length (u) for the BRAKE blend. */
+export const AUTOPILOT_BRAKE_ARC_DIST = AUTOPILOT_APPROACH_SPEED * 10;
+
+/** Distance (u) above which autopilot engages warp for fast transit. */
+export const AUTOPILOT_WARP_THRESHOLD =
+    1.5 *
+        ((FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
+            (2 * AUTOPILOT_WARP_DECEL)) +
+    AUTOPILOT_BOOST_THRESHOLD;
