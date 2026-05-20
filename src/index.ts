@@ -2184,10 +2184,12 @@ function createNewBody(
             mass: newStarMass,
             radius: newStarRadius,
             temperature: newStarTemp,
+            lightIntensity: newStarLightIntensity,
         } = randomStarParams({
             mass: customMass,
             radius: customRadius,
             temperature: customTemperature,
+            lightIntensity: customLightIntensity,
         });
 
         newBody = new MainSequenceStar(dependencies, scene, {
@@ -2208,22 +2210,11 @@ function createNewBody(
             id: createUniqueId('star'),
             name: generateIAUName(BodyTypeEnum.Star, null, simulationState.bodies),
             temperature: newStarTemp,
-            lightIntensity:
-                typeof customLightIntensity === 'number' && isFinite(customLightIntensity)
-                    ? customLightIntensity
-                    : 500000000,
+            lightIntensity: newStarLightIntensity,
             lightDistance: 524400,
             rotation: { tilt: 0, speed: 0.08 },
             mesh: undefined, // use default star material/mesh
         });
-
-        if (typeof customLightIntensity === 'number' && isFinite(customLightIntensity)) {
-            try {
-                newBody.setLightIntensity(customLightIntensity);
-            } catch (e) {
-                console.error('Error applying custom star light intensity:', e);
-            }
-        }
     } else if (bodyType === 'planet') {
         // Create a new planet near the camera with appropriate orbital velocity
         const planetParentBody =
@@ -2609,7 +2600,7 @@ function spawn({
 
     // Procedural mode seed plumbing (for now: only log + keep the system empty).
     if (mode === SimulationStartMode.Procedural) {
-        generator = new ProceduralGenerator(seed);
+        generator = new ProceduralGenerator(seed, dependencies, scene);
     }
 
     // Unified cleanup: always dispose existing bodies (stars included).
@@ -2675,7 +2666,12 @@ function spawn({
         simulationState.bodies = [blackHole];
 
         // Randomised star
-        const { mass: starMass, radius: starRadius, temperature: starTemp } = randomStarParams();
+        const {
+            mass: starMass,
+            radius: starRadius,
+            temperature: starTemp,
+            lightIntensity: starLightIntensity,
+        } = randomStarParams();
 
         // Orbit: 50/50 circular vs elliptical
         const isElliptical = Math.random() < 0.5;
@@ -2709,7 +2705,7 @@ function spawn({
             id: createUniqueId('star'),
             name: generateIAUName(BodyTypeEnum.Star, null, simulationState.bodies),
             temperature: starTemp,
-            lightIntensity: 500000000,
+            lightIntensity: starLightIntensity,
             lightDistance: 524400,
             rotation: { tilt: 0, speed: 0.08 },
             mesh: undefined, // use default star material/mesh
@@ -2725,7 +2721,10 @@ function spawn({
     }
 
     if (mode === SimulationStartMode.Procedural) {
-        generator?.generateSolarSystem();
+        const bodies = generator?.generateSolarSystem() ?? [];
+        simulationState.bodies = bodies;
+        syncAllStarLightTargets();
+        selectedBody = null;
         return;
     }
 
