@@ -38,7 +38,7 @@ function xmur3(str: string) {
  * different types of random values based on a single seed instance.
  */
 export class SeededRandom {
-    private rng: () => number;
+    rng: () => number;
 
     constructor(seedString: string) {
         // Generate a 32-bit integer from the string

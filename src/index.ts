@@ -293,6 +293,8 @@ uiCamera.position.z = 10;
 import Noty from 'noty';
 import 'noty/lib/noty.css';
 import { createFPSTexture, createSpeedTexture, createStatsTexture } from './drawing/text-rendering';
+import { SolarSystemGenerator } from './procedural/solar-system-generator';
+import { ProceduralGenerator } from './procedural/procedural-generator';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: { message: string; notificationType: NotificationType }) {
@@ -2577,7 +2579,10 @@ function createNewBody(
 
 function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     // Only touches background visuals + management checkboxes (if already initialized).
-    const hideKuiper = mode === SimulationStartMode.Empty || mode === SimulationStartMode.BlackHole;
+    const hideKuiper =
+        mode === SimulationStartMode.Empty ||
+        mode === SimulationStartMode.BlackHole ||
+        mode === SimulationStartMode.Procedural;
 
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = !hideKuiper;
@@ -2589,8 +2594,23 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     }
 }
 
-function spawn({ mode = SimulationStartMode.Default } = {}) {
+function spawn({
+    mode = SimulationStartMode.Default,
+    seed,
+}: {
+    mode?: SimulationStartMode;
+    seed?: string;
+} = {}) {
+
+    // Store the generator used to create the solar system. For now, it will be for procedural generation only.
+    let generator: SolarSystemGenerator | null = null;
+
     applyEnvironmentDefaultsForMode(mode);
+
+    // Procedural mode seed plumbing (for now: only log + keep the system empty).
+    if (mode === SimulationStartMode.Procedural) {
+        generator = new ProceduralGenerator(seed);
+    }
 
     // Unified cleanup: always dispose existing bodies (stars included).
     // No special-casing is required here; Star.die(true) is already the canonical disposal path.
@@ -2634,7 +2654,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
         console.error('Error dispatching bodies:reset event:', e);
     }
 
-    // Empty mode: starfield only (no bodies)
+    // Empty / procedural mode: starfield only (no bodies)
     if (mode === SimulationStartMode.Empty) {
         selectedBody = null;
         return;
@@ -2701,6 +2721,11 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
 
         const shadowCheckbox = document.getElementById('enableShadows') as HTMLInputElement;
         toggleShadows(shadowCheckbox ? shadowCheckbox.checked : true);
+        return;
+    }
+
+    if (mode === SimulationStartMode.Procedural) {
+        generator?.generateSolarSystem();
         return;
     }
 
@@ -7202,6 +7227,19 @@ startupModal.on('launchBlackHole', () => {
     applyDefaultCameraTogglesAfterSpawn();
 });
 
+startupModal.on('generateProcedural', ({ seed }: { seed: string }) => {
+    uiManager.managementPanel.hide();
+
+    // Ensure both launch overlays are closed before spawning the new simulation.
+    startupModal.hide();
+    // If the procedural modal is visible, hide it too via direct DOM class toggle.
+    const proceduralOverlay = document.getElementById('procedural-overlay');
+    proceduralOverlay?.classList.remove('visible');
+
+    spawn({ mode: SimulationStartMode.Procedural, seed });
+    applyDefaultCameraTogglesAfterSpawn();
+});
+
 startupModal.on('cancel', () => {
     startupModal.hide();
 });
@@ -7212,7 +7250,7 @@ const _origOnMouseMove = onMouseMove;
 const _origOnMouseUp = onMouseUp;
 
 function modalBlocksInput() {
-    return startupModal.isVisible();
+    return startupModal.isVisible() || startupModal.isProceduralVisible();
 }
 
 function onMouseDownWrapped(e: MouseEvent) {

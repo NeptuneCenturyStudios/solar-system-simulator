@@ -24,6 +24,13 @@
                     <span class="material-symbols-outlined">build</span>
                     BUILD YOUR OWN SYSTEM
                 </button>
+                <button
+                    id="startupLaunchGenerateBtn"
+                    class="old-ui btn-with-icon"
+                >
+                    <span class="material-symbols-outlined">auto_fix_high</span>
+                    GENERATE
+                </button>
                 <button id="startupLaunchBlackHoleBtn" class="old-ui btn-dark btn-with-icon">
                     <span class="material-symbols-outlined">brightness_1</span>
                     BLACK HOLE
@@ -36,6 +43,46 @@
                     <span class="material-symbols-outlined">close</span>
                     CANCEL
                 </button>
+        </div>
+        </div>
+
+        <div
+            id="procedural-overlay"
+            class="modal-overlay"
+            aria-modal="true"
+            role="dialog"
+        >
+            <div id="procedural-modal" class="modal">
+                <div class="modal-header">Generate Procedural System</div>
+
+                <div class="modal-body">
+                    <label for="proceduralSeedInput">Seed (optional)</label>
+                    <input
+                        id="proceduralSeedInput"
+                        type="text"
+                        class="text-input"
+                        placeholder="Leave blank for random seed"
+                    />
+                </div>
+
+                <div class="modal-actions">
+                    <button
+                        id="proceduralCreateBtn"
+                        class="old-ui btn-with-icon"
+                    >
+                        <span class="material-symbols-outlined">auto_fix_high</span>
+                        CREATE
+                    </button>
+
+                    <button
+                        id="proceduralCancelBtn"
+                        class="old-ui btn-with-icon btn-danger"
+                    >
+                        <span class="material-symbols-outlined">cancel</span>
+                        CANCEL
+                    </button>
+
+                </div>
             </div>
         </div>
 

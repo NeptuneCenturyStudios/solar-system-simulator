@@ -12,6 +12,7 @@ export enum SimulationStartMode {
     Default = 0,
     Empty = 1,
     BlackHole = 2,
+    Procedural = 3,
 }
 
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===
