@@ -9,6 +9,8 @@ declare global {
     interface WindowEventMap {
         'body:added': CustomEvent<{ body: Body; id: string; name: string }>;
         'body:removed': CustomEvent<{ body: Body; id: string; name: string }>;
+        'body:dead': CustomEvent<{ body: Body; id: string; name: string }>;
+        'body:absorbed': CustomEvent<{ message: string; notificationType: NotificationType }>;
         'body:selected': CustomEvent<{ body: Body; id: string; name: string }>;
         'body:deselected': CustomEvent<{ body: Body; id: string; name: string }>;
         'camera:focusChanged': CustomEvent<{
@@ -19,7 +21,9 @@ declare global {
     }
 
     interface Event {
-        detail?: { body: Body; id: string; name: string };
+        // Allow different CustomEvent detail payload shapes across the app
+        // (e.g. body:* and our new body:absorbed notification).
+        detail?: unknown;
     }
 
     interface Window {
@@ -121,7 +125,6 @@ import {
     AUTOPILOT_APPROACH_MIN_DISTANCE,
     AUTOPILOT_BRAKE_ARC_DIST,
     AUTOPILOT_WARP_THRESHOLD,
-
     TIME_SCALE,
     SUN_RADIUS,
     DIST_SCALE,
@@ -137,8 +140,10 @@ import {
     createUniqueId,
     BodyTypeEnum,
     createSatellite,
+    generateIAUName,
+    getBodyTypeLabel,
 } from './utilities/utilities';
-import { calculateTrajectory, IAutopilotState, updateSimulation } from './physics/physics';
+import { absorbBody, calculateTrajectory, chooseCollisionWinner, IAutopilotState, setBodyRadius, updateSimulation } from './physics/physics';
 import {
     randomStarParams,
     randomBlackHoleParams,
@@ -232,529 +237,8 @@ window.addEventListener('beforeunload', (e) => {
     return ''; // Some browsers use the return value
 });
 
-// calculateStarRadius is imported from './utilities/body-params.js'
-
-/**
- * Set the visual radius for any body. Delegates to the body's setRadius method.
- * @param {object} body - The celestial body to update
- * @param {number} newRadius - The new radius to set
- */
-function setBodyRadius(body: CelestialBody, newRadius: number) {
-    if (!body) return;
-
-    // Hard cap to prevent extreme “fills the screen” glitches.
-    // Target: allow stars to grow to roughly Kuiper-belt scale, but never beyond.
-    //
-    // Kuiper belt generation uses:
-    //   r = NEPTUNE_DIST + rand * (PLUTO_DIST - NEPTUNE_DIST + 300000)
-    // So the outer edge is roughly PLUTO_DIST + 300000.
-    const MAX_RADIUS = PLUTO_DIST + 300000;
-    newRadius = Math.min(newRadius, MAX_RADIUS);
-
-    body.setRadius(newRadius);
-}
-
-function collisionScoreEscapeVelocity(body: Body) {
-    // Winner heuristic: compare escape velocity (constants cancel):
-    //   v_esc = sqrt(2GM/R)  => ordering is equivalent to M/R
-    const m = Math.max(0, body?.mass || 0);
-    const r = Math.max(
-        1e-6,
-        typeof body?.radius === 'number' && isFinite(body.radius) && body.radius > 0
-            ? body.radius
-            : 0
-    );
-
-    return m / r;
-}
-
-function chooseCollisionWinner(b1: Body, b2: Body) {
-    // Spaceships always lose — they should never absorb anything.
-    if (b1 instanceof Spaceship) return { winner: b2, victim: b1 };
-    if (b2 instanceof Spaceship) return { winner: b1, victim: b2 };
-
-    const s1 = collisionScoreEscapeVelocity(b1);
-    const s2 = collisionScoreEscapeVelocity(b2);
-
-    if (s1 > s2) return { winner: b1, victim: b2 };
-    if (s2 > s1) return { winner: b2, victim: b1 };
-
-    // Stable-ish tie breakers (avoid random flip-flops on exact ties)
-    const m1 = Math.max(0, b1?.mass || 0);
-    const m2 = Math.max(0, b2?.mass || 0);
-    if (m1 > m2) return { winner: b1, victim: b2 };
-    if (m2 > m1) return { winner: b2, victim: b1 };
-
-    const n1 = String(b1?.name || '');
-    const n2 = String(b2?.name || '');
-    if (n1 >= n2) return { winner: b1, victim: b2 };
-    return { winner: b2, victim: b1 };
-}
-
-function absorbBody(winner: Body, victim: Body) {
-    if (!winner || !victim) return;
-    if (winner._isDisposed || victim._isDisposed) return;
-    if (winner._isDisposed || victim._isDisposed) return;
-
-    const mw = Math.max(0, winner.mass || 0);
-    const mv = Math.max(0, victim.mass || 0);
-    const newMass = mw + mv;
-    if (newMass <= 0) return;
-
-    // Momentum conservation
-    const vW = winner.velocity?.clone?.() || new THREE.Vector3();
-    const vV = victim.velocity?.clone?.() || new THREE.Vector3();
-    const mergedVel = vW.multiplyScalar(mw).add(vV.multiplyScalar(mv)).divideScalar(newMass);
-    if (winner.velocity) winner.velocity.copy(mergedVel);
-
-    // Mass
-    winner.mass = newMass;
-
-    // Stars: transfer remaining fuel + capacity (when fuel system is active)
-    if (
-        winner instanceof MainSequenceStar &&
-        victim instanceof MainSequenceStar &&
-        winner.fuel !== null &&
-        victim.fuel !== null
-    ) {
-        winner.fuel += victim.fuel;
-        if (winner.maxFuel !== null && victim.maxFuel !== null) {
-            winner.maxFuel += victim.maxFuel;
-        }
-    }
-
-    // Radius:
-    // - Default: volume add => cbrt(r1^3 + r2^3)
-    // - Black holes: radius is derived from mass compression, not added "raw volume".
-    if (winner instanceof BlackHole) {
-        const compressed = BlackHole.massToEventHorizonRadius(newMass);
-        setBodyRadius(winner, compressed);
-        // Flood the accretion disk — a whole star's worth of material disrupted at once.
-        winner.seedAccretionDisk(400);
-    } else if (winner instanceof CelestialBody && victim instanceof CelestialBody) {
-        const rw = Math.max(0.0001, winner.radius || 0.0001);
-        const rv = Math.max(0.0001, victim.radius || 0.0001);
-        const newRadius = Math.cbrt(rw * rw * rw + rv * rv * rv);
-        setBodyRadius(winner, newRadius);
-    }
-
-    // Inform the user
-    try {
-        addEvent?.({
-            message: `${winner.name} absorbed ${victim.name}`,
-            notificationType: NotificationType.Alert,
-        });
-    } catch (e) {
-        console.error('Error dispatching body:added event:', e);
-    }
-}
-
-// --- IAU-style Random Naming Convention ---
-// Generates science-style provisional/catalog names for new bodies
-function generateIAUName(type: BodyTypeEnum, parentBody: Body | null = null) {
-    const year = new Date().getFullYear();
-
-    // Letter set excluding 'I' to mimic IAU conventions
-    const letters = 'ABCDEFGHJKLMNOPQRSTUVWXYZ';
-    function randLetter() {
-        return letters.charAt(Math.floor(Math.random() * letters.length));
-    }
-
-    function randNumber(max = 99) {
-        return Math.floor(1 + Math.random() * max);
-    }
-
-    function provisional() {
-        // Year + two-letter code + optional sequence number
-        const a = randLetter();
-        const b = randLetter();
-        const seq = Math.random() < 0.25 ? randNumber(9) : ''; // occasional sub-number
-        return `${year} ${a}${b}${seq}`;
-    }
-
-    function cometDesignation() {
-        // Simple comet-like designation: C/YYYY Xn
-        const a = randLetter();
-        const n = randNumber(9);
-        return `C/${year} ${a}${n}`;
-    }
-
-    function hdCatalog() {
-        // Henry Draper-like catalog number
-        const num = Math.floor(100000 + Math.random() * 900000);
-        return `HD ${num}`;
-    }
-
-    function asteroidDesignation() {
-        return provisional();
-    }
-
-    function planetDesignation() {
-        return provisional();
-    }
-
-    function moonName(parent: Body | null) {
-        if (!parent) return `Moon ${provisional()}`;
-        // Count existing moons that start with parent name (simple heuristic)
-        const existing = simulationState.bodies.filter(
-            (b) => b.name && b.name.startsWith(parent.name + ' ')
-        ).length;
-        const roman = toRoman(existing + 1);
-        return `${parent.name} ${roman}`;
-    }
-
-    // Convert integer to Roman numerals (1..3999)
-    function toRoman(num: number): string {
-        if (!num || num <= 0) return 'I';
-        const romans = [
-            [1000, 'M'],
-            [900, 'CM'],
-            [500, 'D'],
-            [400, 'CD'],
-            [100, 'C'],
-            [90, 'XC'],
-            [50, 'L'],
-            [40, 'XL'],
-            [10, 'X'],
-            [9, 'IX'],
-            [5, 'V'],
-            [4, 'IV'],
-            [1, 'I'],
-        ];
-        let n = num;
-        let result = '';
-        for (const [val, sym] of romans) {
-            while (n >= (val as number)) {
-                result += sym;
-                n -= val as number;
-            }
-        }
-        return result;
-    }
-
-    switch (type) {
-        case BodyTypeEnum.Star:
-            return hdCatalog();
-        case BodyTypeEnum.Planet:
-            return planetDesignation();
-        case BodyTypeEnum.Asteroid:
-            return asteroidDesignation();
-        case BodyTypeEnum.Comet:
-            return cometDesignation();
-        case BodyTypeEnum.Moon:
-            return moonName(parentBody);
-        default:
-            return provisional();
-    }
-}
-
-// Function to create/update FPS counter texture
-function createFPSTexture(fps: number) {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) return null;
-
-    // Set canvas size
-    canvas.width = 256;
-    canvas.height = 64;
-
-    // Setup text style (monospace for numbers)
-    context.font = '27px monospace';
-    context.fillStyle = '#00ffcc';
-    context.textAlign = 'right';
-    context.textBaseline = 'middle';
-
-    // Add glow effect
-    context.shadowColor = 'rgba(0, 255, 204, 0.8)';
-    context.shadowBlur = 8;
-
-    // Draw text
-    context.fillText(`FPS: ${fps}`, canvas.width - 10, canvas.height / 2);
-
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-
-    return texture;
-}
-
-// Flight speed HUD texture — drawn in the same style as the FPS counter
-function createSpeedTexture(
-    speed: number,
-    isBoosting: boolean,
-    pos?: THREE.Vector3,
-    vel?: THREE.Vector3,
-    isWarp = false
-) {
-    const hasExtra = !!(pos && vel);
-    // Canvas is sized so that sprite scale = canvas × 0.625 matches the FPS counter pixel density.
-    // 640×640 canvas → 400×400 sprite pixels on screen.
-    const W = 640;
-    const H = hasExtra ? 640 : 200;
-    const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    const color = isWarp ? '#ff4488' : isBoosting ? '#ff9944' : '#00ffcc';
-    const glow = isWarp
-        ? 'rgba(255,68,136,0.9)'
-        : isBoosting
-          ? 'rgba(255,153,68,0.85)'
-          : 'rgba(0,255,204,0.85)';
-    const dim = 'rgba(0,255,204,0.5)';
-
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-
-    // ── Speed ─────────────────────────────────────────────────────────────────
-    ctx.fillStyle = color;
-    ctx.shadowColor = glow;
-    ctx.shadowBlur = 12;
-    ctx.font = '36px monospace';
-    ctx.fillText(isWarp ? 'WARP' : isBoosting ? 'BOOST' : 'SPEED', W - 24, hasExtra ? 44 : 56);
-
-    ctx.shadowBlur = 28;
-    ctx.font = 'bold 68px monospace';
-    ctx.fillText(Math.abs(speed).toFixed(1), W - 24, hasExtra ? 120 : 140);
-
-    if (hasExtra) {
-        const lh = 56; // canvas-pixel line height for data rows
-
-        // ── Position ──────────────────────────────────────────────────────────
-        let y = 194;
-        ctx.shadowBlur = 8;
-        ctx.font = '32px monospace';
-        ctx.fillStyle = dim;
-        ctx.shadowColor = dim;
-        ctx.fillText('POSITION', W - 24, y);
-        y += lh;
-
-        ctx.shadowBlur = 16;
-        ctx.font = '34px monospace';
-        ctx.fillStyle = color;
-        ctx.shadowColor = glow;
-        ctx.fillText(`X  ${pos!.x.toFixed(1)}`, W - 24, y);
-        y += lh;
-        ctx.fillText(`Y  ${pos!.y.toFixed(1)}`, W - 24, y);
-        y += lh;
-        ctx.fillText(`Z  ${pos!.z.toFixed(1)}`, W - 24, y);
-        y += lh + 12;
-
-        // ── Velocity ──────────────────────────────────────────────────────────
-        ctx.shadowBlur = 8;
-        ctx.font = '32px monospace';
-        ctx.fillStyle = dim;
-        ctx.shadowColor = dim;
-        ctx.fillText('VELOCITY', W - 24, y);
-        y += lh;
-
-        ctx.shadowBlur = 16;
-        ctx.font = '34px monospace';
-        ctx.fillStyle = color;
-        ctx.shadowColor = glow;
-        ctx.fillText(`X  ${vel!.x.toFixed(2)}`, W - 24, y);
-        y += lh;
-        ctx.fillText(`Y  ${vel!.y.toFixed(2)}`, W - 24, y);
-        y += lh;
-        ctx.fillText(`Z  ${vel!.z.toFixed(2)}`, W - 24, y);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    return texture;
-}
-
 // Function to create/update body stats texture
-function createStatsTexture(body: Body, bodiesArray = [] as Body[]) {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) return null;
 
-    // Set canvas size
-    canvas.width = 700;
-    // Increased height to fit Planet Type stat if needed
-    canvas.height = 700;
-
-    // Setup text style
-    context.fillStyle = '#aaaaaa'; // Light gray
-    context.textAlign = 'right';
-    context.textBaseline = 'top';
-
-    const lineHeight = 40;
-    const rightPadding = 10;
-    let y = 5;
-
-    // Helper function to format numbers with locale separators and scientific notation for very small values
-    function formatNumber(
-        num: number,
-        options: { minimumFractionDigits?: number; maximumFractionDigits?: number } = {}
-    ) {
-        const { minimumFractionDigits = 2, maximumFractionDigits = 2 } = options;
-
-        if (!Number.isFinite(num)) return '—';
-        if (num === 0) return new Intl.NumberFormat().format(0);
-
-        const absNum = Math.abs(num);
-        if (absNum < 0.01) {
-            return num.toExponential(2);
-        }
-
-        return new Intl.NumberFormat(undefined, {
-            minimumFractionDigits,
-            maximumFractionDigits,
-        }).format(num);
-    }
-
-    // Helper function to draw label + value right-aligned (normal font weight)
-    function drawStat(label: string, value: string | number, yPos: number) {
-        if (!context) return;
-        context.font = '27px monospace';
-        const text = label + value;
-        context.fillText(text, canvas.width - rightPadding, yPos);
-    }
-
-    // (duplicate getBodyTypeLabel removed; use the shared version below)
-
-    // Name
-    drawStat('Name: ', body.name, y);
-    y += lineHeight;
-
-    // Body Type
-    drawStat('Type: ', getBodyTypeLabel(body), y);
-    y += lineHeight;
-
-    // Planet Type (if planet or dwarf planet)
-    // Check for planet type property (Planet or DwarfPlanet class or similar)
-    if (
-        body.bodyType &&
-        (body.bodyType & BodyTypeEnum.Planet || body.bodyType & BodyTypeEnum.DwarfPlanet) &&
-        'planetType' in body &&
-        body.planetType
-    ) {
-        // Map enum/string to display label
-        let planetTypeLabel: string;
-        switch (body.planetType) {
-            case 'gas_giant':
-            case 'GasGiant':
-                planetTypeLabel = 'Gas Giant';
-                break;
-            case 'ice_giant':
-            case 'IceGiant':
-                planetTypeLabel = 'Ice Giant';
-                break;
-            case 'solid':
-            case 'Terrestrial':
-                planetTypeLabel = 'Terrestrial';
-                break;
-            case 'volcanic':
-                planetTypeLabel = 'Volcanic';
-                break;
-            case 'ocean':
-                planetTypeLabel = 'Ocean';
-                break;
-            case 'frozen':
-                planetTypeLabel = 'Frozen';
-                break;
-            case 'desert':
-                planetTypeLabel = 'Desert';
-                break;
-            default:
-                planetTypeLabel = String(body.planetType);
-        }
-        drawStat('Sub Type: ', planetTypeLabel, y);
-        y += lineHeight;
-    }
-
-    // Mass
-    drawStat('Mass: ', formatNumber(body.mass), y);
-    y += lineHeight;
-
-    // Radius
-    if (body instanceof CelestialBody) {
-        drawStat('Radius: ', formatNumber(body.radius), y);
-        y += lineHeight;
-    }
-
-    // Temperature (for stars and stellar remnants)
-    if (body instanceof Star) {
-        drawStat(
-            'Temperature: ',
-            formatNumber(body.temperature, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-                'K',
-            y
-        );
-        y += lineHeight;
-    }
-
-    // Fuel (for stars with fuel system, only if star death is enabled)
-    const starDeathEnabled =
-        (document.getElementById('enableStarDeath') as HTMLInputElement)?.checked || false;
-    if (
-        starDeathEnabled &&
-        body instanceof MainSequenceStar &&
-        body.fuel !== null &&
-        body.maxFuel !== null
-    ) {
-        const fuelPercent = ((body.fuel / body.maxFuel) * 100).toFixed(1);
-        drawStat('Fuel: ', `${fuelPercent}%`, y);
-        y += lineHeight;
-    }
-
-    // Position
-    const pos = body.mesh.position;
-    drawStat('Position: ', `(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})`, y);
-    y += lineHeight;
-
-    // Velocity
-    const vel = body.velocity;
-    drawStat('Velocity: ', `(${vel.x.toFixed(2)}, ${vel.y.toFixed(2)}, ${vel.z.toFixed(2)})`, y);
-    y += lineHeight;
-
-    // Speed (velocity magnitude)
-    const speed = vel.length();
-    drawStat('Speed: ', speed.toFixed(2), y);
-    y += lineHeight;
-
-    // Net gravitational force (force experienced FROM other bodies, F = m * a)
-    if (body.tempAcc) {
-        const netForce = body.tempAcc.length() * body.mass;
-        drawStat('Net Force: ', formatNumber(netForce), y);
-        y += lineHeight;
-    }
-
-    // Total gravitational force exerted ON other bodies
-    let totalForceExerted = 0;
-    for (const other of bodiesArray) {
-        if (other !== body && !other?._isDisposed && other.mesh) {
-            const diff = new THREE.Vector3().subVectors(other.mesh.position, body.mesh.position);
-            const r = diff.length();
-            if (r > 0.01) {
-                const force = (G * simulationState.gMultiplier * body.mass * other.mass) / (r * r);
-                totalForceExerted += force;
-            }
-        }
-    }
-    drawStat('Grav Output: ', formatNumber(totalForceExerted), y);
-    y += lineHeight;
-
-    // Orbital inclination (angle of velocity from xy-plane, in degrees)
-    const velXY = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
-    const inclination = Math.atan2(vel.z, velXY) * (180 / Math.PI);
-    drawStat('Inclination: ', inclination.toFixed(1) + '°', y);
-    y += lineHeight;
-
-    // Longitude (angle in xy-plane, in degrees)
-    const longitude = Math.atan2(pos.y, pos.x) * (180 / Math.PI);
-    drawStat('Longitude: ', longitude.toFixed(1) + '°', y);
-
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-
-    return texture;
-}
 
 const scene = new THREE.Scene();
 
@@ -808,6 +292,7 @@ uiCamera.position.z = 10;
 
 import Noty from 'noty';
 import 'noty/lib/noty.css';
+import { createFPSTexture, createSpeedTexture, createStatsTexture } from './drawing/text-rendering';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: { message: string; notificationType: NotificationType }) {
@@ -825,13 +310,12 @@ function addEvent(event: { message: string; notificationType: NotificationType }
         progressBar: false,
         closeWith: ['click', 'button'],
         queue: 'solar-event-log',
-        killer: true,
+        //killer: true,
     }).show();
 }
 
 // Keep queue bounded to avoid a burst of notifications freezing the UI.
 Noty.setMaxVisible(4, 'solar-event-log');
-
 
 // --- Flight mode steering line (drawn in uiScene screen space) ---
 // A line from the ship's projected aim point to the current pointer offset.
@@ -926,7 +410,7 @@ controls.enableZoom = true;
 // We still set touches here, but we also add our own custom handlers below.
 controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
 
- // -------- Mobile touch controls (1-finger rotate, 2-finger pinch zoom) --------
+// -------- Mobile touch controls (1-finger rotate, 2-finger pinch zoom) --------
 function getTouchDist(t1: Touch, t2: Touch) {
     const dx = t1.clientX - t2.clientX;
     const dy = t1.clientY - t2.clientY;
@@ -999,10 +483,10 @@ function isTouchOverUI(e: TouchEvent) {
     // If the finger is on an actual interactive control, allow the click/tap to happen.
     return Boolean(
         el.closest('#startup-overlay, #about-overlay, .modal-overlay, .modal') ||
-            el.closest('.ui-panel') ||
-            el.closest('button, input, select, textarea, label, a') ||
-            el.closest('.toolbar-btn') ||
-            el.closest('.old-ui')
+        el.closest('.ui-panel') ||
+        el.closest('button, input, select, textarea, label, a') ||
+        el.closest('.toolbar-btn') ||
+        el.closest('.old-ui')
     );
 }
 
@@ -1217,7 +701,6 @@ const autopilotState: IAutopilotState = {
     brakeEntryDistance: 0,
 };
 
-
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
 const dependencies: IStateDependencies = {
@@ -1250,8 +733,6 @@ const dependencies: IStateDependencies = {
     getBodies: () => simulationState.bodies,
     getG: () => G * simulationState.gMultiplier,
 };
-
-
 
 /** Shared tuning constants. */
 const SIM = Object.freeze({
@@ -1902,7 +1383,6 @@ function createHintTexture({ lines }: { lines: string[] }) {
 createHintSprite();
 
 // Backward compatibility aliases
-let isRepositioning = false;
 let activeAxis: string | null = null;
 let isChangingVelocity = false;
 let isMiddleMouseVelocity = false;
@@ -1923,12 +1403,7 @@ const dragCameraOffset = new THREE.Vector3();
 const dragPlane = new THREE.Plane();
 
 // Synchronize aliases with state objects
-Object.defineProperty(window, 'isRepositioning', {
-    get: () => interactionState.isRepositioning,
-    set: (v) => {
-        interactionState.isRepositioning = v;
-    },
-});
+
 Object.defineProperty(window, 'activeAxis', {
     get: () => interactionState.activeAxis,
     set: (v) => {
@@ -2022,7 +1497,7 @@ function canMoveSelectedBodyWithArrowKeys() {
         !!gizmo.group?.visible &&
         !!gizmo.target &&
         !!gizmo.target.mesh &&
-        !isRepositioning &&
+        !interactionState.isRepositioning &&
         !isChangingVelocity &&
         !isMiddleMouseVelocity
     );
@@ -2312,7 +1787,7 @@ function ensureGridHelperSizedToTarget(targetBody: Body | null) {
         gridHelper.position.set(center.x, 0, center.z);
 
         // Ensure the grid remains visible during a drag even if we recreate it this frame.
-        if (isRepositioning || isChangingVelocity || isMiddleMouseVelocity) {
+        if (interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity) {
             gridHelper.visible = true;
         }
     }
@@ -2729,7 +2204,7 @@ function createNewBody(
                     : new THREE.Vector3(0, 0, 0),
             mass: newStarMass,
             id: createUniqueId('star'),
-            name: generateIAUName(BodyTypeEnum.Star),
+            name: generateIAUName(BodyTypeEnum.Star, null, simulationState.bodies),
             temperature: newStarTemp,
             lightIntensity:
                 typeof customLightIntensity === 'number' && isFinite(customLightIntensity)
@@ -2796,16 +2271,16 @@ function createNewBody(
               ? fictionalIceTextures
               : fictionalTextures;
 
-            const planetTexture =
-                resolvedPlanetType === 'volcanic'
-                    ? fictionalVolcanicTexture
-                    : resolvedPlanetType === 'ocean'
-                      ? fictionalOceanTexture
-                      : resolvedPlanetType === 'desert'
-                        ? fictionalDesertTexture
-                        : resolvedPlanetType === 'frozen'
-                          ? fictionalFrozenTexture
-                          : pickRandom(planetTexturePool);
+        const planetTexture =
+            resolvedPlanetType === 'volcanic'
+                ? fictionalVolcanicTexture
+                : resolvedPlanetType === 'ocean'
+                  ? fictionalOceanTexture
+                  : resolvedPlanetType === 'desert'
+                    ? fictionalDesertTexture
+                    : resolvedPlanetType === 'frozen'
+                      ? fictionalFrozenTexture
+                      : pickRandom(planetTexturePool);
 
         const geometry = new THREE.SphereGeometry(planetRadius, 32, 32);
         const planetMaterial = new THREE.MeshStandardMaterial({
@@ -2824,7 +2299,7 @@ function createNewBody(
             vel: spawnVel,
             mass: planetMass,
             id: createUniqueId('planet'),
-            name: generateIAUName(BodyTypeEnum.Planet),
+            name: generateIAUName(BodyTypeEnum.Planet, null, simulationState.bodies),
             bodySubtype: planetBodySubtype,
             trailColor: 0x888888,
             maxTrail: 3000,
@@ -2950,7 +2425,7 @@ function createNewBody(
                 moonSpawnVel,
                 moonMass,
                 createUniqueId('moon'),
-                generateIAUName(BodyTypeEnum.Moon, focusedBody),
+                generateIAUName(BodyTypeEnum.Moon, focusedBody, simulationState.bodies),
                 BodyTypeEnum.Moon,
                 0x666666,
                 1000,
@@ -3037,7 +2512,7 @@ function createNewBody(
             vel: cometOrbitVel,
             mass: cometMass,
             id: createUniqueId('comet'),
-            name: generateIAUName(BodyTypeEnum.Comet),
+            name: generateIAUName(BodyTypeEnum.Comet, null, simulationState.bodies),
             rotation: { tilt: 0, speed: 0.05 },
         });
     } else if (bodyType === 'black_hole') {
@@ -3050,7 +2525,7 @@ function createNewBody(
             bhSpawnPos,
             bhMass,
             createUniqueId('black_hole'),
-            generateIAUName(BodyTypeEnum.BlackHole),
+            generateIAUName(BodyTypeEnum.BlackHole, null, simulationState.bodies),
             { tilt: 0, speed: 0 }
         );
 
@@ -3212,7 +2687,7 @@ function spawn({ mode = SimulationStartMode.Default } = {}) {
             vel: starVel,
             mass: starMass,
             id: createUniqueId('star'),
-            name: generateIAUName(BodyTypeEnum.Star),
+            name: generateIAUName(BodyTypeEnum.Star, null, simulationState.bodies),
             temperature: starTemp,
             lightIntensity: 500000000,
             lightDistance: 524400,
@@ -3667,7 +3142,7 @@ function onMouseDown(event: MouseEvent) {
             return;
         }
 
-        isRepositioning = true;
+        interactionState.isRepositioning = true;
         activeAxis = gizmoIntersects[0].object.userData.axis;
         // Inside onMouseDown, when an arrow is clicked:
         gizmo.arrows.forEach((a) => ((a.line.material as THREE.LineBasicMaterial).opacity = 0.2)); // Dim others
@@ -3937,7 +3412,7 @@ function onMouseMove(event: MouseEvent) {
     }
 
     // Handle position gizmo dragging
-    if (isRepositioning && gizmo.target) {
+    if (interactionState.isRepositioning && gizmo.target) {
         // Intersect the cached dragPlane, and move ONLY along the chosen axis by the
         // amount the intersection moved since drag start (incremental, stable).
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -4149,7 +3624,7 @@ function onMouseUp(event: MouseEvent) {
     if (event.button === 0) {
         const wasVel = isChangingVelocity;
 
-        isRepositioning = false;
+        interactionState.isRepositioning = false;
         isChangingVelocity = false;
         activeAxis = null;
         gizmo.arrows.forEach((a) => ((a.line.material as THREE.LineBasicMaterial).opacity = 1.0));
@@ -4378,7 +3853,7 @@ function animate() {
             }
 
             // If dragging gizmo arrow, move the planet along that specific axis
-            if (isRepositioning && gizmo.target && activeAxis) {
+            if (interactionState.isRepositioning && gizmo.target && activeAxis) {
                 if (activeAxis === 'x') {
                     gizmo.target.mesh.position.x += movement.x;
                 } else if (activeAxis === 'y') {
@@ -4458,7 +3933,7 @@ function animate() {
     updateSimulation(simulationState, autopilotState, steps, dt, updateAutopilot);
 
     // Collision detection and trail updates (outside integration loop for performance)
-    if (!isRepositioning) {
+    if (!interactionState.isRepositioning) {
         // NOTE: collision resolution can remove bodies from the `bodies` array mid-iteration.
         // Do NOT cache `bodies.length` (or rely on `bodies[j]` being non-undefined) in this loop.
         // Otherwise we can end up with `b1 === undefined` and crash on `b1.updateTrail()`.
@@ -4576,7 +4051,7 @@ function animate() {
 
     // Update grid size while dragging so it expands/contracts as needed.
     if (
-        (isRepositioning || isChangingVelocity || isMiddleMouseVelocity) &&
+        (interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity) &&
         gizmo.target &&
         !gizmo.target._isDisposed &&
         gizmo.target.mesh
@@ -4586,7 +4061,7 @@ function animate() {
         if (
             yAxisIndicator &&
             yAxisRing &&
-            (isChangingVelocity || isMiddleMouseVelocity || isRepositioning)
+            (isChangingVelocity || isMiddleMouseVelocity || interactionState.isRepositioning)
         ) {
             updatePositionIndicator(yAxisIndicator, yAxisRing, gizmo.target.mesh.position);
         }
@@ -4807,7 +4282,7 @@ function animate() {
                 camera.lookAt(0, 0, 0);
             } else {
                 // Normal look-at follow: camera follows focused body
-                if (!isRepositioning && !isChangingVelocity) {
+                if (!interactionState.isRepositioning && !isChangingVelocity) {
                     camera.position.add(delta);
                     controls.target.copy(focusObj.mesh.position);
                 }
@@ -4852,44 +4327,6 @@ function animate() {
             cameraPosWorld: camera.position,
         });
     }
-
-    // // Update Earth sun refraction billboard near the (local) horizon
-    // {
-    //     const sunBody = getPrimaryStar();
-    //     if (
-    //         earthBodyForShell &&
-    //         earthBodyForShell.mesh &&
-    //         sunBody?.mesh &&
-    //         earthSunRefraction
-    //     ) {
-    //         const earthPos = earthBodyForShell.mesh.position;
-    //         const sunPos = sunBody.mesh.position;
-
-    //         const sunDirWorld = sunPos.clone().sub(earthPos);
-    //         if (sunDirWorld.lengthSq() > 1e-12) sunDirWorld.normalize();
-
-    //         // In surface cam, camera.up already matches local gravity-up.
-    //         // Otherwise, approximate local up as pointing from Earth center to camera.
-    //         const isEarthSurfaceCam =
-    //             surfaceState?.isActive && surfaceState.body instanceof Earth;
-
-    //         const upWorld = isEarthSurfaceCam
-    //             ? camera.up.clone()
-    //             : camera.position.clone().sub(earthPos);
-
-    //         if (upWorld.lengthSq() > 1e-12) upWorld.normalize();
-
-    //         earthSunRefraction.update({
-    //             cameraPosWorld: camera.position,
-    //             upWorld,
-    //             sunDirWorld,
-    //             sunColor: sunBody.baseColor,
-    //             sunRadiusWorld: sunBody.radius,
-    //         });
-    //     } else {
-    //         earthSunRefraction.setVisible(false);
-    //     }
-    // }
 
     syncAllStarLightTargets();
 
@@ -4997,7 +4434,7 @@ function animate() {
             statsSprite
         ) {
             statsSprite.material.map?.dispose();
-            statsSprite.material.map = createStatsTexture(selectedBody, simulationState.bodies);
+            statsSprite.material.map = createStatsTexture(selectedBody);
             statsSprite.material.needsUpdate = true;
             statsSprite.visible = true;
         } else if (statsSprite) {
@@ -5010,10 +4447,7 @@ function animate() {
             // Determine desired HUD state
             let desiredHud: AutopilotHudState = 'NONE';
             if (autopilotState.isActive) {
-                if (
-                    autopilotState.phase === 'WARP_CHARGING' ||
-                    autopilotState.phase === 'WARP'
-                ) {
+                if (autopilotState.phase === 'WARP_CHARGING' || autopilotState.phase === 'WARP') {
                     desiredHud = 'APPROACH_WARP';
                 } else if (autopilotState.phase === 'CIRCULARIZE') {
                     desiredHud = 'CIRCULARIZE';
@@ -5104,22 +4538,7 @@ function getFocusObject() {
         : null;
 }
 
-function getBodyTypeLabel(b: Body) {
-    if (!b) return 'Unknown';
-    if (b.bodyType & BodyTypeEnum.BlackHole) return 'Black Hole';
-    if (isBodyType(b, BodyTypeEnum.Star)) return 'Star';
-    if (b.bodyType && b.bodyType & BodyTypeEnum.GasGiant) return 'Gas Giant';
-    if (b.bodyType && b.bodyType & BodyTypeEnum.IceGiant) return 'Ice Giant';
-    if (b.bodyType && b.bodyType & BodyTypeEnum.DwarfPlanet) return 'Dwarf Planet';
-    if (b.bodyType && b.bodyType & BodyTypeEnum.Planet) return 'Planet';
-    if (b.bodyType && b.bodyType & BodyTypeEnum.Moon) return 'Moon';
-    if (b.bodyType && b.bodyType & BodyTypeEnum.Asteroid) return 'Asteroid';
-    if (b.bodyType && b.bodyType & BodyTypeEnum.Comet) return 'Comet';
-    if (b.bodyType && b.bodyType & BodyTypeEnum.SpaceShip) return 'Spaceship';
-    if (b.bodyType && b.bodyType & BodyTypeEnum.Satellite) return 'Satellite';
 
-    return 'Unknown';
-}
 
 function refreshBodiesTable() {
     if (!uiManager.mainPanel) return;
@@ -6019,7 +5438,8 @@ function engageAutopilot(target: Body) {
         let nearestT01 = Infinity;
         let nearestObstruction: Body | null = null;
 
-        const shipRadius0 = typeof ship0.radius === 'number' && isFinite(ship0.radius) ? ship0.radius : 0;
+        const shipRadius0 =
+            typeof ship0.radius === 'number' && isFinite(ship0.radius) ? ship0.radius : 0;
         const padding0 = 0.5 * SCALE_FACTOR;
 
         for (const other of simulationState.bodies) {
@@ -6034,9 +5454,7 @@ function engageAutopilot(target: Body) {
             const tUnclamped = toOther.dot(segDir0) / segLen0; // roughly 0..1
             const t = Math.max(0, Math.min(1, tUnclamped));
 
-            const closest = shipPos0
-                .clone()
-                .add(segDir0.clone().multiplyScalar(t * segLen0));
+            const closest = shipPos0.clone().add(segDir0.clone().multiplyScalar(t * segLen0));
             const d = new THREE.Vector3().subVectors(other.mesh.position, closest);
 
             const hitRadius = r + shipRadius0 + padding0;
@@ -7268,7 +6686,7 @@ if (starDeathCheckbox) {
         // Update stats display if a body is currently selected
         if (selectedBody && statsSprite && statsSprite.visible) {
             statsSprite.material.map?.dispose();
-            statsSprite.material.map = createStatsTexture(selectedBody, simulationState.bodies);
+            statsSprite.material.map = createStatsTexture(selectedBody);
             statsSprite.material.needsUpdate = true;
         }
     });
@@ -7325,10 +6743,10 @@ function deleteSelectedBody() {
         const index = simulationState.bodies.indexOf(bodyToDelete);
         if (index > -1) simulationState.bodies.splice(index, 1);
 
-            addEvent?.({
-                message: `${bodyToDelete.name} deleted`,
-                notificationType: NotificationType.Alert,
-            });
+        addEvent?.({
+            message: `${bodyToDelete.name} deleted`,
+            notificationType: NotificationType.Alert,
+        });
 
         if (wasCameraTarget) {
             setF('camNone');
@@ -7528,7 +6946,7 @@ window.addEventListener('keyup', (e) => {
     if (key === 'shift') keys.shift = false;
 
     if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
-        if (!isChangingVelocity && !isMiddleMouseVelocity && !isRepositioning) {
+        if (!isChangingVelocity && !isMiddleMouseVelocity && !interactionState.isRepositioning) {
             hidePositionIndicators();
             velocityArcXZ.visible = false;
             velocityArcY.visible = false;
@@ -7557,7 +6975,7 @@ window.addEventListener(
 
         // Disable wheel zoom while dragging gizmos (position or velocity).
         // Wheel zoom during a drag causes unstable interaction / weird cursor-plane mapping.
-        if (isRepositioning || isChangingVelocity || isMiddleMouseVelocity) {
+        if (interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity) {
             return;
         }
 
@@ -7677,8 +7095,15 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
 // Event-driven bodies table + selection cleanup updates (avoid constant refresh/flicker)
 window.addEventListener('body:added', refreshBodiesTable);
 
-window.addEventListener('body:removed', (e) => {
-    const removedBody = e?.detail?.body;
+// Physics → UI logging: body absorption events become Noty notifications via addEvent()
+window.addEventListener('body:absorbed', (e) => {
+    if (!e?.detail) return;
+    const { message, notificationType } = e.detail;
+    addEvent({ message, notificationType });
+});
+
+window.addEventListener('body:removed', (e: WindowEventMap['body:removed']) => {
+    const removedBody = e.detail.body;
     // If the deleted body was the player's known ship, clear the reference
     // so the button reverts to "SPAWN SPACESHIP" rather than "ENTER SHIP".
     if (removedBody && removedBody === flightState.knownShip) {
@@ -7698,8 +7123,8 @@ window.addEventListener('body:removed', (e) => {
     refreshBodiesTable();
 });
 
-window.addEventListener('body:dead', (e) => {
-    const body = e?.detail?.body;
+window.addEventListener('body:dead', (e: WindowEventMap['body:dead']) => {
+    const body = e.detail.body;
     if (body) {
         // Ensure truly-dead bodies are removed from the simulation array.
         // Collision deaths already remove immediately, but other death paths (e.g. star fuel death)

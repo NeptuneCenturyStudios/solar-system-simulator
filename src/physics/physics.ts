@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { ParticleExplosion } from '../effects/particle-explosion';
-import { G } from '../utilities/consts';
+import { G, PLUTO_DIST } from '../utilities/consts';
+import { MainSequenceStar } from '../bodies/main-sequence-star';
+import { BlackHole } from '../bodies/black-hole';
+import { CelestialBody } from '../bodies/celestial-body';
+import { Spaceship } from '../bodies/spaceship';
+import { NotificationType } from '../event-log/event-log';
 
 /**
  * Represents the rotation of a body in 3D space
@@ -154,4 +159,125 @@ function updatePhysics(simulationState: ISimulationState) {
         // Store the accumulated force to apply in the update step
         body.tempAcc = totalAcc;
     }
+}
+
+
+/**
+ * Set the visual radius for any body. Delegates to the body's setRadius method.
+ * @param {object} body - The celestial body to update
+ * @param {number} newRadius - The new radius to set
+ */
+export function setBodyRadius(body: CelestialBody, newRadius: number) {
+    if (!body) return;
+
+    // Hard cap to prevent extreme “fills the screen” glitches.
+    // Target: allow stars to grow to roughly Kuiper-belt scale, but never beyond.
+    //
+    // Kuiper belt generation uses:
+    //   r = NEPTUNE_DIST + rand * (PLUTO_DIST - NEPTUNE_DIST + 300000)
+    // So the outer edge is roughly PLUTO_DIST + 300000.
+    const MAX_RADIUS = PLUTO_DIST + 300000;
+    newRadius = Math.min(newRadius, MAX_RADIUS);
+
+    body.setRadius(newRadius);
+}
+
+function collisionScoreEscapeVelocity(body: Body) {
+    // Winner heuristic: compare escape velocity (constants cancel):
+    //   v_esc = sqrt(2GM/R)  => ordering is equivalent to M/R
+    const m = Math.max(0, body?.mass || 0);
+    const r = Math.max(
+        1e-6,
+        typeof body?.radius === 'number' && isFinite(body.radius) && body.radius > 0
+            ? body.radius
+            : 0
+    );
+
+    return m / r;
+}
+
+
+
+export function chooseCollisionWinner(b1: Body, b2: Body) {
+    // Spaceships always lose — they should never absorb anything.
+    if (b1 instanceof Spaceship) return { winner: b2, victim: b1 };
+    if (b2 instanceof Spaceship) return { winner: b1, victim: b2 };
+
+    const s1 = collisionScoreEscapeVelocity(b1);
+    const s2 = collisionScoreEscapeVelocity(b2);
+
+    if (s1 > s2) return { winner: b1, victim: b2 };
+    if (s2 > s1) return { winner: b2, victim: b1 };
+
+    // Stable-ish tie breakers (avoid random flip-flops on exact ties)
+    const m1 = Math.max(0, b1?.mass || 0);
+    const m2 = Math.max(0, b2?.mass || 0);
+    if (m1 > m2) return { winner: b1, victim: b2 };
+    if (m2 > m1) return { winner: b2, victim: b1 };
+
+    const n1 = String(b1?.name || '');
+    const n2 = String(b2?.name || '');
+    if (n1 >= n2) return { winner: b1, victim: b2 };
+    return { winner: b2, victim: b1 };
+}
+
+export function absorbBody(winner: Body, victim: Body) {
+    if (!winner || !victim) return;
+    if (winner._isDisposed || victim._isDisposed) return;
+    if (winner._isDisposed || victim._isDisposed) return;
+
+    const mw = Math.max(0, winner.mass || 0);
+    const mv = Math.max(0, victim.mass || 0);
+    const newMass = mw + mv;
+    if (newMass <= 0) return;
+
+    // Momentum conservation
+    const vW = winner.velocity?.clone?.() || new THREE.Vector3();
+    const vV = victim.velocity?.clone?.() || new THREE.Vector3();
+    const mergedVel = vW.multiplyScalar(mw).add(vV.multiplyScalar(mv)).divideScalar(newMass);
+    if (winner.velocity) winner.velocity.copy(mergedVel);
+
+    // Mass
+    winner.mass = newMass;
+
+    // Stars: transfer remaining fuel + capacity (when fuel system is active)
+    if (
+        winner instanceof MainSequenceStar &&
+        victim instanceof MainSequenceStar &&
+        winner.fuel !== null &&
+        victim.fuel !== null
+    ) {
+        winner.fuel += victim.fuel;
+        if (winner.maxFuel !== null && victim.maxFuel !== null) {
+            winner.maxFuel += victim.maxFuel;
+        }
+    }
+
+    // Radius:
+    // - Default: volume add => cbrt(r1^3 + r2^3)
+    // - Black holes: radius is derived from mass compression, not added "raw volume".
+    if (winner instanceof BlackHole) {
+        const compressed = BlackHole.massToEventHorizonRadius(newMass);
+        setBodyRadius(winner, compressed);
+        // Flood the accretion disk — a whole star's worth of material disrupted at once.
+        winner.seedAccretionDisk(400);
+    } else if (winner instanceof CelestialBody && victim instanceof CelestialBody) {
+        const rw = Math.max(0.0001, winner.radius || 0.0001);
+        const rv = Math.max(0.0001, victim.radius || 0.0001);
+        const newRadius = Math.cbrt(rw * rw * rw + rv * rv * rv);
+        setBodyRadius(winner, newRadius);
+    }
+
+    // Inform the user via a decoupled event so UI/logging stays in index.ts.
+    // index.ts listens and turns this into a Noty notification.
+    const message = `${winner.name} absorbed ${victim.name}`;
+    console.info('[body:absorbed]', message);
+    window.dispatchEvent(
+        new CustomEvent('body:absorbed', {
+            detail: {
+                message,
+                notificationType: NotificationType.Alert,
+            },
+        })
+    );
 }

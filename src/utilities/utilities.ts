@@ -110,3 +110,129 @@ export function createSatellite(scene: THREE.Scene, parent: CelestialBody, confi
 
         return satellite;
     }
+
+    /**
+     * Generates a name for a celestial body based on IAU-style conventions.
+     * @param type The type of the celestial body.
+     * @param parentBody The parent body, if applicable (e.g., for moons).
+     * @param bodies The array of existing bodies to ensure unique naming.
+     * @returns A string representing the generated name.
+     */
+    export function generateIAUName(type: BodyTypeEnum, parentBody: Body | null = null, bodies: Body[]) {
+        const year = new Date().getFullYear();
+    
+        // Letter set excluding 'I' to mimic IAU conventions
+        const letters = 'ABCDEFGHJKLMNOPQRSTUVWXYZ';
+        function randLetter() {
+            return letters.charAt(Math.floor(Math.random() * letters.length));
+        }
+    
+        function randNumber(max = 99) {
+            return Math.floor(1 + Math.random() * max);
+        }
+    
+        function provisional() {
+            // Year + two-letter code + optional sequence number
+            const a = randLetter();
+            const b = randLetter();
+            const seq = Math.random() < 0.25 ? randNumber(9) : ''; // occasional sub-number
+            return `${year} ${a}${b}${seq}`;
+        }
+    
+        function cometDesignation() {
+            // Simple comet-like designation: C/YYYY Xn
+            const a = randLetter();
+            const n = randNumber(9);
+            return `C/${year} ${a}${n}`;
+        }
+    
+        function hdCatalog() {
+            // Henry Draper-like catalog number
+            const num = Math.floor(100000 + Math.random() * 900000);
+            return `HD ${num}`;
+        }
+    
+        function asteroidDesignation() {
+            return provisional();
+        }
+    
+        function planetDesignation() {
+            return provisional();
+        }
+    
+        function moonName(parent: Body | null) {
+            if (!parent) return `Moon ${provisional()}`;
+            // Count existing moons that start with parent name (simple heuristic)
+            const existing = bodies.filter(
+                (b) => b.name && b.name.startsWith(parent.name + ' ')
+            ).length;
+            const roman = toRoman(existing + 1);
+            return `${parent.name} ${roman}`;
+        }
+    
+        // Convert integer to Roman numerals (1..3999)
+        function toRoman(num: number): string {
+            if (!num || num <= 0) return 'I';
+            const romans = [
+                [1000, 'M'],
+                [900, 'CM'],
+                [500, 'D'],
+                [400, 'CD'],
+                [100, 'C'],
+                [90, 'XC'],
+                [50, 'L'],
+                [40, 'XL'],
+                [10, 'X'],
+                [9, 'IX'],
+                [5, 'V'],
+                [4, 'IV'],
+                [1, 'I'],
+            ];
+            let n = num;
+            let result = '';
+            for (const [val, sym] of romans) {
+                while (n >= (val as number)) {
+                    result += sym;
+                    n -= val as number;
+                }
+            }
+            return result;
+        }
+    
+        switch (type) {
+            case BodyTypeEnum.Star:
+                return hdCatalog();
+            case BodyTypeEnum.Planet:
+                return planetDesignation();
+            case BodyTypeEnum.Asteroid:
+                return asteroidDesignation();
+            case BodyTypeEnum.Comet:
+                return cometDesignation();
+            case BodyTypeEnum.Moon:
+                return moonName(parentBody);
+            default:
+                return provisional();
+        }
+    }
+
+    /**
+     * Gets a human-readable label for a body's type based on its bodyType flags.
+     * @param b The body to get the type label for.
+     * @returns A string representing the body's type.
+     */
+    export function getBodyTypeLabel(b: Body) {
+        if (!b) return 'Unknown';
+        if (b.bodyType & BodyTypeEnum.BlackHole) return 'Black Hole';
+        if (isBodyType(b, BodyTypeEnum.Star)) return 'Star';
+        if (b.bodyType && b.bodyType & BodyTypeEnum.GasGiant) return 'Gas Giant';
+        if (b.bodyType && b.bodyType & BodyTypeEnum.IceGiant) return 'Ice Giant';
+        if (b.bodyType && b.bodyType & BodyTypeEnum.DwarfPlanet) return 'Dwarf Planet';
+        if (b.bodyType && b.bodyType & BodyTypeEnum.Planet) return 'Planet';
+        if (b.bodyType && b.bodyType & BodyTypeEnum.Moon) return 'Moon';
+        if (b.bodyType && b.bodyType & BodyTypeEnum.Asteroid) return 'Asteroid';
+        if (b.bodyType && b.bodyType & BodyTypeEnum.Comet) return 'Comet';
+        if (b.bodyType && b.bodyType & BodyTypeEnum.SpaceShip) return 'Spaceship';
+        if (b.bodyType && b.bodyType & BodyTypeEnum.Satellite) return 'Satellite';
+    
+        return 'Unknown';
+    }
