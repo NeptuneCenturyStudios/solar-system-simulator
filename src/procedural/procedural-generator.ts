@@ -8,6 +8,7 @@ import { BodyTypeEnum } from '../utilities/utilities';
 import type { IStateDependencies } from '../interfaces';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { G } from '../utilities/consts';
+import { generateProceduralBodyName } from './body-naming';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -76,7 +77,11 @@ function createStarBody(
     rotation?: { tilt: number; speed: number }
 ): MainSequenceStar {
     const id = `proc_star_${index}_${params.seed}`;
-    const name = `Proc Star ${index + 1}`;
+    const name = generateProceduralBodyName(BodyTypeEnum.Star, {
+        seed: params.seed,
+        sequenceNumber: index + 1,
+        starTemperatureK: params.temperature,
+    });
 
     return new MainSequenceStar(dependencies, scene, {
         radius: params.radius,
