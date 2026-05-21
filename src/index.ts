@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
@@ -2185,6 +2186,8 @@ function createNewBody(
             radius: newStarRadius,
             temperature: newStarTemp,
             lightIntensity: newStarLightIntensity,
+            rotationTilt,
+            rotationSpeed,
         } = randomStarParams({
             mass: customMass,
             radius: customRadius,
@@ -2212,7 +2215,10 @@ function createNewBody(
             temperature: newStarTemp,
             lightIntensity: newStarLightIntensity,
             lightDistance: 524400,
-            rotation: { tilt: 0, speed: 0.08 },
+            rotation: {
+                tilt: rotationTilt,
+                speed: rotationSpeed,
+            },
             mesh: undefined, // use default star material/mesh
         });
     } else if (bodyType === 'planet') {

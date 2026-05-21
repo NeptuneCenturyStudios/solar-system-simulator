@@ -88,7 +88,8 @@ function createStarBody(
         temperature: params.temperature,
         lightIntensity: params.lightIntensity,
         lightDistance: 524400,
-        rotation: rotation ?? { tilt: 0, speed: 0.08 },
+        rotation:
+            rotation ?? { tilt: params.rotationTilt, speed: params.rotationSpeed },
         mesh: undefined,
     });
 }
@@ -119,7 +120,16 @@ function generateBinaryPlacements(
     const u = buildUnitPositionDirection(0, yawRad, inclinationRad); // phi=0 => +X in base
 
     // Velocity direction for star at +u
-    const velDir = new THREE.Vector3().crossVectors(normal, u).normalize();
+    // Velocity direction for star at +u
+    // Guard against degenerate cross-product => normalize() => NaNs.
+    let velDir = new THREE.Vector3().crossVectors(normal, u);
+    if (velDir.lengthSq() < 1e-12) {
+        velDir = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(1, 0, 0));
+        if (velDir.lengthSq() < 1e-12) {
+            velDir = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(0, 0, 1));
+        }
+    }
+    velDir.normalize();
 
     const omega = Math.sqrt((G * mSum) / Math.pow(separationDistance, 3));
 
@@ -144,7 +154,9 @@ function generateTriplePlacements(
     const mSum = m1 + m2 + m3;
 
     const yawRad = rng.range(0, Math.PI * 2);
-    const inclinationDeg = rng.range(0, 90);
+    // Avoid ~0/90° extremes that can make the orbital-plane basis degenerate
+    // (cross(normal, u) becomes ~zero => normalize() => NaNs).
+    const inclinationDeg = rng.range(5, 85);
     const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
     const maxRadius = Math.max(radii[0], radii[1], radii[2]);
@@ -171,7 +183,15 @@ function generateTriplePlacements(
             return applyInclinationX(nYaw, inclinationRad).normalize();
         })();
 
-        const velDir = new THREE.Vector3().crossVectors(normalBase, u).normalize();
+        // Guard against degenerate cross-product => normalize() => NaNs.
+        let velDir = new THREE.Vector3().crossVectors(normalBase, u);
+        if (velDir.lengthSq() < 1e-12) {
+            velDir = new THREE.Vector3().crossVectors(normalBase, new THREE.Vector3(1, 0, 0));
+            if (velDir.lengthSq() < 1e-12) {
+                velDir = new THREE.Vector3().crossVectors(normalBase, new THREE.Vector3(0, 0, 1));
+            }
+        }
+        velDir.normalize();
         const pos = u.clone().multiplyScalar(ri);
         const vel = velDir.multiplyScalar(speed);
 
@@ -195,9 +215,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         this.scene = scene;
 
         const inputSeed = (seed ?? '').trim();
-        this.masterSeed =
-            inputSeed.length > 0 ? inputSeed : generateSeedString();
+        this.masterSeed = inputSeed.length > 0 ? inputSeed : generateSeedString();
 
+        console.log('Seed: ', this.masterSeed);
         // Numeric seed for PRNG from master seed string.
         this.prng = new SeededRandom(this.masterSeed);
     }
@@ -227,7 +247,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             const separationDistance = rng.range(sepMin, sepMax);
 
             const yawRad = rng.range(0, Math.PI * 2);
-            const inclinationDeg = rng.range(0, 90);
+            // Avoid ~0/90° extremes that can make the orbital-plane basis degenerate
+            // (even with cross-product guards).
+            const inclinationDeg = rng.range(5, 85);
 
             const binary = generateBinaryPlacements(
                 rng,
@@ -240,11 +262,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         } else {
             // 3 stars
             const radii = starParams.map((p) => p.radius) as [number, number, number];
-            const triple = generateTriplePlacements(
-                rng,
-                [masses[0], masses[1], masses[2]],
-                radii
-            );
+            const triple = generateTriplePlacements(rng, [masses[0], masses[1], masses[2]], radii);
             placements = [triple[0], triple[1], triple[2]];
         }
 
@@ -254,13 +272,63 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             const params = starParams[i];
             const placement = placements[i];
 
+            const posOk =
+                Number.isFinite(placement.pos.x) &&
+                Number.isFinite(placement.pos.y) &&
+                Number.isFinite(placement.pos.z);
+
+            const velOk =
+                Number.isFinite(placement.vel.x) &&
+                Number.isFinite(placement.vel.y) &&
+                Number.isFinite(placement.vel.z);
+
+            const rotationTiltOk = Number.isFinite(params.rotationTilt);
+            const rotationSpeedOk = Number.isFinite(params.rotationSpeed) && params.rotationSpeed > 0;
+
+            const starOk =
+                Number.isFinite(params.mass) &&
+                params.mass > 0 &&
+                Number.isFinite(params.radius) &&
+                params.radius > 0 &&
+                Number.isFinite(params.temperature) &&
+                params.temperature > 0 &&
+                Number.isFinite(params.lightIntensity) &&
+                params.lightIntensity > 0 &&
+                rotationTiltOk &&
+                rotationSpeedOk;
+
             const rotation = {
-                tilt: rng.range(0, 90),
-                speed: rng.range(0.03, 0.12),
+                tilt: rotationTiltOk ? params.rotationTilt : 0,
+                speed: rotationSpeedOk ? params.rotationSpeed : 0.08,
             };
 
+            if (!posOk || !velOk || !starOk) {
+                // Prevent THREE BufferGeometry NaNs from crashing rendering.
+                console.error('[procedural] invalid star inputs; substituting defaults', {
+                    starIndex: i,
+                    pos: placement.pos,
+                    vel: placement.vel,
+                    params,
+                    posOk,
+                    velOk,
+                    starOk,
+                    rotation,
+                });
+
+                placement.pos.set(0, 0, 0);
+                placement.vel.set(0, 0, 0);
+            }
+
             bodies.push(
-                createStarBody(this.dependencies, this.scene, params, i, placement.pos, placement.vel, rotation)
+                createStarBody(
+                    this.dependencies,
+                    this.scene,
+                    params,
+                    i,
+                    placement.pos,
+                    placement.vel,
+                    rotation
+                )
             );
         }
 

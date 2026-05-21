@@ -27,6 +27,8 @@ export interface StarParams {
     radius: number;
     temperature: number;
     lightIntensity: number;
+    rotationTilt: number;
+    rotationSpeed: number;
     /** The seed actually used to derive this star's properties. */
     seed: string;
 }
@@ -67,6 +69,8 @@ export function randomStarParams(
         radius?: number | null;
         temperature?: number | null;
         lightIntensity?: number | null;
+        rotationTilt?: number | null;
+        rotationSpeed?: number | null;
     } = {}
 ): StarParams {
     const inputSeed = (opts.seed ?? '').trim();
@@ -104,6 +108,19 @@ export function randomStarParams(
             ? opts.lightIntensity
             : LIGHT_MIN * Math.pow(LIGHT_MAX / LIGHT_MIN, rng.next());
 
+    // Rotation:
+    // - tilt: [0, 90] (degrees) similar to prior procedural generator behavior
+    // - speed: [0.03, 0.12] similar to prior procedural generator behavior
+    const rotationTilt =
+        typeof opts.rotationTilt === 'number' && isFinite(opts.rotationTilt)
+            ? opts.rotationTilt
+            : rng.range(0, 90);
+
+    const rotationSpeed =
+        typeof opts.rotationSpeed === 'number' && isFinite(opts.rotationSpeed) && opts.rotationSpeed > 0
+            ? opts.rotationSpeed
+            : rng.range(0.03, 0.12);
+
     // Defensive: ensure outputs are finite + positive (prevents NaN geometry in THREE)
     const safeMass = isFinitePositiveNumber(mass) ? mass : minMass;
     const safeRadius = isFinitePositiveNumber(radius) ? radius : minRadius;
@@ -114,7 +131,19 @@ export function randomStarParams(
     const safeLightIntensity =
         isFinitePositiveNumber(lightIntensity) ? lightIntensity : 500000000;
 
-    return { mass: safeMass, radius: safeRadius, temperature: safeTemperature, lightIntensity: safeLightIntensity, seed };
+    const safeRotationTilt = isFinitePositiveNumber(rotationTilt) ? rotationTilt : 0;
+    const safeRotationSpeed =
+        isFinitePositiveNumber(rotationSpeed) ? rotationSpeed : 0.08;
+
+    return {
+        mass: safeMass,
+        radius: safeRadius,
+        temperature: safeTemperature,
+        lightIntensity: safeLightIntensity,
+        rotationTilt: safeRotationTilt,
+        rotationSpeed: safeRotationSpeed,
+        seed,
+    };
 }
 
 // ---------------------------------------------------------------------------

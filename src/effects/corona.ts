@@ -36,13 +36,17 @@ export class Corona implements IEffect {
         this.scene = scene;
         this.active = true;
         this.count = 1500;
-        this.radius = radius;
+
+        // Hard guard: if radius is ever non-finite/invalid, fall back to a tiny sane value
+        // so BufferGeometry.position never receives NaNs.
+        this.radius = Number.isFinite(radius) && radius > 0 ? radius : 1;
+
         this.pArr = new Float32Array(this.count * 3);
         this.lives = new Float32Array(this.count);
         this.lifeIncrements = new Float32Array(this.count);
         this.vels = [];
 
-        const scaleFactor = radius / 80;
+        const scaleFactor = this.radius / 80;
         const particleSize = 3.5 * scaleFactor;
         this.baseVelocity = 0.15 * scaleFactor;
         this.velocityVariation = 0.25 * scaleFactor;
@@ -104,8 +108,8 @@ export class Corona implements IEffect {
     private resetParticle(i: number) {
         const phi = Math.random() * Math.PI * 2;
         const theta = Math.random() * Math.PI;
-        const currentRadius = this.radius;
 
+        const currentRadius = Number.isFinite(this.radius) && this.radius > 0 ? this.radius : 1;
         const d = currentRadius * 0.98;
         this.pArr[i * 3] = d * Math.sin(theta) * Math.cos(phi);
         this.pArr[i * 3 + 1] = d * Math.sin(theta) * Math.sin(phi);
@@ -140,13 +144,26 @@ export class Corona implements IEffect {
         const positionAttribute = this.geometry.attributes.position as THREE.BufferAttribute;
         const p = positionAttribute.array as Float32Array;
 
-        for (let i = 0; i < this.count; i++) {
-            this.lives[i] += this.lifeIncrements[i] * (dt * 60);
-            p[i * 3] += this.vels[i].x * (dt * 60);
-            p[i * 3 + 1] += this.vels[i].y * (dt * 60);
-            p[i * 3 + 2] += this.vels[i].z * (dt * 60);
+        const frameScale = dt * 60;
 
-            if (this.lives[i] >= 1.0) {
+        for (let i = 0; i < this.count; i++) {
+            this.lives[i] += this.lifeIncrements[i] * frameScale;
+
+            const v = this.vels[i];
+            const vx = Number.isFinite(v.x) ? v.x : 0;
+            const vy = Number.isFinite(v.y) ? v.y : 0;
+            const vz = Number.isFinite(v.z) ? v.z : 0;
+
+            const xIdx = i * 3;
+
+            p[xIdx] += vx * frameScale;
+            p[xIdx + 1] += vy * frameScale;
+            p[xIdx + 2] += vz * frameScale;
+
+            // If anything went non-finite, reset this particle.
+            if (!Number.isFinite(p[xIdx]) || !Number.isFinite(p[xIdx + 1]) || !Number.isFinite(p[xIdx + 2])) {
+                this.resetParticle(i);
+            } else if (this.lives[i] >= 1.0) {
                 this.resetParticle(i);
             }
         }
@@ -157,14 +174,14 @@ export class Corona implements IEffect {
 
     setRadius(radius: number) {
         const prevRadius = this.radius;
-        this.radius = radius;
+        this.radius = Number.isFinite(radius) && radius > 0 ? radius : 1;
 
-        const scaleFactor = radius / 80;
+        const scaleFactor = this.radius / 80;
         this.baseVelocity = 0.15 * scaleFactor;
         this.velocityVariation = 0.25 * scaleFactor;
         this.material.size = 3.5 * scaleFactor;
 
-        const s = prevRadius > 0 ? radius / prevRadius : 1;
+        const s = prevRadius > 0 ? this.radius / prevRadius : 1;
         if (Number.isFinite(s) && s > 0 && s !== 1) {
             for (let i = 0; i < this.count; i++) {
                 this.pArr[i * 3] *= s;
