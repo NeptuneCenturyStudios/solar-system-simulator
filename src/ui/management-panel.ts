@@ -15,6 +15,7 @@ import {
 import { BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
 import { Star } from '../bodies/star.js';
 import { Body } from '../bodies/body.js';
+import { randomStarParams } from '../utilities/body-params.js';
 
 interface CreateSliderInitState {
     mass: number | null;
@@ -1017,7 +1018,10 @@ export class ManagementPanel extends Panel {
         const randInt = (min: number, max: number) => Math.floor(rand(min, max + 1));
         const randBool = () => Math.random() < 0.5;
 
-        if (this.inclinationSlider) {
+        // Only randomize the inclination slider for non-star bodies.
+        // Custom stars already get deterministic axial tilt/rotation from randomStarParams() (seeded PRNG),
+        // so using Math.random() here would introduce unnecessary non-determinism.
+        if (this.inclinationSlider && type !== 'sun') {
             setValue(this.inclinationSlider, randInt(0, 90));
         }
 
@@ -1179,7 +1183,6 @@ export class ManagementPanel extends Panel {
     }
 
     randomizeCustomStarValues(useStarlikeValues: boolean): void {
-        const rand = (min: number, max: number) => min + Math.random() * (max - min);
         const setValue = (input: HTMLInputElement | null, value: number): void => {
             if (!input) return;
             input.value = String(value);
@@ -1188,15 +1191,44 @@ export class ManagementPanel extends Panel {
             }
         };
 
-        const starMassMin = useStarlikeValues ? 0.5 * SUN_MASS : 1e29;
-        const starMassMax = useStarlikeValues ? 5 * SUN_MASS : 5e31;
-        const temperatureMin = useStarlikeValues ? 2500 : 1500;
-        const temperatureMax = useStarlikeValues ? 12000 : 40000;
-        const lightIntensityMin = useStarlikeValues ? 1000000 : 100000;
-        const lightIntensityMax = useStarlikeValues ? 5000000000 : 50000000000;
+        // Star mode: generate inclination + star rotation using the seeded PRNG in randomStarParams().
+        // This fixes the UX regression where the inclination slider no longer changes for "sun" randomize.
+        if (useStarlikeValues) {
+            const params = randomStarParams();
+            const inclinationDeg = Math.round(params.rotationTilt); // 0..90 integer
+
+            // Inclination slider is an <input type="range">, so set its value directly.
+            // Also set the visible label explicitly (don't rely solely on oninput).
+            setValue(this.inclinationSlider, inclinationDeg);
+
+            // Force UI refresh for range inputs (some browsers won't repaint thumb reliably on value assignment)
+            if (this.inclinationSlider) {
+                this.inclinationSlider.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+
+            if (this.inclinationDisplay) {
+                this.inclinationDisplay.textContent = `${inclinationDeg.toFixed(0)}°`;
+            }
+
+            setValue(this.createMassInput, this.clampMassValue(params.mass));
+            // Radius slider: round to 2 decimals like other star/planet displays.
+            setValue(this.createRadiusSlider, Math.round(params.radius * 100) / 100);
+            setValue(this.createTemperatureSlider, Math.round(params.temperature));
+            setValue(this.createLightIntensitySlider, Math.round(params.lightIntensity));
+            return;
+        }
+
+        // Non-star / alternative range randomization: keep existing behavior for now.
+        const rand = (min: number, max: number) => min + Math.random() * (max - min);
+
+        const starMassMin = 1e29;
+        const starMassMax = 5e31;
+        const temperatureMin = 1500;
+        const temperatureMax = 40000;
+        const lightIntensityMin = 100000;
+        const lightIntensityMax = 50000000000;
 
         setValue(this.createMassInput, this.clampMassValue(rand(starMassMin, starMassMax)));
-        // Compute radius from mass using the mass-radius relationship; slider can be adjusted afterwards.
         const randomMass = parseFloat(this.createMassInput?.value ?? '0');
         const computedRadius = SUN_RADIUS * Math.pow(Math.max(0, randomMass) / SUN_MASS, 0.8);
         setValue(this.createRadiusSlider, Math.round(computedRadius * 100) / 100);

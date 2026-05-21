@@ -201,6 +201,9 @@ function generateTriplePlacements(
     return [placements[0], placements[1], placements[2]];
 }
 
+/**
+ * Procedurally generates a solar system based on a seed string, which is used to create a seeded PRNG. The generator creates stars with parameters and placements determined by the PRNG, ensuring that the same seed will always produce the same solar system. The generator currently supports systems with 1 to 3 stars, placing them according to astrophysical rules for binary and triple systems.
+ */
 export class ProceduralGenerator extends SolarSystemGenerator {
     private prng: SeededRandom;
     private masterSeed: string;
