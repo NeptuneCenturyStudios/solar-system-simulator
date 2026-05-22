@@ -183,6 +183,7 @@ import { BlackHole } from './bodies/black-hole';
 import { Star } from './bodies/star';
 import { MainSequenceStar } from './bodies/main-sequence-star';
 import { createMainSequenceStarFromParams } from './procedural/star-factory';
+import { createPlanetBodyFromProceduralCreation } from './procedural/planet-factory';
 import { Asteroid } from './bodies/asteroid';
 import { Comet } from './bodies/comet';
 
@@ -2229,6 +2230,7 @@ function createNewBody(
             inclination
         );
 
+        // Custom mode: never create dwarfs (UI dropdown has only planet subtypes).
         const resolvedPlanetType = (planetType || 'solid') as
             | 'solid'
             | 'gas_giant'
@@ -2237,6 +2239,7 @@ function createNewBody(
             | 'ocean'
             | 'desert'
             | 'frozen';
+
         const {
             mass: planetMass,
             radius: planetRadius,
@@ -2244,8 +2247,6 @@ function createNewBody(
             bodySubtype: planetBodySubtype,
         } = randomPlanetParams(resolvedPlanetType, { mass: customMass, radius: customRadius });
 
-        const isGasGiant = resolvedPlanetType === 'gas_giant';
-        const isIceGiant = resolvedPlanetType === 'ice_giant';
         const isSolidPlanet =
             resolvedPlanetType === 'solid' ||
             resolvedPlanetType === 'volcanic' ||
@@ -2253,51 +2254,20 @@ function createNewBody(
             resolvedPlanetType === 'desert' ||
             resolvedPlanetType === 'frozen';
 
-        const planetTexturePool = isGasGiant
-            ? fictionalGasTextures
-            : isIceGiant
-              ? fictionalIceTextures
-              : fictionalTextures;
-
-        const planetTexture =
-            resolvedPlanetType === 'volcanic'
-                ? fictionalVolcanicTexture
-                : resolvedPlanetType === 'ocean'
-                  ? fictionalOceanTexture
-                  : resolvedPlanetType === 'desert'
-                    ? fictionalDesertTexture
-                    : resolvedPlanetType === 'frozen'
-                      ? fictionalFrozenTexture
-                      : pickRandom(planetTexturePool);
-
-        const geometry = new THREE.SphereGeometry(planetRadius, 32, 32);
-        const planetMaterial = new THREE.MeshStandardMaterial({
-            map: planetTexture,
-            color: 0xffffff, // keep texture untinted
-            emissive: 0x000000,
-            emissiveIntensity: 0,
-            roughness: 0.7,
-            metalness: 0.7,
-        });
-        const mesh = new THREE.Mesh(geometry, planetMaterial);
-
-        newBody = new Planet(dependencies, scene, {
-            radius: planetRadius,
-            pos: spawnPos,
-            vel: spawnVel,
-            mass: planetMass,
+        newBody = createPlanetBodyFromProceduralCreation(dependencies, scene, {
             id: createUniqueId('planet'),
             name: generateIAUName(BodyTypeEnum.Planet, null, simulationState.bodies),
+            pos: spawnPos,
+            vel: spawnVel,
+            bodyType: BodyTypeEnum.Planet,
             bodySubtype: planetBodySubtype,
-            trailColor: 0x888888,
-            maxTrail: 3000,
-            hasRings: false,
-            rotation: { tilt: 0, speed: planetRotationSpeed },
-            mesh,
+            radius: planetRadius,
+            mass: planetMass,
+            rotationSpeed: planetRotationSpeed,
         });
 
         // Optional atmosphere/cloud layer (checkbox-driven for custom solid + volcanic planets)
-        if (hasAtmosphere && isSolidPlanet) {
+        if (hasAtmosphere && isSolidPlanet && newBody) {
             const cloudsMat = new THREE.MeshStandardMaterial({
                 map: pickRandom(fictionalAtmosphereTextures),
                 color: 0xffffff,
@@ -2320,6 +2290,7 @@ function createNewBody(
             } else {
                 newBody.clouds = null;
             }
+
             // Make cloud sphere selectable (raycaster maps back to owning body)
             if (newBody.clouds) {
                 newBody.clouds.userData = { parentBody: newBody };

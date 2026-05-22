@@ -130,7 +130,15 @@ export class StartupModal extends Panel {
     private openProceduralModal() {
         // Hide startup modal but keep its internal state (allowCancel).
         this.hide();
+
+        // IMPORTANT: ensure the hidden startup overlay can't intercept pointer events
+        // while the procedural overlay is open (both are fixed-position overlays).
+        if (this.element) {
+            this.element.style.pointerEvents = 'none';
+        }
+
         if (this.proceduralOverlayEl) this.proceduralOverlayEl.classList.add('visible');
+        if (this.proceduralOverlayEl) this.proceduralOverlayEl.style.pointerEvents = 'auto';
 
         if (this.proceduralSeedInput) {
             // Focus after paint so it works reliably.
@@ -140,6 +148,12 @@ export class StartupModal extends Panel {
 
     private closeProceduralModalToStartup() {
         if (this.proceduralOverlayEl) this.proceduralOverlayEl.classList.remove('visible');
+
+        // Restore pointer events so the startup overlay behaves normally again.
+        if (this.element) {
+            this.element.style.pointerEvents = '';
+        }
+
         this.open({ allowCancel: this._allowCancel });
     }
 }

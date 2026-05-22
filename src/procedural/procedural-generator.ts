@@ -10,6 +10,8 @@ import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { G } from '../utilities/consts';
 import { generateProceduralBodyName } from './body-naming';
 import { createMainSequenceStarFromParams } from './star-factory';
+import { generateProceduralPlanets } from './planet-generator';
+import { createPlanetBodyFromProceduralCreation } from './planet-factory';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -229,6 +231,11 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         const starEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Star);
         const starCount = starEntry?.count ?? 1;
 
+        const planetEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Planet);
+        const planetCount = planetEntry?.count ?? 0;
+
+        // currently only stars and planets are instantiated in this pass (moons not yet).
+
         const rng = this.prng;
 
         const starParams = Array.from({ length: starCount }, (_, i) =>
@@ -332,6 +339,23 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                     rotation
                 )
             );
+        }
+
+        // Procedurally generate planets (no moons in this pass)
+        const planetCreations = generateProceduralPlanets({
+            masterSeed: this.masterSeed,
+            prng: this.prng,
+            planetCount,
+            starParams,
+            starPlacements: placements,
+        });
+
+        let dwarfCount = 0;
+        for (let i = 0; i < planetCreations.length; i++) {
+            const creation = planetCreations[i]!;
+            if (creation.bodyType === BodyTypeEnum.DwarfPlanet) dwarfCount++;
+
+            bodies.push(createPlanetBodyFromProceduralCreation(this.dependencies, this.scene, creation));
         }
 
         return bodies;

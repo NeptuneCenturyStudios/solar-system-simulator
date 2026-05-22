@@ -222,7 +222,7 @@ export function randomPlanetParams(
         | 'ocean'
         | 'frozen'
         | 'desert' = 'solid',
-    opts: { mass?: number | null; radius?: number | null } = {}
+    opts: { mass?: number | null; radius?: number | null; seed?: string | null } = {}
 ): PlanetParams {
     const isGasGiant = planetType === 'gas_giant';
     const isSolidLike =
@@ -232,21 +232,25 @@ export function randomPlanetParams(
         planetType === 'frozen' ||
         planetType === 'desert';
 
+    const inputSeed = (opts.seed ?? '').trim();
+    const seed = inputSeed.length > 0 ? inputSeed : generateSeedString();
+    const rng = new SeededRandom(seed);
+
     const radius =
         typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
             ? opts.radius
             : isSolidLike
-              ? 5 + Math.random() * 10
-              : 18 + Math.random() * 24;
+              ? 5 + rng.next() * 10
+              : 18 + rng.next() * 24;
 
     const mass =
         typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0
             ? opts.mass
             : isSolidLike
-              ? 50 + Math.random() * 500
+              ? 50 + rng.next() * 500
               : isGasGiant
-                ? 4000 + Math.random() * 26000
-                : 1200 + Math.random() * 7000;
+                ? 4000 + rng.next() * 26000
+                : 1200 + rng.next() * 7000;
 
     const bodySubtype: PlanetTypeEnum =
         planetType === 'gas_giant'
@@ -266,7 +270,7 @@ export function randomPlanetParams(
     return {
         mass,
         radius,
-        rotationSpeed: 0.1 + Math.random() * 0.4,
+        rotationSpeed: 0.1 + rng.next() * 0.4,
         bodyType: BodyTypeEnum.Planet,
         bodySubtype,
     };
