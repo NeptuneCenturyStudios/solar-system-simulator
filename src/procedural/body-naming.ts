@@ -273,6 +273,12 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                 '',
                 '',
                 '',
+                ' A',
+                ' B',
+                ' C',
+                ' Alpha',
+                ' Beta',
+                ' Gamma',
                 ' Prime', // keep Prime rare
                 ' Major',
                 ' Minor',
