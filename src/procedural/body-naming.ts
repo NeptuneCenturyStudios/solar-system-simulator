@@ -219,15 +219,29 @@ function markerLetter(rng: SeededRandom): string {
 }
 
 function romanFromSequence(rng: SeededRandom, sequenceNumber?: number): string {
-    if (typeof sequenceNumber === 'number' && Number.isFinite(sequenceNumber) && sequenceNumber > 0) {
+    if (
+        typeof sequenceNumber === 'number' &&
+        Number.isFinite(sequenceNumber) &&
+        sequenceNumber > 0
+    ) {
         return toRoman(sequenceNumber);
     }
     // Small deterministic fallback
     return toRoman(rng.rangeInt(1, 24));
 }
 
+function maybeSecondToken(rng: SeededRandom, chance: number): string {
+    if (!rng.chance(chance)) return '';
+    return makeWordFromSyllables(rng, { minSyllables: 2, maxSyllables: 3 });
+}
+
 export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: ProceduralBodyNameOptions): string {
-    const rng = new SeededRandom(options.seed);
+    // Primary name token(s) + suffix/roman are generated from rngPrimary.
+    // Secondary-name presence/token is generated from rngSecond so we don't
+    // disturb existing suffix/roman choices for the same seed.
+    const rngPrimary = new SeededRandom(options.seed);
+    const rngSecond = new SeededRandom(`${options.seed}|second-name`);
+
     const sequence = options.sequenceNumber;
 
     switch (bodyType) {
@@ -237,7 +251,7 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                     ? spectralClassFromTemperature(options.starTemperatureK)
                     : (() => {
                           // Deterministically derive spectral class from RNG outputs.
-                          const roll = rng.next();
+                          const roll = rngPrimary.next();
                           if (roll < 0.03) return 'O';
                           if (roll < 0.08) return 'B';
                           if (roll < 0.18) return 'A';
@@ -248,7 +262,7 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                       })();
 
             // Shorter core words than before (user noted “really long”).
-            const core = makeWordFromSyllables(rng, { minSyllables: 2, maxSyllables: 2 });
+            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 2 });
 
             // Star suffixes: varied + sometimes none (user noted all stars were “Prime”).
             const suffixByClass: Record<'O' | 'B' | 'A' | 'F' | 'G' | 'K' | 'M', string[]> = {
@@ -262,10 +276,10 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
             };
 
             // Sometimes add an adjective-like suffix token; often omit to keep names short.
-            const adjective = rng.chance(0.45) ? pickFrom(rng, suffixByClass[cls]) : '';
+            const adjective = rngPrimary.chance(0.45) ? pickFrom(rngPrimary, suffixByClass[cls]) : '';
 
             // Majoris/Minor/etc “style” endings (space included when present)
-            // Heavily bias toward “no suffix” so not all stars end with Prime.
+            // Heavily bias toward “no suffix” so not all stars end with a suffix.
             const nameEndingBank = [
                 '',
                 '',
@@ -279,7 +293,7 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                 ' Alpha',
                 ' Beta',
                 ' Gamma',
-                ' Prime', // keep Prime rare
+                ' Prime',
                 ' Major',
                 ' Minor',
                 ' Majoris',
@@ -291,18 +305,19 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                 ' Zenith',
             ];
 
-            const suffix = pickFrom(rng, nameEndingBank);
-            const maybeRoman = rng.chance(0.25) ? ` ${romanFromSequence(rng, sequence)}` : '';
+            const suffix = pickFrom(rngPrimary, nameEndingBank);
+            const maybeRoman = rngPrimary.chance(0.25) ? ` ${romanFromSequence(rngPrimary, sequence)}` : '';
 
-            // Final star shape: "<Core><Adj><Suffix>" (Suffix may be empty)
-            // This keeps things short and varied.
-            return `${core}${adjective}${suffix}${maybeRoman}`;
+            const firstToken = `${core}${adjective}`;
+            const secondToken = maybeSecondToken(rngSecond, 0.55);
+
+            return `${firstToken}${secondToken ? ` ${secondToken}` : ''}${suffix}${maybeRoman}`;
         }
 
         case BodyTypeEnum.Planet: {
             const subtype = options.planetSubtype ?? PlanetTypeEnum.Terrestrial;
 
-            const core = makeWordFromSyllables(rng, { minSyllables: 2, maxSyllables: 3 });
+            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
 
             // Short suffixes so we don't get huge names.
             const suffixBank: Record<PlanetTypeEnum, string[]> = {
@@ -315,39 +330,87 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                 [PlanetTypeEnum.Desert]: ['sahara', 'arid', 'solia', 'siro', 'dun'],
             };
 
-            const suffix = pickFrom(rng, suffixBank[subtype] ?? suffixBank[PlanetTypeEnum.Terrestrial]);
-            const roman = romanFromSequence(rng, sequence);
+            const suffix = pickFrom(rngPrimary, suffixBank[subtype] ?? suffixBank[PlanetTypeEnum.Terrestrial]);
+            const roman = romanFromSequence(rngPrimary, sequence);
 
-            // Requested vibe example: "Gisi III" (core+suffix is one token, roman is separate)
+            const secondToken = maybeSecondToken(rngSecond, 0.5);
+
+            if (secondToken) {
+                // When a second name exists, treat the suffix as its own token:
+                //   Core SecondName Suffix Roman
+                // Keep original formatting when secondToken is absent.
+                return `${core} ${secondToken} ${suffix} ${roman}`;
+            }
+
+            // Keep primary formatting when secondToken is absent:
+            //   CoreSuffix Roman
             return `${core}${suffix} ${roman}`;
         }
 
         case BodyTypeEnum.Moon:
         case BodyTypeEnum.Satellite: {
             const parentName = (options.parentName ?? '').trim();
-            const roman = romanFromSequence(rng, sequence);
-            // Requested vibe: "<Parent> III"
-            return parentName.length > 0 ? `${parentName} ${roman}` : makeWordFromSyllables(rng, { minSyllables: 2, maxSyllables: 3 });
+            const roman = romanFromSequence(rngPrimary, sequence);
+
+            const secondToken = maybeSecondToken(rngSecond, 0.6);
+
+            if (parentName.length > 0) {
+                // Requested vibe: "<Parent> III" (with optional "<Parent> Opus III")
+                return `${parentName}${secondToken ? ` ${secondToken}` : ''} ${roman}`;
+            }
+
+            // Fallback when we don't have a parent.
+            const fallback = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
+            return `${fallback}${secondToken ? ` ${secondToken}` : ''}`;
         }
 
         case BodyTypeEnum.Asteroid: {
-            const core = makeWordFromSyllables(rng, { minSyllables: 2, maxSyllables: 3 });
-            return `${core} ${markerLetter(rng)}`;
+            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
+            const letter = markerLetter(rngPrimary);
+
+            const secondToken = maybeSecondToken(rngSecond, 0.5);
+
+            return `${core}${secondToken ? ` ${secondToken}` : ''} ${letter}`;
         }
 
         case BodyTypeEnum.Comet: {
-            const core = makeWordFromSyllables(rng, { minSyllables: 2, maxSyllables: 3 });
-            return `Comet ${core}${markerLetter(rng)}`;
+            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
+            const letter = markerLetter(rngPrimary);
+
+            const secondToken = maybeSecondToken(rngSecond, 0.5);
+
+            // Keep primary formatting exactly when secondToken is absent.
+            if (!secondToken) {
+                return `Comet ${core}${letter}`;
+            }
+
+            // When second token exists, we prefer to separate the marker into its own token.
+            return `Comet ${core} ${secondToken} ${letter}`;
         }
 
         case BodyTypeEnum.BlackHole: {
-            const core = makeWordFromSyllables(rng, { minSyllables: 2, maxSyllables: 3 });
-            return `${core} Singularity ${markerLetter(rng)}`;
+            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
+            const letter = markerLetter(rngPrimary);
+
+            const secondToken = maybeSecondToken(rngSecond, 0.55);
+
+            // Primary: "<Core> Singularity <Letter>"
+            // With second: "<Core> Singularity Opus <Letter>"
+            return `${core} Singularity${secondToken ? ` ${secondToken}` : ''} ${letter}`;
         }
 
         default: {
-            const core = makeWordFromSyllables(rng, { minSyllables: 2, maxSyllables: 3 });
-            return `${core}${markerLetter(rng)}`;
+            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
+            const letter = markerLetter(rngPrimary);
+
+            const secondToken = maybeSecondToken(rngSecond, 0.5);
+
+            // Keep primary formatting exactly when secondToken is absent.
+            if (!secondToken) {
+                return `${core}${letter}`;
+            }
+
+            return `${core} ${secondToken} ${letter}`;
         }
     }
 }
