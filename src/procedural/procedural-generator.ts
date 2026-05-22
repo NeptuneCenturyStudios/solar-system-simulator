@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { SolarSystemGenerator } from './solar-system-generator';
 import { SeededRandom } from '../utilities/prng';
 import { generateSystemBodyInventory } from './system-body-inventory-generator';
-import { randomStarParams } from '../utilities/body-params';
+import { randomStarParams, type StarParams } from '../utilities/body-params';
 import type { Body } from '../bodies/body';
 import { BodyTypeEnum } from '../utilities/utilities';
 import type { IStateDependencies } from '../interfaces';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { G } from '../utilities/consts';
 import { generateProceduralBodyName } from './body-naming';
+import { createMainSequenceStarFromParams } from './star-factory';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -70,7 +71,7 @@ function buildUnitPositionDirection(
 function createStarBody(
     dependencies: IStateDependencies,
     scene: THREE.Scene,
-    params: ReturnType<typeof randomStarParams>,
+    params: StarParams,
     index: number,
     pos: THREE.Vector3,
     vel: THREE.Vector3,
@@ -83,19 +84,12 @@ function createStarBody(
         starTemperatureK: params.temperature,
     });
 
-    return new MainSequenceStar(dependencies, scene, {
-        radius: params.radius,
-        pos,
-        vel,
-        mass: params.mass,
+    return createMainSequenceStarFromParams(dependencies, scene, params, {
         id,
         name,
-        temperature: params.temperature,
-        lightIntensity: params.lightIntensity,
-        lightDistance: 524400,
-        rotation:
-            rotation ?? { tilt: params.rotationTilt, speed: params.rotationSpeed },
-        mesh: undefined,
+        pos,
+        vel,
+        rotation,
     });
 }
 

@@ -182,6 +182,7 @@ import { Ceres } from './bodies/ceres';
 import { BlackHole } from './bodies/black-hole';
 import { Star } from './bodies/star';
 import { MainSequenceStar } from './bodies/main-sequence-star';
+import { createMainSequenceStarFromParams } from './procedural/star-factory';
 import { Asteroid } from './bodies/asteroid';
 import { Comet } from './bodies/comet';
 
@@ -2181,22 +2182,20 @@ function createNewBody(
             simulationState.bodies.some((b) => b && !b._isDisposed && b instanceof BlackHole);
         const starPos = _hasCentralBody ? getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
 
-        const {
-            mass: newStarMass,
-            radius: newStarRadius,
-            temperature: newStarTemp,
-            lightIntensity: newStarLightIntensity,
-            rotationTilt,
-            rotationSpeed,
-        } = randomStarParams({
+        const starParams = randomStarParams({
             mass: customMass,
             radius: customRadius,
             temperature: customTemperature,
             lightIntensity: customLightIntensity,
         });
+        const { rotationTilt, rotationSpeed } = starParams;
 
-        newBody = new MainSequenceStar(dependencies, scene, {
-            radius: newStarRadius,
+        const id = createUniqueId('star');
+        const name = generateIAUName(BodyTypeEnum.Star, null, simulationState.bodies);
+
+        newBody = createMainSequenceStarFromParams(dependencies, scene, starParams, {
+            id,
+            name,
             pos: starPos,
             vel:
                 orbitParent && !orbitParent._isDisposed
@@ -2209,17 +2208,7 @@ function createNewBody(
                           inclination
                       )
                     : new THREE.Vector3(0, 0, 0),
-            mass: newStarMass,
-            id: createUniqueId('star'),
-            name: generateIAUName(BodyTypeEnum.Star, null, simulationState.bodies),
-            temperature: newStarTemp,
-            lightIntensity: newStarLightIntensity,
-            lightDistance: 524400,
-            rotation: {
-                tilt: rotationTilt,
-                speed: rotationSpeed,
-            },
-            mesh: undefined, // use default star material/mesh
+            rotation: { tilt: rotationTilt, speed: rotationSpeed },
         });
     } else if (bodyType === 'planet') {
         // Create a new planet near the camera with appropriate orbital velocity
