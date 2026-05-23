@@ -223,6 +223,11 @@ export const KUIPER_BELT_INNER_DIST = (4500000000 / DIST_SCALE) * SCALE_FACTOR; 
 export const KUIPER_BELT_OUTER_DIST = (7500000000 / DIST_SCALE) * SCALE_FACTOR; // 7,500,000,000 km
 export const KUIPER_BELT_VERTICAL_SPREAD = (100000000 / DIST_SCALE) * SCALE_FACTOR; // 100,000,000 km
 export const SHADOW_MAP_SIZE = 8192;
+
+// Star light intensity bounds (used for procedural stars + custom star creation)
+export const STAR_LIGHT_INTENSITY_MIN = 200_000_000;
+export const STAR_LIGHT_INTENSITY_MAX = 4_000_000_000;
+
 export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;
 export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4;
 export const MAX_NEUTRON_STAR_MASS = SUN_MASS * 3;

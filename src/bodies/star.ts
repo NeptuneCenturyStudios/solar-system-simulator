@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { SHADOW_MAP_SIZE, SUN_MASS, SUN_RADIUS } from '../utilities/consts';
+import {
+    SHADOW_MAP_SIZE,
+    SUN_MASS,
+    SUN_RADIUS,
+    STAR_LIGHT_INTENSITY_MIN,
+    STAR_LIGHT_INTENSITY_MAX,
+} from '../utilities/consts';
 import { BodyTypeEnum, isBodyType } from '../utilities/utilities';
 import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
@@ -120,7 +126,13 @@ export class Star extends CelestialBody {
         );
 
         this.textures = textures;
-        this.lightIntensity = options.lightIntensity;
+
+        const clampedLightIntensity = Math.max(
+            STAR_LIGHT_INTENSITY_MIN,
+            Math.min(STAR_LIGHT_INTENSITY_MAX, options.lightIntensity)
+        );
+
+        this.lightIntensity = clampedLightIntensity;
 
         this.temperature = options.temperature;
 
@@ -131,7 +143,7 @@ export class Star extends CelestialBody {
 
         this.sunLight = this.createLight(
             options.pos,
-            options.lightIntensity,
+            clampedLightIntensity,
             options.lightDistance
         );
 
@@ -291,9 +303,14 @@ export class Star extends CelestialBody {
     }
 
     setLightIntensity(intensity: number) {
-        this.lightIntensity = intensity;
+        const clamped = Math.max(
+            STAR_LIGHT_INTENSITY_MIN,
+            Math.min(STAR_LIGHT_INTENSITY_MAX, intensity)
+        );
+
+        this.lightIntensity = clamped;
         if (this.sunLight) {
-            this.sunLight.intensity = intensity / 20000000;
+            this.sunLight.intensity = clamped / 20000000;
         }
     }
 

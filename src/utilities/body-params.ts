@@ -5,7 +5,13 @@
  * No THREE imports, no scene references — only numbers in, numbers out.
  * Shared between the `createNewBody` interactive flow and the preset spawn modes.
  */
-import { SCALE_FACTOR, SUN_MASS, SUN_RADIUS } from './consts';
+import {
+    SCALE_FACTOR,
+    SUN_MASS,
+    SUN_RADIUS,
+    STAR_LIGHT_INTENSITY_MIN,
+    STAR_LIGHT_INTENSITY_MAX,
+} from './consts';
 import { BlackHole } from '../bodies/black-hole';
 import { SeededRandom } from './prng';
 import { BodyTypeEnum } from './utilities';
@@ -99,14 +105,17 @@ export function randomStarParams(
             : 2000 + rng.next() * 28000;
 
     // Light intensity:
-    // Management panel uses values roughly in [1e5, 5e11] depending on randomization mode.
+    // Procedural stars + custom stars should share the same clamp bounds.
     // Use a log-distribution for nicer spread.
-    const LIGHT_MIN = 100000;
-    const LIGHT_MAX = 500000000000;
-    const lightIntensity =
+    const lightMin = STAR_LIGHT_INTENSITY_MIN;
+    const lightMax = STAR_LIGHT_INTENSITY_MAX;
+
+    const rawLightIntensity =
         isFinitePositiveNumber(opts.lightIntensity)
             ? opts.lightIntensity
-            : LIGHT_MIN * Math.pow(LIGHT_MAX / LIGHT_MIN, rng.next());
+            : lightMin * Math.pow(lightMax / lightMin, rng.next());
+
+    const lightIntensity = Math.min(Math.max(rawLightIntensity, lightMin), lightMax);
 
     // Rotation:
     // - tilt: [0, 90] (degrees) similar to prior procedural generator behavior
@@ -129,7 +138,7 @@ export function randomStarParams(
             ? temperature
             : 5778;
     const safeLightIntensity =
-        isFinitePositiveNumber(lightIntensity) ? lightIntensity : 500000000;
+        isFinitePositiveNumber(lightIntensity) ? lightIntensity : lightMin;
 
     const safeRotationTilt = isFinitePositiveNumber(rotationTilt) ? rotationTilt : 0;
     const safeRotationSpeed =

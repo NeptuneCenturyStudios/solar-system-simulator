@@ -20,6 +20,17 @@ export type ProceduralBodyNameOptions = {
 
     /** For star naming (optional; improves tailoring). */
     starTemperatureK?: number;
+
+    /**
+     * When provided for stars, enables "shared base + per-member suffix" naming
+     * for multi-star systems (2–3 stars):
+     *   <base name> A / B / C  OR  <base name> I / II / III
+     *
+     * Note: `seed` should be the shared base seed (stable across all stars in the system).
+     */
+    starSystemMemberIndex?: number; // 0-based
+    starSystemMemberCount?: number;
+    starSystemSuffixStyle?: 'letters' | 'romans' | 'auto';
 };
 
 const LETTERS_NO_I = 'ABCDEFGHJKLMNOPQRSTUVWXYZ';
@@ -246,8 +257,38 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
 
     switch (bodyType) {
         case BodyTypeEnum.Star: {
-            const cls =
-                typeof options.starTemperatureK === 'number' && Number.isFinite(options.starTemperatureK)
+            const starMemberCount =
+                typeof options.starSystemMemberCount === 'number' && Number.isFinite(options.starSystemMemberCount)
+                    ? options.starSystemMemberCount
+                    : undefined;
+
+            const starMemberIndex =
+                typeof options.starSystemMemberIndex === 'number' && Number.isFinite(options.starSystemMemberIndex)
+                    ? options.starSystemMemberIndex
+                    : undefined;
+
+            const isMultiStarSystemNamed =
+                typeof starMemberCount === 'number' &&
+                starMemberCount > 1 &&
+                typeof starMemberIndex === 'number' &&
+                starMemberIndex >= 0;
+
+            // In multi-star-system mode we must ensure the whole base name is shared.
+            // Therefore we should NOT let per-star inputs (like temperature) affect the base.
+            const cls = (() => {
+                if (isMultiStarSystemNamed) {
+                    // Derive spectral class purely from RNG for shared base determinism.
+                    const roll = rngPrimary.next();
+                    if (roll < 0.03) return 'O';
+                    if (roll < 0.08) return 'B';
+                    if (roll < 0.18) return 'A';
+                    if (roll < 0.35) return 'F';
+                    if (roll < 0.58) return 'G';
+                    if (roll < 0.78) return 'K';
+                    return 'M';
+                }
+
+                return typeof options.starTemperatureK === 'number' && Number.isFinite(options.starTemperatureK)
                     ? spectralClassFromTemperature(options.starTemperatureK)
                     : (() => {
                           // Deterministically derive spectral class from RNG outputs.
@@ -260,11 +301,11 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                           if (roll < 0.78) return 'K';
                           return 'M';
                       })();
+            })();
 
             // Shorter core words than before (user noted “really long”).
             const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 2 });
 
-            // Star suffixes: varied + sometimes none (user noted all stars were “Prime”).
             const suffixByClass: Record<'O' | 'B' | 'A' | 'F' | 'G' | 'K' | 'M', string[]> = {
                 O: ['ion', 'elor', 'aris'],
                 B: ['ara', 'orin', 'vyr'],
@@ -278,8 +319,31 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
             // Sometimes add an adjective-like suffix token; often omit to keep names short.
             const adjective = rngPrimary.chance(0.45) ? pickFrom(rngPrimary, suffixByClass[cls]) : '';
 
-            // Majoris/Minor/etc “style” endings (space included when present)
-            // Heavily bias toward “no suffix” so not all stars end with a suffix.
+            const firstToken = `${core}${adjective}`;
+            const secondToken = maybeSecondToken(rngSecond, 0.55);
+
+            // Multi-star-system mode: base name is shared; only append A/B/C or I/II/III.
+            if (isMultiStarSystemNamed) {
+                const style =
+                    options.starSystemSuffixStyle === 'letters' ||
+                    options.starSystemSuffixStyle === 'romans'
+                        ? options.starSystemSuffixStyle
+                        : (() => {
+                              const styleRng = new SeededRandom(`${options.seed}|star-system-suffix-style`);
+                              return styleRng.chance(0.5) ? 'letters' : 'romans';
+                          })();
+
+                const idx = clampInt(starMemberIndex!, 0, Math.max(0, starMemberCount! - 1));
+
+                const memberSuffix =
+                    style === 'romans'
+                        ? toRoman(idx + 1)
+                        : LETTERS_NO_I.charAt(clampInt(idx, 0, LETTERS_NO_I.length - 1));
+
+                return `${firstToken}${secondToken ? ` ${secondToken}` : ''} ${memberSuffix}`;
+            }
+
+            // Single-star mode: keep existing behavior (varied + sometimes roman/suffix endings).
             const nameEndingBank = [
                 '',
                 '',
@@ -307,9 +371,6 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
 
             const suffix = pickFrom(rngPrimary, nameEndingBank);
             const maybeRoman = rngPrimary.chance(0.25) ? ` ${romanFromSequence(rngPrimary, sequence)}` : '';
-
-            const firstToken = `${core}${adjective}`;
-            const secondToken = maybeSecondToken(rngSecond, 0.55);
 
             return `${firstToken}${secondToken ? ` ${secondToken}` : ''}${suffix}${maybeRoman}`;
         }

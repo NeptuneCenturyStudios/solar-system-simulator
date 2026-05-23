@@ -77,14 +77,42 @@ function createStarBody(
     index: number,
     pos: THREE.Vector3,
     vel: THREE.Vector3,
-    rotation?: { tilt: number; speed: number }
+    rotation: { tilt: number; speed: number } | undefined,
+    starCount: number,
+    sharedStarNameSeed: string
 ): MainSequenceStar {
     const id = `proc_star_${index}_${params.seed}`;
-    const name = generateProceduralBodyName(BodyTypeEnum.Star, {
-        seed: params.seed,
-        sequenceNumber: index + 1,
-        starTemperatureK: params.temperature,
-    });
+
+    const nameOptions = (() => {
+        if (starCount > 1) {
+            return {
+                seed: sharedStarNameSeed,
+                sequenceNumber: index + 1,
+                starTemperatureK: params.temperature,
+                starSystemMemberIndex: index, // 0-based
+                starSystemMemberCount: starCount,
+                starSystemSuffixStyle: 'auto' as const,
+            };
+        }
+
+        return {
+            seed: params.seed,
+            sequenceNumber: index + 1,
+            starTemperatureK: params.temperature,
+        };
+    })();
+
+    const name = generateProceduralBodyName(BodyTypeEnum.Star, nameOptions);
+
+    if (starCount > 1) {
+        // Confirms multi-star naming: shared base + per-member suffix (A/B or I/II/etc).
+        console.log('[procedural] multi-star star name', {
+            starCount,
+            memberIndex: index,
+            sharedStarNameSeed,
+            name,
+        });
+    }
 
     return createMainSequenceStarFromParams(dependencies, scene, params, {
         id,
@@ -277,6 +305,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         // Instantiate bodies
         const bodies: Body[] = [];
+        const sharedStarNameSeed =
+            starCount > 1 ? `${this.masterSeed}|star-name-base` : `${this.masterSeed}|star-name-base|single`;
+
         for (let i = 0; i < starCount; i++) {
             const params = starParams[i];
             const placement = placements[i];
@@ -336,7 +367,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                     i,
                     placement.pos,
                     placement.vel,
-                    rotation
+                    rotation,
+                    starCount,
+                    sharedStarNameSeed
                 )
             );
         }

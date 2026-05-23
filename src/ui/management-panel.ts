@@ -426,7 +426,7 @@ export class ManagementPanel extends Panel {
         const updateCreateInputsForBodyType = () => {
             const bodyType = this.getSelectedBodyType();
             if (bodyType === 'sun') {
-                this.randomizeCustomStarValues(true);
+                this.randomizeCustomStarValues();
                 return;
             }
 
@@ -1026,7 +1026,7 @@ export class ManagementPanel extends Panel {
         }
 
         if (type === 'sun') {
-            this.randomizeCustomStarValues(true);
+            this.randomizeCustomStarValues();
             return;
         }
 
@@ -1179,10 +1179,10 @@ export class ManagementPanel extends Panel {
             return;
         }
 
-        this.randomizeCustomStarValues(false);
+        this.randomizeCustomStarValues();
     }
 
-    randomizeCustomStarValues(useStarlikeValues: boolean): void {
+    randomizeCustomStarValues(): void {
         const setValue = (input: HTMLInputElement | null, value: number): void => {
             if (!input) return;
             input.value = String(value);
@@ -1191,52 +1191,25 @@ export class ManagementPanel extends Panel {
             }
         };
 
-        // Star mode: generate inclination + star rotation using the seeded PRNG in randomStarParams().
-        // This fixes the UX regression where the inclination slider no longer changes for "sun" randomize.
-        if (useStarlikeValues) {
-            const params = randomStarParams();
-            const inclinationDeg = Math.round(params.rotationTilt); // 0..90 integer
+        // Always use the seeded generator to guarantee consistent, in-bounds values.
+        const params = randomStarParams();
+        const inclinationDeg = Math.round(params.rotationTilt); // 0..90 integer
 
-            // Inclination slider is an <input type="range">, so set its value directly.
-            // Also set the visible label explicitly (don't rely solely on oninput).
-            setValue(this.inclinationSlider, inclinationDeg);
+        setValue(this.inclinationSlider, inclinationDeg);
 
-            // Force UI refresh for range inputs (some browsers won't repaint thumb reliably on value assignment)
-            if (this.inclinationSlider) {
-                this.inclinationSlider.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-
-            if (this.inclinationDisplay) {
-                this.inclinationDisplay.textContent = `${inclinationDeg.toFixed(0)}°`;
-            }
-
-            setValue(this.createMassInput, this.clampMassValue(params.mass));
-            // Radius slider: round to 2 decimals like other star/planet displays.
-            setValue(this.createRadiusSlider, Math.round(params.radius * 100) / 100);
-            setValue(this.createTemperatureSlider, Math.round(params.temperature));
-            setValue(this.createLightIntensitySlider, Math.round(params.lightIntensity));
-            return;
+        // Force UI refresh for range inputs (some browsers won't repaint thumb reliably on value assignment)
+        if (this.inclinationSlider) {
+            this.inclinationSlider.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
-        // Non-star / alternative range randomization: keep existing behavior for now.
-        const rand = (min: number, max: number) => min + Math.random() * (max - min);
+        if (this.inclinationDisplay) {
+            this.inclinationDisplay.textContent = `${inclinationDeg.toFixed(0)}°`;
+        }
 
-        const starMassMin = 1e29;
-        const starMassMax = 5e31;
-        const temperatureMin = 1500;
-        const temperatureMax = 40000;
-        const lightIntensityMin = 100000;
-        const lightIntensityMax = 50000000000;
-
-        setValue(this.createMassInput, this.clampMassValue(rand(starMassMin, starMassMax)));
-        const randomMass = parseFloat(this.createMassInput?.value ?? '0');
-        const computedRadius = SUN_RADIUS * Math.pow(Math.max(0, randomMass) / SUN_MASS, 0.8);
-        setValue(this.createRadiusSlider, Math.round(computedRadius * 100) / 100);
-        setValue(this.createTemperatureSlider, Math.round(rand(temperatureMin, temperatureMax)));
-        setValue(
-            this.createLightIntensitySlider,
-            Math.round(rand(lightIntensityMin, lightIntensityMax))
-        );
+        setValue(this.createMassInput, this.clampMassValue(params.mass));
+        setValue(this.createRadiusSlider, Math.round(params.radius * 100) / 100);
+        setValue(this.createTemperatureSlider, Math.round(params.temperature));
+        setValue(this.createLightIntensitySlider, Math.round(params.lightIntensity));
     }
 
     toggleCreationForm(): void {
