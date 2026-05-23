@@ -59,6 +59,7 @@ export interface IAutopilotState {
 
 /**
  * Calculate position and velocity for a circular orbit around a parent body
+ * @param {number} gForce The gravitational constant to use in the calculation
  * @param {number} distance The distance from the parent body at which the orbit is calculated
  * @param {number} parentMass The mass of the parent body around which the orbit is calculated
  * @returns An object containing the position and velocity vectors for the circular orbit
@@ -73,6 +74,21 @@ export function calculateTrajectory(gForce: number, distance: number, parentMass
     const vel = new THREE.Vector3(0, 0, speed);
 
     return { pos, vel };
+}
+
+/**
+ * Calculate the orbital speed for a given distance and host mass, optionally accounting for eccentricity.
+ * @param {number} gForce The gravitational constant to use in the calculation
+ * @param {number} distance The distance from the parent body at which the orbit is calculated
+ * @param {number} hostMass The mass of the parent body around which the orbit is calculated
+ * @param {number} eccentricity The eccentricity of the orbit (0 = circular, 1 = parabolic)
+ * @returns The orbital speed for the given parameters
+ */
+export function calculateOrbitalSpeed(gForce: number, distance: number, hostMass: number, eccentricity: number) {
+    const circularSpeed = Math.sqrt((gForce * hostMass) / distance);
+    const speed = circularSpeed * Math.sqrt(Math.max(0, 1 - eccentricity));
+
+    return speed;
 }
 
 /**

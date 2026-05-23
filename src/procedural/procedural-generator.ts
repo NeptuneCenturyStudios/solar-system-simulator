@@ -343,6 +343,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         // Procedurally generate planets (no moons in this pass)
         const planetCreations = generateProceduralPlanets({
+            dependencies: this.dependencies,
             masterSeed: this.masterSeed,
             prng: this.prng,
             planetCount,
@@ -350,10 +351,10 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             starPlacements: placements,
         });
 
-        let dwarfCount = 0;
+        //let dwarfCount = 0;
         for (let i = 0; i < planetCreations.length; i++) {
             const creation = planetCreations[i]!;
-            if (creation.bodyType === BodyTypeEnum.DwarfPlanet) dwarfCount++;
+            //if (creation.bodyType === BodyTypeEnum.DwarfPlanet) dwarfCount++;
 
             bodies.push(createPlanetBodyFromProceduralCreation(this.dependencies, this.scene, creation));
         }

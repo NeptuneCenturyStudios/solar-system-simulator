@@ -86,23 +86,22 @@ export function createPlanetBodyFromProceduralCreation(
             ? pickTextureForGasIceSubtype(bodySubtype, creation.textureIndex)
             : pickTextureForSolidSubtype(bodySubtype, creation.textureIndex);
 
-    // TEMP DEBUG: Procedural bodies can be extremely far from the origin.
-    // Use an unlit material + disable depthTest/write so we can verify the mesh is actually being drawn.
+    // Procedural bodies may be far away, but we still need correct depth so planets
+    // occlude each other properly (otherwise they look "glowy" / see-through).
     const mesh = new THREE.Mesh(
         geometry,
-        new THREE.MeshBasicMaterial({
+        new THREE.MeshStandardMaterial({
             map: texture,
             color: 0xffffff, // keep texture untinted
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.7,
+            metalness: 0.85,
             transparent: false,
-            depthTest: false,
-            depthWrite: false,
+            depthTest: true,
+            depthWrite: true,
         })
     );
-
-    // Procedural systems are spawned at extremely large world coordinates.
-    // With log-depth + huge transforms, Mesh frustum culling can occasionally misclassify them.
-    // Disable culling for procedural planets to ensure visibility.
-    mesh.frustumCulled = false;
 
     const commonOptions = {
         radius,

@@ -155,10 +155,6 @@ import {
 import {
     loadSrgbTexture,
     fictionalTextures,
-    fictionalVolcanicTexture,
-    fictionalFrozenTexture,
-    fictionalOceanTexture,
-    fictionalDesertTexture,
 } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { ParticleExplosion } from './effects/particle-explosion';
@@ -167,12 +163,10 @@ import { triggerScreenFlash } from './effects/screen-flash';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
 import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
-import { Planet } from './bodies/planet';
 import { Mercury } from './bodies/mercury';
 import { Venus } from './bodies/venus';
 import { Earth } from './bodies/earth';
 import { Mars } from './bodies/mars';
-//import { createEarthAtmosphereSky } from './effects/earth-atmosphere-sky';
 import { Jupiter } from './bodies/jupiter';
 import { Saturn } from './bodies/saturn';
 import { Uranus } from './bodies/uranus';
@@ -211,17 +205,17 @@ skydomeTexture.wrapS = THREE.RepeatWrapping;
 skydomeTexture.wrapT = THREE.RepeatWrapping;
 skydomeTexture.repeat.set(2, 1);
 
-// Custom/random textures for custom gas giants
-const fictionalGasTextures = [
-    loadSrgbTexture('./assets/textures/fictional_gas_1.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_gas_2.jpg'),
-];
+// // Custom/random textures for custom gas giants
+// const fictionalGasTextures = [
+//     loadSrgbTexture('./assets/textures/fictional_gas_1.jpg'),
+//     loadSrgbTexture('./assets/textures/fictional_gas_2.jpg'),
+// ];
 
-// Custom/random textures for custom ice giants
-const fictionalIceTextures = [
-    loadSrgbTexture('./assets/textures/fictional_ice_1.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_ice_2.jpg'),
-];
+// // Custom/random textures for custom ice giants
+// const fictionalIceTextures = [
+//     loadSrgbTexture('./assets/textures/fictional_ice_1.jpg'),
+//     loadSrgbTexture('./assets/textures/fictional_ice_2.jpg'),
+// ];
 
 // Custom/random atmosphere textures (used for custom mode planets/moons when "Has Atmosphere" is checked)
 const fictionalAtmosphereTextures = [
@@ -2268,15 +2262,15 @@ function createNewBody(
 
         // Optional atmosphere/cloud layer (checkbox-driven for custom solid + volcanic planets)
         if (hasAtmosphere && isSolidPlanet && newBody) {
-            const cloudsMat = new THREE.MeshStandardMaterial({
-                map: pickRandom(fictionalAtmosphereTextures),
-                color: 0xffffff,
-                transparent: true,
-                opacity: 0.45,
-                depthWrite: false,
-                roughness: 1.0,
-                metalness: 0.0,
-            });
+                const cloudsMat = new THREE.MeshStandardMaterial({
+                    map: pickRandom(fictionalAtmosphereTextures),
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.25,
+                    depthWrite: false,
+                    roughness: 1.0,
+                    metalness: 0.0,
+                });
 
             const cloudsRadius =
                 Number.isFinite(newBody.radius) && newBody.radius > 0
@@ -2399,7 +2393,7 @@ function createNewBody(
                     map: pickRandom(fictionalAtmosphereTextures),
                     color: 0xffffff,
                     transparent: true,
-                    opacity: 0.45,
+                    opacity: 0.25,
                     depthWrite: false,
                     roughness: 1.0,
                     metalness: 0.0,
@@ -4020,14 +4014,19 @@ function animate() {
                 // Use inverse square law with a reference distance (Earth's orbit)
                 const referenceDistance = 21850; // Earth's distance
                 const minBrightness = 0.05; // Pluto will be quite dim but still visible
-                const brightness = Math.max(
-                    minBrightness,
-                    (referenceDistance * referenceDistance) / (distanceFromSun * distanceFromSun)
-                );
+                const brightnessRaw =
+                    (referenceDistance * referenceDistance) / (distanceFromSun * distanceFromSun);
+                // Prevent inverse-square boost from overexposing near-star bodies (looks like "glow").
+                // Preset far planets remain unchanged because brightnessRaw is already << 1.
+                const brightness = Math.max(minBrightness, Math.min(1.0, brightnessRaw));
 
-                // Apply brightness to material color (ShaderMaterial bodies handle their own lighting)
+                // Apply brightness to material colors (clouds/atmosphere should match the planet too).
                 if (body.mesh.material instanceof THREE.MeshStandardMaterial) {
                     body.mesh.material.color.copy(body.baseColor).multiplyScalar(brightness);
+                }
+
+                if (body.clouds?.material instanceof THREE.MeshStandardMaterial) {
+                    body.clouds.material.color.copy(body.baseColor).multiplyScalar(brightness);
                 }
             }
         }

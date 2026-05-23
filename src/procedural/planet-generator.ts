@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utilities/prng';
 import { EARTH_DIST } from '../utilities/consts';
-import { G } from '../utilities/consts';
 import { BodyTypeEnum } from '../utilities/utilities';
 import type { StarParams } from '../utilities/body-params';
 import { PlanetTypeEnum } from '../utilities/body-params';
@@ -9,6 +8,8 @@ import { generateProceduralBodyName } from './body-naming';
 import type { ProceduralPlanetCreation } from './planet-factory';
 import { PlanetBodyType, ProceduralPlanetSubtype } from './planet-factory';
 import { randomPlanetParams } from '../utilities/body-params';
+import { calculateOrbitalSpeed } from '../physics/physics';
+import { IStateDependencies } from '../interfaces';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -79,7 +80,7 @@ function pickPlanetSubtypeByDistance(params: {
     const terrestrial = base + 1.2 * smoothGaussian(t, 0.55, 0.18);
     const desert = base + 1.5 * smoothGaussian(t, 0.18, 0.16);
     const volcanic = base + 1.3 * smoothGaussian(t, 0.22, 0.16);
-    const ocean = base + 1.05 * smoothGaussian(t, 0.60, 0.18);
+    const ocean = base + 1.05 * smoothGaussian(t, 0.6, 0.18);
 
     const gasGiant = base + 1.25 * smoothGaussian(t, 0.83, 0.14);
     const iceGiant = base + 1.1 * smoothGaussian(t, 0.78, 0.14);
@@ -124,7 +125,8 @@ function safeUnitCross(a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3 {
     const out = new THREE.Vector3().crossVectors(a, b);
     if (out.lengthSq() < 1e-12) {
         // Degenerate: pick a stable fallback orthogonal-ish vector.
-        const fallback = Math.abs(a.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+        const fallback =
+            Math.abs(a.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
         out.copy(new THREE.Vector3().crossVectors(a, fallback));
     }
     out.normalize();
@@ -132,13 +134,14 @@ function safeUnitCross(a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3 {
 }
 
 export function generateProceduralPlanets(params: {
+    dependencies: IStateDependencies;
     masterSeed: string;
     prng: SeededRandom;
     planetCount: number;
     starParams: StarParams[];
     starPlacements: StarPlacement[];
 }): ProceduralPlanetCreation[] {
-    const { masterSeed, prng, planetCount, starParams, starPlacements } = params;
+    const { dependencies, masterSeed, prng, planetCount, starParams, starPlacements } = params;
 
     if (planetCount <= 0) return [];
 
@@ -167,8 +170,7 @@ export function generateProceduralPlanets(params: {
 
     for (let i = 0; i < planetCount; i++) {
         const distance = distances[i]!;
-        const distanceT01 =
-            planetCount <= 1 ? 0 : i / Math.max(1, planetCount - 1);
+        const distanceT01 = planetCount <= 1 ? 0 : i / Math.max(1, planetCount - 1);
 
         // Dwarf roll (10%)
         const isDwarf = prng.chance(0.1);
@@ -214,13 +216,10 @@ export function generateProceduralPlanets(params: {
 
         const tangentialDir = safeUnitCross(normal, u); // perpendicular to u in orbital plane
 
-        // Circular speed around host star
-        const circularSpeed = Math.sqrt((G * hostStar.mass) / Math.max(1e-9, distance));
-
-        // Eccentricity in [0..0.6], mapped into speed factor (0 => circular)
+         // Eccentricity in [0..0.6], mapped into speed factor (0 => circular)
         const eccentricity = prng.range(0, 0.6);
-        const speed = circularSpeed * Math.sqrt(Math.max(0, 1 - eccentricity));
-
+        const speed = calculateOrbitalSpeed(dependencies.getG(), distance, hostStar.mass, eccentricity);
+        
         const pos = hostPlacement.pos.clone().addScaledVector(u, distance);
         const vel = hostPlacement.vel.clone().addScaledVector(tangentialDir, speed);
 
