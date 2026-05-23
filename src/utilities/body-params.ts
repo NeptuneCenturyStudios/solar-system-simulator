@@ -203,6 +203,19 @@ export enum PlanetTypeEnum {
     Desert = 'desert',
 }
 
+/**
+ * MoonTypeEnum mirrors the "solid-like" planet subtypes, but intentionally excludes
+ * gas/ice giant categories. This lets procedural moons pick planet-like textures
+ * (ocean/desert/frozen/volcanic/terrestrial) without ever needing gas/ice moon textures.
+ */
+export enum MoonTypeEnum {
+    Terrestrial = 'solid',
+    Volcanic = 'volcanic',
+    Ocean = 'ocean',
+    Frozen = 'frozen',
+    Desert = 'desert',
+}
+
 export interface PlanetParams {
     mass: number;
     radius: number;
@@ -289,39 +302,62 @@ export function randomPlanetParams(
 // Moon
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns deterministic (or override-applied) params for a new custom/procedural moon.
+ * `parentRadius` is used to scale the default orbital distance.
+ *
+ * Note: `seed` is included so procedural moon generation can create stable names/placements.
+ */
 export interface MoonParams {
     mass: number;
     radius: number;
     /** Distance from parent centre (world units). */
     distance: number;
     rotationSpeed: number;
+    /** Seed actually used to derive this moon's properties. */
+    seed: string;
 }
 
-/**
- * Returns randomised (or override-applied) params for a new custom moon.
- * `parentRadius` is used to scale the default orbital distance.
- */
+// - If `opts.seed` is provided, it is used to derive deterministic values.
+// - Otherwise a new seed string is generated (matches the star/planet custom pattern).
+// Returns deterministic (or override-applied) params for a new custom/procedural moon.
+// Hardened against NaN/invalid parentRadius to avoid THREE geometry blowups.
 export function randomMoonParams(
     parentRadius: number,
-    opts: { mass?: number | null; radius?: number | null } = {}
+    opts: { mass?: number | null; radius?: number | null; seed?: string | null } = {}
 ): MoonParams {
-    const distance = parentRadius * 5 + Math.random() * parentRadius * 10;
+    const inputSeed = (opts.seed ?? '').trim();
+    const seed = inputSeed.length > 0 ? inputSeed : generateSeedString();
+
+    const rng = new SeededRandom(seed);
+
+    const safeParentRadius =
+        typeof parentRadius === 'number' && isFinite(parentRadius) && parentRadius > 0
+            ? parentRadius
+            : 1;
+
+    const distance = safeParentRadius * 5 + rng.next() * safeParentRadius * 10;
 
     const radius =
         typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
             ? opts.radius
-            : 1 + Math.random() * 3;
+            : 1 + rng.next() * 3;
 
     const mass =
         typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0
             ? opts.mass
-            : 0.5 + Math.random() * 2;
+            : 0.5 + rng.next() * 2;
+
+    const safeRadius = isFinite(radius) && radius > 0 ? radius : 1;
+    const safeMass = isFinite(mass) && mass > 0 ? mass : 0.5;
+    const safeDistance = isFinite(distance) && distance > 0 ? distance : safeParentRadius * 5;
 
     return {
-        mass,
-        radius,
-        distance,
-        rotationSpeed: 0.15 + Math.random() * 0.35,
+        mass: safeMass,
+        radius: safeRadius,
+        distance: safeDistance,
+        rotationSpeed: 0.15 + rng.next() * 0.35,
+        seed,
     };
 }
 

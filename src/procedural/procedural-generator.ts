@@ -4,6 +4,7 @@ import { SeededRandom } from '../utilities/prng';
 import { generateSystemBodyInventory } from './system-body-inventory-generator';
 import { randomStarParams, type StarParams } from '../utilities/body-params';
 import type { Body } from '../bodies/body';
+import type { CelestialBody } from '../bodies/celestial-body';
 import { BodyTypeEnum } from '../utilities/utilities';
 import type { IStateDependencies } from '../interfaces';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
@@ -12,6 +13,8 @@ import { generateProceduralBodyName } from './body-naming';
 import { createMainSequenceStarFromParams } from './star-factory';
 import { generateProceduralPlanets } from './planet-generator';
 import { createPlanetBodyFromProceduralCreation } from './planet-factory';
+import { generateProceduralMoons } from './moon-generator';
+import { createMoonBodyFromProceduralCreation } from './moon-factory';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -104,15 +107,7 @@ function createStarBody(
 
     const name = generateProceduralBodyName(BodyTypeEnum.Star, nameOptions);
 
-    if (starCount > 1) {
-        // Confirms multi-star naming: shared base + per-member suffix (A/B or I/II/etc).
-        console.log('[procedural] multi-star star name', {
-            starCount,
-            memberIndex: index,
-            sharedStarNameSeed,
-            name,
-        });
-    }
+    // Multi-star naming confirmed (letters/romans handled by generateProceduralBodyName).
 
     return createMainSequenceStarFromParams(dependencies, scene, params, {
         id,
@@ -249,7 +244,8 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         const inputSeed = (seed ?? '').trim();
         this.masterSeed = inputSeed.length > 0 ? inputSeed : generateSeedString();
 
-        console.log('Seed: ', this.masterSeed);
+        console.info('[procedural] using master seed:', this.masterSeed);
+
         // Numeric seed for PRNG from master seed string.
         this.prng = new SeededRandom(this.masterSeed);
     }
@@ -374,7 +370,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             );
         }
 
-        // Procedurally generate planets (no moons in this pass)
+        // Procedurally generate planets + moons
         const planetCreations = generateProceduralPlanets({
             dependencies: this.dependencies,
             masterSeed: this.masterSeed,
@@ -384,12 +380,44 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             starPlacements: placements,
         });
 
+        const planetBodies: Body[] = [];
+
         //let dwarfCount = 0;
         for (let i = 0; i < planetCreations.length; i++) {
             const creation = planetCreations[i]!;
             //if (creation.bodyType === BodyTypeEnum.DwarfPlanet) dwarfCount++;
 
-            bodies.push(createPlanetBodyFromProceduralCreation(this.dependencies, this.scene, creation));
+            const planetBody = createPlanetBodyFromProceduralCreation(
+                this.dependencies,
+                this.scene,
+                creation
+            );
+
+            planetBodies.push(planetBody);
+            bodies.push(planetBody);
+        }
+
+        const moonCreations = generateProceduralMoons({
+            dependencies: this.dependencies,
+            masterSeed: this.masterSeed,
+            planetCreations,
+        });
+
+        for (let i = 0; i < moonCreations.length; i++) {
+            const creation = moonCreations[i]!;
+
+            const parentBody = planetBodies[creation.parentIndex] as Body | undefined;
+            const parentCelestial = parentBody as unknown as CelestialBody;
+            if (!parentCelestial || parentCelestial._isDisposed) continue;
+
+            const moonBody = createMoonBodyFromProceduralCreation({
+                dependencies: this.dependencies,
+                scene: this.scene,
+                creation,
+                parent: parentCelestial,
+            });
+
+            bodies.push(moonBody);
         }
 
         return bodies;

@@ -375,68 +375,29 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
             return `${firstToken}${secondToken ? ` ${secondToken}` : ''}${suffix}${maybeRoman}`;
         }
 
+
         case BodyTypeEnum.DwarfPlanet: {
-            const subtype = options.planetSubtype ?? PlanetTypeEnum.Terrestrial;
-
             const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
-
-            // Short suffixes so we don't get huge names.
-            const suffixBank: Record<PlanetTypeEnum, string[]> = {
-                [PlanetTypeEnum.Terrestrial]: ['ara', 'elin', 'oria', 'neth', 'siv'],
-                [PlanetTypeEnum.Ocean]: ['mar', 'lenth', 'selia', 'thoa', 'vori'],
-                [PlanetTypeEnum.IceGiant]: ['krion', 'niva', 'lune', 'arctic', 'frost'],
-                [PlanetTypeEnum.GasGiant]: ['viora', 'zun', 'tor', 'brontia', 'gass'],
-                [PlanetTypeEnum.Volcanic]: ['pyra', 'magma', 'ember', 'scoria', 'cald'],
-                [PlanetTypeEnum.Frozen]: ['frig', 'helia', 'sora', 'glac', 'albed'],
-                [PlanetTypeEnum.Desert]: ['sahara', 'arid', 'solia', 'siro', 'dun'],
-            };
-
-            const suffix = pickFrom(
-                rngPrimary,
-                suffixBank[subtype] ?? suffixBank[PlanetTypeEnum.Terrestrial]
-            );
             const roman = romanFromSequence(rngPrimary, sequence);
-
             const secondToken = maybeSecondToken(rngSecond, 0.5);
 
             if (secondToken) {
-                return `${core} ${secondToken} ${suffix} ${roman} Dwarf`;
+                return `${core} ${secondToken} ${roman}`;
             }
 
-            return `${core}${suffix} ${roman} Dwarf`;
+            return `${core} ${roman}`;
         }
 
         case BodyTypeEnum.Planet: {
-            const subtype = options.planetSubtype ?? PlanetTypeEnum.Terrestrial;
-
             const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
-
-            // Short suffixes so we don't get huge names.
-            const suffixBank: Record<PlanetTypeEnum, string[]> = {
-                [PlanetTypeEnum.Terrestrial]: ['ara', 'elin', 'oria', 'neth', 'siv'],
-                [PlanetTypeEnum.Ocean]: ['mar', 'lenth', 'selia', 'thoa', 'vori'],
-                [PlanetTypeEnum.IceGiant]: ['krion', 'niva', 'lune', 'arctic', 'frost'],
-                [PlanetTypeEnum.GasGiant]: ['viora', 'zun', 'tor', 'brontia', 'gass'],
-                [PlanetTypeEnum.Volcanic]: ['pyra', 'magma', 'ember', 'scoria', 'cald'],
-                [PlanetTypeEnum.Frozen]: ['frig', 'helia', 'sora', 'glac', 'albed'],
-                [PlanetTypeEnum.Desert]: ['sahara', 'arid', 'solia', 'siro', 'dun'],
-            };
-
-            const suffix = pickFrom(rngPrimary, suffixBank[subtype] ?? suffixBank[PlanetTypeEnum.Terrestrial]);
             const roman = romanFromSequence(rngPrimary, sequence);
-
             const secondToken = maybeSecondToken(rngSecond, 0.5);
 
             if (secondToken) {
-                // When a second name exists, treat the suffix as its own token:
-                //   Core SecondName Suffix Roman
-                // Keep original formatting when secondToken is absent.
-                return `${core} ${secondToken} ${suffix} ${roman}`;
+                return `${core} ${secondToken} ${roman}`;
             }
 
-            // Keep primary formatting when secondToken is absent:
-            //   CoreSuffix Roman
-            return `${core}${suffix} ${roman}`;
+            return `${core} ${roman}`;
         }
 
         case BodyTypeEnum.Moon:
