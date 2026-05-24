@@ -21,11 +21,11 @@ export const MAX_PARTICLE_ALPHA = 1.0;
 
 // === Simulation Scale and Physics Constants ===
 export const SCALE_FACTOR = 1;
-export const G_SCALE = 1; // 1000000;
+export const G_SCALE = 10000000;
 // Tuned so that SUN_MASS = 33,000,000 exactly
 export const MASS_SCALE = 6.025757575757576e22;
-export const RADIUS_SCALE = 100;
-export const DIST_SCALE = 100;
+export const RADIUS_SCALE = 1;
+export const DIST_SCALE = 1;
 // 1. Keep the physically-derived base time scale
 export const BASE_TIME_SCALE = Math.sqrt(DIST_SCALE ** 3 / MASS_SCALE);
 // 2. Choose a user multiplier so that at warp 1, dt matches the old behavior
@@ -111,7 +111,7 @@ export const PLUTO_ORBITAL_PERIOD_REAL = 90560 * 24 * 3600;
 
 // === Planetary System: Per-planet Time Scale Factors ===
 // S_time = T_real / T_sim, where T_sim = 2 * PI * r_sim / sqrt(G * M_sun / r_sim)
-function calcSimOrbitalPeriod(r_sim: number, G: number, M_sun: number): number {
+export function calcSimOrbitalPeriod(r_sim: number, G: number, M_sun: number): number {
     // T_sim = 2 * PI * sqrt(r_sim^3 / (G * M_sun))
     return 2 * Math.PI * Math.sqrt(Math.pow(r_sim, 3) / (G * M_sun));
 }

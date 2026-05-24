@@ -11,6 +11,29 @@ import {
     SUN_RADIUS,
     STAR_LIGHT_INTENSITY_MIN,
     STAR_LIGHT_INTENSITY_MAX,
+    MOON_MASS,
+    MOON_RADIUS,
+    MOON_DIST_FROM_EARTH,
+
+    // Solid-like reference range (scaled by MASS_SCALE / RADIUS_SCALE)
+    MERCURY_MASS,
+    VENUS_MASS,
+    EARTH_MASS,
+    MERCURY_RADIUS,
+    VENUS_RADIUS,
+    EARTH_RADIUS,
+
+    // Gas giant reference range
+    JUPITER_MASS,
+    SATURN_MASS,
+    JUPITER_RADIUS,
+    SATURN_RADIUS,
+
+    // Ice giant reference range
+    URANUS_MASS,
+    NEPTUNE_MASS,
+    URANUS_RADIUS,
+    NEPTUNE_RADIUS,
 } from './consts';
 import { BlackHole } from '../bodies/black-hole';
 import { SeededRandom } from './prng';
@@ -246,7 +269,12 @@ export function randomPlanetParams(
         | 'desert' = 'solid',
     opts: { mass?: number | null; radius?: number | null; seed?: string | null } = {}
 ): PlanetParams {
+    const inputSeed = (opts.seed ?? '').trim();
+    const seed = inputSeed.length > 0 ? inputSeed : generateSeedString();
+    const rng = new SeededRandom(seed);
+
     const isGasGiant = planetType === 'gas_giant';
+    const isIceGiant = planetType === 'ice_giant';
     const isSolidLike =
         planetType === 'solid' ||
         planetType === 'volcanic' ||
@@ -254,30 +282,61 @@ export function randomPlanetParams(
         planetType === 'frozen' ||
         planetType === 'desert';
 
-    const inputSeed = (opts.seed ?? '').trim();
-    const seed = inputSeed.length > 0 ? inputSeed : generateSeedString();
-    const rng = new SeededRandom(seed);
+    // Mass+radius ranges from already-scaled constants.
+    const solidMassMin = Math.min(MERCURY_MASS, VENUS_MASS, EARTH_MASS);
+    const solidMassMax = Math.max(MERCURY_MASS, VENUS_MASS, EARTH_MASS);
+
+    const solidRadiusMin = Math.min(MERCURY_RADIUS, VENUS_RADIUS, EARTH_RADIUS);
+    const solidRadiusMax = Math.max(MERCURY_RADIUS, VENUS_RADIUS, EARTH_RADIUS);
+
+    const gasMassMin = Math.min(JUPITER_MASS, SATURN_MASS);
+    const gasMassMax = Math.max(JUPITER_MASS, SATURN_MASS);
+
+    const gasRadiusMin = Math.min(JUPITER_RADIUS, SATURN_RADIUS);
+    const gasRadiusMax = Math.max(JUPITER_RADIUS, SATURN_RADIUS);
+
+    const iceMassMin = Math.min(URANUS_MASS, NEPTUNE_MASS);
+    const iceMassMax = Math.max(URANUS_MASS, NEPTUNE_MASS);
+
+    const iceRadiusMin = Math.min(URANUS_RADIUS, NEPTUNE_RADIUS);
+    const iceRadiusMax = Math.max(URANUS_RADIUS, NEPTUNE_RADIUS);
+
+    const massMin = isSolidLike ? solidMassMin : isGasGiant ? gasMassMin : iceMassMin;
+    const massMax = isSolidLike ? solidMassMax : isGasGiant ? gasMassMax : iceMassMax;
+
+    const radiusMin = isSolidLike
+        ? solidRadiusMin
+        : isGasGiant
+          ? gasRadiusMin
+          : iceRadiusMin;
+    const radiusMax = isSolidLike
+        ? solidRadiusMax
+        : isGasGiant
+          ? gasRadiusMax
+          : iceRadiusMax;
+
+    // Sample mass log-uniform between min/max, unless overridden.
+    const sampledMass =
+        massMin * Math.pow(massMax / Math.max(1e-12, massMin), rng.next());
+
+    const mass =
+        typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0 ? opts.mass : sampledMass;
+
+    // Derive radius from the mass using a power-law anchored at min/max,
+    // unless overridden.
+    const massDen = Math.max(1e-12, massMin);
+    const exp = Math.log(radiusMax / Math.max(1e-12, radiusMin)) / Math.log(massMax / massDen);
+    const derivedRadius = radiusMin * Math.pow(mass / massDen, exp);
 
     const radius =
         typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
             ? opts.radius
-            : isSolidLike
-              ? 5 + rng.next() * 10
-              : 18 + rng.next() * 24;
-
-    const mass =
-        typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0
-            ? opts.mass
-            : isSolidLike
-              ? 50 + rng.next() * 500
-              : isGasGiant
-                ? 4000 + rng.next() * 26000
-                : 1200 + rng.next() * 7000;
+            : Math.min(Math.max(derivedRadius, radiusMin), radiusMax);
 
     const bodySubtype: PlanetTypeEnum =
         planetType === 'gas_giant'
             ? PlanetTypeEnum.GasGiant
-            : planetType === 'ice_giant'
+            : isIceGiant
               ? PlanetTypeEnum.IceGiant
               : planetType === 'volcanic'
                 ? PlanetTypeEnum.Volcanic
@@ -336,20 +395,41 @@ export function randomMoonParams(
             ? parentRadius
             : 1;
 
-    const distance = safeParentRadius * 5 + rng.next() * safeParentRadius * 10;
+    // Distance scales with parent size using the real Earth/Moon baseline:
+    // Earth–Moon: MOON_DIST_FROM_EARTH. Scale linearly by radius ratio.
+    const parentRelEarth = safeParentRadius / Math.max(1e-12, EARTH_RADIUS);
+    const distanceBase = MOON_DIST_FROM_EARTH * parentRelEarth;
+
+    // Add a deterministic multiplier so moons don't all sit on the same ring.
+    // Keep it modest so distance doesn't explode for tiny/huge radii.
+    const distanceMultiplier = 0.75 + rng.next() * 0.5; // [0.75..1.25]
+    const distance = distanceBase * distanceMultiplier;
+
+    // Planet-relative sizing so procedural moons can’t come out larger than the host.
+    // - Only applies to PROCEDURAL defaults (when opts.radius/mass aren't provided).
+    const maxDefaultMoonRadius = safeParentRadius * 0.25;
+    const minDefaultMoonRadius = Math.max(MOON_RADIUS * 0.05, safeParentRadius * 0.03);
 
     const radius =
         typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
             ? opts.radius
-            : 1 + rng.next() * 3;
+            : minDefaultMoonRadius +
+              rng.next() * Math.max(1e-6, maxDefaultMoonRadius - minDefaultMoonRadius);
+
+    // Use a density-ish scaling anchored to Earth/Moon constants:
+    // mass ∝ radius^3, with a light random multiplier to avoid uniformity.
+    const densityScale = MOON_MASS / Math.pow(Math.max(1e-12, MOON_RADIUS), 3);
+    const densityFactor = 0.7 + rng.next() * 0.6;
+
+    const computedMass = densityScale * Math.pow(radius, 3) * densityFactor;
 
     const mass =
         typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0
             ? opts.mass
-            : 0.5 + rng.next() * 2;
+            : computedMass;
 
-    const safeRadius = isFinite(radius) && radius > 0 ? radius : 1;
-    const safeMass = isFinite(mass) && mass > 0 ? mass : 0.5;
+    const safeRadius = isFinite(radius) && radius > 0 ? radius : minDefaultMoonRadius;
+    const safeMass = isFinite(mass) && mass > 0 ? mass : MOON_MASS * 0.5;
     const safeDistance = isFinite(distance) && distance > 0 ? distance : safeParentRadius * 5;
 
     return {

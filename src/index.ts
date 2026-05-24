@@ -257,7 +257,7 @@ const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
 // --- Camera and renderer setup ---
-const CAMERA_FAR_PLANE = PLUTO_DIST + 300000 * SCALE_FACTOR + 2000000 * SCALE_FACTOR;
+const CAMERA_FAR_PLANE = PLUTO_DIST + (300000000 / DIST_SCALE) * SCALE_FACTOR + (2000000000 / DIST_SCALE) * SCALE_FACTOR;
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
@@ -4689,7 +4689,7 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
             : 0;
     const farLimit = Math.min(
         MAX_CAMERA_VIEW_DISTANCE,
-        Math.max(targetDistance * 2, targetDistance + 500000 * SCALE_FACTOR, maxDist)
+        Math.max(targetDistance * 2, targetDistance + (500000000 /  DIST_SCALE) * SCALE_FACTOR, maxDist)
     );
 
     const zoomInLimit = 0;
