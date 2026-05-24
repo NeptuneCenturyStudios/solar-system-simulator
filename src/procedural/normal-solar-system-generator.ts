@@ -24,40 +24,31 @@ import type { IStateDependencies } from '../interfaces';
 import {
     G,
     SUN_MASS,
-
     MOON_MASS,
     MOON_DIST_FROM_EARTH,
     MOON_RADIUS,
-
     ISS_DIST_FROM_EARTH,
     ISS_MASS,
     ISS_RADIUS,
     ISS_INCLINATION,
-
     IO_MASS,
     IO_DIST_FROM_JUPITER,
     IO_RADIUS,
-
     EUROPA_MASS,
     EUROPA_DIST_FROM_JUPITER,
     EUROPA_RADIUS,
-
     GANYMEDE_MASS,
     GANYMEDE_DIST_FROM_JUPITER,
     GANYMEDE_RADIUS,
-
     CALLISTO_MASS,
     CALLISTO_DIST_FROM_JUPITER,
     CALLISTO_RADIUS,
-
     VESTA_MASS,
     VESTA_DISTANCE,
     VESTA_RADIUS,
-
     PALLAS_MASS,
     PALLAS_DISTANCE,
     PALLAS_RADIUS,
-
     HYGIEA_MASS,
     HYGIEA_DISTANCE,
     HYGIEA_RADIUS,
@@ -86,8 +77,14 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     }
 
     generateSolarSystem(): Body[] {
-        const { jupiterTexture, saturnTexture, uranusTexture, neptuneTexture, plutoTexture, ceresTexture } =
-            this.textures;
+        const {
+            jupiterTexture,
+            saturnTexture,
+            uranusTexture,
+            neptuneTexture,
+            plutoTexture,
+            ceresTexture,
+        } = this.textures;
 
         const bodies: Body[] = [];
 

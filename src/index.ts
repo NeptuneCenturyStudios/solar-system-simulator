@@ -39,18 +39,6 @@ import {
     SUN_MASS,
     EARTH_DIST,
     PLUTO_DIST,
-    IO_MASS,
-    IO_DIST_FROM_JUPITER,
-    IO_RADIUS,
-    EUROPA_MASS,
-    EUROPA_DIST_FROM_JUPITER,
-    EUROPA_RADIUS,
-    GANYMEDE_MASS,
-    GANYMEDE_DIST_FROM_JUPITER,
-    GANYMEDE_RADIUS,
-    CALLISTO_MASS,
-    CALLISTO_DIST_FROM_JUPITER,
-    CALLISTO_RADIUS,
     MOON_MASS,
     MOON_DIST_FROM_EARTH,
     MOON_RADIUS,
@@ -59,15 +47,6 @@ import {
     KUIPER_BELT_INNER_DIST,
     KUIPER_BELT_OUTER_DIST,
     KUIPER_BELT_VERTICAL_SPREAD,
-    VESTA_MASS,
-    VESTA_DISTANCE,
-    VESTA_RADIUS,
-    PALLAS_MASS,
-    PALLAS_DISTANCE,
-    PALLAS_RADIUS,
-    HYGIEA_MASS,
-    HYGIEA_DISTANCE,
-    HYGIEA_RADIUS,
     SimulationStartMode,
 
     // HUD / sim constants moved from index.ts
@@ -129,10 +108,6 @@ import {
     TIME_SCALE,
     SUN_RADIUS,
     DIST_SCALE,
-    ISS_MASS,
-    ISS_DIST_FROM_EARTH,
-    ISS_RADIUS,
-    ISS_INCLINATION,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -140,11 +115,16 @@ import {
     pickRandom,
     createUniqueId,
     BodyTypeEnum,
-    createSatellite,
     generateIAUName,
     getBodyTypeLabel,
 } from './utilities/utilities';
-import { absorbBody, calculateTrajectory, chooseCollisionWinner, IAutopilotState, setBodyRadius, updateSimulation } from './physics/physics';
+import {
+    absorbBody,
+    chooseCollisionWinner,
+    IAutopilotState,
+    setBodyRadius,
+    updateSimulation,
+} from './physics/physics';
 import {
     randomStarParams,
     randomBlackHoleParams,
@@ -152,10 +132,7 @@ import {
     randomMoonParams,
     randomCometParams,
 } from './utilities/body-params';
-import {
-    loadSrgbTexture,
-    fictionalTextures,
-} from './drawing/textures';
+import { loadSrgbTexture, fictionalTextures } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { WarpEffect } from './effects/warp-effect';
@@ -186,7 +163,6 @@ import { StartupModal } from './ui/startup-modal';
 import { AboutModal } from './ui/about-modal';
 import { PerformancePanel } from './ui/performance-panel';
 import { EventLogEntry, NotificationType } from './event-log/event-log';
-import { Halley } from './bodies/halley';
 import { IStateDependencies } from './interfaces';
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
@@ -236,7 +212,6 @@ window.addEventListener('beforeunload', (e) => {
 
 // Function to create/update body stats texture
 
-
 const scene = new THREE.Scene();
 
 // --- Skydome background ---
@@ -257,7 +232,8 @@ const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
 // --- Camera and renderer setup ---
-const CAMERA_FAR_PLANE = PLUTO_DIST + (300000000 / DIST_SCALE) * SCALE_FACTOR + (2000000000 / DIST_SCALE) * SCALE_FACTOR;
+const CAMERA_FAR_PLANE =
+    PLUTO_DIST + (300000000 / DIST_SCALE) * SCALE_FACTOR + (2000000000 / DIST_SCALE) * SCALE_FACTOR;
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
@@ -2263,15 +2239,15 @@ function createNewBody(
 
         // Optional atmosphere/cloud layer (checkbox-driven for custom solid + volcanic planets)
         if (hasAtmosphere && isSolidPlanet && newBody) {
-                const cloudsMat = new THREE.MeshStandardMaterial({
-                    map: pickRandom(fictionalAtmosphereTextures),
-                    color: 0xffffff,
-                    transparent: true,
-                    opacity: 0.25,
-                    depthWrite: false,
-                    roughness: 1.0,
-                    metalness: 0.0,
-                });
+            const cloudsMat = new THREE.MeshStandardMaterial({
+                map: pickRandom(fictionalAtmosphereTextures),
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.25,
+                depthWrite: false,
+                roughness: 1.0,
+                metalness: 0.0,
+            });
 
             const cloudsRadius =
                 Number.isFinite(newBody.radius) && newBody.radius > 0
@@ -2553,7 +2529,6 @@ function spawn({
     mode?: SimulationStartMode;
     seed?: string;
 } = {}) {
-
     // Store the generator used to create the solar system. For now, it will be for procedural generation only.
     let generator: SolarSystemGenerator | null = null;
 
@@ -2689,7 +2664,6 @@ function spawn({
         return;
     }
 
-
     // Default mode: build the solar system
     const normalGenerator = new NormalSolarSystemGenerator(dependencies, scene, {
         jupiterTexture,
@@ -2708,208 +2682,6 @@ function spawn({
     const shadowCheckboxForSpawn = document.getElementById('enableShadows') as HTMLInputElement;
     toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
     return;
-    simulationState.bodies.push(new Mercury(dependencies, scene));
-
-    // Venus
-    simulationState.bodies.push(new Venus(dependencies, scene));
-
-    // Earth
-    const earth = new Earth(dependencies, scene);
-    simulationState.bodies.push(earth);
-
-    // Moon
-    simulationState.bodies.push(
-        earth.createMoon(scene, {
-            distance: MOON_DIST_FROM_EARTH,
-            radius: MOON_RADIUS,
-            mass: MOON_MASS,
-            id: 'moon',
-            name: 'Moon',
-            trailColor: 0xffffff,
-            maxTrail: 1500,
-        })
-    );
-
-    // Satellite
-    simulationState.bodies.push(
-        createSatellite(scene, earth, {
-            distance: ISS_DIST_FROM_EARTH,
-            radius: ISS_RADIUS,
-            mass: ISS_MASS,
-            id: 'iss',
-            name: 'ISS',
-            trailColor: 0xffffff,
-            maxTrail: 1500,
-            inclinationDeg: ISS_INCLINATION,
-        })
-    );
-
-    // Mars
-    simulationState.bodies.push(new Mars(dependencies, scene));
-
-    // Ceres - dwarf planet, ~2.77 AU
-    simulationState.bodies.push(new Ceres(dependencies, scene, ceresTexture));
-
-    // Vesta - second most massive asteroid, ~2.36 AU
-    const vestaAngle = Math.random() * Math.PI * 2;
-    const vestaTrajectory = calculateTrajectory(dependencies.getG(), VESTA_DISTANCE, SUN_MASS);
-    const vesta = new Asteroid(dependencies, scene, {
-        radius: VESTA_RADIUS,
-        color: 0xb8a890,
-        pos: [
-            Math.cos(vestaAngle) * VESTA_DISTANCE,
-            (Math.random() - 0.5) * 1639,
-            Math.sin(vestaAngle) * VESTA_DISTANCE,
-        ],
-        vel: [
-            -Math.sin(vestaAngle) * vestaTrajectory.vel.length(),
-            0,
-            Math.cos(vestaAngle) * vestaTrajectory.vel.length(),
-        ],
-        mass: VESTA_MASS,
-        id: 'vesta',
-        name: 'Vesta',
-        trailColor: 0xc9b89a,
-        maxTrail: 1500,
-        roughness: 0.9,
-    });
-    simulationState.bodies.push(vesta);
-
-    // Pallas - third most massive, ~2.77 AU
-    const pallasAngle = Math.random() * Math.PI * 2;
-    const pallasTrajectory = calculateTrajectory(dependencies.getG(), PALLAS_DISTANCE, SUN_MASS);
-    const pallas = new Asteroid(dependencies, scene, {
-        radius: PALLAS_RADIUS,
-        color: 0x8a8a8a,
-        pos: [
-            Math.cos(pallasAngle) * PALLAS_DISTANCE,
-            (Math.random() - 0.5) * 2185,
-            Math.sin(pallasAngle) * PALLAS_DISTANCE,
-        ],
-        vel: [
-            -Math.sin(pallasAngle) * pallasTrajectory.vel.length(),
-            0,
-            Math.cos(pallasAngle) * pallasTrajectory.vel.length(),
-        ],
-        mass: PALLAS_MASS,
-        id: 'pallas',
-        name: 'Pallas',
-        trailColor: 0x999999,
-        maxTrail: 1500,
-        roughness: 0.9,
-    });
-    simulationState.bodies.push(pallas);
-
-    // Hygiea - fourth largest, ~3.14 AU
-    const hygieaAngle = Math.random() * Math.PI * 2;
-    const hygieaTrajectory = calculateTrajectory(dependencies.getG(), HYGIEA_DISTANCE, SUN_MASS);
-    const hygiea = new Asteroid(dependencies, scene, {
-        radius: HYGIEA_RADIUS,
-        color: 0x7a7a7a,
-        pos: [
-            Math.cos(hygieaAngle) * HYGIEA_DISTANCE,
-            (Math.random() - 0.5) * 1093,
-            Math.sin(hygieaAngle) * HYGIEA_DISTANCE,
-        ],
-        vel: [
-            -Math.sin(hygieaAngle) * hygieaTrajectory.vel.length(),
-            0,
-            Math.cos(hygieaAngle) * hygieaTrajectory.vel.length(),
-        ],
-        mass: HYGIEA_MASS,
-        id: 'hygiea',
-        name: 'Hygiea',
-        trailColor: 0x888888,
-        maxTrail: 1500,
-        roughness: 0.9,
-    });
-    simulationState.bodies.push(hygiea);
-
-    // Jupiter
-    const jupiter = new Jupiter(dependencies, scene, jupiterTexture);
-    simulationState.bodies.push(jupiter);
-
-    // Io (innermost Galilean moon) - Start at 0 degrees
-    simulationState.bodies.push(
-        jupiter.createMoon(scene, {
-            angle: 0,
-            distance: IO_DIST_FROM_JUPITER,
-            radius: IO_RADIUS, // 1.048 × Moon
-            mass: IO_MASS,
-            id: 'camIo',
-            name: 'Io',
-            trailColor: 0xffdd77,
-            maxTrail: 800,
-            yVariation: 109,
-        })
-    );
-
-    // Europa - Start at 90 degrees
-    simulationState.bodies.push(
-        jupiter.createMoon(scene, {
-            angle: Math.PI / 2,
-            distance: EUROPA_DIST_FROM_JUPITER,
-            radius: EUROPA_RADIUS, // 0.899 × Moon
-            mass: EUROPA_MASS,
-            id: 'camEuropa',
-            name: 'Europa',
-            trailColor: 0xccddee,
-            maxTrail: 1000,
-            yVariation: 164,
-        })
-    );
-
-    // Ganymede (largest moon in solar system) - Start at 180 degrees
-    simulationState.bodies.push(
-        jupiter.createMoon(scene, {
-            angle: Math.PI,
-            distance: GANYMEDE_DIST_FROM_JUPITER,
-            radius: GANYMEDE_RADIUS, // 1.517 × Moon (largest moon!)
-            mass: GANYMEDE_MASS,
-            id: 'camGanymede',
-            name: 'Ganymede',
-            trailColor: 0xcccccc,
-            maxTrail: 1200,
-            yVariation: 219,
-        })
-    );
-
-    // Callisto (outermost Galilean moon) - Start at 270 degrees
-    simulationState.bodies.push(
-        jupiter.createMoon(scene, {
-            angle: (Math.PI * 3) / 2,
-            distance: CALLISTO_DIST_FROM_JUPITER,
-            radius: CALLISTO_RADIUS, // 1.387 × Moon
-            mass: CALLISTO_MASS,
-            id: 'camCallisto',
-            name: 'Callisto',
-            trailColor: 0xaa9988,
-            maxTrail: 1500,
-            yVariation: 273,
-        })
-    );
-
-    // Saturn
-    simulationState.bodies.push(new Saturn(dependencies, scene, saturnTexture));
-
-    // Uranus
-    simulationState.bodies.push(new Uranus(dependencies, scene, uranusTexture));
-
-    // Neptune
-    simulationState.bodies.push(new Neptune(dependencies, scene, neptuneTexture));
-
-    // Pluto
-    simulationState.bodies.push(new Pluto(dependencies, scene, plutoTexture));
-
-    // Comet
-    simulationState.bodies.push(new Halley(dependencies, scene));
-
-    selectedBody = null;
-
-    // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
-    // immediately without requiring the user to toggle the checkbox.
-    const shadowCheckbox = document.getElementById('enableShadows') as HTMLInputElement;
-    toggleShadows((document.getElementById('enableShadows') as HTMLInputElement | null)?.checked ?? true);
 }
 
 function togglePause() {
@@ -4539,8 +4311,6 @@ function getFocusObject() {
         : null;
 }
 
-
-
 function refreshBodiesTable() {
     if (!uiManager.mainPanel) return;
 
@@ -4701,7 +4471,11 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
             : 0;
     const farLimit = Math.min(
         MAX_CAMERA_VIEW_DISTANCE,
-        Math.max(targetDistance * 2, targetDistance + (500000000 /  DIST_SCALE) * SCALE_FACTOR, maxDist)
+        Math.max(
+            targetDistance * 2,
+            targetDistance + (500000000 / DIST_SCALE) * SCALE_FACTOR,
+            maxDist
+        )
     );
 
     const zoomInLimit = 0;
