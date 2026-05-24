@@ -292,6 +292,7 @@ import 'noty/lib/noty.css';
 import { createFPSTexture, createSpeedTexture, createStatsTexture } from './drawing/text-rendering';
 import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { ProceduralGenerator } from './procedural/procedural-generator';
+import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: { message: string; notificationType: NotificationType }) {
@@ -2675,8 +2676,8 @@ function spawn({
         syncAllStarLightTargets();
         selectedBody = null;
 
-        const shadowCheckbox = document.getElementById('enableShadows') as HTMLInputElement;
-        toggleShadows(shadowCheckbox ? shadowCheckbox.checked : true);
+        const shadowCheckboxForSpawn = document.getElementById('enableShadows') as HTMLInputElement;
+        toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
         return;
     }
 
@@ -2688,14 +2689,25 @@ function spawn({
         return;
     }
 
-    // Recreate the primary star for default mode (local, not global)
-    const sun = new Sun(dependencies, scene);
 
     // Default mode: build the solar system
-    simulationState.bodies = [sun];
+    const normalGenerator = new NormalSolarSystemGenerator(dependencies, scene, {
+        jupiterTexture,
+        saturnTexture,
+        uranusTexture,
+        neptuneTexture,
+        plutoTexture,
+        ceresTexture,
+    });
+    simulationState.bodies = normalGenerator.generateSolarSystem();
     syncAllStarLightTargets();
+    selectedBody = null;
 
-    // Mercury
+    // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
+    // immediately without requiring the user to toggle the checkbox.
+    const shadowCheckboxForSpawn = document.getElementById('enableShadows') as HTMLInputElement;
+    toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
+    return;
     simulationState.bodies.push(new Mercury(dependencies, scene));
 
     // Venus
@@ -2897,7 +2909,7 @@ function spawn({
     // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
     // immediately without requiring the user to toggle the checkbox.
     const shadowCheckbox = document.getElementById('enableShadows') as HTMLInputElement;
-    toggleShadows(shadowCheckbox ? shadowCheckbox.checked : true);
+    toggleShadows((document.getElementById('enableShadows') as HTMLInputElement | null)?.checked ?? true);
 }
 
 function togglePause() {
