@@ -14,6 +14,8 @@ declare global {
         'body:absorbed': CustomEvent<{ message: string; notificationType: NotificationType }>;
         'body:selected': CustomEvent<{ body: Body; id: string; name: string }>;
         'body:deselected': CustomEvent<{ body: Body; id: string; name: string }>;
+        /** Fired when a weapon projectile strikes a body. Future damage systems listen here. */
+        'weapon:hit': CustomEvent<{ body: Body; position: THREE.Vector3 }>;
         'camera:focusChanged': CustomEvent<{
             body: Body | null;
             id: string | null;
@@ -159,6 +161,7 @@ import { Asteroid } from './bodies/asteroid';
 import { Comet } from './bodies/comet';
 
 import { Spaceship } from './bodies/spaceship';
+import { ShipWeapon } from './ship-effects/ship-weapon';
 import { StartupModal } from './ui/startup-modal';
 import { AboutModal } from './ui/about-modal';
 import { PerformancePanel } from './ui/performance-panel';
@@ -343,9 +346,10 @@ const flightCrosshair = new THREE.LineSegments(
 flightCrosshair.visible = false;
 uiScene.add(flightCrosshair);
 
-// End-circle marker at the pointer end of the steering line.
+// End-circle marker (aim reticle) at the pointer end of the steering line.
+// Kept large so it's easy to aim; driven by pointer offset each frame.
 const steeringEndMarker = new THREE.Mesh(
-    new THREE.RingGeometry(4, 6, 24),
+    new THREE.RingGeometry(18, 24, 48),
     new THREE.MeshBasicMaterial({
         color: 0x00ffcc,
         transparent: true,
@@ -359,7 +363,27 @@ steeringEndMarker.frustumCulled = false;
 steeringEndMarker.visible = false;
 uiScene.add(steeringEndMarker);
 
+// Origin circle — large translucent gray ring centred on the ship nose projection.
+// Defines the aim boundary; the steering line + aim reticle live inside it.
+const steeringOriginMarker = new THREE.Mesh(
+    new THREE.RingGeometry(138, 144, 72),
+    new THREE.MeshBasicMaterial({
+        color: 0xaaaaaa,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+    })
+);
+steeringOriginMarker.frustumCulled = false;
+steeringOriginMarker.visible = false;
+uiScene.add(steeringOriginMarker);
+
 // (Ship engine trail is owned by each Spaceship via its ShipTrail property)
+
+// --- Ship weapon (projectile particle system, lives in the main 3D scene) ---
+const shipWeapon = new ShipWeapon(scene);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 camera.position.set(INITIAL_CAMERA_DISTANCE, 12018 * SCALE_FACTOR, INITIAL_CAMERA_DISTANCE); // Scaled for new world size
@@ -656,6 +680,8 @@ const flightState = {
     /** Visual pitch offset of ship mesh relative to camera frame (radians).
      *  Animated toward steerY * FLIGHT_MAX_BANK_PITCH when steering vertically. */
     shipBankPitch: 0,
+    /** True while LMB is held during flight — fires weapon particles each frame. */
+    isFiring: false,
 };
 
 // --- Autopilot state ---
@@ -2734,8 +2760,11 @@ function onMouseDown(event: MouseEvent) {
     // Ignore synthetic mouse events immediately after touch gestures.
     if (Date.now() < interactionState.touchIgnoreUntil) return;
 
-    // In flight mode: block all LMB interactions (selection, gizmo, velocity editing).
-    // Only allow RMB (which just sets isMouseLookActive that flight mode ignores anyway).
+    // In flight mode: LMB fires the weapon; all other non-RMB interactions are blocked.
+    if (flightState.isActive && event.button === 0) {
+        flightState.isFiring = true;
+        return;
+    }
     if (flightState.isActive && event.button !== 2) return;
 
     // Surface mode RMB look uses the global mousemove handler (onSurfaceMouseMove).
@@ -3368,6 +3397,12 @@ function onMouseUp(event: MouseEvent) {
     // Ignore synthetic mouse events immediately after touch gestures.
     if (Date.now() < interactionState.touchIgnoreUntil) return;
 
+    // Flight mode: release LMB stops firing.
+    if (flightState.isActive && event.button === 0) {
+        flightState.isFiring = false;
+        return;
+    }
+
     // Middle mouse button release
     if (event.button === 1) {
         isMiddleMouseVelocity = false;
@@ -3861,14 +3896,24 @@ function animate() {
         }
     }
 
-    // Keep steering end marker synced with the line endpoint
+    // Keep steering end marker and origin ring synced each frame.
     if (flightState.isActive && flightSteeringLine.visible) {
+        const startX = steeringLinePositions[0];
+        const startY = steeringLinePositions[1];
         const endX = steeringLinePositions[3];
         const endY = steeringLinePositions[4];
         steeringEndMarker.position.set(endX, endY, 0);
         steeringEndMarker.visible = true;
+        steeringOriginMarker.position.set(startX, startY, 0);
+        steeringOriginMarker.visible = true;
     } else {
         steeringEndMarker.visible = false;
+        steeringOriginMarker.visible = false;
+    }
+
+    // Update weapon bolts (advance positions, collision check, camera-relative upload).
+    if (flightState.isActive && flightState.activeShip) {
+        shipWeapon.update(dtTotal, simulationState.bodies, camera.position, flightState.activeShip);
     }
 
     // Filter dead explosions
@@ -5362,7 +5407,7 @@ function updateFlightControls(dt: number) {
             warpEffect.stop();
             // Restore steering HUD now that warp deceleration is complete.
             flightSteeringLine.visible = true;
-            flightCrosshair.visible = true;
+            steeringOriginMarker.visible = true;
         }
         flightState.thrustActive = false;
         if (warpSprite) warpSprite.visible = false;
@@ -5397,6 +5442,7 @@ function updateFlightControls(dt: number) {
         flightSteeringLine.visible = false;
         flightCrosshair.visible = false;
         steeringEndMarker.visible = false;
+        steeringOriginMarker.visible = false;
         // Pulsing warp-active text (update every call is cheap since canvas is small)
         if (warpSprite) {
             const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
@@ -5663,10 +5709,35 @@ function updateFlightControls(dt: number) {
     steeringLinePositions[5] = 0;
     steeringLineGeo.attributes.position.needsUpdate = true;
 
-    // Move the static crosshair to the projected nose position
-    flightCrosshair.position.set(noseScreenX, noseScreenY, 0);
+    // Move origin ring and aim reticle to their screen positions.
+    steeringOriginMarker.position.set(noseScreenX, noseScreenY, 0);
     steeringEndMarker.position.set(noseScreenX + displayOffX, noseScreenY - displayOffY, 0);
     steeringEndMarker.visible = true;
+
+    // ── Weapon firing ────────────────────────────────────────────────────────
+    if (flightState.isFiring && !autopilotState.isActive) {
+        // Build world-space aim direction from the aim reticle screen position.
+        // Avoid unproject() — with near=0.00001 and far~8.2e9, any mid-NDC z value
+        // maps to a point essentially at the camera, causing floating-point errors.
+        // Instead, derive the ray directly from perspective FOV math:
+        //   view-space dir = (ndcX * tan(hFOV/2), ndcY * tan(vFOV/2), -1), normalised
+        // then rotate to world space via the camera world matrix.
+        const aimNdcX = (noseScreenX + displayOffX) / (window.innerWidth * 0.5);
+        const aimNdcY = (noseScreenY - displayOffY) / (window.innerHeight * 0.5);
+        const halfFovY = THREE.MathUtils.degToRad(camera.fov * 0.5);
+        const tanHalfFovY = Math.tan(halfFovY);
+        const tanHalfFovX = tanHalfFovY * camera.aspect;
+        const viewSpaceDir = new THREE.Vector3(
+            aimNdcX * tanHalfFovX,
+            aimNdcY * tanHalfFovY,
+            -1  // camera local -Z is forward in OpenGL/Three.js convention
+        ).normalize();
+        const aimDir = viewSpaceDir.transformDirection(camera.matrixWorld);
+
+        // Muzzle: slightly ahead of the ship so projectiles clear the hull.
+        const muzzlePos = ship.mesh.position.clone().addScaledVector(forward, ship.radius * 4);
+        shipWeapon.tryFire(dt, muzzlePos, aimDir, ship.velocity);
+    }
 }
 
 /** Spawn a spaceship in front of the camera and enter flight mode.
@@ -5785,8 +5856,8 @@ function spawnShip() {
     controls.enabled = false;
 
     flightSteeringLine.visible = true;
-    flightCrosshair.visible = true;
     steeringEndMarker.visible = true;
+    steeringOriginMarker.visible = true;
     if (warpSprite) warpSprite.visible = false;
     flightControlsPanel.setFlightActive(true);
     flightControlsPanel.setViewState(flightState.isCockpitView);
@@ -5825,6 +5896,8 @@ function exitFlightMode() {
     flightState.rollVelocity = 0;
     flightState.steerX = 0;
     flightState.steerY = 0;
+    flightState.isFiring = false;
+    shipWeapon.reset();
 
     flightState.isActive = false;
     flightState.activeShip = null;
@@ -5873,6 +5946,7 @@ function exitFlightMode() {
     flightSteeringLine.visible = false;
     flightCrosshair.visible = false;
     steeringEndMarker.visible = false;
+    steeringOriginMarker.visible = false;
     if (warpSprite) warpSprite.visible = false;
     flightState.warpCharge = 0;
     flightState.warpCharging = false;
@@ -6668,7 +6742,6 @@ window.addEventListener('keydown', (e) => {
                 // Restore steering HUD immediately on disengage (decel still active,
                 // but steering is restored so the player can redirect during slowdown).
                 flightSteeringLine.visible = true;
-                flightCrosshair.visible = true;
                 addEvent({
                     message: 'Warp disengaged. Decelerating...',
                     notificationType: NotificationType.Info,

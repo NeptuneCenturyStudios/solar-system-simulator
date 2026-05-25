@@ -326,3 +326,34 @@ export const AUTOPILOT_WARP_THRESHOLD =
         ((FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
             (2 * AUTOPILOT_WARP_DECEL)) +
     AUTOPILOT_BOOST_THRESHOLD;
+
+// === Ship weapon tuning ===
+/**
+ * Base bolt speed added on top of the ship's current speed (units/s).
+ * Effective relative speed = min(WEAPON_MAX_SPEED, WEAPON_BASE_SPEED + shipSpeed).
+ * Bolts are always exactly WEAPON_BASE_SPEED faster than the ship in camera space —
+ * so you can never outrun them, and the feel scales linearly with your velocity.
+ */
+export const WEAPON_BASE_SPEED = FLIGHT_MAX_SPEED * 2;
+/**
+ * Hard cap on bolt relative speed (units/s).
+ * Prevents bolts becoming sub-pixel at boost / warp speeds.
+ * Defaults to 10× normal max speed.
+ */
+export const WEAPON_MAX_SPEED = FLIGHT_MAX_SPEED * 10;
+/** Seconds a projectile lives before fizzling out. */
+export const WEAPON_PARTICLE_LIFETIME = 4.0;
+/**
+ * Visual bolt length (world units).  Each shot is a fixed-length line segment;
+ * the tail always sits exactly WEAPON_BOLT_LENGTH behind the head.
+ * ~40 ship radii gives a clearly visible streak at minimum fire speed.
+ */
+export const WEAPON_BOLT_LENGTH = SPACESHIP_RADIUS * 40;
+/** Hex colour of weapon bolts. */
+export const WEAPON_PARTICLE_COLOR = 0x00eeff;
+/** World-space size (units) of the glowing point at each bolt head.
+ *  Uses sizeAttenuation=true — perspective-correct, so distant bolts appear smaller.
+ *  Increase the multiplier to keep bolts visible at greater range. */
+export const WEAPON_BOLT_HEAD_SIZE = SPACESHIP_RADIUS * 2400;
+/** Maximum projectiles fired per second. */
+export const WEAPON_FIRE_RATE = 2;
