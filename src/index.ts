@@ -6977,7 +6977,17 @@ function applyDefaultCameraTogglesAfterSpawn() {
     forceHintRefresh();
 }
 
+function applyStartupGMultiplier() {
+    const gMult = startupModal.getGMultiplier();
+    simulationState.gMultiplier = gMult;
+    const mpSlider = uiManager.managementPanel.gravitationalConstantSlider;
+    const mpDisplay = uiManager.managementPanel.gravitationalConstantDisplay;
+    if (mpSlider) mpSlider.value = String(gMult);
+    if (mpDisplay) mpDisplay.textContent = gMult.toFixed(gMult < 10 ? 2 : 0);
+}
+
 startupModal.on('launchDefault', () => {
+    applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.Default });
@@ -6985,6 +6995,7 @@ startupModal.on('launchDefault', () => {
 });
 
 startupModal.on('launchEmpty', () => {
+    applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.Empty });
@@ -6992,6 +7003,7 @@ startupModal.on('launchEmpty', () => {
 });
 
 startupModal.on('launchBlackHole', () => {
+    applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.BlackHole });
@@ -6999,6 +7011,7 @@ startupModal.on('launchBlackHole', () => {
 });
 
 startupModal.on('generateProcedural', ({ seed }: { seed: string }) => {
+    applyStartupGMultiplier();
     uiManager.managementPanel.hide();
 
     // Ensure both launch overlays are closed before spawning the new simulation.

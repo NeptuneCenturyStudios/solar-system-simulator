@@ -173,6 +173,26 @@ body {
     gap: 0.5rem;
 }
 
+.startup-g-control {
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--new-ui-border);
+}
+
+.startup-g-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72em;
+    color: #7a9aba;
+    margin-top: 3px;
+    text-transform: none;
+}
+
+.startup-g-labels span {
+    cursor: help;
+    text-transform: none;
+}
+
 /* --- Bodies table (below Camera section) --- */
 #bodiesTableContainer {
     flex: 1 1 auto;
