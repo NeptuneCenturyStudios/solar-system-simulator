@@ -1083,6 +1083,7 @@ let autopilotBlockedNotifyTimer = 0;
 let autopilotBlockedByName = '';
 
 type AutopilotHudState =
+    | 'ALIGN'
     | 'APPROACH_WARP'
     | 'APPROACH_BOOST'
     | 'APPROACH'
@@ -1112,6 +1113,11 @@ function createAutopilotPhaseTexture(
     let color: string;
     let glow: string;
     switch (state) {
+        case 'ALIGN':
+            text = '◎  AUTOPILOT: ALIGNING TO TARGET';
+            color = '#88ddff';
+            glow = 'rgba(136,221,255,0.85)';
+            break;
         case 'APPROACH_WARP':
             text = '⚡  AUTOPILOT: WARPING';
             color = '#ff4488';
@@ -4220,7 +4226,9 @@ function animate() {
             // Determine desired HUD state
             let desiredHud: AutopilotHudState = 'NONE';
             if (autopilotState.isActive) {
-                if (autopilotState.phase === 'WARP_CHARGING' || autopilotState.phase === 'WARP') {
+                if (autopilotState.phase === 'ALIGN') {
+                    desiredHud = 'ALIGN';
+                } else if (autopilotState.phase === 'WARP_CHARGING' || autopilotState.phase === 'WARP') {
                     desiredHud = 'APPROACH_WARP';
                 } else if (autopilotState.phase === 'CIRCULARIZE') {
                     desiredHud = 'CIRCULARIZE';
@@ -4843,7 +4851,20 @@ function updateAutopilot(dt: number) {
     // time regardless of which way it is currently pointing.  The ship still rotates to face
     // the thrust direction, but that rotation is cosmetic only.
 
-    if (autopilotState.phase === 'WARP_CHARGING') {
+    if (autopilotState.phase === 'ALIGN') {
+        // Rotate toward the target without applying any thrust.  Once the ship's forward axis
+        // is within ~3° of the target direction the warp-charge sequence begins.
+        flightState.thrustActive = false;
+        const alignQuat = new THREE.Quaternion().setFromRotationMatrix(
+            new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
+        );
+        ship.mesh.quaternion.rotateTowards(alignQuat, FLIGHT_MAX_TURN_RATE * dt);
+
+        const shipForward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
+        if (shipForward.dot(toTargetDir) >= Math.cos(THREE.MathUtils.degToRad(3))) {
+            autopilotState.phase = 'WARP_CHARGING';
+        }
+    } else if (autopilotState.phase === 'WARP_CHARGING') {
         // Reuse the same charge progress bar shown during manual warp.
         autopilotState.warpChargeTimer = Math.min(
             autopilotState.warpChargeTimer + dt,
@@ -5263,7 +5284,7 @@ function engageAutopilot(target: Body) {
     autopilotState.isWarpActive = false;
     autopilotState.warpChargeTimer = 0;
     if (startWithWarp) {
-        autopilotState.phase = 'WARP_CHARGING';
+        autopilotState.phase = 'ALIGN';
     } else if (startInBrake) {
         autopilotState.phase = 'BRAKE';
         autopilotState.brakeEntryDistance = dist0;
@@ -5274,7 +5295,7 @@ function engageAutopilot(target: Body) {
 
     if (startWithWarp) {
         addEvent({
-            message: `Autopilot engaged: initiating warp to ${target.name || 'target'}.`,
+            message: `Autopilot engaged: aligning to ${target.name || 'target'}.`,
             notificationType: NotificationType.Info,
         });
     } else if (startInBrake) {

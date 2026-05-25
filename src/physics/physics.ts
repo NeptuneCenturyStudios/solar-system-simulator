@@ -34,7 +34,7 @@ export interface ISimulationState {
 /**
  * Autopilot state and phase information used to control the ship's automatic navigation behavior
  */
-export type AutopilotPhase = 'WARP_CHARGING' | 'WARP' | 'APPROACH' | 'BRAKE' | 'CIRCULARIZE';
+export type AutopilotPhase = 'ALIGN' | 'WARP_CHARGING' | 'WARP' | 'APPROACH' | 'BRAKE' | 'CIRCULARIZE';
 
 /**
  * Represents the state of the autopilot, including its activity status, target body, current phase, and various timers.
