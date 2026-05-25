@@ -22,7 +22,6 @@ import { createSatellite } from '../utilities/utilities';
 import type { IStateDependencies } from '../interfaces';
 
 import {
-    G,
     SUN_MASS,
     MOON_MASS,
     MOON_DIST_FROM_EARTH,
@@ -136,7 +135,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Vesta (~2.36 AU)
         const vestaAngle = Math.random() * Math.PI * 2;
-        const vestaTrajectory = calculateTrajectory(G, VESTA_DISTANCE, SUN_MASS);
+        const vestaTrajectory = calculateTrajectory(this.dependencies.getG(), VESTA_DISTANCE, SUN_MASS);
         const vesta = new Asteroid(this.dependencies, this.scene, {
             radius: VESTA_RADIUS,
             color: 0xb8a890,
@@ -161,7 +160,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Pallas (~2.77 AU)
         const pallasAngle = Math.random() * Math.PI * 2;
-        const pallasTrajectory = calculateTrajectory(G, PALLAS_DISTANCE, SUN_MASS);
+        const pallasTrajectory = calculateTrajectory(this.dependencies.getG(), PALLAS_DISTANCE, SUN_MASS);
         const pallas = new Asteroid(this.dependencies, this.scene, {
             radius: PALLAS_RADIUS,
             color: 0x8a8a8a,
@@ -186,7 +185,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Hygiea (~3.14 AU)
         const hygieaAngle = Math.random() * Math.PI * 2;
-        const hygieaTrajectory = calculateTrajectory(G, HYGIEA_DISTANCE, SUN_MASS);
+        const hygieaTrajectory = calculateTrajectory(this.dependencies.getG(), HYGIEA_DISTANCE, SUN_MASS);
         const hygiea = new Asteroid(this.dependencies, this.scene, {
             radius: HYGIEA_RADIUS,
             color: 0x7a7a7a,
