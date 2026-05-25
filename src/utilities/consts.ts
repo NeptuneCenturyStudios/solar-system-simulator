@@ -357,3 +357,18 @@ export const WEAPON_PARTICLE_COLOR = 0x00eeff;
 export const WEAPON_BOLT_HEAD_SIZE = SPACESHIP_RADIUS * 2400;
 /** Maximum projectiles fired per second. */
 export const WEAPON_FIRE_RATE = 2;
+/** HP damage dealt to a body on each bolt impact. */
+export const WEAPON_DAMAGE = 1;
+
+// === Body health points ===
+/**
+ * Multiplier applied to a body's mass to compute its initial health points.
+ *   healthPoints = mass * HP_MASS_MULTIPLIER
+ * With WEAPON_DAMAGE = 1 this gives roughly:
+ *   - Comet    ~0 HP  → destroyed in 1 shot
+ *   - Ceres    ~1.5 HP → destroyed in 1-2 shots
+ *   - Moon     ~122 HP
+ *   - Earth    ~9 900 HP
+ *   - Sun      ~3.3 billion HP (practically indestructible)
+ */
+export const HP_MASS_MULTIPLIER = 100;

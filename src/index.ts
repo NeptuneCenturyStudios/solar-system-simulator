@@ -110,6 +110,7 @@ import {
     TIME_SCALE,
     SUN_RADIUS,
     DIST_SCALE,
+    WEAPON_DAMAGE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -137,6 +138,7 @@ import {
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { ParticleExplosion } from './effects/particle-explosion';
+import { ImpactShockwave } from './effects/impact-shockwave';
 import { WarpEffect } from './effects/warp-effect';
 import { triggerScreenFlash } from './effects/screen-flash';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
@@ -628,6 +630,7 @@ const simulationState = {
     lastT: performance.now(),
     bodies: [] as Body[],
     explosions: [] as ParticleExplosion[],
+    impacts: [] as ImpactShockwave[],
     showNames: false,
     gMultiplier: 1,
 };
@@ -2597,6 +2600,10 @@ function spawn({
     });
     simulationState.explosions = [];
 
+    // Clean up any existing impact shockwaves
+    for (const impact of simulationState.impacts) impact.dispose();
+    simulationState.impacts = [];
+
     // Clean up all supernova effects
     for (const supernova of supernovas) {
         supernova.dispose();
@@ -3918,8 +3925,14 @@ function animate() {
 
     // Filter dead explosions
     simulationState.explosions = simulationState.explosions.filter((exp) => {
-        exp.update(dtTotal);
+        exp.update(dtTotal, camera.position);
         return exp.active;
+    });
+
+    // Update impact shockwaves
+    simulationState.impacts = simulationState.impacts.filter((impact) => {
+        impact.update(dtTotal, camera.position);
+        return impact.active;
     });
 
     // Update all supernovas (remove those that have collapsed)
@@ -6990,6 +7003,19 @@ window.addEventListener('body:removed', (e: WindowEventMap['body:removed']) => {
     }
     handleBodyBecameInvalid(removedBody);
     refreshBodiesTable();
+});
+
+window.addEventListener('weapon:hit', (e: WindowEventMap['weapon:hit']) => {
+    const { body, position } = e.detail;
+    if (body._isDisposed) return;
+
+    // Spawn impact shockwave rings at the hit point
+    simulationState.impacts.push(new ImpactShockwave(dependencies, scene, position, body.radius));
+
+    body.healthPoints -= WEAPON_DAMAGE;
+    if (body.healthPoints <= 0) {
+        body.die();
+    }
 });
 
 window.addEventListener('body:dead', (e: WindowEventMap['body:dead']) => {

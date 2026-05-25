@@ -113,6 +113,7 @@ export class Spaceship extends Body {
                 group.traverse((child) => {
                     if ((child as THREE.Mesh).isMesh) {
                         child.castShadow = true;
+                        child.renderOrder = 2; // draw after effects (renderOrder 1)
                     }
                 });
 

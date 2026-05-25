@@ -83,6 +83,7 @@ export class ShipWeapon {
 
         this.lines = new THREE.LineSegments(this.geometry, this.material);
         this.lines.frustumCulled = false;
+        this.lines.renderOrder = 2;
         this.lines.visible = false;
         scene.add(this.lines);
 
@@ -129,6 +130,7 @@ export class ShipWeapon {
 
         this.headPoints = new THREE.Points(this.headGeometry, this.headMaterial);
         this.headPoints.frustumCulled = false;
+        this.headPoints.renderOrder = 2;
         this.headPoints.visible = false;
         scene.add(this.headPoints);
     }

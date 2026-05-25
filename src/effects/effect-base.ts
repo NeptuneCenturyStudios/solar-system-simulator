@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { IStateDependencies } from '../interfaces';
 
 /**
@@ -6,7 +7,7 @@ import { IStateDependencies } from '../interfaces';
 export interface IEffect {
     dependencies: IStateDependencies;
     active: boolean;
-    update(dt: number): void;
+    update(dt: number, cameraPosition?: THREE.Vector3): void;
     dispose(): void;
 }
 

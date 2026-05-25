@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createTextTexture } from '../drawing/text-rendering.js';
 import { BodyTypeEnum } from '../utilities/utilities.js';
+import { HP_MASS_MULTIPLIER } from '../utilities/consts.js';
 
 export interface IBodyCreationOptions {
     mass: number;
@@ -24,6 +25,12 @@ export class Body {
     label: THREE.Sprite;
     labelLine: THREE.Line | null = null;
     bodyType: BodyTypeEnum;
+    /** Current hit-points.  Initialised from mass × HP_MASS_MULTIPLIER.
+     *  Reduced by weapon impacts; reaching ≤ 0 triggers body.die(). */
+    healthPoints: number;
+    /** Maximum hit-points at spawn (same initial value as healthPoints).
+     *  Use healthPoints / maxHealthPoints for a [0–1] health percentage. */
+    readonly maxHealthPoints: number;
     protected labelHeight = 0;
     tempAcc?: THREE.Vector3;
 
@@ -60,6 +67,8 @@ export class Body {
         this.id = id;
         this.name = name;
         this.bodyType = bodyType;
+        this.healthPoints = mass * HP_MASS_MULTIPLIER;
+        this.maxHealthPoints = this.healthPoints;
         this.mesh = mesh;
 
         if (position instanceof THREE.Vector3) {
