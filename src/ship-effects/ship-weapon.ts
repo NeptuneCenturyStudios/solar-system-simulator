@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
+import { playWeaponFire } from '../utilities/audio.js';
 import {
     WEAPON_BASE_SPEED,
     WEAPON_MAX_SPEED,
@@ -161,6 +162,7 @@ export class ShipWeapon {
             .multiplyScalar(relativeSpeed)
             .add(shipVelocity);
 
+        playWeaponFire();
         this.projectiles.push({
             position: origin.clone(),
             velocity,

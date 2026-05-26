@@ -24,8 +24,8 @@ export const SCALE_FACTOR = 1;
 export const G_SCALE = 1//10000000;
 // Tuned so that SUN_MASS = 33,000,000 exactly
 export const MASS_SCALE = 6.025757575757576e22;
-export const RADIUS_SCALE = 1;
-export const DIST_SCALE = 1;
+export const RADIUS_SCALE = 100;
+export const DIST_SCALE = 100;
 // 1. Keep the physically-derived base time scale
 export const BASE_TIME_SCALE = Math.sqrt(DIST_SCALE ** 3 / MASS_SCALE);
 // 2. Choose a user multiplier so that at warp 1, dt matches the old behavior

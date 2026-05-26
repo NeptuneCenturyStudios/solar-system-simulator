@@ -140,6 +140,7 @@ import { Supernova } from './effects/supernova';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { WarpEffect } from './effects/warp-effect';
+import { playWeaponImpact } from './utilities/audio.js';
 import { triggerScreenFlash } from './effects/screen-flash';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
 import { Body } from './bodies/body';
@@ -7008,6 +7009,8 @@ window.addEventListener('body:removed', (e: WindowEventMap['body:removed']) => {
 window.addEventListener('weapon:hit', (e: WindowEventMap['weapon:hit']) => {
     const { body, position } = e.detail;
     if (body._isDisposed || !body.mesh) return;
+
+    playWeaponImpact();
 
     // Spawn impact flash: pass body centre so ImpactShockwave can snap to surface
     simulationState.impacts.push(
