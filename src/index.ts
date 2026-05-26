@@ -368,11 +368,11 @@ uiScene.add(steeringEndMarker);
 // Origin circle — large translucent gray ring centred on the ship nose projection.
 // Defines the aim boundary; the steering line + aim reticle live inside it.
 const steeringOriginMarker = new THREE.Mesh(
-    new THREE.RingGeometry(138, 144, 72),
+    new THREE.RingGeometry(120, 124, 72),
     new THREE.MeshBasicMaterial({
         color: 0xaaaaaa,
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.25,
         side: THREE.DoubleSide,
         depthTest: false,
         depthWrite: false,
@@ -7007,10 +7007,12 @@ window.addEventListener('body:removed', (e: WindowEventMap['body:removed']) => {
 
 window.addEventListener('weapon:hit', (e: WindowEventMap['weapon:hit']) => {
     const { body, position } = e.detail;
-    if (body._isDisposed) return;
+    if (body._isDisposed || !body.mesh) return;
 
-    // Spawn impact shockwave rings at the hit point
-    simulationState.impacts.push(new ImpactShockwave(dependencies, scene, position, body.radius));
+    // Spawn impact flash: pass body centre so ImpactShockwave can snap to surface
+    simulationState.impacts.push(
+        new ImpactShockwave(dependencies, scene, position, body.mesh.position, body.radius)
+    );
 
     body.healthPoints -= WEAPON_DAMAGE;
     if (body.healthPoints <= 0) {

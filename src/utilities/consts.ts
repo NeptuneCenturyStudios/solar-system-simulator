@@ -334,7 +334,7 @@ export const AUTOPILOT_WARP_THRESHOLD =
  * Bolts are always exactly WEAPON_BASE_SPEED faster than the ship in camera space —
  * so you can never outrun them, and the feel scales linearly with your velocity.
  */
-export const WEAPON_BASE_SPEED = FLIGHT_MAX_SPEED * 2;
+export const WEAPON_BASE_SPEED = FLIGHT_MAX_SPEED * 1.1;
 /**
  * Hard cap on bolt relative speed (units/s).
  * Prevents bolts becoming sub-pixel at boost / warp speeds.
@@ -356,7 +356,7 @@ export const WEAPON_PARTICLE_COLOR = 0x00eeff;
  *  Increase the multiplier to keep bolts visible at greater range. */
 export const WEAPON_BOLT_HEAD_SIZE = SPACESHIP_RADIUS * 2400;
 /** Maximum projectiles fired per second. */
-export const WEAPON_FIRE_RATE = 2;
+export const WEAPON_FIRE_RATE = 4;
 /** HP damage dealt to a body on each bolt impact. */
 export const WEAPON_DAMAGE = 1;
 
