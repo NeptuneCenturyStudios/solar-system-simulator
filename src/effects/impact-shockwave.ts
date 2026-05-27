@@ -58,7 +58,7 @@ export class ImpactShockwave implements IEffect {
         scene.add(this.sphere);
     }
 
-    update(dt: number, _cameraPosition?: THREE.Vector3) {
+    update(dt: number) {
         dt = Math.abs(dt);
         this.age += dt * 60;
 

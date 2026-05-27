@@ -3932,7 +3932,7 @@ function animate() {
 
     // Update impact shockwaves
     simulationState.impacts = simulationState.impacts.filter((impact) => {
-        impact.update(dtTotal, camera.position);
+        impact.update(dtTotal);
         return impact.active;
     });
 
