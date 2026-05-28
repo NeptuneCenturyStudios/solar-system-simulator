@@ -447,6 +447,71 @@ export function randomMoonParams(
 }
 
 // ---------------------------------------------------------------------------
+// Asteroid
+// ---------------------------------------------------------------------------
+
+export interface AsteroidParams {
+    mass: number;
+    radius: number;
+    /** The seed actually used to derive this asteroid's properties. */
+    seed: string;
+}
+
+/**
+ * Returns deterministic (or override-applied) mass/radius for a new custom/procedural asteroid.
+ * Mass and radius are scaled relative to Ceres as the upper bound.
+ */
+export function randomAsteroidParams(
+    opts: {
+        mass?: number | null;
+        radius?: number | null;
+        seed?: string | null;
+    } = {}
+): AsteroidParams {
+    const inputSeed = (opts.seed ?? '').trim();
+    const seed = inputSeed.length > 0 ? inputSeed : generateSeedString();
+
+    const rng = new SeededRandom(seed);
+
+    // Asteroid size range anchored to Ceres (large) down to small rocky bodies.
+    // Import Ceres constants inline via a local scale derivation to keep body-params pure.
+    // We use the simulation-space values directly from consts.
+    const ASTEROID_MIN_MASS = 1e-6; // tiny rocky fragment (simulation units)
+    const ASTEROID_MAX_MASS = (9.393e20 / 6.025757575757576e22) * 1; // ≈ CERES_MASS
+
+    const mass =
+        typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0
+            ? opts.mass
+            : ASTEROID_MIN_MASS * Math.pow(ASTEROID_MAX_MASS / ASTEROID_MIN_MASS, rng.next());
+
+    // Radius roughly scales as mass^(1/3) anchored at Ceres size.
+    const ASTEROID_MIN_RADIUS = 0.005; // tiny fragment (simulation units)
+    const ASTEROID_MAX_RADIUS = (473 / 100) * 1; // ≈ CERES_RADIUS
+
+    const massT = Math.max(
+        0,
+        Math.min(
+            1,
+            (Math.log(Math.max(1e-30, mass)) - Math.log(ASTEROID_MIN_MASS)) /
+                (Math.log(ASTEROID_MAX_MASS) - Math.log(ASTEROID_MIN_MASS))
+        )
+    );
+    const derivedRadius =
+        ASTEROID_MIN_RADIUS +
+        (ASTEROID_MAX_RADIUS - ASTEROID_MIN_RADIUS) * Math.pow(massT, 1 / 3);
+
+    const radius =
+        typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
+            ? opts.radius
+            : Math.min(Math.max(derivedRadius, ASTEROID_MIN_RADIUS), ASTEROID_MAX_RADIUS);
+
+    const safeMass = isFinite(mass) && mass > 0 ? mass : ASTEROID_MIN_MASS;
+    const safeRadius = isFinite(radius) && radius > 0 ? radius : ASTEROID_MIN_RADIUS;
+
+    return { mass: safeMass, radius: safeRadius, seed };
+}
+
+// ---------------------------------------------------------------------------
 // Comet
 // ---------------------------------------------------------------------------
 

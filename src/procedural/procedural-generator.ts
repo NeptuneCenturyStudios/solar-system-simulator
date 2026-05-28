@@ -15,6 +15,8 @@ import { generateProceduralPlanets } from './planet-generator';
 import { createPlanetBodyFromProceduralCreation } from './planet-factory';
 import { generateProceduralMoons } from './moon-generator';
 import { createMoonBodyFromProceduralCreation } from './moon-factory';
+import { generateProceduralAsteroids } from './asteroid-generator';
+import { createAsteroidBodyFromProceduralCreation } from './asteroid-factory';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -258,6 +260,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         const planetEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Planet);
         const planetCount = planetEntry?.count ?? 0;
 
+        const asteroidEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Asteroid);
+        const asteroidCount = asteroidEntry?.count ?? 0;
+
         // currently only stars and planets are instantiated in this pass (moons not yet).
 
         const rng = this.prng;
@@ -418,6 +423,26 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             });
 
             bodies.push(moonBody);
+        }
+
+        const asteroidCreations = generateProceduralAsteroids({
+            dependencies: this.dependencies,
+            masterSeed: this.masterSeed,
+            asteroidCount,
+            starParams,
+            starPlacements: placements,
+        });
+
+        for (let i = 0; i < asteroidCreations.length; i++) {
+            const creation = asteroidCreations[i]!;
+
+            const asteroidBody = createAsteroidBodyFromProceduralCreation(
+                this.dependencies,
+                this.scene,
+                creation
+            );
+
+            bodies.push(asteroidBody);
         }
 
         return bodies;

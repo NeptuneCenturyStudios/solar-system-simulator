@@ -134,6 +134,7 @@ import {
     randomPlanetParams,
     randomMoonParams,
     randomCometParams,
+    randomAsteroidParams,
 } from './utilities/body-params';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures';
 import { Supernova } from './effects/supernova';
@@ -2447,9 +2448,16 @@ function createNewBody(
             inclination
         );
 
+        const { mass: asteroidMass, radius: asteroidRadius } = randomAsteroidParams({
+            mass: customMass,
+            radius: customRadius,
+        });
+
         newBody = new Asteroid(dependencies, scene, {
             pos: asteroidSpawnPos.toArray(),
             vel: asteroidVel.toArray(),
+            mass: asteroidMass,
+            radius: asteroidRadius,
         });
     } else if (bodyType === 'comet') {
         // Create a comet near the camera with appropriate orbital velocity
