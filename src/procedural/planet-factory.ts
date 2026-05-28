@@ -10,6 +10,7 @@ import {
     fictionalFrozenTexture,
     fictionalOceanTexture,
     fictionalDesertTexture,
+    fictionalTemperateTexture,
     fictionalGasTextures,
     fictionalIceTextures,
 } from '../drawing/textures';
@@ -21,7 +22,8 @@ export type ProceduralPlanetSubtype =
     | 'volcanic'
     | 'ocean'
     | 'frozen'
-    | 'desert';
+    | 'desert'
+    | 'temperate';
 
 export type PlanetBodyType = BodyTypeEnum.Planet | BodyTypeEnum.DwarfPlanet;
 
@@ -57,6 +59,7 @@ function pickTextureForSolidSubtype(
     if (subtype === PlanetTypeEnum.Ocean) return fictionalOceanTexture;
     if (subtype === PlanetTypeEnum.Frozen) return fictionalFrozenTexture;
     if (subtype === PlanetTypeEnum.Desert) return fictionalDesertTexture;
+    if (subtype === PlanetTypeEnum.Temperate) return fictionalTemperateTexture;
 
     // Remaining solid-like uses the pooled random textures (deterministic via textureIndex)
     const idx = Math.max(0, textureIndex ?? 0);

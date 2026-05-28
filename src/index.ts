@@ -2245,7 +2245,8 @@ function createNewBody(
             | 'volcanic'
             | 'ocean'
             | 'desert'
-            | 'frozen';
+            | 'frozen'
+            | 'temperate';
 
         const {
             mass: planetMass,
@@ -2259,7 +2260,8 @@ function createNewBody(
             resolvedPlanetType === 'volcanic' ||
             resolvedPlanetType === 'ocean' ||
             resolvedPlanetType === 'desert' ||
-            resolvedPlanetType === 'frozen';
+            resolvedPlanetType === 'frozen' ||
+            resolvedPlanetType === 'temperate';
 
         newBody = createPlanetBodyFromProceduralCreation(dependencies, scene, {
             id: createUniqueId('planet'),
@@ -5773,7 +5775,8 @@ function spawnShip() {
             scene,
             spawnPos,
             new THREE.Vector3(),
-            createUniqueId('spaceship')
+            createUniqueId('spaceship'),
+            flightControlsPanel.getSelectedModel()
         );
 
         // Orient the ship to the same direction the camera is facing

@@ -545,7 +545,8 @@ export class ManagementPanel extends Panel {
                             planetType === 'volcanic' ||
                             planetType === 'ocean' ||
                             planetType === 'frozen' ||
-                            planetType === 'desert'));
+                            planetType === 'desert' ||
+                            planetType === 'temperate'));
                 if (this.hasAtmosphereRow)
                     this.hasAtmosphereRow.style.display = canHaveAtmosphere ? 'flex' : 'none';
                 if (this.hasAtmosphereCheckbox && !canHaveAtmosphere)
@@ -1048,6 +1049,7 @@ export class ManagementPanel extends Panel {
                 'ocean',
                 'frozen',
                 'desert',
+                'temperate',
             ] as const;
             if (planetTypeSelect && planetTypeSelect.options.length > 0) {
                 const randomSubtype =
@@ -1251,7 +1253,8 @@ export class ManagementPanel extends Panel {
             value === 'volcanic' ||
             value === 'ocean' ||
             value === 'frozen' ||
-            value === 'desert'
+            value === 'desert' ||
+            value === 'temperate'
         ) {
             return value;
         }

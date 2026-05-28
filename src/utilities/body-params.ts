@@ -224,6 +224,7 @@ export enum PlanetTypeEnum {
     Ocean = 'ocean',
     Frozen = 'frozen',
     Desert = 'desert',
+    Temperate = 'temperate',
 }
 
 /**
@@ -266,7 +267,8 @@ export function randomPlanetParams(
         | 'volcanic'
         | 'ocean'
         | 'frozen'
-        | 'desert' = 'solid',
+        | 'desert'
+        | 'temperate' = 'solid',
     opts: { mass?: number | null; radius?: number | null; seed?: string | null } = {}
 ): PlanetParams {
     const inputSeed = (opts.seed ?? '').trim();
@@ -280,7 +282,8 @@ export function randomPlanetParams(
         planetType === 'volcanic' ||
         planetType === 'ocean' ||
         planetType === 'frozen' ||
-        planetType === 'desert';
+        planetType === 'desert' ||
+        planetType === 'temperate';
 
     // Mass+radius ranges from already-scaled constants.
     const solidMassMin = Math.min(MERCURY_MASS, VENUS_MASS, EARTH_MASS);
@@ -346,7 +349,9 @@ export function randomPlanetParams(
                     ? PlanetTypeEnum.Frozen
                     : planetType === 'desert'
                       ? PlanetTypeEnum.Desert
-                      : PlanetTypeEnum.Terrestrial;
+                      : planetType === 'temperate'
+                        ? PlanetTypeEnum.Temperate
+                        : PlanetTypeEnum.Terrestrial;
 
     return {
         mass,

@@ -78,6 +78,7 @@ function pickPlanetSubtypeByDistance(params: {
     const base = 0.15;
 
     const terrestrial = base + 1.2 * smoothGaussian(t, 0.55, 0.18);
+    const temperate = base + 1.3 * smoothGaussian(t, 0.5, 0.18);
     const desert = base + 1.5 * smoothGaussian(t, 0.18, 0.16);
     const volcanic = base + 1.3 * smoothGaussian(t, 0.22, 0.16);
     const ocean = base + 1.05 * smoothGaussian(t, 0.6, 0.18);
@@ -90,6 +91,7 @@ function pickPlanetSubtypeByDistance(params: {
         // Dwarf cannot be gas/ice giants.
         return pickWeighted(rng, [
             { value: PlanetTypeEnum.Terrestrial, weight: terrestrial },
+            { value: PlanetTypeEnum.Temperate, weight: temperate },
             { value: PlanetTypeEnum.Desert, weight: desert },
             { value: PlanetTypeEnum.Volcanic, weight: volcanic },
             { value: PlanetTypeEnum.Ocean, weight: ocean },
@@ -99,6 +101,7 @@ function pickPlanetSubtypeByDistance(params: {
 
     return pickWeighted(rng, [
         { value: PlanetTypeEnum.Terrestrial, weight: terrestrial },
+        { value: PlanetTypeEnum.Temperate, weight: temperate },
         { value: PlanetTypeEnum.Desert, weight: desert },
         { value: PlanetTypeEnum.Volcanic, weight: volcanic },
         { value: PlanetTypeEnum.Ocean, weight: ocean },
@@ -118,6 +121,7 @@ function planetSubtypeToCustomPlanetTypeString(subtype: PlanetTypeEnum): Procedu
     if (subtype === PlanetTypeEnum.Ocean) return 'ocean';
     if (subtype === PlanetTypeEnum.Frozen) return 'frozen';
     if (subtype === PlanetTypeEnum.Desert) return 'desert';
+    if (subtype === PlanetTypeEnum.Temperate) return 'temperate';
     return 'solid';
 }
 
