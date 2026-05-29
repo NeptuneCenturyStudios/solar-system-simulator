@@ -144,6 +144,9 @@ import { WarpEffect } from './effects/warp-effect';
 import { playWeaponImpact } from './utilities/audio.js';
 import { triggerScreenFlash } from './effects/screen-flash';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
+import { GridHelperManager } from './gizmos/grid-helper';
+import { PositionIndicatorManager } from './gizmos/position-indicator';
+import { FlightHUD } from './drawing/flight-hud';
 import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
 import { Mercury } from './bodies/mercury';
@@ -710,6 +713,13 @@ const autopilotState: IAutopilotState = {
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
+
+// Grid helper and position indicator managers (depend on scene + gizmo being ready)
+const gridHelperManager = new GridHelperManager(scene);
+gridHelperManager.init();
+const posIndicator = new PositionIndicatorManager(scene, gridHelperManager, gizmo);
+posIndicator.init();
+
 const dependencies: IStateDependencies = {
     gizmo: gizmo,
     addEvent: addEvent,
@@ -1004,396 +1014,17 @@ function createSpeedSprite() {
 }
 createSpeedSprite();
 
-// ── Warp HUD sprite ───────────────────────────────────────────────────────────
-// Bottom-center canvas sprite. Shows progress bar while charging, pulsing
-// "WARP ACTIVE" text once warp is engaged.
-let warpSprite: THREE.Sprite | null = null;
 const warpEffect = new WarpEffect(scene);
-
-/** Renders the charging progress bar (fill = 0..1) with label above. */
-function createWarpChargeTexture(fill: number): THREE.CanvasTexture {
-    const W = 512,
-        H = 128;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
-
-    // Label
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 36px monospace';
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = '#00ffcc';
-    ctx.shadowColor = 'rgba(0,255,204,0.9)';
-    ctx.fillText('INITIATING WARP', W / 2, 34);
-
-    // Bar track
-    const barX = 40,
-        barY = 68,
-        barW = W - 80,
-        barH = 28;
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(0,255,204,0.12)';
-    ctx.strokeStyle = 'rgba(0,255,204,0.5)';
-    ctx.lineWidth = 2;
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.strokeRect(barX, barY, barW, barH);
-
-    // Bar fill — gradient cyan→white at tip
-    if (fill > 0) {
-        const fillW = barW * fill;
-        const grad = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
-        grad.addColorStop(0, 'rgba(0,200,180,0.9)');
-        grad.addColorStop(0.8, 'rgba(0,255,220,1.0)');
-        grad.addColorStop(1, 'rgba(255,255,255,1.0)');
-        ctx.fillStyle = grad;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = 'rgba(0,255,204,0.9)';
-        ctx.fillRect(barX, barY, fillW, barH);
-        ctx.shadowBlur = 0;
-    }
-
-    // Percentage label inside bar
-    ctx.font = 'bold 18px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.shadowBlur = 0;
-    ctx.fillText(`${Math.round(fill * 100)}%`, W / 2, barY + barH / 2);
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
-}
-
-/** Renders the pulsing "WARP ACTIVE" text (pulse = 0..1 sine wave). */
-function createWarpActiveTexture(pulse: number): THREE.CanvasTexture {
-    const W = 512,
-        H = 96;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
-
-    const alpha = 0.55 + 0.45 * pulse; // 0.55–1.0
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 52px monospace';
-    ctx.shadowBlur = 20 + 20 * pulse;
-    ctx.shadowColor = `rgba(255,120,0,${alpha})`;
-    ctx.fillStyle = `rgba(255,${Math.round(180 + 75 * pulse)},0,${alpha})`;
-    ctx.fillText('⚡ WARP ACTIVE ⚡', W / 2, H / 2);
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
-}
-
-function createWarpSprite() {
-    const texture = createWarpChargeTexture(0);
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    warpSprite = new THREE.Sprite(material);
-    // 512×128 canvas at 0.625 ratio → 320×80 screen pixels; center at bottom
-    warpSprite.scale.set(320, 80, 1);
-    warpSprite.position.set(0, -(window.innerHeight / 2 - 50), 0);
-    warpSprite.visible = false;
-    uiScene.add(warpSprite);
-}
-createWarpSprite();
-
-// ── Autopilot phase-status HUD sprite ───────────────────────────────────────
-// Shows the current autopilot phase while active, and a brief "STABLE ORBIT"
-// confirmation for AUTOPILOT_ORBIT_NOTIFY_DURATION seconds after completion.
-let orbitNotifySprite: THREE.Sprite | null = null;
-
-let autopilotBlockedNotifyTimer = 0;
-let autopilotBlockedByName = '';
-
-type AutopilotHudState =
-    | 'ALIGN'
-    | 'APPROACH_WARP'
-    | 'APPROACH_BOOST'
-    | 'APPROACH'
-    | 'BRAKE'
-    | 'CIRCULARIZE'
-    | 'ORBIT'
-    | 'BLOCKED'
-    | 'NONE';
-let _lastAutopilotHudState: AutopilotHudState = 'NONE';
-
-function createAutopilotPhaseTexture(
-    state: AutopilotHudState,
-    distanceLabel = ''
-): THREE.CanvasTexture {
-    // Canvas is deliberately wide (800px) so no label ever clips.
-    // Two rows: phase label on top, distance on the bottom.
-    const W = 900,
-        H = 100;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    let text: string;
-    let color: string;
-    let glow: string;
-    switch (state) {
-        case 'ALIGN':
-            text = '◎  AUTOPILOT: ALIGNING TO TARGET';
-            color = '#88ddff';
-            glow = 'rgba(136,221,255,0.85)';
-            break;
-        case 'APPROACH_WARP':
-            text = '⚡  AUTOPILOT: WARPING';
-            color = '#ff4488';
-            glow = 'rgba(255,68,136,0.9)';
-            break;
-        case 'APPROACH_BOOST':
-            text = '▶▶  AUTOPILOT: APPROACHING TARGET (BOOST)';
-            color = '#ff9944';
-            glow = 'rgba(255,153,68,0.85)';
-            break;
-        case 'APPROACH':
-            text = '▶  AUTOPILOT: APPROACHING TARGET';
-            color = '#00ffcc';
-            glow = 'rgba(0,255,204,0.85)';
-            break;
-        case 'BRAKE':
-            text = '◼  AUTOPILOT: ESTABLISHING ORBIT TRAJECTORY';
-            color = '#00ffcc';
-            glow = 'rgba(0,255,204,0.85)';
-            break;
-        case 'CIRCULARIZE':
-            text = '↻  AUTOPILOT: ENTERING ORBIT';
-            color = '#00ffcc';
-            glow = 'rgba(0,255,204,0.85)';
-            break;
-        case 'ORBIT':
-            text = '✓  STABLE ORBIT ESTABLISHED';
-            color = '#7ef0ff';
-            glow = 'rgba(100,220,255,0.9)';
-            break;
-        case 'BLOCKED':
-            text = '⚠ AUTOPILOT BLOCKED';
-            color = '#ff3344';
-            glow = 'rgba(255,51,68,0.9)';
-            break;
-        default:
-            text = '';
-            color = '#ffffff';
-            glow = 'transparent';
-    }
-
-    // Phase label
-    ctx.font = 'bold 34px monospace';
-    ctx.shadowBlur = 14;
-    ctx.shadowColor = glow;
-    ctx.fillStyle = color;
-    ctx.fillText(text, W / 2, 34);
-
-    // Distance sub-label
-    if (distanceLabel) {
-        ctx.font = '24px monospace';
-        ctx.shadowBlur = 6;
-        ctx.fillStyle = 'rgba(255,255,255,0.75)';
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.fillText(distanceLabel, W / 2, 72);
-    }
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
-}
-
-function createOrbitNotifySprite() {
-    const material = new THREE.SpriteMaterial({
-        map: createAutopilotPhaseTexture('NONE'),
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    orbitNotifySprite = new THREE.Sprite(material);
-    // 800×100 canvas → 800×80 screen-pixel sprite (two-line display).
-    orbitNotifySprite.scale.set(800, 80, 1);
-    orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), 0);
-    orbitNotifySprite.visible = false;
-    uiScene.add(orbitNotifySprite);
-}
-createOrbitNotifySprite();
-
-function showOrbitNotifySprite() {
-    if (!orbitNotifySprite) return;
-    orbitNotifySprite.visible = true;
-    autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
-}
-
-// --- Context hint system (top-center HUD text) ---
-let hintSprite: THREE.Sprite | null = null;
-let hintLastText = '';
-
-function createHintSprite() {
-    const texture = createHintTexture({
-        lines: [],
-    });
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    hintSprite = new THREE.Sprite(material);
-    hintSprite.scale.set(1100, 95, 1); // allow 1-2 lines (wider to avoid clipping)
-    hintSprite.visible = false;
-
-    // Top-center of the screen (slightly below top edge)
-    hintSprite.position.set(0, window.innerHeight / 2 - 55, 0);
-
-    uiScene.add(hintSprite);
-
-    window.__updateHintSprite = function updateHintSprite() {
-        if (!hintSprite) return;
-
-        const hint = getActiveContextHint();
-        hintSprite.visible = hint.visible;
-        if (!hint.visible) return;
-
-        const textKey = hint.lines.join('\n');
-        if (textKey === hintLastText) return;
-        hintLastText = textKey;
-
-        if (hintSprite.material.map) hintSprite.material.map.dispose();
-        hintSprite.material.map = createHintTexture({ lines: hint.lines });
-        hintSprite.material.needsUpdate = true;
-    };
-}
-
-function forceHintRefresh() {
-    try {
-        hintLastText = '';
-
-        // Always recompute the hint, and force-apply both visibility and texture.
-        // This avoids "stuck" hint sprites when switching camera modes.
-        if (!hintSprite) return;
-
-        const hint = getActiveContextHint();
-        hintSprite.visible = hint.visible;
-
-        // Dispose old texture (if any)
-        if (hintSprite.material?.map) hintSprite.material.map.dispose();
-
-        if (!hint.visible) {
-            // Ensure we don't keep stale text around
-            hintLastText = '';
-            hintSprite.material.map = createHintTexture({ lines: [] });
-            hintSprite.material.needsUpdate = true;
-            return;
-        }
-
-        hintLastText = hint.lines.join('\n');
-        hintSprite.material.map = createHintTexture({ lines: hint.lines });
-        hintSprite.material.needsUpdate = true;
-    } catch (e) {
-        console.error('Error dispatching body:added event for preset body:', e);
-    }
-}
-
-function getActiveContextHint() {
-    // Highest priority: velocity dragging hint (existing behavior)
-    const draggingVel = isChangingVelocity || isMiddleMouseVelocity;
-    if (draggingVel) {
-        const mode = interactionState.velocityEditMode || 'xz';
-        return {
-            visible: true,
-            lines: [
-                `Dragging velocity — press G to switch modes (XZ ↔ Y) | Mode: ${mode.toUpperCase()}`,
-            ],
-        };
-    }
-
-    const selected =
-        selectedBody && simulationState.bodies.includes(selectedBody) ? selectedBody : null;
-
-    const isFree = !!cameraState.isFreeCameraMode;
-    const isTarget = !!cameraState.isTargetMode;
-
-    // Case 1: Free camera mode hint (always show when enabled)
-    if (isFree) {
-        // If a body is also selected, we can show a second line about manipulation.
-        if (selected) {
-            const bodyLine = isTarget
-                ? `Selected: drag axis arrows to move body | Drag yellow arrow to change velocity`
-                : `Selected: click Target (crosshair) to enable arrows | Then drag arrows to move / change velocity`;
-            return {
-                visible: true,
-                lines: [`Free Camera: WASD move | Space up | C down | Shift = fast`, bodyLine],
-            };
-        }
-
-        return {
-            visible: true,
-            lines: [`Free Camera: WASD move | Space up | C down | Shift = fast`],
-        };
-    }
-
-    // Case 2: Body selected manipulation hint (non-free-cam)
-    if (selected) {
-        const line = isTarget
-            ? `Selected: drag axis arrows or use Arrow keys to move body | Drag yellow arrow to change velocity`
-            : `Selected: click Target (crosshair) to enable arrows | Arrow keys move body once Target is on`;
-
-        return {
-            visible: true,
-            lines: [line, 'Hold middle mouse button: follow mode'],
-        };
-    }
-
-    // Case 3: Default camera hint (no selection, not free camera)
-    return {
-        visible: true,
-        lines: ['Use right mouse button to rotate camera'],
-    };
-}
-
-function createHintTexture({ lines }: { lines: string[] }) {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Failed to create canvas context for hint texture');
-
-    canvas.width = 2200;
-    canvas.height = 140;
-
-    context.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 28pt hint text (slightly smaller to avoid clipping)
-    context.font = '28px monospace';
-    context.fillStyle = '#aaaaaa';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-
-    const safeLines = Array.isArray(lines) ? lines.filter(Boolean) : [];
-    if (safeLines.length === 0) {
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.needsUpdate = true;
-        return texture;
-    }
-
-    const lineY = safeLines.length > 1 ? [50, 100] : [75];
-    for (let i = 0; i < Math.min(safeLines.length, 2); i++) {
-        context.fillText(safeLines[i], canvas.width / 2, lineY[i]);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    return texture;
-}
-
-createHintSprite();
+const flightHUD = new FlightHUD(
+    uiScene,
+    autopilotState,
+    interactionState,
+    cameraState,
+    simulationState,
+    flightState,
+    () => selectedBody
+);
+flightHUD.init();
 
 // Backward compatibility aliases
 let activeAxis: string | null = null;
@@ -1585,20 +1216,20 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
     }
 
     if (gizmo.group?.visible) {
-        showPositionIndicators('position');
-        updatePositionIndicator(yAxisIndicator, yAxisRing, body.mesh.position);
+        posIndicator.show('position');
+        posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, body.mesh.position);
     }
 
     if (gizmo.target === body) {
         gizmo.update();
         updateVelocityArcs();
-        if (yAxisIndicator && yAxisRing) {
-            updatePositionIndicator(yAxisIndicator, yAxisRing, body.mesh.position);
+        if (posIndicator.yAxisIndicator && posIndicator.yAxisRing) {
+            posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, body.mesh.position);
         }
         if (
             (isChangingVelocity || isMiddleMouseVelocity) &&
-            velocityTipIndicator &&
-            velocityTipRing
+            posIndicator.velocityTipIndicator &&
+            posIndicator.velocityTipRing
         ) {
             const speed = body.velocity.length();
             const arrowScale = 50;
@@ -1607,7 +1238,7 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
             const arrowTip = body.mesh.position
                 .clone()
                 .add(direction.multiplyScalar(speed * arrowScale));
-            updatePositionIndicator(velocityTipIndicator, velocityTipRing, arrowTip);
+            posIndicator.updateIndicator(posIndicator.velocityTipIndicator, posIndicator.velocityTipRing, arrowTip);
         }
     }
 
@@ -1647,278 +1278,6 @@ const kuiperBeltPoints = new THREE.Points(kuiperBeltGeo, kuiperBeltMat);
 scene.add(kuiperBeltPoints);
 
 // Velocity arrow is now part of CoordinateGizmo (gizmo.velocityArrow)
-
-// Grid plane for when dragging gizmo or velocity arrow
-// UX goal: grid should feel "world anchored" (does not move with the body),
-// but should dynamically expand/contract to encompass the dragged target + buffer.
-let gridHelper: THREE.GridHelper | null = null;
-const gridState = {
-    size: 0,
-    divisions: 0,
-
-    // While dragging, the grid is anchored at the body's position at drag start (but does not move after).
-    dragAnchor: new THREE.Vector3(),
-
-    // Base cell size to use for the drag session (fixed; derived from body radius at drag start).
-    dragCellSize: null as number | null,
-
-    // While dragging, keep divisions stable to avoid a distracting "grid shifting" effect
-    // (divisions changes re-quantize line spacing, which reads as the grid moving).
-    freezeDivisions: false,
-};
-
-function disposeGridHelper() {
-    if (!gridHelper) return;
-    scene.remove(gridHelper);
-    gridHelper.geometry?.dispose?.();
-    gridHelper.material?.dispose?.();
-    gridHelper = null;
-    gridState.size = 0;
-    gridState.divisions = 0;
-}
-
-function createGridHelper({
-    size,
-    divisions,
-    center,
-}: {
-    size: number;
-    divisions: number;
-    center: THREE.Vector3 | null;
-}) {
-    // Recreate (GridHelper doesn't support resizing)
-    disposeGridHelper();
-
-    gridHelper = new THREE.GridHelper(size, divisions, 0x444444, 0x222222);
-    // Anchored at a fixed center (drag-start position) on the y=0 plane
-    if (center) {
-        gridHelper.position.set(center.x, 0, center.z);
-    } else {
-        gridHelper.position.set(0, 0, 0);
-    }
-    gridHelper.visible = false;
-    scene.add(gridHelper);
-
-    gridState.size = size;
-    gridState.divisions = divisions;
-}
-
-function calcGridRequiredSize(targetBody: Body | null) {
-    // Fallback: if no target, just keep a modest grid.
-    if (!targetBody || targetBody._isDisposed || !targetBody.mesh) {
-        const fallbackSize = 12000;
-        const fallbackDivisions = 200;
-        return {
-            size: fallbackSize,
-            divisions: fallbackDivisions,
-            center: new THREE.Vector3(0, 0, 0),
-        };
-    }
-
-    // Grid anchor: where the body was when the drag started.
-    // During drag we keep gridHelper.position fixed at this point (XZ).
-    const anchor = gridState.dragAnchor || new THREE.Vector3(0, 0, 0);
-
-    // How far the body has moved away from the drag start anchor (in XZ)
-    const p = targetBody.mesh.position;
-    const dx = p.x - anchor.x;
-    const dz = p.z - anchor.z;
-    const rXZ = Math.sqrt(dx * dx + dz * dz);
-
-    const radius = Math.max(0, targetBody.radius || 0);
-
-    // Buffer rules:
-    // Keep the initial grid SMALL and only slightly larger than the dragged body.
-    // Then EXPAND ONLY as the body moves away from the anchor.
-    //
-    // Use a smaller body-relative padding so the grid doesn't feel excessively large.
-    const buffer = Math.max(25, radius * 4);
-
-    // Baseline: just enough to cover the body + padding.
-    const baseHalfExtent = Math.max(radius + buffer, 120);
-
-    // Expand as the body moves away from the anchor
-    const halfExtent = baseHalfExtent + rXZ;
-
-    // GridHelper size is full width across X and Z.
-    const size = THREE.MathUtils.clamp(halfExtent * 2, 500, 4000000); //4000000
-
-    // Cell sizing rules:
-    // - Cell size is FIXED for the drag session and based on the object's radius at drag start.
-    // - Cell size MUST NOT increase as the body moves away; only size/divisions change.
-    const cell = gridState.dragCellSize || Math.max(0.05, Math.min(20000, radius || 1));
-
-    // Keep cell size stable by computing divisions from the fixed cell size.
-    let divisions = Math.round(size / cell);
-
-    // Clamp for GridHelper sanity, but avoid forcing large minimums (that would imply a big grid).
-    // Allow smaller cell sizes by allowing more divisions.
-    // GridHelper cost grows with divisions, so keep a safety cap.
-    divisions = THREE.MathUtils.clamp(divisions, 2, 20000);
-
-    // Make divisions even so the center line is stable/consistent.
-    if (divisions % 2 !== 0) divisions += 1;
-
-    return { size, divisions, center: anchor };
-}
-
-function ensureGridHelperSizedToTarget(targetBody: Body | null) {
-    const {
-        size: requiredSize,
-        divisions: requiredDivisions,
-        center,
-    } = calcGridRequiredSize(targetBody);
-
-    const currentSize = gridState.size || 0;
-    const currentDivisions = gridState.divisions || 0;
-
-    const sizeChangedEnough =
-        !gridHelper || Math.abs(requiredSize - currentSize) > currentSize * 0.05;
-
-    // While dragging we freeze divisions to avoid a perceived "grid shifting" effect.
-    // But if we allow the grid to SHRINK, we must allow divisions to shrink too, otherwise cell size
-    // becomes enormous as size decreases. So during freeze we still keep the cell size stable by
-    // tracking divisions from the required size.
-    const divisionsToUse = gridState.freezeDivisions ? requiredDivisions : requiredDivisions;
-    const divisionsChanged = divisionsToUse !== currentDivisions;
-
-    const shouldRebuild =
-        sizeChangedEnough ||
-        (!gridState.freezeDivisions && divisionsChanged) ||
-        (gridState.freezeDivisions && sizeChangedEnough);
-
-    if (shouldRebuild) {
-        createGridHelper({
-            size: requiredSize,
-            divisions: divisionsToUse,
-            center,
-        });
-    }
-
-    // Keep the grid anchored at drag-start center (XZ).
-    if (gridHelper && center) {
-        gridHelper.position.set(center.x, 0, center.z);
-
-        // Ensure the grid remains visible during a drag even if we recreate it this frame.
-        if (interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity) {
-            gridHelper.visible = true;
-        }
-    }
-}
-
-// Initialize with a default grid
-createGridHelper(calcGridRequiredSize(null));
-
-// Y-axis indicator (red line from grid to object with ring at bottom)
-let yAxisIndicator: THREE.Line | null = null;
-let yAxisRing: THREE.Mesh | null = null;
-let velocityTipIndicator: THREE.Line | null = null;
-let velocityTipRing: THREE.Mesh | null = null;
-
-function createPositionIndicator(color: number) {
-    // Create vertical line
-    const lineMaterial = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
-    const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 100, 0),
-    ]);
-    const line = new THREE.Line(lineGeometry, lineMaterial);
-    line.visible = false;
-    scene.add(line);
-
-    // Create ring at bottom
-    const ringGeometry = new THREE.RingGeometry(8, 10, 32);
-    const ringMaterial = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide });
-    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-    ring.rotation.x = Math.PI / 2; // Rotate to lie flat on XZ plane
-    ring.visible = false;
-    scene.add(ring);
-
-    return { line, ring };
-}
-
-// Create red indicator for object position
-const redIndicator = createPositionIndicator(0xff0000);
-yAxisIndicator = redIndicator.line;
-yAxisRing = redIndicator.ring;
-
-// Create green indicator for velocity arrow tip
-const greenIndicator = createPositionIndicator(0x00ff00);
-velocityTipIndicator = greenIndicator.line;
-velocityTipRing = greenIndicator.ring;
-
-function updatePositionIndicator(
-    line: THREE.Line | null,
-    ring: THREE.Mesh | null,
-    position: THREE.Vector3 | null
-) {
-    if (!line || !ring || !position) return;
-
-    const gridY = 0; // Grid is at y=0
-
-    // Update line position and length
-    const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(position.x, gridY, position.z),
-        new THREE.Vector3(position.x, position.y, position.z),
-    ]);
-    line.geometry.dispose();
-    line.geometry = lineGeometry;
-
-    // Update ring position
-    ring.position.set(position.x, gridY, position.z);
-}
-
-function setIndicatorMode(mode: string) {
-    const showRed = mode === 'position' || mode === 'both';
-    const showGreen = mode === 'velocity' || mode === 'both';
-
-    if (yAxisIndicator) yAxisIndicator.visible = showRed;
-    if (yAxisRing) yAxisRing.visible = showRed;
-    if (velocityTipIndicator) velocityTipIndicator.visible = showGreen;
-    if (velocityTipRing) velocityTipRing.visible = showGreen;
-}
-
-function showPositionIndicators(mode = 'position') {
-    // Capture drag-start anchor and a fixed cell size derived from the dragged body's radius.
-    // Grid will be anchored here (not moving), and will only EXPAND as the body moves away.
-    if (gizmo?.target?.mesh) {
-        gridState.dragAnchor.copy(gizmo.target.mesh.position);
-        const r = Math.max(0, gizmo.target.radius || 0);
-        // Cell size is derived from body radius, but scaled down for this sim's world units.
-        const cell = Math.max(0.05, Math.min(20000, r || 1));
-        gridState.dragCellSize = cell;
-    } else {
-        gridState.dragAnchor.set(0, 0, 0);
-        gridState.dragCellSize = 10;
-    }
-
-    // Freeze divisions during drag to prevent "shimmering" / perceived grid motion.
-    gridState.freezeDivisions = true;
-    ensureGridHelperSizedToTarget(gizmo?.target);
-
-    // Defensive: ensure helpers are actually in the scene and not disposed/removed due to any race
-    if (gridHelper && !gridHelper.parent) scene.add(gridHelper);
-    if (yAxisIndicator && !yAxisIndicator.parent) scene.add(yAxisIndicator);
-    if (yAxisRing && !yAxisRing.parent) scene.add(yAxisRing);
-    if (velocityTipIndicator && !velocityTipIndicator.parent) scene.add(velocityTipIndicator);
-    if (velocityTipRing && !velocityTipRing.parent) scene.add(velocityTipRing);
-
-    if (gridHelper) gridHelper.visible = true;
-    setIndicatorMode(mode);
-
-    if ((mode === 'position' || mode === 'both') && gizmo?.target?.mesh) {
-        updatePositionIndicator(yAxisIndicator, yAxisRing, gizmo.target.mesh.position);
-    }
-}
-
-function hidePositionIndicators() {
-    // Allow divisions to update again once the drag ends.
-    gridState.freezeDivisions = false;
-    gridState.dragCellSize = null;
-    setIndicatorMode('none');
-
-    if (gridHelper) gridHelper.visible = false;
-}
 
 function getPrimaryStar() {
     return (
@@ -2818,7 +2177,7 @@ function onMouseDown(event: MouseEvent) {
         }
 
         // Show grid and indicators
-        showPositionIndicators('both');
+        posIndicator.show('both');
         updateVelocityArcs();
 
         return;
@@ -2948,7 +2307,7 @@ function onMouseDown(event: MouseEvent) {
         }
 
         // Show grid + arcs + indicators
-        showPositionIndicators('both');
+        posIndicator.show('both');
         updateVelocityArcs();
 
         return;
@@ -3027,7 +2386,7 @@ function onMouseDown(event: MouseEvent) {
         }
 
         // Show grid and indicators
-        showPositionIndicators('position');
+        posIndicator.show('position');
 
         if (!isPaused && !isFreeCameraMode) {
             togglePause();
@@ -3099,7 +2458,7 @@ function onMouseDown(event: MouseEvent) {
         uiManager.managementPanel.setSelectedBody(null);
 
         refreshBodiesTable();
-        forceHintRefresh();
+        flightHUD.forceHintRefresh();
     }
 }
 
@@ -3428,7 +2787,7 @@ function onMouseUp(event: MouseEvent) {
         // If LMB velocity drag is still active, do NOT hide the grid/indicators/arcs.
         // This prevents "grid disappearing" when the user releases MMB while still dragging with LMB.
         if (!isChangingVelocity) {
-            hidePositionIndicators();
+            posIndicator.hide();
 
             // Hide arc helper for middle-mouse velocity drag as well
             velocityArcXZ.visible = false;
@@ -3456,7 +2815,7 @@ function onMouseUp(event: MouseEvent) {
         activeAxis = null;
         gizmo.arrows.forEach((a) => ((a.line.material as THREE.LineBasicMaterial).opacity = 1.0));
         controls.enabled = !isFreeCameraMode;
-        hidePositionIndicators();
+        posIndicator.hide();
 
         velocityArcXZ.visible = false;
         velocityArcY.visible = false;
@@ -3888,20 +3247,21 @@ function animate() {
         !gizmo.target._isDisposed &&
         gizmo.target.mesh
     ) {
-        ensureGridHelperSizedToTarget(gizmo.target);
+        const isDragging = interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity;
+        gridHelperManager.ensure(gizmo.target, isDragging);
 
         if (
-            yAxisIndicator &&
-            yAxisRing &&
+            posIndicator.yAxisIndicator &&
+            posIndicator.yAxisRing &&
             (isChangingVelocity || isMiddleMouseVelocity || interactionState.isRepositioning)
         ) {
-            updatePositionIndicator(yAxisIndicator, yAxisRing, gizmo.target.mesh.position);
+            posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, gizmo.target.mesh.position);
         }
 
         if (
             (isChangingVelocity || isMiddleMouseVelocity) &&
-            velocityTipIndicator &&
-            velocityTipRing
+            posIndicator.velocityTipIndicator &&
+            posIndicator.velocityTipRing
         ) {
             const speed = gizmo.target.velocity.length();
             const arrowScale = 50;
@@ -3910,7 +3270,7 @@ function animate() {
             const arrowTip = gizmo.target.mesh.position
                 .clone()
                 .add(direction.multiplyScalar(speed * arrowScale));
-            updatePositionIndicator(velocityTipIndicator, velocityTipRing, arrowTip);
+            posIndicator.updateIndicator(posIndicator.velocityTipIndicator, posIndicator.velocityTipRing, arrowTip);
         }
     }
 
@@ -3972,17 +3332,17 @@ function animate() {
 
         if (
             (isChangingVelocity || isMiddleMouseVelocity) &&
-            velocityTipIndicator &&
-            velocityTipRing
+            posIndicator.velocityTipIndicator &&
+            posIndicator.velocityTipRing
         ) {
             const arrowTip = gizmo.target.mesh.position
                 .clone()
                 .add(direction.multiplyScalar(speed * arrowScale));
-            updatePositionIndicator(velocityTipIndicator, velocityTipRing, arrowTip);
+            posIndicator.updateIndicator(posIndicator.velocityTipIndicator, posIndicator.velocityTipRing, arrowTip);
         }
 
-        if ((isChangingVelocity || isMiddleMouseVelocity) && yAxisIndicator && yAxisRing) {
-            updatePositionIndicator(yAxisIndicator, yAxisRing, gizmo.target.mesh.position);
+        if ((isChangingVelocity || isMiddleMouseVelocity) && posIndicator.yAxisIndicator && posIndicator.yAxisRing) {
+            posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, gizmo.target.mesh.position);
         }
     }
 
@@ -4179,9 +3539,7 @@ function animate() {
     syncAllStarLightTargets();
 
     // Update hint sprite each frame (cheap; texture only updates when text changes)
-    if (window.__updateHintSprite) {
-        window.__updateHintSprite();
-    }
+    flightHUD.updateHintSprite();
 
     // Distance-fade the warp streaks based on camera proximity to the ship.
     // Speed-based opacity is handled inside warpEffect.update(); here we only
@@ -4289,83 +3647,8 @@ function animate() {
             statsSprite.visible = false;
         }
 
-        // Autopilot phase status HUD — update canvas texture whenever the phase changes,
-        // then hide the sprite once the stable-orbit timer expires.
-        if (orbitNotifySprite) {
-            // Determine desired HUD state
-            let desiredHud: AutopilotHudState = 'NONE';
-            if (autopilotState.isActive) {
-                if (autopilotState.phase === 'ALIGN') {
-                    desiredHud = 'ALIGN';
-                } else if (autopilotState.phase === 'WARP_CHARGING' || autopilotState.phase === 'WARP') {
-                    desiredHud = 'APPROACH_WARP';
-                } else if (autopilotState.phase === 'CIRCULARIZE') {
-                    desiredHud = 'CIRCULARIZE';
-                } else if (autopilotState.phase === 'BRAKE') {
-                    desiredHud = 'BRAKE';
-                } else if (autopilotState.isBoostActive) {
-                    desiredHud = 'APPROACH_BOOST';
-                } else {
-                    desiredHud = 'APPROACH';
-                }
-            } else if (autopilotBlockedNotifyTimer > 0) {
-                desiredHud = 'BLOCKED';
-            } else if (autopilotState.orbitNotifyTimer > 0) {
-                desiredHud = 'ORBIT';
-            }
-
-            if (desiredHud === 'NONE') {
-                orbitNotifySprite.visible = false;
-                _lastAutopilotHudState = 'NONE';
-            } else {
-                orbitNotifySprite.visible = true;
-
-                // Build label for the autopilot HUD sprite.
-                let distLabel = '';
-                if (desiredHud === 'BLOCKED') {
-                    distLabel = autopilotBlockedByName
-                        ? `Blocked by: ${autopilotBlockedByName}`
-                        : '';
-                } else if (autopilotState.isActive && autopilotState.targetBody?.mesh) {
-                    const ship = flightState.knownShip;
-                    if (ship?.mesh) {
-                        const dist = ship.mesh.position.distanceTo(
-                            autopilotState.targetBody.mesh.position
-                        );
-                        // Format: show as integer with thousands separator, strip tiny noise.
-                        const distRounded = Math.max(0, Math.round(dist));
-                        distLabel = `Distance to target: ${distRounded.toLocaleString()} u`;
-                    }
-                }
-
-                // Re-render canvas every frame while active (distance changes continuously),
-                // but only on phase changes when the stable-orbit message is showing.
-                const needsRedraw = autopilotState.isActive
-                    ? true // distance always changes
-                    : desiredHud !== _lastAutopilotHudState;
-
-                if (needsRedraw) {
-                    orbitNotifySprite.material.map?.dispose();
-                    orbitNotifySprite.material.map = createAutopilotPhaseTexture(
-                        desiredHud,
-                        distLabel
-                    );
-                    orbitNotifySprite.material.needsUpdate = true;
-                    _lastAutopilotHudState = desiredHud;
-                }
-
-                // Tick down the autopilot HUD timers
-                if (desiredHud === 'ORBIT') {
-                    autopilotState.orbitNotifyTimer -= (now - lastT) / 1000;
-                } else if (desiredHud === 'BLOCKED') {
-                    autopilotBlockedNotifyTimer -= (now - lastT) / 1000;
-                    if (autopilotBlockedNotifyTimer <= 0) {
-                        autopilotBlockedNotifyTimer = 0;
-                        autopilotBlockedByName = '';
-                    }
-                }
-            }
-        }
+        // Autopilot phase status HUD
+        flightHUD.updateAutopilotHUD((now - lastT) / 1000);
 
         // Update event log
 
@@ -4657,7 +3940,7 @@ function exitSurfaceMode() {
         document.exitPointerLock();
     }
 
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 }
 
 function enterSurfaceMode(body: Body | null) {
@@ -4709,7 +3992,7 @@ function enterSurfaceMode(body: Body | null) {
     updateSurfaceCameraTransform();
 
     uiManager.mainPanel.setSurfaceCameraState({ isActive: true, isEnabled: true });
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 }
 
 function updateSurfaceCameraTransform() {
@@ -4940,13 +4223,7 @@ function updateAutopilot(dt: number) {
             FLIGHT_WARP_CHARGE_TIME
         );
         const fill = autopilotState.warpChargeTimer / FLIGHT_WARP_CHARGE_TIME;
-        if (warpSprite) {
-            warpSprite.material.map?.dispose();
-            warpSprite.material.map = createWarpChargeTexture(fill);
-            warpSprite.material.needsUpdate = true;
-            warpSprite.scale.set(320, 80, 1);
-            warpSprite.visible = true;
-        }
+        flightHUD.setWarpCharge(fill);
         // Point toward target while charging.
         const chargeQuat = new THREE.Quaternion().setFromRotationMatrix(
             new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
@@ -4958,7 +4235,7 @@ function updateAutopilot(dt: number) {
             autopilotState.warpChargeTimer = 0;
             autopilotState.isWarpActive = true;
             autopilotState.phase = 'WARP';
-            if (warpSprite) warpSprite.visible = false;
+            flightHUD.hideWarpSprite();
             warpEffect.start();
             triggerScreenFlash(200, 0.01, 2.5);
             addEvent({
@@ -5187,7 +4464,7 @@ function updateAutopilot(dt: number) {
                 notificationType: NotificationType.Success,
             });
             autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
-            showOrbitNotifySprite();
+            flightHUD.showOrbitNotify();
 
             autopilotState.isActive = false;
             autopilotState.phase = null;
@@ -5219,7 +4496,7 @@ function cancelAutopilot(message?: string) {
     }
     // Hide the charge bar if it was showing.
     if (autopilotState.phase === 'WARP_CHARGING') {
-        if (warpSprite) warpSprite.visible = false;
+        flightHUD.hideWarpSprite();
         autopilotState.warpChargeTimer = 0;
     }
     autopilotState.isActive = false;
@@ -5332,8 +4609,8 @@ function engageAutopilot(target: Body) {
         }
 
         if (nearestObstruction) {
-            autopilotBlockedNotifyTimer = AUTOPILOT_BLOCKED_NOTIFY_DURATION;
-            autopilotBlockedByName = nearestObstruction.name || 'obstruction';
+            flightHUD.autopilotBlockedNotifyTimer = AUTOPILOT_BLOCKED_NOTIFY_DURATION;
+            flightHUD.autopilotBlockedByName = nearestObstruction.name || 'obstruction';
 
             addEvent({
                 message: `⚠ Autopilot blocked: ${nearestObstruction.name || 'obstruction'} is in the path to ${
@@ -5434,7 +4711,7 @@ function updateFlightControls(dt: number) {
             steeringOriginMarker.visible = true;
         }
         flightState.thrustActive = false;
-        if (warpSprite) warpSprite.visible = false;
+        flightHUD.hideWarpSprite();
         // Fall through to steering/roll below (no early return)
     }
 
@@ -5468,14 +4745,8 @@ function updateFlightControls(dt: number) {
         steeringEndMarker.visible = false;
         steeringOriginMarker.visible = false;
         // Pulsing warp-active text (update every call is cheap since canvas is small)
-        if (warpSprite) {
-            const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
-            warpSprite.material.map?.dispose();
-            warpSprite.material.map = createWarpActiveTexture(pulse);
-            warpSprite.material.needsUpdate = true;
-            warpSprite.scale.set(320, 60, 1);
-            warpSprite.visible = true;
-        }
+        const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
+        flightHUD.setWarpActive(pulse);
         return; // Skip all flight controls below
     }
 
@@ -5483,13 +4754,7 @@ function updateFlightControls(dt: number) {
     if (flightState.warpCharging && !flightState.warpDecelerating && !autopilotState.isWarpActive) {
         flightState.warpCharge = Math.min(flightState.warpCharge + dt, FLIGHT_WARP_CHARGE_TIME);
         const fill = flightState.warpCharge / FLIGHT_WARP_CHARGE_TIME;
-        if (warpSprite) {
-            warpSprite.material.map?.dispose();
-            warpSprite.material.map = createWarpChargeTexture(fill);
-            warpSprite.material.needsUpdate = true;
-            warpSprite.scale.set(320, 80, 1);
-            warpSprite.visible = true;
-        }
+        flightHUD.setWarpCharge(fill);
         if (flightState.warpCharge >= FLIGHT_WARP_CHARGE_TIME) {
             // Engage warp!
             flightState.warpActive = true;
@@ -5883,7 +5148,7 @@ function spawnShip() {
     flightSteeringLine.visible = true;
     steeringEndMarker.visible = true;
     steeringOriginMarker.visible = true;
-    if (warpSprite) warpSprite.visible = false;
+    flightHUD.hideWarpSprite();
     flightControlsPanel.setFlightActive(true);
     flightControlsPanel.setViewState(flightState.isCockpitView);
     // Enable the autopilot button now that a ship is active
@@ -5972,7 +5237,7 @@ function exitFlightMode() {
     flightCrosshair.visible = false;
     steeringEndMarker.visible = false;
     steeringOriginMarker.visible = false;
-    if (warpSprite) warpSprite.visible = false;
+    flightHUD.hideWarpSprite();
     flightState.warpCharge = 0;
     flightState.warpCharging = false;
     flightState.warpDecelerating = false;
@@ -6093,7 +5358,7 @@ uiManager.mainPanel.on('freeCameraToggle', () => {
 
     refreshBodiesTable();
     updateSurfaceButtonEnabled();
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 });
 
 uiManager.mainPanel.on('zoomIn', () => {
@@ -6207,7 +5472,7 @@ uiManager.mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
 
     // Selecting from the table should always refresh hints (selection-driven).
     setFocusBody(body, { zoom: cameraState.isLookAtMode });
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 
     // Gizmo visibility controlled by Target toggle
     if (cameraState.isTargetMode) {
@@ -6247,7 +5512,7 @@ uiManager.mainPanel.on('targetToggle', () => {
     }
 
     // Target toggle changes the "selected body" hint line, so force a refresh.
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 });
 
 // LOOK AT button (toggle): when enabled, orbit/zoom around selected body.
@@ -6261,7 +5526,7 @@ uiManager.mainPanel.on('lookAtToggle', () => {
     const turningOn = !cameraState.isLookAtMode;
     // Look-at changes hint context (and camera focus behavior) so refresh.
     // We'll also refresh again after any selection changes.
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 
     // If we are turning Look At ON while Free Camera is ON, we implicitly disable Free Camera.
     // That transition must also refresh the hint (Free Camera hint -> Look At/selection hint).
@@ -6270,7 +5535,7 @@ uiManager.mainPanel.on('lookAtToggle', () => {
         cameraState.isFreeCameraMode = false;
         uiManager.mainPanel.setFreeCameraState(false);
         controls.enabled = true;
-        forceHintRefresh();
+        flightHUD.forceHintRefresh();
     }
 
     if (turningOn) {
@@ -6833,7 +6098,7 @@ window.addEventListener('keyup', (e) => {
             if (flightState.warpCharging) {
                 flightState.warpCharging = false;
                 flightState.warpCharge = 0;
-                if (warpSprite) warpSprite.visible = false;
+                flightHUD.hideWarpSprite();
             }
         }
     }
@@ -6841,7 +6106,7 @@ window.addEventListener('keyup', (e) => {
 
     if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
         if (!isChangingVelocity && !isMiddleMouseVelocity && !interactionState.isRepositioning) {
-            hidePositionIndicators();
+            posIndicator.hide();
             velocityArcXZ.visible = false;
             velocityArcY.visible = false;
         }
@@ -6908,8 +6173,8 @@ window.addEventListener('resize', () => {
     }
 
     // Reposition hint display (top-center)
-    if (hintSprite) {
-        hintSprite.position.set(0, window.innerHeight / 2 - 55, 0);
+    if (flightHUD.hintSprite) {
+        flightHUD.hintSprite.position.set(0, window.innerHeight / 2 - 55, 0);
     }
 
     // Reposition event log
@@ -7089,7 +6354,7 @@ function applyDefaultCameraTogglesAfterSpawn() {
     refreshBodiesTable();
 
     // Hint text depends on toggle state (Target/Look At).
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 }
 
 function applyStartupGMultiplier() {
