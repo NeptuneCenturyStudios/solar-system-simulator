@@ -1,9 +1,6 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Line2 } from 'three/examples/jsm/lines/Line2.js';
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
-import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 
 // Tell typescript about our custom events that has detail property
 declare global {
@@ -55,13 +52,6 @@ import {
     BASE_FRAME_DT,
     CROSSHAIR_SIZE,
     VEL_SCALE,
-    VEL_ARC_SEGMENTS,
-    VEL_ARC_COLOR,
-    VEL_ARC_OPACITY,
-    VEL_ARC_ACTIVE_OPACITY,
-    VEL_ARC_LINEWIDTH_PX,
-    VEL_ARC_TIP_RADIUS_MIN,
-    VEL_ARC_TIP_RADIUS_MAX,
 
     // Flight thrust constants still imported for other derived logic
     FLIGHT_THRUST_ACCEL,
@@ -147,6 +137,8 @@ import { GravitationalLensingEffect } from './effects/gravitational-lensing';
 import { GridHelperManager } from './gizmos/grid-helper';
 import { PositionIndicatorManager } from './gizmos/position-indicator';
 import { FlightHUD } from './drawing/flight-hud';
+import { VelocityArcManager } from './drawing/velocity-arc';
+import { SurfaceCameraManager } from './camera/surface-camera';
 import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
 import { Mercury } from './bodies/mercury';
@@ -499,7 +491,7 @@ function isTouchOverUI(e: TouchEvent) {
 
 function onTouchStart(e: TouchEvent) {
     if (flightState.isActive) return;
-    if (surfaceState.isActive) return;
+    if (surfaceCam.isActive) return;
     if (modalBlocksInput()) return;
     if (isTouchOverUI(e)) return;
 
@@ -524,7 +516,7 @@ function onTouchStart(e: TouchEvent) {
 
 function onTouchMove(e: TouchEvent) {
     if (flightState.isActive) return;
-    if (surfaceState.isActive) return;
+    if (surfaceCam.isActive) return;
     if (!interactionState.isTouchGestureActive) return;
     if (modalBlocksInput()) return;
     if (isTouchOverUI(e)) return;
@@ -760,181 +752,7 @@ const SIM = Object.freeze({
 let stepsPerFrame = 64;
 
 // --- Velocity editing arc helpers ---
-// NOTE: We use Line2 (fat lines) because LineBasicMaterial.linewidth is ignored on most WebGL platforms.
-// (VEL_ARC_* constants moved to utilities/consts.ts)
-//
-// Arc is centered on the VELOCITY TIP (not the body), and its radius is based on body radius.
-// This creates a "mouse path preview" near where the tip will sweep as you drag.
-
-// Small "preview" arc shown near the velocity handle, not a full circle.
-function createArcLine(segments = VEL_ARC_SEGMENTS, color = VEL_ARC_COLOR) {
-    // Authored in the XZ plane around origin and later positioned/rotated/scaled.
-    const positions = [];
-    const span = (Math.PI * 2) / 3; // 120° visible arc
-    const start = -span / 2;
-    const end = span / 2;
-
-    for (let i = 0; i <= segments; i++) {
-        const u = i / segments;
-        const t = start + (end - start) * u;
-        positions.push(Math.cos(t), 0, Math.sin(t));
-    }
-
-    const geo = new LineGeometry();
-    geo.setPositions(positions);
-
-    const mat = new LineMaterial({
-        color,
-        transparent: true,
-        opacity: VEL_ARC_OPACITY,
-        linewidth: VEL_ARC_LINEWIDTH_PX, // in pixels (requires setting resolution)
-        depthTest: false,
-        depthWrite: false,
-    });
-    mat.resolution.set(window.innerWidth, window.innerHeight);
-
-    const line = new Line2(geo, mat);
-    line.computeLineDistances();
-    line.frustumCulled = false;
-    line.renderOrder = 999; // keep on top of most scene elements
-    line.visible = false;
-    return line;
-}
-
-const velocityArcXZ = createArcLine();
-const velocityArcY = createArcLine();
-scene.add(velocityArcXZ);
-scene.add(velocityArcY);
-
-function updateArcResolution() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    if (velocityArcXZ?.material?.resolution) velocityArcXZ.material.resolution.set(w, h);
-    if (velocityArcY?.material?.resolution) velocityArcY.material.resolution.set(w, h);
-}
-
-function calcVelArcRadius(body: Body) {
-    // Arc radius should match the velocity arrow length (treat arrow as circle radius).
-    // velocityArrow length = speed * ARROW_SCALE
-    const speed = body?.velocity?.length?.() ? body.velocity.length() : 0;
-    const arrowLen = Math.max(speed * GIZMO_TUNING.VELOCITY_ARROW_SCALE, 0.1);
-
-    // Keep within sane limits so it stays visible and not enormous.
-    return THREE.MathUtils.clamp(arrowLen, VEL_ARC_TIP_RADIUS_MIN, VEL_ARC_TIP_RADIUS_MAX);
-}
-
-function updateVelocityArcs() {
-    // Use the legacy alias flags (isChangingVelocity/isMiddleMouseVelocity) because the drag handlers
-    // still mutate those variables directly. The interactionState flags are *not* guaranteed to be in sync.
-    const draggingVel = isChangingVelocity || isMiddleMouseVelocity;
-
-    if (!gizmo?.target || gizmo.target._isDisposed || !gizmo.target.mesh || !draggingVel) {
-        velocityArcXZ.visible = false;
-        velocityArcY.visible = false;
-        return;
-    }
-
-    // Force visibility while dragging so the user gets immediate "hit" feedback.
-    velocityArcXZ.visible = true;
-    velocityArcY.visible = true;
-
-    const body = gizmo.target;
-    const origin = body.mesh.position;
-    const arcR = calcVelArcRadius(body);
-
-    // Current velocity direction in world space
-    const v = body.velocity.clone();
-    const speed = v.length();
-    const handleDir = speed > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
-
-    // Center arc at the VELOCITY TIP (what the mouse is effectively dragging around).
-    // Note: velocityArrow uses arrowScale=50 in CoordinateGizmo.updateVelocityArrow().
-    const tipPos = origin
-        .clone()
-        .addScaledVector(handleDir, speed * GIZMO_TUNING.VELOCITY_ARROW_SCALE);
-
-    // Center arcs on the ARROW TIP, but the arc should be a segment of the circle
-    // whose radius is the arrow length. That means the circle's center is:
-    //   center = tipPos - handleDir * arcR
-    // (tipPos is one radius away from the center, in the handleDir direction)
-    //
-    // XZ mode: the arc should be located at the arrow tip's CURRENT Y (not forced to y=0).
-    // Using the full handleDir can push the center down/up; instead we compute the center in XZ only,
-    // then restore the tip's Y so it visually sits at the handle height.
-    const arcCenterXZ = tipPos
-        .clone()
-        .addScaledVector(new THREE.Vector3(handleDir.x, 0, handleDir.z).normalize(), -arcR);
-    arcCenterXZ.y = tipPos.y;
-
-    // Y mode: keep using full 3D center so it stays oriented/pitched with the handle.
-    const arcCenterY = tipPos.clone().addScaledVector(handleDir, -arcR);
-
-    velocityArcXZ.position.copy(arcCenterXZ);
-    velocityArcY.position.copy(arcCenterY);
-
-    // XZ arc:
-    // Keep the arc in the horizontal plane, but rotate it so it is oriented around
-    // the SAME heading as the velocity arrow's horizontal projection.
-    //
-    // Additionally: tilt the arc to match the arrow's pitch, so the arc "leans" with
-    // the arrow even though XZ mode doesn't allow changing Y. This is purely visual.
-    const h = new THREE.Vector3(handleDir.x, 0, handleDir.z);
-    if (h.lengthSq() < 1e-10) h.set(1, 0, 0);
-    h.normalize();
-
-    // Heading in XZ
-    const yaw = -Math.atan2(h.z, h.x);
-
-    // Keep the XZ arc FLAT in the XZ plane regardless of the arrow's pitch.
-    // Only rotate around Y to match the horizontal heading.
-    velocityArcXZ.rotation.set(0, yaw, 0);
-    velocityArcXZ.scale.set(arcR, arcR, arcR);
-
-    // Y arc:
-    // The arc should "tilt" with the current velocity vector, i.e. match the arrow's pitch
-    // relative to the XZ plane. We build an orthonormal basis where:
-    //   - xAxis points along the full velocity direction (handleDir)
-    //   - yAxis lies in the plane spanned by (handleDir, up) and is perpendicular to handleDir
-    //   - zAxis completes the right-handed basis
-    //
-    // This makes the arc's plane rotate as the user adds Y, so at 45° pitch the arc plane is also pitched 45°.
-    const up = new THREE.Vector3(0, 1, 0);
-
-    // If the handle is (nearly) vertical, fall back to using world X as a stable reference.
-    const xAxis = handleDir.clone();
-    const ref = Math.abs(xAxis.dot(up)) > 0.999 ? new THREE.Vector3(1, 0, 0) : up;
-
-    // Build yAxis as component of ref that's perpendicular to xAxis
-    const yAxis = ref.clone().sub(xAxis.clone().multiplyScalar(ref.dot(xAxis)));
-    if (yAxis.lengthSq() < 1e-10) yAxis.set(0, 0, 1);
-    yAxis.normalize();
-
-    const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis).normalize();
-
-    // Our arc geometry is authored in XZ (y=0). Rotate it into the "x-y" plane of this basis
-    // so it varies in y as it sweeps.
-    const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
-    const arcAdjust = new THREE.Matrix4().makeRotationX(Math.PI / 2);
-    const m = new THREE.Matrix4().multiplyMatrices(basis, arcAdjust);
-
-    velocityArcY.setRotationFromMatrix(m);
-    velocityArcY.scale.set(arcR, arcR, arcR);
-
-    // Visibility by mode (and ensure they're not accidentally left hidden)
-    if (interactionState.velocityEditMode === 'xz') {
-        velocityArcXZ.visible = true;
-        velocityArcY.visible = false;
-    } else {
-        velocityArcXZ.visible = false;
-        velocityArcY.visible = true;
-    }
-
-    // Extra "hit" feedback: thicken + brighten the active arc during the drag
-    const activeArc = interactionState.velocityEditMode === 'xz' ? velocityArcXZ : velocityArcY;
-    if (activeArc && activeArc.material) {
-        activeArc.material.opacity = VEL_ARC_ACTIVE_OPACITY;
-    }
-}
+const velArc = new VelocityArcManager(scene, gizmo, interactionState);
 
 // Create FPS counter sprite
 let fpsSprite: THREE.Sprite | null = null;
@@ -1207,7 +1025,7 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
     const shouldMoveCameraWithBody =
         cameraState.isLookAtMode &&
         !isFreeCameraMode &&
-        !surfaceState?.isActive &&
+        !surfaceCam.isActive &&
         !cameraState.isFreeCameraMode;
 
     if (shouldMoveCameraWithBody) {
@@ -1222,7 +1040,7 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
 
     if (gizmo.target === body) {
         gizmo.update();
-        updateVelocityArcs();
+        velArc.update();
         if (posIndicator.yAxisIndicator && posIndicator.yAxisRing) {
             posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, body.mesh.position);
         }
@@ -2144,7 +1962,7 @@ function onMouseDown(event: MouseEvent) {
     }
     if (flightState.isActive && event.button !== 2) return;
 
-    // Surface mode RMB look uses the global mousemove handler (onSurfaceMouseMove).
+    // Surface mode RMB look uses the global mousemove handler (surfaceCam.onMouseMove).
     // Avoid engaging the generic pointer-lock mouse-look while on the surface.
     // Middle mouse button for velocity control when body is selected
     // Do not allow MMB velocity edit to start while already doing an LMB velocity drag.
@@ -2178,14 +1996,14 @@ function onMouseDown(event: MouseEvent) {
 
         // Show grid and indicators
         posIndicator.show('both');
-        updateVelocityArcs();
+        velArc.update();
 
         return;
     }
 
     // Right mouse button activates mouse look
     if (event.button === 2) {
-        if (surfaceState?.isActive) {
+        if (surfaceCam.isActive) {
             isMouseLookActive = true;
             return;
         }
@@ -2308,7 +2126,7 @@ function onMouseDown(event: MouseEvent) {
 
         // Show grid + arcs + indicators
         posIndicator.show('both');
-        updateVelocityArcs();
+        velArc.update();
 
         return;
     }
@@ -2579,7 +2397,7 @@ function onMouseMove(event: MouseEvent) {
                     gizmo.target.velocity.copy(newVel);
                 }
 
-                updateVelocityArcs();
+                velArc.update();
                 // Do NOT return here; allow mouse-look to also run if RMB is held.
                 // (Velocity updates will still be stable because Y-mode locks XZ, and XZ-mode is screen-plane constrained.)
                 // If you want to prevent simultaneous camera movement, re-add `return`.
@@ -2790,8 +2608,7 @@ function onMouseUp(event: MouseEvent) {
             posIndicator.hide();
 
             // Hide arc helper for middle-mouse velocity drag as well
-            velocityArcXZ.visible = false;
-            velocityArcY.visible = false;
+            velArc.hideAll();
         }
 
         return;
@@ -2817,8 +2634,7 @@ function onMouseUp(event: MouseEvent) {
         controls.enabled = !isFreeCameraMode;
         posIndicator.hide();
 
-        velocityArcXZ.visible = false;
-        velocityArcY.visible = false;
+        velArc.hideAll();
 
         if (wasVel) {
             // Restore velocity arrow color after drag
@@ -2949,9 +2765,9 @@ function animate() {
     // IMPORTANT: when surface mode is active, it fully owns camera position + orientation.
     // We still run physics (so the planet rotates under you), but we must skip any other
     // camera-follow / look-at / orbit-controls logic later in this frame.
-    const isSurfaceModeActive = !!surfaceState?.isActive;
+    const isSurfaceModeActive = !!surfaceCam.isActive;
     if (isSurfaceModeActive) {
-        updateSurfaceCameraTransform();
+        surfaceCam.updateTransform();
     }
 
     // Flight mode camera + controls update.
@@ -3238,7 +3054,7 @@ function animate() {
     skydome.position.copy(camera.position);
 
     gizmo.update();
-    updateVelocityArcs();
+    velArc.update();
 
     // Update grid size while dragging so it expands/contracts as needed.
     if (
@@ -3693,7 +3509,7 @@ function refreshBodiesTable() {
 
     // Surface camera enablement depends on selection, so keep it in sync.
     try {
-        updateSurfaceButtonEnabled?.();
+        surfaceCam.updateButtonEnabled();
     } catch {
         // Empty
     }
@@ -3869,228 +3685,18 @@ function zoomOut() {
 }
 
 // --- Surface camera / player rig ---
-const surfaceState = {
-    isActive: false,
-    body: null as Body | null, // CelestialBody
-
-    // Anchor point on the body's surface, expressed in the body's LOCAL space.
-    // This is what makes the camera "fixed to the planet" while the planet spins.
-    anchorLocalDir: new THREE.Vector3(0, 1, 0),
-
-    // View orientation relative to the local tangent frame at the anchor.
-    yaw: 0,
-    pitch: 0,
-
-    // Snapshot (for clean exit)
-    prevCameraPos: new THREE.Vector3(),
-    prevCameraQuat: new THREE.Quaternion(),
-    prevCameraUp: new THREE.Vector3(0, 1, 0),
-    prevControlsTarget: new THREE.Vector3(),
-
-    // Tunables
-    // Keep this very small so it reads as "standing on the surface" not hovering.
-    // We still need a tiny offset to avoid z-fighting / clipping into the mesh.
-    eyeHeight: 0.2, // world units above surface
-    lookSensitivity: 0.002,
-};
-
-function isSurfaceEligibleBody(body: Body | null) {
-    if (!body || !simulationState.bodies.includes(body) || body._isDisposed || !body.mesh)
-        return false;
-    if (isBodyType(body, BodyTypeEnum.Star)) return false;
-    if (body instanceof BlackHole) return false;
-    // require some minimum radius so we don't go crazy on tiny asteroids
-    return (body.radius || 0) >= 1.0;
-}
-
-function updateSurfaceButtonEnabled() {
-    const selected =
-        (selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
-            ? selectedBody
-            : null) ||
-        (manuallySelectedBody &&
-        simulationState.bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
-            ? manuallySelectedBody
-            : null);
-
-    const isEnabled = isSurfaceEligibleBody(selected);
-    uiManager.mainPanel.setSurfaceCameraState({ isActive: surfaceState.isActive, isEnabled });
-}
-
-function exitSurfaceMode() {
-    // Restore pre-surface camera/controls state (so exiting doesn't leave the camera at a weird angle)
-    camera.position.copy(surfaceState.prevCameraPos);
-    camera.quaternion.copy(surfaceState.prevCameraQuat);
-    camera.up.copy(surfaceState.prevCameraUp);
-
-    controls.target.copy(surfaceState.prevControlsTarget);
-    controls.update();
-
-    surfaceState.isActive = false;
-    surfaceState.body = null;
-
-    uiManager.mainPanel.setSurfaceCameraState({ isActive: false, isEnabled: true });
-
-    // restore default (non-free) controls behavior
-    controls.enabled = true;
-
-    // Stop any pointer lock (if we ever use it later)
-    if (document.pointerLockElement === renderer.domElement) {
-        document.exitPointerLock();
-    }
-
-    flightHUD.forceHintRefresh();
-}
-
-function enterSurfaceMode(body: Body | null) {
-    if (!body) return;
-    if (!isSurfaceEligibleBody(body)) return;
-
-    // Snapshot camera/controls state so exiting returns to the exact view.
-    surfaceState.prevCameraPos.copy(camera.position);
-    surfaceState.prevCameraQuat.copy(camera.quaternion);
-    surfaceState.prevCameraUp.copy(camera.up);
-    surfaceState.prevControlsTarget.copy(controls.target);
-
-    // Surface mode is mutually exclusive with Free Camera + Look At.
-    if (cameraState.isFreeCameraMode) {
-        isFreeCameraMode = false;
-        cameraState.isFreeCameraMode = false;
-        uiManager.mainPanel.setFreeCameraState(false);
-    }
-    if (cameraState.isLookAtMode) {
-        cameraState.isLookAtMode = false;
-        uiManager.mainPanel.setLookAtState(false);
-    }
-
-    controls.enabled = false;
-
-    surfaceState.isActive = true;
-    surfaceState.body = body;
-    surfaceState.yaw = 0;
-    surfaceState.pitch = 0;
-
-    // Anchor selection:
-    // - If we have a selected body, pick the surface point directly under the current camera view.
-    //   This makes it feel like you "land" where you're looking, not on a fixed pole.
-    // - Store the anchor direction in BODY-LOCAL space so it rotates with the planet spin.
-    const bodyCenter = body.mesh.position.clone();
-
-    // From body -> camera direction (points at the currently viewed hemisphere)
-    const fromBodyToCam = new THREE.Vector3().subVectors(camera.position, bodyCenter).normalize();
-
-    // The closest visible surface point is on the opposite side of that vector:
-    // body -> camera points outward; surface point facing camera is in that direction.
-    // But we want the surface normal at the anchor to point outward, toward the camera.
-    const surfaceNormalWorld = fromBodyToCam.clone().normalize();
-
-    const invQ = body.mesh.quaternion.clone().invert();
-    surfaceState.anchorLocalDir = surfaceNormalWorld.clone().applyQuaternion(invQ).normalize();
-
-    // Immediately apply transform so first frame doesn't "snap".
-    updateSurfaceCameraTransform();
-
-    uiManager.mainPanel.setSurfaceCameraState({ isActive: true, isEnabled: true });
-    flightHUD.forceHintRefresh();
-}
-
-function updateSurfaceCameraTransform() {
-    if (
-        !surfaceState.isActive ||
-        !surfaceState.body ||
-        !simulationState.bodies.includes(surfaceState.body) ||
-        surfaceState.body._isDisposed
-    )
-        return;
-
-    const b = surfaceState.body;
-    const center = b.mesh.position;
-
-    // World-space surface normal ("gravity up") derived from the ANCHOR (stored in body-local space).
-    // This keeps the CAMERA POSITION pinned to the same spot on the planet as it rotates.
-    const gravityUp = surfaceState.anchorLocalDir
-        .clone()
-        .applyQuaternion(b.mesh.quaternion)
-        .normalize();
-
-    // Put the camera on the surface with a tiny epsilon above it (along gravity up).
-    const worldRadius = (b.radius || 0) * (b.mesh?.scale?.x || 1);
-
-    // Keep a small safety margin so numeric drift can never put the camera *inside* the body.
-    // This directly prevents “seeing through” the planet when the surface rig updates each frame.
-    const minEyeClearance = Math.max(worldRadius * 0.001, 0.05);
-    const eyeOffset = Math.max(surfaceState.eyeHeight, minEyeClearance);
-
-    const surfacePoint = center
-        .clone()
-        .add(gravityUp.clone().multiplyScalar(worldRadius + eyeOffset));
-
-    // Build a STABLE tangent frame that does NOT depend on the planet's spin axis.
-    // Depending on rotationAxis for "horizon up" can cause sudden flips near poles,
-    // which reads as wild camera spinning/rolling.
-    //
-    // We instead:
-    //  - Use gravityUp as the camera's up (like standing upright on the ground).
-    //  - Derive a tangent "north" direction by projecting a fixed world reference onto the tangent plane.
-    //  - Derive "east" from north × up.
-    // Build a stable tangent basis (east/north) from a fixed world reference.
-    // NOTE: "world north" itself is arbitrary, but it must be stable (not body-axis dependent).
-    const worldRefA = new THREE.Vector3(0, 1, 0);
-    const worldRefB = new THREE.Vector3(0, 0, 1);
-
-    let north = worldRefA.clone().projectOnPlane(gravityUp);
-    if (north.lengthSq() < 1e-10) {
-        north = worldRefB.clone().projectOnPlane(gravityUp);
-    }
-    north.normalize();
-
-    let east = new THREE.Vector3().crossVectors(gravityUp, north);
-    if (east.lengthSq() < 1e-10) {
-        east = new THREE.Vector3(1, 0, 0).projectOnPlane(gravityUp);
-    }
-    east.normalize();
-
-    // Re-orthogonalize north (guards against precision drift)
-    north = new THREE.Vector3().crossVectors(east, gravityUp).normalize();
-
-    // Base forward: north (arbitrary but stable). Yaw rotates around gravityUp.
-    const yawQuat = new THREE.Quaternion().setFromAxisAngle(gravityUp, surfaceState.yaw);
-    const forwardYawed = north.clone().applyQuaternion(yawQuat).normalize();
-
-    // Right handed basis for pitch.
-    const right = new THREE.Vector3().crossVectors(forwardYawed, gravityUp).normalize();
-    const pitchQuat = new THREE.Quaternion().setFromAxisAngle(right, surfaceState.pitch);
-    const forward = forwardYawed.clone().applyQuaternion(pitchQuat).normalize();
-
-    const lookAtTarget = surfacePoint.clone().add(forward.multiplyScalar(1000));
-
-    camera.position.copy(surfacePoint);
-    camera.up.copy(gravityUp);
-    camera.lookAt(lookAtTarget);
-}
-
-// Mouse look (RMB) while in surface mode: yaw/pitch, with pitch clamp.
-function onSurfaceMouseMove(event: MouseEvent) {
-    if (!surfaceState.isActive) return;
-
-    // Only apply surface look while RMB is held AND we're not pointer-locked.
-    // (Pointer lock can feed very large deltas on some systems and makes surface mode feel "spun up".)
-    const rmbDown = (event.buttons & 2) === 2;
-    if (!rmbDown) return;
-    if (document.pointerLockElement === renderer.domElement) return;
-
-    const dx = event.movementX || 0;
-    const dy = event.movementY || 0;
-
-    surfaceState.yaw -= dx * surfaceState.lookSensitivity;
-    surfaceState.pitch -= dy * surfaceState.lookSensitivity;
-    surfaceState.pitch = THREE.MathUtils.clamp(
-        surfaceState.pitch,
-        -Math.PI / 2 + 0.01,
-        Math.PI / 2 - 0.01
-    );
-}
+const surfaceCam = new SurfaceCameraManager(
+    camera,
+    controls,
+    renderer,
+    simulationState,
+    uiManager,
+    flightHUD,
+    cameraState,
+    () => selectedBody,
+    () => manuallySelectedBody,
+    () => { isFreeCameraMode = false; }
+);
 
 // ── Flight mode functions ────────────────────────────────────────────────────
 
@@ -5281,12 +4887,12 @@ function exitFlightMode() {
     });
 }
 
-window.addEventListener('mousemove', onSurfaceMouseMove, { passive: true });
+window.addEventListener('mousemove', surfaceCam.onMouseMove, { passive: true });
 
 uiManager.mainPanel.on('surfaceCameraToggle', () => {
-    if (surfaceState.isActive) {
-        exitSurfaceMode();
-        updateSurfaceButtonEnabled();
+    if (surfaceCam.isActive) {
+        surfaceCam.exit();
+        surfaceCam.updateButtonEnabled();
         return;
     }
 
@@ -5300,17 +4906,17 @@ uiManager.mainPanel.on('surfaceCameraToggle', () => {
             ? manuallySelectedBody
             : null);
 
-    if (!isSurfaceEligibleBody(selected)) return;
-    enterSurfaceMode(selected);
-    updateSurfaceButtonEnabled();
+    if (!surfaceCam.isEligibleBody(selected)) return;
+    surfaceCam.enter(selected);
+    surfaceCam.updateButtonEnabled();
 });
 
 uiManager.mainPanel.on('freeCameraToggle', () => {
     // If turning on free camera, surface mode must exit.
-    if (!surfaceState.isActive) {
+    if (!surfaceCam.isActive) {
         // noop
     } else {
-        exitSurfaceMode();
+        surfaceCam.exit();
     }
 
     isFreeCameraMode = !isFreeCameraMode;
@@ -5357,7 +4963,7 @@ uiManager.mainPanel.on('freeCameraToggle', () => {
     uiManager.managementPanel.setSelectedBody(selected);
 
     refreshBodiesTable();
-    updateSurfaceButtonEnabled();
+    surfaceCam.updateButtonEnabled();
     flightHUD.forceHintRefresh();
 });
 
@@ -5519,9 +5125,9 @@ uiManager.mainPanel.on('targetToggle', () => {
 // When disabled, behave like "None camera": orbit/zoom around the scene center.
 uiManager.mainPanel.on('lookAtToggle', () => {
     // Turning Look At ON/OFF exits surface mode (mutually exclusive camera behaviors).
-    if (surfaceState?.isActive) {
-        exitSurfaceMode();
-        updateSurfaceButtonEnabled();
+    if (surfaceCam.isActive) {
+        surfaceCam.exit();
+        surfaceCam.updateButtonEnabled();
     }
     const turningOn = !cameraState.isLookAtMode;
     // Look-at changes hint context (and camera focus behavior) so refresh.
@@ -5966,7 +5572,7 @@ window.addEventListener('keydown', (e) => {
             }
         }
 
-        updateVelocityArcs();
+        velArc.update();
         // Prevent the key from doing anything else
         e.preventDefault();
         return;
@@ -6107,8 +5713,7 @@ window.addEventListener('keyup', (e) => {
     if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
         if (!isChangingVelocity && !isMiddleMouseVelocity && !interactionState.isRepositioning) {
             posIndicator.hide();
-            velocityArcXZ.visible = false;
-            velocityArcY.visible = false;
+            velArc.hideAll();
         }
     }
 });
@@ -6160,7 +5765,7 @@ window.addEventListener('resize', () => {
     uiCamera.updateProjectionMatrix();
 
     // Update fat-line resolutions (velocity arcs)
-    updateArcResolution();
+    velArc.resize(window.innerWidth, window.innerHeight);
 
     // Reposition FPS counter
     if (fpsSprite) {
