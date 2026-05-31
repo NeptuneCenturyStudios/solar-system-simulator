@@ -128,6 +128,7 @@ import {
 } from './utilities/body-params';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures';
 import { Supernova } from './effects/supernova';
+import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { WarpEffect } from './effects/warp-effect';
@@ -724,6 +725,10 @@ const dependencies: IStateDependencies = {
         if (!supernova) return;
         supernovas.push(supernova);
     },
+    addPlanetaryNebula: (nebula: PlanetaryNebula) => {
+        if (!nebula) return;
+        planetaryNebulae.push(nebula);
+    },
     addBody: (body: Body) => {
         if (!body) return;
         simulationState.bodies.push(body);
@@ -859,6 +864,7 @@ let savedTimeScale = 1;
 let lastT = performance.now();
 
 let supernovas: Supernova[] = []; // Track all supernova effects
+let planetaryNebulae: PlanetaryNebula[] = []; // Track all planetary nebula effects
 
 let wasRunningBeforeDrag = false;
 let isTilting = false;
@@ -1818,6 +1824,12 @@ function spawn({
         supernova.dispose();
     }
     supernovas = [];
+
+    // Clean up all planetary nebula effects
+    for (const nebula of planetaryNebulae) {
+        nebula.dispose();
+    }
+    planetaryNebulae = [];
 
     // Reset bodies array depending on mode
     simulationState.bodies = [];
@@ -3323,6 +3335,16 @@ function animate() {
         if (!supernova.active) {
             supernova.dispose();
             supernovas.splice(i, 1);
+        }
+    }
+
+    // Update all planetary nebulae (remove when fully faded)
+    for (let i = planetaryNebulae.length - 1; i >= 0; i--) {
+        const nebula = planetaryNebulae[i];
+        nebula.update(dtTotal);
+        if (!nebula.active) {
+            nebula.dispose();
+            planetaryNebulae.splice(i, 1);
         }
     }
 

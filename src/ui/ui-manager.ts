@@ -99,7 +99,7 @@ export class UIManager extends Panel {
         if (this.btnForwardSpeed) {
             this.btnForwardSpeed.onclick = () => {
                 this.timeScale *= 2; // Double the time scale for forward speed
-                if (this.timeScale > 128) this.timeScale = 128; // Cap the time scale to prevent it from getting too high
+                if (this.timeScale > 2**10) this.timeScale = 2**10; // Cap the time scale to prevent it from getting too high
                 this.emit('timeScaleChange', { value: this.timeScale });
             };
         }

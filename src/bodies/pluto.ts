@@ -7,7 +7,9 @@ import {
     SUN_MASS,
     PLUTO_RADIUS,
     PLUTO_AXIS,
-    PLUTO_ROT_SPEED,
+    PLUTO_AZIMUTH,
+    PLUTO_ORBITAL_PERIOD_REAL,
+    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 import { PlanetTypeEnum } from '../utilities/body-params';
@@ -25,7 +27,10 @@ export class Pluto extends DwarfPlanet {
      * @param plutoTexture The texture to use for rendering Pluto.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, plutoTexture: THREE.Texture) {
-        const trajectory = calculateTrajectory(dependencies.getG(), PLUTO_DIST, SUN_MASS);
+        const gEff = dependencies.getG();
+        const timeScale = PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, gEff, SUN_MASS);
+        const rotSpeed = (-2 * Math.PI / (153.3 * 3600)) * timeScale; // retrograde
+        const trajectory = calculateTrajectory(gEff, PLUTO_DIST, SUN_MASS);
         const geometry = new THREE.SphereGeometry(PLUTO_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
             map: plutoTexture,
@@ -48,7 +53,7 @@ export class Pluto extends DwarfPlanet {
             trailColor: 0xddbb99,
             maxTrail: 20000,
             hasRings: false,
-            rotation: { tilt: PLUTO_AXIS, speed: PLUTO_ROT_SPEED },
+            rotation: { tilt: PLUTO_AXIS, speed: rotSpeed, azimuth: PLUTO_AZIMUTH },
             mesh: mesh,
         });
     }

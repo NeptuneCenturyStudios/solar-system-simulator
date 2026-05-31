@@ -7,7 +7,9 @@ import {
     SUN_MASS,
     SATURN_RADIUS,
     SATURN_AXIS,
-    SATURN_ROT_SPEED,
+    SATURN_AZIMUTH,
+    SATURN_ORBITAL_PERIOD_REAL,
+    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
@@ -29,7 +31,10 @@ export class Saturn extends Planet {
         scene: THREE.Scene,
         saturnTexture: THREE.Texture
     ) {
-        const trajectory = calculateTrajectory(dependencies.getG(), SATURN_DIST, SUN_MASS);
+        const gEff = dependencies.getG();
+        const timeScale = SATURN_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(SATURN_DIST, gEff, SUN_MASS);
+        const rotSpeed = (2 * Math.PI / (10.656 * 3600)) * timeScale;
+        const trajectory = calculateTrajectory(gEff, SATURN_DIST, SUN_MASS);
         const geometry = new THREE.SphereGeometry(SATURN_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: saturnTexture,
@@ -52,7 +57,7 @@ export class Saturn extends Planet {
             trailColor: 0xffeebb,
             maxTrail: 12000,
             hasRings: true,
-            rotation: { tilt: SATURN_AXIS, speed: SATURN_ROT_SPEED },
+            rotation: { tilt: SATURN_AXIS, speed: rotSpeed, azimuth: SATURN_AZIMUTH },
             mesh: mesh,
         });
     }

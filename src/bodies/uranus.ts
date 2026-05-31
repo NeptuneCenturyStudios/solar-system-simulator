@@ -4,10 +4,12 @@ import { createUniqueId } from '../utilities/utilities.js';
 import {
     SUN_MASS,
     URANUS_AXIS,
+    URANUS_AZIMUTH,
     URANUS_DIST,
     URANUS_MASS,
     URANUS_RADIUS,
-    URANUS_ROT_SPEED,
+    URANUS_ORBITAL_PERIOD_REAL,
+    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 import { PlanetTypeEnum } from '../utilities/body-params';
@@ -29,7 +31,10 @@ export class Uranus extends Planet {
         scene: THREE.Scene,
         uranusTexture: THREE.Texture
     ) {
-        const trajectory = calculateTrajectory(dependencies.getG(), URANUS_DIST, SUN_MASS);
+        const gEff = dependencies.getG();
+        const timeScale = URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, gEff, SUN_MASS);
+        const rotSpeed = (-2 * Math.PI / (17.24 * 3600)) * timeScale; // retrograde
+        const trajectory = calculateTrajectory(gEff, URANUS_DIST, SUN_MASS);
         const geometry = new THREE.SphereGeometry(URANUS_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: uranusTexture,
@@ -52,7 +57,7 @@ export class Uranus extends Planet {
             trailColor: 0x88ddff,
             maxTrail: 15000,
             hasRings: false,
-            rotation: { tilt: URANUS_AXIS, speed: URANUS_ROT_SPEED },
+            rotation: { tilt: URANUS_AXIS, speed: rotSpeed, azimuth: URANUS_AZIMUTH },
             mesh: mesh,
         });
     }

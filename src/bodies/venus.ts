@@ -3,10 +3,12 @@ import { calculateTrajectory } from '../physics/physics.js';
 import {
     SUN_MASS,
     VENUS_AXIS,
+    VENUS_AZIMUTH,
     VENUS_DIST,
     VENUS_MASS,
+    VENUS_ORBITAL_PERIOD_REAL,
     VENUS_RADIUS,
-    VENUS_ROT_SPEED,
+    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
@@ -28,7 +30,10 @@ export class Venus extends Planet {
      * @param scene The THREE.Scene to which Venus belongs.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-        const trajectory = calculateTrajectory(dependencies.getG(), VENUS_DIST, SUN_MASS);
+        const gEff = dependencies.getG();
+        const timeScale = VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, gEff, SUN_MASS);
+        const rotSpeed = (-2 * Math.PI / (5832.5 * 3600)) * timeScale; // retrograde
+        const trajectory = calculateTrajectory(gEff, VENUS_DIST, SUN_MASS);
         const geometry = new THREE.SphereGeometry(VENUS_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: venusTexture,
@@ -51,7 +56,7 @@ export class Venus extends Planet {
             trailColor: 0xffdd88,
             maxTrail: 3500,
             hasRings: false,
-            rotation: { tilt: VENUS_AXIS, speed: VENUS_ROT_SPEED },
+            rotation: { tilt: VENUS_AXIS, speed: rotSpeed, azimuth: VENUS_AZIMUTH },
             mesh: mesh,
         });
 
@@ -71,7 +76,7 @@ export class Venus extends Planet {
         this.clouds.userData = { parentBody: this };
         this.mesh.add(this.clouds);
 
-        this.cloudRotationSpeed = VENUS_ROT_SPEED * 60; // Clouds rotate much faster than the surface
+        this.cloudRotationSpeed = rotSpeed * 60; // Clouds rotate much faster than the surface
     }
 
     update(acc: THREE.Vector3, dt: number): void {

@@ -7,7 +7,9 @@ import {
     SUN_MASS,
     NEPTUNE_RADIUS,
     NEPTUNE_AXIS,
-    NEPTUNE_ROT_SPEED,
+    NEPTUNE_AZIMUTH,
+    NEPTUNE_ORBITAL_PERIOD_REAL,
+    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
@@ -29,7 +31,10 @@ export class Neptune extends Planet {
         scene: THREE.Scene,
         neptuneTexture: THREE.Texture
     ) {
-        const trajectory = calculateTrajectory(dependencies.getG(), NEPTUNE_DIST, SUN_MASS);
+        const gEff = dependencies.getG();
+        const timeScale = NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, gEff, SUN_MASS);
+        const rotSpeed = (2 * Math.PI / (16.11 * 3600)) * timeScale;
+        const trajectory = calculateTrajectory(gEff, NEPTUNE_DIST, SUN_MASS);
         const geometry = new THREE.SphereGeometry(NEPTUNE_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: neptuneTexture,
@@ -52,7 +57,7 @@ export class Neptune extends Planet {
             trailColor: 0x6688ff,
             maxTrail: 18000,
             hasRings: false,
-            rotation: { tilt: NEPTUNE_AXIS, speed: NEPTUNE_ROT_SPEED },
+            rotation: { tilt: NEPTUNE_AXIS, speed: rotSpeed, azimuth: NEPTUNE_AZIMUTH },
             mesh: mesh,
         });
     }

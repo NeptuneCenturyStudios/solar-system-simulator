@@ -7,7 +7,9 @@ import {
     JUPITER_MASS,
     JUPITER_RADIUS,
     JUPITER_AXIS,
-    JUPITER_ROT_SPEED,
+    JUPITER_AZIMUTH,
+    JUPITER_ORBITAL_PERIOD_REAL,
+    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
@@ -29,7 +31,10 @@ export class Jupiter extends Planet {
         scene: THREE.Scene,
         jupiterTexture: THREE.Texture
     ) {
-        const trajectory = calculateTrajectory(dependencies.getG(), JUPITER_DIST, SUN_MASS);
+        const gEff = dependencies.getG();
+        const timeScale = JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, gEff, SUN_MASS);
+        const rotSpeed = (2 * Math.PI / (9.925 * 3600)) * timeScale;
+        const trajectory = calculateTrajectory(gEff, JUPITER_DIST, SUN_MASS);
         const geometry = new THREE.SphereGeometry(JUPITER_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: jupiterTexture,
@@ -52,7 +57,7 @@ export class Jupiter extends Planet {
             trailColor: 0xffcc88,
             maxTrail: 5000,
             hasRings: false,
-            rotation: { tilt: JUPITER_AXIS, speed: JUPITER_ROT_SPEED },
+            rotation: { tilt: JUPITER_AXIS, speed: rotSpeed, azimuth: JUPITER_AZIMUTH },
             mesh: mesh,
         });
     }
