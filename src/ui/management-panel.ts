@@ -93,6 +93,12 @@ export class ManagementPanel extends Panel {
     editOrbitalAngleDisplay: HTMLElement | null;
     editInclinationSlider: HTMLInputElement | null;
     editInclinationDisplay: HTMLElement | null;
+    editTiltGroup: HTMLElement | null;
+    editTiltSlider: HTMLInputElement | null;
+    editTiltDisplay: HTMLElement | null;
+    editAzimuthGroup: HTMLElement | null;
+    editAzimuthSlider: HTMLInputElement | null;
+    editAzimuthDisplay: HTMLElement | null;
     applyEditBtn: HTMLButtonElement | null;
     deleteBodyBtn: HTMLButtonElement | null;
     cancelEditBtn: HTMLButtonElement | null;
@@ -100,6 +106,14 @@ export class ManagementPanel extends Panel {
     _editSpeedDirty: boolean;
     _editAngleDirty: boolean;
     _editInclinationDirty: boolean;
+
+    // Create-form tilt/azimuth sliders
+    createTiltGroup: HTMLElement | null;
+    createTiltSlider: HTMLInputElement | null;
+    createTiltDisplay: HTMLElement | null;
+    createAzimuthGroup: HTMLElement | null;
+    createAzimuthSlider: HTMLInputElement | null;
+    createAzimuthDisplay: HTMLElement | null;
 
     // Environment toggles (owned by ManagementPanel)
     enableKuiperBeltCheckbox: HTMLInputElement | null;
@@ -184,6 +198,12 @@ export class ManagementPanel extends Panel {
         this.editOrbitalAngleDisplay = null;
         this.editInclinationSlider = null;
         this.editInclinationDisplay = null;
+        this.editTiltGroup = null;
+        this.editTiltSlider = null;
+        this.editTiltDisplay = null;
+        this.editAzimuthGroup = null;
+        this.editAzimuthSlider = null;
+        this.editAzimuthDisplay = null;
         this.applyEditBtn = null;
         this.deleteBodyBtn = null;
         this.cancelEditBtn = null;
@@ -191,6 +211,14 @@ export class ManagementPanel extends Panel {
         this._editSpeedDirty = false;
         this._editAngleDirty = false;
         this._editInclinationDirty = false;
+
+        // Create-form tilt/azimuth
+        this.createTiltGroup = null;
+        this.createTiltSlider = null;
+        this.createTiltDisplay = null;
+        this.createAzimuthGroup = null;
+        this.createAzimuthSlider = null;
+        this.createAzimuthDisplay = null;
 
         // Environment toggles (owned by ManagementPanel)
         this.enableKuiperBeltCheckbox = null;
@@ -299,6 +327,40 @@ export class ManagementPanel extends Panel {
             'editInclination'
         ) as HTMLInputElement | null;
         this.editInclinationDisplay = document.getElementById('edit-inclination-val');
+        this.editTiltGroup = document.getElementById('editTiltGroup');
+        this.editTiltSlider = document.getElementById('editTilt') as HTMLInputElement | null;
+        this.editTiltDisplay = document.getElementById('edit-tilt-val');
+        this.editAzimuthGroup = document.getElementById('editAzimuthGroup');
+        this.editAzimuthSlider = document.getElementById('editAzimuth') as HTMLInputElement | null;
+        this.editAzimuthDisplay = document.getElementById('edit-azimuth-val');
+
+        // Create-form tilt/azimuth
+        this.createTiltGroup = document.getElementById('createTiltGroup');
+        this.createTiltSlider = document.getElementById('createTilt') as HTMLInputElement | null;
+        this.createTiltDisplay = document.getElementById('create-tilt-val');
+        this.createAzimuthGroup = document.getElementById('createAzimuthGroup');
+        this.createAzimuthSlider = document.getElementById('createAzimuth') as HTMLInputElement | null;
+        this.createAzimuthDisplay = document.getElementById('create-azimuth-val');
+
+        // Live display updates for create-form sliders
+        if (this.createTiltSlider && this.createTiltDisplay) {
+            const s = this.createTiltSlider, d = this.createTiltDisplay;
+            s.oninput = () => { d.textContent = `${s.value}°`; };
+        }
+        if (this.createAzimuthSlider && this.createAzimuthDisplay) {
+            const s = this.createAzimuthSlider, d = this.createAzimuthDisplay;
+            s.oninput = () => { d.textContent = `${s.value}°`; };
+        }
+        // Live display updates for edit-form sliders
+        if (this.editTiltSlider && this.editTiltDisplay) {
+            const s = this.editTiltSlider, d = this.editTiltDisplay;
+            s.oninput = () => { d.textContent = `${s.value}°`; };
+        }
+        if (this.editAzimuthSlider && this.editAzimuthDisplay) {
+            const s = this.editAzimuthSlider, d = this.editAzimuthDisplay;
+            s.oninput = () => { d.textContent = `${s.value}°`; };
+        }
+
         this.applyEditBtn = document.getElementById('applyEditBtn') as HTMLButtonElement | null;
         this.deleteBodyBtn = document.getElementById('deleteBodyBtn') as HTMLButtonElement | null;
         this.cancelEditBtn = document.getElementById('cancelEditBtn') as HTMLButtonElement | null;
@@ -489,6 +551,8 @@ export class ManagementPanel extends Panel {
                 if (this.createLightIntensityGroup)
                     this.createLightIntensityGroup.style.display = 'none';
                 if (this.createRadiusGroup) this.createRadiusGroup.style.display = 'none';
+                if (this.createTiltGroup) this.createTiltGroup.style.display = 'none';
+                if (this.createAzimuthGroup) this.createAzimuthGroup.style.display = 'none';
                 if (this.moonValidationMessage)
                     this.moonValidationMessage.classList.remove('visible');
                 if (this.createBodyBtn) this.createBodyBtn.disabled = false;
@@ -508,6 +572,8 @@ export class ManagementPanel extends Panel {
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
                 if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
+                if (this.createTiltGroup) this.createTiltGroup.style.display = 'none';
+                if (this.createAzimuthGroup) this.createAzimuthGroup.style.display = 'none';
                 if (this.moonValidationMessage)
                     this.moonValidationMessage.classList.remove('visible');
                 if (this.createBodyBtn) this.createBodyBtn.disabled = false;
@@ -536,6 +602,11 @@ export class ManagementPanel extends Panel {
                 if (this.createTemperatureGroup) this.createTemperatureGroup.style.display = 'none';
                 if (this.createLightIntensityGroup)
                     this.createLightIntensityGroup.style.display = 'none';
+
+                // Show tilt/azimuth only for planet and moon
+                const showTilt = bodyType === 'planet' || bodyType === 'moon';
+                if (this.createTiltGroup) this.createTiltGroup.style.display = showTilt ? 'block' : 'none';
+                if (this.createAzimuthGroup) this.createAzimuthGroup.style.display = showTilt ? 'block' : 'none';
 
                 const planetType = this.getSelectedPlanetType();
                 const canHaveAtmosphere =
@@ -587,6 +658,9 @@ export class ManagementPanel extends Panel {
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
                 if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
+                // Stars have axial tilt/azimuth too
+                if (this.createTiltGroup) this.createTiltGroup.style.display = 'block';
+                if (this.createAzimuthGroup) this.createAzimuthGroup.style.display = 'block';
                 if (this.moonValidationMessage)
                     this.moonValidationMessage.classList.remove('visible');
                 if (this.createBodyBtn) this.createBodyBtn.disabled = false;
@@ -782,6 +856,14 @@ export class ManagementPanel extends Panel {
                     this.createRadiusSlider && this.createRadiusGroup?.style.display !== 'none'
                         ? parseFloat(this.createRadiusSlider.value)
                         : null;
+                const createTilt =
+                    this.createTiltSlider && this.createTiltGroup?.style.display !== 'none'
+                        ? parseFloat(this.createTiltSlider.value)
+                        : null;
+                const createAzimuth =
+                    this.createAzimuthSlider && this.createAzimuthGroup?.style.display !== 'none'
+                        ? parseFloat(this.createAzimuthSlider.value)
+                        : null;
 
                 this.emit('createBody', {
                     bodyType,
@@ -793,6 +875,8 @@ export class ManagementPanel extends Panel {
                     customTemperature,
                     customLightIntensity,
                     customRadius,
+                    createTilt,
+                    createAzimuth,
                     orbitParent: this.selectedBody,
                 });
 
@@ -970,6 +1054,15 @@ export class ManagementPanel extends Panel {
                         ? parseFloat(this.editInclinationSlider.value)
                         : null;
                 const color = this.editColorInput ? this.editColorInput.value : null;
+                // Tilt/azimuth: always emit current slider values when the group is visible
+                const editTilt =
+                    this.editTiltSlider && this.editTiltGroup?.style.display !== 'none'
+                        ? parseFloat(this.editTiltSlider.value)
+                        : null;
+                const editAzimuth =
+                    this.editAzimuthSlider && this.editAzimuthGroup?.style.display !== 'none'
+                        ? parseFloat(this.editAzimuthSlider.value)
+                        : null;
 
                 this.emit('applyEdit', {
                     body: this.selectedBody,
@@ -983,6 +1076,8 @@ export class ManagementPanel extends Panel {
                     inclination,
                     color,
                     isStarBody,
+                    editTilt,
+                    editAzimuth,
                 });
             };
         }
@@ -1102,6 +1197,10 @@ export class ManagementPanel extends Panel {
             }
 
             setValue(this.createRadiusSlider, radius);
+            if (this.createTiltGroup?.style.display !== 'none') {
+                setValue(this.createTiltSlider, randInt(-180, 180));
+                setValue(this.createAzimuthSlider, randInt(-180, 180));
+            }
             return;
         }
 
@@ -1129,6 +1228,10 @@ export class ManagementPanel extends Panel {
             }
 
             setValue(this.createRadiusSlider, rand(radiusMin, radiusMax));
+            if (this.createTiltGroup?.style.display !== 'none') {
+                setValue(this.createTiltSlider, randInt(-180, 180));
+                setValue(this.createAzimuthSlider, randInt(-180, 180));
+            }
             return;
         }
 
@@ -1212,6 +1315,11 @@ export class ManagementPanel extends Panel {
         setValue(this.createRadiusSlider, Math.round(params.radius * 100) / 100);
         setValue(this.createTemperatureSlider, Math.round(params.temperature));
         setValue(this.createLightIntensitySlider, Math.round(params.lightIntensity));
+
+        if (this.createTiltGroup?.style.display !== 'none') {
+            setValue(this.createTiltSlider, inclinationDeg);
+            setValue(this.createAzimuthSlider, Math.floor(Math.random() * 361) - 180);
+        }
     }
 
     toggleCreationForm(): void {
@@ -1472,6 +1580,23 @@ export class ManagementPanel extends Panel {
             }
             this.editInclinationDisplay.textContent =
                 this.formatNumberForDisplay(parseFloat(this.editInclinationSlider.value)) + '°';
+        }
+
+        // Show tilt/azimuth sliders only for bodies that have axial rotation (CelestialBody).
+        const hasTilt = 'rotation' in body && (body as { rotation?: { tilt?: number } }).rotation?.tilt !== undefined;
+        setGroupVisible(this.editTiltGroup, hasTilt);
+        setGroupVisible(this.editAzimuthGroup, hasTilt);
+        if (hasTilt && this.editTiltSlider && this.editTiltDisplay) {
+            const rot = (body as { rotation: { tilt: number; azimuth?: number } }).rotation;
+            const tiltVal = Math.round(rot.tilt ?? 0);
+            this.editTiltSlider.value = String(tiltVal);
+            this.editTiltDisplay.textContent = `${tiltVal}°`;
+        }
+        if (hasTilt && this.editAzimuthSlider && this.editAzimuthDisplay) {
+            const rot = (body as { rotation: { tilt: number; azimuth?: number } }).rotation;
+            const azVal = Math.round(rot.azimuth ?? 0);
+            this.editAzimuthSlider.value = String(azVal);
+            this.editAzimuthDisplay.textContent = `${azVal}°`;
         }
 
         this.validateMoonCreation();

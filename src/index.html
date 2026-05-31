@@ -593,6 +593,20 @@
                                 />
                             </div>
 
+                            <div class="control-group" id="createTiltGroup" style="display: none">
+                                <label>Axial Tilt
+                                    <span id="create-tilt-val" class="val-display">0°</span>
+                                </label>
+                                <input type="range" id="createTilt" min="-180" max="180" step="1" value="0" />
+                            </div>
+
+                            <div class="control-group" id="createAzimuthGroup" style="display: none">
+                                <label>Tilt Azimuth
+                                    <span id="create-azimuth-val" class="val-display">0°</span>
+                                </label>
+                                <input type="range" id="createAzimuth" min="-180" max="180" step="1" value="0" />
+                            </div>
+
                             <div class="control-group" id="planetTypeGroup" style="display: none">
                                 <label for="planetTypeSelect">Planet Type:</label>
                                 <select id="planetTypeSelect">
@@ -794,6 +808,20 @@
                                         step="1"
                                         value="0"
                                     />
+                                </div>
+
+                                <div class="control-group" id="editTiltGroup" style="display: none">
+                                    <label>Axial Tilt
+                                        <span id="edit-tilt-val" class="val-display">0°</span>
+                                    </label>
+                                    <input type="range" id="editTilt" min="-180" max="180" step="1" value="0" />
+                                </div>
+
+                                <div class="control-group" id="editAzimuthGroup" style="display: none">
+                                    <label>Tilt Azimuth
+                                        <span id="edit-azimuth-val" class="val-display">0°</span>
+                                    </label>
+                                    <input type="range" id="editAzimuth" min="-180" max="180" step="1" value="0" />
                                 </div>
 
                                 <div class="button-group">

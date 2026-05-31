@@ -12,6 +12,14 @@ export class CoordinateGizmo {
     velocityHeadWidth: number;
     gravityHeadLength: number;
     gravityHeadWidth: number;
+    tiltRing: THREE.Mesh;
+    tiltKnob: THREE.Mesh;
+    azimuthRing: THREE.Mesh;
+    azimuthKnob: THREE.Mesh;
+    /** Scaled main radius of the tilt ring; used to position tiltKnob in update(). */
+    _tiltRingRadius: number;
+    /** Scaled main radius of the azimuth ring; used to position azimuthKnob in update(). */
+    _azimuthRingRadius: number;
 
     constructor(scene: THREE.Scene) {
         this.group = new THREE.Group();
@@ -87,6 +95,73 @@ export class CoordinateGizmo {
         this.gravityArrow.line.userData = { isGravityGizmo: true };
         this.gravityArrow.cone.userData = { isGravityGizmo: true };
         this.group.add(this.gravityArrow);
+
+        // --- Gimbal rings ---
+        // Tilt ring — lies in the YZ plane (normal = X-axis). Thin tube for clean look.
+        // Dragging maps the mouse ray onto the YZ plane; atan2(z, y) = axial tilt.
+        const tiltRingMat = new THREE.MeshPhongMaterial({
+            color: 0xff8800,
+            emissive: new THREE.Color(0xff8800).multiplyScalar(0.25),
+            specular: new THREE.Color(0xffffff),
+            shininess: 80,
+            side: THREE.FrontSide,
+        });
+        this.tiltRing = new THREE.Mesh(new THREE.TorusGeometry(80, 1.5, 16, 48), tiltRingMat);
+        this.tiltRing.rotation.y = Math.PI / 2; // default XY → YZ plane
+        this.tiltRing.userData = { isTiltGizmo: true };
+        this.tiltRing.renderOrder = 0;
+        this.tiltRing.visible = false;
+        this.group.add(this.tiltRing);
+
+        // Tilt knob — small sphere marking the current tilt angle on the ring.
+        this.tiltKnob = new THREE.Mesh(
+            new THREE.SphereGeometry(6, 16, 16),
+            new THREE.MeshPhongMaterial({
+                color: 0xff8800,
+                emissive: new THREE.Color(0xff8800).multiplyScalar(0.25),
+                specular: new THREE.Color(0xffffff),
+                shininess: 100,
+            })
+        );
+        this.tiltKnob.userData = { isTiltGizmo: true };
+        this.tiltKnob.renderOrder = 0;
+        this.tiltKnob.visible = false;
+        this.group.add(this.tiltKnob);
+
+        // Azimuth ring — lies in the XZ plane (normal = Y-axis), slightly smaller radius.
+        // Dragging maps the mouse ray onto the XZ plane; atan2(x, z) = azimuth direction.
+        const azimuthRingMat = new THREE.MeshPhongMaterial({
+            color: 0x00ccff,
+            emissive: new THREE.Color(0x00ccff).multiplyScalar(0.2),
+            specular: new THREE.Color(0xffffff),
+            shininess: 80,
+            side: THREE.FrontSide,
+        });
+        this.azimuthRing = new THREE.Mesh(new THREE.TorusGeometry(70, 1.5, 16, 48), azimuthRingMat);
+        this.azimuthRing.rotation.x = Math.PI / 2; // default XY → XZ plane
+        this.azimuthRing.userData = { isAzimuthGizmo: true };
+        this.azimuthRing.renderOrder = 0;
+        this.azimuthRing.visible = false;
+        this.group.add(this.azimuthRing);
+
+        // Azimuth knob — small sphere marking the current azimuth direction on the ring.
+        this.azimuthKnob = new THREE.Mesh(
+            new THREE.SphereGeometry(6, 16, 16),
+            new THREE.MeshPhongMaterial({
+                color: 0x00ccff,
+                emissive: new THREE.Color(0x00ccff).multiplyScalar(0.2),
+                specular: new THREE.Color(0xffffff),
+                shininess: 100,
+
+            })
+        );
+        this.azimuthKnob.userData = { isAzimuthGizmo: true };
+        this.azimuthKnob.renderOrder = 4;
+        this.azimuthKnob.visible = false;
+        this.group.add(this.azimuthKnob);
+
+        this._tiltRingRadius = 80;
+        this._azimuthRingRadius = 70;
     }
 
     attach(body: Body | null) {
@@ -95,6 +170,10 @@ export class CoordinateGizmo {
             this.group.visible = false;
             this.velocityArrow.visible = false;
             this.gravityArrow.visible = false;
+            this.tiltRing.visible = false;
+            this.tiltKnob.visible = false;
+            this.azimuthRing.visible = false;
+            this.azimuthKnob.visible = false;
             return;
         }
 
@@ -123,6 +202,45 @@ export class CoordinateGizmo {
         this.gravityArrow.setLength(1, this.gravityHeadLength, this.gravityHeadWidth);
         this.gravityArrow.line.scale.set(3, 1, 3);
         this.gravityArrow.cone.scale.set(2, 2, 2);
+
+        // Tilt ring: only shown for bodies that have axial tilt (CelestialBody subclasses).
+        // Duck-type check avoids a circular import (gizmo ← celestial-body ← star ← …).
+        if ('rotation' in body && (body as { rotation: { tilt: number } }).rotation?.tilt !== undefined) {
+            this.tiltRing.visible = true;
+            this.tiltKnob.visible = true;
+            this.azimuthRing.visible = true;
+            this.azimuthKnob.visible = true;
+            // Rings scale with the body so they clear its surface.
+            // Knobs use a capped scale so they stay small and don't dominate on large bodies.
+            // Rebuild ring geometry with the correct orbit radius. Tube radius is kept at a
+            // fixed ~2% of the ring radius so the ring always looks like a thin wire at any scale.
+            const tiltRadius = 80 * scaleFactor;
+            const azRadius   = 70 * scaleFactor;
+            const TUBE_RADIUS = Math.max(tiltRadius * 0.022, 0.5);
+            const AZ_TUBE_RADIUS = Math.max(azRadius * 0.022, 0.5);
+            this.tiltRing.geometry.dispose();
+            this.tiltRing.geometry = new THREE.TorusGeometry(tiltRadius, TUBE_RADIUS, 16, 64);
+            this.tiltRing.scale.setScalar(1);
+            this.azimuthRing.geometry.dispose();
+            this.azimuthRing.geometry = new THREE.TorusGeometry(azRadius, AZ_TUBE_RADIUS, 16, 64);
+            this.azimuthRing.scale.setScalar(1);
+            // Knobs: sized to sit clearly on the tube surface
+            const KNOB_RADIUS = Math.max(TUBE_RADIUS * 3.5, 0.8);
+            const AZ_KNOB_RADIUS = Math.max(AZ_TUBE_RADIUS * 3.5, 0.8);
+            this.tiltKnob.geometry.dispose();
+            this.tiltKnob.geometry = new THREE.SphereGeometry(KNOB_RADIUS, 16, 16);
+            this.tiltKnob.scale.setScalar(1);
+            this.azimuthKnob.geometry.dispose();
+            this.azimuthKnob.geometry = new THREE.SphereGeometry(AZ_KNOB_RADIUS, 16, 16);
+            this.azimuthKnob.scale.setScalar(1);
+            this._tiltRingRadius = tiltRadius;
+            this._azimuthRingRadius = azRadius;
+        } else {
+            this.tiltRing.visible = false;
+            this.tiltKnob.visible = false;
+            this.azimuthRing.visible = false;
+            this.azimuthKnob.visible = false;
+        }
     }
 
     updateVelocityArrow() {
@@ -173,10 +291,49 @@ export class CoordinateGizmo {
             this.group.position.copy(this.target.mesh.position);
             this.updateVelocityArrow();
             this.updateGravityArrow();
+            this.updateGimbalKnobs();
         } else {
             this.group.visible = false;
             if (this.velocityArrow) this.velocityArrow.visible = false;
             if (this.gravityArrow) this.gravityArrow.visible = false;
         }
+    }
+
+    updateGimbalKnobs() {
+        if (!this.target || !('rotation' in this.target)) return;
+        const rot = (this.target as { rotation: { tilt: number; azimuth?: number } }).rotation;
+        const tiltRad = THREE.MathUtils.degToRad(rot.tilt ?? 0);
+        const azimuthRad = THREE.MathUtils.degToRad(rot.azimuth ?? 0);
+        const Rt = this._tiltRingRadius;
+        const Ra = this._azimuthRingRadius;
+
+        // Keep the tilt ring aligned with the current azimuth so it always contains the spin axis.
+        // TorusGeometry normal is local Z; after rotation.y = PI/2 it points along world X (YZ plane).
+        // Adding azimuthRad swings it to the correct vertical plane.
+        this.tiltRing.rotation.y = Math.PI / 2 + azimuthRad;
+
+        // Tilt knob: position on the rotated tilt ring at the tilt angle.
+        // Offset outward along the radial direction (away from body centre) by the tube
+        // radius so the knob sits proud on the surface of the ring tube.
+        const TUBE_R = Rt * 0.022;
+        const AZ_TUBE_R = Ra * 0.022;
+        const sinAz = Math.sin(azimuthRad);
+        const cosAz = Math.cos(azimuthRad);
+        const sinTilt = Math.sin(tiltRad);
+        const cosTilt = Math.cos(tiltRad);
+        // Radial unit vector on the tilt ring at the knob position
+        const tiltRadialX = sinTilt * sinAz;
+        const tiltRadialY = cosTilt;
+        const tiltRadialZ = sinTilt * cosAz;
+        this.tiltKnob.position.set(
+            Rt * tiltRadialX,
+            Rt * tiltRadialY,
+            Rt * tiltRadialZ
+        );
+
+        // Azimuth knob: centered on the ring tube centerline in the XZ plane.
+        const azRadialX = sinAz;
+        const azRadialZ = cosAz;
+        this.azimuthKnob.position.set(Ra * azRadialX, 0, Ra * azRadialZ);
     }
 }
