@@ -96,8 +96,8 @@ export class PlanetaryNebula implements IEffect {
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         pos: THREE.Vector3,
-        _radius: number,   // reserved – star radius at death (for potential future scaling)
-        _mass:   number    // reserved – star mass (can influence palette choice)
+        radius: number,   // star radius at death – seeds particles at the stellar surface
+        _mass:  number    // reserved – star mass (can influence palette choice)
     ) {
         this.dependencies = dependencies;
         this.active       = true;
@@ -145,11 +145,6 @@ export class PlanetaryNebula implements IEffect {
         this.velocities = [];
 
         for (let i = 0; i < this.count; i++) {
-            // All particles born at the star's position
-            this.positions[i * 3]     = pos.x;
-            this.positions[i * 3 + 1] = pos.y;
-            this.positions[i * 3 + 2] = pos.z;
-
             const isInner = i < innerCount;
             const isHalo  = i >= innerCount + outerCount;
 
@@ -219,9 +214,17 @@ export class PlanetaryNebula implements IEffect {
 
             // Apply random global orientation
             dir.applyQuaternion(orientation);
+            dir.normalize();
+
+            // Seed particle at the stellar surface so the nebula begins
+            // already spread to the red giant's radius rather than collapsing
+            // from a single point.
+            this.positions[i * 3]     = pos.x + dir.x * radius;
+            this.positions[i * 3 + 1] = pos.y + dir.y * radius;
+            this.positions[i * 3 + 2] = pos.z + dir.z * radius;
 
             // Final velocity with a small per-particle speed jitter
-            const vel = dir.normalize().multiplyScalar(speed * (1 + (Math.random() - 0.5) * 0.12));
+            const vel = dir.multiplyScalar(speed * (1 + (Math.random() - 0.5) * 0.12));
             this.velocities.push(vel);
 
             // ---- Color from palette -----------------------------------------
