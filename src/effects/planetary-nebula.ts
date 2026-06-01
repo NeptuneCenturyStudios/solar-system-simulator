@@ -104,6 +104,7 @@ export class PlanetaryNebula implements IEffect {
         this.scene        = scene;
         this.origin       = pos.clone();
         this.expandTime   = 0;
+        void _mass;
 
         // ---- Randomise appearance ----------------------------------------
         const paletteIdx = Math.floor(Math.random() * PALETTES.length);
@@ -203,7 +204,7 @@ export class PlanetaryNebula implements IEffect {
                     break;
                 }
 
-                default: { // SHAPE_ELLIPTICAL
+                case SHAPE_ELLIPTICAL: {
                     dir = randomUnitVector();
                     dir.y *= ellipticScale;
                     dir.normalize();
@@ -266,6 +267,27 @@ export class PlanetaryNebula implements IEffect {
             depthWrite:     false,
         });
 
+        // Make the default square point into a round, soft-glow sprite.
+        // Pattern matches other effects (see ParticleExplosion / SolarFlare).
+        this.material.onBeforeCompile = (shader) => {
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'outgoingLight = diffuseColor.rgb;',
+                `outgoingLight = diffuseColor.rgb;
+                float _d = length(gl_PointCoord - vec2(0.5));
+                if (_d > 0.5) discard;
+                float _r = _d * 2.0;
+
+                // Softer exponent => wider glow bloom.
+                float _glow = pow(1.0 - _r, 0.8);
+
+                // Brighten the core toward white.
+                outgoingLight = mix(outgoingLight, vec3(1.0),
+                                    pow(max(0.0, 1.0 - _r * 1.2), 2.0));
+
+                // Preserve existing per-particle alpha fade by scaling it with glow.
+                diffuseColor.a *= _glow;`
+            );
+        };
         this.points = new THREE.Points(this.geometry, this.material);
         this.points.frustumCulled = false;
         scene.add(this.points);
