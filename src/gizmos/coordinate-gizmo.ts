@@ -315,8 +315,6 @@ export class CoordinateGizmo {
         // Tilt knob: position on the rotated tilt ring at the tilt angle.
         // Offset outward along the radial direction (away from body centre) by the tube
         // radius so the knob sits proud on the surface of the ring tube.
-        const TUBE_R = Rt * 0.022;
-        const AZ_TUBE_R = Ra * 0.022;
         const sinAz = Math.sin(azimuthRad);
         const cosAz = Math.cos(azimuthRad);
         const sinTilt = Math.sin(tiltRad);

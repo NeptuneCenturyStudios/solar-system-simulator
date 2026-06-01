@@ -57,7 +57,9 @@ export function playWeaponFire(): void {
             loadAndCache(ac, url, (buf) => { blasterBuffer = buf; });
         }
         if (blasterBuffer) playBuffer(ac, blasterBuffer);
-    } catch {}
+    } catch {
+        console.error('Error playing weapon fire sound');
+    }
 }
 
 /** Play the weapon impact sound — picks randomly from the loaded buffers. */
@@ -74,5 +76,7 @@ export function playWeaponImpact(): void {
         if (impactBuffers.length === 0) return;
         const buf = impactBuffers[Math.floor(Math.random() * impactBuffers.length)];
         playBuffer(ac, buf);
-    } catch {}
+    } catch {
+        console.error('Error playing weapon impact sound');
+    }
 }
