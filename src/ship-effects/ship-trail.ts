@@ -131,7 +131,7 @@ export class ShipTrail {
 
         this.coreLine = new Line2(this.coreGeo, this.coreMat);
         this.coreLine.frustumCulled = false;
-        this.coreLine.renderOrder = 1;
+        this.coreLine.renderOrder = 2;
         this.coreLine.visible = false;
         scene.add(this.coreLine);
 
@@ -183,7 +183,7 @@ export class ShipTrail {
 
         this.glowLine = new Line2(this.glowGeo, this.glowMat);
         this.glowLine.frustumCulled = false;
-        this.glowLine.renderOrder = 1;
+        this.glowLine.renderOrder = 2;
         this.glowLine.visible = false;
         scene.add(this.glowLine);
 

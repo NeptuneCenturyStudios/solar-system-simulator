@@ -33,13 +33,15 @@ export class Spaceship extends Body {
      * @param position The initial position of the spaceship.
      * @param velocity The initial velocity of the spaceship.
      * @param id Unique identifier for the spaceship.
+     * @param modelName Base filename (without extension) of the OBJ/MTL model to load.
      */
     constructor(
         dependencies: object,
         scene: THREE.Scene,
         position: THREE.Vector3,
         velocity: THREE.Vector3,
-        id: string
+        id: string,
+        modelName: string = 'Lo_poly_Spaceship_01_by_Liz_Reddington'
     ) {
         // Invisible placeholder mesh — replaced by the loaded OBJ group once ready.
         const placeholderGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
@@ -79,13 +81,13 @@ export class Spaceship extends Body {
         const mtlLoader = new MTLLoader();
         mtlLoader.setPath('./assets/models/');
         mtlLoader
-            .loadAsync('Lo_poly_Spaceship_01_by_Liz_Reddington.mtl')
+            .loadAsync(`${modelName}.mtl`)
             .then((materials) => {
                 materials.preload();
                 const objLoader = new OBJLoader();
                 objLoader.setMaterials(materials);
                 return objLoader.loadAsync(
-                    './assets/models/Lo_poly_Spaceship_01_by_Liz_Reddington.obj'
+                    `./assets/models/${modelName}.obj`
                 );
             })
             .then((group) => {
@@ -113,6 +115,7 @@ export class Spaceship extends Body {
                 group.traverse((child) => {
                     if ((child as THREE.Mesh).isMesh) {
                         child.castShadow = true;
+                        child.renderOrder = 2; // draw after effects (renderOrder 1)
                     }
                 });
 

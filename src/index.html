@@ -16,6 +16,24 @@
         <div id="startup-overlay" class="modal-overlay visible" aria-modal="true" role="dialog">
             <div id="startup-modal" class="modal">
                 <div class="modal-header">Launch Control</div>
+                <div class="control-group startup-g-control">
+                    <label for="startupGMultiplierSlider">
+                        Gravity Multiplier (G)
+                        <span id="startupGMultiplierVal" class="val-display">Normal (1×)</span>
+                    </label>
+                    <input
+                        type="range"
+                        id="startupGMultiplierSlider"
+                        min="0"
+                        max="4"
+                        step="1"
+                        value="0"
+                    />
+                    <div class="startup-g-labels">
+                        <span title="Lower gravity is ideal for flight simulation and exploration">Normal</span>
+                        <span title="Higher gravity is ideal for simulation and experiments">10,000,000×</span>
+                    </div>
+                </div>
                 <button id="startupLaunchDefaultBtn" class="old-ui btn-with-icon">
                     <span class="material-symbols-outlined">orbit</span>
                     LAUNCH SOLAR SYSTEM
@@ -343,6 +361,16 @@
                         <label class="checkbox-row" style="margin-bottom: 8px">
                             <input type="checkbox" id="flightAdvancedMode" /> Advanced Flight Mode
                         </label>
+                        <div class="control-group" style="margin-bottom: 8px">
+                            <label for="flightShipModelSelect">Ship Model</label>
+                            <select id="flightShipModelSelect">
+                                <option value="Lo_poly_Spaceship_01_by_Liz_Reddington" selected>Spaceship 1</option>
+                                <option value="Lo_poly_Spaceship_02_by_Liz_Reddington">Spaceship 2</option>
+                                <option value="Lo_poly_Spaceship_03_by_Liz_Reddington">Spaceship 3</option>
+                                <option value="Lo_poly_Spaceship_04_by_Liz_Reddington">Spaceship 4</option>
+                                <option value="Lo_poly_Spaceship_05_by_Liz_Reddington">Spaceship 5</option>
+                            </select>
+                        </div>
                         <button id="flightSpawnBtn" class="old-ui btn-with-icon">
                             <span class="material-symbols-outlined">rocket_launch</span>
                             SPAWN SPACESHIP
@@ -389,7 +417,7 @@
                                     type="range"
                                     id="gravitationalConstantSlider"
                                     min="0"
-                                    max="1000000"
+                                    max="10000000"
                                     step="0.1"
                                     value="1"
                                 />
@@ -565,12 +593,27 @@
                                 />
                             </div>
 
+                            <div class="control-group" id="createTiltGroup" style="display: none">
+                                <label>Axial Tilt
+                                    <span id="create-tilt-val" class="val-display">0°</span>
+                                </label>
+                                <input type="range" id="createTilt" min="-180" max="180" step="1" value="0" />
+                            </div>
+
+                            <div class="control-group" id="createAzimuthGroup" style="display: none">
+                                <label>Tilt Azimuth
+                                    <span id="create-azimuth-val" class="val-display">0°</span>
+                                </label>
+                                <input type="range" id="createAzimuth" min="-180" max="180" step="1" value="0" />
+                            </div>
+
                             <div class="control-group" id="planetTypeGroup" style="display: none">
                                 <label for="planetTypeSelect">Planet Type:</label>
                                 <select id="planetTypeSelect">
                                     <option value="solid" selected>Solid</option>
                                     <option value="gas_giant">Gas Giant</option>
                                     <option value="ice_giant">Ice Giant</option>
+                                    <option value="temperate">Temperate</option>
                                     <option value="volcanic">Volcanic</option>
                                     <option value="frozen">Frozen</option>
                                     <option value="ocean">Ocean</option>
@@ -765,6 +808,20 @@
                                         step="1"
                                         value="0"
                                     />
+                                </div>
+
+                                <div class="control-group" id="editTiltGroup" style="display: none">
+                                    <label>Axial Tilt
+                                        <span id="edit-tilt-val" class="val-display">0°</span>
+                                    </label>
+                                    <input type="range" id="editTilt" min="-180" max="180" step="1" value="0" />
+                                </div>
+
+                                <div class="control-group" id="editAzimuthGroup" style="display: none">
+                                    <label>Tilt Azimuth
+                                        <span id="edit-azimuth-val" class="val-display">0°</span>
+                                    </label>
+                                    <input type="range" id="editAzimuth" min="-180" max="180" step="1" value="0" />
                                 </div>
 
                                 <div class="button-group">

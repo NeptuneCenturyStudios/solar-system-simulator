@@ -1,9 +1,6 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { Line2 } from 'three/examples/jsm/lines/Line2.js';
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
-import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 
 // Tell typescript about our custom events that has detail property
 declare global {
@@ -14,6 +11,8 @@ declare global {
         'body:absorbed': CustomEvent<{ message: string; notificationType: NotificationType }>;
         'body:selected': CustomEvent<{ body: Body; id: string; name: string }>;
         'body:deselected': CustomEvent<{ body: Body; id: string; name: string }>;
+        /** Fired when a weapon projectile strikes a body. Future damage systems listen here. */
+        'weapon:hit': CustomEvent<{ body: Body; position: THREE.Vector3 }>;
         'camera:focusChanged': CustomEvent<{
             body: Body | null;
             id: string | null;
@@ -53,13 +52,6 @@ import {
     BASE_FRAME_DT,
     CROSSHAIR_SIZE,
     VEL_SCALE,
-    VEL_ARC_SEGMENTS,
-    VEL_ARC_COLOR,
-    VEL_ARC_OPACITY,
-    VEL_ARC_ACTIVE_OPACITY,
-    VEL_ARC_LINEWIDTH_PX,
-    VEL_ARC_TIP_RADIUS_MIN,
-    VEL_ARC_TIP_RADIUS_MAX,
 
     // Flight thrust constants still imported for other derived logic
     FLIGHT_THRUST_ACCEL,
@@ -108,6 +100,7 @@ import {
     TIME_SCALE,
     SUN_RADIUS,
     DIST_SCALE,
+    WEAPON_DAMAGE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -131,13 +124,22 @@ import {
     randomPlanetParams,
     randomMoonParams,
     randomCometParams,
+    randomAsteroidParams,
 } from './utilities/body-params';
 import { loadSrgbTexture, fictionalTextures } from './drawing/textures';
 import { Supernova } from './effects/supernova';
+import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
+import { ImpactShockwave } from './effects/impact-shockwave';
 import { WarpEffect } from './effects/warp-effect';
+import { playWeaponImpact } from './utilities/audio.js';
 import { triggerScreenFlash } from './effects/screen-flash';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
+import { GridHelperManager } from './gizmos/grid-helper';
+import { PositionIndicatorManager } from './gizmos/position-indicator';
+import { FlightHUD } from './drawing/flight-hud';
+import { VelocityArcManager } from './drawing/velocity-arc';
+import { SurfaceCameraManager } from './camera/surface-camera';
 import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
 import { Mercury } from './bodies/mercury';
@@ -159,6 +161,7 @@ import { Asteroid } from './bodies/asteroid';
 import { Comet } from './bodies/comet';
 
 import { Spaceship } from './bodies/spaceship';
+import { ShipWeapon } from './ship-effects/ship-weapon';
 import { StartupModal } from './ui/startup-modal';
 import { AboutModal } from './ui/about-modal';
 import { PerformancePanel } from './ui/performance-panel';
@@ -343,9 +346,10 @@ const flightCrosshair = new THREE.LineSegments(
 flightCrosshair.visible = false;
 uiScene.add(flightCrosshair);
 
-// End-circle marker at the pointer end of the steering line.
+// End-circle marker (aim reticle) at the pointer end of the steering line.
+// Kept large so it's easy to aim; driven by pointer offset each frame.
 const steeringEndMarker = new THREE.Mesh(
-    new THREE.RingGeometry(4, 6, 24),
+    new THREE.RingGeometry(18, 24, 48),
     new THREE.MeshBasicMaterial({
         color: 0x00ffcc,
         transparent: true,
@@ -359,7 +363,27 @@ steeringEndMarker.frustumCulled = false;
 steeringEndMarker.visible = false;
 uiScene.add(steeringEndMarker);
 
+// Origin circle — large translucent gray ring centred on the ship nose projection.
+// Defines the aim boundary; the steering line + aim reticle live inside it.
+const steeringOriginMarker = new THREE.Mesh(
+    new THREE.RingGeometry(120, 124, 72),
+    new THREE.MeshBasicMaterial({
+        color: 0xaaaaaa,
+        transparent: true,
+        opacity: 0.25,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+    })
+);
+steeringOriginMarker.frustumCulled = false;
+steeringOriginMarker.visible = false;
+uiScene.add(steeringOriginMarker);
+
 // (Ship engine trail is owned by each Spaceship via its ShipTrail property)
+
+// --- Ship weapon (projectile particle system, lives in the main 3D scene) ---
+const shipWeapon = new ShipWeapon(scene);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 camera.position.set(INITIAL_CAMERA_DISTANCE, 12018 * SCALE_FACTOR, INITIAL_CAMERA_DISTANCE); // Scaled for new world size
@@ -468,7 +492,7 @@ function isTouchOverUI(e: TouchEvent) {
 
 function onTouchStart(e: TouchEvent) {
     if (flightState.isActive) return;
-    if (surfaceState.isActive) return;
+    if (surfaceCam.isActive) return;
     if (modalBlocksInput()) return;
     if (isTouchOverUI(e)) return;
 
@@ -493,7 +517,7 @@ function onTouchStart(e: TouchEvent) {
 
 function onTouchMove(e: TouchEvent) {
     if (flightState.isActive) return;
-    if (surfaceState.isActive) return;
+    if (surfaceCam.isActive) return;
     if (!interactionState.isTouchGestureActive) return;
     if (modalBlocksInput()) return;
     if (isTouchOverUI(e)) return;
@@ -604,6 +628,7 @@ const simulationState = {
     lastT: performance.now(),
     bodies: [] as Body[],
     explosions: [] as ParticleExplosion[],
+    impacts: [] as ImpactShockwave[],
     showNames: false,
     gMultiplier: 1,
 };
@@ -656,6 +681,8 @@ const flightState = {
     /** Visual pitch offset of ship mesh relative to camera frame (radians).
      *  Animated toward steerY * FLIGHT_MAX_BANK_PITCH when steering vertically. */
     shipBankPitch: 0,
+    /** True while LMB is held during flight — fires weapon particles each frame. */
+    isFiring: false,
 };
 
 // --- Autopilot state ---
@@ -679,6 +706,13 @@ const autopilotState: IAutopilotState = {
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
+
+// Grid helper and position indicator managers (depend on scene + gizmo being ready)
+const gridHelperManager = new GridHelperManager(scene);
+gridHelperManager.init();
+const posIndicator = new PositionIndicatorManager(scene, gridHelperManager, gizmo);
+posIndicator.init();
+
 const dependencies: IStateDependencies = {
     gizmo: gizmo,
     addEvent: addEvent,
@@ -690,6 +724,10 @@ const dependencies: IStateDependencies = {
     addSupernova: (supernova: Supernova) => {
         if (!supernova) return;
         supernovas.push(supernova);
+    },
+    addPlanetaryNebula: (nebula: PlanetaryNebula) => {
+        if (!nebula) return;
+        planetaryNebulae.push(nebula);
     },
     addBody: (body: Body) => {
         if (!body) return;
@@ -719,181 +757,7 @@ const SIM = Object.freeze({
 let stepsPerFrame = 64;
 
 // --- Velocity editing arc helpers ---
-// NOTE: We use Line2 (fat lines) because LineBasicMaterial.linewidth is ignored on most WebGL platforms.
-// (VEL_ARC_* constants moved to utilities/consts.ts)
-//
-// Arc is centered on the VELOCITY TIP (not the body), and its radius is based on body radius.
-// This creates a "mouse path preview" near where the tip will sweep as you drag.
-
-// Small "preview" arc shown near the velocity handle, not a full circle.
-function createArcLine(segments = VEL_ARC_SEGMENTS, color = VEL_ARC_COLOR) {
-    // Authored in the XZ plane around origin and later positioned/rotated/scaled.
-    const positions = [];
-    const span = (Math.PI * 2) / 3; // 120° visible arc
-    const start = -span / 2;
-    const end = span / 2;
-
-    for (let i = 0; i <= segments; i++) {
-        const u = i / segments;
-        const t = start + (end - start) * u;
-        positions.push(Math.cos(t), 0, Math.sin(t));
-    }
-
-    const geo = new LineGeometry();
-    geo.setPositions(positions);
-
-    const mat = new LineMaterial({
-        color,
-        transparent: true,
-        opacity: VEL_ARC_OPACITY,
-        linewidth: VEL_ARC_LINEWIDTH_PX, // in pixels (requires setting resolution)
-        depthTest: false,
-        depthWrite: false,
-    });
-    mat.resolution.set(window.innerWidth, window.innerHeight);
-
-    const line = new Line2(geo, mat);
-    line.computeLineDistances();
-    line.frustumCulled = false;
-    line.renderOrder = 999; // keep on top of most scene elements
-    line.visible = false;
-    return line;
-}
-
-const velocityArcXZ = createArcLine();
-const velocityArcY = createArcLine();
-scene.add(velocityArcXZ);
-scene.add(velocityArcY);
-
-function updateArcResolution() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    if (velocityArcXZ?.material?.resolution) velocityArcXZ.material.resolution.set(w, h);
-    if (velocityArcY?.material?.resolution) velocityArcY.material.resolution.set(w, h);
-}
-
-function calcVelArcRadius(body: Body) {
-    // Arc radius should match the velocity arrow length (treat arrow as circle radius).
-    // velocityArrow length = speed * ARROW_SCALE
-    const speed = body?.velocity?.length?.() ? body.velocity.length() : 0;
-    const arrowLen = Math.max(speed * GIZMO_TUNING.VELOCITY_ARROW_SCALE, 0.1);
-
-    // Keep within sane limits so it stays visible and not enormous.
-    return THREE.MathUtils.clamp(arrowLen, VEL_ARC_TIP_RADIUS_MIN, VEL_ARC_TIP_RADIUS_MAX);
-}
-
-function updateVelocityArcs() {
-    // Use the legacy alias flags (isChangingVelocity/isMiddleMouseVelocity) because the drag handlers
-    // still mutate those variables directly. The interactionState flags are *not* guaranteed to be in sync.
-    const draggingVel = isChangingVelocity || isMiddleMouseVelocity;
-
-    if (!gizmo?.target || gizmo.target._isDisposed || !gizmo.target.mesh || !draggingVel) {
-        velocityArcXZ.visible = false;
-        velocityArcY.visible = false;
-        return;
-    }
-
-    // Force visibility while dragging so the user gets immediate "hit" feedback.
-    velocityArcXZ.visible = true;
-    velocityArcY.visible = true;
-
-    const body = gizmo.target;
-    const origin = body.mesh.position;
-    const arcR = calcVelArcRadius(body);
-
-    // Current velocity direction in world space
-    const v = body.velocity.clone();
-    const speed = v.length();
-    const handleDir = speed > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
-
-    // Center arc at the VELOCITY TIP (what the mouse is effectively dragging around).
-    // Note: velocityArrow uses arrowScale=50 in CoordinateGizmo.updateVelocityArrow().
-    const tipPos = origin
-        .clone()
-        .addScaledVector(handleDir, speed * GIZMO_TUNING.VELOCITY_ARROW_SCALE);
-
-    // Center arcs on the ARROW TIP, but the arc should be a segment of the circle
-    // whose radius is the arrow length. That means the circle's center is:
-    //   center = tipPos - handleDir * arcR
-    // (tipPos is one radius away from the center, in the handleDir direction)
-    //
-    // XZ mode: the arc should be located at the arrow tip's CURRENT Y (not forced to y=0).
-    // Using the full handleDir can push the center down/up; instead we compute the center in XZ only,
-    // then restore the tip's Y so it visually sits at the handle height.
-    const arcCenterXZ = tipPos
-        .clone()
-        .addScaledVector(new THREE.Vector3(handleDir.x, 0, handleDir.z).normalize(), -arcR);
-    arcCenterXZ.y = tipPos.y;
-
-    // Y mode: keep using full 3D center so it stays oriented/pitched with the handle.
-    const arcCenterY = tipPos.clone().addScaledVector(handleDir, -arcR);
-
-    velocityArcXZ.position.copy(arcCenterXZ);
-    velocityArcY.position.copy(arcCenterY);
-
-    // XZ arc:
-    // Keep the arc in the horizontal plane, but rotate it so it is oriented around
-    // the SAME heading as the velocity arrow's horizontal projection.
-    //
-    // Additionally: tilt the arc to match the arrow's pitch, so the arc "leans" with
-    // the arrow even though XZ mode doesn't allow changing Y. This is purely visual.
-    const h = new THREE.Vector3(handleDir.x, 0, handleDir.z);
-    if (h.lengthSq() < 1e-10) h.set(1, 0, 0);
-    h.normalize();
-
-    // Heading in XZ
-    const yaw = -Math.atan2(h.z, h.x);
-
-    // Keep the XZ arc FLAT in the XZ plane regardless of the arrow's pitch.
-    // Only rotate around Y to match the horizontal heading.
-    velocityArcXZ.rotation.set(0, yaw, 0);
-    velocityArcXZ.scale.set(arcR, arcR, arcR);
-
-    // Y arc:
-    // The arc should "tilt" with the current velocity vector, i.e. match the arrow's pitch
-    // relative to the XZ plane. We build an orthonormal basis where:
-    //   - xAxis points along the full velocity direction (handleDir)
-    //   - yAxis lies in the plane spanned by (handleDir, up) and is perpendicular to handleDir
-    //   - zAxis completes the right-handed basis
-    //
-    // This makes the arc's plane rotate as the user adds Y, so at 45° pitch the arc plane is also pitched 45°.
-    const up = new THREE.Vector3(0, 1, 0);
-
-    // If the handle is (nearly) vertical, fall back to using world X as a stable reference.
-    const xAxis = handleDir.clone();
-    const ref = Math.abs(xAxis.dot(up)) > 0.999 ? new THREE.Vector3(1, 0, 0) : up;
-
-    // Build yAxis as component of ref that's perpendicular to xAxis
-    const yAxis = ref.clone().sub(xAxis.clone().multiplyScalar(ref.dot(xAxis)));
-    if (yAxis.lengthSq() < 1e-10) yAxis.set(0, 0, 1);
-    yAxis.normalize();
-
-    const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis).normalize();
-
-    // Our arc geometry is authored in XZ (y=0). Rotate it into the "x-y" plane of this basis
-    // so it varies in y as it sweeps.
-    const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
-    const arcAdjust = new THREE.Matrix4().makeRotationX(Math.PI / 2);
-    const m = new THREE.Matrix4().multiplyMatrices(basis, arcAdjust);
-
-    velocityArcY.setRotationFromMatrix(m);
-    velocityArcY.scale.set(arcR, arcR, arcR);
-
-    // Visibility by mode (and ensure they're not accidentally left hidden)
-    if (interactionState.velocityEditMode === 'xz') {
-        velocityArcXZ.visible = true;
-        velocityArcY.visible = false;
-    } else {
-        velocityArcXZ.visible = false;
-        velocityArcY.visible = true;
-    }
-
-    // Extra "hit" feedback: thicken + brighten the active arc during the drag
-    const activeArc = interactionState.velocityEditMode === 'xz' ? velocityArcXZ : velocityArcY;
-    if (activeArc && activeArc.material) {
-        activeArc.material.opacity = VEL_ARC_ACTIVE_OPACITY;
-    }
-}
+const velArc = new VelocityArcManager(scene, gizmo, interactionState);
 
 // Create FPS counter sprite
 let fpsSprite: THREE.Sprite | null = null;
@@ -973,396 +837,17 @@ function createSpeedSprite() {
 }
 createSpeedSprite();
 
-// ── Warp HUD sprite ───────────────────────────────────────────────────────────
-// Bottom-center canvas sprite. Shows progress bar while charging, pulsing
-// "WARP ACTIVE" text once warp is engaged.
-let warpSprite: THREE.Sprite | null = null;
 const warpEffect = new WarpEffect(scene);
-
-/** Renders the charging progress bar (fill = 0..1) with label above. */
-function createWarpChargeTexture(fill: number): THREE.CanvasTexture {
-    const W = 512,
-        H = 128;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
-
-    // Label
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 36px monospace';
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = '#00ffcc';
-    ctx.shadowColor = 'rgba(0,255,204,0.9)';
-    ctx.fillText('INITIATING WARP', W / 2, 34);
-
-    // Bar track
-    const barX = 40,
-        barY = 68,
-        barW = W - 80,
-        barH = 28;
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(0,255,204,0.12)';
-    ctx.strokeStyle = 'rgba(0,255,204,0.5)';
-    ctx.lineWidth = 2;
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.strokeRect(barX, barY, barW, barH);
-
-    // Bar fill — gradient cyan→white at tip
-    if (fill > 0) {
-        const fillW = barW * fill;
-        const grad = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
-        grad.addColorStop(0, 'rgba(0,200,180,0.9)');
-        grad.addColorStop(0.8, 'rgba(0,255,220,1.0)');
-        grad.addColorStop(1, 'rgba(255,255,255,1.0)');
-        ctx.fillStyle = grad;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = 'rgba(0,255,204,0.9)';
-        ctx.fillRect(barX, barY, fillW, barH);
-        ctx.shadowBlur = 0;
-    }
-
-    // Percentage label inside bar
-    ctx.font = 'bold 18px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.shadowBlur = 0;
-    ctx.fillText(`${Math.round(fill * 100)}%`, W / 2, barY + barH / 2);
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
-}
-
-/** Renders the pulsing "WARP ACTIVE" text (pulse = 0..1 sine wave). */
-function createWarpActiveTexture(pulse: number): THREE.CanvasTexture {
-    const W = 512,
-        H = 96;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
-
-    const alpha = 0.55 + 0.45 * pulse; // 0.55–1.0
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 52px monospace';
-    ctx.shadowBlur = 20 + 20 * pulse;
-    ctx.shadowColor = `rgba(255,120,0,${alpha})`;
-    ctx.fillStyle = `rgba(255,${Math.round(180 + 75 * pulse)},0,${alpha})`;
-    ctx.fillText('⚡ WARP ACTIVE ⚡', W / 2, H / 2);
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
-}
-
-function createWarpSprite() {
-    const texture = createWarpChargeTexture(0);
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    warpSprite = new THREE.Sprite(material);
-    // 512×128 canvas at 0.625 ratio → 320×80 screen pixels; center at bottom
-    warpSprite.scale.set(320, 80, 1);
-    warpSprite.position.set(0, -(window.innerHeight / 2 - 50), 0);
-    warpSprite.visible = false;
-    uiScene.add(warpSprite);
-}
-createWarpSprite();
-
-// ── Autopilot phase-status HUD sprite ───────────────────────────────────────
-// Shows the current autopilot phase while active, and a brief "STABLE ORBIT"
-// confirmation for AUTOPILOT_ORBIT_NOTIFY_DURATION seconds after completion.
-let orbitNotifySprite: THREE.Sprite | null = null;
-
-let autopilotBlockedNotifyTimer = 0;
-let autopilotBlockedByName = '';
-
-type AutopilotHudState =
-    | 'ALIGN'
-    | 'APPROACH_WARP'
-    | 'APPROACH_BOOST'
-    | 'APPROACH'
-    | 'BRAKE'
-    | 'CIRCULARIZE'
-    | 'ORBIT'
-    | 'BLOCKED'
-    | 'NONE';
-let _lastAutopilotHudState: AutopilotHudState = 'NONE';
-
-function createAutopilotPhaseTexture(
-    state: AutopilotHudState,
-    distanceLabel = ''
-): THREE.CanvasTexture {
-    // Canvas is deliberately wide (800px) so no label ever clips.
-    // Two rows: phase label on top, distance on the bottom.
-    const W = 900,
-        H = 100;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    let text: string;
-    let color: string;
-    let glow: string;
-    switch (state) {
-        case 'ALIGN':
-            text = '◎  AUTOPILOT: ALIGNING TO TARGET';
-            color = '#88ddff';
-            glow = 'rgba(136,221,255,0.85)';
-            break;
-        case 'APPROACH_WARP':
-            text = '⚡  AUTOPILOT: WARPING';
-            color = '#ff4488';
-            glow = 'rgba(255,68,136,0.9)';
-            break;
-        case 'APPROACH_BOOST':
-            text = '▶▶  AUTOPILOT: APPROACHING TARGET (BOOST)';
-            color = '#ff9944';
-            glow = 'rgba(255,153,68,0.85)';
-            break;
-        case 'APPROACH':
-            text = '▶  AUTOPILOT: APPROACHING TARGET';
-            color = '#00ffcc';
-            glow = 'rgba(0,255,204,0.85)';
-            break;
-        case 'BRAKE':
-            text = '◼  AUTOPILOT: ESTABLISHING ORBIT TRAJECTORY';
-            color = '#00ffcc';
-            glow = 'rgba(0,255,204,0.85)';
-            break;
-        case 'CIRCULARIZE':
-            text = '↻  AUTOPILOT: ENTERING ORBIT';
-            color = '#00ffcc';
-            glow = 'rgba(0,255,204,0.85)';
-            break;
-        case 'ORBIT':
-            text = '✓  STABLE ORBIT ESTABLISHED';
-            color = '#7ef0ff';
-            glow = 'rgba(100,220,255,0.9)';
-            break;
-        case 'BLOCKED':
-            text = '⚠ AUTOPILOT BLOCKED';
-            color = '#ff3344';
-            glow = 'rgba(255,51,68,0.9)';
-            break;
-        default:
-            text = '';
-            color = '#ffffff';
-            glow = 'transparent';
-    }
-
-    // Phase label
-    ctx.font = 'bold 34px monospace';
-    ctx.shadowBlur = 14;
-    ctx.shadowColor = glow;
-    ctx.fillStyle = color;
-    ctx.fillText(text, W / 2, 34);
-
-    // Distance sub-label
-    if (distanceLabel) {
-        ctx.font = '24px monospace';
-        ctx.shadowBlur = 6;
-        ctx.fillStyle = 'rgba(255,255,255,0.75)';
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.fillText(distanceLabel, W / 2, 72);
-    }
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
-}
-
-function createOrbitNotifySprite() {
-    const material = new THREE.SpriteMaterial({
-        map: createAutopilotPhaseTexture('NONE'),
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    orbitNotifySprite = new THREE.Sprite(material);
-    // 800×100 canvas → 800×80 screen-pixel sprite (two-line display).
-    orbitNotifySprite.scale.set(800, 80, 1);
-    orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), 0);
-    orbitNotifySprite.visible = false;
-    uiScene.add(orbitNotifySprite);
-}
-createOrbitNotifySprite();
-
-function showOrbitNotifySprite() {
-    if (!orbitNotifySprite) return;
-    orbitNotifySprite.visible = true;
-    autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
-}
-
-// --- Context hint system (top-center HUD text) ---
-let hintSprite: THREE.Sprite | null = null;
-let hintLastText = '';
-
-function createHintSprite() {
-    const texture = createHintTexture({
-        lines: [],
-    });
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    hintSprite = new THREE.Sprite(material);
-    hintSprite.scale.set(1100, 95, 1); // allow 1-2 lines (wider to avoid clipping)
-    hintSprite.visible = false;
-
-    // Top-center of the screen (slightly below top edge)
-    hintSprite.position.set(0, window.innerHeight / 2 - 55, 0);
-
-    uiScene.add(hintSprite);
-
-    window.__updateHintSprite = function updateHintSprite() {
-        if (!hintSprite) return;
-
-        const hint = getActiveContextHint();
-        hintSprite.visible = hint.visible;
-        if (!hint.visible) return;
-
-        const textKey = hint.lines.join('\n');
-        if (textKey === hintLastText) return;
-        hintLastText = textKey;
-
-        if (hintSprite.material.map) hintSprite.material.map.dispose();
-        hintSprite.material.map = createHintTexture({ lines: hint.lines });
-        hintSprite.material.needsUpdate = true;
-    };
-}
-
-function forceHintRefresh() {
-    try {
-        hintLastText = '';
-
-        // Always recompute the hint, and force-apply both visibility and texture.
-        // This avoids "stuck" hint sprites when switching camera modes.
-        if (!hintSprite) return;
-
-        const hint = getActiveContextHint();
-        hintSprite.visible = hint.visible;
-
-        // Dispose old texture (if any)
-        if (hintSprite.material?.map) hintSprite.material.map.dispose();
-
-        if (!hint.visible) {
-            // Ensure we don't keep stale text around
-            hintLastText = '';
-            hintSprite.material.map = createHintTexture({ lines: [] });
-            hintSprite.material.needsUpdate = true;
-            return;
-        }
-
-        hintLastText = hint.lines.join('\n');
-        hintSprite.material.map = createHintTexture({ lines: hint.lines });
-        hintSprite.material.needsUpdate = true;
-    } catch (e) {
-        console.error('Error dispatching body:added event for preset body:', e);
-    }
-}
-
-function getActiveContextHint() {
-    // Highest priority: velocity dragging hint (existing behavior)
-    const draggingVel = isChangingVelocity || isMiddleMouseVelocity;
-    if (draggingVel) {
-        const mode = interactionState.velocityEditMode || 'xz';
-        return {
-            visible: true,
-            lines: [
-                `Dragging velocity — press G to switch modes (XZ ↔ Y) | Mode: ${mode.toUpperCase()}`,
-            ],
-        };
-    }
-
-    const selected =
-        selectedBody && simulationState.bodies.includes(selectedBody) ? selectedBody : null;
-
-    const isFree = !!cameraState.isFreeCameraMode;
-    const isTarget = !!cameraState.isTargetMode;
-
-    // Case 1: Free camera mode hint (always show when enabled)
-    if (isFree) {
-        // If a body is also selected, we can show a second line about manipulation.
-        if (selected) {
-            const bodyLine = isTarget
-                ? `Selected: drag axis arrows to move body | Drag yellow arrow to change velocity`
-                : `Selected: click Target (crosshair) to enable arrows | Then drag arrows to move / change velocity`;
-            return {
-                visible: true,
-                lines: [`Free Camera: WASD move | Space up | C down | Shift = fast`, bodyLine],
-            };
-        }
-
-        return {
-            visible: true,
-            lines: [`Free Camera: WASD move | Space up | C down | Shift = fast`],
-        };
-    }
-
-    // Case 2: Body selected manipulation hint (non-free-cam)
-    if (selected) {
-        const line = isTarget
-            ? `Selected: drag axis arrows or use Arrow keys to move body | Drag yellow arrow to change velocity`
-            : `Selected: click Target (crosshair) to enable arrows | Arrow keys move body once Target is on`;
-
-        return {
-            visible: true,
-            lines: [line, 'Hold middle mouse button: follow mode'],
-        };
-    }
-
-    // Case 3: Default camera hint (no selection, not free camera)
-    return {
-        visible: true,
-        lines: ['Use right mouse button to rotate camera'],
-    };
-}
-
-function createHintTexture({ lines }: { lines: string[] }) {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Failed to create canvas context for hint texture');
-
-    canvas.width = 2200;
-    canvas.height = 140;
-
-    context.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 28pt hint text (slightly smaller to avoid clipping)
-    context.font = '28px monospace';
-    context.fillStyle = '#aaaaaa';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-
-    const safeLines = Array.isArray(lines) ? lines.filter(Boolean) : [];
-    if (safeLines.length === 0) {
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.needsUpdate = true;
-        return texture;
-    }
-
-    const lineY = safeLines.length > 1 ? [50, 100] : [75];
-    for (let i = 0; i < Math.min(safeLines.length, 2); i++) {
-        context.fillText(safeLines[i], canvas.width / 2, lineY[i]);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    return texture;
-}
-
-createHintSprite();
+const flightHUD = new FlightHUD(
+    uiScene,
+    autopilotState,
+    interactionState,
+    cameraState,
+    simulationState,
+    flightState,
+    () => selectedBody
+);
+flightHUD.init();
 
 // Backward compatibility aliases
 let activeAxis: string | null = null;
@@ -1379,8 +864,11 @@ let savedTimeScale = 1;
 let lastT = performance.now();
 
 let supernovas: Supernova[] = []; // Track all supernova effects
+let planetaryNebulae: PlanetaryNebula[] = []; // Track all planetary nebula effects
 
 let wasRunningBeforeDrag = false;
+let isTilting = false;
+let isAzimuthDragging = false;
 const dragCameraOffset = new THREE.Vector3();
 const dragPlane = new THREE.Plane();
 
@@ -1545,7 +1033,7 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
     const shouldMoveCameraWithBody =
         cameraState.isLookAtMode &&
         !isFreeCameraMode &&
-        !surfaceState?.isActive &&
+        !surfaceCam.isActive &&
         !cameraState.isFreeCameraMode;
 
     if (shouldMoveCameraWithBody) {
@@ -1554,20 +1042,20 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
     }
 
     if (gizmo.group?.visible) {
-        showPositionIndicators('position');
-        updatePositionIndicator(yAxisIndicator, yAxisRing, body.mesh.position);
+        posIndicator.show('position');
+        posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, body.mesh.position);
     }
 
     if (gizmo.target === body) {
         gizmo.update();
-        updateVelocityArcs();
-        if (yAxisIndicator && yAxisRing) {
-            updatePositionIndicator(yAxisIndicator, yAxisRing, body.mesh.position);
+        velArc.update();
+        if (posIndicator.yAxisIndicator && posIndicator.yAxisRing) {
+            posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, body.mesh.position);
         }
         if (
             (isChangingVelocity || isMiddleMouseVelocity) &&
-            velocityTipIndicator &&
-            velocityTipRing
+            posIndicator.velocityTipIndicator &&
+            posIndicator.velocityTipRing
         ) {
             const speed = body.velocity.length();
             const arrowScale = 50;
@@ -1576,7 +1064,7 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
             const arrowTip = body.mesh.position
                 .clone()
                 .add(direction.multiplyScalar(speed * arrowScale));
-            updatePositionIndicator(velocityTipIndicator, velocityTipRing, arrowTip);
+            posIndicator.updateIndicator(posIndicator.velocityTipIndicator, posIndicator.velocityTipRing, arrowTip);
         }
     }
 
@@ -1616,278 +1104,6 @@ const kuiperBeltPoints = new THREE.Points(kuiperBeltGeo, kuiperBeltMat);
 scene.add(kuiperBeltPoints);
 
 // Velocity arrow is now part of CoordinateGizmo (gizmo.velocityArrow)
-
-// Grid plane for when dragging gizmo or velocity arrow
-// UX goal: grid should feel "world anchored" (does not move with the body),
-// but should dynamically expand/contract to encompass the dragged target + buffer.
-let gridHelper: THREE.GridHelper | null = null;
-const gridState = {
-    size: 0,
-    divisions: 0,
-
-    // While dragging, the grid is anchored at the body's position at drag start (but does not move after).
-    dragAnchor: new THREE.Vector3(),
-
-    // Base cell size to use for the drag session (fixed; derived from body radius at drag start).
-    dragCellSize: null as number | null,
-
-    // While dragging, keep divisions stable to avoid a distracting "grid shifting" effect
-    // (divisions changes re-quantize line spacing, which reads as the grid moving).
-    freezeDivisions: false,
-};
-
-function disposeGridHelper() {
-    if (!gridHelper) return;
-    scene.remove(gridHelper);
-    gridHelper.geometry?.dispose?.();
-    gridHelper.material?.dispose?.();
-    gridHelper = null;
-    gridState.size = 0;
-    gridState.divisions = 0;
-}
-
-function createGridHelper({
-    size,
-    divisions,
-    center,
-}: {
-    size: number;
-    divisions: number;
-    center: THREE.Vector3 | null;
-}) {
-    // Recreate (GridHelper doesn't support resizing)
-    disposeGridHelper();
-
-    gridHelper = new THREE.GridHelper(size, divisions, 0x444444, 0x222222);
-    // Anchored at a fixed center (drag-start position) on the y=0 plane
-    if (center) {
-        gridHelper.position.set(center.x, 0, center.z);
-    } else {
-        gridHelper.position.set(0, 0, 0);
-    }
-    gridHelper.visible = false;
-    scene.add(gridHelper);
-
-    gridState.size = size;
-    gridState.divisions = divisions;
-}
-
-function calcGridRequiredSize(targetBody: Body | null) {
-    // Fallback: if no target, just keep a modest grid.
-    if (!targetBody || targetBody._isDisposed || !targetBody.mesh) {
-        const fallbackSize = 12000;
-        const fallbackDivisions = 200;
-        return {
-            size: fallbackSize,
-            divisions: fallbackDivisions,
-            center: new THREE.Vector3(0, 0, 0),
-        };
-    }
-
-    // Grid anchor: where the body was when the drag started.
-    // During drag we keep gridHelper.position fixed at this point (XZ).
-    const anchor = gridState.dragAnchor || new THREE.Vector3(0, 0, 0);
-
-    // How far the body has moved away from the drag start anchor (in XZ)
-    const p = targetBody.mesh.position;
-    const dx = p.x - anchor.x;
-    const dz = p.z - anchor.z;
-    const rXZ = Math.sqrt(dx * dx + dz * dz);
-
-    const radius = Math.max(0, targetBody.radius || 0);
-
-    // Buffer rules:
-    // Keep the initial grid SMALL and only slightly larger than the dragged body.
-    // Then EXPAND ONLY as the body moves away from the anchor.
-    //
-    // Use a smaller body-relative padding so the grid doesn't feel excessively large.
-    const buffer = Math.max(25, radius * 4);
-
-    // Baseline: just enough to cover the body + padding.
-    const baseHalfExtent = Math.max(radius + buffer, 120);
-
-    // Expand as the body moves away from the anchor
-    const halfExtent = baseHalfExtent + rXZ;
-
-    // GridHelper size is full width across X and Z.
-    const size = THREE.MathUtils.clamp(halfExtent * 2, 500, 4000000); //4000000
-
-    // Cell sizing rules:
-    // - Cell size is FIXED for the drag session and based on the object's radius at drag start.
-    // - Cell size MUST NOT increase as the body moves away; only size/divisions change.
-    const cell = gridState.dragCellSize || Math.max(0.05, Math.min(20000, radius || 1));
-
-    // Keep cell size stable by computing divisions from the fixed cell size.
-    let divisions = Math.round(size / cell);
-
-    // Clamp for GridHelper sanity, but avoid forcing large minimums (that would imply a big grid).
-    // Allow smaller cell sizes by allowing more divisions.
-    // GridHelper cost grows with divisions, so keep a safety cap.
-    divisions = THREE.MathUtils.clamp(divisions, 2, 20000);
-
-    // Make divisions even so the center line is stable/consistent.
-    if (divisions % 2 !== 0) divisions += 1;
-
-    return { size, divisions, center: anchor };
-}
-
-function ensureGridHelperSizedToTarget(targetBody: Body | null) {
-    const {
-        size: requiredSize,
-        divisions: requiredDivisions,
-        center,
-    } = calcGridRequiredSize(targetBody);
-
-    const currentSize = gridState.size || 0;
-    const currentDivisions = gridState.divisions || 0;
-
-    const sizeChangedEnough =
-        !gridHelper || Math.abs(requiredSize - currentSize) > currentSize * 0.05;
-
-    // While dragging we freeze divisions to avoid a perceived "grid shifting" effect.
-    // But if we allow the grid to SHRINK, we must allow divisions to shrink too, otherwise cell size
-    // becomes enormous as size decreases. So during freeze we still keep the cell size stable by
-    // tracking divisions from the required size.
-    const divisionsToUse = gridState.freezeDivisions ? requiredDivisions : requiredDivisions;
-    const divisionsChanged = divisionsToUse !== currentDivisions;
-
-    const shouldRebuild =
-        sizeChangedEnough ||
-        (!gridState.freezeDivisions && divisionsChanged) ||
-        (gridState.freezeDivisions && sizeChangedEnough);
-
-    if (shouldRebuild) {
-        createGridHelper({
-            size: requiredSize,
-            divisions: divisionsToUse,
-            center,
-        });
-    }
-
-    // Keep the grid anchored at drag-start center (XZ).
-    if (gridHelper && center) {
-        gridHelper.position.set(center.x, 0, center.z);
-
-        // Ensure the grid remains visible during a drag even if we recreate it this frame.
-        if (interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity) {
-            gridHelper.visible = true;
-        }
-    }
-}
-
-// Initialize with a default grid
-createGridHelper(calcGridRequiredSize(null));
-
-// Y-axis indicator (red line from grid to object with ring at bottom)
-let yAxisIndicator: THREE.Line | null = null;
-let yAxisRing: THREE.Mesh | null = null;
-let velocityTipIndicator: THREE.Line | null = null;
-let velocityTipRing: THREE.Mesh | null = null;
-
-function createPositionIndicator(color: number) {
-    // Create vertical line
-    const lineMaterial = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
-    const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 100, 0),
-    ]);
-    const line = new THREE.Line(lineGeometry, lineMaterial);
-    line.visible = false;
-    scene.add(line);
-
-    // Create ring at bottom
-    const ringGeometry = new THREE.RingGeometry(8, 10, 32);
-    const ringMaterial = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide });
-    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-    ring.rotation.x = Math.PI / 2; // Rotate to lie flat on XZ plane
-    ring.visible = false;
-    scene.add(ring);
-
-    return { line, ring };
-}
-
-// Create red indicator for object position
-const redIndicator = createPositionIndicator(0xff0000);
-yAxisIndicator = redIndicator.line;
-yAxisRing = redIndicator.ring;
-
-// Create green indicator for velocity arrow tip
-const greenIndicator = createPositionIndicator(0x00ff00);
-velocityTipIndicator = greenIndicator.line;
-velocityTipRing = greenIndicator.ring;
-
-function updatePositionIndicator(
-    line: THREE.Line | null,
-    ring: THREE.Mesh | null,
-    position: THREE.Vector3 | null
-) {
-    if (!line || !ring || !position) return;
-
-    const gridY = 0; // Grid is at y=0
-
-    // Update line position and length
-    const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(position.x, gridY, position.z),
-        new THREE.Vector3(position.x, position.y, position.z),
-    ]);
-    line.geometry.dispose();
-    line.geometry = lineGeometry;
-
-    // Update ring position
-    ring.position.set(position.x, gridY, position.z);
-}
-
-function setIndicatorMode(mode: string) {
-    const showRed = mode === 'position' || mode === 'both';
-    const showGreen = mode === 'velocity' || mode === 'both';
-
-    if (yAxisIndicator) yAxisIndicator.visible = showRed;
-    if (yAxisRing) yAxisRing.visible = showRed;
-    if (velocityTipIndicator) velocityTipIndicator.visible = showGreen;
-    if (velocityTipRing) velocityTipRing.visible = showGreen;
-}
-
-function showPositionIndicators(mode = 'position') {
-    // Capture drag-start anchor and a fixed cell size derived from the dragged body's radius.
-    // Grid will be anchored here (not moving), and will only EXPAND as the body moves away.
-    if (gizmo?.target?.mesh) {
-        gridState.dragAnchor.copy(gizmo.target.mesh.position);
-        const r = Math.max(0, gizmo.target.radius || 0);
-        // Cell size is derived from body radius, but scaled down for this sim's world units.
-        const cell = Math.max(0.05, Math.min(20000, r || 1));
-        gridState.dragCellSize = cell;
-    } else {
-        gridState.dragAnchor.set(0, 0, 0);
-        gridState.dragCellSize = 10;
-    }
-
-    // Freeze divisions during drag to prevent "shimmering" / perceived grid motion.
-    gridState.freezeDivisions = true;
-    ensureGridHelperSizedToTarget(gizmo?.target);
-
-    // Defensive: ensure helpers are actually in the scene and not disposed/removed due to any race
-    if (gridHelper && !gridHelper.parent) scene.add(gridHelper);
-    if (yAxisIndicator && !yAxisIndicator.parent) scene.add(yAxisIndicator);
-    if (yAxisRing && !yAxisRing.parent) scene.add(yAxisRing);
-    if (velocityTipIndicator && !velocityTipIndicator.parent) scene.add(velocityTipIndicator);
-    if (velocityTipRing && !velocityTipRing.parent) scene.add(velocityTipRing);
-
-    if (gridHelper) gridHelper.visible = true;
-    setIndicatorMode(mode);
-
-    if ((mode === 'position' || mode === 'both') && gizmo?.target?.mesh) {
-        updatePositionIndicator(yAxisIndicator, yAxisRing, gizmo.target.mesh.position);
-    }
-}
-
-function hidePositionIndicators() {
-    // Allow divisions to update again once the drag ends.
-    gridState.freezeDivisions = false;
-    gridState.dragCellSize = null;
-    setIndicatorMode('none');
-
-    if (gridHelper) gridHelper.visible = false;
-}
 
 function getPrimaryStar() {
     return (
@@ -2143,7 +1359,9 @@ function createNewBody(
     customTemperature: number | null = null,
     customLightIntensity: number | null = null,
     customRadius: number | null = null,
-    orbitParent: Body | null = null
+    orbitParent: Body | null = null,
+    createTilt: number | null = null,
+    createAzimuth: number | null = null
 ) {
     let newBody;
     let moonCreationParent: Body | null = null; // tracked so post-creation can re-focus the parent
@@ -2215,7 +1433,8 @@ function createNewBody(
             | 'volcanic'
             | 'ocean'
             | 'desert'
-            | 'frozen';
+            | 'frozen'
+            | 'temperate';
 
         const {
             mass: planetMass,
@@ -2229,7 +1448,8 @@ function createNewBody(
             resolvedPlanetType === 'volcanic' ||
             resolvedPlanetType === 'ocean' ||
             resolvedPlanetType === 'desert' ||
-            resolvedPlanetType === 'frozen';
+            resolvedPlanetType === 'frozen' ||
+            resolvedPlanetType === 'temperate';
 
         newBody = createPlanetBodyFromProceduralCreation(dependencies, scene, {
             id: createUniqueId('planet'),
@@ -2415,9 +1635,16 @@ function createNewBody(
             inclination
         );
 
+        const { mass: asteroidMass, radius: asteroidRadius } = randomAsteroidParams({
+            mass: customMass,
+            radius: customRadius,
+        });
+
         newBody = new Asteroid(dependencies, scene, {
             pos: asteroidSpawnPos.toArray(),
             vel: asteroidVel.toArray(),
+            mass: asteroidMass,
+            radius: asteroidRadius,
         });
     } else if (bodyType === 'comet') {
         // Create a comet near the camera with appropriate orbital velocity
@@ -2472,6 +1699,23 @@ function createNewBody(
     }
 
     if (newBody) {
+        // Apply axial tilt/azimuth from create sliders if the body supports rotation
+        if ((createTilt !== null || createAzimuth !== null) && newBody instanceof CelestialBody && newBody.rotation) {
+            const tilt    = createTilt    !== null ? createTilt    : (newBody.rotation.tilt    ?? 0);
+            const azimuth = createAzimuth !== null ? createAzimuth : (newBody.rotation.azimuth ?? 0);
+            newBody.rotation.tilt    = tilt;
+            newBody.rotation.azimuth = azimuth;
+            const tiltRad = THREE.MathUtils.degToRad(tilt);
+            const azRad   = THREE.MathUtils.degToRad(azimuth);
+            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
+            const azQuat   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), azRad);
+            newBody.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
+            if (newBody.rings) {
+                newBody.rings.position.copy(newBody.mesh.position);
+                newBody.rings.quaternion.copy(newBody.mesh.quaternion);
+            }
+        }
+
         simulationState.bodies.push(newBody);
 
         // Notify UI / systems that track live bodies
@@ -2571,11 +1815,21 @@ function spawn({
     });
     simulationState.explosions = [];
 
+    // Clean up any existing impact shockwaves
+    for (const impact of simulationState.impacts) impact.dispose();
+    simulationState.impacts = [];
+
     // Clean up all supernova effects
     for (const supernova of supernovas) {
         supernova.dispose();
     }
     supernovas = [];
+
+    // Clean up all planetary nebula effects
+    for (const nebula of planetaryNebulae) {
+        nebula.dispose();
+    }
+    planetaryNebulae = [];
 
     // Reset bodies array depending on mode
     simulationState.bodies = [];
@@ -2734,11 +1988,14 @@ function onMouseDown(event: MouseEvent) {
     // Ignore synthetic mouse events immediately after touch gestures.
     if (Date.now() < interactionState.touchIgnoreUntil) return;
 
-    // In flight mode: block all LMB interactions (selection, gizmo, velocity editing).
-    // Only allow RMB (which just sets isMouseLookActive that flight mode ignores anyway).
+    // In flight mode: LMB fires the weapon; all other non-RMB interactions are blocked.
+    if (flightState.isActive && event.button === 0) {
+        flightState.isFiring = true;
+        return;
+    }
     if (flightState.isActive && event.button !== 2) return;
 
-    // Surface mode RMB look uses the global mousemove handler (onSurfaceMouseMove).
+    // Surface mode RMB look uses the global mousemove handler (surfaceCam.onMouseMove).
     // Avoid engaging the generic pointer-lock mouse-look while on the surface.
     // Middle mouse button for velocity control when body is selected
     // Do not allow MMB velocity edit to start while already doing an LMB velocity drag.
@@ -2771,15 +2028,15 @@ function onMouseDown(event: MouseEvent) {
         }
 
         // Show grid and indicators
-        showPositionIndicators('both');
-        updateVelocityArcs();
+        posIndicator.show('both');
+        velArc.update();
 
         return;
     }
 
     // Right mouse button activates mouse look
     if (event.button === 2) {
-        if (surfaceState?.isActive) {
+        if (surfaceCam.isActive) {
             isMouseLookActive = true;
             return;
         }
@@ -2901,10 +2158,62 @@ function onMouseDown(event: MouseEvent) {
         }
 
         // Show grid + arcs + indicators
-        showPositionIndicators('both');
-        updateVelocityArcs();
+        posIndicator.show('both');
+        velArc.update();
 
         return;
+    }
+
+    // Check for tilt ring before the general gizmo check so it takes priority.
+    if (gizmo.tiltRing?.visible && gizmo.target instanceof CelestialBody) {
+        const tiltIntersects = raycaster.intersectObjects(
+            [gizmo.tiltRing, gizmo.tiltKnob].filter((m) => m.visible),
+            false
+        );
+        if (tiltIntersects.length > 0) {
+            isTilting = true;
+            controls.enabled = false;
+            // Drag plane normal is perpendicular to the tilt ring's plane.
+            // The tilt ring's plane contains world-Y and the azimuth forward direction.
+            // Normal = worldX rotated by azimuth around Y = (cos(az), 0, -sin(az)).
+            const az = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
+            dragPlane.setFromNormalAndCoplanarPoint(
+                new THREE.Vector3(Math.cos(az), 0, -Math.sin(az)),
+                gizmo.target.mesh.position
+            );
+            // Highlight ring while dragging
+            (gizmo.tiltRing.material as THREE.MeshPhongMaterial).color.set(0xffffff);
+            (gizmo.tiltRing.material as THREE.MeshPhongMaterial).emissive.set(0x666666);
+            if (!isPaused && !isFreeCameraMode) {
+                togglePause();
+                wasRunningBeforeDrag = true;
+            }
+            return;
+        }
+    }
+
+    // Check for azimuth ring before the general gizmo check.
+    if (gizmo.azimuthRing?.visible && gizmo.target instanceof CelestialBody) {
+        const azimuthIntersects = raycaster.intersectObjects(
+            [gizmo.azimuthRing, gizmo.azimuthKnob].filter((m) => m.visible),
+            false
+        );
+        if (azimuthIntersects.length > 0) {
+            isAzimuthDragging = true;
+            controls.enabled = false;
+            // Drag plane normal = Y-axis  =>  the XZ plane through the body.
+            dragPlane.setFromNormalAndCoplanarPoint(
+                new THREE.Vector3(0, 1, 0),
+                gizmo.target.mesh.position
+            );
+            (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).color.set(0xffffff);
+            (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).emissive.set(0x666666);
+            if (!isPaused && !isFreeCameraMode) {
+                togglePause();
+                wasRunningBeforeDrag = true;
+            }
+            return;
+        }
     }
 
     // Check for Gizmo first
@@ -2913,6 +2222,14 @@ function onMouseDown(event: MouseEvent) {
         // Gravity arrow is informational-only (shows net gravitational acceleration).
         // Ignore clicks/drags on it so it can't be used to move the body.
         if (gizmoIntersects[0].object?.userData?.isGravityGizmo) {
+            return;
+        }
+        // Tilt ring is handled in the block above; skip it here to avoid spurious repositioning.
+        if (gizmoIntersects[0].object?.userData?.isTiltGizmo) {
+            return;
+        }
+        // Azimuth ring is handled in the block above; skip it here to avoid spurious repositioning.
+        if (gizmoIntersects[0].object?.userData?.isAzimuthGizmo) {
             return;
         }
 
@@ -2980,7 +2297,7 @@ function onMouseDown(event: MouseEvent) {
         }
 
         // Show grid and indicators
-        showPositionIndicators('position');
+        posIndicator.show('position');
 
         if (!isPaused && !isFreeCameraMode) {
             togglePause();
@@ -3052,7 +2369,7 @@ function onMouseDown(event: MouseEvent) {
         uiManager.managementPanel.setSelectedBody(null);
 
         refreshBodiesTable();
-        forceHintRefresh();
+        flightHUD.forceHintRefresh();
     }
 }
 
@@ -3173,7 +2490,7 @@ function onMouseMove(event: MouseEvent) {
                     gizmo.target.velocity.copy(newVel);
                 }
 
-                updateVelocityArcs();
+                velArc.update();
                 // Do NOT return here; allow mouse-look to also run if RMB is held.
                 // (Velocity updates will still be stable because Y-mode locks XZ, and XZ-mode is screen-plane constrained.)
                 // If you want to prevent simultaneous camera movement, re-add `return`.
@@ -3183,6 +2500,103 @@ function onMouseMove(event: MouseEvent) {
                 if (!rmbDown && document.pointerLockElement === renderer.domElement) return;
             }
         }
+    }
+
+    // Handle tilt ring drag — 3D analytic tangent projection.
+    //
+    // The tilt ring parameterization (azimuth=az, radius=Rt):
+    //   P(θ) = (sin(az)·sin(θ), cos(θ), cos(az)·sin(θ)) * Rt  relative to body
+    // Tangent = dP/dθ = (sin(az)·cos(θ), −sin(θ), cos(az)·cos(θ)) * Rt
+    //
+    // We project two nearby points on the ring to screen to get the screen-space tangent
+    // direction AND pixels-per-radian sensitivity — both correct at any camera angle.
+    if (isTilting && gizmo.target instanceof CelestialBody) {
+        const W = window.innerWidth, H = window.innerHeight;
+        const tiltRad = THREE.MathUtils.degToRad(gizmo.target.rotation.tilt);
+        const azRad   = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
+        const Rt  = gizmo._tiltRingRadius;
+        const bodyPos = gizmo.target.mesh.position;
+        const eps = 0.002; // radians; large enough to avoid float noise
+
+        // Two knob positions straddling the current tilt angle
+        const makeKnob = (t: number) => bodyPos.clone().add(new THREE.Vector3(
+            Math.sin(azRad) * Math.sin(t) * Rt,
+            Math.cos(t) * Rt,
+            Math.cos(azRad) * Math.sin(t) * Rt
+        ));
+        const n1 = makeKnob(tiltRad - eps).project(camera);
+        const n2 = makeKnob(tiltRad + eps).project(camera);
+
+        // Screen pixels per radian along the tangent
+        const tsx = (n2.x - n1.x) * (W / 2) / (2 * eps);
+        const tsy = -(n2.y - n1.y) * (H / 2) / (2 * eps); // NDC Y up → screen Y down
+        const tsLen = Math.hypot(tsx, tsy);
+
+        if (tsLen > 0.5) { // skip only when ring tangent truly collapses to depth axis
+            const tx = tsx / tsLen;
+            const ty = tsy / tsLen;
+            const movement = event.movementX * tx + event.movementY * ty;
+            const deltaDeg = THREE.MathUtils.radToDeg(movement / tsLen);
+
+            const newTiltDeg = gizmo.target.rotation.tilt + deltaDeg;
+            const newTiltRad = THREE.MathUtils.degToRad(newTiltDeg);
+            // Use setFromAxisAngle (not setFromUnitVectors) to avoid the antiparallel
+            // singularity at tilt = ±180° where setFromUnitVectors picks the wrong axis.
+            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), newTiltRad);
+            const azQuat   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), azRad);
+            gizmo.target.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
+            gizmo.target.rotation.tilt = newTiltDeg;
+            if (gizmo.target.rings) {
+                gizmo.target.rings.position.copy(gizmo.target.mesh.position);
+                gizmo.target.rings.quaternion.copy(gizmo.target.mesh.quaternion);
+            }
+        }
+        if (!isFreeCameraMode) return;
+    }
+
+    // Handle azimuth ring drag — same 3D analytic tangent projection.
+    //
+    // Azimuth ring parameterization (radius=Ra, in XZ plane, Y=0):
+    //   P(φ) = (sin(φ), 0, cos(φ)) * Ra  relative to body
+    // Tangent = dP/dφ = (cos(φ), 0, −sin(φ)) * Ra
+    if (isAzimuthDragging && gizmo.target instanceof CelestialBody) {
+        const W = window.innerWidth, H = window.innerHeight;
+        const tiltRad = THREE.MathUtils.degToRad(gizmo.target.rotation.tilt);
+        const azRad   = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
+        const Ra = gizmo._azimuthRingRadius;
+        const bodyPos = gizmo.target.mesh.position;
+        const eps = 0.002;
+
+        const makeKnob = (a: number) => bodyPos.clone().add(new THREE.Vector3(
+            Math.sin(a) * Ra,
+            0,
+            Math.cos(a) * Ra
+        ));
+        const n1 = makeKnob(azRad - eps).project(camera);
+        const n2 = makeKnob(azRad + eps).project(camera);
+
+        const tsx = (n2.x - n1.x) * (W / 2) / (2 * eps);
+        const tsy = -(n2.y - n1.y) * (H / 2) / (2 * eps);
+        const tsLen = Math.hypot(tsx, tsy);
+
+        if (tsLen > 0.5) {
+            const tx = tsx / tsLen;
+            const ty = tsy / tsLen;
+            const movement = event.movementX * tx + event.movementY * ty;
+            const deltaDeg = THREE.MathUtils.radToDeg(movement / tsLen);
+
+            const newAzimuthDeg = (gizmo.target.rotation.azimuth ?? 0) + deltaDeg;
+            const newAzRad = THREE.MathUtils.degToRad(newAzimuthDeg);
+            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
+            const azQuat   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), newAzRad);
+            gizmo.target.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
+            gizmo.target.rotation.azimuth = newAzimuthDeg;
+            if (gizmo.target.rings) {
+                gizmo.target.rings.position.copy(gizmo.target.mesh.position);
+                gizmo.target.rings.quaternion.copy(gizmo.target.mesh.quaternion);
+            }
+        }
+        if (!isFreeCameraMode) return;
     }
 
     // Handle position gizmo dragging
@@ -3368,6 +2782,12 @@ function onMouseUp(event: MouseEvent) {
     // Ignore synthetic mouse events immediately after touch gestures.
     if (Date.now() < interactionState.touchIgnoreUntil) return;
 
+    // Flight mode: release LMB stops firing.
+    if (flightState.isActive && event.button === 0) {
+        flightState.isFiring = false;
+        return;
+    }
+
     // Middle mouse button release
     if (event.button === 1) {
         isMiddleMouseVelocity = false;
@@ -3375,11 +2795,10 @@ function onMouseUp(event: MouseEvent) {
         // If LMB velocity drag is still active, do NOT hide the grid/indicators/arcs.
         // This prevents "grid disappearing" when the user releases MMB while still dragging with LMB.
         if (!isChangingVelocity) {
-            hidePositionIndicators();
+            posIndicator.hide();
 
             // Hide arc helper for middle-mouse velocity drag as well
-            velocityArcXZ.visible = false;
-            velocityArcY.visible = false;
+            velArc.hideAll();
         }
 
         return;
@@ -3397,16 +2816,30 @@ function onMouseUp(event: MouseEvent) {
     // Left mouse button releases
     if (event.button === 0) {
         const wasVel = isChangingVelocity;
+        const wasTilting = isTilting;
+        const wasAzimuth = isAzimuthDragging;
 
         interactionState.isRepositioning = false;
         isChangingVelocity = false;
+        isTilting = false;
+        isAzimuthDragging = false;
         activeAxis = null;
         gizmo.arrows.forEach((a) => ((a.line.material as THREE.LineBasicMaterial).opacity = 1.0));
-        controls.enabled = !isFreeCameraMode;
-        hidePositionIndicators();
 
-        velocityArcXZ.visible = false;
-        velocityArcY.visible = false;
+        // Restore tilt ring color
+        if (wasTilting && gizmo.tiltRing) {
+            (gizmo.tiltRing.material as THREE.MeshPhongMaterial).color.set(0xff8800);
+            (gizmo.tiltRing.material as THREE.MeshPhongMaterial).emissive.setRGB(1, 0.533, 0).multiplyScalar(0.25);
+        }
+        // Restore azimuth ring color
+        if (wasAzimuth && gizmo.azimuthRing) {
+            (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).color.set(0x00ccff);
+            (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).emissive.setRGB(0, 0.8, 1).multiplyScalar(0.2);
+        }
+        controls.enabled = !isFreeCameraMode;
+        posIndicator.hide();
+
+        velArc.hideAll();
 
         if (wasVel) {
             // Restore velocity arrow color after drag
@@ -3537,9 +2970,9 @@ function animate() {
     // IMPORTANT: when surface mode is active, it fully owns camera position + orientation.
     // We still run physics (so the planet rotates under you), but we must skip any other
     // camera-follow / look-at / orbit-controls logic later in this frame.
-    const isSurfaceModeActive = !!surfaceState?.isActive;
+    const isSurfaceModeActive = !!surfaceCam.isActive;
     if (isSurfaceModeActive) {
-        updateSurfaceCameraTransform();
+        surfaceCam.updateTransform();
     }
 
     // Flight mode camera + controls update.
@@ -3826,7 +3259,7 @@ function animate() {
     skydome.position.copy(camera.position);
 
     gizmo.update();
-    updateVelocityArcs();
+    velArc.update();
 
     // Update grid size while dragging so it expands/contracts as needed.
     if (
@@ -3835,20 +3268,21 @@ function animate() {
         !gizmo.target._isDisposed &&
         gizmo.target.mesh
     ) {
-        ensureGridHelperSizedToTarget(gizmo.target);
+        const isDragging = interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity;
+        gridHelperManager.ensure(gizmo.target, isDragging);
 
         if (
-            yAxisIndicator &&
-            yAxisRing &&
+            posIndicator.yAxisIndicator &&
+            posIndicator.yAxisRing &&
             (isChangingVelocity || isMiddleMouseVelocity || interactionState.isRepositioning)
         ) {
-            updatePositionIndicator(yAxisIndicator, yAxisRing, gizmo.target.mesh.position);
+            posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, gizmo.target.mesh.position);
         }
 
         if (
             (isChangingVelocity || isMiddleMouseVelocity) &&
-            velocityTipIndicator &&
-            velocityTipRing
+            posIndicator.velocityTipIndicator &&
+            posIndicator.velocityTipRing
         ) {
             const speed = gizmo.target.velocity.length();
             const arrowScale = 50;
@@ -3857,24 +3291,40 @@ function animate() {
             const arrowTip = gizmo.target.mesh.position
                 .clone()
                 .add(direction.multiplyScalar(speed * arrowScale));
-            updatePositionIndicator(velocityTipIndicator, velocityTipRing, arrowTip);
+            posIndicator.updateIndicator(posIndicator.velocityTipIndicator, posIndicator.velocityTipRing, arrowTip);
         }
     }
 
-    // Keep steering end marker synced with the line endpoint
+    // Keep steering end marker and origin ring synced each frame.
     if (flightState.isActive && flightSteeringLine.visible) {
+        const startX = steeringLinePositions[0];
+        const startY = steeringLinePositions[1];
         const endX = steeringLinePositions[3];
         const endY = steeringLinePositions[4];
         steeringEndMarker.position.set(endX, endY, 0);
         steeringEndMarker.visible = true;
+        steeringOriginMarker.position.set(startX, startY, 0);
+        steeringOriginMarker.visible = true;
     } else {
         steeringEndMarker.visible = false;
+        steeringOriginMarker.visible = false;
+    }
+
+    // Update weapon bolts (advance positions, collision check, camera-relative upload).
+    if (flightState.isActive && flightState.activeShip) {
+        shipWeapon.update(dtTotal, simulationState.bodies, camera.position, flightState.activeShip);
     }
 
     // Filter dead explosions
     simulationState.explosions = simulationState.explosions.filter((exp) => {
-        exp.update(dtTotal);
+        exp.update(dtTotal, camera.position);
         return exp.active;
+    });
+
+    // Update impact shockwaves
+    simulationState.impacts = simulationState.impacts.filter((impact) => {
+        impact.update(dtTotal);
+        return impact.active;
     });
 
     // Update all supernovas (remove those that have collapsed)
@@ -3885,6 +3335,16 @@ function animate() {
         if (!supernova.active) {
             supernova.dispose();
             supernovas.splice(i, 1);
+        }
+    }
+
+    // Update all planetary nebulae (remove when fully faded)
+    for (let i = planetaryNebulae.length - 1; i >= 0; i--) {
+        const nebula = planetaryNebulae[i];
+        nebula.update(dtTotal);
+        if (!nebula.active) {
+            nebula.dispose();
+            planetaryNebulae.splice(i, 1);
         }
     }
 
@@ -3903,17 +3363,17 @@ function animate() {
 
         if (
             (isChangingVelocity || isMiddleMouseVelocity) &&
-            velocityTipIndicator &&
-            velocityTipRing
+            posIndicator.velocityTipIndicator &&
+            posIndicator.velocityTipRing
         ) {
             const arrowTip = gizmo.target.mesh.position
                 .clone()
                 .add(direction.multiplyScalar(speed * arrowScale));
-            updatePositionIndicator(velocityTipIndicator, velocityTipRing, arrowTip);
+            posIndicator.updateIndicator(posIndicator.velocityTipIndicator, posIndicator.velocityTipRing, arrowTip);
         }
 
-        if ((isChangingVelocity || isMiddleMouseVelocity) && yAxisIndicator && yAxisRing) {
-            updatePositionIndicator(yAxisIndicator, yAxisRing, gizmo.target.mesh.position);
+        if ((isChangingVelocity || isMiddleMouseVelocity) && posIndicator.yAxisIndicator && posIndicator.yAxisRing) {
+            posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, gizmo.target.mesh.position);
         }
     }
 
@@ -4110,9 +3570,7 @@ function animate() {
     syncAllStarLightTargets();
 
     // Update hint sprite each frame (cheap; texture only updates when text changes)
-    if (window.__updateHintSprite) {
-        window.__updateHintSprite();
-    }
+    flightHUD.updateHintSprite();
 
     // Distance-fade the warp streaks based on camera proximity to the ship.
     // Speed-based opacity is handled inside warpEffect.update(); here we only
@@ -4220,83 +3678,8 @@ function animate() {
             statsSprite.visible = false;
         }
 
-        // Autopilot phase status HUD — update canvas texture whenever the phase changes,
-        // then hide the sprite once the stable-orbit timer expires.
-        if (orbitNotifySprite) {
-            // Determine desired HUD state
-            let desiredHud: AutopilotHudState = 'NONE';
-            if (autopilotState.isActive) {
-                if (autopilotState.phase === 'ALIGN') {
-                    desiredHud = 'ALIGN';
-                } else if (autopilotState.phase === 'WARP_CHARGING' || autopilotState.phase === 'WARP') {
-                    desiredHud = 'APPROACH_WARP';
-                } else if (autopilotState.phase === 'CIRCULARIZE') {
-                    desiredHud = 'CIRCULARIZE';
-                } else if (autopilotState.phase === 'BRAKE') {
-                    desiredHud = 'BRAKE';
-                } else if (autopilotState.isBoostActive) {
-                    desiredHud = 'APPROACH_BOOST';
-                } else {
-                    desiredHud = 'APPROACH';
-                }
-            } else if (autopilotBlockedNotifyTimer > 0) {
-                desiredHud = 'BLOCKED';
-            } else if (autopilotState.orbitNotifyTimer > 0) {
-                desiredHud = 'ORBIT';
-            }
-
-            if (desiredHud === 'NONE') {
-                orbitNotifySprite.visible = false;
-                _lastAutopilotHudState = 'NONE';
-            } else {
-                orbitNotifySprite.visible = true;
-
-                // Build label for the autopilot HUD sprite.
-                let distLabel = '';
-                if (desiredHud === 'BLOCKED') {
-                    distLabel = autopilotBlockedByName
-                        ? `Blocked by: ${autopilotBlockedByName}`
-                        : '';
-                } else if (autopilotState.isActive && autopilotState.targetBody?.mesh) {
-                    const ship = flightState.knownShip;
-                    if (ship?.mesh) {
-                        const dist = ship.mesh.position.distanceTo(
-                            autopilotState.targetBody.mesh.position
-                        );
-                        // Format: show as integer with thousands separator, strip tiny noise.
-                        const distRounded = Math.max(0, Math.round(dist));
-                        distLabel = `Distance to target: ${distRounded.toLocaleString()} u`;
-                    }
-                }
-
-                // Re-render canvas every frame while active (distance changes continuously),
-                // but only on phase changes when the stable-orbit message is showing.
-                const needsRedraw = autopilotState.isActive
-                    ? true // distance always changes
-                    : desiredHud !== _lastAutopilotHudState;
-
-                if (needsRedraw) {
-                    orbitNotifySprite.material.map?.dispose();
-                    orbitNotifySprite.material.map = createAutopilotPhaseTexture(
-                        desiredHud,
-                        distLabel
-                    );
-                    orbitNotifySprite.material.needsUpdate = true;
-                    _lastAutopilotHudState = desiredHud;
-                }
-
-                // Tick down the autopilot HUD timers
-                if (desiredHud === 'ORBIT') {
-                    autopilotState.orbitNotifyTimer -= (now - lastT) / 1000;
-                } else if (desiredHud === 'BLOCKED') {
-                    autopilotBlockedNotifyTimer -= (now - lastT) / 1000;
-                    if (autopilotBlockedNotifyTimer <= 0) {
-                        autopilotBlockedNotifyTimer = 0;
-                        autopilotBlockedByName = '';
-                    }
-                }
-            }
-        }
+        // Autopilot phase status HUD
+        flightHUD.updateAutopilotHUD((now - lastT) / 1000);
 
         // Update event log
 
@@ -4341,7 +3724,7 @@ function refreshBodiesTable() {
 
     // Surface camera enablement depends on selection, so keep it in sync.
     try {
-        updateSurfaceButtonEnabled?.();
+        surfaceCam.updateButtonEnabled();
     } catch {
         // Empty
     }
@@ -4517,228 +3900,18 @@ function zoomOut() {
 }
 
 // --- Surface camera / player rig ---
-const surfaceState = {
-    isActive: false,
-    body: null as Body | null, // CelestialBody
-
-    // Anchor point on the body's surface, expressed in the body's LOCAL space.
-    // This is what makes the camera "fixed to the planet" while the planet spins.
-    anchorLocalDir: new THREE.Vector3(0, 1, 0),
-
-    // View orientation relative to the local tangent frame at the anchor.
-    yaw: 0,
-    pitch: 0,
-
-    // Snapshot (for clean exit)
-    prevCameraPos: new THREE.Vector3(),
-    prevCameraQuat: new THREE.Quaternion(),
-    prevCameraUp: new THREE.Vector3(0, 1, 0),
-    prevControlsTarget: new THREE.Vector3(),
-
-    // Tunables
-    // Keep this very small so it reads as "standing on the surface" not hovering.
-    // We still need a tiny offset to avoid z-fighting / clipping into the mesh.
-    eyeHeight: 0.2, // world units above surface
-    lookSensitivity: 0.002,
-};
-
-function isSurfaceEligibleBody(body: Body | null) {
-    if (!body || !simulationState.bodies.includes(body) || body._isDisposed || !body.mesh)
-        return false;
-    if (isBodyType(body, BodyTypeEnum.Star)) return false;
-    if (body instanceof BlackHole) return false;
-    // require some minimum radius so we don't go crazy on tiny asteroids
-    return (body.radius || 0) >= 1.0;
-}
-
-function updateSurfaceButtonEnabled() {
-    const selected =
-        (selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
-            ? selectedBody
-            : null) ||
-        (manuallySelectedBody &&
-        simulationState.bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
-            ? manuallySelectedBody
-            : null);
-
-    const isEnabled = isSurfaceEligibleBody(selected);
-    uiManager.mainPanel.setSurfaceCameraState({ isActive: surfaceState.isActive, isEnabled });
-}
-
-function exitSurfaceMode() {
-    // Restore pre-surface camera/controls state (so exiting doesn't leave the camera at a weird angle)
-    camera.position.copy(surfaceState.prevCameraPos);
-    camera.quaternion.copy(surfaceState.prevCameraQuat);
-    camera.up.copy(surfaceState.prevCameraUp);
-
-    controls.target.copy(surfaceState.prevControlsTarget);
-    controls.update();
-
-    surfaceState.isActive = false;
-    surfaceState.body = null;
-
-    uiManager.mainPanel.setSurfaceCameraState({ isActive: false, isEnabled: true });
-
-    // restore default (non-free) controls behavior
-    controls.enabled = true;
-
-    // Stop any pointer lock (if we ever use it later)
-    if (document.pointerLockElement === renderer.domElement) {
-        document.exitPointerLock();
-    }
-
-    forceHintRefresh();
-}
-
-function enterSurfaceMode(body: Body | null) {
-    if (!body) return;
-    if (!isSurfaceEligibleBody(body)) return;
-
-    // Snapshot camera/controls state so exiting returns to the exact view.
-    surfaceState.prevCameraPos.copy(camera.position);
-    surfaceState.prevCameraQuat.copy(camera.quaternion);
-    surfaceState.prevCameraUp.copy(camera.up);
-    surfaceState.prevControlsTarget.copy(controls.target);
-
-    // Surface mode is mutually exclusive with Free Camera + Look At.
-    if (cameraState.isFreeCameraMode) {
-        isFreeCameraMode = false;
-        cameraState.isFreeCameraMode = false;
-        uiManager.mainPanel.setFreeCameraState(false);
-    }
-    if (cameraState.isLookAtMode) {
-        cameraState.isLookAtMode = false;
-        uiManager.mainPanel.setLookAtState(false);
-    }
-
-    controls.enabled = false;
-
-    surfaceState.isActive = true;
-    surfaceState.body = body;
-    surfaceState.yaw = 0;
-    surfaceState.pitch = 0;
-
-    // Anchor selection:
-    // - If we have a selected body, pick the surface point directly under the current camera view.
-    //   This makes it feel like you "land" where you're looking, not on a fixed pole.
-    // - Store the anchor direction in BODY-LOCAL space so it rotates with the planet spin.
-    const bodyCenter = body.mesh.position.clone();
-
-    // From body -> camera direction (points at the currently viewed hemisphere)
-    const fromBodyToCam = new THREE.Vector3().subVectors(camera.position, bodyCenter).normalize();
-
-    // The closest visible surface point is on the opposite side of that vector:
-    // body -> camera points outward; surface point facing camera is in that direction.
-    // But we want the surface normal at the anchor to point outward, toward the camera.
-    const surfaceNormalWorld = fromBodyToCam.clone().normalize();
-
-    const invQ = body.mesh.quaternion.clone().invert();
-    surfaceState.anchorLocalDir = surfaceNormalWorld.clone().applyQuaternion(invQ).normalize();
-
-    // Immediately apply transform so first frame doesn't "snap".
-    updateSurfaceCameraTransform();
-
-    uiManager.mainPanel.setSurfaceCameraState({ isActive: true, isEnabled: true });
-    forceHintRefresh();
-}
-
-function updateSurfaceCameraTransform() {
-    if (
-        !surfaceState.isActive ||
-        !surfaceState.body ||
-        !simulationState.bodies.includes(surfaceState.body) ||
-        surfaceState.body._isDisposed
-    )
-        return;
-
-    const b = surfaceState.body;
-    const center = b.mesh.position;
-
-    // World-space surface normal ("gravity up") derived from the ANCHOR (stored in body-local space).
-    // This keeps the CAMERA POSITION pinned to the same spot on the planet as it rotates.
-    const gravityUp = surfaceState.anchorLocalDir
-        .clone()
-        .applyQuaternion(b.mesh.quaternion)
-        .normalize();
-
-    // Put the camera on the surface with a tiny epsilon above it (along gravity up).
-    const worldRadius = (b.radius || 0) * (b.mesh?.scale?.x || 1);
-
-    // Keep a small safety margin so numeric drift can never put the camera *inside* the body.
-    // This directly prevents “seeing through” the planet when the surface rig updates each frame.
-    const minEyeClearance = Math.max(worldRadius * 0.001, 0.05);
-    const eyeOffset = Math.max(surfaceState.eyeHeight, minEyeClearance);
-
-    const surfacePoint = center
-        .clone()
-        .add(gravityUp.clone().multiplyScalar(worldRadius + eyeOffset));
-
-    // Build a STABLE tangent frame that does NOT depend on the planet's spin axis.
-    // Depending on rotationAxis for "horizon up" can cause sudden flips near poles,
-    // which reads as wild camera spinning/rolling.
-    //
-    // We instead:
-    //  - Use gravityUp as the camera's up (like standing upright on the ground).
-    //  - Derive a tangent "north" direction by projecting a fixed world reference onto the tangent plane.
-    //  - Derive "east" from north × up.
-    // Build a stable tangent basis (east/north) from a fixed world reference.
-    // NOTE: "world north" itself is arbitrary, but it must be stable (not body-axis dependent).
-    const worldRefA = new THREE.Vector3(0, 1, 0);
-    const worldRefB = new THREE.Vector3(0, 0, 1);
-
-    let north = worldRefA.clone().projectOnPlane(gravityUp);
-    if (north.lengthSq() < 1e-10) {
-        north = worldRefB.clone().projectOnPlane(gravityUp);
-    }
-    north.normalize();
-
-    let east = new THREE.Vector3().crossVectors(gravityUp, north);
-    if (east.lengthSq() < 1e-10) {
-        east = new THREE.Vector3(1, 0, 0).projectOnPlane(gravityUp);
-    }
-    east.normalize();
-
-    // Re-orthogonalize north (guards against precision drift)
-    north = new THREE.Vector3().crossVectors(east, gravityUp).normalize();
-
-    // Base forward: north (arbitrary but stable). Yaw rotates around gravityUp.
-    const yawQuat = new THREE.Quaternion().setFromAxisAngle(gravityUp, surfaceState.yaw);
-    const forwardYawed = north.clone().applyQuaternion(yawQuat).normalize();
-
-    // Right handed basis for pitch.
-    const right = new THREE.Vector3().crossVectors(forwardYawed, gravityUp).normalize();
-    const pitchQuat = new THREE.Quaternion().setFromAxisAngle(right, surfaceState.pitch);
-    const forward = forwardYawed.clone().applyQuaternion(pitchQuat).normalize();
-
-    const lookAtTarget = surfacePoint.clone().add(forward.multiplyScalar(1000));
-
-    camera.position.copy(surfacePoint);
-    camera.up.copy(gravityUp);
-    camera.lookAt(lookAtTarget);
-}
-
-// Mouse look (RMB) while in surface mode: yaw/pitch, with pitch clamp.
-function onSurfaceMouseMove(event: MouseEvent) {
-    if (!surfaceState.isActive) return;
-
-    // Only apply surface look while RMB is held AND we're not pointer-locked.
-    // (Pointer lock can feed very large deltas on some systems and makes surface mode feel "spun up".)
-    const rmbDown = (event.buttons & 2) === 2;
-    if (!rmbDown) return;
-    if (document.pointerLockElement === renderer.domElement) return;
-
-    const dx = event.movementX || 0;
-    const dy = event.movementY || 0;
-
-    surfaceState.yaw -= dx * surfaceState.lookSensitivity;
-    surfaceState.pitch -= dy * surfaceState.lookSensitivity;
-    surfaceState.pitch = THREE.MathUtils.clamp(
-        surfaceState.pitch,
-        -Math.PI / 2 + 0.01,
-        Math.PI / 2 - 0.01
-    );
-}
+const surfaceCam = new SurfaceCameraManager(
+    camera,
+    controls,
+    renderer,
+    simulationState,
+    uiManager,
+    flightHUD,
+    cameraState,
+    () => selectedBody,
+    () => manuallySelectedBody,
+    () => { isFreeCameraMode = false; }
+);
 
 // ── Flight mode functions ────────────────────────────────────────────────────
 
@@ -4871,13 +4044,7 @@ function updateAutopilot(dt: number) {
             FLIGHT_WARP_CHARGE_TIME
         );
         const fill = autopilotState.warpChargeTimer / FLIGHT_WARP_CHARGE_TIME;
-        if (warpSprite) {
-            warpSprite.material.map?.dispose();
-            warpSprite.material.map = createWarpChargeTexture(fill);
-            warpSprite.material.needsUpdate = true;
-            warpSprite.scale.set(320, 80, 1);
-            warpSprite.visible = true;
-        }
+        flightHUD.setWarpCharge(fill);
         // Point toward target while charging.
         const chargeQuat = new THREE.Quaternion().setFromRotationMatrix(
             new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
@@ -4889,7 +4056,7 @@ function updateAutopilot(dt: number) {
             autopilotState.warpChargeTimer = 0;
             autopilotState.isWarpActive = true;
             autopilotState.phase = 'WARP';
-            if (warpSprite) warpSprite.visible = false;
+            flightHUD.hideWarpSprite();
             warpEffect.start();
             triggerScreenFlash(200, 0.01, 2.5);
             addEvent({
@@ -5118,7 +4285,7 @@ function updateAutopilot(dt: number) {
                 notificationType: NotificationType.Success,
             });
             autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
-            showOrbitNotifySprite();
+            flightHUD.showOrbitNotify();
 
             autopilotState.isActive = false;
             autopilotState.phase = null;
@@ -5150,7 +4317,7 @@ function cancelAutopilot(message?: string) {
     }
     // Hide the charge bar if it was showing.
     if (autopilotState.phase === 'WARP_CHARGING') {
-        if (warpSprite) warpSprite.visible = false;
+        flightHUD.hideWarpSprite();
         autopilotState.warpChargeTimer = 0;
     }
     autopilotState.isActive = false;
@@ -5263,8 +4430,8 @@ function engageAutopilot(target: Body) {
         }
 
         if (nearestObstruction) {
-            autopilotBlockedNotifyTimer = AUTOPILOT_BLOCKED_NOTIFY_DURATION;
-            autopilotBlockedByName = nearestObstruction.name || 'obstruction';
+            flightHUD.autopilotBlockedNotifyTimer = AUTOPILOT_BLOCKED_NOTIFY_DURATION;
+            flightHUD.autopilotBlockedByName = nearestObstruction.name || 'obstruction';
 
             addEvent({
                 message: `⚠ Autopilot blocked: ${nearestObstruction.name || 'obstruction'} is in the path to ${
@@ -5362,10 +4529,10 @@ function updateFlightControls(dt: number) {
             warpEffect.stop();
             // Restore steering HUD now that warp deceleration is complete.
             flightSteeringLine.visible = true;
-            flightCrosshair.visible = true;
+            steeringOriginMarker.visible = true;
         }
         flightState.thrustActive = false;
-        if (warpSprite) warpSprite.visible = false;
+        flightHUD.hideWarpSprite();
         // Fall through to steering/roll below (no early return)
     }
 
@@ -5397,15 +4564,10 @@ function updateFlightControls(dt: number) {
         flightSteeringLine.visible = false;
         flightCrosshair.visible = false;
         steeringEndMarker.visible = false;
+        steeringOriginMarker.visible = false;
         // Pulsing warp-active text (update every call is cheap since canvas is small)
-        if (warpSprite) {
-            const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
-            warpSprite.material.map?.dispose();
-            warpSprite.material.map = createWarpActiveTexture(pulse);
-            warpSprite.material.needsUpdate = true;
-            warpSprite.scale.set(320, 60, 1);
-            warpSprite.visible = true;
-        }
+        const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
+        flightHUD.setWarpActive(pulse);
         return; // Skip all flight controls below
     }
 
@@ -5413,13 +4575,7 @@ function updateFlightControls(dt: number) {
     if (flightState.warpCharging && !flightState.warpDecelerating && !autopilotState.isWarpActive) {
         flightState.warpCharge = Math.min(flightState.warpCharge + dt, FLIGHT_WARP_CHARGE_TIME);
         const fill = flightState.warpCharge / FLIGHT_WARP_CHARGE_TIME;
-        if (warpSprite) {
-            warpSprite.material.map?.dispose();
-            warpSprite.material.map = createWarpChargeTexture(fill);
-            warpSprite.material.needsUpdate = true;
-            warpSprite.scale.set(320, 80, 1);
-            warpSprite.visible = true;
-        }
+        flightHUD.setWarpCharge(fill);
         if (flightState.warpCharge >= FLIGHT_WARP_CHARGE_TIME) {
             // Engage warp!
             flightState.warpActive = true;
@@ -5663,10 +4819,35 @@ function updateFlightControls(dt: number) {
     steeringLinePositions[5] = 0;
     steeringLineGeo.attributes.position.needsUpdate = true;
 
-    // Move the static crosshair to the projected nose position
-    flightCrosshair.position.set(noseScreenX, noseScreenY, 0);
+    // Move origin ring and aim reticle to their screen positions.
+    steeringOriginMarker.position.set(noseScreenX, noseScreenY, 0);
     steeringEndMarker.position.set(noseScreenX + displayOffX, noseScreenY - displayOffY, 0);
     steeringEndMarker.visible = true;
+
+    // ── Weapon firing ────────────────────────────────────────────────────────
+    if (flightState.isFiring && !autopilotState.isActive) {
+        // Build world-space aim direction from the aim reticle screen position.
+        // Avoid unproject() — with near=0.00001 and far~8.2e9, any mid-NDC z value
+        // maps to a point essentially at the camera, causing floating-point errors.
+        // Instead, derive the ray directly from perspective FOV math:
+        //   view-space dir = (ndcX * tan(hFOV/2), ndcY * tan(vFOV/2), -1), normalised
+        // then rotate to world space via the camera world matrix.
+        const aimNdcX = (noseScreenX + displayOffX) / (window.innerWidth * 0.5);
+        const aimNdcY = (noseScreenY - displayOffY) / (window.innerHeight * 0.5);
+        const halfFovY = THREE.MathUtils.degToRad(camera.fov * 0.5);
+        const tanHalfFovY = Math.tan(halfFovY);
+        const tanHalfFovX = tanHalfFovY * camera.aspect;
+        const viewSpaceDir = new THREE.Vector3(
+            aimNdcX * tanHalfFovX,
+            aimNdcY * tanHalfFovY,
+            -1  // camera local -Z is forward in OpenGL/Three.js convention
+        ).normalize();
+        const aimDir = viewSpaceDir.transformDirection(camera.matrixWorld);
+
+        // Muzzle: slightly ahead of the ship so projectiles clear the hull.
+        const muzzlePos = ship.mesh.position.clone().addScaledVector(forward, ship.radius * 4);
+        shipWeapon.tryFire(dt, muzzlePos, aimDir, ship.velocity);
+    }
 }
 
 /** Spawn a spaceship in front of the camera and enter flight mode.
@@ -5688,7 +4869,8 @@ function spawnShip() {
             scene,
             spawnPos,
             new THREE.Vector3(),
-            createUniqueId('spaceship')
+            createUniqueId('spaceship'),
+            flightControlsPanel.getSelectedModel()
         );
 
         // Orient the ship to the same direction the camera is facing
@@ -5785,9 +4967,9 @@ function spawnShip() {
     controls.enabled = false;
 
     flightSteeringLine.visible = true;
-    flightCrosshair.visible = true;
     steeringEndMarker.visible = true;
-    if (warpSprite) warpSprite.visible = false;
+    steeringOriginMarker.visible = true;
+    flightHUD.hideWarpSprite();
     flightControlsPanel.setFlightActive(true);
     flightControlsPanel.setViewState(flightState.isCockpitView);
     // Enable the autopilot button now that a ship is active
@@ -5825,6 +5007,8 @@ function exitFlightMode() {
     flightState.rollVelocity = 0;
     flightState.steerX = 0;
     flightState.steerY = 0;
+    flightState.isFiring = false;
+    shipWeapon.reset();
 
     flightState.isActive = false;
     flightState.activeShip = null;
@@ -5873,7 +5057,8 @@ function exitFlightMode() {
     flightSteeringLine.visible = false;
     flightCrosshair.visible = false;
     steeringEndMarker.visible = false;
-    if (warpSprite) warpSprite.visible = false;
+    steeringOriginMarker.visible = false;
+    flightHUD.hideWarpSprite();
     flightState.warpCharge = 0;
     flightState.warpCharging = false;
     flightState.warpDecelerating = false;
@@ -5917,12 +5102,12 @@ function exitFlightMode() {
     });
 }
 
-window.addEventListener('mousemove', onSurfaceMouseMove, { passive: true });
+window.addEventListener('mousemove', surfaceCam.onMouseMove, { passive: true });
 
 uiManager.mainPanel.on('surfaceCameraToggle', () => {
-    if (surfaceState.isActive) {
-        exitSurfaceMode();
-        updateSurfaceButtonEnabled();
+    if (surfaceCam.isActive) {
+        surfaceCam.exit();
+        surfaceCam.updateButtonEnabled();
         return;
     }
 
@@ -5936,17 +5121,17 @@ uiManager.mainPanel.on('surfaceCameraToggle', () => {
             ? manuallySelectedBody
             : null);
 
-    if (!isSurfaceEligibleBody(selected)) return;
-    enterSurfaceMode(selected);
-    updateSurfaceButtonEnabled();
+    if (!surfaceCam.isEligibleBody(selected)) return;
+    surfaceCam.enter(selected);
+    surfaceCam.updateButtonEnabled();
 });
 
 uiManager.mainPanel.on('freeCameraToggle', () => {
     // If turning on free camera, surface mode must exit.
-    if (!surfaceState.isActive) {
+    if (!surfaceCam.isActive) {
         // noop
     } else {
-        exitSurfaceMode();
+        surfaceCam.exit();
     }
 
     isFreeCameraMode = !isFreeCameraMode;
@@ -5993,8 +5178,8 @@ uiManager.mainPanel.on('freeCameraToggle', () => {
     uiManager.managementPanel.setSelectedBody(selected);
 
     refreshBodiesTable();
-    updateSurfaceButtonEnabled();
-    forceHintRefresh();
+    surfaceCam.updateButtonEnabled();
+    flightHUD.forceHintRefresh();
 });
 
 uiManager.mainPanel.on('zoomIn', () => {
@@ -6108,7 +5293,7 @@ uiManager.mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
 
     // Selecting from the table should always refresh hints (selection-driven).
     setFocusBody(body, { zoom: cameraState.isLookAtMode });
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 
     // Gizmo visibility controlled by Target toggle
     if (cameraState.isTargetMode) {
@@ -6148,21 +5333,21 @@ uiManager.mainPanel.on('targetToggle', () => {
     }
 
     // Target toggle changes the "selected body" hint line, so force a refresh.
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 });
 
 // LOOK AT button (toggle): when enabled, orbit/zoom around selected body.
 // When disabled, behave like "None camera": orbit/zoom around the scene center.
 uiManager.mainPanel.on('lookAtToggle', () => {
     // Turning Look At ON/OFF exits surface mode (mutually exclusive camera behaviors).
-    if (surfaceState?.isActive) {
-        exitSurfaceMode();
-        updateSurfaceButtonEnabled();
+    if (surfaceCam.isActive) {
+        surfaceCam.exit();
+        surfaceCam.updateButtonEnabled();
     }
     const turningOn = !cameraState.isLookAtMode;
     // Look-at changes hint context (and camera focus behavior) so refresh.
     // We'll also refresh again after any selection changes.
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
 
     // If we are turning Look At ON while Free Camera is ON, we implicitly disable Free Camera.
     // That transition must also refresh the hint (Free Camera hint -> Look At/selection hint).
@@ -6171,7 +5356,7 @@ uiManager.mainPanel.on('lookAtToggle', () => {
         cameraState.isFreeCameraMode = false;
         uiManager.mainPanel.setFreeCameraState(false);
         controls.enabled = true;
-        forceHintRefresh();
+        flightHUD.forceHintRefresh();
     }
 
     if (turningOn) {
@@ -6262,6 +5447,8 @@ uiManager.managementPanel.on(
         customLightIntensity,
         customRadius,
         orbitParent,
+        createTilt,
+        createAzimuth,
     }: {
         bodyType: string;
         planetType: string;
@@ -6273,6 +5460,8 @@ uiManager.managementPanel.on(
         customLightIntensity: number | null;
         customRadius: number | null;
         orbitParent: Body | null;
+        createTilt: number | null;
+        createAzimuth: number | null;
     }) => {
         createNewBody(
             bodyType,
@@ -6284,7 +5473,9 @@ uiManager.managementPanel.on(
             customTemperature,
             customLightIntensity,
             customRadius,
-            orbitParent ?? null
+            orbitParent ?? null,
+            createTilt ?? null,
+            createAzimuth ?? null
         );
         refreshBodiesTable();
     }
@@ -6346,6 +5537,8 @@ uiManager.managementPanel.on(
         orbitalAngle,
         inclination,
         color,
+        editTilt,
+        editAzimuth,
     }: {
         body: Body;
         name: string;
@@ -6356,6 +5549,8 @@ uiManager.managementPanel.on(
         orbitalAngle: number | null;
         inclination: number | null;
         color: number;
+        editTilt: number | null;
+        editAzimuth: number | null;
     }) => {
         if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
 
@@ -6469,6 +5664,24 @@ uiManager.managementPanel.on(
             } catch (e) {
                 console.error('Error applying body color edit:', e);
             }
+        }
+
+        // Apply axial tilt and azimuth if the sliders were visible and the body supports rotation
+        if ((editTilt !== null || editAzimuth !== null) && body instanceof CelestialBody) {
+            const newTilt    = editTilt    !== null ? editTilt    : (body.rotation.tilt    ?? 0);
+            const newAzimuth = editAzimuth !== null ? editAzimuth : (body.rotation.azimuth ?? 0);
+            body.rotation.tilt    = newTilt;
+            body.rotation.azimuth = newAzimuth;
+            const tiltRad = THREE.MathUtils.degToRad(newTilt);
+            const azRad   = THREE.MathUtils.degToRad(newAzimuth);
+            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
+            const azQuat   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), azRad);
+            body.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
+            if (body.rings) {
+                body.rings.position.copy(body.mesh.position);
+                body.rings.quaternion.copy(body.mesh.quaternion);
+            }
+            if (body === selectedBody) gizmo.attach(body);
         }
 
         refreshBodiesTable();
@@ -6602,7 +5815,7 @@ window.addEventListener('keydown', (e) => {
             }
         }
 
-        updateVelocityArcs();
+        velArc.update();
         // Prevent the key from doing anything else
         e.preventDefault();
         return;
@@ -6668,7 +5881,6 @@ window.addEventListener('keydown', (e) => {
                 // Restore steering HUD immediately on disengage (decel still active,
                 // but steering is restored so the player can redirect during slowdown).
                 flightSteeringLine.visible = true;
-                flightCrosshair.visible = true;
                 addEvent({
                     message: 'Warp disengaged. Decelerating...',
                     notificationType: NotificationType.Info,
@@ -6735,7 +5947,7 @@ window.addEventListener('keyup', (e) => {
             if (flightState.warpCharging) {
                 flightState.warpCharging = false;
                 flightState.warpCharge = 0;
-                if (warpSprite) warpSprite.visible = false;
+                flightHUD.hideWarpSprite();
             }
         }
     }
@@ -6743,9 +5955,8 @@ window.addEventListener('keyup', (e) => {
 
     if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
         if (!isChangingVelocity && !isMiddleMouseVelocity && !interactionState.isRepositioning) {
-            hidePositionIndicators();
-            velocityArcXZ.visible = false;
-            velocityArcY.visible = false;
+            posIndicator.hide();
+            velArc.hideAll();
         }
     }
 });
@@ -6797,7 +6008,7 @@ window.addEventListener('resize', () => {
     uiCamera.updateProjectionMatrix();
 
     // Update fat-line resolutions (velocity arcs)
-    updateArcResolution();
+    velArc.resize(window.innerWidth, window.innerHeight);
 
     // Reposition FPS counter
     if (fpsSprite) {
@@ -6810,8 +6021,8 @@ window.addEventListener('resize', () => {
     }
 
     // Reposition hint display (top-center)
-    if (hintSprite) {
-        hintSprite.position.set(0, window.innerHeight / 2 - 55, 0);
+    if (flightHUD.hintSprite) {
+        flightHUD.hintSprite.position.set(0, window.innerHeight / 2 - 55, 0);
     }
 
     // Reposition event log
@@ -6919,6 +6130,23 @@ window.addEventListener('body:removed', (e: WindowEventMap['body:removed']) => {
     refreshBodiesTable();
 });
 
+window.addEventListener('weapon:hit', (e: WindowEventMap['weapon:hit']) => {
+    const { body, position } = e.detail;
+    if (body._isDisposed || !body.mesh) return;
+
+    playWeaponImpact();
+
+    // Spawn impact flash: pass body centre so ImpactShockwave can snap to surface
+    simulationState.impacts.push(
+        new ImpactShockwave(dependencies, scene, position, body.mesh.position, body.radius)
+    );
+
+    body.healthPoints -= WEAPON_DAMAGE;
+    if (body.healthPoints <= 0) {
+        body.die();
+    }
+});
+
 window.addEventListener('body:dead', (e: WindowEventMap['body:dead']) => {
     const body = e.detail.body;
     if (body) {
@@ -6974,10 +6202,20 @@ function applyDefaultCameraTogglesAfterSpawn() {
     refreshBodiesTable();
 
     // Hint text depends on toggle state (Target/Look At).
-    forceHintRefresh();
+    flightHUD.forceHintRefresh();
+}
+
+function applyStartupGMultiplier() {
+    const gMult = startupModal.getGMultiplier();
+    simulationState.gMultiplier = gMult;
+    const mpSlider = uiManager.managementPanel.gravitationalConstantSlider;
+    const mpDisplay = uiManager.managementPanel.gravitationalConstantDisplay;
+    if (mpSlider) mpSlider.value = String(gMult);
+    if (mpDisplay) mpDisplay.textContent = gMult.toFixed(gMult < 10 ? 2 : 0);
 }
 
 startupModal.on('launchDefault', () => {
+    applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.Default });
@@ -6985,6 +6223,7 @@ startupModal.on('launchDefault', () => {
 });
 
 startupModal.on('launchEmpty', () => {
+    applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.Empty });
@@ -6992,6 +6231,7 @@ startupModal.on('launchEmpty', () => {
 });
 
 startupModal.on('launchBlackHole', () => {
+    applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
     spawn({ mode: SimulationStartMode.BlackHole });
@@ -6999,6 +6239,7 @@ startupModal.on('launchBlackHole', () => {
 });
 
 startupModal.on('generateProcedural', ({ seed }: { seed: string }) => {
+    applyStartupGMultiplier();
     uiManager.managementPanel.hide();
 
     // Ensure both launch overlays are closed before spawning the new simulation.

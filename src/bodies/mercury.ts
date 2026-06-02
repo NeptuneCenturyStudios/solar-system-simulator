@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
 import {
     MERCURY_AXIS,
+    MERCURY_AZIMUTH,
     MERCURY_DIST,
     MERCURY_MASS,
+    MERCURY_ORBITAL_PERIOD_REAL,
     MERCURY_RADIUS,
-    MERCURY_ROT_SPEED,
     SUN_MASS,
+    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
@@ -27,7 +29,10 @@ export class Mercury extends Planet {
      * @param scene The THREE.Scene to which Mercury belongs.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-        const trajectory = calculateTrajectory(dependencies.getG(), MERCURY_DIST, SUN_MASS);
+        const gEff = dependencies.getG();
+        const timeScale = MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, gEff, SUN_MASS);
+        const rotSpeed = (2 * Math.PI / (1407.5 * 3600)) * timeScale;
+        const trajectory = calculateTrajectory(gEff, MERCURY_DIST, SUN_MASS);
         const geometry = new THREE.SphereGeometry(MERCURY_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
             map: mercuryTexture,
@@ -48,7 +53,8 @@ export class Mercury extends Planet {
             vel: trajectory.vel,
             rotation: {
                 tilt: MERCURY_AXIS,
-                speed: MERCURY_ROT_SPEED,
+                speed: rotSpeed,
+                azimuth: MERCURY_AZIMUTH,
             },
             trailColor: 0xaaaaaa,
             maxTrail: 2000,

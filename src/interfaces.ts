@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Body } from './bodies/body';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { Supernova } from './effects/supernova';
+import { PlanetaryNebula } from './effects/planetary-nebula';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { BodyTypeEnum } from './utilities/utilities';
 import { IPipelineFeedEffect } from './effects/effect-base';
@@ -11,6 +12,7 @@ export interface IStateDependencies {
     addEvent: (event: { message: string; notificationType: NotificationType }) => void;
     addExplosion: (explosion: ParticleExplosion) => void;
     addSupernova: (supernova: Supernova) => void;
+    addPlanetaryNebula: (nebula: PlanetaryNebula) => void;
     addBody: (body: Body) => void;
     gizmo: CoordinateGizmo;
     getBodies: () => Body[];

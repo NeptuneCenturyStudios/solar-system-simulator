@@ -321,10 +321,19 @@ export class CelestialBody extends Body {
     setRotation(rotation: IRotation) {
         // Orient the mesh so its texture "north" matches Saturn's spin axis
         const tiltRad = (rotation.tilt * Math.PI) / 180;
+        const azimuthRad = ((rotation.azimuth ?? 0) * Math.PI) / 180;
         const spinAxis = new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad)); // YZ plane
         // Orient the mesh so its texture "north" matches the provided spin axis
         const up = new THREE.Vector3(0, 1, 0);
         this.mesh.quaternion.setFromUnitVectors(up, spinAxis);
+        // Rotate the entire orientation around world Y by azimuth (swings tilt direction horizontally)
+        if (azimuthRad !== 0) {
+            const azimuthQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                azimuthRad
+            );
+            this.mesh.quaternion.premultiply(azimuthQuat);
+        }
         // Set rotationAxis to local Y for correct spinning
         this.rotationAxis = new THREE.Vector3(0, 1, 0);
         // Set rotation speed and axis based on provided rotation info

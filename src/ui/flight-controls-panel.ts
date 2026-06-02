@@ -9,6 +9,7 @@ import { Panel } from './panel';
 export class FlightControlsPanel extends Panel {
     spawnBtn: HTMLButtonElement | null;
     toggleViewBtn: HTMLButtonElement | null;
+    shipModelSelect: HTMLSelectElement | null;
 
     autopilotBtn: HTMLButtonElement | null;
     btnClose: HTMLButtonElement | null;
@@ -17,6 +18,7 @@ export class FlightControlsPanel extends Panel {
         super(elementId);
         this.spawnBtn = null;
         this.toggleViewBtn = null;
+        this.shipModelSelect = null;
 
         this.autopilotBtn = null;
         this.btnClose = null;
@@ -38,6 +40,9 @@ export class FlightControlsPanel extends Panel {
         this.toggleViewBtn = document.getElementById(
             'flightToggleViewBtn'
         ) as HTMLButtonElement | null;
+        this.shipModelSelect = document.getElementById(
+            'flightShipModelSelect'
+        ) as HTMLSelectElement | null;
 
         this.autopilotBtn = document.getElementById(
             'flightAutopilotBtn'
@@ -105,5 +110,10 @@ export class FlightControlsPanel extends Panel {
             btn.appendChild(
                 document.createTextNode(canReenter ? ' ENTER SHIP' : ' SPAWN SPACESHIP')
             );
+    }
+
+    /** Returns the currently selected ship model base name (without extension). */
+    getSelectedModel(): string {
+        return this.shipModelSelect?.value ?? 'Lo_poly_Spaceship_01_by_Liz_Reddington';
     }
 }

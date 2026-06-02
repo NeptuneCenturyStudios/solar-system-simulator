@@ -6,7 +6,9 @@ import {
     EARTH_DIST,
     EARTH_RADIUS,
     EARTH_AXIS,
-    EARTH_ROT_SPEED,
+    EARTH_AZIMUTH,
+    EARTH_ORBITAL_PERIOD_REAL,
+    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { createUniqueId, BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
@@ -142,7 +144,10 @@ export class Earth extends Planet {
      * @param scene The THREE.Scene to which Earth belongs.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-        const trajectory = calculateTrajectory(dependencies.getG(), EARTH_DIST, SUN_MASS);
+        const gEff = dependencies.getG();
+        const timeScale = EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, gEff, SUN_MASS);
+        const rotSpeed = (2 * Math.PI / (23.934 * 3600)) * timeScale;
+        const trajectory = calculateTrajectory(gEff, EARTH_DIST, SUN_MASS);
         const geometry = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
 
         const customUniforms: EarthUniforms = {
@@ -164,7 +169,8 @@ export class Earth extends Planet {
             vel: trajectory.vel,
             rotation: {
                 tilt: EARTH_AXIS,
-                speed: EARTH_ROT_SPEED,
+                speed: rotSpeed,
+                azimuth: EARTH_AZIMUTH,
             },
             trailColor: 0x88ccff,
             maxTrail: 4500,
@@ -198,7 +204,7 @@ export class Earth extends Planet {
         this.atmosphereShell = createEarthAtmosphereShell(scene, this.radius * 1.07, 0x5599ff, this.mesh);
 
         // Clouds rotate slightly faster than Earth to simulate moving atmosphere.
-        this.cloudRotationSpeed = EARTH_ROT_SPEED * 1.3;
+        this.cloudRotationSpeed = rotSpeed * 1.3;
     }
 
     update(acc: THREE.Vector3, dt: number) {

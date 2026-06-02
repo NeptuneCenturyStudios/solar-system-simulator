@@ -16,6 +16,7 @@ import { BlackHole } from './black-hole';
 import { WhiteDwarf } from './white-dwarf';
 import { Pulsar } from './pulsar';
 import { Supernova } from '../effects/supernova';
+import { PlanetaryNebula } from '../effects/planetary-nebula';
 import { SolarFlare, SolarFlareType } from '../effects/solar-flare';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { Corona } from '../effects/corona';
@@ -518,6 +519,19 @@ export class MainSequenceStar extends Star {
                 }
             } catch (e) {
                 console.error('Error creating white dwarf:', e);
+            }
+
+            try {
+                const nebula = new PlanetaryNebula(
+                    this.dependencies,
+                    this.scene,
+                    this.mesh.position.clone(),
+                    this.radius,
+                    this.initialMass
+                );
+                this.dependencies.addPlanetaryNebula(nebula);
+            } catch (e) {
+                console.error('Error creating planetary nebula:', e);
             }
 
             this.die(true);

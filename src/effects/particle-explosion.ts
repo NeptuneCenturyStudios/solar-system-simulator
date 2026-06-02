@@ -13,8 +13,19 @@ export class ParticleExplosion implements IEffect {
     flashSphere: THREE.Mesh | null;
     flashOpacity: number;
     count: number;
+    /** GPU-side float32 buffer — written each frame as camera-relative coords. */
     positions: Float32Array;
+    /** Float64 world-space particle positions.  Avoids float32 precision loss at extreme distances. */
+    private worldPositions: Float64Array;
+    /** World-space centre of the flash sphere (float64). */
+    private flashWorldPos: THREE.Vector3;
     opacity: number;
+    /** Expanding shockwave ring perpendicular to a random tilt axis. */
+    private shockwave: THREE.Mesh | null;
+    private swCurrentRadius: number;
+    private swStartRadius: number;
+    private swMaxRadius: number;
+    private swExpansionRate: number;
 
     constructor(
         dependencies: IStateDependencies,
@@ -27,22 +38,28 @@ export class ParticleExplosion implements IEffect {
         this.count = 800; // 4x more particles
         this.geometry = new THREE.BufferGeometry();
         this.positions = new Float32Array(this.count * 3);
+        this.worldPositions = new Float64Array(this.count * 3);
+        this.flashWorldPos = pos.clone();
         this.velocities = [];
         this.active = true;
         this.opacity = 1.0;
         this.scene = scene;
 
         for (let i = 0; i < this.count; i++) {
-            this.positions[i * 3] = pos.x;
-            this.positions[i * 3 + 1] = pos.y;
-            this.positions[i * 3 + 2] = pos.z;
+            this.worldPositions[i * 3]     = pos.x;
+            this.worldPositions[i * 3 + 1] = pos.y;
+            this.worldPositions[i * 3 + 2] = pos.z;
+            // Velocity scales with body radius.  Much slower than before so
+            // particles linger near the body when the camera is zoomed in.
+            // Target: ~0.25–1× radius spread over the explosion lifetime (~330 frames).
+            const spreadScale = Math.max(5, radius * 0.004);
             const v = new THREE.Vector3(
                 Math.random() - 0.5,
                 Math.random() - 0.5,
                 Math.random() - 0.5
             )
                 .normalize()
-                .multiplyScalar(Math.random() * 8 + 2); // Faster, bigger spread
+                .multiplyScalar((Math.random() * 0.8 + 0.2) * spreadScale);
             this.velocities.push(v);
         }
         this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
@@ -50,12 +67,33 @@ export class ParticleExplosion implements IEffect {
         const brightColor = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.5);
         this.material = new THREE.PointsMaterial({
             color: brightColor,
-            size: 6, // Larger particles
+            // Larger particles so they're visible when zoomed in close.
+            size: Math.max(10, radius * 0.02),
             transparent: true,
             blending: THREE.AdditiveBlending,
-            opacity: 1.5, // Brighter with additive blending
+            opacity: 1.5,
+            depthWrite: false,
+            depthTest: false,
         });
+        // Round glowing sprite — same shader pattern as weapon bolts
+        this.material.onBeforeCompile = (shader) => {
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'outgoingLight = diffuseColor.rgb;',
+                `outgoingLight = diffuseColor.rgb;
+                float _d  = length(gl_PointCoord - vec2(0.5));
+                if (_d > 0.5) discard;
+                float _r    = _d * 2.0;
+                // Softer exponent = wider glow bloom
+                float _glow = pow(1.0 - _r, 0.8);
+                // Brighter, wider white-hot core
+                outgoingLight = mix(outgoingLight, vec3(1.0),
+                                    pow(max(0.0, 1.0 - _r * 1.2), 2.0));
+                diffuseColor.a *= _glow;`
+            );
+        };
         this.points = new THREE.Points(this.geometry, this.material);
+        this.points.frustumCulled = false;
+        this.points.renderOrder = 1;
         scene.add(this.points);
 
         // Create bright flash sphere at impact
@@ -65,19 +103,66 @@ export class ParticleExplosion implements IEffect {
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: false,
         });
         this.flashSphere = new THREE.Mesh(flashGeo, flashMat);
+        this.flashSphere.renderOrder = 1;
         this.flashSphere.position.copy(pos);
         scene.add(this.flashSphere);
         this.flashOpacity = 1.0;
+
+        // Shockwave ring — a flat ring oriented perpendicular to a random tilt axis,
+        // expanding outward from the explosion centre.
+        const tiltAxis = new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+        ).normalize();
+        const swGeo = new THREE.RingGeometry(0.9, 1.0, 64);
+        const swMat = new THREE.MeshBasicMaterial({
+            color: brightColor,
+            transparent: true,
+            opacity: 1.5,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            depthTest: false,
+        });
+        // Glowing rim: vUv.y runs 0 (inner edge) → 1 (outer edge) across the ring width.
+        // We brighten the centre of the band and fade the edges, matching the other glow effects.
+        swMat.onBeforeCompile = (shader) => {
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'outgoingLight = diffuseColor.rgb;',
+                `outgoingLight = diffuseColor.rgb;
+                float _edge = abs(vUv.y - 0.5) * 2.0; // 0 at band centre, 1 at edges
+                if (_edge >= 1.0) discard;
+                float _glow = pow(1.0 - _edge, 1.2);
+                outgoingLight = mix(outgoingLight, vec3(1.0),
+                                    pow(max(0.0, 1.0 - _edge * 1.3), 2.5));
+                diffuseColor.a *= _glow;`
+            );
+        };
+        this.shockwave = new THREE.Mesh(swGeo, swMat);
+        this.shockwave.renderOrder = 1;
+        this.shockwave.position.copy(pos);
+        // RingGeometry lies in XY plane (normal = Z); rotate so normal = tiltAxis
+        this.shockwave.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tiltAxis);
+        this.swStartRadius = Math.max(5, radius);
+        this.swCurrentRadius = this.swStartRadius;
+        this.swMaxRadius = this.swStartRadius * 12;
+        // Expand fully over ~300 normalised frames (~5 s at 60 fps)
+        this.swExpansionRate = (this.swMaxRadius - this.swStartRadius) / 300;
+        this.shockwave.scale.setScalar(this.swCurrentRadius);
+        this.shockwave.frustumCulled = false;
+        scene.add(this.shockwave);
     }
 
-    update(dt: number) {
+    update(dt: number, cameraPosition?: THREE.Vector3) {
         // Use absolute value of dt so explosion always plays forward regardless of time direction
         dt = Math.abs(dt);
 
-        const p = this.geometry.attributes.position.array;
-        this.opacity -= 0.003 * (dt * 60); // Slower fade (was 0.01)
+        this.opacity -= 0.001 * (dt * 60); // Fade over ~1000 frames (~16 s at 60 fps)
         this.material.opacity = this.opacity;
 
         // Update flash sphere
@@ -101,12 +186,57 @@ export class ParticleExplosion implements IEffect {
             }
         }
 
+        // Shockwave ring
+        if (this.shockwave) {
+            this.swCurrentRadius += this.swExpansionRate * (dt * 60);
+            const progress =
+                (this.swCurrentRadius - this.swStartRadius) /
+                (this.swMaxRadius - this.swStartRadius);
+            (this.shockwave.material as THREE.MeshBasicMaterial).opacity =
+                // pow exponent < 1 keeps opacity high for most of the life then
+                // drops off sharply near the end — much more gradual than linear.
+                Math.max(0, 1.5 * Math.pow(1.0 - progress, 0.4));
+            this.shockwave.scale.setScalar(this.swCurrentRadius);
+            this.shockwave.position.copy(this.flashWorldPos);
+
+            if (progress >= 1.0) {
+                this.scene.remove(this.shockwave);
+                this.shockwave.geometry.dispose();
+                (this.shockwave.material as THREE.MeshBasicMaterial).dispose();
+                this.shockwave = null;
+            }
+        }
+
+        // Advance float64 world positions — keeps sub-km precision at any simulation distance.
         for (let i = 0; i < this.count; i++) {
-            p[i * 3] += this.velocities[i].x * (dt * 60);
-            p[i * 3 + 1] += this.velocities[i].y * (dt * 60);
-            p[i * 3 + 2] += this.velocities[i].z * (dt * 60);
+            this.worldPositions[i * 3]     += this.velocities[i].x * (dt * 60);
+            this.worldPositions[i * 3 + 1] += this.velocities[i].y * (dt * 60);
+            this.worldPositions[i * 3 + 2] += this.velocities[i].z * (dt * 60);
+        }
+
+        // Write camera-relative float32 values to the GPU buffer.
+        // The Points mesh is placed at cameraPosition; vertices are (worldPos − cameraPos),
+        // keeping the GPU floats small regardless of the simulation coordinate.
+        if (cameraPosition) {
+            const cpx = cameraPosition.x;
+            const cpy = cameraPosition.y;
+            const cpz = cameraPosition.z;
+            for (let i = 0; i < this.count; i++) {
+                this.positions[i * 3]     = this.worldPositions[i * 3]     - cpx;
+                this.positions[i * 3 + 1] = this.worldPositions[i * 3 + 1] - cpy;
+                this.positions[i * 3 + 2] = this.worldPositions[i * 3 + 2] - cpz;
+            }
+            this.points.position.copy(cameraPosition);
+        } else {
+            // Fallback: write world positions directly (no camera-relative correction)
+            for (let i = 0; i < this.count; i++) {
+                this.positions[i * 3]     = this.worldPositions[i * 3];
+                this.positions[i * 3 + 1] = this.worldPositions[i * 3 + 1];
+                this.positions[i * 3 + 2] = this.worldPositions[i * 3 + 2];
+            }
         }
         this.geometry.attributes.position.needsUpdate = true;
+
         if (this.opacity <= 0) {
             this.active = false;
             this.scene.remove(this.points);
@@ -117,6 +247,14 @@ export class ParticleExplosion implements IEffect {
                 this.flashSphere.geometry.dispose();
                 (this.flashSphere.material as THREE.MeshBasicMaterial).dispose();
                 this.flashSphere = null;
+            }
+
+            // Shockwave may already be cleaned up above
+            if (this.shockwave) {
+                this.scene.remove(this.shockwave);
+                this.shockwave.geometry.dispose();
+                (this.shockwave.material as THREE.MeshBasicMaterial).dispose();
+                this.shockwave = null;
             }
 
             // Proper cleanup

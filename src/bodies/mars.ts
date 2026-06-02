@@ -6,7 +6,9 @@ import {
     MARS_DIST,
     MARS_RADIUS,
     MARS_AXIS,
-    MARS_ROT_SPEED,
+    MARS_AZIMUTH,
+    MARS_ORBITAL_PERIOD_REAL,
+    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
@@ -27,7 +29,10 @@ export class Mars extends Planet {
      * @param scene The THREE.Scene to which Mars belongs.
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
-        const trajectory = calculateTrajectory(dependencies.getG(), MARS_DIST, SUN_MASS);
+        const gEff = dependencies.getG();
+        const timeScale = MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, gEff, SUN_MASS);
+        const rotSpeed = (2 * Math.PI / (24.623 * 3600)) * timeScale;
+        const trajectory = calculateTrajectory(gEff, MARS_DIST, SUN_MASS);
         const geometry = new THREE.SphereGeometry(MARS_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
             map: marsTexture,
@@ -50,7 +55,7 @@ export class Mars extends Planet {
             trailColor: 0xff8888,
             maxTrail: 3000,
             hasRings: false,
-            rotation: { tilt: MARS_AXIS, speed: MARS_ROT_SPEED },
+            rotation: { tilt: MARS_AXIS, speed: rotSpeed, azimuth: MARS_AZIMUTH },
             mesh: mesh,
         });
     }

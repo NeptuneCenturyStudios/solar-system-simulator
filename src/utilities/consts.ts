@@ -24,8 +24,8 @@ export const SCALE_FACTOR = 1;
 export const G_SCALE = 1//10000000;
 // Tuned so that SUN_MASS = 33,000,000 exactly
 export const MASS_SCALE = 6.025757575757576e22;
-export const RADIUS_SCALE = 1;
-export const DIST_SCALE = 1;
+export const RADIUS_SCALE = 100;
+export const DIST_SCALE = 100;
 // 1. Keep the physically-derived base time scale
 export const BASE_TIME_SCALE = Math.sqrt(DIST_SCALE ** 3 / MASS_SCALE);
 // 2. Choose a user multiplier so that at warp 1, dt matches the old behavior
@@ -98,6 +98,24 @@ export const URANUS_AXIS = 97.77;
 export const NEPTUNE_AXIS = 28.32;
 export const PLUTO_AXIS = 119.61;
 
+// === Planetary System: Rotation Azimuth (degrees) ===
+// Direction the north pole points within the orbital (ecliptic) plane, derived from the IAU
+// north-pole right ascension (α₀) and declination (δ₀) converted to ecliptic coordinates.
+// Mapping: azimuth = (ecliptic longitude of pole) − 270°  (mod 360°)
+// At azimuth=0 the tilt faces +Z; azimuth=90 faces +X (vernal equinox direction).
+// Source: IAU 2015 Cartographic Coordinates and Rotational Elements.
+export const SUN_AZIMUTH     = 76;   // IAU α₀=286.13°, δ₀= 63.87° → λ_pole≈346°
+export const MERCURY_AZIMUTH = 48;   // IAU α₀=281.01°, δ₀= 61.45° → λ_pole≈318°
+export const VENUS_AZIMUTH   = 119;  // IAU α₀=272.76°, δ₀= 67.16° → λ_pole≈  29°
+export const EARTH_AZIMUTH   = 180;  // IAU α₀=  0.00°, δ₀= 90.00° → λ_pole≈  90°
+export const MARS_AZIMUTH    = 83;   // IAU α₀=317.68°, δ₀= 52.89° → λ_pole≈353°
+export const JUPITER_AZIMUTH = 23;   // IAU α₀=268.06°, δ₀= 64.50° → λ_pole≈293°
+export const SATURN_AZIMUTH  = 171;  // IAU α₀= 40.59°, δ₀= 83.54° → λ_pole≈  81°
+export const URANUS_AZIMUTH  = 348;  // IAU α₀=257.31°, δ₀=-15.18° → λ_pole≈258°
+export const NEPTUNE_AZIMUTH = 49;   // IAU α₀=299.36°, δ₀= 43.46° → λ_pole≈319°
+export const PLUTO_AZIMUTH   = 227;  // IAU α₀=132.99°, δ₀= -6.16° → λ_pole≈137°
+export const CERES_AZIMUTH   = 101;  // IAU α₀=291.42°, δ₀= 66.76° → λ_pole≈  11°
+
 // === Planetary System: Real Orbital Periods (seconds) ===
 export const MERCURY_ORBITAL_PERIOD_REAL = 87.969 * 24 * 3600; // days to seconds
 export const VENUS_ORBITAL_PERIOD_REAL = 224.701 * 24 * 3600;
@@ -110,45 +128,12 @@ export const NEPTUNE_ORBITAL_PERIOD_REAL = 60190.03 * 24 * 3600;
 export const PLUTO_ORBITAL_PERIOD_REAL = 90560 * 24 * 3600;
 
 // === Planetary System: Per-planet Time Scale Factors ===
-// S_time = T_real / T_sim, where T_sim = 2 * PI * r_sim / sqrt(G * M_sun / r_sim)
+// Used by individual body classes to compute rotation speed at construction time,
+// accounting for the effective G (including gMultiplier) via dependencies.getG().
 export function calcSimOrbitalPeriod(r_sim: number, G: number, M_sun: number): number {
     // T_sim = 2 * PI * sqrt(r_sim^3 / (G * M_sun))
     return 2 * Math.PI * Math.sqrt(Math.pow(r_sim, 3) / (G * M_sun));
 }
-
-export const SUN_TIME_SCALE = 1;
-export const MERCURY_TIME_SCALE =
-    MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, G, SUN_MASS);
-export const VENUS_TIME_SCALE =
-    VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, G, SUN_MASS);
-export const EARTH_TIME_SCALE =
-    EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, G, SUN_MASS);
-export const MARS_TIME_SCALE =
-    MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, G, SUN_MASS);
-export const JUPITER_TIME_SCALE =
-    JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, G, SUN_MASS);
-export const SATURN_TIME_SCALE =
-    SATURN_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(SATURN_DIST, G, SUN_MASS);
-export const URANUS_TIME_SCALE =
-    URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, G, SUN_MASS);
-export const NEPTUNE_TIME_SCALE =
-    NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, G, SUN_MASS);
-export const PLUTO_TIME_SCALE =
-    PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, G, SUN_MASS);
-
-// === Sun: Rotation Speed ===
-export const SUN_ROT_SPEED = ((2 * Math.PI) / (25.38 * 3600)) * SUN_TIME_SCALE; // ~2.86e-6 radians/sec
-// === Planetary System: Rotation Speed (radians/sec, scaled for simulation) ===
-// Angular speed = 2 * PI / (sidereal day in seconds), then scaled by per-planet time scale
-export const MERCURY_ROT_SPEED = ((2 * Math.PI) / (1407.5 * 3600)) * MERCURY_TIME_SCALE; // ~1.24e-6
-export const VENUS_ROT_SPEED = ((-2 * Math.PI) / (5832.5 * 3600)) * VENUS_TIME_SCALE; // ~-2.98e-7 (retrograde)
-export const EARTH_ROT_SPEED = ((2 * Math.PI) / (23.934 * 3600)) * EARTH_TIME_SCALE; // ~7.29e-5
-export const MARS_ROT_SPEED = ((2 * Math.PI) / (24.623 * 3600)) * MARS_TIME_SCALE; // ~7.09e-5
-export const JUPITER_ROT_SPEED = ((2 * Math.PI) / (9.925 * 3600)) * JUPITER_TIME_SCALE; // ~1.76e-4
-export const SATURN_ROT_SPEED = ((2 * Math.PI) / (10.656 * 3600)) * SATURN_TIME_SCALE; // ~1.64e-4
-export const URANUS_ROT_SPEED = ((-2 * Math.PI) / (17.24 * 3600)) * URANUS_TIME_SCALE; // ~-1.01e-4 (retrograde)
-export const NEPTUNE_ROT_SPEED = ((2 * Math.PI) / (16.11 * 3600)) * NEPTUNE_TIME_SCALE; // ~1.08e-4
-export const PLUTO_ROT_SPEED = ((-2 * Math.PI) / (153.3 * 3600)) * PLUTO_TIME_SCALE; // ~-1.14e-5 (retrograde)
 
 // === Spaceship: Mass ===
 export const SPACESHIP_MASS = (75000 / MASS_SCALE) * SCALE_FACTOR;
@@ -189,8 +174,8 @@ export const HYGIEA_DISTANCE = (470300000 / DIST_SCALE) * SCALE_FACTOR;
 // == Asteroids: Axial Tilt ===
 export const CERES_AXIS = 4.0;
 
-// === Asteroids: Rotation ===
-export const CERES_ROT_SPEED = ((2 * Math.PI) / (9.074 * 3600)) * SUN_TIME_SCALE; // ~1.92e-4
+// === Asteroids: Orbital Period ===
+export const CERES_ORBITAL_PERIOD_REAL = 1682.0 * 24 * 3600; // ~4.607 Earth years in seconds
 
 // === Comet (Halley): Mass, Radius, Distance ===
 // Halley's Comet: 2.2e14 kg
@@ -326,3 +311,49 @@ export const AUTOPILOT_WARP_THRESHOLD =
         ((FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
             (2 * AUTOPILOT_WARP_DECEL)) +
     AUTOPILOT_BOOST_THRESHOLD;
+
+// === Ship weapon tuning ===
+/**
+ * Base bolt speed added on top of the ship's current speed (units/s).
+ * Effective relative speed = min(WEAPON_MAX_SPEED, WEAPON_BASE_SPEED + shipSpeed).
+ * Bolts are always exactly WEAPON_BASE_SPEED faster than the ship in camera space —
+ * so you can never outrun them, and the feel scales linearly with your velocity.
+ */
+export const WEAPON_BASE_SPEED = FLIGHT_MAX_SPEED * 1.1;
+/**
+ * Hard cap on bolt relative speed (units/s).
+ * Prevents bolts becoming sub-pixel at boost / warp speeds.
+ * Defaults to 10× normal max speed.
+ */
+export const WEAPON_MAX_SPEED = FLIGHT_MAX_SPEED * 10;
+/** Seconds a projectile lives before fizzling out. */
+export const WEAPON_PARTICLE_LIFETIME = 4.0;
+/**
+ * Visual bolt length (world units).  Each shot is a fixed-length line segment;
+ * the tail always sits exactly WEAPON_BOLT_LENGTH behind the head.
+ * ~40 ship radii gives a clearly visible streak at minimum fire speed.
+ */
+export const WEAPON_BOLT_LENGTH = SPACESHIP_RADIUS * 40;
+/** Hex colour of weapon bolts. */
+export const WEAPON_PARTICLE_COLOR = 0x00eeff;
+/** World-space size (units) of the glowing point at each bolt head.
+ *  Uses sizeAttenuation=true — perspective-correct, so distant bolts appear smaller.
+ *  Increase the multiplier to keep bolts visible at greater range. */
+export const WEAPON_BOLT_HEAD_SIZE = SPACESHIP_RADIUS * 2400;
+/** Maximum projectiles fired per second. */
+export const WEAPON_FIRE_RATE = 4;
+/** HP damage dealt to a body on each bolt impact. */
+export const WEAPON_DAMAGE = 1;
+
+// === Body health points ===
+/**
+ * Multiplier applied to a body's mass to compute its initial health points.
+ *   healthPoints = mass * HP_MASS_MULTIPLIER
+ * With WEAPON_DAMAGE = 1 this gives roughly:
+ *   - Comet    ~0 HP  → destroyed in 1 shot
+ *   - Ceres    ~1.5 HP → destroyed in 1-2 shots
+ *   - Moon     ~122 HP
+ *   - Earth    ~9 900 HP
+ *   - Sun      ~3.3 billion HP (practically indestructible)
+ */
+export const HP_MASS_MULTIPLIER = 100;

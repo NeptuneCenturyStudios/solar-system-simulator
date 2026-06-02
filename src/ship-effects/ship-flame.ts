@@ -114,6 +114,7 @@ export class ShipFlame implements IShipEffect {
 
         this.glowInner = new THREE.Points(this.innerGeo, this.innerMat);
         this.glowInner.frustumCulled = false;
+        this.glowInner.renderOrder = 2;
         this.glowInner.visible = false;
         scene.add(this.glowInner);
 
@@ -137,6 +138,7 @@ export class ShipFlame implements IShipEffect {
 
         this.glowOuter = new THREE.Points(this.outerGeo, this.outerMat);
         this.glowOuter.frustumCulled = false;
+        this.glowOuter.renderOrder = 2;
         this.glowOuter.visible = false;
         scene.add(this.glowOuter);
     }

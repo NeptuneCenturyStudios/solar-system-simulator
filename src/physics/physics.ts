@@ -15,6 +15,7 @@ export interface IRotation {
     // axis: THREE.Vector3;
     tilt: number; // in degrees
     speed: number; // in degrees per second
+    azimuth?: number; // in degrees — rotates the tilt direction around the world Y axis (default 0)
 }
 
 /**

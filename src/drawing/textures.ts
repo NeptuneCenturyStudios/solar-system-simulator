@@ -37,6 +37,7 @@ export const fictionalVolcanicTexture = loadSrgbTexture('./assets/textures/ficti
 export const fictionalFrozenTexture = loadSrgbTexture('./assets/textures/fictional_6.jpg');
 export const fictionalOceanTexture = loadSrgbTexture('./assets/textures/fictional_7.jpg');
 export const fictionalDesertTexture = loadSrgbTexture('./assets/textures/fictional_8.jpg');
+export const fictionalTemperateTexture = loadSrgbTexture('./assets/textures/earth_day.jpg');
 
 // Custom/random textures for custom gas giants
 // (kept here because these are not part of the fictional solid pool)
