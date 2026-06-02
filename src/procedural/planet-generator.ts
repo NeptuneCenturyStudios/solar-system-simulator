@@ -247,6 +247,7 @@ export function generateProceduralPlanets(params: {
             mass: planetParams.mass,
             rotationSpeed: planetParams.rotationSpeed,
             textureIndex,
+            textureSeed: subSeed,
         });
     }
 

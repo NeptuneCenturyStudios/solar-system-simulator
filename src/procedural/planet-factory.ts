@@ -3,6 +3,7 @@ import { IStateDependencies } from '../interfaces';
 import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { BodyTypeEnum } from '../utilities/utilities';
+// still uses the existing deterministic fictional JPGs for volcanic/ocean/frozen
 import { PlanetTypeEnum } from '../utilities/body-params';
 import {
     fictionalTextures,
@@ -13,6 +14,9 @@ import {
     fictionalGasTextures,
     fictionalIceTextures,
 } from '../drawing/textures';
+
+// New deterministic, seam-free procedural desert generator.
+import { getDesertNormalTexture, getDesertTexture } from './desert/desert-texture-generator';
 
 export type ProceduralPlanetSubtype =
     | 'solid'
@@ -43,20 +47,32 @@ export type ProceduralPlanetCreation = {
      * - 'solid' uses fictionalTextures
      * - 'gas_giant' uses fictionalGasTextures
      * - 'ice_giant' uses fictionalIceTextures
-     * For deterministic textures (volcanic/ocean/frozen/desert), this can be omitted.
      */
     textureIndex?: number;
+
+    /**
+     * Seed used for deterministic textures (currently: desert).
+     * Generated in planet-generator.ts and kept stable across runs.
+     */
+    textureSeed?: string;
 };
 
+// `textureSeed` is optional so existing creation paths still work;
+// for desert we prefer it, but fall back to the existing fictional desert JPG.
 function pickTextureForSolidSubtype(
     subtype: PlanetTypeEnum,
-    textureIndex: number | undefined
+    textureIndex: number | undefined,
+    textureSeed: string | undefined
 ): THREE.Texture {
     // Deterministic custom textures first (match custom creation in index.ts)
     if (subtype === PlanetTypeEnum.Volcanic) return fictionalVolcanicTexture;
     if (subtype === PlanetTypeEnum.Ocean) return fictionalOceanTexture;
     if (subtype === PlanetTypeEnum.Frozen) return fictionalFrozenTexture;
-    if (subtype === PlanetTypeEnum.Desert) return fictionalDesertTexture;
+
+    if (subtype === PlanetTypeEnum.Desert) {
+        if (!textureSeed) return fictionalDesertTexture;
+        return getDesertTexture(textureSeed);
+    }
 
     // Remaining solid-like uses the pooled random textures (deterministic via textureIndex)
     const idx = Math.max(0, textureIndex ?? 0);
@@ -79,12 +95,20 @@ export function createPlanetBodyFromProceduralCreation(
 ): Planet | DwarfPlanet {
     const { bodyType, bodySubtype, radius, mass, pos, vel, id, name, rotationSpeed } = creation;
 
-    const geometry = new THREE.SphereGeometry(radius, 32, 32);
+    // Higher segment count helps texture detail read sharper on the sphere.
+    const geometry = new THREE.SphereGeometry(radius, 64, 64);
 
     const texture =
         bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant
             ? pickTextureForGasIceSubtype(bodySubtype, creation.textureIndex)
-            : pickTextureForSolidSubtype(bodySubtype, creation.textureIndex);
+            : pickTextureForSolidSubtype(bodySubtype, creation.textureIndex, creation.textureSeed);
+
+    const isDesert = bodySubtype === PlanetTypeEnum.Desert;
+
+    // Add a deterministic normal map for deserts to make lighting read sharper.
+    // (Works even when the base color texture is minified.)
+    const desertNormalMap =
+        isDesert && creation.textureSeed ? getDesertNormalTexture(creation.textureSeed) : null;
 
     // Procedural bodies may be far away, but we still need correct depth so planets
     // occlude each other properly (otherwise they look "glowy" / see-through).
@@ -92,11 +116,15 @@ export function createPlanetBodyFromProceduralCreation(
         geometry,
         new THREE.MeshStandardMaterial({
             map: texture,
+            normalMap: desertNormalMap ?? undefined,
+            // Lower normal strength for deserts so it doesn't look like foil.
+            normalScale: desertNormalMap ? new THREE.Vector2(0.7, 0.7) : undefined,
             color: 0xffffff, // keep texture untinted
             emissive: 0x000000,
             emissiveIntensity: 0,
-            roughness: 0.7,
-            metalness: 0.85,
+            // Deserts should be very non-metallic, very rough.
+            roughness: isDesert ? 0.95 : 0.7,
+            metalness: isDesert ? 0.02 : 0.85,
             transparent: false,
             depthTest: true,
             depthWrite: true,
