@@ -18,21 +18,34 @@ const NOISE_OASIS_OCTAVES = 3;
 // Lower strength so normals don't look like shiny foil; we rely on rough material for sandy feel.
 const NORMAL_STRENGTH = 0.9;
 
-// Subtle crater / impact micro-detail (for more “sandy realism”)
+// Subtle crater / impact micro-detail
+// Shape into “impacts” by separating rim band vs dark interior.
 const NOISE_CRATER_SCALE = 40.0;
 const NOISE_CRATER_OCTAVES = 4;
-const CRATER_STRENGTH = 0.1;
+
+// Height: rim slightly raised, interior slightly lowered.
+const CRATER_RIM_STRENGTH = 0.05;
+const CRATER_DEPTH_STRENGTH = 0.03;
+
+// Thresholds for crater rim/interior from ridged crater signal.
+const CRATER_RIM_EDGE0 = 0.55;
+const CRATER_RIM_EDGE1 = 0.80;
+const CRATER_INNER_EDGE0 = 0.78;
+const CRATER_INNER_EDGE1 = 0.92;
+
+// Overall crater presence gating.
 const CRATER_MASK_EDGE0 = 0.62;
 const CRATER_MASK_EDGE1 = 0.92;
 
 // Crack / fractured crust detail (to match your reference more closely)
 const NOISE_CRACK_SCALE = 80.0;
 const NOISE_CRACK_OCTAVES = 3;
-const CRACK_STRENGTH = 0.18;
+const CRACK_STRENGTH = 0.11;
 
 // Flatten normal/height detail near poles to avoid “weird” polar shading artifacts.
 const POLAR_FLAT_START = 0.65; // 0..1 (0=equator, 1=pole)
 const POLAR_FLAT_END = 0.98; // higher => affects only the very top/bottom
+const POLAR_DETAIL_MIN = 0.35; // keep some detail at poles (avoid blurry uniform caps)
 
 type Vec3 = { x: number; y: number; z: number };
 
@@ -200,14 +213,18 @@ function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
     lonSin[x] = Math.sin(lon);
   }
 
-  // Precompute lat sin/cos for internal y
+  // Precompute lat sin/cos for internal y.
+  // Use an equal-area latitude mapping (sin(lat) instead of lat) so texture detail
+  // doesn't get visibly “compressed/smeared” near the poles when projected to a sphere.
   const latSin = new Float32Array(INTERNAL_HEIGHT);
   const latCos = new Float32Array(INTERNAL_HEIGHT);
   for (let y = 0; y < INTERNAL_HEIGHT; y++) {
     const v01 = y / Math.max(1, INTERNAL_HEIGHT - 1);
-    const lat = (0.5 - v01) * Math.PI;
-    latSin[y] = Math.sin(lat);
-    latCos[y] = Math.cos(lat);
+    // v01=0 -> +1 (north pole), v01=1 -> -1 (south pole)
+    const sinLat = 1 - 2 * v01;
+    const cosLat = Math.sqrt(Math.max(0, 1 - sinLat * sinLat));
+    latSin[y] = sinLat;
+    latCos[y] = cosLat;
   }
 
   // We want uniform deserts (no distinctive “desert poles”), so mask is 1 everywhere.
@@ -219,7 +236,8 @@ function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
 
     const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
     const pole01 = Math.abs(v01Pole - 0.5) / 0.5; // 0..1
-    const flatMask = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
+    const flatMaskRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
+    const flatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * flatMaskRaw;
 
     for (let x = 0; x < INTERNAL_WIDTH; x++) {
       const cLon = lonCos[x]!;
@@ -235,10 +253,17 @@ function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
       const xLocal = dot({ x: dx, y: dy, z: dz }, east);
       const zLocal = dot({ x: dx, y: dy, z: dz }, north);
 
+      // Reduce longitude-driven variation near the poles.
+      // Physical area shrinks near poles; if noise depends strongly on longitude,
+      // the equirectangular mapping can look “smeared”/blurry.
+      const poleFactor = Math.pow(Math.max(0, 1 - Math.abs(yLocal)), 0.65);
+      const xLocalEff = xLocal * poleFactor;
+      const zLocalEff = zLocal * poleFactor;
+
       const dunesN = fbm3D(
-        xLocal * NOISE_DUNE_SCALE + ox,
+        xLocalEff * NOISE_DUNE_SCALE + ox,
         yLocal * NOISE_DUNE_SCALE + oy,
-        zLocal * NOISE_DUNE_SCALE + oz,
+        zLocalEff * NOISE_DUNE_SCALE + oz,
         NOISE_DUNE_OCTAVES,
         seedU32
       );
@@ -264,11 +289,23 @@ function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
         seedU32
       );
       const craterRidged = 1 - Math.abs(craterN);
+
+      // Rim band + dark interior from the same ridged signal.
+      const craterInner = smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
+      const craterRimBand =
+        smoothstep(CRATER_RIM_EDGE0, CRATER_RIM_EDGE1, craterRidged) -
+        smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
+
       const craterMask = hotMask * flatMask * smoothstep(CRATER_MASK_EDGE0, CRATER_MASK_EDGE1, craterRidged);
 
-      // Height drives both normals + some color micro-contrast.
+      // Height drives both normals + some color micro-contrast:
+      // - rim raised
+      // - interior slightly depressed
       height[y * INTERNAL_WIDTH + x] =
-        dunesNMasked + CRATER_STRENGTH * craterRidged * craterMask + CRACK_STRENGTH * crackRidged * crackMask;
+        dunesNMasked +
+        CRATER_RIM_STRENGTH * craterRimBand * craterMask -
+        CRATER_DEPTH_STRENGTH * craterInner * craterMask +
+        CRACK_STRENGTH * crackRidged * crackMask;
 
       const dunesRidged = 1 - Math.abs(dunesNMasked);
       const dunesT = clamp01(0.5 + 0.65 * dunesRidged);
@@ -293,10 +330,22 @@ function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
       const contrast = 0.72 + 0.28 * dunesNMasked;
       col = { x: col.x * contrast, y: col.y * contrast, z: col.z * contrast };
 
+      // Crater coloration:
+      // - darker interior
+      // - slightly lighter rim (like raised impact ejecta)
+      if (craterMask > 0) {
+        const craterDark = mix3(darkSand, rockColor, 0.25);
+        const craterLight = mix3(paleSand, sandColor, 0.35);
+
+        // Rim band gets only a subtle boost to avoid “dark blobs”.
+        col = mix3(col, craterLight, craterRimBand * craterMask * 0.22);
+        col = mix3(col, craterDark, craterInner * craterMask * 0.28);
+      }
+
       // Crust cracks (thin-ish)
       if (crackMask > 0) {
         const crackColor = mix3(darkSand, rockColor, 0.35);
-        col = mix3(col, crackColor, crackMask * 0.45);
+        col = mix3(col, crackColor, crackMask * 0.25);
       }
 
       // Oases (subtle)
@@ -338,7 +387,8 @@ function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
 
     const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
     const pole01 = Math.abs(v01Pole - 0.5) / 0.5; // 0..1
-    const normalFlatMask = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
+    const normalFlatMaskRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
+    const normalFlatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * normalFlatMaskRaw;
 
     for (let x = 0; x < INTERNAL_WIDTH; x++) {
       const xL = x > 0 ? x - 1 : INTERNAL_WIDTH - 1;
