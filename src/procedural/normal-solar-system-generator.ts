@@ -20,6 +20,7 @@ import { Asteroid } from '../bodies/asteroid';
 
 import { createSatellite } from '../utilities/utilities';
 import type { IStateDependencies } from '../interfaces';
+import { createMoon } from '../bodies/create-moon';
 
 import {
     SUN_MASS,
@@ -102,7 +103,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         bodies.push(earth);
 
         bodies.push(
-            earth.createMoon(this.scene, {
+            createMoon(earth, this.scene, {
                 distance: MOON_DIST_FROM_EARTH,
                 radius: MOON_RADIUS,
                 mass: MOON_MASS,
@@ -214,7 +215,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Io (0 degrees)
         bodies.push(
-            jupiter.createMoon(this.scene, {
+            createMoon(jupiter, this.scene, {
                 angle: 0,
                 distance: IO_DIST_FROM_JUPITER,
                 radius: IO_RADIUS,
@@ -229,7 +230,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Europa (90 degrees)
         bodies.push(
-            jupiter.createMoon(this.scene, {
+            createMoon(jupiter, this.scene, {
                 angle: Math.PI / 2,
                 distance: EUROPA_DIST_FROM_JUPITER,
                 radius: EUROPA_RADIUS,
@@ -244,7 +245,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Ganymede (180 degrees)
         bodies.push(
-            jupiter.createMoon(this.scene, {
+            createMoon(jupiter, this.scene, {
                 angle: Math.PI,
                 distance: GANYMEDE_DIST_FROM_JUPITER,
                 radius: GANYMEDE_RADIUS,
@@ -259,7 +260,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Callisto (270 degrees)
         bodies.push(
-            jupiter.createMoon(this.scene, {
+            createMoon(jupiter, this.scene, {
                 angle: (Math.PI * 3) / 2,
                 distance: CALLISTO_DIST_FROM_JUPITER,
                 radius: CALLISTO_RADIUS,

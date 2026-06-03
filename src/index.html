@@ -254,22 +254,13 @@
                                 >
                                     <span class="material-symbols-outlined">videogame_asset</span>
                                 </button>
-                                <button
-                                    id="surfaceCameraBtn"
-                                    class="old-ui btn-icon-only"
-                                    title="Surface (Off)"
-                                    disabled
-                                >
+                                <button id="surfaceCameraBtn" class="old-ui btn-icon-only" title="Surface (Off)" disabled>
                                     <span class="material-symbols-outlined">hiking</span>
                                 </button>
                                 <button id="zoomInBtn" class="old-ui btn-icon-only" title="Zoom In">
                                     <span class="material-symbols-outlined">zoom_in</span>
                                 </button>
-                                <button
-                                    id="zoomOutBtn"
-                                    class="old-ui btn-icon-only"
-                                    title="Zoom Out"
-                                >
+                                <button id="zoomOutBtn" class="old-ui btn-icon-only" title="Zoom Out">
                                     <span class="material-symbols-outlined">zoom_out</span>
                                 </button>
                             </div>
@@ -308,11 +299,7 @@
                                             value="64"
                                             title="Controls how many physics steps are calculated per frame. Higher values improve orbital accuracy but use more CPU. Lower values are faster but less precise."
                                         />
-                                        <button
-                                            class="old-ui btn-slider-reset"
-                                            id="substepsResetBtn"
-                                            title="Reset to default (64)"
-                                        >
+                                        <button class="old-ui btn-slider-reset" id="substepsResetBtn" title="Reset to default (64)">
                                             <span class="material-symbols-outlined">replay</span>
                                         </button>
                                     </div>
@@ -617,6 +604,18 @@
                                     <option value="volcanic">Volcanic</option>
                                     <option value="frozen">Frozen</option>
                                     <option value="ocean">Ocean</option>
+                                    <option value="desert">Desert</option>
+                                </select>
+                            </div>
+
+                            <div class="control-group" id="moonTypeGroup" style="display: none">
+                                <label for="moonTypeSelect">Moon Type:</label>
+                                <select id="moonTypeSelect">
+                                    <option value="solid" selected>Solid</option>
+                                    <option value="temperate">Temperate</option>
+                                    <option value="volcanic">Volcanic</option>
+                                    <option value="ocean">Ocean</option>
+                                    <option value="frozen">Frozen</option>
                                     <option value="desert">Desert</option>
                                 </select>
                             </div>

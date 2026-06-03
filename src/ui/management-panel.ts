@@ -47,6 +47,8 @@ export class ManagementPanel extends Panel {
     orbitParentDisplay: HTMLElement | null;
     moonValidationMessage: HTMLElement | null;
     planetTypeGroup: HTMLElement | null;
+    moonTypeGroup: HTMLElement | null;
+    moonTypeSelect: HTMLSelectElement | null;
     hasAtmosphereRow: HTMLElement | null;
     hasAtmosphereCheckbox: HTMLInputElement | null;
     randomizeCreateBtn: HTMLButtonElement | null;
@@ -152,6 +154,8 @@ export class ManagementPanel extends Panel {
         this.orbitParentDisplay = null;
         this.moonValidationMessage = null;
         this.planetTypeGroup = null;
+        this.moonTypeGroup = null;
+        this.moonTypeSelect = null;
         this.hasAtmosphereRow = null;
         this.hasAtmosphereCheckbox = null;
         this.randomizeCreateBtn = null;
@@ -261,6 +265,10 @@ export class ManagementPanel extends Panel {
         this.orbitParentDisplay = document.getElementById('orbitParentDisplay');
         this.moonValidationMessage = document.getElementById('moonValidationMessage');
         this.planetTypeGroup = document.getElementById('planetTypeGroup');
+        this.moonTypeGroup = document.getElementById('moonTypeGroup');
+        this.moonTypeSelect = document.getElementById(
+            'moonTypeSelect'
+        ) as HTMLSelectElement | null;
         this.hasAtmosphereRow = document.getElementById('hasAtmosphereRow');
         this.hasAtmosphereCheckbox = document.getElementById(
             'hasAtmosphere'
@@ -591,8 +599,11 @@ export class ManagementPanel extends Panel {
                 this.updateOrbitParentDisplay();
 
                 const isCustomPlanet = bodyType === 'planet';
+                const isCustomMoon = bodyType === 'moon';
                 if (this.planetTypeGroup)
                     this.planetTypeGroup.style.display = isCustomPlanet ? 'block' : 'none';
+                if (this.moonTypeGroup)
+                    this.moonTypeGroup.style.display = isCustomMoon ? 'block' : 'none';
 
                 const showMassRadius = bodyType === 'planet' || bodyType === 'moon';
                 if (this.createMassGroup)
@@ -609,15 +620,21 @@ export class ManagementPanel extends Panel {
                 if (this.createAzimuthGroup) this.createAzimuthGroup.style.display = showTilt ? 'block' : 'none';
 
                 const planetType = this.getSelectedPlanetType();
+                // Temperate bodies should always have atmosphere (forced in src/index.ts),
+                // so we hide the checkbox to keep the UI consistent with the "giants" behavior.
+                const moonTypeSelect = document.getElementById(
+                    'moonTypeSelect'
+                ) as HTMLSelectElement | null;
+                const moonType = moonTypeSelect?.value;
+
                 const canHaveAtmosphere =
-                    bodyType === 'moon' ||
+                    (bodyType === 'moon' && moonType !== 'temperate') ||
                     (bodyType === 'planet' &&
                         (planetType === 'solid' ||
                             planetType === 'volcanic' ||
                             planetType === 'ocean' ||
                             planetType === 'frozen' ||
-                            planetType === 'desert' ||
-                            planetType === 'temperate'));
+                            planetType === 'desert'));
                 if (this.hasAtmosphereRow)
                     this.hasAtmosphereRow.style.display = canHaveAtmosphere ? 'flex' : 'none';
                 if (this.hasAtmosphereCheckbox && !canHaveAtmosphere)
@@ -684,6 +701,14 @@ export class ManagementPanel extends Panel {
 
         if (planetTypeSelect) {
             planetTypeSelect.addEventListener('change', () => updateAddModeVisibility());
+        }
+
+        if (this.moonTypeSelect) {
+            this.moonTypeSelect.addEventListener('change', () => {
+                updateAddModeVisibility();
+                // Keep moon-specific validation state in sync with the selection
+                this.validateMoonCreation();
+            });
         }
 
         if (this.createMassInput && this.createMassDisplay) {
@@ -830,7 +855,10 @@ export class ManagementPanel extends Panel {
                 const inclination = this.inclinationSlider
                     ? parseFloat(this.inclinationSlider.value)
                     : 0;
-                const planetType = this.getSelectedPlanetType();
+                const planetType =
+                    bodyType === 'moon'
+                        ? this.getSelectedMoonType()
+                        : this.getSelectedPlanetType();
                 const hasAtmosphere =
                     this.hasAtmosphereCheckbox &&
                     this.hasAtmosphereRow &&
@@ -1126,7 +1154,11 @@ export class ManagementPanel extends Panel {
             return;
         }
 
-        if (this.hasAtmosphereCheckbox && this.hasAtmosphereRow?.style.display !== 'none') {
+        if (
+            type === 'planet' &&
+            this.hasAtmosphereCheckbox &&
+            this.hasAtmosphereRow?.style.display !== 'none'
+        ) {
             this.hasAtmosphereCheckbox.checked = randBool();
         }
 
@@ -1205,6 +1237,39 @@ export class ManagementPanel extends Panel {
         }
 
         if (type === 'moon') {
+            // Randomize the moon subtype first so we can consistently hide/force atmosphere UI.
+            const moonTypeSelect = document.getElementById(
+                'moonTypeSelect'
+            ) as HTMLSelectElement | null;
+
+            const moonTypes = [
+                'solid',
+                'temperate',
+                'volcanic',
+                'ocean',
+                'frozen',
+                'desert',
+            ] as const;
+
+            if (moonTypeSelect && moonTypeSelect.options.length > 0) {
+                const randomSubtype =
+                    moonTypes[Math.floor(Math.random() * moonTypes.length)];
+                moonTypeSelect.value = randomSubtype;
+            }
+
+            const moonType = this.getSelectedMoonType();
+            const canHaveAtmosphere = moonType !== 'temperate';
+
+            if (
+                this.hasAtmosphereCheckbox &&
+                this.hasAtmosphereRow?.style.display !== 'none'
+            ) {
+                // If temperate, checkbox is hidden/forced by UI; still keep value consistent.
+                this.hasAtmosphereCheckbox.checked = canHaveAtmosphere
+                    ? randBool()
+                    : false;
+            }
+
             const moonMassMin = MOON_MASS * 0.5;
             const moonMassMax = MOON_MASS * 1.8;
             const mass = rand(moonMassMin, moonMassMax);
@@ -1363,6 +1428,26 @@ export class ManagementPanel extends Panel {
             value === 'frozen' ||
             value === 'desert' ||
             value === 'temperate'
+        ) {
+            return value;
+        }
+
+        return 'solid';
+    }
+
+    getSelectedMoonType(): string {
+        const moonTypeSelect = document.getElementById(
+            'moonTypeSelect'
+        ) as HTMLSelectElement | null;
+
+        const value = moonTypeSelect?.value;
+        if (
+            value === 'solid' ||
+            value === 'temperate' ||
+            value === 'volcanic' ||
+            value === 'ocean' ||
+            value === 'frozen' ||
+            value === 'desert'
         ) {
             return value;
         }

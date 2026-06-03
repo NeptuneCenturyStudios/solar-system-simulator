@@ -111,6 +111,7 @@ import {
     generateIAUName,
     getBodyTypeLabel,
 } from './utilities/utilities';
+import { SeededRandom } from './utilities/prng';
 import {
     absorbBody,
     chooseCollisionWinner,
@@ -125,8 +126,17 @@ import {
     randomMoonParams,
     randomCometParams,
     randomAsteroidParams,
+    PlanetTypeEnum,
+    MoonTypeEnum,
 } from './utilities/body-params';
-import { loadSrgbTexture, fictionalTextures } from './drawing/textures';
+import {
+    loadSrgbTexture,
+    fictionalTextures,
+    fictionalVolcanicTexture,
+    fictionalOceanTexture,
+    fictionalFrozenTexture,
+    fictionalTemperateTexture,
+} from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
@@ -142,6 +152,8 @@ import { VelocityArcManager } from './drawing/velocity-arc';
 import { SurfaceCameraManager } from './camera/surface-camera';
 import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
+import { Moon } from './bodies/moon';
+import { createMoon } from './bodies/create-moon';
 import { Mercury } from './bodies/mercury';
 import { Venus } from './bodies/venus';
 import { Earth } from './bodies/earth';
@@ -157,6 +169,7 @@ import { Star } from './bodies/star';
 import { MainSequenceStar } from './bodies/main-sequence-star';
 import { createMainSequenceStarFromParams } from './procedural/star-factory';
 import { createPlanetBodyFromProceduralCreation } from './procedural/planet-factory';
+import { getDesertTexture } from './procedural/desert/desert-texture-generator';
 import { Asteroid } from './bodies/asteroid';
 import { Comet } from './bodies/comet';
 
@@ -1278,12 +1291,13 @@ function createPresetBody(presetKey: string) {
                 simulationState.bodies.push(earth);
             }
 
-            newBody = earth.createMoon(scene, {
+            newBody = createMoon(earth, scene, {
                 distance: MOON_DIST_FROM_EARTH,
                 radius: MOON_RADIUS,
                 mass: MOON_MASS,
                 id: createUniqueId('moon'),
                 name: 'Moon',
+                moonType: MoonTypeEnum.Temperate,
                 trailColor: 0xffffff,
                 maxTrail: 1500,
             });
@@ -1464,9 +1478,13 @@ function createNewBody(
         });
 
         // Optional atmosphere/cloud layer (checkbox-driven for custom solid + volcanic planets)
-        if (hasAtmosphere && isSolidPlanet && newBody) {
+        // Temperate planets should ALWAYS have an atmosphere.
+        if ((hasAtmosphere || planetBodySubtype === PlanetTypeEnum.Temperate) && isSolidPlanet && newBody) {
+            const atmosphereRng = new SeededRandom(`${newBody.id}|atmosphere|custom-solid`);
+            const atmosphereTex = atmosphereRng.pick(fictionalAtmosphereTextures) ?? fictionalAtmosphereTextures[0];
+
             const cloudsMat = new THREE.MeshStandardMaterial({
-                map: pickRandom(fictionalAtmosphereTextures),
+                map: atmosphereTex,
                 color: 0xffffff,
                 transparent: true,
                 opacity: 0.25,
@@ -1493,7 +1511,9 @@ function createNewBody(
                 newBody.clouds.userData = { parentBody: newBody };
                 newBody.mesh.add(newBody.clouds);
             }
-            newBody.cloudRotationSpeed = 0.12 + Math.random() * 0.12;
+
+            // 0.12 + Math.random()*0.12 => [0.12, 0.24)
+            newBody.cloudRotationSpeed = atmosphereRng.range(0.12, 0.24);
         }
 
         // Ensure brightness scaling uses a neutral base when texture is present
@@ -1560,40 +1580,100 @@ function createNewBody(
             // Moon velocity = parent velocity + orbital velocity
             const moonSpawnVel = parentVel.clone().addScaledVector(orbitDir, orbitSpeed);
 
+            const moonId = createUniqueId('moon');
+            const moonName = generateIAUName(BodyTypeEnum.Moon, focusedBody, simulationState.bodies);
+
             const geometry = new THREE.SphereGeometry(moonRadius, 32, 32);
-            // Random texture per custom moon instance
+
+            // planetType is used as moonType for `bodyType === 'moon'` custom creation.
+            // Map moonType -> texture to match planet subtype visuals.
+            const moonTextureSeed = `${moonId}|moonTexture|${planetType}`;
+            const moonType = (planetType || 'solid') as
+                | 'solid'
+                | 'temperate'
+                | 'volcanic'
+                | 'ocean'
+                | 'frozen'
+                | 'desert';
+
+            // Texture selection:
+            // - desert: generated seam-safe procedural desert texture (like planets)
+            // - temperate: earth_day texture for now
+            // - others: deterministic fictional sub-planet textures
+            // - solid: pooled fictional textures (seeded)
+            let moonMap: THREE.Texture;
+            switch (moonType) {
+                case 'desert':
+                    moonMap = getDesertTexture(moonTextureSeed);
+                    break;
+                case 'temperate':
+                    moonMap = fictionalTemperateTexture;
+                    break;
+                case 'volcanic':
+                    moonMap = fictionalVolcanicTexture;
+                    break;
+                case 'ocean':
+                    moonMap = fictionalOceanTexture;
+                    break;
+                case 'frozen':
+                    moonMap = fictionalFrozenTexture;
+                    break;
+                case 'solid':
+                default: {
+                    const seeded = new SeededRandom(moonTextureSeed);
+                    const idx = Math.floor(seeded.next() * fictionalTextures.length) % fictionalTextures.length;
+                    moonMap = fictionalTextures[Math.abs(idx)]!;
+                    break;
+                }
+            }
+
             const moonMaterial = new THREE.MeshStandardMaterial({
-                map: pickRandom(fictionalTextures),
+                map: moonMap,
                 color: 0xffffff, // keep texture untinted
                 emissive: 0x000000,
                 emissiveIntensity: 0,
-                roughness: 0.7,
-                metalness: 0.7,
+                roughness:
+                    moonType === 'desert' || moonType === 'temperate' ? 0.95 : 0.7,
+                metalness:
+                    moonType === 'desert' || moonType === 'temperate' ? 0.02 : 0.7,
+                transparent: false,
+                depthTest: true,
+                depthWrite: true,
             });
             const mesh = new THREE.Mesh(geometry, moonMaterial);
 
-            newBody = new CelestialBody(
-                dependencies,
-                scene,
-                moonRadius,
-                0xffffff,
-                moonSpawnPos,
-                moonSpawnVel,
-                moonMass,
-                createUniqueId('moon'),
-                generateIAUName(BodyTypeEnum.Moon, focusedBody, simulationState.bodies),
-                BodyTypeEnum.Moon,
-                0x666666,
-                1000,
-                false,
-                { tilt: 0, speed: moonRotationSpeed },
-                mesh
-            );
+            newBody = new Moon(dependencies, scene, {
+                distance: moonDistance,
+                angle: orbitAngle ?? 0,
+                yVariation: 0,
+                moonType: moonType as unknown as MoonTypeEnum,
+                tidalLock: {
+                    target: focusedBody as unknown as CelestialBody,
+                    spinAxisWorld: new THREE.Vector3(0, 1, 0),
+                    faceAxisLocal: new THREE.Vector3(0, 0, 1),
+                    // 0 triggers CelestialBody to compute derived omega on first update tick.
+                    angularSpeed: 0,
+                },
+                radius: moonRadius,
+                pos: moonSpawnPos,
+                vel: moonSpawnVel,
+                mass: moonMass,
+                id: moonId,
+                name: moonName,
+                trailColor: 0x666666,
+                maxTrail: 1000,
+                rotation: { tilt: 0, speed: moonRotationSpeed },
+                mesh,
+            });
 
             // Optional atmosphere/cloud layer (checkbox-driven for custom bodies)
-            if (hasAtmosphere) {
+            // Temperate moons should always have atmosphere/clouds (UI checkbox hidden for temperate).
+            if (hasAtmosphere || planetType === 'temperate') {
+                const atmosphereRng = new SeededRandom(`${newBody.id}|atmosphere|custom-moon`);
+                const atmosphereTex = atmosphereRng.pick(fictionalAtmosphereTextures) ?? fictionalAtmosphereTextures[0];
+
                 const cloudsMat = new THREE.MeshStandardMaterial({
-                    map: pickRandom(fictionalAtmosphereTextures),
+                    map: atmosphereTex,
                     color: 0xffffff,
                     transparent: true,
                     opacity: 0.25,
@@ -1608,7 +1688,9 @@ function createNewBody(
                 // Make cloud sphere selectable (raycaster maps back to owning body)
                 newBody.clouds.userData = { parentBody: newBody };
                 newBody.mesh.add(newBody.clouds);
-                newBody.cloudRotationSpeed = 0.12 + Math.random() * 0.12;
+
+                // 0.12 + Math.random()*0.12 => [0.12, 0.24)
+                newBody.cloudRotationSpeed = atmosphereRng.range(0.12, 0.24);
             }
 
             // Ensure brightness scaling uses a neutral base when texture is present

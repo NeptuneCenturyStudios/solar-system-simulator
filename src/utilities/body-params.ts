@@ -230,10 +230,11 @@ export enum PlanetTypeEnum {
 /**
  * MoonTypeEnum mirrors the "solid-like" planet subtypes, but intentionally excludes
  * gas/ice giant categories. This lets procedural moons pick planet-like textures
- * (ocean/desert/frozen/volcanic/terrestrial) without ever needing gas/ice moon textures.
+ * (ocean/desert/frozen/volcanic/terrestrial/temperate) without ever needing gas/ice moon textures.
  */
 export enum MoonTypeEnum {
     Terrestrial = 'solid',
+    Temperate = 'temperate',
     Volcanic = 'volcanic',
     Ocean = 'ocean',
     Frozen = 'frozen',

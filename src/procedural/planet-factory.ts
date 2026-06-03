@@ -134,6 +134,9 @@ export function createPlanetBodyFromProceduralCreation(
         })
     );
 
+    const hasRings =
+        bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant;
+
     const commonOptions = {
         radius,
         pos,
@@ -144,7 +147,7 @@ export function createPlanetBodyFromProceduralCreation(
         bodySubtype,
         trailColor: 0x888888,
         maxTrail: 3000,
-        hasRings: false,
+        hasRings,
         rotation: { tilt: 0, speed: rotationSpeed },
         mesh,
     };
