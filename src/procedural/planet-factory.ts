@@ -15,7 +15,13 @@ import {
 } from '../drawing/textures';
 
 // New deterministic, seam-free procedural desert generator.
-import { getDesertNormalTexture, getDesertTexture } from './desert/desert-texture-generator';
+import {
+    getDesertNormalTexture,
+    getDesertTexture,
+    getDesertNormalTextureAsync,
+    getDesertTextureAsync,
+    type DesertGenerationProgress,
+} from './desert/desert-texture-generator';
 import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 
 export type ProceduralPlanetSubtype =
@@ -64,6 +70,31 @@ export type ProceduralPlanetCreation = {
     textureSeed?: string;
 };
 
+function computeRingPresence(
+    creation: ProceduralPlanetCreation
+): { hasRings: boolean } {
+    const { id, bodySubtype, hasRings, bodyType } = creation;
+
+    // Ring presence is probabilistic (deterministic per planet id) so not all gas/ice giants get rings,
+    // and regular planets can occasionally have them.
+    const GAS_GIANT_RINGS_PROB = 0.85;
+    const ICE_GIANT_RINGS_PROB = 0.7;
+    const SOLID_RINGS_PROB = 0.08;
+
+    const ringRng = new SeededRandom(`${id}|rings-enabled`);
+    const hasRingsProbabilistic =
+        bodySubtype === PlanetTypeEnum.GasGiant
+            ? ringRng.chance(GAS_GIANT_RINGS_PROB)
+            : bodySubtype === PlanetTypeEnum.IceGiant
+              ? ringRng.chance(ICE_GIANT_RINGS_PROB)
+              : ringRng.chance(SOLID_RINGS_PROB);
+
+    const resolved =
+        typeof hasRings === 'boolean' && bodyType === BodyTypeEnum.Planet ? hasRings : hasRingsProbabilistic;
+
+    return { hasRings: resolved };
+}
+
 // `textureSeed` is optional so existing creation paths still work;
 // for desert we prefer it, but fall back to the existing fictional desert JPG.
 function pickTextureForSolidSubtype(
@@ -96,67 +127,88 @@ function pickTextureForGasIceSubtype(
     return fictionalIceTextures[idx % fictionalIceTextures.length]!;
 }
 
-export function createPlanetBodyFromProceduralCreation(
-    dependencies: IStateDependencies,
-    scene: THREE.Scene,
+function buildMeshMaterialSync(
     creation: ProceduralPlanetCreation
-): Planet | DwarfPlanet {
-    const { bodyType, bodySubtype, radius, mass, pos, vel, id, name, rotationSpeed } = creation;
-
-    // Higher segment count helps texture detail read sharper on the sphere.
-    const geometry = new THREE.SphereGeometry(radius, 64, 64);
+): THREE.MeshStandardMaterial {
+    const { bodySubtype, textureIndex, textureSeed } = creation;
+    const isDesert = bodySubtype === PlanetTypeEnum.Desert;
 
     const texture =
         bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant
-            ? pickTextureForGasIceSubtype(bodySubtype, creation.textureIndex)
-            : pickTextureForSolidSubtype(bodySubtype, creation.textureIndex, creation.textureSeed);
+            ? pickTextureForGasIceSubtype(bodySubtype, textureIndex)
+            : pickTextureForSolidSubtype(bodySubtype, textureIndex, textureSeed);
 
+    const desertNormalMap = isDesert && textureSeed ? getDesertNormalTexture(textureSeed) : null;
+
+    return new THREE.MeshStandardMaterial({
+        map: texture,
+        normalMap: desertNormalMap ?? undefined,
+        // Lower normal strength for deserts so it doesn't look like foil.
+        normalScale: desertNormalMap ? new THREE.Vector2(0.7, 0.7) : undefined,
+        color: 0xffffff, // keep texture untinted
+        emissive: 0x000000,
+        emissiveIntensity: 0,
+        // Deserts should be very non-metallic, very rough.
+        roughness: isDesert ? 0.95 : 0.7,
+        metalness: isDesert ? 0.02 : 0.85,
+        transparent: false,
+        depthTest: true,
+        depthWrite: true,
+    });
+}
+
+async function buildMeshMaterialDesertAsync(
+    creation: ProceduralPlanetCreation,
+    onDesertProgress?: (progress: DesertGenerationProgress) => void,
+    options?: { signal?: AbortSignal }
+): Promise<THREE.MeshStandardMaterial> {
+    const { bodySubtype, textureSeed } = creation;
     const isDesert = bodySubtype === PlanetTypeEnum.Desert;
+    if (!isDesert) throw new Error('buildMeshMaterialDesertAsync called for non-desert');
 
-    // Add a deterministic normal map for deserts to make lighting read sharper.
-    // (Works even when the base color texture is minified.)
-    const desertNormalMap =
-        isDesert && creation.textureSeed ? getDesertNormalTexture(creation.textureSeed) : null;
-
-    // Procedural bodies may be far away, but we still need correct depth so planets
-    // occlude each other properly (otherwise they look "glowy" / see-through).
-    const mesh = new THREE.Mesh(
-        geometry,
-        new THREE.MeshStandardMaterial({
-            map: texture,
-            normalMap: desertNormalMap ?? undefined,
-            // Lower normal strength for deserts so it doesn't look like foil.
-            normalScale: desertNormalMap ? new THREE.Vector2(0.7, 0.7) : undefined,
-            color: 0xffffff, // keep texture untinted
+    if (!textureSeed) {
+        // No seed => fallback to fictional JPG (fast, sync).
+        return new THREE.MeshStandardMaterial({
+            map: fictionalDesertTexture,
+            color: 0xffffff,
             emissive: 0x000000,
             emissiveIntensity: 0,
-            // Deserts should be very non-metallic, very rough.
-            roughness: isDesert ? 0.95 : 0.7,
-            metalness: isDesert ? 0.02 : 0.85,
+            roughness: 0.95,
+            metalness: 0.02,
             transparent: false,
             depthTest: true,
             depthWrite: true,
-        })
-    );
+        });
+    }
 
-    // Ring presence is probabilistic (deterministic per planet id) so not all gas/ice giants get rings,
-    // and regular planets can occasionally have them.
-    const GAS_GIANT_RINGS_PROB = 0.85;
-    const ICE_GIANT_RINGS_PROB = 0.7;
-    const SOLID_RINGS_PROB = 0.08;
+    const [color, normal] = await Promise.all([
+        getDesertTextureAsync(textureSeed, onDesertProgress, { signal: options?.signal }),
+        getDesertNormalTextureAsync(textureSeed, onDesertProgress, { signal: options?.signal }),
+    ]);
 
-    const ringRng = new SeededRandom(`${id}|rings-enabled`);
-    const hasRingsProbabilistic =
-        bodySubtype === PlanetTypeEnum.GasGiant
-            ? ringRng.chance(GAS_GIANT_RINGS_PROB)
-            : bodySubtype === PlanetTypeEnum.IceGiant
-              ? ringRng.chance(ICE_GIANT_RINGS_PROB)
-              : ringRng.chance(SOLID_RINGS_PROB);
+    return new THREE.MeshStandardMaterial({
+        map: color,
+        normalMap: normal,
+        normalScale: new THREE.Vector2(0.7, 0.7),
+        color: 0xffffff,
+        emissive: 0x000000,
+        emissiveIntensity: 0,
+        roughness: 0.95,
+        metalness: 0.02,
+        transparent: false,
+        depthTest: true,
+        depthWrite: true,
+    });
+}
 
-    const hasRings =
-        typeof creation.hasRings === 'boolean' && bodyType === BodyTypeEnum.Planet
-            ? creation.hasRings
-            : hasRingsProbabilistic;
+function createCommonPlanetOptions(
+    dependencies: IStateDependencies,
+    scene: THREE.Scene,
+    creation: ProceduralPlanetCreation,
+    mesh: THREE.Mesh,
+    hasRings: boolean
+): Planet | DwarfPlanet {
+    const { radius, pos, vel, mass, id, name, bodySubtype, rotationSpeed, bodyType } = creation;
 
     const commonOptions = {
         radius,
@@ -178,4 +230,44 @@ export function createPlanetBodyFromProceduralCreation(
     }
 
     return new Planet(dependencies, scene, commonOptions);
+}
+
+export function createPlanetBodyFromProceduralCreation(
+    dependencies: IStateDependencies,
+    scene: THREE.Scene,
+    creation: ProceduralPlanetCreation
+): Planet | DwarfPlanet {
+    const geometry = new THREE.SphereGeometry(creation.radius, 64, 64);
+    const material = buildMeshMaterialSync(creation);
+    const mesh = new THREE.Mesh(geometry, material);
+
+    const { hasRings } = computeRingPresence(creation);
+    return createCommonPlanetOptions(dependencies, scene, creation, mesh, hasRings);
+}
+
+export async function createPlanetBodyFromProceduralCreationAsync(
+    dependencies: IStateDependencies,
+    scene: THREE.Scene,
+    creation: ProceduralPlanetCreation,
+    options?: {
+        onDesertProgress?: (progress: DesertGenerationProgress) => void;
+        signal?: AbortSignal;
+    }
+): Promise<Planet | DwarfPlanet> {
+    const geometry = new THREE.SphereGeometry(creation.radius, 64, 64);
+
+    const isDesert = creation.bodySubtype === PlanetTypeEnum.Desert;
+    const onDesertProgress = options?.onDesertProgress;
+
+    let material: THREE.MeshStandardMaterial;
+    if (isDesert) {
+        material = await buildMeshMaterialDesertAsync(creation, onDesertProgress);
+    } else {
+        material = buildMeshMaterialSync(creation);
+    }
+
+    const mesh = new THREE.Mesh(geometry, material);
+
+    const { hasRings } = computeRingPresence(creation);
+    return createCommonPlanetOptions(dependencies, scene, creation, mesh, hasRings);
 }

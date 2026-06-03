@@ -29,7 +29,7 @@ const CRATER_DEPTH_STRENGTH = 0.03;
 
 // Thresholds for crater rim/interior from ridged crater signal.
 const CRATER_RIM_EDGE0 = 0.55;
-const CRATER_RIM_EDGE1 = 0.80;
+const CRATER_RIM_EDGE1 = 0.8;
 const CRATER_INNER_EDGE0 = 0.78;
 const CRATER_INNER_EDGE1 = 0.92;
 
@@ -50,408 +50,748 @@ const POLAR_DETAIL_MIN = 0.35; // keep some detail at poles (avoid blurry unifor
 type Vec3 = { x: number; y: number; z: number };
 
 function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
+    return Math.max(0, Math.min(1, v));
 }
 
 function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
+    return a + (b - a) * t;
 }
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = clamp01((x - edge0) / (edge1 - edge0));
-  return t * t * (3 - 2 * t);
+    const t = clamp01((x - edge0) / (edge1 - edge0));
+    return t * t * (3 - 2 * t);
 }
 
 function fade(t: number): number {
-  // Perlin fade curve
-  return t * t * t * (t * (t * 6 - 15) + 10);
+    // Perlin fade curve
+    return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
 // FNV-1a for seed -> u32
 function hashStringToU32(seed: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < seed.length; i++) {
+        h ^= seed.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
 }
 
 function hashU32(x: number, y: number, z: number, seedU32: number): number {
-  let h = seedU32 ^ Math.imul(x, 0x9e3779b1);
-  h ^= Math.imul(y, 0x85ebca77);
-  h ^= Math.imul(z, 0xc2b2ae3d);
-  h ^= h >>> 16;
-  h = Math.imul(h, 0x7feb352d);
-  h ^= h >>> 15;
-  h = Math.imul(h, 0x846ca68b);
-  h ^= h >>> 16;
-  return h >>> 0;
+    let h = seedU32 ^ Math.imul(x, 0x9e3779b1);
+    h ^= Math.imul(y, 0x85ebca77);
+    h ^= Math.imul(z, 0xc2b2ae3d);
+    h ^= h >>> 16;
+    h = Math.imul(h, 0x7feb352d);
+    h ^= h >>> 15;
+    h = Math.imul(h, 0x846ca68b);
+    h ^= h >>> 16;
+    return h >>> 0;
 }
 
 function valueNoise3D(x: number, y: number, z: number, seedU32: number): number {
-  const xi = Math.floor(x);
-  const yi = Math.floor(y);
-  const zi = Math.floor(z);
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const zi = Math.floor(z);
 
-  const xf = x - xi;
-  const yf = y - yi;
-  const zf = z - zi;
+    const xf = x - xi;
+    const yf = y - yi;
+    const zf = z - zi;
 
-  const u = fade(xf);
-  const v = fade(yf);
-  const w = fade(zf);
+    const u = fade(xf);
+    const v = fade(yf);
+    const w = fade(zf);
 
-  const n000 = hashU32(xi, yi, zi, seedU32) / 4294967295;
-  const n100 = hashU32(xi + 1, yi, zi, seedU32) / 4294967295;
-  const n010 = hashU32(xi, yi + 1, zi, seedU32) / 4294967295;
-  const n110 = hashU32(xi + 1, yi + 1, zi, seedU32) / 4294967295;
+    const n000 = hashU32(xi, yi, zi, seedU32) / 4294967295;
+    const n100 = hashU32(xi + 1, yi, zi, seedU32) / 4294967295;
+    const n010 = hashU32(xi, yi + 1, zi, seedU32) / 4294967295;
+    const n110 = hashU32(xi + 1, yi + 1, zi, seedU32) / 4294967295;
 
-  const n001 = hashU32(xi, yi, zi + 1, seedU32) / 4294967295;
-  const n101 = hashU32(xi + 1, yi, zi + 1, seedU32) / 4294967295;
-  const n011 = hashU32(xi, yi + 1, zi + 1, seedU32) / 4294967295;
-  const n111 = hashU32(xi + 1, yi + 1, zi + 1, seedU32) / 4294967295;
+    const n001 = hashU32(xi, yi, zi + 1, seedU32) / 4294967295;
+    const n101 = hashU32(xi + 1, yi, zi + 1, seedU32) / 4294967295;
+    const n011 = hashU32(xi, yi + 1, zi + 1, seedU32) / 4294967295;
+    const n111 = hashU32(xi + 1, yi + 1, zi + 1, seedU32) / 4294967295;
 
-  const x00 = lerp(n000, n100, u);
-  const x10 = lerp(n010, n110, u);
-  const x01 = lerp(n001, n101, u);
-  const x11 = lerp(n011, n111, u);
+    const x00 = lerp(n000, n100, u);
+    const x10 = lerp(n010, n110, u);
+    const x01 = lerp(n001, n101, u);
+    const x11 = lerp(n011, n111, u);
 
-  const y0 = lerp(x00, x10, v);
-  const y1 = lerp(x01, x11, v);
+    const y0 = lerp(x00, x10, v);
+    const y1 = lerp(x01, x11, v);
 
-  return lerp(y0, y1, w);
+    return lerp(y0, y1, w);
 }
 
 function fbm3D(x: number, y: number, z: number, octaves: number, seedU32: number): number {
-  let sum = 0;
-  let amp = 0.5;
-  let freq = 1;
+    let sum = 0;
+    let amp = 0.5;
+    let freq = 1;
 
-  for (let i = 0; i < octaves; i++) {
-    const nx = x * freq;
-    const ny = y * freq;
-    const nz = z * freq;
-    const n = valueNoise3D(nx, ny, nz, seedU32) * 2 - 1;
-    sum += amp * n;
-    amp *= 0.5;
-    freq *= 2;
-  }
+    for (let i = 0; i < octaves; i++) {
+        const nx = x * freq;
+        const ny = y * freq;
+        const nz = z * freq;
+        const n = valueNoise3D(nx, ny, nz, seedU32) * 2 - 1;
+        sum += amp * n;
+        amp *= 0.5;
+        freq *= 2;
+    }
 
-  return sum;
+    return sum;
 }
 
 function dot(a: Vec3, b: Vec3): number {
-  return a.x * b.x + a.y * b.y + a.z * b.z;
+    return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 function normalizeSafe(v: Vec3): Vec3 {
-  const l = Math.hypot(v.x, v.y, v.z);
-  if (l < 1e-12) return { x: 0, y: 0, z: 1 };
-  return { x: v.x / l, y: v.y / l, z: v.z / l };
+    const l = Math.hypot(v.x, v.y, v.z);
+    if (l < 1e-12) return { x: 0, y: 0, z: 1 };
+    return { x: v.x / l, y: v.y / l, z: v.z / l };
 }
 
 function mix3(a: Vec3, b: Vec3, t: number): Vec3 {
-  return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), z: lerp(a.z, b.z, t) };
+    return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), z: lerp(a.z, b.z, t) };
 }
 
 type DesertMaps = {
-  color: THREE.Texture;
-  normal: THREE.Texture;
+    color: THREE.Texture;
+    normal: THREE.Texture;
 };
 
 const colorCache = new Map<string, THREE.Texture>();
 const normalCache = new Map<string, THREE.Texture>();
 
+const pendingDesertMaps = new Map<string, Promise<DesertMaps>>();
+
+function yieldToEventLoop(): Promise<void> {
+    // setTimeout(0) works everywhere and lets the browser repaint.
+    return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+export type DesertGenerationProgress = {
+    seed: string;
+    phase: 'height' | 'normal';
+    done: number; // number of completed "rows" across both phases
+    total: number; // total rows across both phases
+};
+
+type DesertProgressCallback = (progress: DesertGenerationProgress) => void;
+
 function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
-  const cacheKey = seed.trim();
-  const cachedColor = colorCache.get(cacheKey);
-  const cachedNormal = normalCache.get(cacheKey);
-  if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
+    const cacheKey = seed.trim();
+    const cachedColor = colorCache.get(cacheKey);
+    const cachedNormal = normalCache.get(cacheKey);
+    if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
 
-  const seedU32 = hashStringToU32(cacheKey);
+    const seedU32 = hashStringToU32(cacheKey);
 
-  // Deterministic climate axis:
-  const climateRng = new SeededRandom(`${cacheKey}|climate-axis`);
-  const yaw = climateRng.range(0, Math.PI * 2);
+    // Deterministic climate axis:
+    const climateRng = new SeededRandom(`${cacheKey}|climate-axis`);
+    const yaw = climateRng.range(0, Math.PI * 2);
 
-  const up: Vec3 = { x: 0, y: 1, z: 0 };
-  const north: Vec3 = { x: Math.cos(yaw), y: 0, z: Math.sin(yaw) };
-  const east: Vec3 = { x: -Math.sin(yaw), y: 0, z: Math.cos(yaw) };
+    const up: Vec3 = { x: 0, y: 1, z: 0 };
+    const north: Vec3 = { x: Math.cos(yaw), y: 0, z: Math.sin(yaw) };
+    const east: Vec3 = { x: -Math.sin(yaw), y: 0, z: Math.cos(yaw) };
 
-  // Seeded offsets for noise so deserts vary between planets
-  const ox = climateRng.range(-200, 200);
-  const oy = climateRng.range(-200, 200);
-  const oz = climateRng.range(-200, 200);
+    // Seeded offsets for noise so deserts vary between planets
+    const ox = climateRng.range(-200, 200);
+    const oy = climateRng.range(-200, 200);
+    const oz = climateRng.range(-200, 200);
 
-  const sandColor: Vec3 = { x: 0.86, y: 0.74, z: 0.53 };
-  const darkSand: Vec3 = { x: 0.63, y: 0.52, z: 0.35 };
-  const paleSand: Vec3 = { x: 0.97, y: 0.88, z: 0.65 };
+    const sandColor: Vec3 = { x: 0.86, y: 0.74, z: 0.53 };
+    const darkSand: Vec3 = { x: 0.63, y: 0.52, z: 0.35 };
+    const paleSand: Vec3 = { x: 0.97, y: 0.88, z: 0.65 };
 
-  const rockColor: Vec3 = { x: 0.63, y: 0.6, z: 0.58 };
-  const waterColor: Vec3 = { x: 0.26, y: 0.55, z: 0.6 };
+    const rockColor: Vec3 = { x: 0.63, y: 0.6, z: 0.58 };
+    const waterColor: Vec3 = { x: 0.26, y: 0.55, z: 0.6 };
 
-  const canvas = document.createElement('canvas');
-  canvas.width = INTERNAL_WIDTH;
-  canvas.height = INTERNAL_HEIGHT;
+    const canvas = document.createElement('canvas');
+    canvas.width = INTERNAL_WIDTH;
+    canvas.height = INTERNAL_HEIGHT;
 
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Failed to create desert texture canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to create desert texture canvas');
 
-  const img = ctx.createImageData(INTERNAL_WIDTH, INTERNAL_HEIGHT);
-  const data = img.data;
+    const img = ctx.createImageData(INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    const data = img.data;
 
-  const height = new Float32Array(INTERNAL_WIDTH * INTERNAL_HEIGHT);
+    const height = new Float32Array(INTERNAL_WIDTH * INTERNAL_HEIGHT);
 
-  // Precompute lon for internal x
-  const lonCos = new Float32Array(INTERNAL_WIDTH);
-  const lonSin = new Float32Array(INTERNAL_WIDTH);
-  for (let x = 0; x < INTERNAL_WIDTH; x++) {
-    const u01 = x / Math.max(1, INTERNAL_WIDTH - 1);
-    const lon = u01 * Math.PI * 2;
-    lonCos[x] = Math.cos(lon);
-    lonSin[x] = Math.sin(lon);
-  }
-
-  // Precompute lat sin/cos for internal y.
-  // Use an equal-area latitude mapping (sin(lat) instead of lat) so texture detail
-  // doesn't get visibly “compressed/smeared” near the poles when projected to a sphere.
-  const latSin = new Float32Array(INTERNAL_HEIGHT);
-  const latCos = new Float32Array(INTERNAL_HEIGHT);
-  for (let y = 0; y < INTERNAL_HEIGHT; y++) {
-    const v01 = y / Math.max(1, INTERNAL_HEIGHT - 1);
-    // v01=0 -> +1 (north pole), v01=1 -> -1 (south pole)
-    const sinLat = 1 - 2 * v01;
-    const cosLat = Math.sqrt(Math.max(0, 1 - sinLat * sinLat));
-    latSin[y] = sinLat;
-    latCos[y] = cosLat;
-  }
-
-  // We want uniform deserts (no distinctive “desert poles”), so mask is 1 everywhere.
-  const hotMask = 1.0;
-
-  for (let y = 0; y < INTERNAL_HEIGHT; y++) {
-    const sLat = latSin[y]!;
-    const cLat = latCos[y]!;
-
-    const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
-    const pole01 = Math.abs(v01Pole - 0.5) / 0.5; // 0..1
-    const flatMaskRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
-    const flatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * flatMaskRaw;
-
+    // Precompute lon for internal x
+    const lonCos = new Float32Array(INTERNAL_WIDTH);
+    const lonSin = new Float32Array(INTERNAL_WIDTH);
     for (let x = 0; x < INTERNAL_WIDTH; x++) {
-      const cLon = lonCos[x]!;
-      const sLon = lonSin[x]!;
-
-      // Direction on unit sphere from equirectangular coords.
-      const dx = cLat * cLon;
-      const dy = sLat;
-      const dz = cLat * sLon;
-
-      // Transform direction into climate local frame using dot products.
-      const yLocal = dot({ x: dx, y: dy, z: dz }, up);
-      const xLocal = dot({ x: dx, y: dy, z: dz }, east);
-      const zLocal = dot({ x: dx, y: dy, z: dz }, north);
-
-      // Reduce longitude-driven variation near the poles.
-      // Physical area shrinks near poles; if noise depends strongly on longitude,
-      // the equirectangular mapping can look “smeared”/blurry.
-      const poleFactor = Math.pow(Math.max(0, 1 - Math.abs(yLocal)), 0.65);
-      const xLocalEff = xLocal * poleFactor;
-      const zLocalEff = zLocal * poleFactor;
-
-      const dunesN = fbm3D(
-        xLocalEff * NOISE_DUNE_SCALE + ox,
-        yLocal * NOISE_DUNE_SCALE + oy,
-        zLocalEff * NOISE_DUNE_SCALE + oz,
-        NOISE_DUNE_OCTAVES,
-        seedU32
-      );
-
-      // Suppress detail near poles to avoid polar shading artifacts.
-      const dunesNMasked = dunesN * flatMask;
-
-      const crackN = fbm3D(
-        xLocal * NOISE_CRACK_SCALE + (ox + 1234.56),
-        yLocal * NOISE_CRACK_SCALE + (oy - 234.12),
-        zLocal * NOISE_CRACK_SCALE + (oz + 98.76),
-        NOISE_CRACK_OCTAVES,
-        seedU32
-      );
-      const crackRidged = Math.abs(crackN);
-      const crackMask = hotMask * flatMask * smoothstep(0.55, 0.78, crackRidged);
-
-      const craterN = fbm3D(
-        xLocal * NOISE_CRATER_SCALE + (ox + 999.13),
-        yLocal * NOISE_CRATER_SCALE + (oy - 321.71),
-        zLocal * NOISE_CRATER_SCALE + (oz + 77.77),
-        NOISE_CRATER_OCTAVES,
-        seedU32
-      );
-      const craterRidged = 1 - Math.abs(craterN);
-
-      // Rim band + dark interior from the same ridged signal.
-      const craterInner = smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
-      const craterRimBand =
-        smoothstep(CRATER_RIM_EDGE0, CRATER_RIM_EDGE1, craterRidged) -
-        smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
-
-      const craterMask = hotMask * flatMask * smoothstep(CRATER_MASK_EDGE0, CRATER_MASK_EDGE1, craterRidged);
-
-      // Height drives both normals + some color micro-contrast:
-      // - rim raised
-      // - interior slightly depressed
-      height[y * INTERNAL_WIDTH + x] =
-        dunesNMasked +
-        CRATER_RIM_STRENGTH * craterRimBand * craterMask -
-        CRATER_DEPTH_STRENGTH * craterInner * craterMask +
-        CRACK_STRENGTH * crackRidged * crackMask;
-
-      const dunesRidged = 1 - Math.abs(dunesNMasked);
-      const dunesT = clamp01(0.5 + 0.65 * dunesRidged);
-
-      const oasisN = fbm3D(
-        xLocal * NOISE_OASIS_SCALE + (ox + 777.1),
-        yLocal * NOISE_OASIS_SCALE + (oy - 133.7),
-        zLocal * NOISE_OASIS_SCALE + (oz + 42.5),
-        NOISE_OASIS_OCTAVES,
-        seedU32
-      );
-      const oasisBlob = smoothstep(0.48, 0.78, oasisN * 0.5 + 0.5) * hotMask * flatMask;
-
-      // Color
-      const baseRock = rockColor;
-      let col = mix3(baseRock, sandColor, hotMask);
-
-      const duneLight = mix3(darkSand, paleSand, dunesT);
-      col = mix3(col, duneLight, hotMask * 0.75);
-
-      // Contrast (sandy relief)
-      const contrast = 0.72 + 0.28 * dunesNMasked;
-      col = { x: col.x * contrast, y: col.y * contrast, z: col.z * contrast };
-
-      // Crater coloration:
-      // - darker interior
-      // - slightly lighter rim (like raised impact ejecta)
-      if (craterMask > 0) {
-        const craterDark = mix3(darkSand, rockColor, 0.25);
-        const craterLight = mix3(paleSand, sandColor, 0.35);
-
-        // Rim band gets only a subtle boost to avoid “dark blobs”.
-        col = mix3(col, craterLight, craterRimBand * craterMask * 0.22);
-        col = mix3(col, craterDark, craterInner * craterMask * 0.28);
-      }
-
-      // Crust cracks (thin-ish)
-      if (crackMask > 0) {
-        const crackColor = mix3(darkSand, rockColor, 0.35);
-        col = mix3(col, crackColor, crackMask * 0.25);
-      }
-
-      // Oases (subtle)
-      if (oasisBlob > 0) {
-        const oasisCol = mix3(waterColor, paleSand, 0.15 + 0.25 * dunesT);
-        col = mix3(col, oasisCol, oasisBlob);
-        // Keep halo sandy (not icy/polar)
-        col = mix3(col, sandColor, oasisBlob * 0.7);
-      }
-
-      const r = Math.round(clamp01(col.x) * 255);
-      const g = Math.round(clamp01(col.y) * 255);
-      const b = Math.round(clamp01(col.z) * 255);
-
-      const pIndex = (y * INTERNAL_WIDTH + x) * 4;
-      data[pIndex] = r;
-      data[pIndex + 1] = g;
-      data[pIndex + 2] = b;
-      data[pIndex + 3] = 255;
+        const u01 = x / Math.max(1, INTERNAL_WIDTH - 1);
+        const lon = u01 * Math.PI * 2;
+        lonCos[x] = Math.cos(lon);
+        lonSin[x] = Math.sin(lon);
     }
-  }
 
-  ctx.putImageData(img, 0, 0);
-
-  // Normal map from height (seam-safe because we wrap x)
-  const normalCanvas = document.createElement('canvas');
-  normalCanvas.width = INTERNAL_WIDTH;
-  normalCanvas.height = INTERNAL_HEIGHT;
-
-  const nctx = normalCanvas.getContext('2d');
-  if (!nctx) throw new Error('Failed to create desert normal canvas');
-
-  const nimg = nctx.createImageData(INTERNAL_WIDTH, INTERNAL_HEIGHT);
-  const ndata = nimg.data;
-
-  for (let y = 0; y < INTERNAL_HEIGHT; y++) {
-    const yU = y > 0 ? y - 1 : 0;
-    const yD = y + 1 < INTERNAL_HEIGHT ? y + 1 : INTERNAL_HEIGHT - 1;
-
-    const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
-    const pole01 = Math.abs(v01Pole - 0.5) / 0.5; // 0..1
-    const normalFlatMaskRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
-    const normalFlatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * normalFlatMaskRaw;
-
-    for (let x = 0; x < INTERNAL_WIDTH; x++) {
-      const xL = x > 0 ? x - 1 : INTERNAL_WIDTH - 1;
-      const xR = x + 1 < INTERNAL_WIDTH ? x + 1 : 0;
-
-      const hL = height[y * INTERNAL_WIDTH + xL]!;
-      const hR = height[y * INTERNAL_WIDTH + xR]!;
-      const hU = height[yU * INTERNAL_WIDTH + x]!;
-      const hD = height[yD * INTERNAL_WIDTH + x]!;
-      const dxH = hR - hL;
-      const dyH = hD - hU;
-
-      // Tangent-space normal approximation.
-      const nx = -dxH * NORMAL_STRENGTH * normalFlatMask;
-      const ny = -dyH * NORMAL_STRENGTH * normalFlatMask;
-      const nz = 1.0;
-
-      const n = normalizeSafe({ x: nx, y: ny, z: nz });
-
-      const out = (n.z * 0.5 + 0.5) * 255;
-      const outX = (n.x * 0.5 + 0.5) * 255;
-      // Invert Y (green) to match Three.js normal-map convention for this generated tangent basis.
-      const outY = (1 - (n.y * 0.5 + 0.5)) * 255;
-
-      const i = (y * INTERNAL_WIDTH + x) * 4;
-      ndata[i] = Math.round(outX);
-      ndata[i + 1] = Math.round(outY);
-      ndata[i + 2] = Math.round(out);
-      ndata[i + 3] = 255;
+    // Precompute lat sin/cos for internal y.
+    // Use an equal-area latitude mapping (sin(lat) instead of lat) so texture detail
+    // doesn't get visibly “compressed/smeared” near the poles when projected to a sphere.
+    const latSin = new Float32Array(INTERNAL_HEIGHT);
+    const latCos = new Float32Array(INTERNAL_HEIGHT);
+    for (let y = 0; y < INTERNAL_HEIGHT; y++) {
+        const v01 = y / Math.max(1, INTERNAL_HEIGHT - 1);
+        // v01=0 -> +1 (north pole), v01=1 -> -1 (south pole)
+        const sinLat = 1 - 2 * v01;
+        const cosLat = Math.sqrt(Math.max(0, 1 - sinLat * sinLat));
+        latSin[y] = sinLat;
+        latCos[y] = cosLat;
     }
-  }
 
-  nctx.putImageData(nimg, 0, 0);
+    // We want uniform deserts (no distinctive “desert poles”), so mask is 1 everywhere.
+    const hotMask = 1.0;
 
-  const colorTex = new THREE.CanvasTexture(canvas);
-  colorTex.colorSpace = THREE.SRGBColorSpace;
-  colorTex.wrapS = THREE.RepeatWrapping;
-  colorTex.wrapT = THREE.ClampToEdgeWrapping;
-  colorTex.generateMipmaps = false;
-  colorTex.minFilter = THREE.NearestFilter;
-  colorTex.magFilter = THREE.NearestFilter;
-  colorTex.anisotropy = 16;
-  colorTex.needsUpdate = true;
+        for (let y = 0; y < INTERNAL_HEIGHT; y++) {
+            const sLat = latSin[y]!;
+            const cLat = latCos[y]!;
 
-  const normalTex = new THREE.CanvasTexture(normalCanvas);
-  normalTex.wrapS = THREE.RepeatWrapping;
-  normalTex.wrapT = THREE.ClampToEdgeWrapping;
-  normalTex.generateMipmaps = false;
-  normalTex.minFilter = THREE.LinearFilter;
-  normalTex.magFilter = THREE.LinearFilter;
-  normalTex.anisotropy = 16;
-  normalTex.needsUpdate = true;
+        const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
+        const pole01 = Math.abs(v01Pole - 0.5) / 0.5; // 0..1
+        const flatMaskRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
+        const flatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * flatMaskRaw;
 
-  colorCache.set(cacheKey, colorTex);
-  normalCache.set(cacheKey, normalTex);
+        for (let x = 0; x < INTERNAL_WIDTH; x++) {
+            const cLon = lonCos[x]!;
+            const sLon = lonSin[x]!;
 
-  return { color: colorTex, normal: normalTex };
+            // Direction on unit sphere from equirectangular coords.
+            const dx = cLat * cLon;
+            const dy = sLat;
+            const dz = cLat * sLon;
+
+            // Transform direction into climate local frame using dot products.
+            const yLocal = dot({ x: dx, y: dy, z: dz }, up);
+            const xLocal = dot({ x: dx, y: dy, z: dz }, east);
+            const zLocal = dot({ x: dx, y: dy, z: dz }, north);
+
+            // Reduce longitude-driven variation near the poles.
+            // Physical area shrinks near poles; if noise depends strongly on longitude,
+            // the equirectangular mapping can look “smeared”/blurry.
+            const poleFactor = Math.pow(Math.max(0, 1 - Math.abs(yLocal)), 0.65);
+            const xLocalEff = xLocal * poleFactor;
+            const zLocalEff = zLocal * poleFactor;
+
+            const dunesN = fbm3D(
+                xLocalEff * NOISE_DUNE_SCALE + ox,
+                yLocal * NOISE_DUNE_SCALE + oy,
+                zLocalEff * NOISE_DUNE_SCALE + oz,
+                NOISE_DUNE_OCTAVES,
+                seedU32
+            );
+
+            // Suppress detail near poles to avoid polar shading artifacts.
+            const dunesNMasked = dunesN * flatMask;
+
+            const crackN = fbm3D(
+                xLocal * NOISE_CRACK_SCALE + (ox + 1234.56),
+                yLocal * NOISE_CRACK_SCALE + (oy - 234.12),
+                zLocal * NOISE_CRACK_SCALE + (oz + 98.76),
+                NOISE_CRACK_OCTAVES,
+                seedU32
+            );
+            const crackRidged = Math.abs(crackN);
+            const crackMask = hotMask * flatMask * smoothstep(0.55, 0.78, crackRidged);
+
+            const craterN = fbm3D(
+                xLocal * NOISE_CRATER_SCALE + (ox + 999.13),
+                yLocal * NOISE_CRATER_SCALE + (oy - 321.71),
+                zLocal * NOISE_CRATER_SCALE + (oz + 77.77),
+                NOISE_CRATER_OCTAVES,
+                seedU32
+            );
+            const craterRidged = 1 - Math.abs(craterN);
+
+            // Rim band + dark interior from the same ridged signal.
+            const craterInner = smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
+            const craterRimBand =
+                smoothstep(CRATER_RIM_EDGE0, CRATER_RIM_EDGE1, craterRidged) -
+                smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
+
+            const craterMask = hotMask * flatMask * smoothstep(CRATER_MASK_EDGE0, CRATER_MASK_EDGE1, craterRidged);
+
+            // Height drives both normals + some color micro-contrast:
+            // - rim raised
+            // - interior slightly depressed
+            height[y * INTERNAL_WIDTH + x] =
+                dunesNMasked +
+                CRATER_RIM_STRENGTH * craterRimBand * craterMask -
+                CRATER_DEPTH_STRENGTH * craterInner * craterMask +
+                CRACK_STRENGTH * crackRidged * crackMask;
+
+            const dunesRidged = 1 - Math.abs(dunesNMasked);
+            const dunesT = clamp01(0.5 + 0.65 * dunesRidged);
+
+            const oasisN = fbm3D(
+                xLocal * NOISE_OASIS_SCALE + (ox + 777.1),
+                yLocal * NOISE_OASIS_SCALE + (oy - 133.7),
+                zLocal * NOISE_OASIS_SCALE + (oz + 42.5),
+                NOISE_OASIS_OCTAVES,
+                seedU32
+            );
+            const oasisBlob = smoothstep(0.48, 0.78, oasisN * 0.5 + 0.5) * hotMask * flatMask;
+
+            // Color
+            const baseRock = rockColor;
+            let col = mix3(baseRock, sandColor, hotMask);
+
+            const duneLight = mix3(darkSand, paleSand, dunesT);
+            col = mix3(col, duneLight, hotMask * 0.75);
+
+            // Contrast (sandy relief)
+            const contrast = 0.72 + 0.28 * dunesNMasked;
+            col = { x: col.x * contrast, y: col.y * contrast, z: col.z * contrast };
+
+            // Crater coloration:
+            // - darker interior
+            // - slightly lighter rim (like raised impact ejecta)
+            if (craterMask > 0) {
+                const craterDark = mix3(darkSand, rockColor, 0.25);
+                const craterLight = mix3(paleSand, sandColor, 0.35);
+
+                // Rim band gets only a subtle boost to avoid “dark blobs”.
+                col = mix3(col, craterLight, craterRimBand * craterMask * 0.22);
+                col = mix3(col, craterDark, craterInner * craterMask * 0.28);
+            }
+
+            // Crust cracks (thin-ish)
+            if (crackMask > 0) {
+                const crackColor = mix3(darkSand, rockColor, 0.35);
+                col = mix3(col, crackColor, crackMask * 0.25);
+            }
+
+            // Oases (subtle)
+            if (oasisBlob > 0) {
+                const oasisCol = mix3(waterColor, paleSand, 0.15 + 0.25 * dunesT);
+                col = mix3(col, oasisCol, oasisBlob);
+                // Keep halo sandy (not icy/polar)
+                col = mix3(col, sandColor, oasisBlob * 0.7);
+            }
+
+            const r = Math.round(clamp01(col.x) * 255);
+            const g = Math.round(clamp01(col.y) * 255);
+            const b = Math.round(clamp01(col.z) * 255);
+
+            const pIndex = (y * INTERNAL_WIDTH + x) * 4;
+            data[pIndex] = r;
+            data[pIndex + 1] = g;
+            data[pIndex + 2] = b;
+            data[pIndex + 3] = 255;
+        }
+    }
+
+    ctx.putImageData(img, 0, 0);
+
+    // Normal map from height (seam-safe because we wrap x)
+    const normalCanvas = document.createElement('canvas');
+    normalCanvas.width = INTERNAL_WIDTH;
+    normalCanvas.height = INTERNAL_HEIGHT;
+
+    const nctx = normalCanvas.getContext('2d');
+    if (!nctx) throw new Error('Failed to create desert normal canvas');
+
+    const nimg = nctx.createImageData(INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    const ndata = nimg.data;
+
+    for (let y = 0; y < INTERNAL_HEIGHT; y++) {
+        const yU = y > 0 ? y - 1 : 0;
+        const yD = y + 1 < INTERNAL_HEIGHT ? y + 1 : INTERNAL_HEIGHT - 1;
+
+        const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
+        const pole01 = Math.abs(v01Pole - 0.5) / 0.5; // 0..1
+        const normalFlatMaskRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
+        const normalFlatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * normalFlatMaskRaw;
+
+        for (let x = 0; x < INTERNAL_WIDTH; x++) {
+            const xL = x > 0 ? x - 1 : INTERNAL_WIDTH - 1;
+            const xR = x + 1 < INTERNAL_WIDTH ? x + 1 : 0;
+
+            const hL = height[y * INTERNAL_WIDTH + xL]!;
+            const hR = height[y * INTERNAL_WIDTH + xR]!;
+            const hU = height[yU * INTERNAL_WIDTH + x]!;
+            const hD = height[yD * INTERNAL_WIDTH + x]!;
+            const dxH = hR - hL;
+            const dyH = hD - hU;
+
+            // Tangent-space normal approximation.
+            const nx = -dxH * NORMAL_STRENGTH * normalFlatMask;
+            const ny = -dyH * NORMAL_STRENGTH * normalFlatMask;
+            const nz = 1.0;
+
+            const n = normalizeSafe({ x: nx, y: ny, z: nz });
+
+            const out = (n.z * 0.5 + 0.5) * 255;
+            const outX = (n.x * 0.5 + 0.5) * 255;
+            // Invert Y (green) to match Three.js normal-map convention for this generated tangent basis.
+            const outY = (1 - (n.y * 0.5 + 0.5)) * 255;
+
+            const i = (y * INTERNAL_WIDTH + x) * 4;
+            ndata[i] = Math.round(outX);
+            ndata[i + 1] = Math.round(outY);
+            ndata[i + 2] = Math.round(out);
+            ndata[i + 3] = 255;
+        }
+    }
+
+    nctx.putImageData(nimg, 0, 0);
+
+    const colorTex = new THREE.CanvasTexture(canvas);
+    colorTex.colorSpace = THREE.SRGBColorSpace;
+    colorTex.wrapS = THREE.RepeatWrapping;
+    colorTex.wrapT = THREE.ClampToEdgeWrapping;
+    colorTex.generateMipmaps = false;
+    colorTex.minFilter = THREE.NearestFilter;
+    colorTex.magFilter = THREE.NearestFilter;
+    colorTex.anisotropy = 16;
+    colorTex.needsUpdate = true;
+
+    const normalTex = new THREE.CanvasTexture(normalCanvas);
+    normalTex.wrapS = THREE.RepeatWrapping;
+    normalTex.wrapT = THREE.ClampToEdgeWrapping;
+    normalTex.generateMipmaps = false;
+    normalTex.minFilter = THREE.LinearFilter;
+    normalTex.magFilter = THREE.LinearFilter;
+    normalTex.anisotropy = 16;
+    normalTex.needsUpdate = true;
+
+    colorCache.set(cacheKey, colorTex);
+    normalCache.set(cacheKey, normalTex);
+
+    return { color: colorTex, normal: normalTex };
+}
+
+async function getOrCreateDesertMapsForSeedAsync(
+    seed: string,
+    onProgress?: DesertProgressCallback,
+    signal?: AbortSignal
+): Promise<DesertMaps> {
+    const cacheKey = seed.trim();
+
+    const cachedColor = colorCache.get(cacheKey);
+    const cachedNormal = normalCache.get(cacheKey);
+    if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
+
+    const existing = pendingDesertMaps.get(cacheKey);
+    if (existing) return existing;
+
+    const workPromise = (async (): Promise<DesertMaps> => {
+        const seedU32 = hashStringToU32(cacheKey);
+
+        // Deterministic climate axis:
+        const climateRng = new SeededRandom(`${cacheKey}|climate-axis`);
+        const yaw = climateRng.range(0, Math.PI * 2);
+
+        const up: Vec3 = { x: 0, y: 1, z: 0 };
+        const north: Vec3 = { x: Math.cos(yaw), y: 0, z: Math.sin(yaw) };
+        const east: Vec3 = { x: -Math.sin(yaw), y: 0, z: Math.cos(yaw) };
+
+        // Seeded offsets for noise so deserts vary between planets
+        const ox = climateRng.range(-200, 200);
+        const oy = climateRng.range(-200, 200);
+        const oz = climateRng.range(-200, 200);
+
+        const sandColor: Vec3 = { x: 0.86, y: 0.74, z: 0.53 };
+        const darkSand: Vec3 = { x: 0.63, y: 0.52, z: 0.35 };
+        const paleSand: Vec3 = { x: 0.97, y: 0.88, z: 0.65 };
+
+        const rockColor: Vec3 = { x: 0.63, y: 0.6, z: 0.58 };
+        const waterColor: Vec3 = { x: 0.26, y: 0.55, z: 0.6 };
+
+        const canvas = document.createElement('canvas');
+        canvas.width = INTERNAL_WIDTH;
+        canvas.height = INTERNAL_HEIGHT;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Failed to create desert texture canvas');
+
+        const img = ctx.createImageData(INTERNAL_WIDTH, INTERNAL_HEIGHT);
+        const data = img.data;
+
+        const height = new Float32Array(INTERNAL_WIDTH * INTERNAL_HEIGHT);
+
+        // Precompute lon for internal x
+        const lonCos = new Float32Array(INTERNAL_WIDTH);
+        const lonSin = new Float32Array(INTERNAL_WIDTH);
+        for (let x = 0; x < INTERNAL_WIDTH; x++) {
+            const u01 = x / Math.max(1, INTERNAL_WIDTH - 1);
+            const lon = u01 * Math.PI * 2;
+            lonCos[x] = Math.cos(lon);
+            lonSin[x] = Math.sin(lon);
+        }
+
+        // Precompute lat sin/cos for internal y.
+        const latSin = new Float32Array(INTERNAL_HEIGHT);
+        const latCos = new Float32Array(INTERNAL_HEIGHT);
+        for (let y = 0; y < INTERNAL_HEIGHT; y++) {
+            const v01 = y / Math.max(1, INTERNAL_HEIGHT - 1);
+            const sinLat = 1 - 2 * v01;
+            const cosLat = Math.sqrt(Math.max(0, 1 - sinLat * sinLat));
+            latSin[y] = sinLat;
+            latCos[y] = cosLat;
+        }
+
+        const hotMask = 1.0;
+
+        const ensureNotAborted = () => {
+            if (signal?.aborted) {
+                throw new Error('Desert generation aborted.');
+            }
+        };
+
+        const totalRows = INTERNAL_HEIGHT * 2;
+        let doneRows = 0;
+
+        const YIELD_EVERY_ROWS = 6;
+
+        for (let y = 0; y < INTERNAL_HEIGHT; y++) {
+            ensureNotAborted();
+            const sLat = latSin[y]!;
+            const cLat = latCos[y]!;
+
+            const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
+            const pole01 = Math.abs(v01Pole - 0.5) / 0.5; // 0..1
+            const flatMaskRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
+            const flatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * flatMaskRaw;
+
+            for (let x = 0; x < INTERNAL_WIDTH; x++) {
+                const cLon = lonCos[x]!;
+                const sLon = lonSin[x]!;
+
+                const dx = cLat * cLon;
+                const dy = sLat;
+                const dz = cLat * sLon;
+
+                const yLocal = dot({ x: dx, y: dy, z: dz }, up);
+                const xLocal = dot({ x: dx, y: dy, z: dz }, east);
+                const zLocal = dot({ x: dx, y: dy, z: dz }, north);
+
+                const poleFactor = Math.pow(Math.max(0, 1 - Math.abs(yLocal)), 0.65);
+                const xLocalEff = xLocal * poleFactor;
+                const zLocalEff = zLocal * poleFactor;
+
+                const dunesN = fbm3D(
+                    xLocalEff * NOISE_DUNE_SCALE + ox,
+                    yLocal * NOISE_DUNE_SCALE + oy,
+                    zLocalEff * NOISE_DUNE_SCALE + oz,
+                    NOISE_DUNE_OCTAVES,
+                    seedU32
+                );
+
+                const dunesNMasked = dunesN * flatMask;
+
+                const crackN = fbm3D(
+                    xLocal * NOISE_CRACK_SCALE + (ox + 1234.56),
+                    yLocal * NOISE_CRACK_SCALE + (oy - 234.12),
+                    zLocal * NOISE_CRACK_SCALE + (oz + 98.76),
+                    NOISE_CRACK_OCTAVES,
+                    seedU32
+                );
+                const crackRidged = Math.abs(crackN);
+                const crackMask = hotMask * flatMask * smoothstep(0.55, 0.78, crackRidged);
+
+                const craterN = fbm3D(
+                    xLocal * NOISE_CRATER_SCALE + (ox + 999.13),
+                    yLocal * NOISE_CRATER_SCALE + (oy - 321.71),
+                    zLocal * NOISE_CRATER_SCALE + (oz + 77.77),
+                    NOISE_CRATER_OCTAVES,
+                    seedU32
+                );
+                const craterRidged = 1 - Math.abs(craterN);
+
+                const craterInner = smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
+                const craterRimBand =
+                    smoothstep(CRATER_RIM_EDGE0, CRATER_RIM_EDGE1, craterRidged) -
+                    smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
+
+                const craterMask =
+                    hotMask * flatMask * smoothstep(CRATER_MASK_EDGE0, CRATER_MASK_EDGE1, craterRidged);
+
+                height[y * INTERNAL_WIDTH + x] =
+                    dunesNMasked +
+                    CRATER_RIM_STRENGTH * craterRimBand * craterMask -
+                    CRATER_DEPTH_STRENGTH * craterInner * craterMask +
+                    CRACK_STRENGTH * crackRidged * crackMask;
+
+                const dunesRidged = 1 - Math.abs(dunesNMasked);
+                const dunesT = clamp01(0.5 + 0.65 * dunesRidged);
+
+                const oasisN = fbm3D(
+                    xLocal * NOISE_OASIS_SCALE + (ox + 777.1),
+                    yLocal * NOISE_OASIS_SCALE + (oy - 133.7),
+                    zLocal * NOISE_OASIS_SCALE + (oz + 42.5),
+                    NOISE_OASIS_OCTAVES,
+                    seedU32
+                );
+                const oasisBlob =
+                    smoothstep(0.48, 0.78, oasisN * 0.5 + 0.5) * hotMask * flatMask;
+
+                const baseRock = rockColor;
+                let col = mix3(baseRock, sandColor, hotMask);
+
+                const duneLight = mix3(darkSand, paleSand, dunesT);
+                col = mix3(col, duneLight, hotMask * 0.75);
+
+                const contrast = 0.72 + 0.28 * dunesNMasked;
+                col = { x: col.x * contrast, y: col.y * contrast, z: col.z * contrast };
+
+                if (craterMask > 0) {
+                    const craterDark = mix3(darkSand, rockColor, 0.25);
+                    const craterLight = mix3(paleSand, sandColor, 0.35);
+
+                    col = mix3(col, craterLight, craterRimBand * craterMask * 0.22);
+                    col = mix3(col, craterDark, craterInner * craterMask * 0.28);
+                }
+
+                if (crackMask > 0) {
+                    const crackColor = mix3(darkSand, rockColor, 0.35);
+                    col = mix3(col, crackColor, crackMask * 0.25);
+                }
+
+                if (oasisBlob > 0) {
+                    const oasisCol = mix3(waterColor, paleSand, 0.15 + 0.25 * dunesT);
+                    col = mix3(col, oasisCol, oasisBlob);
+                    col = mix3(col, sandColor, oasisBlob * 0.7);
+                }
+
+                const r = Math.round(clamp01(col.x) * 255);
+                const g = Math.round(clamp01(col.y) * 255);
+                const b = Math.round(clamp01(col.z) * 255);
+
+                const pIndex = (y * INTERNAL_WIDTH + x) * 4;
+                data[pIndex] = r;
+                data[pIndex + 1] = g;
+                data[pIndex + 2] = b;
+                data[pIndex + 3] = 255;
+            }
+
+            doneRows++;
+            if (onProgress) {
+                onProgress({ seed: cacheKey, phase: 'height', done: doneRows, total: totalRows });
+            }
+            if (y % YIELD_EVERY_ROWS === YIELD_EVERY_ROWS - 1) await yieldToEventLoop();
+        }
+
+        ctx.putImageData(img, 0, 0);
+
+        // Normal map from height (seam-safe because we wrap x)
+        const normalCanvas = document.createElement('canvas');
+        normalCanvas.width = INTERNAL_WIDTH;
+        normalCanvas.height = INTERNAL_HEIGHT;
+
+        const nctx = normalCanvas.getContext('2d');
+        if (!nctx) throw new Error('Failed to create desert normal canvas');
+
+        const nimg = nctx.createImageData(INTERNAL_WIDTH, INTERNAL_HEIGHT);
+        const ndata = nimg.data;
+
+        for (let y = 0; y < INTERNAL_HEIGHT; y++) {
+            ensureNotAborted();
+            const yU = y > 0 ? y - 1 : 0;
+            const yD = y + 1 < INTERNAL_HEIGHT ? y + 1 : INTERNAL_HEIGHT - 1;
+
+            const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
+            const pole01 = Math.abs(v01Pole - 0.5) / 0.5; // 0..1
+            const normalFlatMaskRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
+            const normalFlatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * normalFlatMaskRaw;
+
+            for (let x = 0; x < INTERNAL_WIDTH; x++) {
+                const xL = x > 0 ? x - 1 : INTERNAL_WIDTH - 1;
+                const xR = x + 1 < INTERNAL_WIDTH ? x + 1 : 0;
+
+                const hL = height[y * INTERNAL_WIDTH + xL]!;
+                const hR = height[y * INTERNAL_WIDTH + xR]!;
+                const hU = height[yU * INTERNAL_WIDTH + x]!;
+                const hD = height[yD * INTERNAL_WIDTH + x]!;
+                const dxH = hR - hL;
+                const dyH = hD - hU;
+
+                const nx = -dxH * NORMAL_STRENGTH * normalFlatMask;
+                const ny = -dyH * NORMAL_STRENGTH * normalFlatMask;
+                const nz = 1.0;
+
+                const n = normalizeSafe({ x: nx, y: ny, z: nz });
+
+                const out = (n.z * 0.5 + 0.5) * 255;
+                const outX = (n.x * 0.5 + 0.5) * 255;
+                const outY = (1 - (n.y * 0.5 + 0.5)) * 255;
+
+                const i = (y * INTERNAL_WIDTH + x) * 4;
+                ndata[i] = Math.round(outX);
+                ndata[i + 1] = Math.round(outY);
+                ndata[i + 2] = Math.round(out);
+                ndata[i + 3] = 255;
+            }
+
+            doneRows++;
+            if (onProgress) {
+                onProgress({ seed: cacheKey, phase: 'normal', done: doneRows, total: totalRows });
+            }
+            if (y % YIELD_EVERY_ROWS === YIELD_EVERY_ROWS - 1) await yieldToEventLoop();
+        }
+
+        nctx.putImageData(nimg, 0, 0);
+
+        const colorTex = new THREE.CanvasTexture(canvas);
+        colorTex.colorSpace = THREE.SRGBColorSpace;
+        colorTex.wrapS = THREE.RepeatWrapping;
+        colorTex.wrapT = THREE.ClampToEdgeWrapping;
+        colorTex.generateMipmaps = false;
+        colorTex.minFilter = THREE.NearestFilter;
+        colorTex.magFilter = THREE.NearestFilter;
+        colorTex.anisotropy = 16;
+        colorTex.needsUpdate = true;
+
+        const normalTex = new THREE.CanvasTexture(normalCanvas);
+        normalTex.wrapS = THREE.RepeatWrapping;
+        normalTex.wrapT = THREE.ClampToEdgeWrapping;
+        normalTex.generateMipmaps = false;
+        normalTex.minFilter = THREE.LinearFilter;
+        normalTex.magFilter = THREE.LinearFilter;
+        normalTex.anisotropy = 16;
+        normalTex.needsUpdate = true;
+
+        colorCache.set(cacheKey, colorTex);
+        normalCache.set(cacheKey, normalTex);
+
+        return { color: colorTex, normal: normalTex };
+    })();
+
+    pendingDesertMaps.set(cacheKey, workPromise);
+
+    try {
+        const result = await workPromise;
+        return result;
+    } finally {
+        pendingDesertMaps.delete(cacheKey);
+    }
 }
 
 export function getDesertTexture(seed: string): THREE.Texture {
-  return getOrCreateDesertMapsForSeed(seed).color;
+    return getOrCreateDesertMapsForSeed(seed).color;
 }
 
 export function getDesertNormalTexture(seed: string): THREE.Texture {
-  return getOrCreateDesertMapsForSeed(seed).normal;
+    return getOrCreateDesertMapsForSeed(seed).normal;
+}
+
+export async function getDesertTextureAsync(
+    seed: string,
+    onProgress?: (progress: DesertGenerationProgress) => void,
+    options?: { signal?: AbortSignal }
+): Promise<THREE.Texture> {
+    const maps = await getOrCreateDesertMapsForSeedAsync(seed, onProgress, options?.signal);
+    return maps.color;
+}
+
+export async function getDesertNormalTextureAsync(
+    seed: string,
+    onProgress?: (progress: DesertGenerationProgress) => void,
+    options?: { signal?: AbortSignal }
+): Promise<THREE.Texture> {
+    const maps = await getOrCreateDesertMapsForSeedAsync(seed, onProgress, options?.signal);
+    return maps.normal;
 }

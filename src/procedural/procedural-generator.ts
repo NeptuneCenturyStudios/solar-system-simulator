@@ -11,8 +11,16 @@ import { G } from '../utilities/consts';
 import { generateProceduralBodyName } from './body-naming';
 import { createMainSequenceStarFromParams } from './star-factory';
 import { generateProceduralPlanets } from './planet-generator';
-import { createPlanetBodyFromProceduralCreation } from './planet-factory';
+import {
+    createPlanetBodyFromProceduralCreation,
+    createPlanetBodyFromProceduralCreationAsync,
+} from './planet-factory';
 import { generateProceduralMoons } from './moon-generator';
+
+import type {
+    ProceduralGenerationReporter,
+    ProceduralGenerationWorkUnit,
+} from './procedural-generation-progress';
 import { createMoonBodyFromProceduralCreation } from './moon-factory';
 import { generateProceduralAsteroids } from './asteroid-generator';
 import { createAsteroidBodyFromProceduralCreation } from './asteroid-factory';
@@ -376,6 +384,237 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 creation
             );
             bodies.push(asteroidBody);
+        }
+
+        return bodies;
+    }
+
+    async generateSolarSystemAsync(
+        reporter?: ProceduralGenerationReporter,
+        options?: { signal?: AbortSignal }
+    ): Promise<Body[]> {
+        const signal = options?.signal;
+
+        const ensureNotAborted = () => {
+            if (signal?.aborted) {
+                throw new Error('Procedural generation aborted.');
+            }
+        };
+
+        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+        const inventory = generateSystemBodyInventory(this.prng);
+
+        const starEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Star);
+        const starCount = starEntry?.count ?? 1;
+
+        const planetEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Planet);
+        const planetCount = planetEntry?.count ?? 0;
+
+        const asteroidEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Asteroid);
+        const asteroidCount = asteroidEntry?.count ?? 0;
+
+        ensureNotAborted();
+
+        const starParams = Array.from({ length: starCount }, (_, i) =>
+            randomStarParams({ seed: deriveSubSeed(this.masterSeed, i) })
+        );
+
+        const masses = starParams.map((p) => p.mass) as number[];
+
+        // Place stars according to deterministic per-system + per-star RNG streams.
+        let placements!: StarPlacement[];
+        if (starCount === 1) {
+            placements = [{ pos: new THREE.Vector3(0, 0, 0), vel: new THREE.Vector3(0, 0, 0) }];
+        } else if (starCount === 2) {
+            const rMax = Math.max(starParams[0].radius, starParams[1].radius);
+            const sepMin = Math.max((starParams[0].radius + starParams[1].radius) * 2, rMax * 10);
+            const sepMax = sepMin * 50;
+
+            const separationDistance = rngFor(this.masterSeed, 'binarySeparation', 0).range(sepMin, sepMax);
+            const yawRad = rngFor(this.masterSeed, 'binaryYaw', 0).range(0, Math.PI * 2);
+            const inclinationDeg = rngFor(this.masterSeed, 'binaryInclination', 0).range(5, 85);
+            const inclinationRad = (inclinationDeg * Math.PI) / 180;
+
+            placements = generateBinaryPlacements(masses as [number, number], separationDistance, yawRad, inclinationRad);
+        } else {
+            const radii = starParams.map((p) => p.radius) as [number, number, number];
+
+            const yawRad = rngFor(this.masterSeed, 'tripleYaw', 0).range(0, Math.PI * 2);
+            const inclinationDeg = rngFor(this.masterSeed, 'tripleInclination', 0).range(5, 85);
+            const inclinationRad = (inclinationDeg * Math.PI) / 180;
+
+            placements = generateTriplePlacements(
+                masses as [number, number, number],
+                radii,
+                yawRad,
+                inclinationRad,
+                this.masterSeed
+            );
+        }
+
+        // Precompute creation descriptors so total can be set before any bodies are instantiated.
+        const planetCreations = generateProceduralPlanets({
+            dependencies: this.dependencies,
+            masterSeed: this.masterSeed,
+            planetCount,
+            starParams,
+            starPlacements: placements,
+        });
+
+        const moonCreations = generateProceduralMoons({
+            dependencies: this.dependencies,
+            masterSeed: this.masterSeed,
+            planetCreations,
+        });
+
+        const asteroidCreations = generateProceduralAsteroids({
+            dependencies: this.dependencies,
+            masterSeed: this.masterSeed,
+            asteroidCount,
+            starParams,
+            starPlacements: placements,
+        });
+
+        const totalBodies = starCount + planetCreations.length + moonCreations.length + asteroidCreations.length;
+
+        reporter?.setTotal(totalBodies);
+
+        const bodies: Body[] = [];
+        let completed = 0;
+
+        const report = (workUnit?: ProceduralGenerationWorkUnit) => {
+            reporter?.report({
+                completed,
+                total: totalBodies,
+                workUnit,
+            });
+        };
+
+        // Stars
+        const sharedStarNameSeed =
+            starCount > 1 ? `${this.masterSeed}|star-name-base` : `${this.masterSeed}|star-name-base|single`;
+
+        for (let i = 0; i < starCount; i++) {
+            ensureNotAborted();
+
+            const params = starParams[i];
+            const placement = placements[i];
+
+            const rotation = {
+                tilt: Number.isFinite(params.rotationTilt) ? params.rotationTilt : 0,
+                speed: Number.isFinite(params.rotationSpeed) && params.rotationSpeed > 0 ? params.rotationSpeed : 0.08,
+            };
+
+            bodies.push(
+                createStarBody(
+                    this.dependencies,
+                    this.scene,
+                    params,
+                    i,
+                    placement.pos,
+                    placement.vel,
+                    rotation,
+                    starCount,
+                    sharedStarNameSeed
+                )
+            );
+
+            completed++;
+            report({ phase: 'stars', label: `Stars: ${completed}/${totalBodies}` });
+            await yieldToEventLoop();
+        }
+
+        // Planets (async for desert textures)
+        const planetBodies: Body[] = [];
+        for (let i = 0; i < planetCreations.length; i++) {
+            ensureNotAborted();
+            const creation = planetCreations[i]!;
+            const planetIndexLabel = `Planet ${i + 1}/${planetCreations.length}`;
+
+            // Update the label immediately when we *start* a planet so the UI doesn't
+            // keep showing the last completed phase (e.g. "Stars: 1 / N") while we
+            // are blocked inside desert texture generation.
+            reporter?.report({
+                completed,
+                total: totalBodies,
+                workUnit: {
+                    phase: 'planets',
+                    label: `${planetIndexLabel}… (generating textures)`,
+                },
+            });
+
+            // Desert textures are generated asynchronously/yielding internally,
+            // but we don't need to spam the UI with texture phase/row progress.
+            const onDesertProgress = () => {};
+
+            const planetBody = await createPlanetBodyFromProceduralCreationAsync(
+                this.dependencies,
+                this.scene,
+                creation,
+                { onDesertProgress, signal }
+            );
+
+            planetBodies.push(planetBody);
+            bodies.push(planetBody);
+
+            completed++;
+            reporter?.report({
+                completed,
+                total: totalBodies,
+                workUnit: { phase: 'planets', label: `${planetIndexLabel} ✓` },
+            });
+            await yieldToEventLoop();
+        }
+
+        // Moons
+        for (let i = 0; i < moonCreations.length; i++) {
+            ensureNotAborted();
+            const creation = moonCreations[i]!;
+            const parentBody = planetBodies[creation.parentIndex] as Body | undefined;
+            const parentCelestial = parentBody as unknown as CelestialBody;
+
+            if (!parentCelestial || parentCelestial._isDisposed) continue;
+
+            const moonBody = createMoonBodyFromProceduralCreation({
+                dependencies: this.dependencies,
+                scene: this.scene,
+                creation,
+                parent: parentCelestial,
+            });
+
+            bodies.push(moonBody);
+
+            completed++;
+            reporter?.report({
+                completed,
+                total: totalBodies,
+                workUnit: { phase: 'moons', label: `Moon: ${i + 1}/${moonCreations.length} ✓` },
+            });
+
+            if (i % 2 === 1) await yieldToEventLoop();
+        }
+
+        // Asteroids
+        for (let i = 0; i < asteroidCreations.length; i++) {
+            ensureNotAborted();
+
+            const creation = asteroidCreations[i]!;
+            const asteroidBody = createAsteroidBodyFromProceduralCreation(
+                this.dependencies,
+                this.scene,
+                creation
+            );
+            bodies.push(asteroidBody);
+
+            completed++;
+            reporter?.report({
+                completed,
+                total: totalBodies,
+                workUnit: { phase: 'asteroids', label: `Asteroid: ${i + 1}/${asteroidCreations.length} ✓` },
+            });
+
+            if (i % 2 === 1) await yieldToEventLoop();
         }
 
         return bodies;

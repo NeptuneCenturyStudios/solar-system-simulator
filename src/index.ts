@@ -1310,7 +1310,7 @@ function createPresetBody(presetKey: string) {
                 name: 'Moon',
                 moonType: MoonTypeEnum.Terrestrial,
                 trailColor: 0xffffff,
-                maxTrail: 1500
+                maxTrail: 1500,
             });
             break;
         }
@@ -1889,7 +1889,7 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     }
 }
 
-function spawn({
+async function spawn({
     mode = SimulationStartMode.Default,
     seed,
 }: {
@@ -2033,16 +2033,111 @@ function spawn({
         return;
     }
 
+    // Procedural generation (async + progress reporting)
     if (mode === SimulationStartMode.Procedural) {
-        const bodies = generator?.generateSolarSystem() ?? [];
-        simulationState.bodies = bodies;
-        syncAllStarLightTargets();
+        // Keep the solar system empty until generation finishes.
+        simulationState.bodies = [];
         selectedBody = null;
+        manuallySelectedBody = null;
 
-        // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
-        // immediately without requiring the user to toggle the checkbox.
-        const shadowCheckboxForSpawn = document.getElementById('enableShadows') as HTMLInputElement;
-        toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
+        const abortController = new AbortController();
+        const abortSignal = abortController.signal;
+
+        // Ensure procedural overlay + progress UI are owned by StartupModal.
+        startupModal.openProceduralOverlayForGeneration();
+        startupModal.showProceduralProgressUI();
+        startupModal.setProceduralInputsLocked(true);
+
+        // Guard against out-of-order completion when user resets/spawns again.
+        // (We store the counter on window to avoid needing module-scope vars in this huge file.)
+        const runIdKey = '__procRunId__';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const w = window as any;
+        w[runIdKey] = (w[runIdKey] ?? 0) + 1;
+        const runId = w[runIdKey] as number;
+
+        const gen = generator;
+
+        const onProceduralCancel = () => {
+            // UI: lock progress status to "Canceling" immediately
+            startupModal.markProceduralCancelRequested();
+            abortController.abort();
+        };
+
+        // Index.ts owns cancellation (abort); UI is owned by startupModal.
+        startupModal.on('proceduralCancel', onProceduralCancel);
+
+        const reporter = {
+            setTotal: (total: number) => {
+                if (runId !== w[runIdKey]) return;
+                startupModal.setProceduralProgressTotal(total);
+            },
+            report: (p: { completed: number; total: number; workUnit?: { label?: string } }) => {
+                if (runId !== w[runIdKey]) return;
+                startupModal.reportProceduralProgress(p.completed, p.total, p.workUnit?.label);
+            },
+        };
+
+        try {
+            const bodies = gen
+                ? await gen.generateSolarSystemAsync(reporter, { signal: abortSignal })
+                : [];
+
+            if (runId !== w[runIdKey]) return; // stale completion
+            if (abortSignal.aborted) return;
+
+            simulationState.bodies = bodies;
+            syncAllStarLightTargets();
+            selectedBody = null;
+            manuallySelectedBody = null;
+
+            // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
+            // immediately without requiring the user to toggle the checkbox.
+            const shadowCheckboxForSpawn = document.getElementById(
+                'enableShadows'
+            ) as HTMLInputElement;
+            toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
+
+            // Refresh UI now that bodies exist
+            try {
+                uiManager.managementPanel?.setSelectedBody?.(null);
+                gizmo.attach(null);
+                refreshBodiesTable();
+                flightHUD.forceHintRefresh();
+            } catch {
+                // Empty
+            }
+
+            // Success path: hide procedural overlay, keep simulation running.
+            startupModal.setProceduralInputsLocked(false);
+            startupModal.hideProceduralOverlay();
+        } catch (e) {
+            if (runId !== w[runIdKey]) return;
+
+            const wasCanceled = abortSignal.aborted;
+
+            if (!wasCanceled) {
+                console.error('[procedural] generation failed:', e);
+            }
+
+            // Keep bodies empty on error/abort
+            simulationState.bodies = [];
+
+            startupModal.setProceduralInputsLocked(false);
+
+            if (wasCanceled) {
+                // Return to Launch Control only after the async generation has fully unwound.
+                startupModal.closeProceduralModalToStartup();
+            } else {
+                // Non-cancel failure: keep procedural overlay open so user can retry.
+                startupModal.setProceduralProgressStatusText('Generation failed.');
+                startupModal.setProceduralProgressErrorVisible(true);
+                startupModal.showProceduralSeedSectionForRetry();
+            }
+        } finally {
+            // Ensure cancel handler doesn't leak into subsequent runs.
+            startupModal.off('proceduralCancel', onProceduralCancel);
+        }
 
         return;
     }
@@ -6390,31 +6485,31 @@ function applyStartupGMultiplier() {
     if (mpDisplay) mpDisplay.textContent = gMult.toFixed(gMult < 10 ? 2 : 0);
 }
 
-startupModal.on('launchDefault', () => {
+startupModal.on('launchDefault', async () => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
-    spawn({ mode: SimulationStartMode.Default });
+    await spawn({ mode: SimulationStartMode.Default });
     applyDefaultCameraTogglesAfterSpawn();
 });
 
-startupModal.on('launchEmpty', () => {
+startupModal.on('launchEmpty', async () => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
-    spawn({ mode: SimulationStartMode.Empty });
+    await spawn({ mode: SimulationStartMode.Empty });
     applyDefaultCameraTogglesAfterSpawn();
 });
 
-startupModal.on('launchBlackHole', () => {
+startupModal.on('launchBlackHole', async () => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
-    spawn({ mode: SimulationStartMode.BlackHole });
+    await spawn({ mode: SimulationStartMode.BlackHole });
     applyDefaultCameraTogglesAfterSpawn();
 });
 
-startupModal.on('generateProcedural', ({ seed }: { seed: string }) => {
+startupModal.on('generateProcedural', async ({ seed }: { seed: string }) => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
 
@@ -6424,7 +6519,7 @@ startupModal.on('generateProcedural', ({ seed }: { seed: string }) => {
     const proceduralOverlay = document.getElementById('procedural-overlay');
     proceduralOverlay?.classList.remove('visible');
 
-    spawn({ mode: SimulationStartMode.Procedural, seed });
+    await spawn({ mode: SimulationStartMode.Procedural, seed });
     applyDefaultCameraTogglesAfterSpawn();
 });
 
