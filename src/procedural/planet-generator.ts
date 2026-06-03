@@ -1,15 +1,14 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utilities/prng';
 import { EARTH_DIST } from '../utilities/consts';
-import { BodyTypeEnum } from '../utilities/utilities';
 import type { StarParams } from '../utilities/body-params';
-import { PlanetTypeEnum } from '../utilities/body-params';
 import { generateProceduralBodyName } from './body-naming';
 import type { ProceduralPlanetCreation } from './planet-factory';
 import { PlanetBodyType, ProceduralPlanetSubtype } from './planet-factory';
 import { randomPlanetParams } from '../utilities/body-params';
 import { calculateOrbitalSpeed } from '../physics/physics';
 import { IStateDependencies } from '../interfaces';
+import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 
 type StarPlacement = {
     pos: THREE.Vector3;

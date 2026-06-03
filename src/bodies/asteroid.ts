@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { CelestialBody } from './celestial-body';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
-import { BodyTypeEnum } from '../utilities/utilities.js';
 import { IStateDependencies } from '../interfaces.js';
+import { BodyTypeEnum } from './body-enums';
 
 export interface IAsteroidOptions {
     pos: THREE.Vector3 | number[];

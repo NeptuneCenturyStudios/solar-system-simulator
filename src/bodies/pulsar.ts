@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import { Star, IStarCreationOptions } from './star';
 import { IStateDependencies, ISiphonTarget, IMassTransferBody } from '../interfaces';
 import { loadSrgbTexture } from '../drawing/textures';
-import { BodyTypeEnum } from '../utilities/utilities';
-import { IRotation } from '../physics/physics';
+import { IRotation } from '../interfaces';
 import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, DIST_SCALE } from '../utilities/consts';
 import { PulsarBeam } from '../effects/pulsar-beam';
 import { StarGlow } from '../effects/star-glow';
@@ -12,6 +11,7 @@ import { PulsarMagneticField } from '../effects/pulsar-magnetic-field';
 import { MassSiphonEffect } from '../effects/mass-siphon';
 import { IPipelineFeedEffect } from '../effects/effect-base';
 import { NotificationType } from '../event-log/event-log';
+import { BodyTypeEnum } from './body-enums';
 
 /**
  * Base radius constant used in the neutron-star mass-to-radius formula.

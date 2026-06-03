@@ -13,7 +13,7 @@ import {
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
-import { PlanetTypeEnum } from '../utilities/body-params';
+import { PlanetTypeEnum } from './body-enums.js';
 
 /**
  * Represents the planet Jupiter in the simulation, including its texture and orbital properties.

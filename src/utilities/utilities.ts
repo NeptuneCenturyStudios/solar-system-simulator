@@ -1,26 +1,12 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { calculateTrajectory } from '../physics/physics';
-import { CelestialBody, ISatelliteBasicCreationOptions } from '../bodies/celestial-body';
+import { CelestialBody } from '../bodies/celestial-body';
 import { ISS } from '../bodies/iss';
+import { BodyTypeEnum } from '../bodies/body-enums';
+import { ISatelliteBasicCreationOptions } from '../interfaces';
 
-export enum BodyTypeEnum {
-    None = 0,
-    Star = 1 << 0,
-    Planet = 1 << 1,
-    Moon = 1 << 2,
-    Asteroid = 1 << 3,
-    Comet = 1 << 4,
-    BlackHole = 1 << 5,
-    GasGiant = 1 << 6,
-    IceGiant = 1 << 7,
-    DwarfPlanet = 1 << 8,
-    WhiteDwarf = 1 << 9,
-    SpaceShip = 1 << 10,
-    BrownDwarf = 1 << 11,
-    Pulsar = 1 << 12,
-    Satellite = 1 << 13,
-}
+
 
 // Shared body-type helper. Checks bodyType flags only.
 export function isBodyType(body: Body, type: BodyTypeEnum) {

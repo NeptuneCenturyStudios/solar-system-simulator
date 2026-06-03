@@ -3,7 +3,7 @@ import { Star, IStarCreationOptions } from './star';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { loadSrgbTexture } from '../drawing/textures';
-import { BodyTypeEnum, createUniqueId } from '../utilities/utilities';
+import { createUniqueId } from '../utilities/utilities';
 import {
     SCALE_FACTOR,
     PLUTO_DIST,
@@ -22,6 +22,7 @@ import { triggerScreenFlash } from '../effects/screen-flash';
 import { Corona } from '../effects/corona';
 import { StarGlow } from '../effects/star-glow';
 import { StarBirth } from '../effects/star-birth';
+import { BodyTypeEnum } from './body-enums';
 
 export class MainSequenceStar extends Star {
     fuel: number | null;

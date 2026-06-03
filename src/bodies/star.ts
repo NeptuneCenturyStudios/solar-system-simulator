@@ -6,10 +6,11 @@ import {
     STAR_LIGHT_INTENSITY_MIN,
     STAR_LIGHT_INTENSITY_MAX,
 } from '../utilities/consts';
-import { BodyTypeEnum, isBodyType } from '../utilities/utilities';
-import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
+import { isBodyType } from '../utilities/utilities';
+import { CelestialBody } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
-import { IStateDependencies } from '../interfaces';
+import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces';
+import { BodyTypeEnum } from './body-enums';
 
 /**
  * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.

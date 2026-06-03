@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { SCALE_FACTOR, SUN_MASS, EARTH_DIST } from '../utilities/consts.js';
-import { BodyTypeEnum } from '../utilities/utilities.js';
 import { CelestialBody } from './celestial-body';
-import { IRotation } from '../physics/physics.js';
+import { IRotation } from '../interfaces';
 import { IStateDependencies, ISiphonTarget, IMassTransferBody } from '../interfaces.js';
 import { IPipelineFeedEffect } from '../effects/effect-base.js';
 import { MassSiphonEffect } from '../effects/mass-siphon.js';
 import { AccretionDiskEffect, BLACK_HOLE_DISK_COLORS } from '../effects/accretion-disk.js';
 import { BlackHoleJetEffect } from '../effects/black-hole-jet.js';
 import { NotificationType } from '../event-log/event-log.js';
+import { BodyTypeEnum } from './body-enums.js';
 
 /** Multiplier for the gravitational mass-transfer formula. Tune to taste. */
 const SIPHON_MASS_TRANSFER_SCALE = 0.0001;

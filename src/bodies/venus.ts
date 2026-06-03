@@ -14,7 +14,7 @@ import { createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
-import { PlanetTypeEnum } from '../utilities/body-params.js';
+import { PlanetTypeEnum } from './body-enums.js';
 
 const venusTexture = loadSrgbTexture('./assets/textures/venus.jpg');
 const venusAtmosphereTexture = loadSrgbTexture('./assets/textures/venus_atmosphere.jpg');

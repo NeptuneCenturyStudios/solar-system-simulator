@@ -8,15 +8,7 @@ import { CelestialBody } from '../bodies/celestial-body';
 import { Spaceship } from '../bodies/spaceship';
 import { NotificationType } from '../event-log/event-log';
 
-/**
- * Represents the rotation of a body in 3D space
- */
-export interface IRotation {
-    // axis: THREE.Vector3;
-    tilt: number; // in degrees
-    speed: number; // in degrees per second
-    azimuth?: number; // in degrees — rotates the tilt direction around the world Y axis (default 0)
-}
+
 
 /**
  * Represents the state of the physics simulation, including all bodies, explosions, and simulation parameters.

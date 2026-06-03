@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import type { IStateDependencies } from '../interfaces';
 import { SeededRandom } from '../utilities/prng';
 import { calculateTrajectory } from '../physics/physics';
-import { BodyTypeEnum } from '../utilities/utilities';
-import { PlanetTypeEnum, MoonTypeEnum, randomMoonParams } from '../utilities/body-params';
+import { randomMoonParams } from '../utilities/body-params';
 import { generateProceduralBodyName } from './body-naming';
 import type { ProceduralPlanetCreation } from './planet-factory';
+import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 
 export type ProceduralMoonCreation = {
     id: string;

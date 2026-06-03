@@ -106,7 +106,6 @@ import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
     isBodyType,
     createUniqueId,
-    BodyTypeEnum,
     generateIAUName,
     getBodyTypeLabel,
 } from './utilities/utilities';
@@ -125,8 +124,6 @@ import {
     randomMoonParams,
     randomCometParams,
     randomAsteroidParams,
-    PlanetTypeEnum,
-    MoonTypeEnum,
 } from './utilities/body-params';
 import {
     loadSrgbTexture,
@@ -284,6 +281,7 @@ import { createFPSTexture, createSpeedTexture, createStatsTexture } from './draw
 import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { ProceduralGenerator } from './procedural/procedural-generator';
 import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
+import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: { message: string; notificationType: NotificationType }) {
@@ -1296,7 +1294,7 @@ function createPresetBody(presetKey: string) {
                 mass: MOON_MASS,
                 id: createUniqueId('moon'),
                 name: 'Moon',
-                moonType: MoonTypeEnum.Temperate,
+                moonType: MoonTypeEnum.Terrestrial,
                 trailColor: 0xffffff,
                 maxTrail: 1500,
             });

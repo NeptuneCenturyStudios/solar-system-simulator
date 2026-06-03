@@ -5,7 +5,6 @@ import { generateSystemBodyInventory } from './system-body-inventory-generator';
 import { randomStarParams, type StarParams } from '../utilities/body-params';
 import type { Body } from '../bodies/body';
 import type { CelestialBody } from '../bodies/celestial-body';
-import { BodyTypeEnum } from '../utilities/utilities';
 import type { IStateDependencies } from '../interfaces';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { G } from '../utilities/consts';
@@ -17,6 +16,7 @@ import { generateProceduralMoons } from './moon-generator';
 import { createMoonBodyFromProceduralCreation } from './moon-factory';
 import { generateProceduralAsteroids } from './asteroid-generator';
 import { createAsteroidBodyFromProceduralCreation } from './asteroid-factory';
+import { BodyTypeEnum } from '../bodies/body-enums';
 
 type StarPlacement = {
     pos: THREE.Vector3;

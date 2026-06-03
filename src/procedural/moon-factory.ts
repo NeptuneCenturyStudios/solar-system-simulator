@@ -10,7 +10,7 @@ import {
     fictionalDesertTexture,
 } from '../drawing/textures';
 import type { ProceduralMoonCreation } from './moon-generator';
-import { MoonTypeEnum } from '../utilities/body-params';
+import { MoonTypeEnum } from '../bodies/body-enums';
 
 function pickMoonTextureForMoonType(
     moonType: MoonTypeEnum,

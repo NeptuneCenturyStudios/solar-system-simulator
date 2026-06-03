@@ -1,14 +1,7 @@
 import * as THREE from 'three';
-import { createTextTexture } from '../drawing/text-rendering.js';
-import { BodyTypeEnum } from '../utilities/utilities.js';
+import { createTextTexture } from '../drawing/text-texture.js';
+import { BodyTypeEnum } from './body-enums.js';
 import { HP_MASS_MULTIPLIER } from '../utilities/consts.js';
-
-export interface IBodyCreationOptions {
-    mass: number;
-    radius: number;
-    id: string;
-    name: string;
-}
 
 /**
  * This class represents the basic body that has gravitational properties, update, and die methods.

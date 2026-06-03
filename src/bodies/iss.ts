@@ -2,18 +2,12 @@ import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { SCALE_FACTOR, ISS_RADIUS } from '../utilities/consts.js';
-import { ICelestialBodyCreationOptions, ITidalLockOptions } from './celestial-body';
-import { IStateDependencies } from '../interfaces';
+import { ISatelliteCreationOptions, IStateDependencies } from '../interfaces';
 import { Satellite } from './satellite.js';
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
 
-export interface ISatelliteCreationOptions extends ICelestialBodyCreationOptions {
-    angle: number;
-    yVariation: number;
-    distance: number;
-    tidalLock: ITidalLockOptions;
-}
+
 
 /**
  * ISS

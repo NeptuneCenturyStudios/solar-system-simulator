@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Body } from '../bodies/body';
 import { BlackHole } from '../bodies/black-hole';
-import { isBodyType, BodyTypeEnum } from '../utilities/utilities';
+import { isBodyType } from '../utilities/utilities';
 import { UIManager } from '../ui/ui-manager';
 import { FlightHUD } from '../drawing/flight-hud';
+import { BodyTypeEnum } from '../bodies/body-enums';
 
 export interface SurfaceCameraState {
     isActive: boolean;

@@ -1,10 +1,10 @@
 import { Star } from './star';
 import { IStateDependencies } from '../interfaces';
 import { loadSrgbTexture } from '../drawing/textures';
-import { BodyTypeEnum } from '../utilities/utilities';
-import { IRotation } from '../physics/physics';
+import { IRotation } from '../interfaces';
 import * as THREE from 'three';
 import { EARTH_RADIUS, SUN_MASS } from '../utilities/consts';
+import { BodyTypeEnum } from './body-enums';
 
 const WHITE_DWARF_RADIUS = EARTH_RADIUS;
 

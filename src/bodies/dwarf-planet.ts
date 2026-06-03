@@ -1,9 +1,7 @@
 import * as THREE from 'three';
-import { IStateDependencies } from '../interfaces';
-import { PlanetTypeEnum } from '../utilities/body-params';
+import { IPlanetCreationOptions, IStateDependencies } from '../interfaces';
 import { CelestialBody } from './celestial-body';
-import { BodyTypeEnum } from '../utilities/utilities';
-import { IPlanetCreationOptions } from './planet';
+import { BodyTypeEnum, PlanetTypeEnum } from './body-enums';
 
 /**
  * Planet class representing a planet in the solar system simulator.

@@ -1,13 +1,7 @@
 import * as THREE from 'three';
-import { IStateDependencies } from '../interfaces';
-import { PlanetTypeEnum } from '../utilities/body-params';
-import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
-import { BodyTypeEnum } from '../utilities/utilities';
-
-export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {
-    hasRings?: boolean;
-    bodySubtype: PlanetTypeEnum;
-}
+import { IPlanetCreationOptions, IStateDependencies } from '../interfaces';
+import { CelestialBody } from './celestial-body';
+import { BodyTypeEnum, PlanetTypeEnum } from './body-enums';
 
 /**
  * Planet class representing a planet in the solar system simulator.
@@ -21,26 +15,24 @@ export class Planet extends CelestialBody {
         scene: THREE.Scene,
         options: IPlanetCreationOptions
     ) {
-        {
-            super(
-                dependencies,
-                scene,
-                options.radius,
-                0xffffff,
-                options.pos,
-                options.vel,
-                options.mass,
-                options.id,
-                options.name,
-                BodyTypeEnum.Planet,
-                options.trailColor ?? 0xffffff,
-                options.maxTrail ?? 500,
-                options.hasRings ?? false,
-                options.rotation,
-                options.mesh
-            );
+        super(
+            dependencies,
+            scene,
+            options.radius,
+            0xffffff,
+            options.pos,
+            options.vel,
+            options.mass,
+            options.id,
+            options.name,
+            BodyTypeEnum.Planet,
+            options.trailColor ?? 0xffffff,
+            options.maxTrail ?? 500,
+            options.hasRings ?? false,
+            options.rotation,
+            options.mesh
+        );
 
-            this.planetType = options.bodySubtype;
-        }
+        this.planetType = options.bodySubtype;
     }
 }

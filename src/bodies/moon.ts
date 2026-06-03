@@ -1,9 +1,8 @@
 import * as THREE from 'three';
-import type { IStateDependencies } from '../interfaces';
-import type { ICelestialBodyCreationOptions, ITidalLockOptions } from './celestial-body';
+import type { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces';
+import type { ITidalLockOptions } from './celestial-body';
 import { CelestialBody } from './celestial-body';
-import { BodyTypeEnum } from '../utilities/utilities';
-import type { MoonTypeEnum } from '../utilities/body-params';
+import { BodyTypeEnum, MoonTypeEnum } from './body-enums';
 
 export interface IMoonCreationOptions extends ICelestialBodyCreationOptions {
     distance: number;

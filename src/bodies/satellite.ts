@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 
-import { IStateDependencies } from "../interfaces";
+import { ISatelliteCreationOptions, IStateDependencies } from "../interfaces";
 import { CelestialBody } from './celestial-body';
-import { ISatelliteCreationOptions } from './iss';
-import { BodyTypeEnum } from '../utilities/utilities';
+import { BodyTypeEnum } from './body-enums';
 
 export class Satellite extends CelestialBody {
     constructor(

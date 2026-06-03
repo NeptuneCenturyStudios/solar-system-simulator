@@ -5,6 +5,8 @@
  * No THREE imports, no scene references — only numbers in, numbers out.
  * Shared between the `createNewBody` interactive flow and the preset spawn modes.
  */
+import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
+import { blackHoleMassToEventHorizonRadius } from '../engine/core';
 import {
     SCALE_FACTOR,
     SUN_MASS,
@@ -35,9 +37,8 @@ import {
     URANUS_RADIUS,
     NEPTUNE_RADIUS,
 } from './consts';
-import { BlackHole } from '../bodies/black-hole';
 import { SeededRandom } from './prng';
-import { BodyTypeEnum } from './utilities';
+
 
 // ---------------------------------------------------------------------------
 // Star
@@ -208,38 +209,12 @@ export function randomBlackHoleParams(
     const radius =
         typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
             ? opts.radius
-            : BlackHole.massToEventHorizonRadius(mass);
+            : blackHoleMassToEventHorizonRadius(mass);
 
     return { mass, radius };
 }
 
-// ---------------------------------------------------------------------------
-// Planet
-// ---------------------------------------------------------------------------
-export enum PlanetTypeEnum {
-    Terrestrial = 'solid',
-    GasGiant = 'gas_giant',
-    IceGiant = 'ice_giant',
-    Volcanic = 'volcanic',
-    Ocean = 'ocean',
-    Frozen = 'frozen',
-    Desert = 'desert',
-    Temperate = 'temperate',
-}
 
-/**
- * MoonTypeEnum mirrors the "solid-like" planet subtypes, but intentionally excludes
- * gas/ice giant categories. This lets procedural moons pick planet-like textures
- * (ocean/desert/frozen/volcanic/terrestrial/temperate) without ever needing gas/ice moon textures.
- */
-export enum MoonTypeEnum {
-    Terrestrial = 'solid',
-    Temperate = 'temperate',
-    Volcanic = 'volcanic',
-    Ocean = 'ocean',
-    Frozen = 'frozen',
-    Desert = 'desert',
-}
 
 export interface PlanetParams {
     mass: number;

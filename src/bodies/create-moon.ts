@@ -11,8 +11,10 @@ import {
     fictionalTemperateTexture,
 } from '../drawing/textures';
 import { getDesertTexture } from '../procedural/desert/desert-texture-generator';
-import { MoonTypeEnum } from '../utilities/body-params';
-import type { CelestialBody, ISatelliteBasicCreationOptions } from './celestial-body';
+
+import type { CelestialBody } from './celestial-body';
+import { MoonTypeEnum } from './body-enums';
+import { ISatelliteBasicCreationOptions } from '../interfaces';
 
 export function createMoon(parent: CelestialBody, scene: THREE.Scene, config: ISatelliteBasicCreationOptions): Moon {
     const moonType = config.moonType;

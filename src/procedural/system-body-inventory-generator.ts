@@ -1,4 +1,5 @@
-import { BodyTypeEnum } from '../utilities/utilities';
+
+import { BodyTypeEnum } from '../bodies/body-enums';
 import { SeededRandom } from '../utilities/prng';
 
 export type SystemBodyInventoryEntry = {

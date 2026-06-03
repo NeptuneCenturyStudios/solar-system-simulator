@@ -12,10 +12,11 @@ import {
     SUN_MASS,
     SUN_RADIUS,
 } from '../utilities/consts.js';
-import { BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
+import { isBodyType } from '../utilities/utilities.js';
 import { Star } from '../bodies/star.js';
 import { Body } from '../bodies/body.js';
 import { randomStarParams } from '../utilities/body-params.js';
+import { BodyTypeEnum } from '../bodies/body-enums';
 
 interface CreateSliderInitState {
     mass: number | null;

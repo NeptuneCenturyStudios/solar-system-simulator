@@ -15,7 +15,7 @@ import {
 import { IStateDependencies } from '../interfaces.js';
 
 import { DwarfPlanet } from './dwarf-planet';
-import { PlanetTypeEnum } from '../utilities/body-params.js';
+import { PlanetTypeEnum } from './body-enums.js';
 
 /**
  * Represents the dwarf planet Ceres in the simulation.

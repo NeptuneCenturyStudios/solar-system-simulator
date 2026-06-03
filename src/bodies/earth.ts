@@ -10,15 +10,15 @@ import {
     EARTH_ORBITAL_PERIOD_REAL,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
-import { createUniqueId, BodyTypeEnum, isBodyType } from '../utilities/utilities.js';
+import { createUniqueId, isBodyType } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
-import { PlanetTypeEnum } from '../utilities/body-params.js';
 import {
     createEarthAtmosphereShell,
     EarthAtmosphereShellHandle,
 } from '../effects/earth-atmosphere-shell.js';
+import { BodyTypeEnum, PlanetTypeEnum } from './body-enums.js';
 
 // Maximum number of stars supported by the day/night shader.
 const MAX_STARS = 8;

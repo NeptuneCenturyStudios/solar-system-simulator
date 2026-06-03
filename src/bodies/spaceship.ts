@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { Body } from './body';
-import { BodyTypeEnum } from '../utilities/utilities.js';
 import { SCALE_FACTOR, SPACESHIP_MASS, SPACESHIP_RADIUS } from '../utilities/consts.js';
 import { IShipEffect } from '../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../ship-effects/ship-flame.js';
+import { BodyTypeEnum } from './body-enums';
 //import { ShipFlame } from '../ship-effects/ship-flame.js';
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;

@@ -1,6 +1,5 @@
+import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { SeededRandom } from '../utilities/prng';
-import { BodyTypeEnum } from '../utilities/utilities';
-import { PlanetTypeEnum } from '../utilities/body-params';
 
 export type ProceduralBodyNameOptions = {
     /** Seed that drives determinism (must be stable for the same generated body). */

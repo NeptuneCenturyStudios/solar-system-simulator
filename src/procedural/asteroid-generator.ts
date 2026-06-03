@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utilities/prng';
 import { EARTH_DIST } from '../utilities/consts';
-import { BodyTypeEnum } from '../utilities/utilities';
 import type { StarParams } from '../utilities/body-params';
 import { randomAsteroidParams } from '../utilities/body-params';
 import { generateProceduralBodyName } from './body-naming';
 import { calculateOrbitalSpeed } from '../physics/physics';
 import type { ProceduralAsteroidCreation } from './asteroid-factory';
 import type { IStateDependencies } from '../interfaces';
+import { BodyTypeEnum } from '../bodies/body-enums';
 
 type StarPlacement = {
     pos: THREE.Vector3;

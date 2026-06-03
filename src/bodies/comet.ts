@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
 import { SCALE_FACTOR } from '../utilities/consts.js';
-import { BodyTypeEnum } from '../utilities/utilities.js';
-import { CelestialBody, ICelestialBodyCreationOptions } from './celestial-body';
-import { IStateDependencies } from '../interfaces.js';
+import { BodyTypeEnum } from './body-enums.js';
+import { CelestialBody } from './celestial-body';
+import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces.js';
 import { performanceSettings } from '../utilities/consts';
 
 /**

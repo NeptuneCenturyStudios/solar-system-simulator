@@ -1,39 +1,15 @@
 import * as THREE from 'three';
-import { Body, IBodyCreationOptions } from './body';
-import { BodyTypeEnum, isBodyType } from '../utilities/utilities';
-import { IRotation } from '../physics/physics';
+import { Body } from './body';
+import { isBodyType } from '../utilities/utilities';
+import { IRotation } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { C, DIST_SCALE } from '../utilities/consts';
-import { createTextTexture } from '../drawing/text-rendering';
+import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
-import type { MoonTypeEnum } from '../utilities/body-params';
-
-export interface IOrbitalBodyCreationOptions extends IBodyCreationOptions {
-    pos: THREE.Vector3;
-    vel: THREE.Vector3;
-    rotation: IRotation;
-    trailColor?: number;
-    maxTrail?: number;
-}
-
-export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptions {
-    mesh?: THREE.Mesh;
-}
-
-export interface ISatelliteBasicCreationOptions extends IBodyCreationOptions {
-    distance: number;
-    angle?: number; // optional initial angle for multiple moons
-    inclinationDeg?: number;
-    yVariation?: number; // optional random Y variation for non-coplanar orbits
-    trailColor?: number;
-    maxTrail?: number;
-
-    /** Optional moon subtype to drive the moon texture (matches planet subtypes). */
-    moonType?: MoonTypeEnum;
-}
+import { BodyTypeEnum } from './body-enums';
 
 export interface ITidalLockOptions {
     target: CelestialBody;
@@ -522,3 +498,4 @@ export class CelestialBody extends Body {
         return new THREE.Color(r, g, b);
     }
 }
+

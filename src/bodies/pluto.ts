@@ -12,8 +12,8 @@ import {
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
-import { PlanetTypeEnum } from '../utilities/body-params';
 import { DwarfPlanet } from './dwarf-planet';
+import { PlanetTypeEnum } from './body-enums.js';
 
 /**
  * Represents the dwarf planet Pluto in the simulation, including its texture and orbital properties.

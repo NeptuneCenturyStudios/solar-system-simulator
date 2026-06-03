@@ -2,9 +2,6 @@ import * as THREE from 'three';
 import { IStateDependencies } from '../interfaces';
 import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
-import { BodyTypeEnum } from '../utilities/utilities';
-// still uses the existing deterministic fictional JPGs for volcanic/ocean/frozen
-import { PlanetTypeEnum } from '../utilities/body-params';
 import { SeededRandom } from '../utilities/prng';
 import {
     fictionalTextures,
@@ -19,6 +16,7 @@ import {
 
 // New deterministic, seam-free procedural desert generator.
 import { getDesertNormalTexture, getDesertTexture } from './desert/desert-texture-generator';
+import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 
 export type ProceduralPlanetSubtype =
     | 'solid'

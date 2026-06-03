@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { Comet } from './comet';
-import { IStateDependencies } from '../interfaces.js';
+import { IOrbitalBodyCreationOptions, IStateDependencies } from '../interfaces.js';
 import { MTLLoader, OBJLoader } from 'three/examples/jsm/Addons.js';
-import { IOrbitalBodyCreationOptions } from './celestial-body.js';
 
 /**
  * Represents a generic comet in the simulation, with a realistic elliptical orbit and physical properties.
