@@ -21,6 +21,8 @@ export interface IMoonCreationOptions extends ICelestialBodyCreationOptions {
  * so we can reserve `Satellite` for orbital vehicles (ISS, etc).
  */
 export class Moon extends CelestialBody {
+    moonType: MoonTypeEnum;
+
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, options: IMoonCreationOptions) {
         super(
             dependencies,
@@ -40,5 +42,7 @@ export class Moon extends CelestialBody {
             options.mesh,
             options.tidalLock
         );
+
+        this.moonType = options.moonType;
     }
 }

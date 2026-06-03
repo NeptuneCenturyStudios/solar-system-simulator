@@ -233,17 +233,18 @@ export function createStatsTexture(body: Body) {
     drawStat('Type: ', getBodyTypeLabel(body), y);
     y += lineHeight;
 
-    // Planet Type (if planet or dwarf planet)
-    // Check for planet type property (Planet or DwarfPlanet class or similar)
+    // Planet / Moon Type (shows the "sub type" like planets already do)
     if (
         body.bodyType &&
         (body.bodyType & BodyTypeEnum.Planet || body.bodyType & BodyTypeEnum.DwarfPlanet) &&
         'planetType' in body &&
-        body.planetType
+        (body as unknown as { planetType?: string }).planetType
     ) {
         // Map enum/string to display label
+        const planetType = (body as unknown as { planetType?: string }).planetType;
         let planetTypeLabel: string;
-        switch (body.planetType) {
+
+        switch (planetType) {
             case 'gas_giant':
             case 'GasGiant':
                 planetTypeLabel = 'Gas Giant';
@@ -257,22 +258,64 @@ export function createStatsTexture(body: Body) {
                 planetTypeLabel = 'Terrestrial';
                 break;
             case 'volcanic':
+            case 'Volcanic':
                 planetTypeLabel = 'Volcanic';
                 break;
             case 'ocean':
+            case 'Ocean':
                 planetTypeLabel = 'Ocean';
                 break;
             case 'frozen':
+            case 'Frozen':
                 planetTypeLabel = 'Frozen';
                 break;
             case 'desert':
+            case 'Desert':
                 planetTypeLabel = 'Desert';
                 break;
             default:
-                planetTypeLabel = String(body.planetType);
+                planetTypeLabel = String(planetType);
         }
+
         drawStat('Sub Type: ', planetTypeLabel, y);
         y += lineHeight;
+    } else if (body.bodyType && body.bodyType & BodyTypeEnum.Moon) {
+        const moonType = (body as unknown as { moonType?: string }).moonType;
+
+        if (moonType) {
+            let moonTypeLabel: string;
+            switch (moonType) {
+                case 'solid':
+                case 'Terrestrial':
+                    moonTypeLabel = 'Terrestrial';
+                    break;
+                case 'temperate':
+                case 'Temperate':
+                    moonTypeLabel = 'Temperate';
+                    break;
+                case 'volcanic':
+                case 'Volcanic':
+                    moonTypeLabel = 'Volcanic';
+                    break;
+                case 'ocean':
+                case 'Ocean':
+                    moonTypeLabel = 'Ocean';
+                    break;
+                case 'frozen':
+                case 'Frozen':
+                    moonTypeLabel = 'Frozen';
+                    break;
+                case 'desert':
+                case 'Desert':
+                    moonTypeLabel = 'Desert';
+                    break;
+                default:
+                    moonTypeLabel = String(moonType);
+            }
+
+            drawStat('Sub Type: ', moonTypeLabel, y);
+            y += lineHeight;
+        }
     }
 
     // Mass

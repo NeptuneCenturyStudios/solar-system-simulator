@@ -5,6 +5,7 @@ import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { BodyTypeEnum } from '../utilities/utilities';
 // still uses the existing deterministic fictional JPGs for volcanic/ocean/frozen
 import { PlanetTypeEnum } from '../utilities/body-params';
+import { SeededRandom } from '../utilities/prng';
 import {
     fictionalTextures,
     fictionalVolcanicTexture,
@@ -134,8 +135,19 @@ export function createPlanetBodyFromProceduralCreation(
         })
     );
 
+    // Ring presence is probabilistic (deterministic per planet id) so not all gas/ice giants get rings,
+    // and regular planets can occasionally have them.
+    const GAS_GIANT_RINGS_PROB = 0.85;
+    const ICE_GIANT_RINGS_PROB = 0.7;
+    const SOLID_RINGS_PROB = 0.08;
+
+    const ringRng = new SeededRandom(`${id}|rings-enabled`);
     const hasRings =
-        bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant;
+        bodySubtype === PlanetTypeEnum.GasGiant
+            ? ringRng.chance(GAS_GIANT_RINGS_PROB)
+            : bodySubtype === PlanetTypeEnum.IceGiant
+              ? ringRng.chance(ICE_GIANT_RINGS_PROB)
+              : ringRng.chance(SOLID_RINGS_PROB);
 
     const commonOptions = {
         radius,
