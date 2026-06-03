@@ -29,7 +29,7 @@ export interface IBodyCreationOptions {
 export interface IOrbitalBodyCreationOptions extends IBodyCreationOptions {
     pos: THREE.Vector3;
     vel: THREE.Vector3;
-    rotation: IRotation;
+    rotation?: IRotation;
     trailColor?: number;
     maxTrail?: number;
 }
@@ -38,23 +38,12 @@ export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptio
     mesh?: THREE.Mesh;
 }
 
-export interface ISatelliteBasicCreationOptions extends IBodyCreationOptions {
-    distance: number;
-    angle?: number; // optional initial angle for multiple moons
-    inclinationDeg?: number;
-    yVariation?: number; // optional random Y variation for non-coplanar orbits
-    trailColor?: number;
-    maxTrail?: number;
-
-    /** Optional moon subtype to drive the moon texture (matches planet subtypes). */
-    moonType?: MoonTypeEnum;
-}
-
 export interface ISatelliteCreationOptions extends ICelestialBodyCreationOptions {
     distance: number;
-    angle: number;
-    yVariation: number;
-    tidalLock: ITidalLockOptions;
+    angle?: number;
+    inclinationDeg?: number;
+    yVariation?: number;
+    tidalLock?: ITidalLockOptions;
 }
 
 export interface IMoonCreationOptions extends ISatelliteCreationOptions {
@@ -65,7 +54,6 @@ export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {
     hasRings?: boolean;
     bodySubtype: PlanetTypeEnum;
 }
-
 
 export interface IStateDependencies {
     addEvent: (event: { message: string; notificationType: NotificationType }) => void;

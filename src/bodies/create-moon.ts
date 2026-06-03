@@ -14,9 +14,9 @@ import { getDesertTexture } from '../procedural/desert/desert-texture-generator'
 
 import type { CelestialBody } from './celestial-body';
 import { MoonTypeEnum } from './body-enums';
-import { ISatelliteBasicCreationOptions } from '../interfaces';
+import { IMoonCreationOptions } from '../interfaces';
 
-export function createMoon(parent: CelestialBody, scene: THREE.Scene, config: ISatelliteBasicCreationOptions): Moon {
+export function createMoon(parent: CelestialBody, scene: THREE.Scene, config: IMoonCreationOptions): Moon {
     const moonType = config.moonType;
 
     const seededFromConfig = new SeededRandom(`${config.id}|moonTexture`);

@@ -4,7 +4,7 @@ import { calculateTrajectory } from '../physics/physics';
 import { CelestialBody } from '../bodies/celestial-body';
 import { ISS } from '../bodies/iss';
 import { BodyTypeEnum } from '../bodies/body-enums';
-import { ISatelliteBasicCreationOptions } from '../interfaces';
+import { ISatelliteCreationOptions } from '../interfaces';
 
 
 
@@ -22,7 +22,7 @@ export function createUniqueId(prefix: string) {
     return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
 }
 
-export function createSatellite(scene: THREE.Scene, parent: CelestialBody, config: ISatelliteBasicCreationOptions) {
+export function createSatellite(scene: THREE.Scene, parent: CelestialBody, config: ISatelliteCreationOptions) {
         // Calculate orbital trajectory based on parent's mass
         const trajectory = calculateTrajectory(
             parent.dependencies.getG(),

@@ -1053,14 +1053,22 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
 
     if (gizmo.group?.visible) {
         posIndicator.show('position');
-        posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, body.mesh.position);
+        posIndicator.updateIndicator(
+            posIndicator.yAxisIndicator,
+            posIndicator.yAxisRing,
+            body.mesh.position
+        );
     }
 
     if (gizmo.target === body) {
         gizmo.update();
         velArc.update();
         if (posIndicator.yAxisIndicator && posIndicator.yAxisRing) {
-            posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, body.mesh.position);
+            posIndicator.updateIndicator(
+                posIndicator.yAxisIndicator,
+                posIndicator.yAxisRing,
+                body.mesh.position
+            );
         }
         if (
             (isChangingVelocity || isMiddleMouseVelocity) &&
@@ -1074,7 +1082,11 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
             const arrowTip = body.mesh.position
                 .clone()
                 .add(direction.multiplyScalar(speed * arrowScale));
-            posIndicator.updateIndicator(posIndicator.velocityTipIndicator, posIndicator.velocityTipRing, arrowTip);
+            posIndicator.updateIndicator(
+                posIndicator.velocityTipIndicator,
+                posIndicator.velocityTipRing,
+                arrowTip
+            );
         }
     }
 
@@ -1292,11 +1304,13 @@ function createPresetBody(presetKey: string) {
                 distance: MOON_DIST_FROM_EARTH,
                 radius: MOON_RADIUS,
                 mass: MOON_MASS,
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
                 id: createUniqueId('moon'),
                 name: 'Moon',
                 moonType: MoonTypeEnum.Terrestrial,
                 trailColor: 0xffffff,
-                maxTrail: 1500,
+                maxTrail: 1500
             });
             break;
         }
@@ -1478,9 +1492,14 @@ function createNewBody(
 
         // Optional atmosphere/cloud layer (checkbox-driven for custom solid + volcanic planets)
         // Temperate planets should ALWAYS have an atmosphere.
-        if ((hasAtmosphere || planetBodySubtype === PlanetTypeEnum.Temperate) && isSolidPlanet && newBody) {
+        if (
+            (hasAtmosphere || planetBodySubtype === PlanetTypeEnum.Temperate) &&
+            isSolidPlanet &&
+            newBody
+        ) {
             const atmosphereRng = new SeededRandom(`${newBody.id}|atmosphere|custom-solid`);
-            const atmosphereTex = atmosphereRng.pick(fictionalAtmosphereTextures) ?? fictionalAtmosphereTextures[0];
+            const atmosphereTex =
+                atmosphereRng.pick(fictionalAtmosphereTextures) ?? fictionalAtmosphereTextures[0];
 
             const cloudsMat = new THREE.MeshStandardMaterial({
                 map: atmosphereTex,
@@ -1580,7 +1599,11 @@ function createNewBody(
             const moonSpawnVel = parentVel.clone().addScaledVector(orbitDir, orbitSpeed);
 
             const moonId = createUniqueId('moon');
-            const moonName = generateIAUName(BodyTypeEnum.Moon, focusedBody, simulationState.bodies);
+            const moonName = generateIAUName(
+                BodyTypeEnum.Moon,
+                focusedBody,
+                simulationState.bodies
+            );
 
             const geometry = new THREE.SphereGeometry(moonRadius, 32, 32);
 
@@ -1620,7 +1643,9 @@ function createNewBody(
                 case 'solid':
                 default: {
                     const seeded = new SeededRandom(moonTextureSeed);
-                    const idx = Math.floor(seeded.next() * fictionalTextures.length) % fictionalTextures.length;
+                    const idx =
+                        Math.floor(seeded.next() * fictionalTextures.length) %
+                        fictionalTextures.length;
                     moonMap = fictionalTextures[Math.abs(idx)]!;
                     break;
                 }
@@ -1631,10 +1656,8 @@ function createNewBody(
                 color: 0xffffff, // keep texture untinted
                 emissive: 0x000000,
                 emissiveIntensity: 0,
-                roughness:
-                    moonType === 'desert' || moonType === 'temperate' ? 0.95 : 0.7,
-                metalness:
-                    moonType === 'desert' || moonType === 'temperate' ? 0.02 : 0.7,
+                roughness: moonType === 'desert' || moonType === 'temperate' ? 0.95 : 0.7,
+                metalness: moonType === 'desert' || moonType === 'temperate' ? 0.02 : 0.7,
                 transparent: false,
                 depthTest: true,
                 depthWrite: true,
@@ -1669,7 +1692,9 @@ function createNewBody(
             // Temperate moons should always have atmosphere/clouds (UI checkbox hidden for temperate).
             if (hasAtmosphere || planetType === 'temperate') {
                 const atmosphereRng = new SeededRandom(`${newBody.id}|atmosphere|custom-moon`);
-                const atmosphereTex = atmosphereRng.pick(fictionalAtmosphereTextures) ?? fictionalAtmosphereTextures[0];
+                const atmosphereTex =
+                    atmosphereRng.pick(fictionalAtmosphereTextures) ??
+                    fictionalAtmosphereTextures[0];
 
                 const cloudsMat = new THREE.MeshStandardMaterial({
                     map: atmosphereTex,
@@ -1781,15 +1806,26 @@ function createNewBody(
 
     if (newBody) {
         // Apply axial tilt/azimuth from create sliders if the body supports rotation
-        if ((createTilt !== null || createAzimuth !== null) && newBody instanceof CelestialBody && newBody.rotation) {
-            const tilt    = createTilt    !== null ? createTilt    : (newBody.rotation.tilt    ?? 0);
-            const azimuth = createAzimuth !== null ? createAzimuth : (newBody.rotation.azimuth ?? 0);
-            newBody.rotation.tilt    = tilt;
+        if (
+            (createTilt !== null || createAzimuth !== null) &&
+            newBody instanceof CelestialBody &&
+            newBody.rotation
+        ) {
+            const tilt = createTilt !== null ? createTilt : (newBody.rotation.tilt ?? 0);
+            const azimuth =
+                createAzimuth !== null ? createAzimuth : (newBody.rotation.azimuth ?? 0);
+            newBody.rotation.tilt = tilt;
             newBody.rotation.azimuth = azimuth;
             const tiltRad = THREE.MathUtils.degToRad(tilt);
-            const azRad   = THREE.MathUtils.degToRad(azimuth);
-            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
-            const azQuat   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), azRad);
+            const azRad = THREE.MathUtils.degToRad(azimuth);
+            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(1, 0, 0),
+                tiltRad
+            );
+            const azQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                azRad
+            );
             newBody.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
             if (newBody.rings) {
                 newBody.rings.position.copy(newBody.mesh.position);
@@ -2592,28 +2628,35 @@ function onMouseMove(event: MouseEvent) {
     // We project two nearby points on the ring to screen to get the screen-space tangent
     // direction AND pixels-per-radian sensitivity — both correct at any camera angle.
     if (isTilting && gizmo.target instanceof CelestialBody) {
-        const W = window.innerWidth, H = window.innerHeight;
+        const W = window.innerWidth,
+            H = window.innerHeight;
         const tiltRad = THREE.MathUtils.degToRad(gizmo.target.rotation.tilt);
-        const azRad   = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
-        const Rt  = gizmo._tiltRingRadius;
+        const azRad = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
+        const Rt = gizmo._tiltRingRadius;
         const bodyPos = gizmo.target.mesh.position;
         const eps = 0.002; // radians; large enough to avoid float noise
 
         // Two knob positions straddling the current tilt angle
-        const makeKnob = (t: number) => bodyPos.clone().add(new THREE.Vector3(
-            Math.sin(azRad) * Math.sin(t) * Rt,
-            Math.cos(t) * Rt,
-            Math.cos(azRad) * Math.sin(t) * Rt
-        ));
+        const makeKnob = (t: number) =>
+            bodyPos
+                .clone()
+                .add(
+                    new THREE.Vector3(
+                        Math.sin(azRad) * Math.sin(t) * Rt,
+                        Math.cos(t) * Rt,
+                        Math.cos(azRad) * Math.sin(t) * Rt
+                    )
+                );
         const n1 = makeKnob(tiltRad - eps).project(camera);
         const n2 = makeKnob(tiltRad + eps).project(camera);
 
         // Screen pixels per radian along the tangent
-        const tsx = (n2.x - n1.x) * (W / 2) / (2 * eps);
-        const tsy = -(n2.y - n1.y) * (H / 2) / (2 * eps); // NDC Y up → screen Y down
+        const tsx = ((n2.x - n1.x) * (W / 2)) / (2 * eps);
+        const tsy = (-(n2.y - n1.y) * (H / 2)) / (2 * eps); // NDC Y up → screen Y down
         const tsLen = Math.hypot(tsx, tsy);
 
-        if (tsLen > 0.5) { // skip only when ring tangent truly collapses to depth axis
+        if (tsLen > 0.5) {
+            // skip only when ring tangent truly collapses to depth axis
             const tx = tsx / tsLen;
             const ty = tsy / tsLen;
             const movement = event.movementX * tx + event.movementY * ty;
@@ -2623,8 +2666,14 @@ function onMouseMove(event: MouseEvent) {
             const newTiltRad = THREE.MathUtils.degToRad(newTiltDeg);
             // Use setFromAxisAngle (not setFromUnitVectors) to avoid the antiparallel
             // singularity at tilt = ±180° where setFromUnitVectors picks the wrong axis.
-            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), newTiltRad);
-            const azQuat   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), azRad);
+            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(1, 0, 0),
+                newTiltRad
+            );
+            const azQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                azRad
+            );
             gizmo.target.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
             gizmo.target.rotation.tilt = newTiltDeg;
             if (gizmo.target.rings) {
@@ -2641,23 +2690,21 @@ function onMouseMove(event: MouseEvent) {
     //   P(φ) = (sin(φ), 0, cos(φ)) * Ra  relative to body
     // Tangent = dP/dφ = (cos(φ), 0, −sin(φ)) * Ra
     if (isAzimuthDragging && gizmo.target instanceof CelestialBody) {
-        const W = window.innerWidth, H = window.innerHeight;
+        const W = window.innerWidth,
+            H = window.innerHeight;
         const tiltRad = THREE.MathUtils.degToRad(gizmo.target.rotation.tilt);
-        const azRad   = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
+        const azRad = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
         const Ra = gizmo._azimuthRingRadius;
         const bodyPos = gizmo.target.mesh.position;
         const eps = 0.002;
 
-        const makeKnob = (a: number) => bodyPos.clone().add(new THREE.Vector3(
-            Math.sin(a) * Ra,
-            0,
-            Math.cos(a) * Ra
-        ));
+        const makeKnob = (a: number) =>
+            bodyPos.clone().add(new THREE.Vector3(Math.sin(a) * Ra, 0, Math.cos(a) * Ra));
         const n1 = makeKnob(azRad - eps).project(camera);
         const n2 = makeKnob(azRad + eps).project(camera);
 
-        const tsx = (n2.x - n1.x) * (W / 2) / (2 * eps);
-        const tsy = -(n2.y - n1.y) * (H / 2) / (2 * eps);
+        const tsx = ((n2.x - n1.x) * (W / 2)) / (2 * eps);
+        const tsy = (-(n2.y - n1.y) * (H / 2)) / (2 * eps);
         const tsLen = Math.hypot(tsx, tsy);
 
         if (tsLen > 0.5) {
@@ -2668,8 +2715,14 @@ function onMouseMove(event: MouseEvent) {
 
             const newAzimuthDeg = (gizmo.target.rotation.azimuth ?? 0) + deltaDeg;
             const newAzRad = THREE.MathUtils.degToRad(newAzimuthDeg);
-            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
-            const azQuat   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), newAzRad);
+            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(1, 0, 0),
+                tiltRad
+            );
+            const azQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                newAzRad
+            );
             gizmo.target.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
             gizmo.target.rotation.azimuth = newAzimuthDeg;
             if (gizmo.target.rings) {
@@ -2910,12 +2963,16 @@ function onMouseUp(event: MouseEvent) {
         // Restore tilt ring color
         if (wasTilting && gizmo.tiltRing) {
             (gizmo.tiltRing.material as THREE.MeshPhongMaterial).color.set(0xff8800);
-            (gizmo.tiltRing.material as THREE.MeshPhongMaterial).emissive.setRGB(1, 0.533, 0).multiplyScalar(0.25);
+            (gizmo.tiltRing.material as THREE.MeshPhongMaterial).emissive
+                .setRGB(1, 0.533, 0)
+                .multiplyScalar(0.25);
         }
         // Restore azimuth ring color
         if (wasAzimuth && gizmo.azimuthRing) {
             (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).color.set(0x00ccff);
-            (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).emissive.setRGB(0, 0.8, 1).multiplyScalar(0.2);
+            (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).emissive
+                .setRGB(0, 0.8, 1)
+                .multiplyScalar(0.2);
         }
         controls.enabled = !isFreeCameraMode;
         posIndicator.hide();
@@ -3349,7 +3406,8 @@ function animate() {
         !gizmo.target._isDisposed &&
         gizmo.target.mesh
     ) {
-        const isDragging = interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity;
+        const isDragging =
+            interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity;
         gridHelperManager.ensure(gizmo.target, isDragging);
 
         if (
@@ -3357,7 +3415,11 @@ function animate() {
             posIndicator.yAxisRing &&
             (isChangingVelocity || isMiddleMouseVelocity || interactionState.isRepositioning)
         ) {
-            posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, gizmo.target.mesh.position);
+            posIndicator.updateIndicator(
+                posIndicator.yAxisIndicator,
+                posIndicator.yAxisRing,
+                gizmo.target.mesh.position
+            );
         }
 
         if (
@@ -3372,7 +3434,11 @@ function animate() {
             const arrowTip = gizmo.target.mesh.position
                 .clone()
                 .add(direction.multiplyScalar(speed * arrowScale));
-            posIndicator.updateIndicator(posIndicator.velocityTipIndicator, posIndicator.velocityTipRing, arrowTip);
+            posIndicator.updateIndicator(
+                posIndicator.velocityTipIndicator,
+                posIndicator.velocityTipRing,
+                arrowTip
+            );
         }
     }
 
@@ -3450,11 +3516,23 @@ function animate() {
             const arrowTip = gizmo.target.mesh.position
                 .clone()
                 .add(direction.multiplyScalar(speed * arrowScale));
-            posIndicator.updateIndicator(posIndicator.velocityTipIndicator, posIndicator.velocityTipRing, arrowTip);
+            posIndicator.updateIndicator(
+                posIndicator.velocityTipIndicator,
+                posIndicator.velocityTipRing,
+                arrowTip
+            );
         }
 
-        if ((isChangingVelocity || isMiddleMouseVelocity) && posIndicator.yAxisIndicator && posIndicator.yAxisRing) {
-            posIndicator.updateIndicator(posIndicator.yAxisIndicator, posIndicator.yAxisRing, gizmo.target.mesh.position);
+        if (
+            (isChangingVelocity || isMiddleMouseVelocity) &&
+            posIndicator.yAxisIndicator &&
+            posIndicator.yAxisRing
+        ) {
+            posIndicator.updateIndicator(
+                posIndicator.yAxisIndicator,
+                posIndicator.yAxisRing,
+                gizmo.target.mesh.position
+            );
         }
     }
 
@@ -3991,7 +4069,9 @@ const surfaceCam = new SurfaceCameraManager(
     cameraState,
     () => selectedBody,
     () => manuallySelectedBody,
-    () => { isFreeCameraMode = false; }
+    () => {
+        isFreeCameraMode = false;
+    }
 );
 
 // ── Flight mode functions ────────────────────────────────────────────────────
@@ -4921,7 +5001,7 @@ function updateFlightControls(dt: number) {
         const viewSpaceDir = new THREE.Vector3(
             aimNdcX * tanHalfFovX,
             aimNdcY * tanHalfFovY,
-            -1  // camera local -Z is forward in OpenGL/Three.js convention
+            -1 // camera local -Z is forward in OpenGL/Three.js convention
         ).normalize();
         const aimDir = viewSpaceDir.transformDirection(camera.matrixWorld);
 
@@ -5752,14 +5832,20 @@ uiManager.managementPanel.on(
 
         // Apply axial tilt and azimuth if the sliders were visible and the body supports rotation
         if ((editTilt !== null || editAzimuth !== null) && body instanceof CelestialBody) {
-            const newTilt    = editTilt    !== null ? editTilt    : (body.rotation.tilt    ?? 0);
+            const newTilt = editTilt !== null ? editTilt : (body.rotation.tilt ?? 0);
             const newAzimuth = editAzimuth !== null ? editAzimuth : (body.rotation.azimuth ?? 0);
-            body.rotation.tilt    = newTilt;
+            body.rotation.tilt = newTilt;
             body.rotation.azimuth = newAzimuth;
             const tiltRad = THREE.MathUtils.degToRad(newTilt);
-            const azRad   = THREE.MathUtils.degToRad(newAzimuth);
-            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tiltRad);
-            const azQuat   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), azRad);
+            const azRad = THREE.MathUtils.degToRad(newAzimuth);
+            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(1, 0, 0),
+                tiltRad
+            );
+            const azQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                azRad
+            );
             body.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
             if (body.rings) {
                 body.rings.position.copy(body.mesh.position);

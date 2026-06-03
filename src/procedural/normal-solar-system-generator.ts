@@ -53,6 +53,7 @@ import {
     HYGIEA_DISTANCE,
     HYGIEA_RADIUS,
 } from '../utilities/consts';
+import { MoonTypeEnum } from '../bodies/body-enums';
 
 type Textures = {
     jupiterTexture: THREE.Texture;
@@ -106,11 +107,14 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             createMoon(earth, this.scene, {
                 distance: MOON_DIST_FROM_EARTH,
                 radius: MOON_RADIUS,
+                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
                 mass: MOON_MASS,
                 id: 'moon',
                 name: 'Moon',
                 trailColor: 0xffffff,
                 maxTrail: 1500,
+                moonType: MoonTypeEnum.Terrestrial
             })
         );
 
@@ -120,6 +124,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 distance: ISS_DIST_FROM_EARTH,
                 radius: ISS_RADIUS,
                 mass: ISS_MASS,
+                pos: new THREE.Vector3(0,0,0), // Will be overridden in createSatellite
+                vel: new THREE.Vector3(0,0,0), // Will be overridden in createSatellite
                 id: 'iss',
                 name: 'ISS',
                 trailColor: 0xffffff,
@@ -219,12 +225,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: 0,
                 distance: IO_DIST_FROM_JUPITER,
                 radius: IO_RADIUS,
+                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
                 mass: IO_MASS,
                 id: 'camIo',
                 name: 'Io',
                 trailColor: 0xffdd77,
                 maxTrail: 800,
                 yVariation: 109,
+                moonType: MoonTypeEnum.Terrestrial
             })
         );
 
@@ -234,12 +243,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: Math.PI / 2,
                 distance: EUROPA_DIST_FROM_JUPITER,
                 radius: EUROPA_RADIUS,
+                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
                 mass: EUROPA_MASS,
                 id: 'camEuropa',
                 name: 'Europa',
                 trailColor: 0xccddee,
                 maxTrail: 1000,
                 yVariation: 164,
+                moonType: MoonTypeEnum.Terrestrial
             })
         );
 
@@ -249,12 +261,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: Math.PI,
                 distance: GANYMEDE_DIST_FROM_JUPITER,
                 radius: GANYMEDE_RADIUS,
+                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
                 mass: GANYMEDE_MASS,
                 id: 'camGanymede',
                 name: 'Ganymede',
                 trailColor: 0xcccccc,
                 maxTrail: 1200,
                 yVariation: 219,
+                moonType: MoonTypeEnum.Terrestrial
             })
         );
 
@@ -264,12 +279,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: (Math.PI * 3) / 2,
                 distance: CALLISTO_DIST_FROM_JUPITER,
                 radius: CALLISTO_RADIUS,
+                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
                 mass: CALLISTO_MASS,
                 id: 'camCallisto',
                 name: 'Callisto',
                 trailColor: 0xaa9988,
                 maxTrail: 1500,
                 yVariation: 273,
+                moonType: MoonTypeEnum.Terrestrial
             })
         );
 
