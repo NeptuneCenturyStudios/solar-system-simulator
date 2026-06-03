@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { SeededRandom } from '../utilities/prng';
-import { EARTH_DIST } from '../utilities/consts';
 import type { StarParams } from '../utilities/body-params';
+import { EARTH_DIST } from '../utilities/consts';
 import { randomAsteroidParams } from '../utilities/body-params';
 import { generateProceduralBodyName } from './body-naming';
 import { calculateOrbitalSpeed } from '../physics/physics';
@@ -9,58 +8,15 @@ import type { ProceduralAsteroidCreation } from './asteroid-factory';
 import type { IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
-type StarPlacement = {
-    pos: THREE.Vector3;
-    vel: THREE.Vector3;
-};
+import { applyInclinationX, applyYawY, buildUnitPositionDirection, safeUnitCross } from './orbital-math';
+import { rngFor } from './seed-utils';
 
-function applyYawY(v: THREE.Vector3, yawRad: number): THREE.Vector3 {
-    const out = v.clone();
-    out.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawRad);
-    return out;
-}
-
-function applyInclinationX(v: THREE.Vector3, inclinationRad: number): THREE.Vector3 {
-    const out = v.clone();
-    out.applyAxisAngle(new THREE.Vector3(1, 0, 0), inclinationRad);
-    return out;
-}
-
-function buildUnitPositionDirection(
-    phiRad: number,
-    yawRad: number,
-    inclinationRad: number
-): THREE.Vector3 {
-    const uBase = new THREE.Vector3(Math.cos(phiRad), 0, Math.sin(phiRad));
-    const uYaw = applyYawY(uBase, yawRad);
-    const u = applyInclinationX(uYaw, inclinationRad).normalize();
-    return u;
-}
-
-function safeUnitCross(a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3 {
-    const out = new THREE.Vector3().crossVectors(a, b);
-    if (out.lengthSq() < 1e-12) {
-        const fallback =
-            Math.abs(a.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-        out.copy(new THREE.Vector3().crossVectors(a, fallback));
-    }
-    out.normalize();
-    return out;
-}
-
-/**
- * Deterministically generates asteroid orbital placements for a procedural solar system.
- *
- * Asteroids are placed in the "belt zone" between inner and outer regions of the system
- * (roughly 1.5–4 AU relative to the primary star), with moderate inclinations and
- * higher eccentricities than planets.
- */
 export function generateProceduralAsteroids(params: {
     dependencies: IStateDependencies;
     masterSeed: string;
     asteroidCount: number;
     starParams: StarParams[];
-    starPlacements: StarPlacement[];
+    starPlacements: Array<{ pos: THREE.Vector3; vel: THREE.Vector3 }>;
 }): ProceduralAsteroidCreation[] {
     const { dependencies, masterSeed, asteroidCount, starParams, starPlacements } = params;
 
@@ -69,14 +25,11 @@ export function generateProceduralAsteroids(params: {
     const starCount = starParams.length;
     if (starCount === 0) return [];
 
-    // Use a fresh seeded RNG so asteroid generation is independent of other body generators.
-    const rng = new SeededRandom(`${masterSeed}|asteroids`);
-
-    const maxStarRadius = Math.max(...starParams.map((s) => s.radius));
-
-    // Belt zone: roughly 1.5–4 AU from the primary star (scaled to world units).
+    // Belt zone: roughly 1.5–4 AU relative to the primary star (scaled to world units).
     const minDistAU = 1.5;
     const maxDistAU = 4.0;
+
+    const maxStarRadius = Math.max(...starParams.map((s) => s.radius));
     const minDistWorld = Math.max(EARTH_DIST * minDistAU, maxStarRadius * 12);
     const maxDistWorld = EARTH_DIST * maxDistAU;
 
@@ -91,26 +44,34 @@ export function generateProceduralAsteroids(params: {
         const hostStar = starParams[starIndex]!;
         const hostPlacement = starPlacements[starIndex]!;
 
+        const distanceRng = rngFor(masterSeed, 'asteroidDistance', i);
         // Random orbital distance within the belt zone (log-uniform).
         const logMin = Math.log(Math.max(1e-6, minDistWorld));
         const logMax = Math.log(Math.max(logMin + 1e-6, maxDistWorld));
-        const distance = Math.exp(logMin + rng.next() * (logMax - logMin));
+        const distance = Math.exp(logMin + distanceRng.next() * (logMax - logMin));
 
-        // Asteroid belts have higher inclinations than planets (up to ~30°).
-        const inclinationDeg = Math.pow(rng.next(), 1.5) * 30;
+        const inclinationRng = rngFor(masterSeed, 'asteroidInclination', i);
+        // Asteroids have higher inclinations than planets (up to ~30°).
+        const inclinationDeg = Math.pow(inclinationRng.next(), 1.5) * 30;
         const inclinationRad = (inclinationDeg * Math.PI) / 180;
-        const yawRad = rng.range(0, Math.PI * 2);
-        const phiRad = rng.range(0, Math.PI * 2);
+
+        const yawRng = rngFor(masterSeed, 'asteroidYaw', i);
+        const yawRad = yawRng.range(0, Math.PI * 2);
+
+        const phiRng = rngFor(masterSeed, 'asteroidPhi', i);
+        const phiRad = phiRng.range(0, Math.PI * 2);
 
         const u = buildUnitPositionDirection(phiRad, yawRad, inclinationRad);
 
         const normalBase = new THREE.Vector3(0, 1, 0);
         const nYaw = applyYawY(normalBase, yawRad);
         const normal = applyInclinationX(nYaw, inclinationRad).normalize();
+
         const tangentialDir = safeUnitCross(normal, u);
 
+        const eccRng = rngFor(masterSeed, 'asteroidEccentricity', i);
         // Asteroids have higher orbital eccentricities (0–0.4).
-        const eccentricity = rng.range(0, 0.4);
+        const eccentricity = eccRng.range(0, 0.4);
         const speed = calculateOrbitalSpeed(dependencies.getG(), distance, hostStar.mass, eccentricity);
 
         const pos = hostPlacement.pos.clone().addScaledVector(u, distance);

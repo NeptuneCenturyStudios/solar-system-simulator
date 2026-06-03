@@ -18,6 +18,9 @@ import { generateProceduralAsteroids } from './asteroid-generator';
 import { createAsteroidBodyFromProceduralCreation } from './asteroid-factory';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
+import { applyInclinationX, applyYawY, buildUnitPositionDirection, safeUnitCross } from './orbital-math';
+import { rngFor } from './seed-utils';
+
 type StarPlacement = {
     pos: THREE.Vector3;
     vel: THREE.Vector3;
@@ -39,40 +42,6 @@ function generateSeedString(): string {
 
 function deriveSubSeed(masterSeed: string, index: number): string {
     return `${masterSeed}|star:${index}`;
-}
-
-function applyYawY(v: THREE.Vector3, yawRad: number): THREE.Vector3 {
-    const out = v.clone();
-    out.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawRad);
-    return out;
-}
-
-function applyInclinationX(v: THREE.Vector3, inclinationRad: number): THREE.Vector3 {
-    const out = v.clone();
-    out.applyAxisAngle(new THREE.Vector3(1, 0, 0), inclinationRad);
-    return out;
-}
-
-/**
- * Orbital-plane basis:
- * - `u` is the unit position direction in the orbital plane (from COM to star)
- * - `n` is the unit normal of that orbital plane
- *
- * We use base plane = XZ with normal = +Y, then apply:
- * - yaw around Y
- * - inclination around X
- */
-
-function buildUnitPositionDirection(
-    phiRad: number,
-    yawRad: number,
-    inclinationRad: number
-): THREE.Vector3 {
-    // Base position direction on XZ plane
-    const uBase = new THREE.Vector3(Math.cos(phiRad), 0, Math.sin(phiRad));
-    const uYaw = applyYawY(uBase, yawRad);
-    const u = applyInclinationX(uYaw, inclinationRad).normalize();
-    return u;
 }
 
 function createStarBody(
@@ -109,8 +78,6 @@ function createStarBody(
 
     const name = generateProceduralBodyName(BodyTypeEnum.Star, nameOptions);
 
-    // Multi-star naming confirmed (letters/romans handled by generateProceduralBodyName).
-
     return createMainSequenceStarFromParams(dependencies, scene, params, {
         id,
         name,
@@ -121,11 +88,10 @@ function createStarBody(
 }
 
 function generateBinaryPlacements(
-    rng: SeededRandom,
     masses: [number, number],
     separationDistance: number,
     yawRad: number,
-    inclinationDeg: number
+    inclinationRad: number
 ): [StarPlacement, StarPlacement] {
     const [m1, m2] = masses;
     const mSum = m1 + m2;
@@ -133,29 +99,16 @@ function generateBinaryPlacements(
     const r1 = separationDistance * (m2 / mSum);
     const r2 = separationDistance * (m1 / mSum);
 
-    const inclinationRad = (inclinationDeg * Math.PI) / 180;
-
-    // Orbital plane basis
-    const normal = (() => {
-        const normalBase = new THREE.Vector3(0, 1, 0);
-        const nYaw = applyYawY(normalBase, yawRad);
-        return applyInclinationX(nYaw, inclinationRad).normalize();
-    })();
-
-    // Separation direction in orbital plane (choose uBase = +X in plane, transformed)
+    // Separation direction in orbital plane (choose uBase = +X in base plane, transformed)
     const u = buildUnitPositionDirection(0, yawRad, inclinationRad); // phi=0 => +X in base
 
-    // Velocity direction for star at +u
-    // Velocity direction for star at +u
-    // Guard against degenerate cross-product => normalize() => NaNs.
-    let velDir = new THREE.Vector3().crossVectors(normal, u);
-    if (velDir.lengthSq() < 1e-12) {
-        velDir = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(1, 0, 0));
-        if (velDir.lengthSq() < 1e-12) {
-            velDir = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(0, 0, 1));
-        }
-    }
-    velDir.normalize();
+    // Orbital-plane normal (used to get consistent perpendicular velocity direction)
+    const normalBase = new THREE.Vector3(0, 1, 0);
+    const normalYaw = applyYawY(normalBase, yawRad);
+    const normal = applyInclinationX(normalYaw, inclinationRad).normalize();
+
+    // Tangential velocity direction for star at +u.
+    const velDir = safeUnitCross(normal, u);
 
     const omega = Math.sqrt((G * mSum) / Math.pow(separationDistance, 3));
 
@@ -172,54 +125,42 @@ function generateBinaryPlacements(
 }
 
 function generateTriplePlacements(
-    rng: SeededRandom,
     masses: [number, number, number],
-    radii: [number, number, number]
+    radii: [number, number, number],
+    yawRad: number,
+    inclinationRad: number,
+    masterSeed: string
 ): [StarPlacement, StarPlacement, StarPlacement] {
     const [m1, m2, m3] = masses;
     const mSum = m1 + m2 + m3;
-
-    const yawRad = rng.range(0, Math.PI * 2);
-    // Avoid ~0/90° extremes that can make the orbital-plane basis degenerate
-    // (cross(normal, u) becomes ~zero => normalize() => NaNs).
-    const inclinationDeg = rng.range(5, 85);
-    const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
     const maxRadius = Math.max(radii[0], radii[1], radii[2]);
     const minRi = maxRadius * 3;
     const maxRi = maxRadius * 40;
 
+    // Orbital-plane normal (shared for all three stars; phi varies per-star).
+    const normalBaseVec = new THREE.Vector3(0, 1, 0);
+    const normalYaw = applyYawY(normalBaseVec, yawRad);
+    const normal = applyInclinationX(normalYaw, inclinationRad).normalize();
+
     const placements: StarPlacement[] = [];
 
     for (let i = 0; i < 3; i++) {
-        const phiRad = rng.range(0, Math.PI * 2);
+        const phiRad = rngFor(masterSeed, 'triplePhi', i).range(0, Math.PI * 2);
 
-        // Ensure star isn't too close to COM relative to others by using a per-star min.
-        // Also keep distances non-overlapping-ish.
-        const base = minRi + (maxRi - minRi) * rng.next();
+        // Deterministic per-star radius choice.
+        const base = minRi + (maxRi - minRi) * rngFor(masterSeed, 'tripleRi', i).next();
         const ri = Math.max(base, radii[i] * 6);
 
         const u = buildUnitPositionDirection(phiRad, yawRad, inclinationRad);
 
-        // Use "orbit around COM" speed to get a coherent swirl; real n-body chaos emerges naturally.
+        // "Orbit around COM" speed to get a coherent swirl.
         const speed = Math.sqrt((G * mSum) / Math.max(ri, 1e-9));
-        const normalBase = (() => {
-            const normalBaseVec = new THREE.Vector3(0, 1, 0);
-            const nYaw = applyYawY(normalBaseVec, yawRad);
-            return applyInclinationX(nYaw, inclinationRad).normalize();
-        })();
 
-        // Guard against degenerate cross-product => normalize() => NaNs.
-        let velDir = new THREE.Vector3().crossVectors(normalBase, u);
-        if (velDir.lengthSq() < 1e-12) {
-            velDir = new THREE.Vector3().crossVectors(normalBase, new THREE.Vector3(1, 0, 0));
-            if (velDir.lengthSq() < 1e-12) {
-                velDir = new THREE.Vector3().crossVectors(normalBase, new THREE.Vector3(0, 0, 1));
-            }
-        }
-        velDir.normalize();
+        const velDir = safeUnitCross(normal, u);
+
         const pos = u.clone().multiplyScalar(ri);
-        const vel = velDir.multiplyScalar(speed);
+        const vel = velDir.clone().multiplyScalar(speed);
 
         placements.push({ pos, vel });
     }
@@ -228,7 +169,12 @@ function generateTriplePlacements(
 }
 
 /**
- * Procedurally generates a solar system based on a seed string, which is used to create a seeded PRNG. The generator creates stars with parameters and placements determined by the PRNG, ensuring that the same seed will always produce the same solar system. The generator currently supports systems with 1 to 3 stars, placing them according to astrophysical rules for binary and triple systems.
+ * Procedurally generates a solar system from a master seed.
+ *
+ * Determinism rules:
+ * - Body *counts* come from an inventory seeded by `masterSeed`.
+ * - Body *parameters* (e.g. starParams) are derived per-body using derived seeds.
+ * - Orbital *placements* are also derived deterministically with per-system/per-star RNG streams.
  */
 export class ProceduralGenerator extends SolarSystemGenerator {
     private prng: SeededRandom;
@@ -248,7 +194,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         console.info('[procedural] using master seed:', this.masterSeed);
 
-        // Numeric seed for PRNG from master seed string.
+        // Numeric seed for PRNG from master seed string (used for inventory/count generation).
         this.prng = new SeededRandom(this.masterSeed);
     }
 
@@ -263,51 +209,48 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         const asteroidEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Asteroid);
         const asteroidCount = asteroidEntry?.count ?? 0;
 
-        // currently only stars and planets are instantiated in this pass (moons not yet).
-
-        const rng = this.prng;
-
         const starParams = Array.from({ length: starCount }, (_, i) =>
             randomStarParams({ seed: deriveSubSeed(this.masterSeed, i) })
         );
 
         const masses = starParams.map((p) => p.mass) as number[];
 
-        // Place stars according to rules.
+        // Place stars according to deterministic per-system + per-star RNG streams.
         let placements!: StarPlacement[];
-
         if (starCount === 1) {
             placements = [{ pos: new THREE.Vector3(0, 0, 0), vel: new THREE.Vector3(0, 0, 0) }];
         } else if (starCount === 2) {
             const rMax = Math.max(starParams[0].radius, starParams[1].radius);
             const sepMin = Math.max((starParams[0].radius + starParams[1].radius) * 2, rMax * 10);
             const sepMax = sepMin * 50;
-            const separationDistance = rng.range(sepMin, sepMax);
 
-            const yawRad = rng.range(0, Math.PI * 2);
-            // Avoid ~0/90° extremes that can make the orbital-plane basis degenerate
-            // (even with cross-product guards).
-            const inclinationDeg = rng.range(5, 85);
+            const separationDistance = rngFor(this.masterSeed, 'binarySeparation', 0).range(sepMin, sepMax);
+            const yawRad = rngFor(this.masterSeed, 'binaryYaw', 0).range(0, Math.PI * 2);
+            const inclinationDeg = rngFor(this.masterSeed, 'binaryInclination', 0).range(5, 85);
+            const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
-            const binary = generateBinaryPlacements(
-                rng,
-                [masses[0], masses[1]],
-                separationDistance,
-                yawRad,
-                inclinationDeg
-            );
-            placements = [binary[0], binary[1]];
+            placements = generateBinaryPlacements(masses as [number, number], separationDistance, yawRad, inclinationRad);
         } else {
-            // 3 stars
             const radii = starParams.map((p) => p.radius) as [number, number, number];
-            const triple = generateTriplePlacements(rng, [masses[0], masses[1], masses[2]], radii);
-            placements = [triple[0], triple[1], triple[2]];
+
+            const yawRad = rngFor(this.masterSeed, 'tripleYaw', 0).range(0, Math.PI * 2);
+            const inclinationDeg = rngFor(this.masterSeed, 'tripleInclination', 0).range(5, 85);
+            const inclinationRad = (inclinationDeg * Math.PI) / 180;
+
+            placements = generateTriplePlacements(
+                masses as [number, number, number],
+                radii,
+                yawRad,
+                inclinationRad,
+                this.masterSeed
+            );
         }
 
-        // Instantiate bodies
         const bodies: Body[] = [];
         const sharedStarNameSeed =
-            starCount > 1 ? `${this.masterSeed}|star-name-base` : `${this.masterSeed}|star-name-base|single`;
+            starCount > 1
+                ? `${this.masterSeed}|star-name-base`
+                : `${this.masterSeed}|star-name-base|single`;
 
         for (let i = 0; i < starCount; i++) {
             const params = starParams[i];
@@ -344,7 +287,6 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             };
 
             if (!posOk || !velOk || !starOk) {
-                // Prevent THREE BufferGeometry NaNs from crashing rendering.
                 console.error('[procedural] invalid star inputs; substituting defaults', {
                     starIndex: i,
                     pos: placement.pos,
@@ -375,23 +317,17 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             );
         }
 
-        // Procedurally generate planets + moons
         const planetCreations = generateProceduralPlanets({
             dependencies: this.dependencies,
             masterSeed: this.masterSeed,
-            prng: this.prng,
             planetCount,
             starParams,
             starPlacements: placements,
         });
 
         const planetBodies: Body[] = [];
-
-        //let dwarfCount = 0;
         for (let i = 0; i < planetCreations.length; i++) {
             const creation = planetCreations[i]!;
-            //if (creation.bodyType === BodyTypeEnum.DwarfPlanet) dwarfCount++;
-
             const planetBody = createPlanetBodyFromProceduralCreation(
                 this.dependencies,
                 this.scene,
@@ -410,7 +346,6 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         for (let i = 0; i < moonCreations.length; i++) {
             const creation = moonCreations[i]!;
-
             const parentBody = planetBodies[creation.parentIndex] as Body | undefined;
             const parentCelestial = parentBody as unknown as CelestialBody;
             if (!parentCelestial || parentCelestial._isDisposed) continue;
@@ -435,13 +370,11 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         for (let i = 0; i < asteroidCreations.length; i++) {
             const creation = asteroidCreations[i]!;
-
             const asteroidBody = createAsteroidBodyFromProceduralCreation(
                 this.dependencies,
                 this.scene,
                 creation
             );
-
             bodies.push(asteroidBody);
         }
 

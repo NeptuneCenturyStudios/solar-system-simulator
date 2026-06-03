@@ -1,42 +1,22 @@
 import * as THREE from 'three';
-import { SeededRandom } from '../utilities/prng';
-import { EARTH_DIST } from '../utilities/consts';
 import type { StarParams } from '../utilities/body-params';
-import { generateProceduralBodyName } from './body-naming';
-import type { ProceduralPlanetCreation } from './planet-factory';
-import { PlanetBodyType, ProceduralPlanetSubtype } from './planet-factory';
-import { randomPlanetParams } from '../utilities/body-params';
+import { EARTH_DIST } from '../utilities/consts';
 import { calculateOrbitalSpeed } from '../physics/physics';
 import { IStateDependencies } from '../interfaces';
 import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
+import { generateProceduralBodyName } from './body-naming';
+import type { ProceduralPlanetCreation } from './planet-factory';
+import { PlanetBodyType, type ProceduralPlanetSubtype } from './planet-factory';
+import { randomPlanetParams } from '../utilities/body-params';
+import { SeededRandom } from '../utilities/prng';
+
+import { buildUnitPositionDirection, safeUnitCross } from './orbital-math';
+import { rngFor } from './seed-utils';
 
 type StarPlacement = {
     pos: THREE.Vector3;
     vel: THREE.Vector3;
 };
-
-function applyYawY(v: THREE.Vector3, yawRad: number): THREE.Vector3 {
-    const out = v.clone();
-    out.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawRad);
-    return out;
-}
-
-function applyInclinationX(v: THREE.Vector3, inclinationRad: number): THREE.Vector3 {
-    const out = v.clone();
-    out.applyAxisAngle(new THREE.Vector3(1, 0, 0), inclinationRad);
-    return out;
-}
-
-function buildUnitPositionDirection(
-    phiRad: number,
-    yawRad: number,
-    inclinationRad: number
-): THREE.Vector3 {
-    const uBase = new THREE.Vector3(Math.cos(phiRad), 0, Math.sin(phiRad));
-    const uYaw = applyYawY(uBase, yawRad);
-    const u = applyInclinationX(uYaw, inclinationRad).normalize();
-    return u;
-}
 
 function pickWeighted<T>(rng: SeededRandom, choices: Array<{ value: T; weight: number }>): T {
     const totalWeight = choices.reduce((sum, c) => sum + Math.max(0, c.weight), 0);
@@ -124,27 +104,15 @@ function planetSubtypeToCustomPlanetTypeString(subtype: PlanetTypeEnum): Procedu
     return 'solid';
 }
 
-function safeUnitCross(a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3 {
-    const out = new THREE.Vector3().crossVectors(a, b);
-    if (out.lengthSq() < 1e-12) {
-        // Degenerate: pick a stable fallback orthogonal-ish vector.
-        const fallback =
-            Math.abs(a.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-        out.copy(new THREE.Vector3().crossVectors(a, fallback));
-    }
-    out.normalize();
-    return out;
-}
-
 export function generateProceduralPlanets(params: {
     dependencies: IStateDependencies;
     masterSeed: string;
-    prng: SeededRandom;
+
     planetCount: number;
     starParams: StarParams[];
     starPlacements: StarPlacement[];
 }): ProceduralPlanetCreation[] {
-    const { dependencies, masterSeed, prng, planetCount, starParams, starPlacements } = params;
+    const { dependencies, masterSeed, planetCount, starParams, starPlacements } = params;
 
     if (planetCount <= 0) return [];
 
@@ -158,13 +126,18 @@ export function generateProceduralPlanets(params: {
     const minAU = minDistWorld / EARTH_DIST;
     const maxAU = maxDistWorld / EARTH_DIST;
 
-    // Distances first (deterministic), then sort for near->far subtype weighting.
+    // Distances first: generate deterministic per-planet candidate distances,
+    // then sort to establish near->far indices used for subtype weighting.
     const distances: number[] = [];
-    for (let i = 0; i < planetCount; i++) {
+    for (let k = 0; k < planetCount; k++) {
+        const distanceRng = rngFor(masterSeed, 'planetDistance', k);
+
         const logMin = Math.log(Math.max(1e-6, minAU));
         const logMax = Math.log(Math.max(logMin + 1e-6, maxAU));
-        const u = prng.next();
+
+        const u = distanceRng.next();
         const au = Math.exp(logMin + u * (logMax - logMin));
+
         distances.push(au * EARTH_DIST);
     }
     distances.sort((a, b) => a - b);
@@ -175,11 +148,14 @@ export function generateProceduralPlanets(params: {
         const distance = distances[i]!;
         const distanceT01 = planetCount <= 1 ? 0 : i / Math.max(1, planetCount - 1);
 
-        // Dwarf roll (10%)
-        const isDwarf = prng.chance(0.1);
+        // Each planetary attribute comes from its own derived RNG stream,
+        // so generation is stable even if other generators change call order.
+        const dwarfRng = rngFor(masterSeed, 'planetDwarf', i);
+        const isDwarf = dwarfRng.chance(0.1);
 
+        const subtypeRng = rngFor(masterSeed, 'planetSubtype', i);
         const subtype = pickPlanetSubtypeByDistance({
-            rng: prng,
+            rng: subtypeRng,
             distanceT01,
             isDwarf,
         });
@@ -190,43 +166,40 @@ export function generateProceduralPlanets(params: {
         const hostStar = starParams[starIndex]!;
         const hostPlacement = starPlacements[starIndex]!;
 
-        // Planet subtype drives mass/radius ranges:
         const customTypeString = planetSubtypeToCustomPlanetTypeString(subtype);
         const subSeed = `${masterSeed}|planet:${i}|star:${starIndex}|type:${customTypeString}|t:${distanceT01.toFixed(3)}`;
+
         const planetParams = randomPlanetParams(customTypeString, {
-            // Seed ensures procedural determinism if caller reruns with same masterSeed.
             seed: subSeed,
         });
 
+        const orbitalRng = rngFor(masterSeed, 'planetOrbit', i);
+
         // Biased-low inclination:
         // u^2 biases heavily toward 0, but still allows up to 90.
-        const inclinationDeg = Math.pow(prng.next(), 2.0) * 90;
+        const inclinationDeg = Math.pow(orbitalRng.next(), 2.0) * 90;
         const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
-        // Orbital plane orientation
-        const yawRad = prng.range(0, Math.PI * 2);
+        const yawRad = orbitalRng.range(0, Math.PI * 2);
+        const phiRad = orbitalRng.range(0, Math.PI * 2);
 
-        // Random phase angle in the orbital plane
-        const phiRad = prng.range(0, Math.PI * 2);
-
-        // Radial direction within that orbital plane
+        // Unit radial direction within orbital plane
         const u = buildUnitPositionDirection(phiRad, yawRad, inclinationRad);
 
         // Orbital normal for tangential direction
+        // (same math as earlier module: build normal from yaw+inclination)
         const normalBase = new THREE.Vector3(0, 1, 0);
-        const nYaw = applyYawY(normalBase, yawRad);
-        const normal = applyInclinationX(nYaw, inclinationRad).normalize();
+        const nYaw = normalBase.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), yawRad);
+        const normal = nYaw.applyAxisAngle(new THREE.Vector3(1, 0, 0), inclinationRad).normalize();
 
-        const tangentialDir = safeUnitCross(normal, u); // perpendicular to u in orbital plane
+        const tangentialDir = safeUnitCross(normal, u);
 
-         // Eccentricity in [0..0.6], mapped into speed factor (0 => circular)
-        const eccentricity = prng.range(0, 0.6);
+        const eccentricity = orbitalRng.range(0, 0.6);
         const speed = calculateOrbitalSpeed(dependencies.getG(), distance, hostStar.mass, eccentricity);
-        
+
         const pos = hostPlacement.pos.clone().addScaledVector(u, distance);
         const vel = hostPlacement.vel.clone().addScaledVector(tangentialDir, speed);
 
-        // Name + ids
         const id = `proc_planet_${i}_${subSeed}`;
         const sequenceNumber = i + 1;
 
@@ -236,7 +209,7 @@ export function generateProceduralPlanets(params: {
             planetSubtype: subtype,
         });
 
-        // Texture pool index (deterministic-ish from i)
+        // Texture pool index: deterministic-ish from i (keeps stable across seeds if planetCount fixed).
         const textureIndex = i;
 
         planetCreations.push({

@@ -2038,6 +2038,12 @@ function spawn({
         simulationState.bodies = bodies;
         syncAllStarLightTargets();
         selectedBody = null;
+
+        // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
+        // immediately without requiring the user to toggle the checkbox.
+        const shadowCheckboxForSpawn = document.getElementById('enableShadows') as HTMLInputElement;
+        toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
+
         return;
     }
 
