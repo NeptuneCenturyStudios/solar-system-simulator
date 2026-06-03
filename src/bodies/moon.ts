@@ -1,18 +1,7 @@
 import * as THREE from 'three';
-import type { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces';
-import type { ITidalLockOptions } from './celestial-body';
+import type { IMoonCreationOptions, IStateDependencies } from '../interfaces';
 import { CelestialBody } from './celestial-body';
 import { BodyTypeEnum, MoonTypeEnum } from './body-enums';
-
-export interface IMoonCreationOptions extends ICelestialBodyCreationOptions {
-    distance: number;
-    angle: number;
-    yVariation: number;
-    tidalLock: ITidalLockOptions;
-
-    /** Solid-like moon texture classification (excludes gas/ice categories). */
-    moonType: MoonTypeEnum;
-}
 
 /**
  * Procedural/custom "Moon" body.

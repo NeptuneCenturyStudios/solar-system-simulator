@@ -1,25 +1,19 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
-import { SCALE_FACTOR, ISS_RADIUS } from '../utilities/consts.js';
+import { ISS_RADIUS } from '../utilities/consts.js';
 import { ISatelliteCreationOptions, IStateDependencies } from '../interfaces';
 import { Satellite } from './satellite.js';
-
-const SF = SCALE_FACTOR / SCALE_FACTOR;
-
-
 
 /**
  * ISS
  */
 export class ISS extends Satellite {
     /**
-     * Constructs a new Spaceship object with camera offsets and placeholder geometry.
-     * @param dependencies External dependencies for the spaceship.
-     * @param scene The THREE.Scene to which the spaceship belongs.
-     * @param position The initial position of the spaceship.
-     * @param velocity The initial velocity of the spaceship.
-     * @param id Unique identifier for the spaceship.
+     * Constructs a new ISS object with camera offsets and placeholder geometry.
+     * @param dependencies External dependencies for the ISS.
+     * @param scene The THREE.Scene to which the ISS belongs.
+     * @param options Creation options for the ISS.
      */
     constructor(
         dependencies: IStateDependencies,
@@ -56,7 +50,7 @@ export class ISS extends Satellite {
                 const size = new THREE.Vector3();
                 bbox.getSize(size);
                 const longestDim = Math.max(size.x, size.y, size.z);
-                const scale = (ISS_RADIUS * SF) / longestDim;
+                const scale = ISS_RADIUS / longestDim;
                 group.scale.setScalar(scale);
 
                 // Re-compute bbox after scaling to find the center.
@@ -85,7 +79,7 @@ export class ISS extends Satellite {
                 this.mesh.add(group);
             })
             .catch((e) => {
-                console.warn('Spaceship OBJ/MTL load failed — using placeholder mesh', e);
+                console.warn('ISS OBJ/MTL load failed — using placeholder mesh', e);
             });
     }
 }

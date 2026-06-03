@@ -51,10 +51,14 @@ export interface ISatelliteBasicCreationOptions extends IBodyCreationOptions {
 }
 
 export interface ISatelliteCreationOptions extends ICelestialBodyCreationOptions {
+    distance: number;
     angle: number;
     yVariation: number;
-    distance: number;
     tidalLock: ITidalLockOptions;
+}
+
+export interface IMoonCreationOptions extends ISatelliteCreationOptions {
+    moonType: MoonTypeEnum;
 }
 
 export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {
