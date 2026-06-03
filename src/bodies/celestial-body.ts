@@ -201,11 +201,9 @@ export class CelestialBody extends Body {
                 })
             );
 
-            // Orient rings with planet tilt
-            if (rotation && typeof rotation.tilt === 'number') {
-                const tiltRad = (rotation.tilt * Math.PI) / 180;
-                this.rings.rotation.x = tiltRad;
-            }
+            // Orient rings to match planet orientation (tilt + azimuth) exactly.
+            // Rings must follow the full mesh quaternion, otherwise the ring plane can drift.
+            this.rings.quaternion.copy(this.mesh.quaternion);
 
             scene.add(this.rings);
         }
@@ -464,7 +462,7 @@ export class CelestialBody extends Body {
 
         if (this.rings) {
             this.rings.position.copy(this.mesh.position);
-            this.rings.rotation.y += 0.001 * (dt * 60);
+            this.rings.quaternion.copy(this.mesh.quaternion);
         }
     }
 

@@ -51,6 +51,8 @@ export class ManagementPanel extends Panel {
     moonTypeSelect: HTMLSelectElement | null;
     hasAtmosphereRow: HTMLElement | null;
     hasAtmosphereCheckbox: HTMLInputElement | null;
+    hasRingsRow: HTMLElement | null;
+    hasRingsCheckbox: HTMLInputElement | null;
     randomizeCreateBtn: HTMLButtonElement | null;
     randomizeCreateRow: HTMLElement | null;
 
@@ -158,6 +160,8 @@ export class ManagementPanel extends Panel {
         this.moonTypeSelect = null;
         this.hasAtmosphereRow = null;
         this.hasAtmosphereCheckbox = null;
+        this.hasRingsRow = null;
+        this.hasRingsCheckbox = null;
         this.randomizeCreateBtn = null;
         this.randomizeCreateRow = null;
 
@@ -272,6 +276,10 @@ export class ManagementPanel extends Panel {
         this.hasAtmosphereRow = document.getElementById('hasAtmosphereRow');
         this.hasAtmosphereCheckbox = document.getElementById(
             'hasAtmosphere'
+        ) as HTMLInputElement | null;
+        this.hasRingsRow = document.getElementById('hasRingsRow');
+        this.hasRingsCheckbox = document.getElementById(
+            'hasRings'
         ) as HTMLInputElement | null;
         this.randomizeCreateBtn = document.getElementById(
             'randomizeCreateBtn'
@@ -554,6 +562,8 @@ export class ManagementPanel extends Panel {
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
                 if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
+                if (this.hasRingsRow) this.hasRingsRow.style.display = 'none';
+                if (this.hasRingsCheckbox) this.hasRingsCheckbox.checked = false;
                 if (this.createMassGroup) this.createMassGroup.style.display = 'none';
                 if (this.createTemperatureGroup) this.createTemperatureGroup.style.display = 'none';
                 if (this.createLightIntensityGroup)
@@ -580,6 +590,8 @@ export class ManagementPanel extends Panel {
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
                 if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
+                if (this.hasRingsRow) this.hasRingsRow.style.display = 'none';
+                if (this.hasRingsCheckbox) this.hasRingsCheckbox.checked = false;
                 if (this.createTiltGroup) this.createTiltGroup.style.display = 'none';
                 if (this.createAzimuthGroup) this.createAzimuthGroup.style.display = 'none';
                 if (this.moonValidationMessage)
@@ -640,6 +652,13 @@ export class ManagementPanel extends Panel {
                 if (this.hasAtmosphereCheckbox && !canHaveAtmosphere)
                     this.hasAtmosphereCheckbox.checked = false;
 
+                // Rings are planet-only (never for moons)
+                const canHaveRings = bodyType === 'planet';
+                if (this.hasRingsRow)
+                    this.hasRingsRow.style.display = canHaveRings ? 'flex' : 'none';
+                if (this.hasRingsCheckbox && !canHaveRings)
+                    this.hasRingsCheckbox.checked = false;
+
                 this.validateMoonCreation();
             } else {
                 [
@@ -675,6 +694,8 @@ export class ManagementPanel extends Panel {
                 if (this.planetTypeGroup) this.planetTypeGroup.style.display = 'none';
                 if (this.hasAtmosphereRow) this.hasAtmosphereRow.style.display = 'none';
                 if (this.hasAtmosphereCheckbox) this.hasAtmosphereCheckbox.checked = false;
+                if (this.hasRingsRow) this.hasRingsRow.style.display = 'none';
+                if (this.hasRingsCheckbox) this.hasRingsCheckbox.checked = false;
                 // Stars have axial tilt/azimuth too
                 if (this.createTiltGroup) this.createTiltGroup.style.display = 'block';
                 if (this.createAzimuthGroup) this.createAzimuthGroup.style.display = 'block';
@@ -866,6 +887,13 @@ export class ManagementPanel extends Panel {
                         ? !!this.hasAtmosphereCheckbox.checked
                         : false;
 
+                const hasRings =
+                    this.hasRingsCheckbox &&
+                    this.hasRingsRow &&
+                    this.hasRingsRow.style.display !== 'none'
+                        ? !!this.hasRingsCheckbox.checked
+                        : false;
+
                 const customMass =
                     this.createMassInput && this.createMassGroup?.style.display !== 'none'
                         ? parseFloat(this.createMassInput.value)
@@ -899,6 +927,7 @@ export class ManagementPanel extends Panel {
                     orbitType,
                     inclination,
                     hasAtmosphere,
+                    hasRings,
                     customMass,
                     customTemperature,
                     customLightIntensity,
@@ -1160,6 +1189,14 @@ export class ManagementPanel extends Panel {
             this.hasAtmosphereRow?.style.display !== 'none'
         ) {
             this.hasAtmosphereCheckbox.checked = randBool();
+        }
+
+        if (
+            type === 'planet' &&
+            this.hasRingsCheckbox &&
+            this.hasRingsRow?.style.display !== 'none'
+        ) {
+            this.hasRingsCheckbox.checked = randBool();
         }
 
         if (type === 'planet') {

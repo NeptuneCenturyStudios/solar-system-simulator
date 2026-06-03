@@ -46,6 +46,12 @@ export type ProceduralPlanetCreation = {
     rotationSpeed: number;
 
     /**
+     * Optional override for whether this planet should have rings.
+     * UI-only feature: only applies to planets (not dwarf planets).
+     */
+    hasRings?: boolean;
+
+    /**
      * For texture pools with multiple options:
      * - 'solid' uses fictionalTextures
      * - 'gas_giant' uses fictionalGasTextures
@@ -142,12 +148,17 @@ export function createPlanetBodyFromProceduralCreation(
     const SOLID_RINGS_PROB = 0.08;
 
     const ringRng = new SeededRandom(`${id}|rings-enabled`);
-    const hasRings =
+    const hasRingsProbabilistic =
         bodySubtype === PlanetTypeEnum.GasGiant
             ? ringRng.chance(GAS_GIANT_RINGS_PROB)
             : bodySubtype === PlanetTypeEnum.IceGiant
               ? ringRng.chance(ICE_GIANT_RINGS_PROB)
               : ringRng.chance(SOLID_RINGS_PROB);
+
+    const hasRings =
+        typeof creation.hasRings === 'boolean' && bodyType === BodyTypeEnum.Planet
+            ? creation.hasRings
+            : hasRingsProbabilistic;
 
     const commonOptions = {
         radius,

@@ -105,7 +105,6 @@ import {
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
     isBodyType,
-    pickRandom,
     createUniqueId,
     BodyTypeEnum,
     generateIAUName,
@@ -1369,6 +1368,7 @@ function createNewBody(
     orbitType = 'circular',
     inclination = 0,
     hasAtmosphere = false,
+    hasRings = false,
     customMass: number | null = null,
     customTemperature: number | null = null,
     customLightIntensity: number | null = null,
@@ -1475,6 +1475,7 @@ function createNewBody(
             radius: planetRadius,
             mass: planetMass,
             rotationSpeed: planetRotationSpeed,
+            hasRings,
         });
 
         // Optional atmosphere/cloud layer (checkbox-driven for custom solid + volcanic planets)
@@ -5524,6 +5525,7 @@ uiManager.managementPanel.on(
         orbitType,
         inclination,
         hasAtmosphere,
+        hasRings,
         customMass,
         customTemperature,
         customLightIntensity,
@@ -5537,6 +5539,7 @@ uiManager.managementPanel.on(
         orbitType: string;
         inclination: number;
         hasAtmosphere: boolean;
+        hasRings: boolean;
         customMass: number | null;
         customTemperature: number | null;
         customLightIntensity: number | null;
@@ -5551,6 +5554,7 @@ uiManager.managementPanel.on(
             orbitType,
             inclination,
             hasAtmosphere,
+            hasRings,
             customMass,
             customTemperature,
             customLightIntensity,
