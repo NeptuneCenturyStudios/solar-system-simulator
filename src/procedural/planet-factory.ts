@@ -22,6 +22,15 @@ import {
     getDesertTextureAsync,
     type DesertGenerationProgress,
 } from './desert/desert-texture-generator';
+
+// New deterministic, seam-free procedural ocean generator.
+import {
+    getOceanNormalTexture,
+    getOceanNormalTextureAsync,
+    getOceanTextureAsync,
+    type OceanGenerationProgress,
+} from './ocean/ocean-texture-generator';
+
 import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 
 export type ProceduralPlanetSubtype =
@@ -132,6 +141,7 @@ function buildMeshMaterialSync(
 ): THREE.MeshStandardMaterial {
     const { bodySubtype, textureIndex, textureSeed } = creation;
     const isDesert = bodySubtype === PlanetTypeEnum.Desert;
+    const isOcean = bodySubtype === PlanetTypeEnum.Ocean;
 
     const texture =
         bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant
@@ -139,18 +149,24 @@ function buildMeshMaterialSync(
             : pickTextureForSolidSubtype(bodySubtype, textureIndex, textureSeed);
 
     const desertNormalMap = isDesert && textureSeed ? getDesertNormalTexture(textureSeed) : null;
+    const oceanNormalMap = isOcean && textureSeed ? getOceanNormalTexture(textureSeed) : null;
+    const normalMap = desertNormalMap ?? oceanNormalMap;
 
     return new THREE.MeshStandardMaterial({
         map: texture,
-        normalMap: desertNormalMap ?? undefined,
+        normalMap: normalMap ?? undefined,
         // Lower normal strength for deserts so it doesn't look like foil.
-        normalScale: desertNormalMap ? new THREE.Vector2(0.7, 0.7) : undefined,
+        normalScale: normalMap
+            ? isDesert
+                ? new THREE.Vector2(0.7, 0.7)
+                : new THREE.Vector2(0.5, 0.5)
+            : undefined,
         color: 0xffffff, // keep texture untinted
         emissive: 0x000000,
         emissiveIntensity: 0,
         // Deserts should be very non-metallic, very rough.
-        roughness: isDesert ? 0.95 : 0.7,
-        metalness: isDesert ? 0.02 : 0.85,
+        roughness: isDesert ? 0.95 : isOcean ? 0.8 : 0.7,
+        metalness: isDesert ? 0.02 : isOcean ? 0.02 : 0.85,
         transparent: false,
         depthTest: true,
         depthWrite: true,
@@ -194,6 +210,50 @@ async function buildMeshMaterialDesertAsync(
         emissive: 0x000000,
         emissiveIntensity: 0,
         roughness: 0.95,
+        metalness: 0.02,
+        transparent: false,
+        depthTest: true,
+        depthWrite: true,
+    });
+}
+
+async function buildMeshMaterialOceanAsync(
+    creation: ProceduralPlanetCreation,
+    onOceanProgress?: (progress: OceanGenerationProgress) => void,
+    options?: { signal?: AbortSignal }
+): Promise<THREE.MeshStandardMaterial> {
+    const { bodySubtype, textureSeed } = creation;
+    const isOcean = bodySubtype === PlanetTypeEnum.Ocean;
+    if (!isOcean) throw new Error('buildMeshMaterialOceanAsync called for non-ocean');
+
+    if (!textureSeed) {
+        // No seed => fallback to fictional ocean JPG (fast, sync).
+        return new THREE.MeshStandardMaterial({
+            map: fictionalOceanTexture,
+            color: 0xffffff,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.8,
+            metalness: 0.02,
+            transparent: false,
+            depthTest: true,
+            depthWrite: true,
+        });
+    }
+
+    const [color, normal] = await Promise.all([
+        getOceanTextureAsync(textureSeed, onOceanProgress, { signal: options?.signal }),
+        getOceanNormalTextureAsync(textureSeed, onOceanProgress, { signal: options?.signal }),
+    ]);
+
+    return new THREE.MeshStandardMaterial({
+        map: color,
+        normalMap: normal,
+        normalScale: new THREE.Vector2(0.5, 0.5),
+        color: 0xffffff,
+        emissive: 0x000000,
+        emissiveIntensity: 0,
+        roughness: 0.8,
         metalness: 0.02,
         transparent: false,
         depthTest: true,
@@ -251,17 +311,23 @@ export async function createPlanetBodyFromProceduralCreationAsync(
     creation: ProceduralPlanetCreation,
     options?: {
         onDesertProgress?: (progress: DesertGenerationProgress) => void;
+        onOceanProgress?: (progress: OceanGenerationProgress) => void;
         signal?: AbortSignal;
     }
 ): Promise<Planet | DwarfPlanet> {
     const geometry = new THREE.SphereGeometry(creation.radius, 64, 64);
 
     const isDesert = creation.bodySubtype === PlanetTypeEnum.Desert;
+    const isOcean = creation.bodySubtype === PlanetTypeEnum.Ocean;
+
     const onDesertProgress = options?.onDesertProgress;
+    const onOceanProgress = options?.onOceanProgress;
 
     let material: THREE.MeshStandardMaterial;
     if (isDesert) {
-        material = await buildMeshMaterialDesertAsync(creation, onDesertProgress);
+        material = await buildMeshMaterialDesertAsync(creation, onDesertProgress, { signal: options?.signal });
+    } else if (isOcean) {
+        material = await buildMeshMaterialOceanAsync(creation, onOceanProgress, { signal: options?.signal });
     } else {
         material = buildMeshMaterialSync(creation);
     }

@@ -12,6 +12,13 @@ import {
 import type { ProceduralMoonCreation } from './moon-generator';
 import { MoonTypeEnum } from '../bodies/body-enums';
 
+// New deterministic, seam-free procedural ocean generator for ocean moons.
+import {
+    getOceanNormalTextureAsync,
+    getOceanTextureAsync,
+    type OceanGenerationProgress,
+} from './ocean/ocean-texture-generator';
+
 function pickMoonTextureForMoonType(
     moonType: MoonTypeEnum,
     moonTextureIndex: number | undefined
@@ -45,13 +52,60 @@ function createMoonMesh(radius: number, texture: THREE.Texture): THREE.Mesh {
     );
 }
 
-export function createMoonBodyFromProceduralCreation(params: {
-    dependencies: IStateDependencies;
-    scene: THREE.Scene;
-    creation: ProceduralMoonCreation;
-    parent: CelestialBody;
-}): CelestialBody {
-    const { dependencies, scene, creation, parent } = params;
+function createMoonTidalLock(parent: CelestialBody, safeRotationSpeed: number): ITidalLockOptions {
+    void safeRotationSpeed;
+    return {
+        target: parent,
+        spinAxisWorld: new THREE.Vector3(0, 1, 0),
+        faceAxisLocal: new THREE.Vector3(0, 0, 1),
+        angularSpeed: 0,
+    };
+}
+
+async function createOceanMoonMeshAsync(params: {
+    radius: number;
+    textureSeed: string;
+    onOceanProgress?: (progress: OceanGenerationProgress) => void;
+    signal?: AbortSignal;
+}): Promise<THREE.Mesh> {
+    const { radius, textureSeed, onOceanProgress, signal } = params;
+
+    const [color, normal] = await Promise.all([
+        getOceanTextureAsync(textureSeed, onOceanProgress, { signal }),
+        getOceanNormalTextureAsync(textureSeed, onOceanProgress, { signal }),
+    ]);
+
+    const geometry = new THREE.SphereGeometry(radius, 32, 32);
+
+    return new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({
+            map: color,
+            normalMap: normal,
+            normalScale: new THREE.Vector2(0.5, 0.5),
+            color: 0xffffff,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.8,
+            metalness: 0.02,
+            transparent: false,
+            depthTest: true,
+            depthWrite: true,
+        })
+    );
+}
+
+function buildMoon(
+    params: {
+        dependencies: IStateDependencies;
+        scene: THREE.Scene;
+        creation: ProceduralMoonCreation;
+        parent: CelestialBody;
+        mesh: THREE.Mesh;
+    }
+): CelestialBody {
+    const { dependencies, scene, creation, parent, mesh } = params;
+
     const {
         id,
         name,
@@ -64,7 +118,6 @@ export function createMoonBodyFromProceduralCreation(params: {
         angle,
         yVariation,
         moonType,
-        moonTextureIndex,
     } = creation;
 
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
@@ -88,17 +141,7 @@ export function createMoonBodyFromProceduralCreation(params: {
     fixVector(safePos);
     fixVector(safeVel);
 
-    const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex);
-    const mesh = createMoonMesh(safeRadius, texture);
-
-    // angularSpeed=0 => CelestialBody will compute instantaneous omega at first update
-    // based on relative state (pos/vel) it sees at runtime.
-    const tidalLock: ITidalLockOptions = {
-        target: parent,
-        spinAxisWorld: new THREE.Vector3(0, 1, 0),
-        faceAxisLocal: new THREE.Vector3(0, 0, 1),
-        angularSpeed: 0,
-    };
+    const tidalLock: ITidalLockOptions = createMoonTidalLock(parent, safeRotationSpeed);
 
     return new Moon(dependencies, scene, {
         radius: safeRadius,
@@ -122,5 +165,79 @@ export function createMoonBodyFromProceduralCreation(params: {
 
         mesh,
         tidalLock,
+    });
+}
+
+export function createMoonBodyFromProceduralCreation(params: {
+    dependencies: IStateDependencies;
+    scene: THREE.Scene;
+    creation: ProceduralMoonCreation;
+    parent: CelestialBody;
+}): CelestialBody {
+    const { creation } = params;
+
+    const {
+        radius,
+        moonType,
+        moonTextureIndex,
+    } = creation;
+
+    const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
+    const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex);
+    const mesh = createMoonMesh(safeRadius, texture);
+
+    return buildMoon({
+        dependencies: params.dependencies,
+        scene: params.scene,
+        creation,
+        parent: params.parent,
+        mesh,
+    });
+}
+
+export async function createMoonBodyFromProceduralCreationAsync(params: {
+    dependencies: IStateDependencies;
+    scene: THREE.Scene;
+    creation: ProceduralMoonCreation;
+    parent: CelestialBody;
+
+    options?: {
+        onOceanProgress?: (progress: OceanGenerationProgress) => void;
+        signal?: AbortSignal;
+    };
+}): Promise<CelestialBody> {
+    const { creation, options, parent, dependencies, scene } = params;
+
+    const { radius, moonType, textureSeed, moonTextureIndex } = creation;
+
+    const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
+
+    if (moonType === MoonTypeEnum.Ocean && textureSeed) {
+        const mesh = await createOceanMoonMeshAsync({
+            radius: safeRadius,
+            textureSeed,
+            onOceanProgress: options?.onOceanProgress,
+            signal: options?.signal,
+        });
+
+        return buildMoon({
+            dependencies,
+            scene,
+            creation,
+            parent,
+            mesh,
+        });
+    }
+
+    // Fallback to sync pooled textures for non-ocean or missing seed.
+    const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex);
+    const mesh = createMoonMesh(safeRadius, texture);
+
+    return buildMoon({
+        dependencies,
+        scene,
+        creation,
+        parent,
+        mesh,
     });
 }

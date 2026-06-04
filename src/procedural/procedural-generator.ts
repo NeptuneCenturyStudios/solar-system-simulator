@@ -21,7 +21,10 @@ import type {
     ProceduralGenerationReporter,
     ProceduralGenerationWorkUnit,
 } from './procedural-generation-progress';
-import { createMoonBodyFromProceduralCreation } from './moon-factory';
+import {
+    createMoonBodyFromProceduralCreation,
+    createMoonBodyFromProceduralCreationAsync,
+} from './moon-factory';
 import { generateProceduralAsteroids } from './asteroid-generator';
 import { createAsteroidBodyFromProceduralCreation } from './asteroid-factory';
 import { BodyTypeEnum } from '../bodies/body-enums';
@@ -576,11 +579,12 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
             if (!parentCelestial || parentCelestial._isDisposed) continue;
 
-            const moonBody = createMoonBodyFromProceduralCreation({
+            const moonBody = await createMoonBodyFromProceduralCreationAsync({
                 dependencies: this.dependencies,
                 scene: this.scene,
                 creation,
                 parent: parentCelestial,
+                options: { onOceanProgress: () => {}, signal },
             });
 
             bodies.push(moonBody);

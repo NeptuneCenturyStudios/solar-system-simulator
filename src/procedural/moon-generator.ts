@@ -29,6 +29,12 @@ export type ProceduralMoonCreation = {
     /** Optional deterministic pool index (comes from the parent planet creation). */
     moonTextureIndex?: number;
 
+    /**
+     * Seed used for deterministic ocean textures (procedural ocean generator).
+     * Only set for ocean-type moons.
+     */
+    textureSeed?: string;
+
     parentIndex: number;
 };
 
@@ -245,6 +251,9 @@ export function generateProceduralMoons(params: {
             // Texture index should also be per-moon for terrestrial-type pooling.
             const moonTextureIndex = Math.floor(typeRng.next() * 10_000);
 
+            const textureSeed =
+                moonType === MoonTypeEnum.Ocean ? `${moonSeed}|ocean-texture-seed` : undefined;
+
             out.push({
                 id,
                 name,
@@ -261,6 +270,7 @@ export function generateProceduralMoons(params: {
 
                 moonType,
                 moonTextureIndex,
+                textureSeed,
 
                 parentIndex: planetIndex,
             });
