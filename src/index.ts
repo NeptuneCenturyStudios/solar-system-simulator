@@ -1919,16 +1919,8 @@ async function spawn({
 
     // Clean up any existing explosions first
     simulationState.explosions.forEach((explosion) => {
-        if (explosion.points) {
-            scene.remove(explosion.points);
-            explosion.geometry?.dispose();
-            explosion.material?.dispose();
-        }
-        if (explosion.flashSphere) {
-            scene.remove(explosion.flashSphere);
-            explosion.flashSphere.geometry?.dispose();
-            (explosion.flashSphere.material as THREE.MeshBasicMaterial)?.dispose();
-        }
+        // ParticleExplosion.dispose() removes/diposes ALL meshes it spawns (including shockwave ring).
+        explosion.dispose();
     });
     simulationState.explosions = [];
 

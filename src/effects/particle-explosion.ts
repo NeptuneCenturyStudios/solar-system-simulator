@@ -64,7 +64,8 @@ export class ParticleExplosion implements IEffect {
         }
         this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
         // Brighten the color by mixing it with white
-        const brightColor = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.5);
+        // More white-hot mixing so the particles read as hotter.
+        const brightColor = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.75);
         this.material = new THREE.PointsMaterial({
             color: brightColor,
             // Larger particles so they're visible when zoomed in close.
@@ -120,29 +121,58 @@ export class ParticleExplosion implements IEffect {
             Math.random() - 0.5
         ).normalize();
         const swGeo = new THREE.RingGeometry(0.9, 1.0, 64);
-        const swMat = new THREE.MeshBasicMaterial({
-            color: brightColor,
+
+        // Deterministic flame-like ring:
+        // - Outer rim stays hot/brighter
+        // - Inner edge is more translucent (fades toward center)
+        // - Overall opacity fades out over the ring lifetime (set in update()).
+        const swMat = new THREE.ShaderMaterial({
             transparent: true,
-            opacity: 1.5,
             blending: THREE.AdditiveBlending,
-            side: THREE.DoubleSide,
             depthWrite: false,
             depthTest: false,
+            side: THREE.DoubleSide,
+            uniforms: {
+                uBaseColor: { value: brightColor.clone() },
+                uWarm: { value: new THREE.Color(0xff8c1a) },
+                uHot: { value: new THREE.Color(0xfff2cc) },
+                uRingOpacity: { value: 1.5 },
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying vec2 vUv;
+                uniform vec3 uBaseColor;
+                uniform vec3 uWarm;
+                uniform vec3 uHot;
+                uniform float uRingOpacity;
+
+                void main() {
+                    float t = clamp(vUv.y, 0.0, 1.0);
+
+                    float rim = pow(t, 0.8);
+                    float core = smoothstep(0.15, 1.0, t);
+                    float flame = rim * core;
+
+                    // Mostly translucent near inner edge
+                    flame = mix(0.08, 1.0, flame);
+
+                    // Warm → hot tint
+                    vec3 warmMix = mix(uBaseColor, uWarm, 0.55 * flame);
+                    vec3 hotMix  = mix(warmMix, uHot, 0.35 * flame);
+
+                    float alpha = uRingOpacity * flame;
+
+                    gl_FragColor = vec4(hotMix, alpha);
+                }
+            `,
         });
-        // Glowing rim: vUv.y runs 0 (inner edge) → 1 (outer edge) across the ring width.
-        // We brighten the centre of the band and fade the edges, matching the other glow effects.
-        swMat.onBeforeCompile = (shader) => {
-            shader.fragmentShader = shader.fragmentShader.replace(
-                'outgoingLight = diffuseColor.rgb;',
-                `outgoingLight = diffuseColor.rgb;
-                float _edge = abs(vUv.y - 0.5) * 2.0; // 0 at band centre, 1 at edges
-                if (_edge >= 1.0) discard;
-                float _glow = pow(1.0 - _edge, 1.2);
-                outgoingLight = mix(outgoingLight, vec3(1.0),
-                                    pow(max(0.0, 1.0 - _edge * 1.3), 2.5));
-                diffuseColor.a *= _glow;`
-            );
-        };
+
         this.shockwave = new THREE.Mesh(swGeo, swMat);
         this.shockwave.renderOrder = 1;
         this.shockwave.position.copy(pos);
@@ -189,20 +219,43 @@ export class ParticleExplosion implements IEffect {
         // Shockwave ring
         if (this.shockwave) {
             this.swCurrentRadius += this.swExpansionRate * (dt * 60);
-            const progress =
+
+            const rawProgress =
                 (this.swCurrentRadius - this.swStartRadius) /
                 (this.swMaxRadius - this.swStartRadius);
-            (this.shockwave.material as THREE.MeshBasicMaterial).opacity =
-                // pow exponent < 1 keeps opacity high for most of the life then
-                // drops off sharply near the end — much more gradual than linear.
-                Math.max(0, 1.5 * Math.pow(1.0 - progress, 0.4));
-            this.shockwave.scale.setScalar(this.swCurrentRadius);
+
+            // Start fading immediately (right as it begins expanding),
+            // but keep the fade smooth so it doesn't “blip”.
+            const fadeStart = 0.0;
+            const fadeEnd = 2.2; // longer fade window so it fades slower
+
+            // Ring keeps expanding; no clamping.
+            const scaleRadius =
+                this.swStartRadius + rawProgress * (this.swMaxRadius - this.swStartRadius);
+
+            const ringMat = this.shockwave.material as THREE.ShaderMaterial;
+
+            const fadeProgress = Math.min(
+                Math.max(0, rawProgress - fadeStart) / (fadeEnd - fadeStart),
+                1.0
+            );
+
+            // Start very bright, then slowly fade (curved, not linear).
+            const baseOpacity = 2.2;
+            const fadeExponent = 1.25;
+            ringMat.uniforms.uRingOpacity.value = Math.max(
+                0,
+                baseOpacity * Math.pow(1.0 - fadeProgress, fadeExponent)
+            );
+
+            this.shockwave.scale.setScalar(scaleRadius);
             this.shockwave.position.copy(this.flashWorldPos);
 
-            if (progress >= 1.0) {
+            // Remove when fade is complete.
+            if (fadeProgress >= 1.0) {
                 this.scene.remove(this.shockwave);
                 this.shockwave.geometry.dispose();
-                (this.shockwave.material as THREE.MeshBasicMaterial).dispose();
+                ringMat.dispose();
                 this.shockwave = null;
             }
         }
@@ -251,9 +304,10 @@ export class ParticleExplosion implements IEffect {
 
             // Shockwave may already be cleaned up above
             if (this.shockwave) {
+                const ringMat = this.shockwave.material as THREE.ShaderMaterial;
                 this.scene.remove(this.shockwave);
                 this.shockwave.geometry.dispose();
-                (this.shockwave.material as THREE.MeshBasicMaterial).dispose();
+                ringMat.dispose();
                 this.shockwave = null;
             }
 
@@ -264,6 +318,33 @@ export class ParticleExplosion implements IEffect {
     }
 
     dispose() {
-        // TODO: This method should be called by the manager when active becomes false, to ensure all resources are freed.
+        // Be robust: spawn/relaunch cleanup may call dispose even if update() never ran to completion.
+        this.active = false;
+
+        // Remove shockwave ring (this is the most likely "blast ring" leftover).
+        if (this.shockwave) {
+            const ringMat = this.shockwave.material as THREE.ShaderMaterial;
+            this.scene.remove(this.shockwave);
+            this.shockwave.geometry.dispose();
+            ringMat.dispose();
+            this.shockwave = null;
+        }
+
+        // Remove flash sphere.
+        if (this.flashSphere) {
+            this.scene.remove(this.flashSphere);
+            this.flashSphere.geometry.dispose();
+            (this.flashSphere.material as THREE.MeshBasicMaterial).dispose();
+            this.flashSphere = null;
+        }
+
+        // Remove points system.
+        if (this.points) {
+            this.scene.remove(this.points);
+        }
+
+        // Dispose GPU resources.
+        this.geometry?.dispose();
+        this.material?.dispose();
     }
 }
