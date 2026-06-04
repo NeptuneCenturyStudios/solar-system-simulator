@@ -14,6 +14,8 @@ import { MoonTypeEnum } from '../bodies/body-enums';
 
 // New deterministic, seam-free procedural ocean generator for ocean moons.
 import {
+    getOceanTexture,
+    getOceanNormalTexture,
     getOceanNormalTextureAsync,
     getOceanTextureAsync,
     type OceanGenerationProgress,
@@ -21,10 +23,14 @@ import {
 
 function pickMoonTextureForMoonType(
     moonType: MoonTypeEnum,
-    moonTextureIndex: number | undefined
+    moonTextureIndex: number | undefined,
+    textureSeed?: string
 ): THREE.Texture {
     if (moonType === MoonTypeEnum.Volcanic) return fictionalVolcanicTexture;
-    if (moonType === MoonTypeEnum.Ocean) return fictionalOceanTexture;
+    if (moonType === MoonTypeEnum.Ocean) {
+        if (textureSeed) return getOceanTexture(textureSeed);
+        return fictionalOceanTexture;
+    }
     if (moonType === MoonTypeEnum.Frozen) return fictionalFrozenTexture;
     if (moonType === MoonTypeEnum.Desert) return fictionalDesertTexture;
 
@@ -33,23 +39,24 @@ function pickMoonTextureForMoonType(
     return fictionalTextures[idx % fictionalTextures.length]!;
 }
 
-function createMoonMesh(radius: number, texture: THREE.Texture): THREE.Mesh {
+function createMoonMesh(radius: number, texture: THREE.Texture, isOcean?: boolean): THREE.Mesh {
     const geometry = new THREE.SphereGeometry(radius, 32, 32);
 
-    return new THREE.Mesh(
-        geometry,
-        new THREE.MeshStandardMaterial({
-            map: texture,
-            color: 0xffffff,
-            emissive: 0x000000,
-            emissiveIntensity: 0,
-            roughness: 0.7,
-            metalness: 0.7,
-            transparent: false,
-            depthTest: true,
-            depthWrite: true,
-        })
-    );
+    const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        normalMap: null,
+        normalScale: undefined,
+        color: 0xffffff,
+        emissive: 0x000000,
+        emissiveIntensity: 0,
+        roughness: isOcean ? 0.8 : 0.7,
+        metalness: isOcean ? 0.02 : 0.7,
+        transparent: false,
+        depthTest: true,
+        depthWrite: true,
+    });
+
+    return new THREE.Mesh(geometry, material);
 }
 
 function createMoonTidalLock(parent: CelestialBody, safeRotationSpeed: number): ITidalLockOptions {
@@ -180,11 +187,23 @@ export function createMoonBodyFromProceduralCreation(params: {
         radius,
         moonType,
         moonTextureIndex,
+        textureSeed,
     } = creation;
 
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
-    const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex);
-    const mesh = createMoonMesh(safeRadius, texture);
+    const isOcean = moonType === MoonTypeEnum.Ocean;
+
+    const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex, textureSeed);
+    const mesh = createMoonMesh(safeRadius, texture, isOcean);
+
+    // For ocean moons: also attach the normal map from the procedural generator.
+    if (isOcean && textureSeed) {
+        const normalMap = getOceanNormalTexture(textureSeed);
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        mat.normalMap = normalMap;
+        mat.normalScale = new THREE.Vector2(0.5, 0.5);
+        mat.needsUpdate = true;
+    }
 
     return buildMoon({
         dependencies: params.dependencies,

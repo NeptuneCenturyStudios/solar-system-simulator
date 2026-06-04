@@ -25,6 +25,7 @@ import {
 
 // New deterministic, seam-free procedural ocean generator.
 import {
+    getOceanTexture,
     getOceanNormalTexture,
     getOceanNormalTextureAsync,
     getOceanTextureAsync,
@@ -113,12 +114,15 @@ function pickTextureForSolidSubtype(
 ): THREE.Texture {
     // Deterministic custom textures first (match custom creation in index.ts)
     if (subtype === PlanetTypeEnum.Volcanic) return fictionalVolcanicTexture;
-    if (subtype === PlanetTypeEnum.Ocean) return fictionalOceanTexture;
     if (subtype === PlanetTypeEnum.Frozen) return fictionalFrozenTexture;
 
     if (subtype === PlanetTypeEnum.Desert) {
         if (!textureSeed) return fictionalDesertTexture;
         return getDesertTexture(textureSeed);
+    }
+    if (subtype === PlanetTypeEnum.Ocean) {
+        if (!textureSeed) return fictionalOceanTexture;
+        return getOceanTexture(textureSeed);
     }
     if (subtype === PlanetTypeEnum.Temperate) return fictionalTemperateTexture;
 

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { SeededRandom } from '../../utilities/prng';
 import { clamp01, dot, fbm3D, hashStringToU32, mix3, normalizeSafe, smoothstep } from './ocean-noise';
 
-const TEXTURE_WIDTH = 2024;
+const TEXTURE_WIDTH = 2048;
 const TEXTURE_HEIGHT = 1024;
 
 const INTERNAL_WIDTH = TEXTURE_WIDTH;
@@ -34,6 +34,8 @@ type OceanMaps = {
 };
 
 // Caches (deterministic by seed)
+// NOTE: versioned so texture changes force regeneration even for previously-generated seeds.
+const OCEAN_TEXTURE_GENERATOR_REV = 2;
 const colorCache = new Map<string, THREE.Texture>();
 const normalCache = new Map<string, THREE.Texture>();
 const pendingOceanMaps = new Map<string, Promise<OceanMaps>>();
@@ -46,21 +48,21 @@ const pendingOceanMaps = new Map<string, Promise<OceanMaps>>();
 const NOISE_WATER_SCALE = 10.5;
 const NOISE_WATER_OCTAVES = 5;
 
-const NOISE_ISLAND_BASE_SCALE = 20.0;
+const NOISE_ISLAND_BASE_SCALE = 12.0;
 const NOISE_ISLAND_BASE_OCTAVES = 4;
 
-const NOISE_ISLAND_RIDGED_SCALE = 58.0;
+const NOISE_ISLAND_RIDGED_SCALE = 35.0;
 const NOISE_ISLAND_RIDGED_OCTAVES = 3;
 
-const ISLAND_GATE_SCALE = 140.0;
+const ISLAND_GATE_SCALE = 90.0;
 const ISLAND_GATE_OCTAVES = 2;
 
-// Island thresholds (rare)
-const ISLAND_RIDGED_EDGE0 = 0.79;
-const ISLAND_RIDGED_EDGE1 = 0.93;
+// Island thresholds — larger, less frequent islands
+const ISLAND_RIDGED_EDGE0 = 0.60;
+const ISLAND_RIDGED_EDGE1 = 0.85;
 
-const ISLAND_GATE_EDGE0 = 0.55;
-const ISLAND_GATE_EDGE1 = 0.85;
+const ISLAND_GATE_EDGE0 = 0.45;
+const ISLAND_GATE_EDGE1 = 0.78;
 
 // Height shaping
 const WATER_DEPTH = 0.035;
@@ -80,21 +82,21 @@ const POLAR_FLAT_START = 0.65;
 const POLAR_FLAT_END = 0.99;
 const POLAR_DETAIL_MIN = 0.45;
 
-// Palette tuned for deep ocean blue
-const waterDeep: Vec3 = { x: 0.00, y: 0.05, z: 0.18 };
-const waterMid: Vec3 = { x: 0.01, y: 0.16, z: 0.42 };
-const waterShallow: Vec3 = { x: 0.04, y: 0.30, z: 0.55 };
+// Palette tuned for deep, saturated ocean blues + vivid islands (match reference)
+const waterDeep: Vec3 = { x: 0.00, y: 0.050, z: 0.480 };
+const waterMid: Vec3 = { x: 0.00, y: 0.150, z: 0.720 };
+const waterShallow: Vec3 = { x: 0.060, y: 0.340, z: 0.850 };
 
-// Very limited land palette (rare islands)
-const landSand: Vec3 = { x: 0.78, y: 0.72, z: 0.45 };
-const landRock: Vec3 = { x: 0.28, y: 0.34, z: 0.30 };
+// Bright lime/yellow islands (rare land)
+const landSand: Vec3 = { x: 0.70, y: 0.86, z: 0.35 };
+const landRock: Vec3 = { x: 0.22, y: 0.48, z: 0.20 };
 
 // ------------------------------
 // Core generation (sync)
 // ------------------------------
 
 function createOceanMapsForSeed(seed: string): OceanMaps {
-    const cacheKey = seed.trim();
+    const cacheKey = `${OCEAN_TEXTURE_GENERATOR_REV}|${seed.trim()}`;
 
     const cachedColor = colorCache.get(cacheKey);
     const cachedNormal = normalCache.get(cacheKey);
@@ -151,11 +153,6 @@ function createOceanMapsForSeed(seed: string): OceanMaps {
     for (let y = 0; y < INTERNAL_HEIGHT; y++) {
         const sLat = latSin[y]!;
         const cLat = latCos[y]!;
-
-        const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
-        const pole01 = Math.abs(v01Pole - 0.5) / 0.5;
-        const polarFlatRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
-        const normalFlatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * polarFlatRaw;
 
         for (let x = 0; x < INTERNAL_WIDTH; x++) {
             const cLon = lonCos[x]!;
@@ -214,10 +211,23 @@ function createOceanMapsForSeed(seed: string): OceanMaps {
             const islandGate = smoothstep(ISLAND_GATE_EDGE0, ISLAND_GATE_EDGE1, gateN);
 
             const baseMod = smoothstep(0.25, 0.8, 0.5 + 0.5 * islandBase);
+
+            // Vary island size with large-scale continent noise
+            const continentN = fbm3D(
+                xLocalEff * 3.5 + (ox + 2222.2),
+                yLocal * 3.5 + (oy - 1111.1),
+                zLocalEff * 3.5 + (oz + 3333.3),
+                2,
+                seedU32
+            );
+            const continentFactor = 0.5 + 0.5 * continentN;
+            const sizeBoost = 0.5 + 1.5 * continentFactor;
+
             const islandMask = islandRidgedMask * islandGate * baseMod;
+            const islandScaled = clamp01(islandMask * sizeBoost);
 
             // Make islands rare + crisp
-            const islandMaskSharp = Math.pow(clamp01(islandMask), 3.6);
+const islandMaskSharp = Math.pow(islandScaled, 1.6);
 
             // Coast sharp band
             const shoreBand = smoothstep(SHOREBAND_EDGE0, SHOREBAND_EDGE1, islandMaskSharp);
@@ -238,7 +248,9 @@ function createOceanMapsForSeed(seed: string): OceanMaps {
             height[y * INTERNAL_WIDTH + x] = h;
 
             // Color (deep blue + subtle variation)
-            const waterT = clamp01(0.08 + 0.55 * clamp01(0.5 + 0.5 * waterN));
+// Bias toward deeper tones (stronger saturation for washed-out fix)
+const waterTraw = clamp01(0.15 + 0.70 * clamp01(0.5 + 0.5 * waterN));
+const waterT = clamp01(Math.pow(waterTraw, 1.2));
             let col = mix3(waterDeep, waterMid, waterT);
 
             // Very subtle banding
@@ -281,8 +293,8 @@ function createOceanMapsForSeed(seed: string): OceanMaps {
                 col = mix3(col, wetSand, wetT);
             }
 
-            // Polar contrast: reduce overall brightness to keep deep blue
-            const polarContrast = 0.45 + 0.2 * normalFlatMask;
+// No polar darkening — keep colors as-authored
+const polarContrast = 1.0;
             col = { x: col.x * polarContrast, y: col.y * polarContrast, z: col.z * polarContrast };
 
             const r = Math.round(clamp01(col.x) * 255);
@@ -367,8 +379,9 @@ function createOceanMapsForSeed(seed: string): OceanMaps {
     normalTex.wrapS = THREE.RepeatWrapping;
     normalTex.wrapT = THREE.ClampToEdgeWrapping;
     normalTex.generateMipmaps = false;
-    normalTex.minFilter = THREE.LinearFilter;
-    normalTex.magFilter = THREE.LinearFilter;
+    // Keep crisp (avoid normal-map blur/softening)
+    normalTex.minFilter = THREE.NearestFilter;
+    normalTex.magFilter = THREE.NearestFilter;
     normalTex.anisotropy = 16;
     normalTex.needsUpdate = true;
 
@@ -387,7 +400,7 @@ async function getOrCreateOceanMapsForSeedAsync(
     onProgress?: OceanProgressCallback,
     signal?: AbortSignal
 ): Promise<OceanMaps> {
-    const cacheKey = seed.trim();
+    const cacheKey = `${OCEAN_TEXTURE_GENERATOR_REV}|${seed.trim()}`;
 
     const cachedColor = colorCache.get(cacheKey);
     const cachedNormal = normalCache.get(cacheKey);
@@ -459,11 +472,6 @@ async function getOrCreateOceanMapsForSeedAsync(
             const sLat = latSin[y]!;
             const cLat = latCos[y]!;
 
-            const v01Pole = y / Math.max(1, INTERNAL_HEIGHT - 1);
-            const pole01 = Math.abs(v01Pole - 0.5) / 0.5;
-            const polarFlatRaw = 1 - smoothstep(POLAR_FLAT_START, POLAR_FLAT_END, pole01);
-            const normalFlatMask = POLAR_DETAIL_MIN + (1 - POLAR_DETAIL_MIN) * polarFlatRaw;
-
             for (let x = 0; x < INTERNAL_WIDTH; x++) {
                 const cLon = lonCos[x]!;
                 const sLon = lonSin[x]!;
@@ -517,9 +525,22 @@ async function getOrCreateOceanMapsForSeedAsync(
                 const islandGate = smoothstep(ISLAND_GATE_EDGE0, ISLAND_GATE_EDGE1, gateN);
 
                 const baseMod = smoothstep(0.25, 0.8, 0.5 + 0.5 * islandBase);
-                const islandMask = islandRidgedMask * islandGate * baseMod;
 
-                const islandMaskSharp = Math.pow(clamp01(islandMask), 3.6);
+                // Vary island size with large-scale continent noise
+                const continentN = fbm3D(
+                    xLocalEff * 3.5 + (ox + 2222.2),
+                    yLocal * 3.5 + (oy - 1111.1),
+                    zLocalEff * 3.5 + (oz + 3333.3),
+                    2,
+                    seedU32
+                );
+                const continentFactor = 0.5 + 0.5 * continentN;
+                const sizeBoost = 0.5 + 1.5 * continentFactor;
+
+                const islandMask = islandRidgedMask * islandGate * baseMod;
+                const islandScaled = clamp01(islandMask * sizeBoost);
+
+const islandMaskSharp = Math.pow(islandScaled, 1.6);
                 const shoreBand = smoothstep(SHOREBAND_EDGE0, SHOREBAND_EDGE1, islandMaskSharp);
 
                 const waveN = fbm3D(
@@ -536,7 +557,9 @@ async function getOrCreateOceanMapsForSeedAsync(
                 const h = lerp(waterHeight, landHeight, islandMaskSharp);
                 height[y * INTERNAL_WIDTH + x] = h;
 
-                const waterT = clamp01(0.08 + 0.55 * clamp01(0.5 + 0.5 * waterN));
+// Bias toward deeper tones (reference-like)
+const waterTraw = clamp01(0.15 + 0.70 * clamp01(0.5 + 0.5 * waterN));
+const waterT = clamp01(Math.pow(waterTraw, 1.2));
                 let col = mix3(waterDeep, waterMid, waterT);
 
                 const band = clamp01(
@@ -574,7 +597,7 @@ async function getOrCreateOceanMapsForSeedAsync(
                     col = mix3(col, wetSand, wetT);
                 }
 
-                const polarContrast = 0.45 + 0.2 * normalFlatMask;
+const polarContrast = 1.0;
                 col = { x: col.x * polarContrast, y: col.y * polarContrast, z: col.z * polarContrast };
 
                 const r = Math.round(clamp01(col.x) * 255);
@@ -667,8 +690,10 @@ async function getOrCreateOceanMapsForSeedAsync(
         normalTex.wrapS = THREE.RepeatWrapping;
         normalTex.wrapT = THREE.ClampToEdgeWrapping;
         normalTex.generateMipmaps = false;
-        normalTex.minFilter = THREE.LinearFilter;
-        normalTex.magFilter = THREE.LinearFilter;
+// Keep crisp (avoid normal-map blur/softening)
+normalTex.minFilter = THREE.NearestFilter;
+// Keep crisp (avoid normal-map blur/softening)
+normalTex.magFilter = THREE.NearestFilter;
         normalTex.anisotropy = 16;
         normalTex.needsUpdate = true;
 

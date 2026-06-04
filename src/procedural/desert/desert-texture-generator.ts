@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../../utilities/prng';
 
-const TEXTURE_WIDTH = 2024;
+const TEXTURE_WIDTH = 2048;
 const TEXTURE_HEIGHT = 1024;
 
 const INTERNAL_WIDTH = TEXTURE_WIDTH;
