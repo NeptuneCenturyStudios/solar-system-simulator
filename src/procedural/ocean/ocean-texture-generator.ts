@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../../utilities/prng';
-import { clamp01, dot, fbm3D, hashStringToU32, mix3, normalizeSafe, smoothstep } from './ocean-noise';
+import { clamp01, dot, fbm3D, hashStringToU32, lerp, mix3, normalizeSafe, smoothstep } from '../noise-utils';
 
 const TEXTURE_WIDTH = 2048;
 const TEXTURE_HEIGHT = 1024;
@@ -9,10 +9,6 @@ const INTERNAL_WIDTH = TEXTURE_WIDTH;
 const INTERNAL_HEIGHT = TEXTURE_HEIGHT;
 
 type Vec3 = { x: number; y: number; z: number };
-
-function lerp(a: number, b: number, t: number): number {
-    return a + (b - a) * t;
-}
 
 function yieldToEventLoop(): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, 0));
