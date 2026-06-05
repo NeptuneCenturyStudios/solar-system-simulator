@@ -252,7 +252,11 @@ export function generateProceduralMoons(params: {
             const moonTextureIndex = Math.floor(typeRng.next() * 10_000);
 
             const textureSeed =
-                moonType === MoonTypeEnum.Ocean ? `${moonSeed}|ocean-texture-seed` : undefined;
+                moonType === MoonTypeEnum.Ocean
+                    ? `${moonSeed}|ocean-texture-seed`
+                    : moonType === MoonTypeEnum.Desert
+                      ? `${moonSeed}|desert-texture-seed`
+                      : undefined;
 
             out.push({
                 id,

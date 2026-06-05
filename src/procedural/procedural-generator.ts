@@ -584,7 +584,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 scene: this.scene,
                 creation,
                 parent: parentCelestial,
-                options: { onOceanProgress: () => {}, signal },
+                options: { onOceanProgress: () => {}, onDesertProgress: () => {}, signal },
             });
 
             bodies.push(moonBody);

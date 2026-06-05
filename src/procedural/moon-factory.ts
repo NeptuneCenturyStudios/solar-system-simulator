@@ -21,6 +21,15 @@ import {
     type OceanGenerationProgress,
 } from './ocean/ocean-texture-generator';
 
+// New deterministic, seam-free procedural desert generator for desert moons.
+import {
+    getDesertTexture,
+    getDesertNormalTexture,
+    getDesertTextureAsync,
+    getDesertNormalTextureAsync,
+    type DesertGenerationProgress,
+} from './desert/desert-texture-generator';
+
 function pickMoonTextureForMoonType(
     moonType: MoonTypeEnum,
     moonTextureIndex: number | undefined,
@@ -32,7 +41,10 @@ function pickMoonTextureForMoonType(
         return fictionalOceanTexture;
     }
     if (moonType === MoonTypeEnum.Frozen) return fictionalFrozenTexture;
-    if (moonType === MoonTypeEnum.Desert) return fictionalDesertTexture;
+    if (moonType === MoonTypeEnum.Desert) {
+        if (textureSeed) return getDesertTexture(textureSeed);
+        return fictionalDesertTexture;
+    }
 
     // Terrestrial uses pooled random textures deterministically.
     const idx = Math.max(0, moonTextureIndex ?? 0);
@@ -94,6 +106,39 @@ async function createOceanMoonMeshAsync(params: {
             emissive: 0x000000,
             emissiveIntensity: 0,
             roughness: 0.8,
+            metalness: 0.02,
+            transparent: false,
+            depthTest: true,
+            depthWrite: true,
+        })
+    );
+}
+
+async function createDesertMoonMeshAsync(params: {
+    radius: number;
+    textureSeed: string;
+    onDesertProgress?: (progress: DesertGenerationProgress) => void;
+    signal?: AbortSignal;
+}): Promise<THREE.Mesh> {
+    const { radius, textureSeed, onDesertProgress, signal } = params;
+
+    const [color, normal] = await Promise.all([
+        getDesertTextureAsync(textureSeed, onDesertProgress, { signal }),
+        getDesertNormalTextureAsync(textureSeed, onDesertProgress, { signal }),
+    ]);
+
+    const geometry = new THREE.SphereGeometry(radius, 32, 32);
+
+    return new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({
+            map: color,
+            normalMap: normal,
+            normalScale: new THREE.Vector2(0.7, 0.7),
+            color: 0xffffff,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.95,
             metalness: 0.02,
             transparent: false,
             depthTest: true,
@@ -192,17 +237,28 @@ export function createMoonBodyFromProceduralCreation(params: {
 
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
     const isOcean = moonType === MoonTypeEnum.Ocean;
+    const isDesert = moonType === MoonTypeEnum.Desert;
 
     const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex, textureSeed);
     const mesh = createMoonMesh(safeRadius, texture, isOcean);
 
-    // For ocean moons: also attach the normal map from the procedural generator.
-    if (isOcean && textureSeed) {
-        const normalMap = getOceanNormalTexture(textureSeed);
-        const mat = mesh.material as THREE.MeshStandardMaterial;
-        mat.normalMap = normalMap;
-        mat.normalScale = new THREE.Vector2(0.5, 0.5);
-        mat.needsUpdate = true;
+    // Attach normal map from the procedural generator if available.
+    if (textureSeed) {
+        if (isOcean) {
+            const normalMap = getOceanNormalTexture(textureSeed);
+            const mat = mesh.material as THREE.MeshStandardMaterial;
+            mat.normalMap = normalMap;
+            mat.normalScale = new THREE.Vector2(0.5, 0.5);
+            mat.needsUpdate = true;
+        } else if (isDesert) {
+            const normalMap = getDesertNormalTexture(textureSeed);
+            const mat = mesh.material as THREE.MeshStandardMaterial;
+            mat.normalMap = normalMap;
+            mat.normalScale = new THREE.Vector2(0.7, 0.7);
+            mat.roughness = 0.95;
+            mat.metalness = 0.02;
+            mat.needsUpdate = true;
+        }
     }
 
     return buildMoon({
@@ -222,6 +278,7 @@ export async function createMoonBodyFromProceduralCreationAsync(params: {
 
     options?: {
         onOceanProgress?: (progress: OceanGenerationProgress) => void;
+        onDesertProgress?: (progress: DesertGenerationProgress) => void;
         signal?: AbortSignal;
     };
 }): Promise<CelestialBody> {
@@ -248,7 +305,24 @@ export async function createMoonBodyFromProceduralCreationAsync(params: {
         });
     }
 
-    // Fallback to sync pooled textures for non-ocean or missing seed.
+    if (moonType === MoonTypeEnum.Desert && textureSeed) {
+        const mesh = await createDesertMoonMeshAsync({
+            radius: safeRadius,
+            textureSeed,
+            onDesertProgress: options?.onDesertProgress,
+            signal: options?.signal,
+        });
+
+        return buildMoon({
+            dependencies,
+            scene,
+            creation,
+            parent,
+            mesh,
+        });
+    }
+
+    // Fallback to sync pooled textures for non-desert/non-ocean or missing seed.
     const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex);
     const mesh = createMoonMesh(safeRadius, texture);
 
