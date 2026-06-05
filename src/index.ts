@@ -1349,6 +1349,26 @@ function createPresetBody(presetKey: string) {
 
     if (!newBody) return;
 
+    // Reposition preset bodies near the camera (like custom bodies), so the user sees them
+    // immediately rather than spawning at their preset orbital distance (e.g. Pluto at the
+    // edge of the system). The Sun stays at the origin.
+    if (key !== 'sun') {
+        const star = getPrimaryStar();
+        if (star && star.mesh) {
+            const spawnPos = getNearCameraSpawnPos();
+            const spawnVel = computeOrbitVelocityAtPos(
+                spawnPos,
+                star.mesh.position,
+                star.mass,
+                'circular',
+                0,
+                0
+            );
+            newBody.mesh.position.copy(spawnPos);
+            newBody.velocity.copy(spawnVel);
+        }
+    }
+
     simulationState.bodies.push(newBody);
 
     // Notify UI / systems that track live bodies
