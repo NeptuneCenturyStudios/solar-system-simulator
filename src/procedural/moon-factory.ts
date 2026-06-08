@@ -30,6 +30,15 @@ import {
     type DesertGenerationProgress,
 } from './desert/desert-texture-generator';
 
+// New deterministic, seam-free procedural frozen generator for frozen moons.
+import {
+    getFrozenTexture,
+    getFrozenNormalTexture,
+    getFrozenTextureAsync,
+    getFrozenNormalTextureAsync,
+    type FrozenGenerationProgress,
+} from './frozen/frozen-texture-generator';
+
 function pickMoonTextureForMoonType(
     moonType: MoonTypeEnum,
     moonTextureIndex: number | undefined,
@@ -40,7 +49,10 @@ function pickMoonTextureForMoonType(
         if (textureSeed) return getOceanTexture(textureSeed);
         return fictionalOceanTexture;
     }
-    if (moonType === MoonTypeEnum.Frozen) return fictionalFrozenTexture;
+    if (moonType === MoonTypeEnum.Frozen) {
+        if (textureSeed) return getFrozenTexture(textureSeed);
+        return fictionalFrozenTexture;
+    }
     if (moonType === MoonTypeEnum.Desert) {
         if (textureSeed) return getDesertTexture(textureSeed);
         return fictionalDesertTexture;
@@ -147,6 +159,39 @@ async function createDesertMoonMeshAsync(params: {
     );
 }
 
+async function createFrozenMoonMeshAsync(params: {
+    radius: number;
+    textureSeed: string;
+    onFrozenProgress?: (progress: FrozenGenerationProgress) => void;
+    signal?: AbortSignal;
+}): Promise<THREE.Mesh> {
+    const { radius, textureSeed, onFrozenProgress, signal } = params;
+
+    const [color, normal] = await Promise.all([
+        getFrozenTextureAsync(textureSeed, onFrozenProgress, { signal }),
+        getFrozenNormalTextureAsync(textureSeed, onFrozenProgress, { signal }),
+    ]);
+
+    const geometry = new THREE.SphereGeometry(radius, 32, 32);
+
+    return new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({
+            map: color,
+            normalMap: normal,
+            normalScale: new THREE.Vector2(0.5, 0.5),
+            color: 0xffffff,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
+            roughness: 0.7,
+            metalness: 0.05,
+            transparent: false,
+            depthTest: true,
+            depthWrite: true,
+        })
+    );
+}
+
 function buildMoon(
     params: {
         dependencies: IStateDependencies;
@@ -238,6 +283,7 @@ export function createMoonBodyFromProceduralCreation(params: {
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
     const isOcean = moonType === MoonTypeEnum.Ocean;
     const isDesert = moonType === MoonTypeEnum.Desert;
+    const isFrozen = moonType === MoonTypeEnum.Frozen;
 
     const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex, textureSeed);
     const mesh = createMoonMesh(safeRadius, texture, isOcean);
@@ -257,6 +303,14 @@ export function createMoonBodyFromProceduralCreation(params: {
             mat.normalScale = new THREE.Vector2(0.7, 0.7);
             mat.roughness = 0.95;
             mat.metalness = 0.02;
+            mat.needsUpdate = true;
+        } else if (isFrozen) {
+            const normalMap = getFrozenNormalTexture(textureSeed);
+            const mat = mesh.material as THREE.MeshStandardMaterial;
+            mat.normalMap = normalMap;
+            mat.normalScale = new THREE.Vector2(0.5, 0.5);
+            mat.roughness = 0.7;
+            mat.metalness = 0.05;
             mat.needsUpdate = true;
         }
     }
@@ -279,6 +333,7 @@ export async function createMoonBodyFromProceduralCreationAsync(params: {
     options?: {
         onOceanProgress?: (progress: OceanGenerationProgress) => void;
         onDesertProgress?: (progress: DesertGenerationProgress) => void;
+        onFrozenProgress?: (progress: FrozenGenerationProgress) => void;
         signal?: AbortSignal;
     };
 }): Promise<CelestialBody> {
@@ -322,7 +377,24 @@ export async function createMoonBodyFromProceduralCreationAsync(params: {
         });
     }
 
-    // Fallback to sync pooled textures for non-desert/non-ocean or missing seed.
+    if (moonType === MoonTypeEnum.Frozen && textureSeed) {
+        const mesh = await createFrozenMoonMeshAsync({
+            radius: safeRadius,
+            textureSeed,
+            onFrozenProgress: options?.onFrozenProgress,
+            signal: options?.signal,
+        });
+
+        return buildMoon({
+            dependencies,
+            scene,
+            creation,
+            parent,
+            mesh,
+        });
+    }
+
+    // Fallback to sync pooled textures for non-desert/non-ocean/non-frozen or missing seed.
     const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex);
     const mesh = createMoonMesh(safeRadius, texture);
 
