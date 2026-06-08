@@ -11,26 +11,23 @@ import { G } from '../utilities/consts';
 import { generateProceduralBodyName } from './body-naming';
 import { createMainSequenceStarFromParams } from './star-factory';
 import { generateProceduralPlanets } from './planet-generator';
-import {
-    createPlanetBodyFromProceduralCreation,
-    createPlanetBodyFromProceduralCreationAsync,
-} from './planet-factory';
+import { createPlanetBodyFromProceduralCreation } from './planet-factory';
 import { generateProceduralMoons } from './moon-generator';
 
 import type {
     ProceduralGenerationReporter,
     ProceduralGenerationWorkUnit,
 } from './procedural-generation-progress';
-import {
-    createMoonBodyFromProceduralCreation,
-    createMoonBodyFromProceduralCreationAsync,
-} from './moon-factory';
+import { createMoonBodyFromProceduralCreation } from './moon-factory';
 import { generateProceduralAsteroids } from './asteroid-generator';
 import { createAsteroidBodyFromProceduralCreation } from './asteroid-factory';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
 import { applyInclinationX, applyYawY, buildUnitPositionDirection, safeUnitCross } from './orbital-math';
 import { rngFor } from './seed-utils';
+
+// Import the background texture upgrader
+import { upgradeProceduralTexture } from './texture-upgrader';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -74,7 +71,7 @@ function createStarBody(
                 seed: sharedStarNameSeed,
                 sequenceNumber: index + 1,
                 starTemperatureK: params.temperature,
-                starSystemMemberIndex: index, // 0-based
+                starSystemMemberIndex: index,
                 starSystemMemberCount: starCount,
                 starSystemSuffixStyle: 'auto' as const,
             };
@@ -110,15 +107,12 @@ function generateBinaryPlacements(
     const r1 = separationDistance * (m2 / mSum);
     const r2 = separationDistance * (m1 / mSum);
 
-    // Separation direction in orbital plane (choose uBase = +X in base plane, transformed)
-    const u = buildUnitPositionDirection(0, yawRad, inclinationRad); // phi=0 => +X in base
+    const u = buildUnitPositionDirection(0, yawRad, inclinationRad);
 
-    // Orbital-plane normal (used to get consistent perpendicular velocity direction)
     const normalBase = new THREE.Vector3(0, 1, 0);
     const normalYaw = applyYawY(normalBase, yawRad);
     const normal = applyInclinationX(normalYaw, inclinationRad).normalize();
 
-    // Tangential velocity direction for star at +u.
     const velDir = safeUnitCross(normal, u);
 
     const omega = Math.sqrt((G * mSum) / Math.pow(separationDistance, 3));
@@ -149,7 +143,6 @@ function generateTriplePlacements(
     const minRi = maxRadius * 3;
     const maxRi = maxRadius * 40;
 
-    // Orbital-plane normal (shared for all three stars; phi varies per-star).
     const normalBaseVec = new THREE.Vector3(0, 1, 0);
     const normalYaw = applyYawY(normalBaseVec, yawRad);
     const normal = applyInclinationX(normalYaw, inclinationRad).normalize();
@@ -158,16 +151,11 @@ function generateTriplePlacements(
 
     for (let i = 0; i < 3; i++) {
         const phiRad = rngFor(masterSeed, 'triplePhi', i).range(0, Math.PI * 2);
-
-        // Deterministic per-star radius choice.
         const base = minRi + (maxRi - minRi) * rngFor(masterSeed, 'tripleRi', i).next();
         const ri = Math.max(base, radii[i] * 6);
 
         const u = buildUnitPositionDirection(phiRad, yawRad, inclinationRad);
-
-        // "Orbit around COM" speed to get a coherent swirl.
         const speed = Math.sqrt((G * mSum) / Math.max(ri, 1e-9));
-
         const velDir = safeUnitCross(normal, u);
 
         const pos = u.clone().multiplyScalar(ri);
@@ -179,14 +167,6 @@ function generateTriplePlacements(
     return [placements[0], placements[1], placements[2]];
 }
 
-/**
- * Procedurally generates a solar system from a master seed.
- *
- * Determinism rules:
- * - Body *counts* come from an inventory seeded by `masterSeed`.
- * - Body *parameters* (e.g. starParams) are derived per-body using derived seeds.
- * - Orbital *placements* are also derived deterministically with per-system/per-star RNG streams.
- */
 export class ProceduralGenerator extends SolarSystemGenerator {
     private prng: SeededRandom;
     private masterSeed: string;
@@ -205,7 +185,6 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         console.info('[procedural] using master seed:', this.masterSeed);
 
-        // Numeric seed for PRNG from master seed string (used for inventory/count generation).
         this.prng = new SeededRandom(this.masterSeed);
     }
 
@@ -226,7 +205,6 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         const masses = starParams.map((p) => p.mass) as number[];
 
-        // Place stars according to deterministic per-system + per-star RNG streams.
         let placements!: StarPlacement[];
         if (starCount === 1) {
             placements = [{ pos: new THREE.Vector3(0, 0, 0), vel: new THREE.Vector3(0, 0, 0) }];
@@ -345,6 +323,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 creation
             );
 
+            // Kick off background procedural texture upgrade
+            upgradeProceduralTexture(planetBody as unknown as CelestialBody);
+
             planetBodies.push(planetBody);
             bodies.push(planetBody);
         }
@@ -367,6 +348,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 creation,
                 parent: parentCelestial,
             });
+
+            // Kick off background procedural texture upgrade
+            upgradeProceduralTexture(moonBody);
 
             bodies.push(moonBody);
         }
@@ -393,17 +377,8 @@ export class ProceduralGenerator extends SolarSystemGenerator {
     }
 
     async generateSolarSystemAsync(
-        reporter?: ProceduralGenerationReporter,
-        options?: { signal?: AbortSignal }
+        reporter?: ProceduralGenerationReporter
     ): Promise<Body[]> {
-        const signal = options?.signal;
-
-        const ensureNotAborted = () => {
-            if (signal?.aborted) {
-                throw new Error('Procedural generation aborted.');
-            }
-        };
-
         const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
         const inventory = generateSystemBodyInventory(this.prng);
@@ -417,15 +392,12 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         const asteroidEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Asteroid);
         const asteroidCount = asteroidEntry?.count ?? 0;
 
-        ensureNotAborted();
-
         const starParams = Array.from({ length: starCount }, (_, i) =>
             randomStarParams({ seed: deriveSubSeed(this.masterSeed, i) })
         );
 
         const masses = starParams.map((p) => p.mass) as number[];
 
-        // Place stars according to deterministic per-system + per-star RNG streams.
         let placements!: StarPlacement[];
         if (starCount === 1) {
             placements = [{ pos: new THREE.Vector3(0, 0, 0), vel: new THREE.Vector3(0, 0, 0) }];
@@ -456,7 +428,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             );
         }
 
-        // Precompute creation descriptors so total can be set before any bodies are instantiated.
+        // Precompute creation descriptors so total can be set before bodies are instantiated.
         const planetCreations = generateProceduralPlanets({
             dependencies: this.dependencies,
             masterSeed: this.masterSeed,
@@ -499,8 +471,6 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             starCount > 1 ? `${this.masterSeed}|star-name-base` : `${this.masterSeed}|star-name-base|single`;
 
         for (let i = 0; i < starCount; i++) {
-            ensureNotAborted();
-
             const params = starParams[i];
             const placement = placements[i];
 
@@ -528,35 +498,28 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             await yieldToEventLoop();
         }
 
-        // Planets (async for desert textures)
+        // Planets (instant — JPG textures)
         const planetBodies: Body[] = [];
         for (let i = 0; i < planetCreations.length; i++) {
-            ensureNotAborted();
             const creation = planetCreations[i]!;
-            const planetIndexLabel = `Planet ${i + 1}/${planetCreations.length}`;
 
-            // Update the label immediately when we *start* a planet so the UI doesn't
-            // keep showing the last completed phase (e.g. "Stars: 1 / N") while we
-            // are blocked inside desert texture generation.
             reporter?.report({
                 completed,
                 total: totalBodies,
                 workUnit: {
                     phase: 'planets',
-                    label: `${planetIndexLabel}… (generating textures)`,
+                    label: `Planet ${i + 1}/${planetCreations.length}…`,
                 },
             });
 
-            // Desert textures are generated asynchronously/yielding internally,
-            // but we don't need to spam the UI with texture phase/row progress.
-            const onDesertProgress = () => {};
-
-            const planetBody = await createPlanetBodyFromProceduralCreationAsync(
+            const planetBody = createPlanetBodyFromProceduralCreation(
                 this.dependencies,
                 this.scene,
-                creation,
-                { onDesertProgress, signal }
+                creation
             );
+
+            // Kick off background procedural texture upgrade
+            upgradeProceduralTexture(planetBody as unknown as CelestialBody);
 
             planetBodies.push(planetBody);
             bodies.push(planetBody);
@@ -565,27 +528,28 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             reporter?.report({
                 completed,
                 total: totalBodies,
-                workUnit: { phase: 'planets', label: `${planetIndexLabel} ✓` },
+                workUnit: { phase: 'planets', label: `Planet ${i + 1}/${planetCreations.length} ✓` },
             });
             await yieldToEventLoop();
         }
 
         // Moons
         for (let i = 0; i < moonCreations.length; i++) {
-            ensureNotAborted();
             const creation = moonCreations[i]!;
             const parentBody = planetBodies[creation.parentIndex] as Body | undefined;
             const parentCelestial = parentBody as unknown as CelestialBody;
 
             if (!parentCelestial || parentCelestial._isDisposed) continue;
 
-            const moonBody = await createMoonBodyFromProceduralCreationAsync({
+            const moonBody = createMoonBodyFromProceduralCreation({
                 dependencies: this.dependencies,
                 scene: this.scene,
                 creation,
                 parent: parentCelestial,
-                options: { onOceanProgress: () => {}, onDesertProgress: () => {}, onFrozenProgress: () => {}, signal },
             });
+
+            // Kick off background procedural texture upgrade
+            upgradeProceduralTexture(moonBody);
 
             bodies.push(moonBody);
 
@@ -601,8 +565,6 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         // Asteroids
         for (let i = 0; i < asteroidCreations.length; i++) {
-            ensureNotAborted();
-
             const creation = asteroidCreations[i]!;
             const asteroidBody = createAsteroidBodyFromProceduralCreation(
                 this.dependencies,

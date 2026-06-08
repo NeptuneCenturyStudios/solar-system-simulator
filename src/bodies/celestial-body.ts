@@ -49,6 +49,9 @@ export class CelestialBody extends Body {
     rotationSpeed!: number;
     rotationAxis!: THREE.Vector3;
 
+    /** Deterministic seed from which procedural features (textures, etc.) are derived. */
+    readonly seed!: string | undefined;
+
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
@@ -65,7 +68,8 @@ export class CelestialBody extends Body {
         hasRings = false,
         rotation: IRotation = { tilt: 0, speed: 0 },
         mesh?: THREE.Mesh,
-        tidalLock?: ITidalLockOptions
+        tidalLock?: ITidalLockOptions,
+        seed?: string
     ) {
         // Create a simple material if one isn't provided
         if (!mesh) {
@@ -82,6 +86,7 @@ export class CelestialBody extends Body {
         }
 
         super(dependencies, scene, mass, radius, pos, vel, mesh, id, name, bodyType);
+        this.seed = seed;
 
         this.dependencies = dependencies;
         this.scene = scene;
@@ -498,4 +503,3 @@ export class CelestialBody extends Body {
         return new THREE.Color(r, g, b);
     }
 }
-

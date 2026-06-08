@@ -31,7 +31,9 @@ export class DwarfPlanet extends CelestialBody {
                 options.maxTrail ?? 500,
                 options.hasRings ?? false,
                 options.rotation,
-                options.mesh
+                options.mesh,
+                undefined,
+                options.seed
             );
 
             this.planetType = options.bodySubtype;

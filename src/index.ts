@@ -2053,7 +2053,6 @@ async function spawn({
         manuallySelectedBody = null;
 
         const abortController = new AbortController();
-        const abortSignal = abortController.signal;
 
         // Ensure procedural overlay + progress UI are owned by StartupModal.
         startupModal.openProceduralOverlayForGeneration();
@@ -2079,24 +2078,12 @@ async function spawn({
         // Index.ts owns cancellation (abort); UI is owned by startupModal.
         startupModal.on('proceduralCancel', onProceduralCancel);
 
-        const reporter = {
-            setTotal: (total: number) => {
-                if (runId !== w[runIdKey]) return;
-                startupModal.setProceduralProgressTotal(total);
-            },
-            report: (p: { completed: number; total: number; workUnit?: { label?: string } }) => {
-                if (runId !== w[runIdKey]) return;
-                startupModal.reportProceduralProgress(p.completed, p.total, p.workUnit?.label);
-            },
-        };
-
         try {
             const bodies = gen
-                ? await gen.generateSolarSystemAsync(reporter, { signal: abortSignal })
+                ? await gen.generateSolarSystemAsync()
                 : [];
 
             if (runId !== w[runIdKey]) return; // stale completion
-            if (abortSignal.aborted) return;
 
             simulationState.bodies = bodies;
             syncAllStarLightTargets();
@@ -2126,29 +2113,15 @@ async function spawn({
         } catch (e) {
             if (runId !== w[runIdKey]) return;
 
-            const wasCanceled = abortSignal.aborted;
+            console.error('[procedural] generation failed:', e);
 
-            if (!wasCanceled) {
-                console.error('[procedural] generation failed:', e);
-            }
-
-            // Keep bodies empty on error/abort
+            // Keep bodies empty on error
             simulationState.bodies = [];
 
             startupModal.setProceduralInputsLocked(false);
-
-            if (wasCanceled) {
-                // Return to Launch Control only after the async generation has fully unwound.
-                startupModal.closeProceduralModalToStartup();
-            } else {
-                // Non-cancel failure: keep procedural overlay open so user can retry.
-                startupModal.setProceduralProgressStatusText('Generation failed.');
-                startupModal.setProceduralProgressErrorVisible(true);
-                startupModal.showProceduralSeedSectionForRetry();
-            }
-        } finally {
-            // Ensure cancel handler doesn't leak into subsequent runs.
-            startupModal.off('proceduralCancel', onProceduralCancel);
+            startupModal.setProceduralProgressStatusText('Generation failed.');
+            startupModal.setProceduralProgressErrorVisible(true);
+            startupModal.showProceduralSeedSectionForRetry();
         }
 
         return;

@@ -25,18 +25,15 @@ export const fictionalTextures: THREE.Texture[] = [
     loadSrgbTexture('./assets/textures/fictional_3.jpg'),
     loadSrgbTexture('./assets/textures/fictional_4.jpg'),
     loadSrgbTexture('./assets/textures/fictional_5.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_6.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_7.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_8.jpg'),
 ];
 
 // Deterministic texture for the new "Volcanic" planet subtype.
 export const fictionalVolcanicTexture = loadSrgbTexture('./assets/textures/fictional_5.jpg');
 
 // Deterministic textures for additional custom solid planet subtypes.
-export const fictionalFrozenTexture = loadSrgbTexture('./assets/textures/fictional_6.jpg');
-export const fictionalOceanTexture = loadSrgbTexture('./assets/textures/fictional_7.jpg');
-export const fictionalDesertTexture = loadSrgbTexture('./assets/textures/fictional_8.jpg');
+export const fictionalFrozenTexture = loadSrgbTexture('./assets/textures/frozen_temp.jpg');
+export const fictionalOceanTexture = loadSrgbTexture('./assets/textures/ocean_temp.jpg');
+export const fictionalDesertTexture = loadSrgbTexture('./assets/textures/desert_temp.jpg');
 export const fictionalTemperateTexture = loadSrgbTexture('./assets/textures/earth_day.jpg');
 
 // Custom/random textures for custom gas giants

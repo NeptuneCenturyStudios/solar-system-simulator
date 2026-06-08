@@ -28,7 +28,8 @@ export class Moon extends CelestialBody {
             false,
             options.rotation,
             options.mesh,
-            options.tidalLock
+            options.tidalLock,
+            options.seed
         );
 
         this.moonType = options.moonType;

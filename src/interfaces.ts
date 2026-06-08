@@ -36,6 +36,8 @@ export interface IOrbitalBodyCreationOptions extends IBodyCreationOptions {
 
 export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptions {
     mesh?: THREE.Mesh;
+    /** Deterministic seed used to derive procedural textures and other procedural features at runtime. */
+    seed?: string;
 }
 
 export interface ISatelliteCreationOptions extends ICelestialBodyCreationOptions {

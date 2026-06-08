@@ -14,7 +14,6 @@ export type ProceduralGenerationWorkUnit = {
         | 'planets'
         | 'moons'
         | 'asteroids'
-        | 'desert-textures'
         | 'finalizing';
 };
 
