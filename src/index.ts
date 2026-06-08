@@ -165,6 +165,7 @@ import { Star } from './bodies/star';
 import { MainSequenceStar } from './bodies/main-sequence-star';
 import { createMainSequenceStarFromParams } from './procedural/star-factory';
 import { createPlanetBodyFromProceduralCreation } from './procedural/planet-factory';
+import { upgradeProceduralTexture } from './procedural/texture-upgrader';
 import { getDesertTexture } from './procedural/desert/desert-texture-generator';
 import { Asteroid } from './bodies/asteroid';
 import { Comet } from './bodies/comet';
@@ -1482,12 +1483,15 @@ function createNewBody(
             | 'frozen'
             | 'temperate';
 
+        const planetId = createUniqueId('planet');
+        const planetSeed = `${planetId}|custom|${resolvedPlanetType}`;
+
         const {
             mass: planetMass,
             radius: planetRadius,
             rotationSpeed: planetRotationSpeed,
             bodySubtype: planetBodySubtype,
-        } = randomPlanetParams(resolvedPlanetType, { mass: customMass, radius: customRadius });
+        } = randomPlanetParams(resolvedPlanetType, { mass: customMass, radius: customRadius, seed: planetSeed });
 
         const isSolidPlanet =
             resolvedPlanetType === 'solid' ||
@@ -1498,7 +1502,7 @@ function createNewBody(
             resolvedPlanetType === 'temperate';
 
         newBody = createPlanetBodyFromProceduralCreation(dependencies, scene, {
-            id: createUniqueId('planet'),
+            id: planetId,
             name: generateIAUName(BodyTypeEnum.Planet, null, simulationState.bodies),
             pos: spawnPos,
             vel: spawnVel,
@@ -1508,6 +1512,7 @@ function createNewBody(
             mass: planetMass,
             rotationSpeed: planetRotationSpeed,
             hasRings,
+            textureSeed: planetSeed,
         });
 
         // Optional atmosphere/cloud layer (checkbox-driven for custom solid + volcanic planets)
@@ -1556,6 +1561,9 @@ function createNewBody(
 
         // Ensure brightness scaling uses a neutral base when texture is present
         newBody.baseColor = new THREE.Color(0xffffff);
+
+        // Kick off background procedural texture upgrade (desert/ocean/frozen only)
+        upgradeProceduralTexture(newBody as unknown as CelestialBody);
     } else if (bodyType === 'moon') {
         // Create a moon orbiting the selected body (management panel selection takes priority)
         const focusedBody = (() => {
@@ -1684,6 +1692,8 @@ function createNewBody(
             });
             const mesh = new THREE.Mesh(geometry, moonMaterial);
 
+            const moonSeed = `${moonId}|custom|${moonType}`;
+
             newBody = new Moon(dependencies, scene, {
                 distance: moonDistance,
                 angle: orbitAngle ?? 0,
@@ -1706,7 +1716,11 @@ function createNewBody(
                 maxTrail: 1000,
                 rotation: { tilt: 0, speed: moonRotationSpeed },
                 mesh,
+                seed: moonSeed,
             });
+
+            // Kick off background procedural texture upgrade (desert/ocean/frozen only)
+            upgradeProceduralTexture(newBody);
 
             // Optional atmosphere/cloud layer (checkbox-driven for custom bodies)
             // Temperate moons should always have atmosphere/clouds (UI checkbox hidden for temperate).
