@@ -15,33 +15,30 @@ const NOISE_ICE_OCTAVES = 5;
 const NOISE_TERRAIN_SCALE = 20.0;
 const NOISE_TERRAIN_OCTAVES = 4;
 
-const NOISE_CRACK_SCALE = 60.0;
-const NOISE_CRACK_OCTAVES = 3;
-
 const NOISE_CRATER_SCALE = 50.0;
 const NOISE_CRATER_OCTAVES = 4;
 
-// Ice band thresholds
+// Ice band thresholds — widened for large smooth patches
 const ICE_DEEP_EDGE0 = 0.0;
-const ICE_DEEP_EDGE1 = 0.20;
-const ICE_MID_EDGE0 = 0.15;
-const ICE_MID_EDGE1 = 0.35;
-const ICE_SURFACE_EDGE0 = 0.30;
-const ICE_SURFACE_EDGE1 = 0.55;
-const SNOW_EDGE0 = 0.50;
-const SNOW_EDGE1 = 0.80;
-const EXPOSED_ROCK_EDGE0 = 0.75;
-const EXPOSED_ROCK_EDGE1 = 0.95;
+const ICE_DEEP_EDGE1 = 0.15;
+const ICE_MID_EDGE0 = 0.10;
+const ICE_MID_EDGE1 = 0.28;
+const ICE_SURFACE_EDGE0 = 0.22;
+const ICE_SURFACE_EDGE1 = 0.65;
+const SNOW_EDGE0 = 0.55;
+const SNOW_EDGE1 = 0.88;
+const EXPOSED_ROCK_EDGE0 = 0.85;
+const EXPOSED_ROCK_EDGE1 = 1.00;
 
-// Crater impact thresholds
+// Crater impact thresholds (reduced influence)
 const CRATER_RIM_EDGE0 = 0.55;
 const CRATER_RIM_EDGE1 = 0.80;
 const CRATER_INNER_EDGE0 = 0.78;
 const CRATER_INNER_EDGE1 = 0.92;
 const CRATER_MASK_EDGE0 = 0.60;
 const CRATER_MASK_EDGE1 = 0.90;
-const CRATER_RIM_STRENGTH = 0.04;
-const CRATER_DEPTH_STRENGTH = 0.03;
+const CRATER_RIM_STRENGTH = 0.02;
+const CRATER_DEPTH_STRENGTH = 0.01;
 
 // Normal map tuning
 const NORMAL_STRENGTH = 0.6;
@@ -54,13 +51,13 @@ const POLAR_DETAIL_MIN = 0.40;
 const YIELD_EVERY_ROWS = 8;
 
 // ====== Palette ======
-const iceDeep: Vec3 = { x: 0.55, y: 0.62, z: 0.72 };
-const iceMid: Vec3 = { x: 0.68, y: 0.75, z: 0.84 };
-const iceSurface: Vec3 = { x: 0.82, y: 0.88, z: 0.94 };
-const snowWhite: Vec3 = { x: 0.92, y: 0.94, z: 0.97 };
-const pureWhite: Vec3 = { x: 0.96, y: 0.97, z: 0.98 };
-const rockGray: Vec3 = { x: 0.55, y: 0.56, z: 0.58 };
-const darkRock: Vec3 = { x: 0.40, y: 0.41, z: 0.44 };
+const iceDeep: Vec3 = { x: 0.50, y: 0.65, z: 0.85 };
+const iceMid: Vec3 = { x: 0.65, y: 0.80, z: 0.92 };
+const iceSurface: Vec3 = { x: 0.82, y: 0.90, z: 0.97 };
+const snowWhite: Vec3 = { x: 0.94, y: 0.96, z: 0.99 };
+const pureWhite: Vec3 = { x: 0.98, y: 0.99, z: 1.00 };
+const rockGray: Vec3 = { x: 0.65, y: 0.66, z: 0.68 };
+const darkRock: Vec3 = { x: 0.55, y: 0.56, z: 0.58 };
 
 type FrozenMaps = {
     color: THREE.Texture;
@@ -74,11 +71,38 @@ function yieldToEventLoop(): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function getOrCreateFrozenMapsForSeed(seed: string): FrozenMaps {
+// =============================================================================
+// Shared helpers
+// =============================================================================
+
+function canvasesToTextures(canvas: HTMLCanvasElement, normalCanvas: HTMLCanvasElement): FrozenMaps {
+    const colorTex = new THREE.CanvasTexture(canvas);
+    colorTex.colorSpace = THREE.SRGBColorSpace;
+    colorTex.wrapS = THREE.RepeatWrapping;
+    colorTex.wrapT = THREE.ClampToEdgeWrapping;
+    colorTex.generateMipmaps = false;
+    colorTex.minFilter = THREE.LinearFilter;
+    colorTex.magFilter = THREE.LinearFilter;
+    colorTex.anisotropy = 16;
+    colorTex.needsUpdate = true;
+
+    const normalTex = new THREE.CanvasTexture(normalCanvas);
+    normalTex.wrapS = THREE.RepeatWrapping;
+    normalTex.wrapT = THREE.ClampToEdgeWrapping;
+    normalTex.generateMipmaps = false;
+    normalTex.minFilter = THREE.LinearFilter;
+    normalTex.magFilter = THREE.LinearFilter;
+    normalTex.anisotropy = 16;
+    normalTex.needsUpdate = true;
+
+    return { color: colorTex, normal: normalTex };
+}
+
+/**
+ * Synchronous core: renders the colour + normal canvases immediately.
+ */
+function renderFrozenMaps(seed: string): { canvas: HTMLCanvasElement; normalCanvas: HTMLCanvasElement } {
     const cacheKey = seed.trim();
-    const cachedColor = colorCache.get(cacheKey);
-    const cachedNormal = normalCache.get(cacheKey);
-    if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
 
     const seedU32 = hashStringToU32(cacheKey);
 
@@ -162,16 +186,6 @@ function getOrCreateFrozenMapsForSeed(seed: string): FrozenMaps {
                 seedU32
             );
 
-            const crackN = fbm3D(
-                xLocal * NOISE_CRACK_SCALE + (ox + 1234.5),
-                yLocal * NOISE_CRACK_SCALE + (oy - 234.6),
-                zLocal * NOISE_CRACK_SCALE + (oz + 98.7),
-                NOISE_CRACK_OCTAVES,
-                seedU32
-            );
-            const crackRidged = Math.abs(crackN);
-            const crackMask = smoothstep(0.55, 0.80, crackRidged);
-
             const craterN = fbm3D(
                 xLocal * NOISE_CRATER_SCALE + (ox + 999.1),
                 yLocal * NOISE_CRATER_SCALE + (oy - 321.7),
@@ -188,12 +202,11 @@ function getOrCreateFrozenMapsForSeed(seed: string): FrozenMaps {
 
             const iceHeight = iceN * 0.06;
             const terrainHeight = terrainN * 0.04;
-            const crackHeight = crackRidged * 0.012 * crackMask;
             const craterHeight =
                 CRATER_RIM_STRENGTH * craterRimBand * craterMask -
                 CRATER_DEPTH_STRENGTH * craterInner * craterMask;
 
-            height[y * INTERNAL_WIDTH + x] = iceHeight + terrainHeight + crackHeight + craterHeight;
+            height[y * INTERNAL_WIDTH + x] = iceHeight + terrainHeight + craterHeight;
 
             // Color blending
             const bandSource = clamp01(0.5 + 0.5 * (iceN * 0.7 + terrainN * 0.3));
@@ -225,12 +238,8 @@ function getOrCreateFrozenMapsForSeed(seed: string): FrozenMaps {
             col = { x: col.x + iceTint.x * microVar, y: col.y + iceTint.y * microVar, z: col.z + iceTint.z * microVar };
 
             if (craterMask > 0) {
-                col = mix3(col, darkRock, craterInner * craterMask * 0.30);
+                col = mix3(col, darkRock, craterInner * craterMask * 0.08);
                 col = mix3(col, iceSurface, craterRimBand * craterMask * 0.10);
-            }
-
-            if (crackMask > 0) {
-                col = mix3(col, darkRock, crackMask * 0.15);
             }
 
             const polarEnhance = clamp01(1 - latGradient);
@@ -304,36 +313,33 @@ function getOrCreateFrozenMapsForSeed(seed: string): FrozenMaps {
 
     nctx.putImageData(nimg, 0, 0);
 
-    const colorTex = new THREE.CanvasTexture(canvas);
-    colorTex.colorSpace = THREE.SRGBColorSpace;
-    colorTex.wrapS = THREE.RepeatWrapping;
-    colorTex.wrapT = THREE.ClampToEdgeWrapping;
-    colorTex.generateMipmaps = false;
-    colorTex.minFilter = THREE.LinearFilter;
-    colorTex.magFilter = THREE.LinearFilter;
-    colorTex.anisotropy = 16;
-    colorTex.needsUpdate = true;
-
-    const normalTex = new THREE.CanvasTexture(normalCanvas);
-    normalTex.wrapS = THREE.RepeatWrapping;
-    normalTex.wrapT = THREE.ClampToEdgeWrapping;
-    normalTex.generateMipmaps = false;
-    normalTex.minFilter = THREE.LinearFilter;
-    normalTex.magFilter = THREE.LinearFilter;
-    normalTex.anisotropy = 16;
-    normalTex.needsUpdate = true;
-
-    colorCache.set(cacheKey, colorTex);
-    normalCache.set(cacheKey, normalTex);
-
-    return { color: colorTex, normal: normalTex };
+    return { canvas, normalCanvas };
 }
 
-// ------------------------------
-// Async generation
-// ------------------------------
+// =============================================================================
+// Synchronous path
+// =============================================================================
 
-async function getOrCreateFrozenMapsForSeedAsync(seed: string): Promise<FrozenMaps> {
+function getOrCreateFrozenMapsSync(seed: string): FrozenMaps {
+    const cacheKey = seed.trim();
+    const cachedColor = colorCache.get(cacheKey);
+    const cachedNormal = normalCache.get(cacheKey);
+    if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
+
+    const { canvas, normalCanvas } = renderFrozenMaps(seed);
+    const maps = canvasesToTextures(canvas, normalCanvas);
+
+    colorCache.set(cacheKey, maps.color);
+    normalCache.set(cacheKey, maps.normal);
+
+    return maps;
+}
+
+// =============================================================================
+// Async path (chunked with yields)
+// =============================================================================
+
+async function getOrCreateFrozenMapsAsync(seed: string): Promise<FrozenMaps> {
     const cacheKey = seed.trim();
 
     const cachedColor = colorCache.get(cacheKey);
@@ -421,16 +427,6 @@ async function getOrCreateFrozenMapsForSeedAsync(seed: string): Promise<FrozenMa
                 seedU32
             );
 
-            const crackN = fbm3D(
-                xLocal * NOISE_CRACK_SCALE + (ox + 1234.5),
-                yLocal * NOISE_CRACK_SCALE + (oy - 234.6),
-                zLocal * NOISE_CRACK_SCALE + (oz + 98.7),
-                NOISE_CRACK_OCTAVES,
-                seedU32
-            );
-            const crackRidged = Math.abs(crackN);
-            const crackMask = smoothstep(0.55, 0.80, crackRidged);
-
             const craterN = fbm3D(
                 xLocal * NOISE_CRATER_SCALE + (ox + 999.1),
                 yLocal * NOISE_CRATER_SCALE + (oy - 321.7),
@@ -447,12 +443,11 @@ async function getOrCreateFrozenMapsForSeedAsync(seed: string): Promise<FrozenMa
 
             const iceHeight = iceN * 0.06;
             const terrainHeight = terrainN * 0.04;
-            const crackHeight = crackRidged * 0.012 * crackMask;
             const craterHeight =
                 CRATER_RIM_STRENGTH * craterRimBand * craterMask -
                 CRATER_DEPTH_STRENGTH * craterInner * craterMask;
 
-            height[y * INTERNAL_WIDTH + x] = iceHeight + terrainHeight + crackHeight + craterHeight;
+            height[y * INTERNAL_WIDTH + x] = iceHeight + terrainHeight + craterHeight;
 
             const bandSource = clamp01(0.5 + 0.5 * (iceN * 0.7 + terrainN * 0.3));
             const bandPow = Math.pow(bandSource, 1.3);
@@ -482,11 +477,8 @@ async function getOrCreateFrozenMapsForSeedAsync(seed: string): Promise<FrozenMa
             col = { x: col.x + iceTint.x * microVar, y: col.y + iceTint.y * microVar, z: col.z + iceTint.z * microVar };
 
             if (craterMask > 0) {
-                col = mix3(col, darkRock, craterInner * craterMask * 0.30);
+                col = mix3(col, darkRock, craterInner * craterMask * 0.08);
                 col = mix3(col, iceSurface, craterRimBand * craterMask * 0.10);
-            }
-            if (crackMask > 0) {
-                col = mix3(col, darkRock, crackMask * 0.15);
             }
 
             const polarEnhance = clamp01(1 - latGradient);
@@ -563,47 +555,30 @@ async function getOrCreateFrozenMapsForSeedAsync(seed: string): Promise<FrozenMa
 
     nctx.putImageData(nimg, 0, 0);
 
-    const colorTex = new THREE.CanvasTexture(canvas);
-    colorTex.colorSpace = THREE.SRGBColorSpace;
-    colorTex.wrapS = THREE.RepeatWrapping;
-    colorTex.wrapT = THREE.ClampToEdgeWrapping;
-    colorTex.generateMipmaps = false;
-    colorTex.minFilter = THREE.LinearFilter;
-    colorTex.magFilter = THREE.LinearFilter;
-    colorTex.anisotropy = 16;
-    colorTex.needsUpdate = true;
+    const maps = canvasesToTextures(canvas, normalCanvas);
 
-    const normalTex = new THREE.CanvasTexture(normalCanvas);
-    normalTex.wrapS = THREE.RepeatWrapping;
-    normalTex.wrapT = THREE.ClampToEdgeWrapping;
-    normalTex.generateMipmaps = false;
-    normalTex.minFilter = THREE.LinearFilter;
-    normalTex.magFilter = THREE.LinearFilter;
-    normalTex.anisotropy = 16;
-    normalTex.needsUpdate = true;
+    colorCache.set(cacheKey, maps.color);
+    normalCache.set(cacheKey, maps.normal);
 
-    colorCache.set(cacheKey, colorTex);
-    normalCache.set(cacheKey, normalTex);
-
-    return { color: colorTex, normal: normalTex };
+    return maps;
 }
 
-// ------------------------------
+// =============================================================================
 // Public API
-// ------------------------------
+// =============================================================================
 
 export function getFrozenTexture(seed: string): THREE.Texture {
-    return getOrCreateFrozenMapsForSeed(seed).color;
+    return getOrCreateFrozenMapsSync(seed).color;
 }
 
 export function getFrozenNormalTexture(seed: string): THREE.Texture {
-    return getOrCreateFrozenMapsForSeed(seed).normal;
+    return getOrCreateFrozenMapsSync(seed).normal;
 }
 
 export function getFrozenTextureAsync(seed: string): Promise<THREE.Texture> {
-    return getOrCreateFrozenMapsForSeedAsync(seed).then((m) => m.color);
+    return getOrCreateFrozenMapsAsync(seed).then((m) => m.color);
 }
 
 export function getFrozenNormalTextureAsync(seed: string): Promise<THREE.Texture> {
-    return getOrCreateFrozenMapsForSeedAsync(seed).then((m) => m.normal);
+    return getOrCreateFrozenMapsAsync(seed).then((m) => m.normal);
 }
