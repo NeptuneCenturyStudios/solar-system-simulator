@@ -9,6 +9,8 @@ import {
     fictionalOceanTexture,
     fictionalDesertTexture,
     fictionalTemperateTexture,
+    getRoughnessForMoonTexture,
+    getMetalnessForMoonTexture,
 } from '../drawing/textures';
 import type { ProceduralMoonCreation } from './moon-generator';
 import { MoonTypeEnum } from '../bodies/body-enums';
@@ -29,7 +31,7 @@ function pickMoonTextureForMoonType(
     return fictionalTextures[idx % fictionalTextures.length]!;
 }
 
-function createMoonMesh(radius: number, texture: THREE.Texture, isOcean?: boolean, isVolcanic?: boolean): THREE.Mesh {
+function createMoonMesh(radius: number, texture: THREE.Texture, moonType: MoonTypeEnum): THREE.Mesh {
     const geometry = new THREE.SphereGeometry(radius, 32, 32);
 
     const material = new THREE.MeshStandardMaterial({
@@ -37,8 +39,8 @@ function createMoonMesh(radius: number, texture: THREE.Texture, isOcean?: boolea
         color: 0xffffff,
         emissive: 0x000000,
         emissiveIntensity: 0,
-        roughness: isOcean ? 0.8 : isVolcanic ? 0.6 : 0.7,
-        metalness: isOcean ? 0.02 : isVolcanic ? 0.15 : 0.7,
+        roughness: getRoughnessForMoonTexture(moonType),
+        metalness: getMetalnessForMoonTexture(moonType),
         transparent: false,
         depthTest: true,
         depthWrite: true,
@@ -140,11 +142,9 @@ export function createMoonBodyFromProceduralCreation(params: {
     } = creation;
 
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
-    const isOcean    = moonType === MoonTypeEnum.Ocean;
-    const isVolcanic = moonType === MoonTypeEnum.Volcanic;
 
     const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex);
-    const mesh = createMoonMesh(safeRadius, texture, isOcean, isVolcanic);
+    const mesh = createMoonMesh(safeRadius, texture, moonType);
 
     return buildMoon({
         dependencies: params.dependencies,

@@ -12,6 +12,8 @@ import {
     fictionalTemperateTexture,
     fictionalGasTextures,
     fictionalIceTextures,
+    getMetalnessForPlanetTexture,
+    getRoughnessForPlanetTexture,
 } from '../drawing/textures';
 
 import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
@@ -76,8 +78,8 @@ function computeRingPresence(
         bodySubtype === PlanetTypeEnum.GasGiant
             ? ringRng.chance(GAS_GIANT_RINGS_PROB)
             : bodySubtype === PlanetTypeEnum.IceGiant
-              ? ringRng.chance(ICE_GIANT_RINGS_PROB)
-              : ringRng.chance(SOLID_RINGS_PROB);
+                ? ringRng.chance(ICE_GIANT_RINGS_PROB)
+                : ringRng.chance(SOLID_RINGS_PROB);
 
     const resolved =
         typeof hasRings === 'boolean' && bodyType === BodyTypeEnum.Planet ? hasRings : hasRingsProbabilistic;
@@ -113,10 +115,6 @@ function buildMeshMaterial(
     creation: ProceduralPlanetCreation
 ): THREE.MeshStandardMaterial {
     const { bodySubtype, textureIndex } = creation;
-    const isDesert   = bodySubtype === PlanetTypeEnum.Desert;
-    const isOcean    = bodySubtype === PlanetTypeEnum.Ocean;
-    const isFrozen   = bodySubtype === PlanetTypeEnum.Frozen;
-    const isVolcanic = bodySubtype === PlanetTypeEnum.Volcanic;
 
     const texture =
         bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant
@@ -128,8 +126,8 @@ function buildMeshMaterial(
         color: 0xffffff,
         emissive: 0x000000,
         emissiveIntensity: 0,
-        roughness: isDesert ? 0.95 : isOcean ? 0.8 : isFrozen ? 0.7 : isVolcanic ? 0.6 : 0.7,
-        metalness: isDesert ? 0.02 : isOcean ? 0.02 : isFrozen ? 0.05 : isVolcanic ? 0.15 : 0.85,
+        roughness: getRoughnessForPlanetTexture(bodySubtype),
+        metalness: getMetalnessForPlanetTexture(bodySubtype),
         transparent: false,
         depthTest: true,
         depthWrite: true,
