@@ -113,9 +113,10 @@ function buildMeshMaterial(
     creation: ProceduralPlanetCreation
 ): THREE.MeshStandardMaterial {
     const { bodySubtype, textureIndex } = creation;
-    const isDesert = bodySubtype === PlanetTypeEnum.Desert;
-    const isOcean = bodySubtype === PlanetTypeEnum.Ocean;
-    const isFrozen = bodySubtype === PlanetTypeEnum.Frozen;
+    const isDesert   = bodySubtype === PlanetTypeEnum.Desert;
+    const isOcean    = bodySubtype === PlanetTypeEnum.Ocean;
+    const isFrozen   = bodySubtype === PlanetTypeEnum.Frozen;
+    const isVolcanic = bodySubtype === PlanetTypeEnum.Volcanic;
 
     const texture =
         bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant
@@ -127,8 +128,8 @@ function buildMeshMaterial(
         color: 0xffffff,
         emissive: 0x000000,
         emissiveIntensity: 0,
-        roughness: isDesert ? 0.95 : isOcean ? 0.8 : isFrozen ? 0.7 : 0.7,
-        metalness: isDesert ? 0.02 : isOcean ? 0.02 : isFrozen ? 0.05 : 0.85,
+        roughness: isDesert ? 0.95 : isOcean ? 0.8 : isFrozen ? 0.7 : isVolcanic ? 0.6 : 0.7,
+        metalness: isDesert ? 0.02 : isOcean ? 0.02 : isFrozen ? 0.05 : isVolcanic ? 0.15 : 0.85,
         transparent: false,
         depthTest: true,
         depthWrite: true,

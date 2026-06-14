@@ -1684,8 +1684,8 @@ function createNewBody(
                 color: 0xffffff, // keep texture untinted
                 emissive: 0x000000,
                 emissiveIntensity: 0,
-                roughness: moonType === 'desert' || moonType === 'temperate' ? 0.95 : 0.7,
-                metalness: moonType === 'desert' || moonType === 'temperate' ? 0.02 : 0.7,
+                roughness: moonType === 'desert' || moonType === 'temperate' ? 0.95 : moonType === 'volcanic' ? 0.6 : 0.7,
+                metalness: moonType === 'desert' || moonType === 'temperate' ? 0.02 : moonType === 'volcanic' ? 0.15 : 0.7,
                 transparent: false,
                 depthTest: true,
                 depthWrite: true,

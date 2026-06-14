@@ -258,7 +258,9 @@ export function generateProceduralMoons(params: {
                       ? `${moonSeed}|desert-texture-seed`
                       : moonType === MoonTypeEnum.Frozen
                         ? `${moonSeed}|frozen-texture-seed`
-                        : undefined;
+                        : moonType === MoonTypeEnum.Volcanic
+                          ? `${moonSeed}|volcanic-texture-seed`
+                          : undefined;
 
             out.push({
                 id,

@@ -18,17 +18,17 @@ export function loadSrgbTexture(url: string): THREE.Texture {
 export const moonTexture = loadSrgbTexture('./assets/textures/moon.jpg');
 
 // Custom/random textures for custom solid planets and moons (random pool).
-// NOTE: Includes fictional_5.jpg which corresponds to the new "Volcanic" subtype.
+// NOTE: Includes volcanic_temp.jpg which corresponds to the new "Volcanic" subtype.
 export const fictionalTextures: THREE.Texture[] = [
     loadSrgbTexture('./assets/textures/fictional_1.jpg'),
     loadSrgbTexture('./assets/textures/fictional_2.jpg'),
     loadSrgbTexture('./assets/textures/fictional_3.jpg'),
     loadSrgbTexture('./assets/textures/fictional_4.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_5.jpg'),
+    loadSrgbTexture('./assets/textures/volcanic_temp.jpg'),
 ];
 
 // Deterministic texture for the new "Volcanic" planet subtype.
-export const fictionalVolcanicTexture = loadSrgbTexture('./assets/textures/fictional_5.jpg');
+export const fictionalVolcanicTexture = loadSrgbTexture('./assets/textures/volcanic_temp.jpg');
 
 // Deterministic textures for additional custom solid planet subtypes.
 export const fictionalFrozenTexture = loadSrgbTexture('./assets/textures/frozen_temp.jpg');
