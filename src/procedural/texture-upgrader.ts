@@ -8,6 +8,10 @@ import {
     getVolcanicNormalTextureAsync,
     getVolcanicEmissiveTextureAsync,
 } from './volcanic/volcanic-texture-generator';
+import {
+    getTerrestrialTextureAsync,
+    getTerrestrialNormalTextureAsync,
+} from './terrestrial/terrestrial-texture-generator';
 import { SeededRandom } from '../utilities/prng';
 import * as THREE from 'three';
 
@@ -61,7 +65,9 @@ function upgradePlanetTexture(
 ): void {
     const subtype = planet.planetType;
 
-    if (subtype === PlanetTypeEnum.Desert) {
+    if (subtype === PlanetTypeEnum.Terrestrial) {
+        scheduleTextureSwap(body, texSeed, getTerrestrialTextureAsync, getTerrestrialNormalTextureAsync);
+    } else if (subtype === PlanetTypeEnum.Desert) {
         scheduleTextureSwap(body, texSeed, getDesertTextureAsync, getDesertNormalTextureAsync);
     } else if (subtype === PlanetTypeEnum.Ocean) {
         scheduleTextureSwap(body, texSeed, getOceanTextureAsync, getOceanNormalTextureAsync);
@@ -88,7 +94,9 @@ function upgradeMoonTexture(
 ): void {
     const subtype = moon.moonType;
 
-    if (subtype === MoonTypeEnum.Desert) {
+    if (subtype === MoonTypeEnum.Terrestrial) {
+        scheduleTextureSwap(body, texSeed, getTerrestrialTextureAsync, getTerrestrialNormalTextureAsync);
+    } else if (subtype === MoonTypeEnum.Desert) {
         scheduleTextureSwap(body, texSeed, getDesertTextureAsync, getDesertNormalTextureAsync);
     } else if (subtype === MoonTypeEnum.Ocean) {
         scheduleTextureSwap(body, texSeed, getOceanTextureAsync, getOceanNormalTextureAsync);

@@ -73,6 +73,8 @@ export function getRoughnessForPlanetTexture(planetSubType: PlanetTypeEnum): num
             return 0.95; // Desert planets have a high roughness for a very rough, matte appearance  
         case PlanetTypeEnum.Temperate:
             return 0.5; // Temperate planets have a moderate roughness for a balanced appearance
+        case PlanetTypeEnum.Terrestrial:
+            return 0.9; // Terrestrial/rocky bodies have a very rough, matte appearance (like the Moon, Pluto)
         default:
             return 0.65; // Default roughness for other subtypes
     }
@@ -95,6 +97,8 @@ export function getRoughnessForMoonTexture(moonType: MoonTypeEnum): number {
             return 0.95; // Desert moons have a high roughness for a very rough, matte appearance
         case MoonTypeEnum.Temperate:
             return 0.5; // Temperate moons have a moderate roughness for a balanced appearance
+        case MoonTypeEnum.Terrestrial:
+            return 0.9; // Terrestrial/rocky moons have a very rough, matte appearance (like Earth's Moon)
         default:
             return 0.65; // Default roughness for other moon types
     }
@@ -117,6 +121,8 @@ export function getMetalnessForPlanetTexture(planetSubType: PlanetTypeEnum): num
             return 0.2; // Desert planets have a low metalness for a dry, matte appearance
         case PlanetTypeEnum.Temperate:
             return 0.3; // Temperate planets have a low to moderate metalness for a balanced appearance
+        case PlanetTypeEnum.Terrestrial:
+            return 0.1; // Terrestrial/rocky planets have very low metalness for a dry, matte rock appearance
         default:
             return 0.25; // Default metalness for other subtypes
     }
@@ -139,6 +145,8 @@ export function getMetalnessForMoonTexture(moonType: MoonTypeEnum): number {
             return 0.2; // Desert moons have a low metalness for a dry, matte appearance
         case MoonTypeEnum.Temperate:
             return 0.3; // Temperate moons have a low to moderate metalness for a balanced appearance
+        case MoonTypeEnum.Terrestrial:
+            return 0.1; // Terrestrial/rocky moons have very low metalness for a dry, matte rock appearance
         default:
             return 0.25; // Default metalness for other moon types
     }
