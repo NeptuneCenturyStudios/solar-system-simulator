@@ -12,6 +12,10 @@ import {
     getTerrestrialTextureAsync,
     getTerrestrialNormalTextureAsync,
 } from './terrestrial/terrestrial-texture-generator';
+import {
+    getTemperateTextureAsync,
+    getTemperateNormalTextureAsync,
+} from './temperate/temperate-texture-generator';
 import { SeededRandom } from '../utilities/prng';
 import * as THREE from 'three';
 
@@ -83,8 +87,10 @@ function upgradePlanetTexture(
             getVolcanicEmissiveTextureAsync,
             emissiveIntensity,
         );
+    } else if (subtype === PlanetTypeEnum.Temperate) {
+        scheduleTextureSwap(body, texSeed, getTemperateTextureAsync, getTemperateNormalTextureAsync);
     }
-    // Other planet subtypes (temperate, gas/ice giants) keep their JPGs.
+    // Other planet subtypes (gas/ice giants) keep their JPGs.
 }
 
 function upgradeMoonTexture(
@@ -112,6 +118,8 @@ function upgradeMoonTexture(
             getVolcanicEmissiveTextureAsync,
             emissiveIntensity,
         );
+    } else if (subtype === MoonTypeEnum.Temperate) {
+        scheduleTextureSwap(body, texSeed, getTemperateTextureAsync, getTemperateNormalTextureAsync);
     }
     // Other moon subtypes keep their JPGs.
 }

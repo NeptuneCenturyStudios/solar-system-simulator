@@ -74,7 +74,7 @@ export function getRoughnessForPlanetTexture(planetSubType: PlanetTypeEnum): num
         case PlanetTypeEnum.Temperate:
             return 0.5; // Temperate planets have a moderate roughness for a balanced appearance
         case PlanetTypeEnum.Terrestrial:
-            return 0.9; // Terrestrial/rocky bodies have a very rough, matte appearance (like the Moon, Pluto)
+            return 0.95; // Terrestrial/rocky bodies have a very rough, matte appearance (like the Moon, Pluto)
         default:
             return 0.65; // Default roughness for other subtypes
     }
@@ -98,7 +98,7 @@ export function getRoughnessForMoonTexture(moonType: MoonTypeEnum): number {
         case MoonTypeEnum.Temperate:
             return 0.5; // Temperate moons have a moderate roughness for a balanced appearance
         case MoonTypeEnum.Terrestrial:
-            return 0.9; // Terrestrial/rocky moons have a very rough, matte appearance (like Earth's Moon)
+            return 0.95; // Terrestrial/rocky moons have a very rough, matte appearance (like Earth's Moon)
         default:
             return 0.65; // Default roughness for other moon types
     }
@@ -112,7 +112,7 @@ export function getRoughnessForMoonTexture(moonType: MoonTypeEnum): number {
 export function getMetalnessForPlanetTexture(planetSubType: PlanetTypeEnum): number {
     switch (planetSubType) {
         case PlanetTypeEnum.Volcanic:
-            return 0.5; // Volcanic planets have a moderate metalness for a slightly shiny appearance
+            return 0.3; // Volcanic planets have a low metalness for a more subtle matte appearance
         case PlanetTypeEnum.Ocean:
             return 0.3; // Ocean planets have a low metalness for a more matte appearance
         case PlanetTypeEnum.Frozen:
@@ -122,7 +122,7 @@ export function getMetalnessForPlanetTexture(planetSubType: PlanetTypeEnum): num
         case PlanetTypeEnum.Temperate:
             return 0.3; // Temperate planets have a low to moderate metalness for a balanced appearance
         case PlanetTypeEnum.Terrestrial:
-            return 0.1; // Terrestrial/rocky planets have very low metalness for a dry, matte rock appearance
+            return 0.2; // Terrestrial/rocky planets have very low metalness for a dry, matte rock appearance
         default:
             return 0.25; // Default metalness for other subtypes
     }
@@ -136,7 +136,7 @@ export function getMetalnessForPlanetTexture(planetSubType: PlanetTypeEnum): num
 export function getMetalnessForMoonTexture(moonType: MoonTypeEnum): number {
     switch (moonType) {
         case MoonTypeEnum.Volcanic:
-            return 0.5; // Volcanic moons have a moderate metalness for a slightly shiny appearance
+            return 0.3; // Volcanic moons have a low metalness for a more subtle matte appearance
         case MoonTypeEnum.Ocean:
             return 0.3; // Ocean moons have a low metalness for a more matte appearance
         case MoonTypeEnum.Frozen:
@@ -146,7 +146,7 @@ export function getMetalnessForMoonTexture(moonType: MoonTypeEnum): number {
         case MoonTypeEnum.Temperate:
             return 0.3; // Temperate moons have a low to moderate metalness for a balanced appearance
         case MoonTypeEnum.Terrestrial:
-            return 0.1; // Terrestrial/rocky moons have very low metalness for a dry, matte rock appearance
+            return 0.2; // Terrestrial/rocky moons have very low metalness for a dry, matte rock appearance
         default:
             return 0.25; // Default metalness for other moon types
     }

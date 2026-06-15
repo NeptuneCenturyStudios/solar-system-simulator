@@ -181,68 +181,86 @@ export function generateProceduralMoons(params: {
 
             const moonTypeWeights: Array<{ value: MoonTypeEnum; weight: number }> = (() => {
                 const solid = planetSubtype === PlanetTypeEnum.Terrestrial;
+                const temperate = planetSubtype === PlanetTypeEnum.Temperate;
                 const ocean = planetSubtype === PlanetTypeEnum.Ocean;
                 const desert = planetSubtype === PlanetTypeEnum.Desert;
                 const frozen = planetSubtype === PlanetTypeEnum.Frozen;
                 const volcanic = planetSubtype === PlanetTypeEnum.Volcanic;
 
+                if (temperate) {
+                    return [
+                        { value: MoonTypeEnum.Temperate, weight: 0.40 },
+                        { value: MoonTypeEnum.Terrestrial, weight: 0.25 },
+                        { value: MoonTypeEnum.Ocean, weight: 0.15 },
+                        { value: MoonTypeEnum.Desert, weight: 0.10 },
+                        { value: MoonTypeEnum.Frozen, weight: 0.07 },
+                        { value: MoonTypeEnum.Volcanic, weight: 0.03 },
+                    ];
+                }
+
                 if (ocean) {
                     return [
                         { value: MoonTypeEnum.Ocean, weight: 0.45 },
-                        { value: MoonTypeEnum.Terrestrial, weight: 0.30 },
-                        { value: MoonTypeEnum.Desert, weight: 0.12 },
-                        { value: MoonTypeEnum.Frozen, weight: 0.08 },
+                        { value: MoonTypeEnum.Terrestrial, weight: 0.28 },
+                        { value: MoonTypeEnum.Desert, weight: 0.10 },
+                        { value: MoonTypeEnum.Frozen, weight: 0.07 },
                         { value: MoonTypeEnum.Volcanic, weight: 0.05 },
+                        { value: MoonTypeEnum.Temperate, weight: 0.05 },
                     ];
                 }
 
                 if (desert) {
                     return [
                         { value: MoonTypeEnum.Desert, weight: 0.45 },
-                        { value: MoonTypeEnum.Terrestrial, weight: 0.30 },
-                        { value: MoonTypeEnum.Ocean, weight: 0.10 },
-                        { value: MoonTypeEnum.Frozen, weight: 0.08 },
+                        { value: MoonTypeEnum.Terrestrial, weight: 0.28 },
+                        { value: MoonTypeEnum.Ocean, weight: 0.08 },
+                        { value: MoonTypeEnum.Frozen, weight: 0.07 },
                         { value: MoonTypeEnum.Volcanic, weight: 0.07 },
+                        { value: MoonTypeEnum.Temperate, weight: 0.05 },
                     ];
                 }
 
                 if (frozen) {
                     return [
                         { value: MoonTypeEnum.Frozen, weight: 0.45 },
-                        { value: MoonTypeEnum.Terrestrial, weight: 0.30 },
-                        { value: MoonTypeEnum.Ocean, weight: 0.10 },
-                        { value: MoonTypeEnum.Desert, weight: 0.08 },
+                        { value: MoonTypeEnum.Terrestrial, weight: 0.28 },
+                        { value: MoonTypeEnum.Ocean, weight: 0.08 },
+                        { value: MoonTypeEnum.Desert, weight: 0.07 },
                         { value: MoonTypeEnum.Volcanic, weight: 0.07 },
+                        { value: MoonTypeEnum.Temperate, weight: 0.05 },
                     ];
                 }
 
                 if (volcanic) {
                     return [
                         { value: MoonTypeEnum.Volcanic, weight: 0.45 },
-                        { value: MoonTypeEnum.Terrestrial, weight: 0.30 },
-                        { value: MoonTypeEnum.Desert, weight: 0.10 },
-                        { value: MoonTypeEnum.Ocean, weight: 0.08 },
+                        { value: MoonTypeEnum.Terrestrial, weight: 0.28 },
+                        { value: MoonTypeEnum.Desert, weight: 0.08 },
+                        { value: MoonTypeEnum.Ocean, weight: 0.07 },
                         { value: MoonTypeEnum.Frozen, weight: 0.07 },
+                        { value: MoonTypeEnum.Temperate, weight: 0.05 },
                     ];
                 }
 
                 if (solid) {
                     return [
-                        { value: MoonTypeEnum.Terrestrial, weight: 0.45 },
-                        { value: MoonTypeEnum.Volcanic, weight: 0.18 },
-                        { value: MoonTypeEnum.Ocean, weight: 0.15 },
-                        { value: MoonTypeEnum.Desert, weight: 0.12 },
+                        { value: MoonTypeEnum.Terrestrial, weight: 0.40 },
+                        { value: MoonTypeEnum.Volcanic, weight: 0.15 },
+                        { value: MoonTypeEnum.Ocean, weight: 0.13 },
+                        { value: MoonTypeEnum.Desert, weight: 0.10 },
                         { value: MoonTypeEnum.Frozen, weight: 0.10 },
+                        { value: MoonTypeEnum.Temperate, weight: 0.12 },
                     ];
                 }
 
                 // gas_giant / ice_giant parent: still pick a moonType independently.
                 return [
-                    { value: MoonTypeEnum.Terrestrial, weight: 0.45 },
-                    { value: MoonTypeEnum.Ocean, weight: 0.20 },
-                    { value: MoonTypeEnum.Frozen, weight: 0.15 },
+                    { value: MoonTypeEnum.Terrestrial, weight: 0.40 },
+                    { value: MoonTypeEnum.Ocean, weight: 0.15 },
+                    { value: MoonTypeEnum.Frozen, weight: 0.12 },
                     { value: MoonTypeEnum.Desert, weight: 0.10 },
                     { value: MoonTypeEnum.Volcanic, weight: 0.10 },
+                    { value: MoonTypeEnum.Temperate, weight: 0.13 },
                 ];
             })();
 
@@ -262,7 +280,9 @@ export function generateProceduralMoons(params: {
                           ? `${moonSeed}|frozen-texture-seed`
                           : moonType === MoonTypeEnum.Volcanic
                             ? `${moonSeed}|volcanic-texture-seed`
-                            : undefined;
+                            : moonType === MoonTypeEnum.Temperate
+                              ? `${moonSeed}|temperate-texture-seed`
+                              : undefined;
 
             out.push({
                 id,
