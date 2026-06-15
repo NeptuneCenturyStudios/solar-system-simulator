@@ -1923,6 +1923,12 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     }
 }
 
+/**
+ * Spawns a new simulation based on the specified mode and seed. Initializes the environment, cleans up existing bodies and effects,
+ * and sets up the initial state for the simulation.
+ * @param param0 An object containing the mode and seed for the simulation spawn.
+ * @returns 
+ */
 async function spawn({
     mode = SimulationStartMode.Default,
     seed,
