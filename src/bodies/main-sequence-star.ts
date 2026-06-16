@@ -21,7 +21,6 @@ import { SolarFlare, SolarFlareType } from '../effects/solar-flare';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { Corona } from '../effects/corona';
 import { StarGlow } from '../effects/star-glow';
-import { StarBirth } from '../effects/star-birth';
 import { BodyTypeEnum } from './body-enums';
 
 export class MainSequenceStar extends Star {
@@ -38,8 +37,6 @@ export class MainSequenceStar extends Star {
     _nextFlareInterval: number;
     corona: Corona | null;
     sunGlow: StarGlow | null;
-    isBirthing: boolean;
-    birthEffect: StarBirth | null;
 
     constructor(
         dependencies: IStateDependencies,
@@ -81,18 +78,11 @@ export class MainSequenceStar extends Star {
         this._solarFlareTimer = 0;
         this._nextFlareInterval = 5 + Math.random() * 25;
 
-        this.isBirthing = false;
-        this.birthEffect = null;
-
-        this._startBirthEffect();
-
         this.setMass(this.mass);
     }
 
     override update(acc: THREE.Vector3, dt: number) {
         if (this._isDisposed) return;
-
-        this._updateBirthEffect(dt);
 
         if (this.corona) {
             this.corona.update(dt);
@@ -169,7 +159,7 @@ export class MainSequenceStar extends Star {
         }
 
         // Solar flare timer
-        if (!this.isBirthing && !(this.bodyType & BodyTypeEnum.BrownDwarf) && !this._isDisposed) {
+        if (!(this.bodyType & BodyTypeEnum.BrownDwarf) && !this._isDisposed) {
             this._solarFlareTimer += dt;
             if (this._solarFlareTimer >= this._nextFlareInterval) {
                 this._solarFlareTimer = 0;
@@ -200,16 +190,6 @@ export class MainSequenceStar extends Star {
     }
 
     override die(skipExplosion = false) {
-        try {
-            if (this.birthEffect) {
-                this.birthEffect.dispose();
-                this.birthEffect = null;
-            }
-            this.isBirthing = false;
-        } catch {
-            // ignore
-        }
-
         try {
             if (this.sunGlow) {
                 this.sunGlow.dispose();
@@ -276,23 +256,6 @@ export class MainSequenceStar extends Star {
         }
     }
 
-    _setBirthVisibility(visible: boolean) {
-        try {
-            if (this.mesh) this.mesh.visible = visible;
-            if (this.trail) this.trail.visible = visible;
-            if (this.sunGlow) this.sunGlow.setVisible(visible);
-            if (this.sunLight) this.sunLight.visible = visible;
-            if (this.ambientLight) this.ambientLight.visible = visible;
-        } catch {
-            // ignore
-        }
-        try {
-            if (this.corona && this.corona.points) this.corona.points.visible = visible;
-        } catch {
-            // ignore
-        }
-    }
-
     override setMass(mass: number) {
         super.setMass(mass);
 
@@ -336,62 +299,6 @@ export class MainSequenceStar extends Star {
 
         this.initialRadius = this.radius;
         if (this.mesh) this.mesh.scale.setScalar(1);
-    }
-
-    createStarBirth(scene: THREE.Scene, pos: THREE.Vector3, radius: number) {
-        return new StarBirth(this.dependencies, scene, pos, radius);
-    }
-
-    _startBirthEffect() {
-        try {
-            this._setBirthVisibility(false);
-
-            const pos = this.mesh?.position?.clone?.() || new THREE.Vector3();
-            const radius = this.radius || 1;
-            this.birthEffect = this.createStarBirth(this.scene, pos, radius);
-            this.isBirthing = !!this.birthEffect;
-        } catch {
-            this.birthEffect = null;
-            this.isBirthing = false;
-            this._setBirthVisibility(true);
-        }
-    }
-
-    _updateBirthEffect(dt: number) {
-        if (!this.isBirthing || !this.birthEffect) return;
-
-        try {
-            this.birthEffect.update?.(dt);
-        } catch {
-            try {
-                this.birthEffect.dispose();
-            } catch {
-                // ignore
-            }
-            this.birthEffect = null;
-            this.isBirthing = false;
-            this._setBirthVisibility(true);
-            return;
-        }
-
-        if (this.birthEffect.isComplete) {
-            this._setBirthVisibility(true);
-
-            try {
-                triggerScreenFlash();
-            } catch {
-                // ignore
-            }
-
-            try {
-                this.birthEffect.dispose();
-            } catch {
-                // ignore
-            }
-
-            this.birthEffect = null;
-            this.isBirthing = false;
-        }
     }
 
     _triggerSolarFlare() {

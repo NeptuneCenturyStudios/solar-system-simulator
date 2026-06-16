@@ -4,7 +4,7 @@ import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { SeededRandom } from '../utilities/prng';
 import {
-    fictionalTextures,
+    fictionalTerrestrialTextures,
     fictionalVolcanicTexture,
     fictionalFrozenTexture,
     fictionalOceanTexture,
@@ -99,7 +99,7 @@ function pickTextureForSolidSubtype(
     if (subtype === PlanetTypeEnum.Temperate) return fictionalTemperateTexture;
 
     const idx = Math.max(0, textureIndex ?? 0);
-    return fictionalTextures[idx % fictionalTextures.length]!;
+    return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
 }
 
 function pickTextureForGasIceSubtype(

@@ -127,7 +127,7 @@ import {
 } from './utilities/body-params';
 import {
     loadSrgbTexture,
-    fictionalTextures,
+    fictionalTerrestrialTextures,
     fictionalVolcanicTexture,
     fictionalOceanTexture,
     fictionalFrozenTexture,
@@ -1672,9 +1672,9 @@ function createNewBody(
                 default: {
                     const seeded = new SeededRandom(moonTextureSeed);
                     const idx =
-                        Math.floor(seeded.next() * fictionalTextures.length) %
-                        fictionalTextures.length;
-                    moonMap = fictionalTextures[Math.abs(idx)]!;
+                        Math.floor(seeded.next() * fictionalTerrestrialTextures.length) %
+                        fictionalTerrestrialTextures.length;
+                    moonMap = fictionalTerrestrialTextures[Math.abs(idx)]!;
                     break;
                 }
             }

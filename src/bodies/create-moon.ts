@@ -4,7 +4,7 @@ import { calculateTrajectory } from '../physics/physics';
 import { SeededRandom } from '../utilities/prng';
 import {
     moonTexture,
-    fictionalTextures,
+    fictionalTerrestrialTextures,
     fictionalVolcanicTexture,
     fictionalFrozenTexture,
     fictionalOceanTexture,
@@ -23,8 +23,8 @@ export function createMoon(parent: CelestialBody, scene: THREE.Scene, config: IM
 
     const seededFromConfig = new SeededRandom(`${config.id}|moonTexture`);
     const pickFictionalDeterministic = (): THREE.Texture => {
-        const idx = Math.abs(Math.floor(seededFromConfig.next() * fictionalTextures.length));
-        return fictionalTextures[idx % fictionalTextures.length]!;
+        const idx = Math.abs(Math.floor(seededFromConfig.next() * fictionalTerrestrialTextures.length));
+        return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
     };
 
     const trajectory = calculateTrajectory(parent.dependencies.getG(), config.distance, parent.mass);

@@ -3,7 +3,7 @@ import type { IStateDependencies } from '../interfaces';
 import { CelestialBody, type ITidalLockOptions } from '../bodies/celestial-body';
 import { Moon } from '../bodies/moon';
 import {
-    fictionalTextures,
+    fictionalTerrestrialTextures,
     fictionalVolcanicTexture,
     fictionalFrozenTexture,
     fictionalOceanTexture,
@@ -28,7 +28,7 @@ function pickMoonTextureForMoonType(
 
     // Terrestrial falls through to the random pool.
     const idx = Math.max(0, moonTextureIndex ?? 0);
-    return fictionalTextures[idx % fictionalTextures.length]!;
+    return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
 }
 
 function createMoonMesh(radius: number, texture: THREE.Texture, moonType: MoonTypeEnum): THREE.Mesh {
