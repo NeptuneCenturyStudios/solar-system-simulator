@@ -145,6 +145,7 @@ import { GridHelperManager } from './gizmos/grid-helper';
 import { PositionIndicatorManager } from './gizmos/position-indicator';
 import { FlightHUD } from './drawing/flight-hud';
 import { VelocityArcManager } from './drawing/velocity-arc';
+import { OrbitPredictionManager } from './drawing/orbit-prediction';
 import { SurfaceCameraManager } from './camera/surface-camera';
 import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
@@ -770,6 +771,9 @@ let stepsPerFrame = 64;
 // --- Velocity editing arc helpers ---
 const velArc = new VelocityArcManager(scene, gizmo, interactionState);
 
+// --- Orbit prediction lines ---
+const orbitPrediction = new OrbitPredictionManager(scene);
+
 // Create FPS counter sprite
 let fpsSprite: THREE.Sprite | null = null;
 let fpsLastUpdate = 0;
@@ -1062,8 +1066,9 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
     }
 
     if (gizmo.target === body) {
-        gizmo.update();
-        velArc.update();
+    gizmo.update();
+    velArc.update();
+    orbitPrediction.update(simulationState.bodies, simulationState.gMultiplier);
         if (posIndicator.yAxisIndicator && posIndicator.yAxisRing) {
             posIndicator.updateIndicator(
                 posIndicator.yAxisIndicator,
@@ -3498,6 +3503,7 @@ function animate() {
 
     gizmo.update();
     velArc.update();
+    orbitPrediction.update(simulationState.bodies, simulationState.gMultiplier);
 
     // Update grid size while dragging so it expands/contracts as needed.
     if (
@@ -5482,6 +5488,10 @@ uiManager.mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
             body.trail.visible = checked;
         }
     });
+});
+
+uiManager.mainPanel.on('predictionChange', ({ checked }: { checked: boolean }) => {
+    orbitPrediction.visible = checked;
 });
 
 uiManager.mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {

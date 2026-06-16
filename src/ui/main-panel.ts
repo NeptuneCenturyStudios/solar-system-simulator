@@ -13,6 +13,7 @@ export class MainPanel extends Panel {
     _selectedBodyRef: Body | null = null;
     lockToSunCheckbox: HTMLInputElement | null = null;
     showTrailsCheckbox: HTMLInputElement | null = null;
+    showPredictionCheckbox: HTMLInputElement | null = null;
     showNamesCheckbox: HTMLInputElement | null = null;
     timeScaleDisplay: HTMLElement | null = null;
     substepsSlider: HTMLInputElement | null = null;
@@ -74,6 +75,7 @@ export class MainPanel extends Panel {
 
         this.lockToSunCheckbox = document.getElementById('lockToSun') as HTMLInputElement | null;
         this.showTrailsCheckbox = document.getElementById('showTrails') as HTMLInputElement | null;
+        this.showPredictionCheckbox = document.getElementById('showOrbitPrediction') as HTMLInputElement | null;
         this.showNamesCheckbox = document.getElementById('showNames') as HTMLInputElement | null;
         this.timeScaleDisplay = document.getElementById('speed-val');
         this.copyrightYearEl = document.getElementById('copyrightYear');
@@ -91,6 +93,12 @@ export class MainPanel extends Panel {
         if (this.showTrailsCheckbox) {
             this.showTrailsCheckbox.onchange = () => {
                 this.emit('trailsChange', { checked: this.showTrailsCheckbox!.checked });
+            };
+        }
+
+        if (this.showPredictionCheckbox) {
+            this.showPredictionCheckbox.onchange = () => {
+                this.emit('predictionChange', { checked: this.showPredictionCheckbox!.checked });
             };
         }
 
