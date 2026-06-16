@@ -58,11 +58,14 @@ function yieldToEventLoop(): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
+/**
+ * Core generation: computes the colour + normal canvas textures.
+ * Returns the raw canvases so callers can decide whether to yield.
+ */
+function renderDesertMaps(
+    seed: string,
+): { canvas: HTMLCanvasElement; normalCanvas: HTMLCanvasElement } {
     const cacheKey = seed.trim();
-    const cachedColor = colorCache.get(cacheKey);
-    const cachedNormal = normalCache.get(cacheKey);
-    if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
 
     const seedU32 = hashStringToU32(cacheKey);
 
@@ -288,6 +291,10 @@ function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
 
     nctx.putImageData(nimg, 0, 0);
 
+    return { canvas, normalCanvas };
+}
+
+function canvasesToTextures(canvas: HTMLCanvasElement, normalCanvas: HTMLCanvasElement): DesertMaps {
     const colorTex = new THREE.CanvasTexture(canvas);
     colorTex.colorSpace = THREE.SRGBColorSpace;
     colorTex.wrapS = THREE.RepeatWrapping;
@@ -307,19 +314,39 @@ function getOrCreateDesertMapsForSeed(seed: string): DesertMaps {
     normalTex.anisotropy = 16;
     normalTex.needsUpdate = true;
 
-    colorCache.set(cacheKey, colorTex);
-    normalCache.set(cacheKey, normalTex);
-
     return { color: colorTex, normal: normalTex };
 }
 
-async function getOrCreateDesertMapsForSeedAsync(seed: string): Promise<DesertMaps> {
+/**
+ * Synchronous path: renders the map immediately on the calling thread.
+ * Used by call sites that need a texture right now (custom moon creation, etc.).
+ */
+function getOrCreateDesertMapsSync(seed: string): DesertMaps {
     const cacheKey = seed.trim();
-
     const cachedColor = colorCache.get(cacheKey);
     const cachedNormal = normalCache.get(cacheKey);
     if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
 
+    const { canvas, normalCanvas } = renderDesertMaps(seed);
+    const maps = canvasesToTextures(canvas, normalCanvas);
+
+    colorCache.set(cacheKey, maps.color);
+    normalCache.set(cacheKey, maps.normal);
+
+    return maps;
+}
+
+/**
+ * Async path: splits the colour + normal loops into chunks that yield to the
+ * event loop every few rows.  Used by the fire-and-forget texture upgrader.
+ */
+async function getOrCreateDesertMapsAsync(seed: string): Promise<DesertMaps> {
+    const cacheKey = seed.trim();
+    const cachedColor = colorCache.get(cacheKey);
+    const cachedNormal = normalCache.get(cacheKey);
+    if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
+
+    // --- Colour + height pass, chunked ---
     const seedU32 = hashStringToU32(cacheKey);
 
     const climateRng = new SeededRandom(`${cacheKey}|climate-axis`);
@@ -492,7 +519,7 @@ async function getOrCreateDesertMapsForSeedAsync(seed: string): Promise<DesertMa
 
     ctx.putImageData(img, 0, 0);
 
-    // Normal map
+    // --- Normal pass, chunked ---
     const normalCanvas = document.createElement('canvas');
     normalCanvas.width = INTERNAL_WIDTH;
     normalCanvas.height = INTERNAL_HEIGHT;
@@ -545,43 +572,26 @@ async function getOrCreateDesertMapsForSeedAsync(seed: string): Promise<DesertMa
 
     nctx.putImageData(nimg, 0, 0);
 
-    const colorTex = new THREE.CanvasTexture(canvas);
-    colorTex.colorSpace = THREE.SRGBColorSpace;
-    colorTex.wrapS = THREE.RepeatWrapping;
-    colorTex.wrapT = THREE.ClampToEdgeWrapping;
-    colorTex.generateMipmaps = false;
-    colorTex.minFilter = THREE.NearestFilter;
-    colorTex.magFilter = THREE.NearestFilter;
-    colorTex.anisotropy = 16;
-    colorTex.needsUpdate = true;
+    const maps = canvasesToTextures(canvas, normalCanvas);
 
-    const normalTex = new THREE.CanvasTexture(normalCanvas);
-    normalTex.wrapS = THREE.RepeatWrapping;
-    normalTex.wrapT = THREE.ClampToEdgeWrapping;
-    normalTex.generateMipmaps = false;
-    normalTex.minFilter = THREE.LinearFilter;
-    normalTex.magFilter = THREE.LinearFilter;
-    normalTex.anisotropy = 16;
-    normalTex.needsUpdate = true;
+    colorCache.set(cacheKey, maps.color);
+    normalCache.set(cacheKey, maps.normal);
 
-    colorCache.set(cacheKey, colorTex);
-    normalCache.set(cacheKey, normalTex);
-
-    return { color: colorTex, normal: normalTex };
+    return maps;
 }
 
 export function getDesertTexture(seed: string): THREE.Texture {
-    return getOrCreateDesertMapsForSeed(seed).color;
+    return getOrCreateDesertMapsSync(seed).color;
 }
 
 export function getDesertNormalTexture(seed: string): THREE.Texture {
-    return getOrCreateDesertMapsForSeed(seed).normal;
+    return getOrCreateDesertMapsSync(seed).normal;
 }
 
 export function getDesertTextureAsync(seed: string): Promise<THREE.Texture> {
-    return getOrCreateDesertMapsForSeedAsync(seed).then((m) => m.color);
+    return getOrCreateDesertMapsAsync(seed).then((m) => m.color);
 }
 
 export function getDesertNormalTextureAsync(seed: string): Promise<THREE.Texture> {
-    return getOrCreateDesertMapsForSeedAsync(seed).then((m) => m.normal);
+    return getOrCreateDesertMapsAsync(seed).then((m) => m.normal);
 }

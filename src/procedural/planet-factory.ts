@@ -4,7 +4,7 @@ import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { SeededRandom } from '../utilities/prng';
 import {
-    fictionalTextures,
+    fictionalTerrestrialTextures,
     fictionalVolcanicTexture,
     fictionalFrozenTexture,
     fictionalOceanTexture,
@@ -12,6 +12,8 @@ import {
     fictionalTemperateTexture,
     fictionalGasTextures,
     fictionalIceTextures,
+    getMetalnessForPlanetTexture,
+    getRoughnessForPlanetTexture,
 } from '../drawing/textures';
 
 import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
@@ -76,8 +78,8 @@ function computeRingPresence(
         bodySubtype === PlanetTypeEnum.GasGiant
             ? ringRng.chance(GAS_GIANT_RINGS_PROB)
             : bodySubtype === PlanetTypeEnum.IceGiant
-              ? ringRng.chance(ICE_GIANT_RINGS_PROB)
-              : ringRng.chance(SOLID_RINGS_PROB);
+                ? ringRng.chance(ICE_GIANT_RINGS_PROB)
+                : ringRng.chance(SOLID_RINGS_PROB);
 
     const resolved =
         typeof hasRings === 'boolean' && bodyType === BodyTypeEnum.Planet ? hasRings : hasRingsProbabilistic;
@@ -97,7 +99,7 @@ function pickTextureForSolidSubtype(
     if (subtype === PlanetTypeEnum.Temperate) return fictionalTemperateTexture;
 
     const idx = Math.max(0, textureIndex ?? 0);
-    return fictionalTextures[idx % fictionalTextures.length]!;
+    return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
 }
 
 function pickTextureForGasIceSubtype(
@@ -113,9 +115,6 @@ function buildMeshMaterial(
     creation: ProceduralPlanetCreation
 ): THREE.MeshStandardMaterial {
     const { bodySubtype, textureIndex } = creation;
-    const isDesert = bodySubtype === PlanetTypeEnum.Desert;
-    const isOcean = bodySubtype === PlanetTypeEnum.Ocean;
-    const isFrozen = bodySubtype === PlanetTypeEnum.Frozen;
 
     const texture =
         bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant
@@ -127,8 +126,8 @@ function buildMeshMaterial(
         color: 0xffffff,
         emissive: 0x000000,
         emissiveIntensity: 0,
-        roughness: isDesert ? 0.95 : isOcean ? 0.8 : isFrozen ? 0.7 : 0.7,
-        metalness: isDesert ? 0.02 : isOcean ? 0.02 : isFrozen ? 0.05 : 0.85,
+        roughness: getRoughnessForPlanetTexture(bodySubtype),
+        metalness: getMetalnessForPlanetTexture(bodySubtype),
         transparent: false,
         depthTest: true,
         depthWrite: true,

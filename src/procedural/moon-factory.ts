@@ -3,12 +3,14 @@ import type { IStateDependencies } from '../interfaces';
 import { CelestialBody, type ITidalLockOptions } from '../bodies/celestial-body';
 import { Moon } from '../bodies/moon';
 import {
-    fictionalTextures,
+    fictionalTerrestrialTextures,
     fictionalVolcanicTexture,
     fictionalFrozenTexture,
     fictionalOceanTexture,
     fictionalDesertTexture,
     fictionalTemperateTexture,
+    getRoughnessForMoonTexture,
+    getMetalnessForMoonTexture,
 } from '../drawing/textures';
 import type { ProceduralMoonCreation } from './moon-generator';
 import { MoonTypeEnum } from '../bodies/body-enums';
@@ -26,10 +28,10 @@ function pickMoonTextureForMoonType(
 
     // Terrestrial falls through to the random pool.
     const idx = Math.max(0, moonTextureIndex ?? 0);
-    return fictionalTextures[idx % fictionalTextures.length]!;
+    return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
 }
 
-function createMoonMesh(radius: number, texture: THREE.Texture, isOcean?: boolean): THREE.Mesh {
+function createMoonMesh(radius: number, texture: THREE.Texture, moonType: MoonTypeEnum): THREE.Mesh {
     const geometry = new THREE.SphereGeometry(radius, 32, 32);
 
     const material = new THREE.MeshStandardMaterial({
@@ -37,8 +39,8 @@ function createMoonMesh(radius: number, texture: THREE.Texture, isOcean?: boolea
         color: 0xffffff,
         emissive: 0x000000,
         emissiveIntensity: 0,
-        roughness: isOcean ? 0.8 : 0.7,
-        metalness: isOcean ? 0.02 : 0.7,
+        roughness: getRoughnessForMoonTexture(moonType),
+        metalness: getMetalnessForMoonTexture(moonType),
         transparent: false,
         depthTest: true,
         depthWrite: true,
@@ -140,10 +142,9 @@ export function createMoonBodyFromProceduralCreation(params: {
     } = creation;
 
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
-    const isOcean = moonType === MoonTypeEnum.Ocean;
 
     const texture = pickMoonTextureForMoonType(moonType, moonTextureIndex);
-    const mesh = createMoonMesh(safeRadius, texture, isOcean);
+    const mesh = createMoonMesh(safeRadius, texture, moonType);
 
     return buildMoon({
         dependencies: params.dependencies,

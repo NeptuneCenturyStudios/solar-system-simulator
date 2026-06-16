@@ -73,16 +73,38 @@ const waterShallow: Vec3 = { x: 0.060, y: 0.340, z: 0.850 };
 const landSand: Vec3 = { x: 0.70, y: 0.86, z: 0.35 };
 const landRock: Vec3 = { x: 0.22, y: 0.48, z: 0.20 };
 
-// ------------------------------
-// Core generation (sync)
-// ------------------------------
+// =============================================================================
+// Shared helpers
+// =============================================================================
 
-function createOceanMapsForSeed(seed: string): OceanMaps {
+function canvasesToTextures(canvas: HTMLCanvasElement, normalCanvas: HTMLCanvasElement): OceanMaps {
+    const colorTex = new THREE.CanvasTexture(canvas);
+    colorTex.colorSpace = THREE.SRGBColorSpace;
+    colorTex.wrapS = THREE.RepeatWrapping;
+    colorTex.wrapT = THREE.ClampToEdgeWrapping;
+    colorTex.generateMipmaps = false;
+    colorTex.minFilter = THREE.NearestFilter;
+    colorTex.magFilter = THREE.NearestFilter;
+    colorTex.anisotropy = 16;
+    colorTex.needsUpdate = true;
+
+    const normalTex = new THREE.CanvasTexture(normalCanvas);
+    normalTex.wrapS = THREE.RepeatWrapping;
+    normalTex.wrapT = THREE.ClampToEdgeWrapping;
+    normalTex.generateMipmaps = false;
+    normalTex.minFilter = THREE.NearestFilter;
+    normalTex.magFilter = THREE.NearestFilter;
+    normalTex.anisotropy = 16;
+    normalTex.needsUpdate = true;
+
+    return { color: colorTex, normal: normalTex };
+}
+
+/**
+ * Synchronous core: renders colour + normal canvases immediately.
+ */
+function renderOceanMaps(seed: string): { canvas: HTMLCanvasElement; normalCanvas: HTMLCanvasElement } {
     const cacheKey = `${OCEAN_TEXTURE_GENERATOR_REV}|${seed.trim()}`;
-
-    const cachedColor = colorCache.get(cacheKey);
-    const cachedNormal = normalCache.get(cacheKey);
-    if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
 
     const seedU32 = hashStringToU32(cacheKey);
 
@@ -334,36 +356,34 @@ function createOceanMapsForSeed(seed: string): OceanMaps {
 
     nctx.putImageData(nimg, 0, 0);
 
-    const colorTex = new THREE.CanvasTexture(canvas);
-    colorTex.colorSpace = THREE.SRGBColorSpace;
-    colorTex.wrapS = THREE.RepeatWrapping;
-    colorTex.wrapT = THREE.ClampToEdgeWrapping;
-    colorTex.generateMipmaps = false;
-    colorTex.minFilter = THREE.NearestFilter;
-    colorTex.magFilter = THREE.NearestFilter;
-    colorTex.anisotropy = 16;
-    colorTex.needsUpdate = true;
-
-    const normalTex = new THREE.CanvasTexture(normalCanvas);
-    normalTex.wrapS = THREE.RepeatWrapping;
-    normalTex.wrapT = THREE.ClampToEdgeWrapping;
-    normalTex.generateMipmaps = false;
-    normalTex.minFilter = THREE.NearestFilter;
-    normalTex.magFilter = THREE.NearestFilter;
-    normalTex.anisotropy = 16;
-    normalTex.needsUpdate = true;
-
-    colorCache.set(cacheKey, colorTex);
-    normalCache.set(cacheKey, normalTex);
-
-    return { color: colorTex, normal: normalTex };
+    return { canvas, normalCanvas };
 }
 
-// ------------------------------
-// Core generation (async)
-// ------------------------------
+// =============================================================================
+// Synchronous path
+// =============================================================================
 
-async function getOrCreateOceanMapsForSeedAsync(seed: string): Promise<OceanMaps> {
+function getOrCreateOceanMapsSync(seed: string): OceanMaps {
+    const cacheKey = `${OCEAN_TEXTURE_GENERATOR_REV}|${seed.trim()}`;
+
+    const cachedColor = colorCache.get(cacheKey);
+    const cachedNormal = normalCache.get(cacheKey);
+    if (cachedColor && cachedNormal) return { color: cachedColor, normal: cachedNormal };
+
+    const { canvas, normalCanvas } = renderOceanMaps(seed);
+    const maps = canvasesToTextures(canvas, normalCanvas);
+
+    colorCache.set(cacheKey, maps.color);
+    normalCache.set(cacheKey, maps.normal);
+
+    return maps;
+}
+
+// =============================================================================
+// Async path (chunked with yields)
+// =============================================================================
+
+async function getOrCreateOceanMapsAsync(seed: string): Promise<OceanMaps> {
     const cacheKey = `${OCEAN_TEXTURE_GENERATOR_REV}|${seed.trim()}`;
 
     const cachedColor = colorCache.get(cacheKey);
@@ -612,29 +632,12 @@ async function getOrCreateOceanMapsForSeedAsync(seed: string): Promise<OceanMaps
 
     nctx.putImageData(nimg, 0, 0);
 
-    const colorTex = new THREE.CanvasTexture(canvas);
-    colorTex.colorSpace = THREE.SRGBColorSpace;
-    colorTex.wrapS = THREE.RepeatWrapping;
-    colorTex.wrapT = THREE.ClampToEdgeWrapping;
-    colorTex.generateMipmaps = false;
-    colorTex.minFilter = THREE.NearestFilter;
-    colorTex.magFilter = THREE.NearestFilter;
-    colorTex.anisotropy = 16;
-    colorTex.needsUpdate = true;
+    const maps = canvasesToTextures(canvas, normalCanvas);
 
-    const normalTex = new THREE.CanvasTexture(normalCanvas);
-    normalTex.wrapS = THREE.RepeatWrapping;
-    normalTex.wrapT = THREE.ClampToEdgeWrapping;
-    normalTex.generateMipmaps = false;
-    normalTex.minFilter = THREE.NearestFilter;
-    normalTex.magFilter = THREE.NearestFilter;
-    normalTex.anisotropy = 16;
-    normalTex.needsUpdate = true;
+    colorCache.set(cacheKey, maps.color);
+    normalCache.set(cacheKey, maps.normal);
 
-    colorCache.set(cacheKey, colorTex);
-    normalCache.set(cacheKey, normalTex);
-
-    return { color: colorTex, normal: normalTex };
+    return maps;
 }
 
 // ------------------------------
@@ -642,17 +645,17 @@ async function getOrCreateOceanMapsForSeedAsync(seed: string): Promise<OceanMaps
 // ------------------------------
 
 export function getOceanTexture(seed: string): THREE.Texture {
-    return createOceanMapsForSeed(seed).color;
+    return getOrCreateOceanMapsSync(seed).color;
 }
 
 export function getOceanNormalTexture(seed: string): THREE.Texture {
-    return createOceanMapsForSeed(seed).normal;
+    return getOrCreateOceanMapsSync(seed).normal;
 }
 
 export function getOceanTextureAsync(seed: string): Promise<THREE.Texture> {
-    return getOrCreateOceanMapsForSeedAsync(seed).then((m) => m.color);
+    return getOrCreateOceanMapsAsync(seed).then((m) => m.color);
 }
 
 export function getOceanNormalTextureAsync(seed: string): Promise<THREE.Texture> {
-    return getOrCreateOceanMapsForSeedAsync(seed).then((m) => m.normal);
+    return getOrCreateOceanMapsAsync(seed).then((m) => m.normal);
 }

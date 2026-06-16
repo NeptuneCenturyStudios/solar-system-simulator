@@ -127,7 +127,7 @@ import {
 } from './utilities/body-params';
 import {
     loadSrgbTexture,
-    fictionalTextures,
+    fictionalTerrestrialTextures,
     fictionalVolcanicTexture,
     fictionalOceanTexture,
     fictionalFrozenTexture,
@@ -1677,9 +1677,9 @@ function createNewBody(
                 default: {
                     const seeded = new SeededRandom(moonTextureSeed);
                     const idx =
-                        Math.floor(seeded.next() * fictionalTextures.length) %
-                        fictionalTextures.length;
-                    moonMap = fictionalTextures[Math.abs(idx)]!;
+                        Math.floor(seeded.next() * fictionalTerrestrialTextures.length) %
+                        fictionalTerrestrialTextures.length;
+                    moonMap = fictionalTerrestrialTextures[Math.abs(idx)]!;
                     break;
                 }
             }
@@ -1689,8 +1689,8 @@ function createNewBody(
                 color: 0xffffff, // keep texture untinted
                 emissive: 0x000000,
                 emissiveIntensity: 0,
-                roughness: moonType === 'desert' || moonType === 'temperate' ? 0.95 : 0.7,
-                metalness: moonType === 'desert' || moonType === 'temperate' ? 0.02 : 0.7,
+                roughness: moonType === 'desert' || moonType === 'temperate' ? 0.95 : moonType === 'volcanic' ? 0.6 : 0.7,
+                metalness: moonType === 'desert' || moonType === 'temperate' ? 0.02 : moonType === 'volcanic' ? 0.15 : 0.7,
                 transparent: false,
                 depthTest: true,
                 depthWrite: true,
@@ -1928,6 +1928,12 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     }
 }
 
+/**
+ * Spawns a new simulation based on the specified mode and seed. Initializes the environment, cleans up existing bodies and effects,
+ * and sets up the initial state for the simulation.
+ * @param param0 An object containing the mode and seed for the simulation spawn.
+ * @returns 
+ */
 async function spawn({
     mode = SimulationStartMode.Default,
     seed,

@@ -3,6 +3,20 @@ import { BodyTypeEnum, PlanetTypeEnum, MoonTypeEnum } from '../bodies/body-enums
 import { getDesertTextureAsync, getDesertNormalTextureAsync } from './desert/desert-texture-generator';
 import { getOceanTextureAsync, getOceanNormalTextureAsync } from './ocean/ocean-texture-generator';
 import { getFrozenTextureAsync, getFrozenNormalTextureAsync } from './frozen/frozen-texture-generator';
+import {
+    getVolcanicTextureAsync,
+    getVolcanicNormalTextureAsync,
+    getVolcanicEmissiveTextureAsync,
+} from './volcanic/volcanic-texture-generator';
+import {
+    getTerrestrialTextureAsync,
+    getTerrestrialNormalTextureAsync,
+} from './terrestrial/terrestrial-texture-generator';
+import {
+    getTemperateTextureAsync,
+    getTemperateNormalTextureAsync,
+} from './temperate/temperate-texture-generator';
+import { SeededRandom } from '../utilities/prng';
 import * as THREE from 'three';
 
 /**
@@ -55,14 +69,28 @@ function upgradePlanetTexture(
 ): void {
     const subtype = planet.planetType;
 
-    if (subtype === PlanetTypeEnum.Desert) {
+    if (subtype === PlanetTypeEnum.Terrestrial) {
+        scheduleTextureSwap(body, texSeed, getTerrestrialTextureAsync, getTerrestrialNormalTextureAsync);
+    } else if (subtype === PlanetTypeEnum.Desert) {
         scheduleTextureSwap(body, texSeed, getDesertTextureAsync, getDesertNormalTextureAsync);
     } else if (subtype === PlanetTypeEnum.Ocean) {
         scheduleTextureSwap(body, texSeed, getOceanTextureAsync, getOceanNormalTextureAsync);
     } else if (subtype === PlanetTypeEnum.Frozen) {
         scheduleTextureSwap(body, texSeed, getFrozenTextureAsync, getFrozenNormalTextureAsync);
+    } else if (subtype === PlanetTypeEnum.Volcanic) {
+        const emissiveIntensity = new SeededRandom(`${texSeed}|emissive-intensity`).range(0.35, 0.60);
+        scheduleTextureSwapWithEmissive(
+            body,
+            texSeed,
+            getVolcanicTextureAsync,
+            getVolcanicNormalTextureAsync,
+            getVolcanicEmissiveTextureAsync,
+            emissiveIntensity,
+        );
+    } else if (subtype === PlanetTypeEnum.Temperate) {
+        scheduleTextureSwap(body, texSeed, getTemperateTextureAsync, getTemperateNormalTextureAsync);
     }
-    // Other planet subtypes (volcanic, temperate, gas/ice giants) keep their JPGs.
+    // Other planet subtypes (gas/ice giants) keep their JPGs.
 }
 
 function upgradeMoonTexture(
@@ -72,12 +100,26 @@ function upgradeMoonTexture(
 ): void {
     const subtype = moon.moonType;
 
-    if (subtype === MoonTypeEnum.Desert) {
+    if (subtype === MoonTypeEnum.Terrestrial) {
+        scheduleTextureSwap(body, texSeed, getTerrestrialTextureAsync, getTerrestrialNormalTextureAsync);
+    } else if (subtype === MoonTypeEnum.Desert) {
         scheduleTextureSwap(body, texSeed, getDesertTextureAsync, getDesertNormalTextureAsync);
     } else if (subtype === MoonTypeEnum.Ocean) {
         scheduleTextureSwap(body, texSeed, getOceanTextureAsync, getOceanNormalTextureAsync);
     } else if (subtype === MoonTypeEnum.Frozen) {
         scheduleTextureSwap(body, texSeed, getFrozenTextureAsync, getFrozenNormalTextureAsync);
+    } else if (subtype === MoonTypeEnum.Volcanic) {
+        const emissiveIntensity = new SeededRandom(`${texSeed}|emissive-intensity`).range(0.35, 0.60);
+        scheduleTextureSwapWithEmissive(
+            body,
+            texSeed,
+            getVolcanicTextureAsync,
+            getVolcanicNormalTextureAsync,
+            getVolcanicEmissiveTextureAsync,
+            emissiveIntensity,
+        );
+    } else if (subtype === MoonTypeEnum.Temperate) {
+        scheduleTextureSwap(body, texSeed, getTemperateTextureAsync, getTemperateNormalTextureAsync);
     }
     // Other moon subtypes keep their JPGs.
 }
@@ -105,5 +147,38 @@ function scheduleTextureSwap(
         .catch((err) => {
             // Silently ignore — the body keeps its JPG texture.
             console.warn(`[texture-upgrader] Failed to upgrade texture for ${body.id}:`, err);
+        });
+}
+
+/**
+ * Like scheduleTextureSwap but also sets an emissive map for bodies with
+ * self-illuminating features (e.g. volcanic lava rivers/lakes).
+ * The emissive map encodes lava color directly, so mat.emissive is set to
+ * white (0xffffff) and emissiveIntensity controls overall brightness.
+ */
+function scheduleTextureSwapWithEmissive(
+    body: CelestialBody,
+    texSeed: string,
+    getColorAsync: TextureAsyncFn,
+    getNormalAsync: TextureAsyncFn,
+    getEmissiveAsync: TextureAsyncFn,
+    emissiveIntensity: number,
+): void {
+    Promise.all([getColorAsync(texSeed), getNormalAsync(texSeed), getEmissiveAsync(texSeed)])
+        .then(([color, normal, emissive]) => {
+            if (body._isDisposed) return;
+
+            const mat = body.mesh.material as THREE.MeshStandardMaterial | undefined;
+            if (!mat) return;
+
+            mat.map          = color;
+            mat.normalMap    = normal;
+            mat.emissiveMap  = emissive;
+            mat.emissive     = new THREE.Color(0xffffff);
+            mat.emissiveIntensity = emissiveIntensity;
+            mat.needsUpdate  = true;
+        })
+        .catch((err) => {
+            console.warn(`[texture-upgrader] Failed to upgrade volcanic texture for ${body.id}:`, err);
         });
 }

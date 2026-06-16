@@ -4,11 +4,13 @@ import { calculateTrajectory } from '../physics/physics';
 import { SeededRandom } from '../utilities/prng';
 import {
     moonTexture,
-    fictionalTextures,
+    fictionalTerrestrialTextures,
     fictionalVolcanicTexture,
     fictionalFrozenTexture,
     fictionalOceanTexture,
     fictionalTemperateTexture,
+    getRoughnessForMoonTexture,
+    getMetalnessForMoonTexture,
 } from '../drawing/textures';
 import { getDesertTexture } from '../procedural/desert/desert-texture-generator';
 
@@ -21,8 +23,8 @@ export function createMoon(parent: CelestialBody, scene: THREE.Scene, config: IM
 
     const seededFromConfig = new SeededRandom(`${config.id}|moonTexture`);
     const pickFictionalDeterministic = (): THREE.Texture => {
-        const idx = Math.abs(Math.floor(seededFromConfig.next() * fictionalTextures.length));
-        return fictionalTextures[idx % fictionalTextures.length]!;
+        const idx = Math.abs(Math.floor(seededFromConfig.next() * fictionalTerrestrialTextures.length));
+        return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
     };
 
     const trajectory = calculateTrajectory(parent.dependencies.getG(), config.distance, parent.mass);
@@ -55,20 +57,13 @@ export function createMoon(parent: CelestialBody, scene: THREE.Scene, config: IM
                       ? moonTexture
                       : pickFictionalDeterministic();
 
-    const isDesert = moonType === MoonTypeEnum.Desert;
-    const isTemperate = moonType === MoonTypeEnum.Temperate;
-
-    // Temperate moons use earth_day texture (more specular/high-contrast highlights).
-    // Matching desert-like low-metal/high-rough parameters prevents violent highlight flicker/shaking.
-    const isRoughLowMetal = isDesert || isTemperate;
-
     const moonMaterial = new THREE.MeshStandardMaterial({
         map: moonMap,
         color: 0xffffff,
         emissive: 0x000000,
         emissiveIntensity: 0,
-        roughness: isRoughLowMetal ? 0.95 : 0.7,
-        metalness: isRoughLowMetal ? 0.02 : 0.7,
+        roughness: getRoughnessForMoonTexture(moonType),
+        metalness: getMetalnessForMoonTexture(moonType),
     });
 
     const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
