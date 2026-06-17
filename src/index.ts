@@ -292,17 +292,18 @@ function addEvent(event: { message: string; notificationType: NotificationType }
     // Add the event message to the console as well for better visibility
     console.info(entry.message);
 
-    new Noty({
-        type: entry.notificationType,
-        theme: 'semanticui',
-        layout: 'topCenter',
-        text: entry.message,
-        timeout: 3500,
-        progressBar: false,
-        closeWith: ['click', 'button'],
-        queue: 'solar-event-log',
-        //killer: true,
-    }).show();
+    // Not using Noty for now. Need to think of better event system. Maybe a log window?
+    // new Noty({
+    //     type: entry.notificationType,
+    //     theme: 'semanticui',
+    //     layout: 'topCenter',
+    //     text: entry.message,
+    //     timeout: 3500,
+    //     progressBar: false,
+    //     closeWith: ['click', 'button'],
+    //     queue: 'solar-event-log',
+    //     //killer: true,
+    // }).show();
 }
 
 // Keep queue bounded to avoid a burst of notifications freezing the UI.

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 
 import {
-    G,
     SUN_MASS,
     COMET_PERIHELION_DIST,
     COMET_APHELION_DIST,
@@ -40,7 +39,8 @@ export class Halley extends Comet {
 
         // Velocity perpendicular to position vector (for elliptical orbit)
         // Using vis-viva equation: v = sqrt(G*M*(2/r - 1/a))
-        const speed = Math.sqrt(G * SUN_MASS * (2 / distance - 1 / semiMajorAxis));
+        const gEff = dependencies.getG();
+        const speed = Math.sqrt(gEff * SUN_MASS * (2 / distance - 1 / semiMajorAxis));
 
         // Velocity perpendicular to radius, inclined
         const velX = -speed * Math.sin(Math.PI / 4) * Math.cos(inclination);
