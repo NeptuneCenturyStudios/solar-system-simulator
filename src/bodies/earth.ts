@@ -143,11 +143,11 @@ export class Earth extends Planet {
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Earth belongs.
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
         const gEff = dependencies.getG();
         const timeScale = EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, gEff, SUN_MASS);
         const rotSpeed = (2 * Math.PI / (23.934 * 3600)) * timeScale;
-        const trajectory = calculateTrajectory(gEff, EARTH_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(gEff, EARTH_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
 
         const customUniforms: EarthUniforms = {

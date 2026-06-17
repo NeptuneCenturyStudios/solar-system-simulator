@@ -22,30 +22,48 @@ export class Halley extends Comet {
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Halley belongs.
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, trueAnomaly: number = Math.PI) {
         // Halley-like elliptical orbit
         const perihelion = COMET_PERIHELION_DIST; // Just outside Mars (scaled)
         const aphelion = COMET_APHELION_DIST; // Scaled
         const semiMajorAxis = (perihelion + aphelion) / 2;
-
-        // Start at aphelion (farthest point)
-        const distance = aphelion;
+        const ecc = (aphelion - perihelion) / (aphelion + perihelion);
+        const semiLatusRectum = semiMajorAxis * (1 - ecc * ecc);
         const inclination = Math.PI / 6; // 30 degrees inclination
 
-        // Position at aphelion
-        const x = distance * Math.cos(Math.PI / 4);
-        const y = distance * Math.sin(inclination) * 0.5;
-        const z = distance * Math.sin(Math.PI / 4);
+        // --- Fixed orbital plane basis vectors ---
+        // ê_r: unit vector from sun toward periapsis (opposite of the original aphelion direction)
+        const er = new THREE.Vector3(
+            -Math.cos(Math.PI / 4),
+            -Math.sin(inclination) * 0.5,
+            -Math.sin(Math.PI / 4)
+        ).normalize();
 
-        // Velocity perpendicular to position vector (for elliptical orbit)
-        // Using vis-viva equation: v = sqrt(G*M*(2/r - 1/a))
+        // ê_t: in-plane tangential direction 90° ahead of periapsis (direction of motion at periapsis).
+        // Derived from the original velocity direction at aphelion, then Gram-Schmidt
+        // orthogonalized against ê_r so both vectors span the fixed orbital plane.
+        const etRaw = new THREE.Vector3(
+            Math.sin(Math.PI / 4) * Math.cos(inclination),
+            -Math.sin(inclination) * 0.3,
+            -Math.cos(Math.PI / 4) * Math.cos(inclination)
+        );
+        etRaw.addScaledVector(er, -etRaw.dot(er));
+        const et = etRaw.normalize();
+
+        // --- Kepler position and velocity at the given true anomaly ---
         const gEff = dependencies.getG();
-        const speed = Math.sqrt(gEff * SUN_MASS * (2 / distance - 1 / semiMajorAxis));
+        const nu = trueAnomaly;
+        const r = semiLatusRectum / (1 + ecc * Math.cos(nu));
 
-        // Velocity perpendicular to radius, inclined
-        const velX = -speed * Math.sin(Math.PI / 4) * Math.cos(inclination);
-        const velY = speed * Math.sin(inclination) * 0.3;
-        const velZ = speed * Math.cos(Math.PI / 4) * Math.cos(inclination);
+        const pos = new THREE.Vector3()
+            .addScaledVector(er, r * Math.cos(nu))
+            .addScaledVector(et, r * Math.sin(nu));
+
+        // vis-viva perifocal formula: v = sqrt(GM/p) * [-sin(ν) ê_r + (e+cos(ν)) ê_t]
+        const velScale = Math.sqrt(gEff * SUN_MASS / semiLatusRectum);
+        const vel = new THREE.Vector3()
+            .addScaledVector(er, -velScale * Math.sin(nu))
+            .addScaledVector(et, velScale * (ecc + Math.cos(nu)));
 
         // Geometry factory returns a placeholder geometry until OBJ loads
         const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
@@ -53,8 +71,8 @@ export class Halley extends Comet {
         const placeholderMesh = new THREE.Mesh(geometryFactory(), placeholderMaterial);
 
         super(dependencies, scene, {
-            pos: new THREE.Vector3(x, y, z),
-            vel: new THREE.Vector3(velX, velY, velZ),
+            pos,
+            vel,
             mass: COMET_MASS,
             id: 'halley',
             name: 'Halley',

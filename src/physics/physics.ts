@@ -55,16 +55,20 @@ export interface IAutopilotState {
  * @param {number} gForce The gravitational constant to use in the calculation
  * @param {number} distance The distance from the parent body at which the orbit is calculated
  * @param {number} parentMass The mass of the parent body around which the orbit is calculated
+ * @param {number} angleRad The orbital angle in radians (0 = +X axis, π/2 = +Z axis)
  * @returns An object containing the position and velocity vectors for the circular orbit
  */
-export function calculateTrajectory(gForce: number, distance: number, parentMass: number) {
+export function calculateTrajectory(gForce: number, distance: number, parentMass: number, angleRad: number = 0) {
     const speed = Math.sqrt((gForce * parentMass) / distance);
 
-    // Position body on the X axis
-    const pos = new THREE.Vector3(distance, 0, 0);
+    const cosA = Math.cos(angleRad);
+    const sinA = Math.sin(angleRad);
 
-    // Velocity must be on the Z axis (perpendicular to X) to start a circular orbit
-    const vel = new THREE.Vector3(0, 0, speed);
+    // Position body at the given angle in the XZ plane
+    const pos = new THREE.Vector3(distance * cosA, 0, distance * sinA);
+
+    // Velocity perpendicular to position (tangential) for circular orbit
+    const vel = new THREE.Vector3(-speed * sinA, 0, speed * cosA);
 
     return { pos, vel };
 }
@@ -179,7 +183,7 @@ function updatePhysics(simulationState: ISimulationState) {
 export function setBodyRadius(body: CelestialBody, newRadius: number) {
     if (!body) return;
 
-    // Hard cap to prevent extreme “fills the screen” glitches.
+    // Hard cap to prevent extreme "fills the screen" glitches.
     // Target: allow stars to grow to roughly Kuiper-belt scale, but never beyond.
     //
     // Kuiper belt generation uses:

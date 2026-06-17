@@ -29,12 +29,13 @@ export class Uranus extends Planet {
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        uranusTexture: THREE.Texture
+        uranusTexture: THREE.Texture,
+        angleRad: number = 0
     ) {
         const gEff = dependencies.getG();
         const timeScale = URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, gEff, SUN_MASS);
         const rotSpeed = (-2 * Math.PI / (17.24 * 3600)) * timeScale; // retrograde
-        const trajectory = calculateTrajectory(gEff, URANUS_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(gEff, URANUS_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(URANUS_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: uranusTexture,

@@ -26,11 +26,11 @@ export class Pluto extends DwarfPlanet {
      * @param scene The THREE.Scene to which Pluto belongs.
      * @param plutoTexture The texture to use for rendering Pluto.
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, plutoTexture: THREE.Texture) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, plutoTexture: THREE.Texture, angleRad: number = 0) {
         const gEff = dependencies.getG();
         const timeScale = PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, gEff, SUN_MASS);
         const rotSpeed = (-2 * Math.PI / (153.3 * 3600)) * timeScale; // retrograde
-        const trajectory = calculateTrajectory(gEff, PLUTO_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(gEff, PLUTO_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(PLUTO_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
             map: plutoTexture,

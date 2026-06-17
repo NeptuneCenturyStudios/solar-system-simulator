@@ -89,20 +89,25 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         const bodies: Body[] = [];
 
-        // Sun
+        // Helper to generate a random orbital angle
+        const randomAngle = () => Math.random() * Math.PI * 2;
+
+        // Sun (static at origin)
         const sun = new Sun(this.dependencies, this.scene);
         bodies.push(sun);
 
         // Mercury
-        bodies.push(new Mercury(this.dependencies, this.scene));
+        bodies.push(new Mercury(this.dependencies, this.scene, randomAngle()));
 
         // Venus
-        bodies.push(new Venus(this.dependencies, this.scene));
+        bodies.push(new Venus(this.dependencies, this.scene, randomAngle()));
 
         // Earth (+ Moon)
-        const earth = new Earth(this.dependencies, this.scene);
+        const earthAngle = randomAngle();
+        const earth = new Earth(this.dependencies, this.scene, earthAngle);
         bodies.push(earth);
 
+        // Moon gets its own random angle around Earth
         bodies.push(
             createMoon(earth, this.scene, {
                 distance: MOON_DIST_FROM_EARTH,
@@ -114,11 +119,12 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 name: 'Moon',
                 trailColor: 0xffffff,
                 maxTrail: 1500,
-                moonType: MoonTypeEnum.Terrestrial
+                moonType: MoonTypeEnum.Terrestrial,
+                angle: randomAngle(),
             })
         );
 
-        // Satellite (ISS)
+        // Satellite (ISS) — random angle around Earth
         bodies.push(
             createSatellite(this.scene, earth, {
                 distance: ISS_DIST_FROM_EARTH,
@@ -131,30 +137,32 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 trailColor: 0xffffff,
                 maxTrail: 1500,
                 inclinationDeg: ISS_INCLINATION,
+                angle: randomAngle(),
             })
         );
 
         // Mars
-        bodies.push(new Mars(this.dependencies, this.scene));
+        bodies.push(new Mars(this.dependencies, this.scene, randomAngle()));
 
         // Ceres (~2.77 AU)
-        bodies.push(new Ceres(this.dependencies, this.scene, ceresTexture));
+        const ceresAngle = randomAngle();
+        bodies.push(new Ceres(this.dependencies, this.scene, ceresTexture, ceresAngle));
 
-        // Vesta (~2.36 AU)
-        const vestaAngle = Math.random() * Math.PI * 2;
-        const vestaTrajectory = calculateTrajectory(this.dependencies.getG(), VESTA_DISTANCE, SUN_MASS);
+        // Vesta (~2.36 AU) — already had random angle, but now uses the helper for consistency
+        const vestaAngle = randomAngle();
+        const vestaTrajectory = calculateTrajectory(this.dependencies.getG(), VESTA_DISTANCE, SUN_MASS, vestaAngle);
         const vesta = new Asteroid(this.dependencies, this.scene, {
             radius: VESTA_RADIUS,
             color: 0xb8a890,
             pos: [
-                Math.cos(vestaAngle) * VESTA_DISTANCE,
+                vestaTrajectory.pos.x,
                 (Math.random() - 0.5) * 1639,
-                Math.sin(vestaAngle) * VESTA_DISTANCE,
+                vestaTrajectory.pos.z,
             ],
             vel: [
-                -Math.sin(vestaAngle) * vestaTrajectory.vel.length(),
+                vestaTrajectory.vel.x,
                 0,
-                Math.cos(vestaAngle) * vestaTrajectory.vel.length(),
+                vestaTrajectory.vel.z,
             ],
             mass: VESTA_MASS,
             id: 'vesta',
@@ -166,20 +174,20 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         bodies.push(vesta);
 
         // Pallas (~2.77 AU)
-        const pallasAngle = Math.random() * Math.PI * 2;
-        const pallasTrajectory = calculateTrajectory(this.dependencies.getG(), PALLAS_DISTANCE, SUN_MASS);
+        const pallasAngle = randomAngle();
+        const pallasTrajectory = calculateTrajectory(this.dependencies.getG(), PALLAS_DISTANCE, SUN_MASS, pallasAngle);
         const pallas = new Asteroid(this.dependencies, this.scene, {
             radius: PALLAS_RADIUS,
             color: 0x8a8a8a,
             pos: [
-                Math.cos(pallasAngle) * PALLAS_DISTANCE,
+                pallasTrajectory.pos.x,
                 (Math.random() - 0.5) * 2185,
-                Math.sin(pallasAngle) * PALLAS_DISTANCE,
+                pallasTrajectory.pos.z,
             ],
             vel: [
-                -Math.sin(pallasAngle) * pallasTrajectory.vel.length(),
+                pallasTrajectory.vel.x,
                 0,
-                Math.cos(pallasAngle) * pallasTrajectory.vel.length(),
+                pallasTrajectory.vel.z,
             ],
             mass: PALLAS_MASS,
             id: 'pallas',
@@ -191,20 +199,20 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         bodies.push(pallas);
 
         // Hygiea (~3.14 AU)
-        const hygieaAngle = Math.random() * Math.PI * 2;
-        const hygieaTrajectory = calculateTrajectory(this.dependencies.getG(), HYGIEA_DISTANCE, SUN_MASS);
+        const hygieaAngle = randomAngle();
+        const hygieaTrajectory = calculateTrajectory(this.dependencies.getG(), HYGIEA_DISTANCE, SUN_MASS, hygieaAngle);
         const hygiea = new Asteroid(this.dependencies, this.scene, {
             radius: HYGIEA_RADIUS,
             color: 0x7a7a7a,
             pos: [
-                Math.cos(hygieaAngle) * HYGIEA_DISTANCE,
+                hygieaTrajectory.pos.x,
                 (Math.random() - 0.5) * 1093,
-                Math.sin(hygieaAngle) * HYGIEA_DISTANCE,
+                hygieaTrajectory.pos.z,
             ],
             vel: [
-                -Math.sin(hygieaAngle) * hygieaTrajectory.vel.length(),
+                hygieaTrajectory.vel.x,
                 0,
-                Math.cos(hygieaAngle) * hygieaTrajectory.vel.length(),
+                hygieaTrajectory.vel.z,
             ],
             mass: HYGIEA_MASS,
             id: 'hygiea',
@@ -216,13 +224,14 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         bodies.push(hygiea);
 
         // Jupiter (+ 4 Galilean moons)
-        const jupiter = new Jupiter(this.dependencies, this.scene, jupiterTexture);
+        const jupiterAngle = randomAngle();
+        const jupiter = new Jupiter(this.dependencies, this.scene, jupiterTexture, jupiterAngle);
         bodies.push(jupiter);
 
-        // Io (0 degrees)
+        // Jovian moons each get their own random angle around Jupiter
         bodies.push(
             createMoon(jupiter, this.scene, {
-                angle: 0,
+                angle: randomAngle(),
                 distance: IO_DIST_FROM_JUPITER,
                 radius: IO_RADIUS,
                 pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
@@ -237,10 +246,9 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             })
         );
 
-        // Europa (90 degrees)
         bodies.push(
             createMoon(jupiter, this.scene, {
-                angle: Math.PI / 2,
+                angle: randomAngle(),
                 distance: EUROPA_DIST_FROM_JUPITER,
                 radius: EUROPA_RADIUS,
                 pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
@@ -255,10 +263,9 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             })
         );
 
-        // Ganymede (180 degrees)
         bodies.push(
             createMoon(jupiter, this.scene, {
-                angle: Math.PI,
+                angle: randomAngle(),
                 distance: GANYMEDE_DIST_FROM_JUPITER,
                 radius: GANYMEDE_RADIUS,
                 pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
@@ -273,10 +280,9 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             })
         );
 
-        // Callisto (270 degrees)
         bodies.push(
             createMoon(jupiter, this.scene, {
-                angle: (Math.PI * 3) / 2,
+                angle: randomAngle(),
                 distance: CALLISTO_DIST_FROM_JUPITER,
                 radius: CALLISTO_RADIUS,
                 pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
@@ -292,19 +298,19 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         );
 
         // Saturn
-        bodies.push(new Saturn(this.dependencies, this.scene, saturnTexture));
+        bodies.push(new Saturn(this.dependencies, this.scene, saturnTexture, randomAngle()));
 
         // Uranus
-        bodies.push(new Uranus(this.dependencies, this.scene, uranusTexture));
+        bodies.push(new Uranus(this.dependencies, this.scene, uranusTexture, randomAngle()));
 
         // Neptune
-        bodies.push(new Neptune(this.dependencies, this.scene, neptuneTexture));
+        bodies.push(new Neptune(this.dependencies, this.scene, neptuneTexture, randomAngle()));
 
         // Pluto
-        bodies.push(new Pluto(this.dependencies, this.scene, plutoTexture));
+        bodies.push(new Pluto(this.dependencies, this.scene, plutoTexture, randomAngle()));
 
-        // Comet (Halley)
-        bodies.push(new Halley(this.dependencies, this.scene));
+        // Comet (Halley) — random orbital angle preserves elliptical orbit shape
+        bodies.push(new Halley(this.dependencies, this.scene, randomAngle()));
 
         return bodies;
     }

@@ -29,12 +29,13 @@ export class Jupiter extends Planet {
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        jupiterTexture: THREE.Texture
+        jupiterTexture: THREE.Texture,
+        angleRad: number = 0
     ) {
         const gEff = dependencies.getG();
         const timeScale = JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, gEff, SUN_MASS);
         const rotSpeed = (2 * Math.PI / (9.925 * 3600)) * timeScale;
-        const trajectory = calculateTrajectory(gEff, JUPITER_DIST, SUN_MASS);
+        const trajectory = calculateTrajectory(gEff, JUPITER_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(JUPITER_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: jupiterTexture,
