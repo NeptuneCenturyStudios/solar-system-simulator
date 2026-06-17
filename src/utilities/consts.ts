@@ -234,6 +234,12 @@ export const VEL_ARC_LINEWIDTH_PX = 22;
 export const VEL_ARC_TIP_RADIUS_MIN = 80;
 export const VEL_ARC_TIP_RADIUS_MAX = 1200;
 
+// Orbit prediction rendering / quality
+export const ORBIT_PREDICTION_LINEWIDTH_PX = 2.5;
+export const ORBIT_PREDICTION_BASE_SEGMENTS = 512;
+export const ORBIT_PREDICTION_MAX_SEGMENTS = 2048;
+export const ORBIT_PREDICTION_HIGH_E_THRESHOLD = 0.6;
+
 // === Simulation / integration timing ===
 /** Base frame dt used for physics integration (approx 60fps). */
 export const BASE_FRAME_DT = 0.016;

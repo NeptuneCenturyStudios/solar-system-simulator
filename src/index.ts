@@ -773,6 +773,7 @@ const velArc = new VelocityArcManager(scene, gizmo, interactionState);
 
 // --- Orbit prediction lines ---
 const orbitPrediction = new OrbitPredictionManager(scene);
+orbitPrediction.resize(window.innerWidth, window.innerHeight);
 
 // Create FPS counter sprite
 let fpsSprite: THREE.Sprite | null = null;
@@ -6295,6 +6296,7 @@ window.addEventListener('resize', () => {
 
     // Update fat-line resolutions (velocity arcs)
     velArc.resize(window.innerWidth, window.innerHeight);
+    orbitPrediction.resize(window.innerWidth, window.innerHeight);
 
     // Reposition FPS counter
     if (fpsSprite) {
