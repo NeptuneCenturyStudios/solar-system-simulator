@@ -7,6 +7,7 @@ import { BlackHole } from '../bodies/black-hole';
 import { CelestialBody } from '../bodies/celestial-body';
 import { Spaceship } from '../bodies/spaceship';
 import { NotificationType } from '../event-log/event-log';
+import { EffectiveGForce } from '../types';
 
 
 
@@ -52,13 +53,13 @@ export interface IAutopilotState {
 
 /**
  * Calculate position and velocity for a circular orbit around a parent body
- * @param {number} gForce The gravitational constant to use in the calculation
+ * @param {EffectiveGForce} gForce The gravitational constant to use in the calculation
  * @param {number} distance The distance from the parent body at which the orbit is calculated
  * @param {number} parentMass The mass of the parent body around which the orbit is calculated
  * @param {number} angleRad The orbital angle in radians (0 = +X axis, π/2 = +Z axis)
  * @returns An object containing the position and velocity vectors for the circular orbit
  */
-export function calculateTrajectory(gForce: number, distance: number, parentMass: number, angleRad: number = 0) {
+export function calculateTrajectory(gForce: EffectiveGForce, distance: number, parentMass: number, angleRad: number = 0) {
     const speed = Math.sqrt((gForce * parentMass) / distance);
 
     const cosA = Math.cos(angleRad);

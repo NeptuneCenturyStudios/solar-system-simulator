@@ -1,0 +1,1 @@
+export type EffectiveGForce = number & { readonly __brand: unique symbol };

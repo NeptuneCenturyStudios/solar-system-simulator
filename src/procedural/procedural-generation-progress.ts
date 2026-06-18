@@ -14,6 +14,8 @@ export type ProceduralGenerationWorkUnit = {
         | 'planets'
         | 'moons'
         | 'asteroids'
+        | 'black-holes'
+        | 'comets'
         | 'finalizing';
 };
 

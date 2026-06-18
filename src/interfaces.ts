@@ -8,7 +8,7 @@ import { IPipelineFeedEffect } from './effects/effect-base';
 import { NotificationType } from './event-log/event-log';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
 import { ITidalLockOptions } from './bodies/celestial-body';
-
+import { EffectiveGForce } from './types';
 /**
  * Represents the rotation of a body in 3D space
  */
@@ -65,7 +65,7 @@ export interface IStateDependencies {
     addBody: (body: Body) => void;
     gizmo: CoordinateGizmo;
     getBodies: () => Body[];
-    getG: () => number;
+    getG: () => EffectiveGForce;
 }
 
 /**

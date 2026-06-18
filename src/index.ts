@@ -286,6 +286,7 @@ import { ProceduralGenerator } from './procedural/procedural-generator';
 import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
 import { BlackHoleSystemGenerator } from './procedural/black-hole-system-generator';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
+import { EffectiveGForce } from './types';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: { message: string; notificationType: NotificationType }) {
@@ -760,7 +761,7 @@ const dependencies: IStateDependencies = {
         }
     },
     getBodies: () => simulationState.bodies,
-    getG: () => G * simulationState.gMultiplier,
+    getG: () => (G * simulationState.gMultiplier) as EffectiveGForce,
 };
 
 /** Shared tuning constants. */

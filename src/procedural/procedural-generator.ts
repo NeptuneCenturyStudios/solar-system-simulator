@@ -7,7 +7,7 @@ import type { Body } from '../bodies/body';
 import type { CelestialBody } from '../bodies/celestial-body';
 import type { IStateDependencies } from '../interfaces';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
-import { G } from '../utilities/consts';
+
 import { generateProceduralBodyName } from './body-naming';
 import { createMainSequenceStarFromParams } from './star-factory';
 import { generateProceduralPlanets } from './planet-generator';
@@ -21,6 +21,10 @@ import type {
 import { createMoonBodyFromProceduralCreation } from './moon-factory';
 import { generateProceduralAsteroids } from './asteroid-generator';
 import { createAsteroidBodyFromProceduralCreation } from './asteroid-factory';
+import { generateProceduralComets } from './comet-generator';
+import { createCometBodyFromProceduralCreation } from './comet-factory';
+import { generateProceduralBlackHoles } from './black-hole-generator';
+import { createBlackHoleBodyFromProceduralCreation } from './black-hole-factory';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
 import { applyInclinationX, applyYawY, buildUnitPositionDirection, safeUnitCross, generateBinaryPlacements } from './orbital-math';
@@ -101,7 +105,7 @@ function generateTriplePlacements(
     yawRad: number,
     inclinationRad: number,
     masterSeed: string,
-    gForce: number = G
+    gForce: number
 ): [StarPlacement, StarPlacement, StarPlacement] {
     const [m1, m2, m3] = masses;
     const mSum = m1 + m2 + m3;
@@ -166,6 +170,12 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         const asteroidEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Asteroid);
         const asteroidCount = asteroidEntry?.count ?? 0;
 
+        const blackHoleEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.BlackHole);
+        const blackHoleCount = blackHoleEntry?.count ?? 0;
+
+        const cometEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Comet);
+        const cometCount = cometEntry?.count ?? 0;
+
         const starParams = Array.from({ length: starCount }, (_, i) =>
             randomStarParams({ seed: deriveSubSeed(this.masterSeed, i) })
         );
@@ -185,7 +195,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             const inclinationDeg = rngFor(this.masterSeed, 'binaryInclination', 0).range(5, 85);
             const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
-            placements = generateBinaryPlacements(masses as [number, number], separationDistance, yawRad, inclinationRad);
+            placements = generateBinaryPlacements(masses as [number, number], separationDistance, yawRad, inclinationRad, this.dependencies.getG());
         } else {
             const radii = starParams.map((p) => p.radius) as [number, number, number];
 
@@ -198,7 +208,8 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 radii,
                 yawRad,
                 inclinationRad,
-                this.masterSeed
+                this.masterSeed,
+                this.dependencies.getG()
             );
         }
 
@@ -340,6 +351,42 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             bodies.push(asteroidBody);
         }
 
+        const blackHoleCreations = generateProceduralBlackHoles({
+            dependencies: this.dependencies,
+            masterSeed: this.masterSeed,
+            blackHoleCount,
+            starParams,
+            starPlacements: placements,
+        });
+
+        for (let i = 0; i < blackHoleCreations.length; i++) {
+            const creation = blackHoleCreations[i]!;
+            const bhBody = createBlackHoleBodyFromProceduralCreation(
+                this.dependencies,
+                this.scene,
+                creation
+            );
+            bodies.push(bhBody);
+        }
+
+        const cometCreations = generateProceduralComets({
+            dependencies: this.dependencies,
+            masterSeed: this.masterSeed,
+            cometCount,
+            starParams,
+            starPlacements: placements,
+        });
+
+        for (let i = 0; i < cometCreations.length; i++) {
+            const creation = cometCreations[i]!;
+            const cometBody = createCometBodyFromProceduralCreation(
+                this.dependencies,
+                this.scene,
+                creation
+            );
+            bodies.push(cometBody);
+        }
+
         return bodies;
     }
 
@@ -358,6 +405,12 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         const asteroidEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Asteroid);
         const asteroidCount = asteroidEntry?.count ?? 0;
+
+        const blackHoleEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.BlackHole);
+        const blackHoleCount = blackHoleEntry?.count ?? 0;
+
+        const cometEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Comet);
+        const cometCount = cometEntry?.count ?? 0;
 
         const starParams = Array.from({ length: starCount }, (_, i) =>
             randomStarParams({ seed: deriveSubSeed(this.masterSeed, i) })
@@ -419,7 +472,29 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             starPlacements: placements,
         });
 
-        const totalBodies = starCount + planetCreations.length + moonCreations.length + asteroidCreations.length;
+        const blackHoleCreations = generateProceduralBlackHoles({
+            dependencies: this.dependencies,
+            masterSeed: this.masterSeed,
+            blackHoleCount,
+            starParams,
+            starPlacements: placements,
+        });
+
+        const cometCreations = generateProceduralComets({
+            dependencies: this.dependencies,
+            masterSeed: this.masterSeed,
+            cometCount,
+            starParams,
+            starPlacements: placements,
+        });
+
+        const totalBodies =
+            starCount +
+            planetCreations.length +
+            moonCreations.length +
+            asteroidCreations.length +
+            blackHoleCreations.length +
+            cometCreations.length;
 
         reporter?.setTotal(totalBodies);
 
@@ -528,7 +603,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 workUnit: { phase: 'moons', label: `Moon: ${i + 1}/${moonCreations.length} ✓` },
             });
 
-            if (i % 2 === 1) await yieldToEventLoop();
+            await yieldToEventLoop();
         }
 
         // Asteroids
@@ -548,7 +623,47 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 workUnit: { phase: 'asteroids', label: `Asteroid: ${i + 1}/${asteroidCreations.length} ✓` },
             });
 
-            if (i % 2 === 1) await yieldToEventLoop();
+            await yieldToEventLoop();
+        }
+
+        // Black Holes
+        for (let i = 0; i < blackHoleCreations.length; i++) {
+            const creation = blackHoleCreations[i]!;
+            const bhBody = createBlackHoleBodyFromProceduralCreation(
+                this.dependencies,
+                this.scene,
+                creation
+            );
+            bodies.push(bhBody);
+
+            completed++;
+            reporter?.report({
+                completed,
+                total: totalBodies,
+                workUnit: { phase: 'black-holes', label: `Black Hole: ${i + 1}/${blackHoleCreations.length} ✓` },
+            });
+
+            await yieldToEventLoop();
+        }
+
+        // Comets
+        for (let i = 0; i < cometCreations.length; i++) {
+            const creation = cometCreations[i]!;
+            const cometBody = createCometBodyFromProceduralCreation(
+                this.dependencies,
+                this.scene,
+                creation
+            );
+            bodies.push(cometBody);
+
+            completed++;
+            reporter?.report({
+                completed,
+                total: totalBodies,
+                workUnit: { phase: 'comets', label: `Comet: ${i + 1}/${cometCreations.length} ✓` },
+            });
+
+            await yieldToEventLoop();
         }
 
         return bodies;
