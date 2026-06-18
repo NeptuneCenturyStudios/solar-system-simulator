@@ -120,32 +120,68 @@ export function generateProceduralPlanets(params: {
     if (starCount === 0) return [];
 
     const maxStarRadius = Math.max(...starParams.map((s) => s.radius));
-    const minDistWorld = Math.max(EARTH_DIST * 0.25, maxStarRadius * 12);
-    const maxDistWorld = EARTH_DIST * 8;
+    const totalStarMass = starParams.reduce((sum, s) => sum + s.mass, 0);
 
-    const minAU = minDistWorld / EARTH_DIST;
-    const maxAU = maxDistWorld / EARTH_DIST;
+    // For multi-star systems, compute the binary separation to classify orbit types.
+    // S-type: planet orbits one star, stable within ~0.3 × binarySeparation of that star.
+    // P-type: planet orbits the barycentre, stable beyond ~2.0 × binarySeparation.
+    const binarySeparation = starCount > 1
+        ? starPlacements[0]!.pos.distanceTo(starPlacements[1]!.pos)
+        : 0;
 
-    // Distances first: generate deterministic per-planet candidate distances,
-    // then sort to establish near->far indices used for subtype weighting.
-    const distances: number[] = [];
+    const S_STABLE_FRACTION = 0.3;
+    const P_STABLE_MULTIPLE = 2.0;
+
+    const sMinDist = Math.max(EARTH_DIST * 0.1, maxStarRadius * 12);
+    const sMaxDist = binarySeparation * S_STABLE_FRACTION;
+    const sZoneValid = starCount > 1 && sMaxDist > sMinDist;
+
+    const pMinDist = Math.max(EARTH_DIST * 0.25, maxStarRadius * 12, binarySeparation * P_STABLE_MULTIPLE);
+    const pMaxDist = Math.max(EARTH_DIST * 8, binarySeparation * 10.0);
+    const pZoneValid = pMinDist < pMaxDist;
+
+    type OrbitPlan = { distance: number; isSType: boolean; hostStarIndex: number };
+
+    // Per-planet: choose S-type or P-type, sample a distance within that zone.
+    const orbitPlans: OrbitPlan[] = [];
     for (let k = 0; k < planetCount; k++) {
         const distanceRng = rngFor(masterSeed, 'planetDistance', k);
+        const orbitTypeRng = rngFor(masterSeed, 'planetOrbitType', k);
 
-        const logMin = Math.log(Math.max(1e-6, minAU));
-        const logMax = Math.log(Math.max(logMin + 1e-6, maxAU));
+        let isSType: boolean;
+        let hostStarIndex = 0;
 
+        if (starCount === 1) {
+            isSType = false;
+        } else if (sZoneValid && pZoneValid) {
+            isSType = orbitTypeRng.chance(0.5);
+        } else if (sZoneValid) {
+            isSType = true;
+        } else {
+            isSType = false;
+        }
+
+        if (isSType) {
+            hostStarIndex = orbitTypeRng.chance(0.5) ? 1 : 0;
+        }
+
+        const zoneMin = isSType ? sMinDist : pMinDist;
+        const zoneMax = isSType ? sMaxDist : pMaxDist;
+
+        const logMin = Math.log(Math.max(1e-6, zoneMin / EARTH_DIST));
+        const logMax = Math.log(Math.max(logMin + 1e-6, zoneMax / EARTH_DIST));
         const u = distanceRng.next();
-        const au = Math.exp(logMin + u * (logMax - logMin));
+        const distance = Math.exp(logMin + u * (logMax - logMin)) * EARTH_DIST;
 
-        distances.push(au * EARTH_DIST);
+        orbitPlans.push({ distance, isSType, hostStarIndex });
     }
-    distances.sort((a, b) => a - b);
+    orbitPlans.sort((a, b) => a.distance - b.distance);
 
     const planetCreations: ProceduralPlanetCreation[] = [];
 
     for (let i = 0; i < planetCount; i++) {
-        const distance = distances[i]!;
+        const plan = orbitPlans[i]!;
+        const distance = plan.distance;
         const distanceT01 = planetCount <= 1 ? 0 : i / Math.max(1, planetCount - 1);
 
         // Each planetary attribute comes from its own derived RNG stream,
@@ -162,12 +198,15 @@ export function generateProceduralPlanets(params: {
 
         const bodyType: PlanetBodyType = isDwarf ? BodyTypeEnum.DwarfPlanet : BodyTypeEnum.Planet;
 
-        const starIndex = i % starCount;
-        const hostStar = starParams[starIndex]!;
-        const hostPlacement = starPlacements[starIndex]!;
-
         const customTypeString = planetSubtypeToCustomPlanetTypeString(subtype);
-        const subSeed = `${masterSeed}|planet:${i}|star:${starIndex}|type:${customTypeString}|t:${distanceT01.toFixed(3)}`;
+        // S-type orbits use one star as the gravitational anchor;
+        // P-type orbits use the system barycenter (always at origin).
+        const hostStarIndex = plan.isSType ? plan.hostStarIndex : -1;
+        const hostMass = plan.isSType ? starParams[plan.hostStarIndex]!.mass : totalStarMass;
+        const hostPos = plan.isSType ? starPlacements[plan.hostStarIndex]!.pos : new THREE.Vector3(0, 0, 0);
+        const hostVel = plan.isSType ? starPlacements[plan.hostStarIndex]!.vel : new THREE.Vector3(0, 0, 0);
+
+        const subSeed = `${masterSeed}|planet:${i}|orbit:${plan.isSType ? `stype:${hostStarIndex}` : 'ptype'}|type:${customTypeString}|t:${distanceT01.toFixed(3)}`;
 
         const planetParams = randomPlanetParams(customTypeString, {
             seed: subSeed,
@@ -194,11 +233,26 @@ export function generateProceduralPlanets(params: {
 
         const tangentialDir = safeUnitCross(normal, u);
 
-        const eccentricity = orbitalRng.range(0, 0.6);
-        const speed = calculateOrbitalSpeed(dependencies.getG(), distance, hostStar.mass, eccentricity);
+        // r_peri = distance × (1−e)/(1+e); clamp so periapsis clears all stars
+        // and stays integrable (distance×0.3 floor caps e ≈ 0.54 max).
+        const minPeriapsis = plan.isSType
+            ? Math.max(
+                starParams[plan.hostStarIndex]!.radius * 5,
+                distance * 0.3
+              )
+            : Math.max(
+                maxStarRadius * 5,
+                starPlacements[0]!.pos.length() + starParams[0]!.radius * 3,
+                starCount > 1 ? starPlacements[1]!.pos.length() + starParams[1]!.radius * 3 : 0,
+                binarySeparation * P_STABLE_MULTIPLE,
+                distance * 0.3
+              );
+        const eMax = Math.max(0, (distance - minPeriapsis) / (distance + minPeriapsis));
+        const eccentricity = Math.min(orbitalRng.range(0, 0.6), eMax);
+        const speed = calculateOrbitalSpeed(dependencies.getG(), distance, hostMass, eccentricity);
 
-        const pos = hostPlacement.pos.clone().addScaledVector(u, distance);
-        const vel = hostPlacement.vel.clone().addScaledVector(tangentialDir, speed);
+        const pos = hostPos.clone().addScaledVector(u, distance);
+        const vel = hostVel.clone().addScaledVector(tangentialDir, speed);
 
         const id = `proc_planet_${i}_${subSeed}`;
         const sequenceNumber = i + 1;

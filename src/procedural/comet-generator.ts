@@ -29,23 +29,56 @@ export function generateProceduralComets(params: {
     const maxDistAU = 50.0;
 
     const maxStarRadius = Math.max(...starParams.map((s) => s.radius));
-    const minDistWorld = Math.max(EARTH_DIST * minDistAU, maxStarRadius * 20);
-    const maxDistWorld = EARTH_DIST * maxDistAU;
+    const totalStarMass = starParams.reduce((sum, s) => sum + s.mass, 0);
+
+    const binarySeparation = starCount > 1
+        ? starPlacements[0]!.pos.distanceTo(starPlacements[1]!.pos)
+        : 0;
+
+    const S_STABLE_FRACTION = 0.3;
+    const P_STABLE_MULTIPLE = 2.0;
+
+    const sMinDist = Math.max(EARTH_DIST * minDistAU, maxStarRadius * 20);
+    const sMaxDist = starCount > 1 ? binarySeparation * S_STABLE_FRACTION : 0;
+    const sZoneValid = starCount > 1 && sMaxDist > sMinDist;
+
+    const pMinDist = Math.max(EARTH_DIST * minDistAU, maxStarRadius * 20, binarySeparation * P_STABLE_MULTIPLE);
+    const pMaxDist = Math.max(EARTH_DIST * maxDistAU, binarySeparation * 20.0);
+    const pZoneValid = pMinDist < pMaxDist;
 
     const creations: ProceduralCometCreation[] = [];
 
     for (let i = 0; i < cometCount; i++) {
         const subSeed = `${masterSeed}|comet:${i}`;
 
-        // Round-robin across stars for multi-star systems.
-        const starIndex = i % starCount;
-        const hostStar = starParams[starIndex]!;
-        const hostPlacement = starPlacements[starIndex]!;
+        const orbitTypeRng = rngFor(masterSeed, 'cometOrbitType', i);
+        let isSType: boolean;
+        let hostStarIndex = 0;
+
+        if (starCount === 1) {
+            isSType = false;
+        } else if (sZoneValid && pZoneValid) {
+            isSType = orbitTypeRng.chance(0.5);
+        } else if (sZoneValid) {
+            isSType = true;
+        } else {
+            isSType = false;
+        }
+
+        if (isSType) {
+            hostStarIndex = orbitTypeRng.chance(0.5) ? 1 : 0;
+        }
+
+        const hostMass = isSType ? starParams[hostStarIndex]!.mass : totalStarMass;
+        const hostPos = isSType ? starPlacements[hostStarIndex]!.pos : new THREE.Vector3(0, 0, 0);
+        const hostVel = isSType ? starPlacements[hostStarIndex]!.vel : new THREE.Vector3(0, 0, 0);
+
+        const zoneMin = isSType ? sMinDist : pMinDist;
+        const zoneMax = isSType ? sMaxDist : pMaxDist;
 
         const distanceRng = rngFor(masterSeed, 'cometDistance', i);
-        // Log-uniform distance within the outer zone.
-        const logMin = Math.log(Math.max(1e-6, minDistWorld));
-        const logMax = Math.log(Math.max(logMin + 1e-6, maxDistWorld));
+        const logMin = Math.log(Math.max(1e-6, zoneMin));
+        const logMax = Math.log(Math.max(logMin + 1e-6, zoneMax));
         const distance = Math.exp(logMin + distanceRng.next() * (logMax - logMin));
 
         // Comets have high inclinations (0–60°).
@@ -66,13 +99,29 @@ export function generateProceduralComets(params: {
         const normal = applyInclinationX(nYaw, inclinationRad).normalize();
         const tangentialDir = safeUnitCross(normal, u);
 
-        // Comets have high eccentricities (0.6–0.97).
-        const eccRng = rngFor(masterSeed, 'cometEccentricity', i);
-        const eccentricity = eccRng.range(0.6, 0.97);
-        const speed = calculateOrbitalSpeed(dependencies.getG(), distance, hostStar.mass, eccentricity);
+        // Comets have high eccentricities (0.6–0.97), but periapsis must clear all stars
+        // AND stay far enough from the host that periapsis velocity remains integrable.
+        // r_peri = distance × (1−e)/(1+e); minPeriapsis ≥ distance×0.15 caps e ≈ 0.74 max.
+        const minPeriapsis = isSType
+            ? Math.max(
+                starParams[hostStarIndex]!.radius * 5,
+                distance * 0.15
+              )
+            : Math.max(
+                maxStarRadius * 5,
+                starPlacements[0]!.pos.length() + starParams[0]!.radius * 3,
+                starCount > 1 ? starPlacements[1]!.pos.length() + starParams[1]!.radius * 3 : 0,
+                binarySeparation * P_STABLE_MULTIPLE,
+                distance * 0.15
+              );
+        const eMax = Math.max(0, (distance - minPeriapsis) / (distance + minPeriapsis));
 
-        const pos = hostPlacement.pos.clone().addScaledVector(u, distance);
-        const vel = hostPlacement.vel.clone().addScaledVector(tangentialDir, speed);
+        const eccRng = rngFor(masterSeed, 'cometEccentricity', i);
+        const eccentricity = Math.min(eccRng.range(0.6, 0.97), eMax);
+        const speed = calculateOrbitalSpeed(dependencies.getG(), distance, hostMass, eccentricity);
+
+        const pos = hostPos.clone().addScaledVector(u, distance);
+        const vel = hostVel.clone().addScaledVector(tangentialDir, speed);
 
         // Seeded mass and radius (avoids the unseeded Math.random() inside randomCometParams).
         const massRng = rngFor(masterSeed, 'cometMass', i);
