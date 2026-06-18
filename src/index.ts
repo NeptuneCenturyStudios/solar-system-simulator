@@ -5161,7 +5161,7 @@ function spawnShip() {
         );
 
         addEvent({
-            message: 'Spaceship spawned. Click RE-ENTER SHIP to pilot it.',
+            message: 'Spaceship spawned.',
             notificationType: NotificationType.Info,
         });
         return;
@@ -5231,6 +5231,9 @@ function spawnShip() {
     refreshBodiesTable();
 
     ambientMusic.enterFlightMode();
+
+    // Close the flight controls panel
+    flightControlsPanel.hide();
 
     addEvent({
         message: 'Entered spaceship.',
