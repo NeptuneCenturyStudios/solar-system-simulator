@@ -138,6 +138,7 @@ import { ParticleExplosion } from './effects/particle-explosion';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { WarpEffect } from './effects/warp-effect';
 import { playWeaponImpact } from './utilities/audio.js';
+import { AmbientSoundManager } from './utilities/ambient-sound';
 import { triggerScreenFlash } from './effects/screen-flash';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
 import { GridHelperManager } from './gizmos/grid-helper';
@@ -855,6 +856,17 @@ function createSpeedSprite() {
 }
 createSpeedSprite();
 
+const ambientMusic = new AmbientSoundManager();
+// Start ambient music immediately. If the browser blocks autoplay,
+// it falls back to starting on the first user gesture.
+ambientMusic.init();
+const _retryMusic = (): void => {
+    ambientMusic.init();
+    document.removeEventListener('pointerdown', _retryMusic);
+    document.removeEventListener('keydown', _retryMusic);
+};
+document.addEventListener('pointerdown', _retryMusic);
+document.addEventListener('keydown', _retryMusic);
 const warpEffect = new WarpEffect(scene);
 const flightHUD = new FlightHUD(
     uiScene,
@@ -3797,8 +3809,10 @@ function animate() {
     // Speed-based opacity is handled inside warpEffect.update(); here we only
     // apply the distance multiplier and handle the case where no ship exists.
     const _visShip = flightState.activeShip ?? flightState.knownShip;
+    let _warpDistanceFade;
     if (_visShip && !_visShip._isDisposed && _visShip.mesh) {
         if (isFlightModeActive) {
+            _warpDistanceFade = 1.0;
             warpEffect.setOpacity(1.0);
         } else {
             const shipIsLookAtTarget =
@@ -3808,20 +3822,35 @@ function animate() {
             if (shipIsLookAtTarget) {
                 const dist = camera.position.distanceTo(_visShip.mesh.position);
                 if (dist >= WARP_FADE_DIST) {
+                    _warpDistanceFade = 0.0;
                     warpEffect.setOpacity(0.0);
                 } else {
                     const t = Math.max(
                         0,
                         (dist - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST)
                     );
+                    _warpDistanceFade = 1.0 - t;
                     warpEffect.setOpacity(1.0 - t);
                 }
             } else {
+                _warpDistanceFade = 0.0;
                 warpEffect.setOpacity(0.0);
             }
         }
     } else {
+        _warpDistanceFade = 0.0;
         warpEffect.setOpacity(0.0);
+    }
+
+    // ── Warp loop sound effect ────────────────────────────────────────────
+    // Volume = speedVolume × distanceFade, matching the warp tunnel visual.
+    // The sound plays always; it is simply silent when the ship is slow or far away.
+    if (_visShip && !_visShip._isDisposed && _visShip.mesh) {
+        const _warpSpeedVolume = Math.min(
+            _visShip.velocity.length() / (FLIGHT_WARP_SPEED / 33.33),
+            1.0
+        );
+        _visShip.updateWarpSound(_warpSpeedVolume, _warpDistanceFade);
     }
 
     // Render 3D scene through the gravitational lensing pass, then composite to screen.
@@ -3997,7 +4026,6 @@ if (performanceOptionsBtn) {
 flightControlsPanel.on('spawnShip', () => spawnShip());
 flightControlsPanel.on('toggleView', () => {
     flightState.isCockpitView = !flightState.isCockpitView;
-    flightControlsPanel.setViewState(flightState.isCockpitView);
 });
 
 // Autopilot toggle from the flight controls panel (targets currently selected body)
@@ -5197,10 +5225,11 @@ function spawnShip() {
     steeringOriginMarker.visible = true;
     flightHUD.hideWarpSprite();
     flightControlsPanel.setFlightActive(true);
-    flightControlsPanel.setViewState(flightState.isCockpitView);
     // Enable the autopilot button now that a ship is active
     flightControlsPanel.setAutopilotState(autopilotState.isActive, true);
     refreshBodiesTable();
+
+    ambientMusic.enterFlightMode();
 
     addEvent({
         message: 'Entered spaceship.',
@@ -5300,7 +5329,6 @@ function exitFlightMode() {
     }
     if (speedSprite) speedSprite.visible = false;
     flightControlsPanel.setFlightActive(false);
-    flightControlsPanel.setViewState(false);
     // Keep autopilot button enabled as long as the known ship still exists
     const _exitShip = flightState.knownShip;
     const _exitShipAlive = !!(
@@ -6100,7 +6128,6 @@ window.addEventListener('keydown', (e) => {
         // Flight mode: C toggles between cockpit and 3rd-person view
         if (flightState.isActive) {
             flightState.isCockpitView = !flightState.isCockpitView;
-            flightControlsPanel.setViewState(flightState.isCockpitView);
             e.preventDefault();
             return;
         }
@@ -6455,6 +6482,7 @@ function applyStartupGMultiplier() {
 }
 
 startupModal.on('launchDefault', async () => {
+    ambientMusic.init();
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();

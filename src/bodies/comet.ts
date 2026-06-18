@@ -125,7 +125,7 @@ export abstract class Comet extends CelestialBody {
 
         this.tailMat = new THREE.PointsMaterial({
             color: 0xffffff,
-            size: 2.5,
+            size: 5,
             transparent: true,
             opacity: 1.0, // per-fragment alpha comes from the shader
             blending: THREE.AdditiveBlending,
@@ -161,7 +161,7 @@ varying float vLife;`
 float dist = length(gl_PointCoord - vec2(0.5));
 if (dist > 0.5) discard;
 // Soft radial falloff: bright core, feathered edge
-float strength = smoothstep(0.5, 0.1, dist);
+float strength = smoothstep(0.95, 0.5, dist);
 // Life drives overall brightness — no sin() bell; life is already 0 at death
 float alpha = vLife * strength;`
             );

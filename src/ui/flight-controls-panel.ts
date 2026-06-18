@@ -8,7 +8,6 @@ import { Panel } from './panel';
  */
 export class FlightControlsPanel extends Panel {
     spawnBtn: HTMLButtonElement | null;
-    toggleViewBtn: HTMLButtonElement | null;
     shipModelSelect: HTMLSelectElement | null;
 
     autopilotBtn: HTMLButtonElement | null;
@@ -17,7 +16,6 @@ export class FlightControlsPanel extends Panel {
     constructor(elementId: string) {
         super(elementId);
         this.spawnBtn = null;
-        this.toggleViewBtn = null;
         this.shipModelSelect = null;
 
         this.autopilotBtn = null;
@@ -37,9 +35,6 @@ export class FlightControlsPanel extends Panel {
         }
 
         this.spawnBtn = document.getElementById('flightSpawnBtn') as HTMLButtonElement | null;
-        this.toggleViewBtn = document.getElementById(
-            'flightToggleViewBtn'
-        ) as HTMLButtonElement | null;
         this.shipModelSelect = document.getElementById(
             'flightShipModelSelect'
         ) as HTMLSelectElement | null;
@@ -51,33 +46,18 @@ export class FlightControlsPanel extends Panel {
         if (this.spawnBtn) {
             this.spawnBtn.onclick = () => this.emit('spawnShip');
         }
-        if (this.toggleViewBtn) {
-            this.toggleViewBtn.onclick = () => this.emit('toggleView');
-        }
 
         if (this.autopilotBtn) {
             this.autopilotBtn.onclick = () => this.emit('autopilot', {});
         }
 
-        // Start with toggle/exit/autopilot disabled (no active ship yet)
+        // Start with autopilot disabled (no active ship yet)
         this.setFlightActive(false);
         this.setAutopilotState(false, false);
     }
 
-    setViewState(isCockpit: boolean) {
-        if (!this.toggleViewBtn) return;
-        const iconEl = this.toggleViewBtn.querySelector('.material-symbols-outlined');
-        if (iconEl) iconEl.textContent = isCockpit ? 'airline_seat_recline_normal' : 'visibility';
-        while (iconEl && iconEl.nextSibling) this.toggleViewBtn.removeChild(iconEl.nextSibling);
-        if (iconEl)
-            this.toggleViewBtn.appendChild(
-                document.createTextNode(isCockpit ? ' 3RD PERSON' : ' COCKPIT VIEW')
-            );
-    }
-
     setFlightActive(isActive: boolean) {
         if (this.spawnBtn) this.spawnBtn.disabled = isActive;
-        if (this.toggleViewBtn) this.toggleViewBtn.disabled = !isActive;
     }
 
     setAutopilotState(isEngaged: boolean, isEnabled: boolean) {

@@ -19,6 +19,10 @@ export default defineConfig({
                     src: './assets/models/**/*',
                     dest: './',
                 },
+                {
+                    src: './assets/sounds/**/*',
+                    dest: './',
+                },
             ],
         }),
     ],

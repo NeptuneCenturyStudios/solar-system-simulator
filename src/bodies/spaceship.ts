@@ -6,6 +6,7 @@ import { SCALE_FACTOR, SPACESHIP_MASS, SPACESHIP_RADIUS } from '../utilities/con
 import { IShipEffect } from '../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
+import { WarpSoundController, playWarpLoop } from '../utilities/audio.js';
 //import { ShipFlame } from '../ship-effects/ship-flame.js';
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
@@ -25,6 +26,9 @@ export class Spaceship extends Body {
     thrusterOffset: THREE.Vector3;
     /** Glowing engine exhaust trail rendered as a connected line in world space. */
     trail: IShipEffect;
+
+    /** Active warp loop sound controller, or null if not currently playing. */
+    private _warpSound: WarpSoundController | null = null;
 
     /**
      * Constructs a new Spaceship object with camera offsets and placeholder geometry.
@@ -128,5 +132,38 @@ export class Spaceship extends Body {
             .catch((e) => {
                 console.warn('Spaceship OBJ/MTL load failed — using placeholder mesh', e);
             });
+    }
+
+    /**
+     * Call once per frame to manage the warp loop sound effect.
+     * The sound plays continuously; volume is driven by ship speed and camera distance.
+     *
+     * @param speedVolume   0–1 speed-based volume (0 at rest → 1 at full warp speed).
+     * @param distanceFade  0–1 camera-distance multiplier (1 = close/in-cockpit, 0 = too far).
+     */
+    updateWarpSound(speedVolume: number, distanceFade: number): void {
+        // Start the sound on first call (or retry each frame if buffer wasn't loaded yet)
+        if (!this._warpSound) {
+            const ctrl = playWarpLoop();
+            if (ctrl) {
+                this._warpSound = ctrl;
+            }
+        }
+
+        // Update volume every frame: speed × distance
+        if (this._warpSound && !this._warpSound.isFadingOut) {
+            this._warpSound.setVolume(speedVolume * distanceFade);
+        }
+    }
+
+    /**
+     * Override die() to clean up the warp sound controller.
+     */
+    die(): void {
+        if (this._warpSound) {
+            this._warpSound.dispose();
+            this._warpSound = null;
+        }
+        super.die();
     }
 }
