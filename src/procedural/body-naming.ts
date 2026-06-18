@@ -302,7 +302,6 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                       })();
             })();
 
-            // Shorter core words than before (user noted “really long”).
             const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 2 });
 
             const suffixByClass: Record<'O' | 'B' | 'A' | 'F' | 'G' | 'K' | 'M', string[]> = {

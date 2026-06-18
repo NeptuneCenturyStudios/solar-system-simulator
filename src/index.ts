@@ -36,7 +36,6 @@ import {
     SCALE_FACTOR,
     G,
     SUN_MASS,
-    EARTH_DIST,
     PLUTO_DIST,
     MOON_MASS,
     MOON_DIST_FROM_EARTH,
@@ -174,6 +173,7 @@ import { Comet } from './bodies/comet';
 import { Spaceship } from './bodies/spaceship';
 import { ShipWeapon } from './ship-effects/ship-weapon';
 import { StartupModal } from './ui/startup-modal';
+import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
 import { PerformancePanel } from './ui/performance-panel';
 import { EventLogEntry, NotificationType } from './event-log/event-log';
@@ -283,6 +283,7 @@ import { createFPSTexture, createSpeedTexture, createStatsTexture } from './draw
 import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { ProceduralGenerator } from './procedural/procedural-generator';
 import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
+import { BlackHoleSystemGenerator } from './procedural/black-hole-system-generator';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
 
 // --- Event notifications (replaces sprite-based event log) ---
@@ -1953,6 +1954,10 @@ async function spawn({
         generator = new ProceduralGenerator(seed, dependencies, scene);
     }
 
+    if (mode === SimulationStartMode.BlackHole) {
+        generator = new BlackHoleSystemGenerator(dependencies, scene, seed);
+    }
+
     // Unified cleanup: always dispose existing bodies (stars included).
     // No special-casing is required here; Star.die(true) is already the canonical disposal path.
     for (const b of simulationState.bodies || []) {
@@ -2003,66 +2008,9 @@ async function spawn({
         return;
     }
 
-    // Black Hole mode: one random black hole at origin + one randomised orbiting star
-    if (mode === SimulationStartMode.BlackHole) {
-        const { mass: bhMass, radius: bhRadius } = randomBlackHoleParams();
-        const blackHole = new BlackHole(
-            dependencies,
-            scene,
-            new THREE.Vector3(0, 0, 0),
-            bhMass,
-            createUniqueId('black_hole'),
-            'Black Hole',
-            { tilt: 0, speed: 0 }
-        );
-        simulationState.bodies = [blackHole];
-
-        // Randomised star
-        const {
-            mass: starMass,
-            radius: starRadius,
-            temperature: starTemp,
-            lightIntensity: starLightIntensity,
-        } = randomStarParams();
-
-        // Orbit: 50/50 circular vs elliptical
-        const isElliptical = Math.random() < 0.5;
-        const eccentricity = isElliptical ? 0.1 + Math.random() * 0.5 : 0;
-        const orbitType = isElliptical ? 'elliptical' : 'circular';
-
-        // Orbital distance: far enough so the star doesn't overlap the black hole
-        const minOrbitDist = Math.max(starRadius * 5 + bhRadius, EARTH_DIST * 0.3);
-        const orbitDist = minOrbitDist + Math.random() * (EARTH_DIST * 4 - minOrbitDist);
-
-        const orbitAngle = Math.random() * Math.PI * 2;
-        const starPos = new THREE.Vector3(
-            Math.cos(orbitAngle) * orbitDist,
-            0,
-            Math.sin(orbitAngle) * orbitDist
-        );
-        const starVel = computeOrbitVelocityAtPos(
-            starPos,
-            new THREE.Vector3(0, 0, 0),
-            bhMass,
-            orbitType,
-            eccentricity,
-            0
-        );
-
-        const orbitingStar = new MainSequenceStar(dependencies, scene, {
-            radius: starRadius,
-            pos: starPos,
-            vel: starVel,
-            mass: starMass,
-            id: createUniqueId('star'),
-            name: generateIAUName(BodyTypeEnum.Star, null, simulationState.bodies),
-            temperature: starTemp,
-            lightIntensity: starLightIntensity,
-            lightDistance: 524400,
-            rotation: { tilt: 0, speed: 0.08 },
-            mesh: undefined, // use default star material/mesh
-        });
-        simulationState.bodies.push(orbitingStar);
+    // Black Hole mode: procedurally generated black hole + 1–3 stars in siphon range
+    if (mode === SimulationStartMode.BlackHole && generator) {
+        simulationState.bodies = generator.generateSolarSystem();
 
         syncAllStarLightTargets();
         selectedBody = null;
@@ -2081,10 +2029,10 @@ async function spawn({
 
         const abortController = new AbortController();
 
-        // Ensure procedural overlay + progress UI are owned by StartupModal.
-        startupModal.openProceduralOverlayForGeneration();
-        startupModal.showProceduralProgressUI();
-        startupModal.setProceduralInputsLocked(true);
+        // The procedural modal is already visible from the startup modal's prompt flow.
+        // Switch to progress UI now that generation is starting.
+        proceduralModal.showProgressUI();
+        proceduralModal.setInputsLocked(true);
 
         // Guard against out-of-order completion when user resets/spawns again.
         // (We store the counter on window to avoid needing module-scope vars in this huge file.)
@@ -2098,12 +2046,12 @@ async function spawn({
 
         const onProceduralCancel = () => {
             // UI: lock progress status to "Canceling" immediately
-            startupModal.markProceduralCancelRequested();
+            proceduralModal.markCancelRequested();
             abortController.abort();
         };
 
-        // Index.ts owns cancellation (abort); UI is owned by startupModal.
-        startupModal.on('proceduralCancel', onProceduralCancel);
+        // Index.ts owns cancellation (abort); UI is owned by proceduralModal.
+        proceduralModal.on('cancelRequested', onProceduralCancel);
 
         try {
             const bodies = gen
@@ -2135,8 +2083,8 @@ async function spawn({
             }
 
             // Success path: hide procedural overlay, keep simulation running.
-            startupModal.setProceduralInputsLocked(false);
-            startupModal.hideProceduralOverlay();
+            proceduralModal.setInputsLocked(false);
+            proceduralModal.hide();
         } catch (e) {
             if (runId !== w[runIdKey]) return;
 
@@ -2145,10 +2093,10 @@ async function spawn({
             // Keep bodies empty on error
             simulationState.bodies = [];
 
-            startupModal.setProceduralInputsLocked(false);
-            startupModal.setProceduralProgressStatusText('Generation failed.');
-            startupModal.setProceduralProgressErrorVisible(true);
-            startupModal.showProceduralSeedSectionForRetry();
+            proceduralModal.setInputsLocked(false);
+            proceduralModal.setProgressStatusText('Generation failed.');
+            proceduralModal.setProgressErrorVisible(true);
+            proceduralModal.showSeedSectionForRetry();
         }
 
         return;
@@ -4013,6 +3961,7 @@ function setF(id: string) {
 // Create and initialize panels
 const uiManager = new UIManager('ui-container');
 const startupModal = new StartupModal('startup-overlay');
+const proceduralModal = new ProceduralGeneratorModal();
 const aboutModal = new AboutModal('about-overlay', 'btn-about', 'aboutCloseBtn');
 const performancePanel = new PerformancePanel('performance-panel');
 uiManager.managementPanel.registerGetFocusObject(() => {
@@ -4022,6 +3971,8 @@ uiManager.managementPanel.registerGetFocusObject(() => {
 
 uiManager.initialize();
 startupModal.initialize();
+proceduralModal.initialize();
+startupModal.setProceduralModal(proceduralModal);
 aboutModal.initialize();
 performancePanel.initialize();
 
@@ -6519,23 +6470,19 @@ startupModal.on('launchEmpty', async () => {
     applyDefaultCameraTogglesAfterSpawn();
 });
 
-startupModal.on('launchBlackHole', async () => {
+startupModal.on('generateBlackHole', async ({ seed }: { seed: string }) => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
+    proceduralModal.hide();
     startupModal.hide();
-    await spawn({ mode: SimulationStartMode.BlackHole });
+
+    await spawn({ mode: SimulationStartMode.BlackHole, seed });
     applyDefaultCameraTogglesAfterSpawn();
 });
 
 startupModal.on('generateProcedural', async ({ seed }: { seed: string }) => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
-
-    // Ensure both launch overlays are closed before spawning the new simulation.
-    startupModal.hide();
-    // If the procedural modal is visible, hide it too via direct DOM class toggle.
-    const proceduralOverlay = document.getElementById('procedural-overlay');
-    proceduralOverlay?.classList.remove('visible');
 
     await spawn({ mode: SimulationStartMode.Procedural, seed });
     applyDefaultCameraTogglesAfterSpawn();
@@ -6545,13 +6492,25 @@ startupModal.on('cancel', () => {
     startupModal.hide();
 });
 
+// Retry: user clicked Create on the seed form after a failed generation.
+proceduralModal.on('create', async ({ seed }: { seed: string }) => {
+    await spawn({ mode: SimulationStartMode.Procedural, seed });
+    applyDefaultCameraTogglesAfterSpawn();
+});
+
+// Retry cancel: user clicked Cancel on the seed form after a failed generation.
+proceduralModal.on('cancelFromRetry', () => {
+    proceduralModal.hide();
+    startupModal.open({ allowCancel: startupModal._allowCancel });
+});
+
 // Block input while modal visible
 const _origOnMouseDown = onMouseDown;
 const _origOnMouseMove = onMouseMove;
 const _origOnMouseUp = onMouseUp;
 
 function modalBlocksInput() {
-    return startupModal.isVisible() || startupModal.isProceduralVisible();
+    return startupModal.isVisible() || proceduralModal.isVisible();
 }
 
 function onMouseDownWrapped(e: MouseEvent) {

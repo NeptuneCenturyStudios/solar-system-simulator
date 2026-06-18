@@ -23,7 +23,7 @@ import { generateProceduralAsteroids } from './asteroid-generator';
 import { createAsteroidBodyFromProceduralCreation } from './asteroid-factory';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
-import { applyInclinationX, applyYawY, buildUnitPositionDirection, safeUnitCross } from './orbital-math';
+import { applyInclinationX, applyYawY, buildUnitPositionDirection, safeUnitCross, generateBinaryPlacements } from './orbital-math';
 import { rngFor } from './seed-utils';
 
 // Import the background texture upgrader
@@ -95,46 +95,13 @@ function createStarBody(
     });
 }
 
-function generateBinaryPlacements(
-    masses: [number, number],
-    separationDistance: number,
-    yawRad: number,
-    inclinationRad: number
-): [StarPlacement, StarPlacement] {
-    const [m1, m2] = masses;
-    const mSum = m1 + m2;
-
-    const r1 = separationDistance * (m2 / mSum);
-    const r2 = separationDistance * (m1 / mSum);
-
-    const u = buildUnitPositionDirection(0, yawRad, inclinationRad);
-
-    const normalBase = new THREE.Vector3(0, 1, 0);
-    const normalYaw = applyYawY(normalBase, yawRad);
-    const normal = applyInclinationX(normalYaw, inclinationRad).normalize();
-
-    const velDir = safeUnitCross(normal, u);
-
-    const omega = Math.sqrt((G * mSum) / Math.pow(separationDistance, 3));
-
-    const pos1 = u.clone().multiplyScalar(r1);
-    const pos2 = u.clone().multiplyScalar(-r2);
-
-    const vel1 = velDir.clone().multiplyScalar(omega * r1);
-    const vel2 = velDir.clone().multiplyScalar(-omega * r2);
-
-    return [
-        { pos: pos1, vel: vel1 },
-        { pos: pos2, vel: vel2 },
-    ];
-}
-
 function generateTriplePlacements(
     masses: [number, number, number],
     radii: [number, number, number],
     yawRad: number,
     inclinationRad: number,
-    masterSeed: string
+    masterSeed: string,
+    gForce: number = G
 ): [StarPlacement, StarPlacement, StarPlacement] {
     const [m1, m2, m3] = masses;
     const mSum = m1 + m2 + m3;
@@ -155,7 +122,7 @@ function generateTriplePlacements(
         const ri = Math.max(base, radii[i] * 6);
 
         const u = buildUnitPositionDirection(phiRad, yawRad, inclinationRad);
-        const speed = Math.sqrt((G * mSum) / Math.max(ri, 1e-9));
+        const speed = Math.sqrt((gForce * mSum) / Math.max(ri, 1e-9));
         const velDir = safeUnitCross(normal, u);
 
         const pos = u.clone().multiplyScalar(ri);
@@ -411,7 +378,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             const inclinationDeg = rngFor(this.masterSeed, 'binaryInclination', 0).range(5, 85);
             const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
-            placements = generateBinaryPlacements(masses as [number, number], separationDistance, yawRad, inclinationRad);
+            placements = generateBinaryPlacements(masses as [number, number], separationDistance, yawRad, inclinationRad, this.dependencies.getG());
         } else {
             const radii = starParams.map((p) => p.radius) as [number, number, number];
 
@@ -424,7 +391,8 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 radii,
                 yawRad,
                 inclinationRad,
-                this.masterSeed
+                this.masterSeed,
+                this.dependencies.getG()
             );
         }
 
