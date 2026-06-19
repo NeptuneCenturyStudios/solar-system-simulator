@@ -251,13 +251,13 @@ export const FLIGHT_MAX_TURN_RATE = 0.6; // radians/s at full pointer deflection
 export const FLIGHT_ROLL_SPEED = 2.0; // max roll angular velocity (rad/s)
 export const FLIGHT_ROLL_ACCEL = 0.4; // how fast roll ramps up (rad/s²)
 export const FLIGHT_ROLL_FRICTION = 0.4; // how fast roll decays when key released (rad/s²)
-export const FLIGHT_STEER_SMOOTH_RATE = 0.24; // exponential-decay rate (per second) — use: 1 - exp(-rate * dt)
+export const FLIGHT_STEER_SMOOTH_RATE = 0.66; // exponential-decay rate (per second) — use: 1 - exp(-rate * dt)
 export const FLIGHT_STEER_DEADZONE = 0.05; // normalised dead zone (0–1)
 export const FLIGHT_WARP_CHARGE_TIME = 2.0; // seconds to hold Space before warp engages
 
 export const FLIGHT_MAX_BANK_ANGLE = 0.35; // max visual roll angle (rad)
 export const FLIGHT_MAX_BANK_PITCH = 0.2; // max visual pitch angle (rad)
-export const FLIGHT_BANK_LERP_SPEED = 5.0; // exponential-decay rate (per second) for banking animation — use: 1 - exp(-rate * dt)
+export const FLIGHT_BANK_LERP_SPEED = 13.76; // exponential-decay rate (per second) for banking animation — use: 1 - exp(-rate * dt)
 
 // === Autopilot tuning constants (derived from flight tuning) ===
 // u/s
