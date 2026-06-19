@@ -3604,7 +3604,7 @@ function animate() {
 
     // Update weapon bolts (advance positions, collision check, camera-relative upload).
     if (flightState.isActive && flightState.activeShip) {
-        shipWeapon.update(dtTotal, simulationState.bodies, camera.position, flightState.activeShip);
+        shipWeapon.update(wallDt, simulationState.bodies, camera.position, flightState.activeShip);
     }
 
     // Filter dead explosions

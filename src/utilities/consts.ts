@@ -187,12 +187,12 @@ export const COMET_APHELION_DIST = (5250000000 / DIST_SCALE) * SCALE_FACTOR;
 // === Flight tuning constants ===
 export const FLIGHT_MAX_SPEED = C * 0.01; // normal max speed cap (units/s) of light speed, chosen to allow for a good sense of speed while still leaving room for boost and warp speeds above it
 export const FLIGHT_BOOST_MAX_SPEED = C * 1; // boost ceiling = 5x light speed
-export const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.1; // acceleration rate while W/S held (u/s²)
-export const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.1; // deceleration rate while W/S held (u/s²)
-export const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.1; // acceleration rate while Shift held (u/s²)
-export const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED * 0.1; // decel rate after boost ends (u/s²)
+export const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.264; // acceleration rate while W/S held (u/s²)
+export const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.264; // deceleration rate while W/S held (u/s²)
+export const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.264; // acceleration rate while Shift held (u/s²)
+export const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED * 0.264; // decel rate after boost ends (u/s²)
 export const FLIGHT_WARP_SPEED = C * 100; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR
-export const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 0.5; // decel rate after warp ends (u/s²)
+export const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 1.32; // decel rate after warp ends (u/s²)
 /** Camera distance (u) at which the warp tunnel is still fully opaque. */
 export const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
 /** Camera distance (u) at which the warp tunnel has fully faded out. */
@@ -245,12 +245,12 @@ export const ORBIT_PREDICTION_HIGH_E_THRESHOLD = 0.6;
 export const BASE_FRAME_DT = 0.016;
 
 // === Flight feel + steering tuning (used by index.ts runtime logic) ===
-export const FLIGHT_PERP_DECAY = 0.5; // per second
+export const FLIGHT_PERP_DECAY = 1.32; // per second
 export const FLIGHT_MAX_POINTER_OFFSET = 260; // pixels before reaching full turn rate
-export const FLIGHT_MAX_TURN_RATE = 0.6; // radians/s at full pointer deflection
-export const FLIGHT_ROLL_SPEED = 2.0; // max roll angular velocity (rad/s)
-export const FLIGHT_ROLL_ACCEL = 0.4; // how fast roll ramps up (rad/s²)
-export const FLIGHT_ROLL_FRICTION = 0.4; // how fast roll decays when key released (rad/s²)
+export const FLIGHT_MAX_TURN_RATE = 1.58; // radians/s at full pointer deflection
+export const FLIGHT_ROLL_SPEED = 5.28; // max roll angular velocity (rad/s)
+export const FLIGHT_ROLL_ACCEL = 1.06; // how fast roll ramps up (rad/s²)
+export const FLIGHT_ROLL_FRICTION = 1.06; // how fast roll decays when key released (rad/s²)
 export const FLIGHT_STEER_SMOOTH_RATE = 0.66; // exponential-decay rate (per second) — use: 1 - exp(-rate * dt)
 export const FLIGHT_STEER_DEADZONE = 0.05; // normalised dead zone (0–1)
 export const FLIGHT_WARP_CHARGE_TIME = 2.0; // seconds to hold Space before warp engages
@@ -347,7 +347,7 @@ export const WEAPON_PARTICLE_COLOR = 0x00eeff;
  *  Increase the multiplier to keep bolts visible at greater range. */
 export const WEAPON_BOLT_HEAD_SIZE = SPACESHIP_RADIUS * 2400;
 /** Maximum projectiles fired per second. */
-export const WEAPON_FIRE_RATE = 4;
+export const WEAPON_FIRE_RATE = 10.56;
 /** HP damage dealt to a body on each bolt impact. */
 export const WEAPON_DAMAGE = 1;
 
