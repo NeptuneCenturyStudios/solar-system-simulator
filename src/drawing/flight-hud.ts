@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { IAutopilotState } from '../physics/physics';
 import { Body } from '../bodies/body';
-import { AUTOPILOT_ORBIT_NOTIFY_DURATION } from '../utilities/consts';
+import { AUTOPILOT_ORBIT_NOTIFY_DURATION, TEXT_SPRITE_Z } from '../utilities/consts';
 
 export type AutopilotHudState =
     | 'ALIGN'
@@ -279,7 +279,7 @@ export class FlightHUD {
         this.warpSprite = new THREE.Sprite(material);
         // 512×128 canvas at 0.625 ratio → 320×80 screen pixels; center at bottom
         this.warpSprite.scale.set(320, 80, 1);
-        this.warpSprite.position.set(0, -(window.innerHeight / 2 - 50), 0);
+        this.warpSprite.position.set(0, -(window.innerHeight / 2 - 50), TEXT_SPRITE_Z);
         this.warpSprite.visible = false;
         this.uiScene.add(this.warpSprite);
     }
@@ -294,7 +294,7 @@ export class FlightHUD {
         this.orbitNotifySprite = new THREE.Sprite(material);
         // 900×100 canvas → 800×80 screen-pixel sprite (two-line display).
         this.orbitNotifySprite.scale.set(800, 80, 1);
-        this.orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), 0);
+        this.orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), TEXT_SPRITE_Z);
         this.orbitNotifySprite.visible = false;
         this.uiScene.add(this.orbitNotifySprite);
     }
@@ -311,7 +311,7 @@ export class FlightHUD {
         this.hintSprite.scale.set(1100, 95, 1); // allow 1-2 lines (wider to avoid clipping)
         this.hintSprite.visible = false;
         // Top-center of the screen (slightly below top edge)
-        this.hintSprite.position.set(0, window.innerHeight / 2 - 55, 0);
+        this.hintSprite.position.set(0, window.innerHeight / 2 - 55, TEXT_SPRITE_Z);
         this.uiScene.add(this.hintSprite);
     }
 
