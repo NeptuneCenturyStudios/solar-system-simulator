@@ -115,6 +115,13 @@ export class AmbientSoundManager {
         this.playlist.push(this.buildTrackUrl('pwlpl-progressive-techno-cinematic-tension-arc-543153.mp3'));
         this.playlist.push(this.buildTrackUrl('absolutesound-cinematic-guitar-adventure-505779.mp3'));
         this.playlist.push(this.buildTrackUrl('leberch-mysterious-cinematic-255712.mp3'));
+        this.playlist.push(this.buildTrackUrl('cfl_turningpages-vast-hollow-tidal-533251.mp3'));
+        this.playlist.push(this.buildTrackUrl('universfield-ambient-space-background-350710.mp3'));
+        this.playlist.push(this.buildTrackUrl('cfl_turningpages-minimalist-pulse-2-529872.mp3'));
+        this.playlist.push(this.buildTrackUrl('databend-dark-electronic-pulse-background-546935.mp3'));
+        this.playlist.push(this.buildTrackUrl('leberch-atmosphere-pulse-263075.mp3'));
+        this.playlist.push(this.buildTrackUrl('joyinsound-drone-perspectives-399304.mp3'));
+        this.playlist.push(this.buildTrackUrl('fabienroch-nebulous-173888.mp3'));
 
     }
 
