@@ -363,3 +363,6 @@ export const WEAPON_DAMAGE = 1;
  *   - Sun      ~3.3 billion HP (practically indestructible)
  */
 export const HP_MASS_MULTIPLIER = 100;
+
+// Set the Z position slightly above 0 for linux systems
+export const TEXT_SPRITE_Z = 0.01;

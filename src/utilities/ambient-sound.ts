@@ -12,7 +12,6 @@
  * playback with Web-Audio-API gain-node fades.
  */
 
-const TRACK_COUNT = 12; // space-ambience-1 through space-ambience-7
 const FADE_DURATION = 1.5; // seconds
 const DELAY_MIN = 60; // seconds
 const DELAY_MAX = 180; // seconds
@@ -109,6 +108,14 @@ export class AmbientSoundManager {
         this.playlist.push(this.buildTrackUrl('slimeyfox-hydrostatic-drones-479105.mp3'));
         this.playlist.push(this.buildTrackUrl('the_mountain-spaceship-155569.mp3'));
         this.playlist.push(this.buildTrackUrl('universfield-haunting-music-box-289437.mp3'));
+        this.playlist.push(this.buildTrackUrl('musheran-low-rumbling-176033.mp3'));
+        this.playlist.push(this.buildTrackUrl('nickpanekaiassets-drones-of-dread-dark-cinematic-industrial-ambient-497226.mp3'));
+        this.playlist.push(this.buildTrackUrl('vjgalaxy-melodic-techno-09-513318.mp3'));
+        this.playlist.push(this.buildTrackUrl('slimeyfox-hyperwoofer-tremormorph-541638.mp3'));
+        this.playlist.push(this.buildTrackUrl('pwlpl-progressive-techno-cinematic-tension-arc-543153.mp3'));
+        this.playlist.push(this.buildTrackUrl('absolutesound-cinematic-guitar-adventure-505779.mp3'));
+        this.playlist.push(this.buildTrackUrl('leberch-mysterious-cinematic-255712.mp3'));
+
     }
 
     private setupAudioContext(): void {
@@ -123,11 +130,11 @@ export class AmbientSoundManager {
      * Pick a random track index that differs from the one currently (or last) playing.
      */
     private pickTrackIndex(): number {
-        if (TRACK_COUNT <= 1) return 0;
+        if (!this.playlist.length) return -1;
 
         let idx: number;
         do {
-            idx = Math.floor(Math.random() * TRACK_COUNT);
+            idx = Math.floor(Math.random() * this.playlist.length);
         } while (idx === this.currentTrackIndex);
         return idx;
     }

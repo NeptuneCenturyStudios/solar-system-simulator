@@ -447,7 +447,7 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
 
             // Primary: "<Core> Singularity <Letter>"
             // With second: "<Core> Singularity Opus <Letter>"
-            return `${core} Singularity${secondToken ? ` ${secondToken}` : ''} ${letter}`;
+            return `${core} ${secondToken ? ` ${secondToken}` : ''} ${letter}`;
         }
 
         default: {
