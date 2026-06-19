@@ -16,9 +16,6 @@ export class MainPanel extends Panel {
     showPredictionCheckbox: HTMLInputElement | null = null;
     showNamesCheckbox: HTMLInputElement | null = null;
     timeScaleDisplay: HTMLElement | null = null;
-    substepsSlider: HTMLInputElement | null = null;
-    substepsDisplay: HTMLElement | null = null;
-    substepsResetBtn: HTMLButtonElement | null = null;
     copyrightYearEl: HTMLElement | null = null;
     targetBtn: HTMLButtonElement | null = null;
     lookAtBtn: HTMLButtonElement | null = null;
@@ -75,7 +72,9 @@ export class MainPanel extends Panel {
 
         this.lockToSunCheckbox = document.getElementById('lockToSun') as HTMLInputElement | null;
         this.showTrailsCheckbox = document.getElementById('showTrails') as HTMLInputElement | null;
-        this.showPredictionCheckbox = document.getElementById('showOrbitPrediction') as HTMLInputElement | null;
+        this.showPredictionCheckbox = document.getElementById(
+            'showOrbitPrediction'
+        ) as HTMLInputElement | null;
         this.showNamesCheckbox = document.getElementById('showNames') as HTMLInputElement | null;
         this.timeScaleDisplay = document.getElementById('speed-val');
         this.copyrightYearEl = document.getElementById('copyrightYear');
@@ -108,26 +107,7 @@ export class MainPanel extends Panel {
             };
         }
 
-        this.substepsSlider = document.getElementById('substepsSlider') as HTMLInputElement | null;
-        this.substepsDisplay = document.getElementById('substeps-val');
-        if (this.substepsSlider) {
-            this.substepsSlider.oninput = () => {
-                const value = parseInt(this.substepsSlider!.value, 10);
-                if (this.substepsDisplay) this.substepsDisplay.textContent = `${value}`;
-                this.emit('substepsChange', { value });
-            };
-        }
-
-        this.substepsResetBtn = document.getElementById(
-            'substepsResetBtn'
-        ) as HTMLButtonElement | null;
-        if (this.substepsResetBtn) {
-            this.substepsResetBtn.onclick = () => {
-                if (this.substepsSlider) this.substepsSlider.value = '64';
-                if (this.substepsDisplay) this.substepsDisplay.textContent = '64';
-                this.emit('substepsChange', { value: 64 });
-            };
-        }
+        
     }
 
     updateTimeScaleDisplay(value: string) {

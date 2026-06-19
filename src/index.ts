@@ -4836,25 +4836,34 @@ function updateFlightControls(dt: number) {
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
 
     // ── Warp deceleration ────────────────────────────────────────────────────
-    // After warp ends, rapidly decelerate toward FLIGHT_MAX_SPEED, then hand
-    // back to normal flight controls (steering/roll still work during decel).
-    // If Shift is held and speed has already fallen into boost range, end early
-    // so boost can engage immediately rather than coasting all the way to normal max.
+    // After warp ends, decelerate in two phases:
+    //   Phase 1: shed speed from warp → FLIGHT_BOOST_MAX_SPEED using FLIGHT_WARP_DECEL.
+    //   Phase 2 (no shift): hand off to boost decel so FLIGHT_BOOST_DECEL carries the
+    //             ship the rest of the way down to FLIGHT_MAX_SPEED.
+    //   Phase 2 (shift held): end warp decel at boost speed and let the normal boost
+    //             logic maintain boost speed until Shift is released.
     if (flightState.warpDecelerating) {
         const fwdSpd = ship.velocity.dot(forward);
-        const boostHandoff = keys.shift && fwdSpd <= FLIGHT_BOOST_MAX_SPEED;
-        if (!boostHandoff && fwdSpd > FLIGHT_MAX_SPEED) {
-            const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_WARP_DECEL * dt);
+        if (fwdSpd > FLIGHT_BOOST_MAX_SPEED) {
+            // Phase 1: decel from warp speed to boost max using warp decel rate.
+            const newSpd = Math.max(FLIGHT_BOOST_MAX_SPEED, fwdSpd - FLIGHT_WARP_DECEL * dt);
             ship.velocity.copy(forward).multiplyScalar(newSpd);
             flightState.currentSpeed = newSpd;
         } else {
+            // Reached boost speed — end the warp decel phase.
             flightState.warpDecelerating = false;
-            // On boost handoff keep current speed; on natural end clamp to normal max.
-            flightState.currentSpeed = boostHandoff ? fwdSpd : Math.min(fwdSpd, FLIGHT_MAX_SPEED);
             warpEffect.stop();
             // Restore steering HUD now that warp deceleration is complete.
             flightSteeringLine.visible = true;
             steeringOriginMarker.visible = true;
+            if (keys.shift) {
+                // Case 2: shift held — sit at boost speed; normal boost logic takes over.
+                flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_BOOST_MAX_SPEED);
+            } else {
+                // Case 1: no shift — transition to boost decel toward normal max speed.
+                flightState.boostDecelerating = true;
+                flightState.currentSpeed = fwdSpd;
+            }
         }
         flightState.thrustActive = false;
         flightHUD.hideWarpSprite();
@@ -5571,7 +5580,7 @@ uiManager.mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
     });
 });
 
-uiManager.mainPanel.on('substepsChange', ({ value }: { value: number }) => {
+performancePanel.on('substepsChange', ({ value }: { value: number }) => {
     stepsPerFrame = value;
 });
 
@@ -6679,7 +6688,7 @@ window.addEventListener(
 })();
 
 // ── popstate listener for back/forward navigation ───────────────────────────
-window.addEventListener('popstate', async (event) => {
+window.addEventListener('popstate', async () => {
     const currentSeed = parseSeedFromURL();
 
     // If there's no seed in the URL now (e.g. navigated back to a page without one)

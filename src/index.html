@@ -30,8 +30,12 @@
                         value="0"
                     />
                     <div class="startup-g-labels">
-                        <span title="Lower gravity is ideal for flight simulation and exploration">Normal</span>
-                        <span title="Higher gravity is ideal for simulation and experiments">10,000,000×</span>
+                        <span title="Lower gravity is ideal for flight simulation and exploration"
+                            >Normal</span
+                        >
+                        <span title="Higher gravity is ideal for simulation and experiments"
+                            >10,000,000×</span
+                        >
                     </div>
                 </div>
                 <button id="startupLaunchDefaultBtn" class="old-ui btn-with-icon">
@@ -42,10 +46,7 @@
                     <span class="material-symbols-outlined">build</span>
                     BUILD YOUR OWN SYSTEM
                 </button>
-                <button
-                    id="startupLaunchGenerateBtn"
-                    class="old-ui btn-with-icon"
-                >
+                <button id="startupLaunchGenerateBtn" class="old-ui btn-with-icon">
                     <span class="material-symbols-outlined">auto_fix_high</span>
                     GENERATE
                 </button>
@@ -64,12 +65,7 @@
             </div>
         </div>
 
-        <div
-            id="procedural-overlay"
-            class="modal-overlay"
-            aria-modal="true"
-            role="dialog"
-        >
+        <div id="procedural-overlay" class="modal-overlay" aria-modal="true" role="dialog">
             <div id="procedural-modal" class="modal">
                 <div class="modal-header">Generate Procedural System</div>
 
@@ -87,26 +83,23 @@
                     <div
                         id="procedural-progress-section"
                         class="procedural-progress-section"
-                        style="display: none;"
+                        style="display: none"
                     >
                         <div>
-                            <div
-                                style="display: flex; align-items: center;"
-                            >
-                                <span class="material-symbols-outlined loading-icon">progress_activity</span>
+                            <div style="display: flex; align-items: center">
+                                <span class="material-symbols-outlined loading-icon"
+                                    >progress_activity</span
+                                >
 
                                 <div
-                                    style="font-weight: bold; color: #00ffcc; margin-bottom: 8px;"
+                                    style="font-weight: bold; color: #00ffcc; margin-bottom: 8px"
                                     id="procedural-progress-status"
                                 >
                                     Preparing...
                                 </div>
                             </div>
 
-                            <div
-                                class="procedural-progress-bar"
-                                aria-hidden="true"
-                            >
+                            <div class="procedural-progress-bar" aria-hidden="true">
                                 <div
                                     class="procedural-progress-bar-fill"
                                     id="procedural-progress-bar-fill"
@@ -114,7 +107,7 @@
                             </div>
 
                             <div
-                                style="margin-top: 8px; color: rgba(255,255,255,0.8);"
+                                style="margin-top: 8px; color: rgba(255, 255, 255, 0.8)"
                                 id="procedural-progress-text"
                             >
                                 0 / 0
@@ -123,7 +116,7 @@
                             <div
                                 id="procedural-progress-error"
                                 class="procedural-progress-error"
-                                style="display: none;"
+                                style="display: none"
                             >
                                 Generation failed. Check console for details.
                             </div>
@@ -132,20 +125,12 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button
-                        id="proceduralCreateBtn"
-                        class="old-ui btn-with-icon"
-                    >
-                        <span class="material-symbols-outlined"
-                            >auto_fix_high</span
-                        >
+                    <button id="proceduralCreateBtn" class="old-ui btn-with-icon">
+                        <span class="material-symbols-outlined">auto_fix_high</span>
                         CREATE
                     </button>
 
-                    <button
-                        id="proceduralCancelBtn"
-                        class="old-ui btn-with-icon btn-danger"
-                    >
+                    <button id="proceduralCancelBtn" class="old-ui btn-with-icon btn-danger">
                         <span class="material-symbols-outlined">cancel</span>
                         CANCEL
                     </button>
@@ -269,8 +254,13 @@
                 <div id="ui-container">
                     <div id="system-explorer" class="ui-panel">
                         <div style="display: flex; flex-direction: column; height: 100%">
-                            <div class="panel-header">System Explorer
-                                <button id="btn-close-system-explorer" class="old-ui btn-danger btn-icon-only ml-auto mb-0" title="Close System Explorer">
+                            <div class="panel-header">
+                                System Explorer
+                                <button
+                                    id="btn-close-system-explorer"
+                                    class="old-ui btn-danger btn-icon-only ml-auto mb-0"
+                                    title="Close System Explorer"
+                                >
                                     <span class="material-symbols-outlined">close</span>
                                 </button>
                             </div>
@@ -303,13 +293,22 @@
                                 >
                                     <span class="material-symbols-outlined">videogame_asset</span>
                                 </button>
-                                <button id="surfaceCameraBtn" class="old-ui btn-icon-only" title="Surface (Off)" disabled>
+                                <button
+                                    id="surfaceCameraBtn"
+                                    class="old-ui btn-icon-only"
+                                    title="Surface (Off)"
+                                    disabled
+                                >
                                     <span class="material-symbols-outlined">hiking</span>
                                 </button>
                                 <button id="zoomInBtn" class="old-ui btn-icon-only" title="Zoom In">
                                     <span class="material-symbols-outlined">zoom_in</span>
                                 </button>
-                                <button id="zoomOutBtn" class="old-ui btn-icon-only" title="Zoom Out">
+                                <button
+                                    id="zoomOutBtn"
+                                    class="old-ui btn-icon-only"
+                                    title="Zoom Out"
+                                >
                                     <span class="material-symbols-outlined">zoom_out</span>
                                 </button>
                             </div>
@@ -337,27 +336,6 @@
                                     >
                                 </label>
 
-                                <div class="control-group">
-                                    <label
-                                        >Physics Accuracy
-                                        <span id="substeps-val" class="val-display">64</span></label
-                                    >
-                                    <div class="slider-row">
-                                        <input
-                                            type="range"
-                                            id="substepsSlider"
-                                            min="8"
-                                            max="512"
-                                            step="8"
-                                            value="64"
-                                            title="Controls how many physics steps are calculated per frame. Higher values improve orbital accuracy but use more CPU. Lower values are faster but less precise."
-                                        />
-                                        <button class="old-ui btn-slider-reset" id="substepsResetBtn" title="Reset to default (64)">
-                                            <span class="material-symbols-outlined">replay</span>
-                                        </button>
-                                    </div>
-                                </div>
-
                                 <div class="footer-note">
                                     © <span id="copyrightYear"></span> Neptune Century
                                 </div>
@@ -366,7 +344,8 @@
                     </div>
 
                     <div id="performance-panel" class="ui-panel">
-                        <div class="panel-header">Performance Options
+                        <div class="panel-header">
+                            Performance Options
                             <button
                                 id="btn-close-performance-panel"
                                 class="old-ui btn-danger btn-icon-only ml-auto mb-0"
@@ -382,10 +361,36 @@
                             <input type="checkbox" id="enableParticleEffects" checked /> Enable
                             Particle Effects
                         </label>
+
+                        <div class="control-group">
+                            <label
+                                >Physics Accuracy
+                                <span id="substeps-val" class="val-display">64</span></label
+                            >
+                            <div class="slider-row">
+                                <input
+                                    type="range"
+                                    id="substepsSlider"
+                                    min="8"
+                                    max="512"
+                                    step="8"
+                                    value="64"
+                                    title="Controls how many physics steps are calculated per frame. Higher values improve orbital accuracy but use more CPU. Lower values are faster but less precise."
+                                />
+                                <button
+                                    class="old-ui btn-slider-reset"
+                                    id="substepsResetBtn"
+                                    title="Reset to default (64)"
+                                >
+                                    <span class="material-symbols-outlined">replay</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="flight-controls-panel" class="ui-panel">
-                        <div class="panel-header">Flight Controls
+                        <div class="panel-header">
+                            Flight Controls
                             <button
                                 id="btn-close-flight-controls-panel"
                                 class="old-ui btn-danger btn-icon-only ml-auto mb-0"
@@ -404,11 +409,21 @@
                         <div class="control-group" style="margin-bottom: 8px">
                             <label for="flightShipModelSelect">Ship Model</label>
                             <select id="flightShipModelSelect">
-                                <option value="Lo_poly_Spaceship_01_by_Liz_Reddington" selected>Spaceship 1</option>
-                                <option value="Lo_poly_Spaceship_02_by_Liz_Reddington">Spaceship 2</option>
-                                <option value="Lo_poly_Spaceship_03_by_Liz_Reddington">Spaceship 3</option>
-                                <option value="Lo_poly_Spaceship_04_by_Liz_Reddington">Spaceship 4</option>
-                                <option value="Lo_poly_Spaceship_05_by_Liz_Reddington">Spaceship 5</option>
+                                <option value="Lo_poly_Spaceship_01_by_Liz_Reddington" selected>
+                                    Spaceship 1
+                                </option>
+                                <option value="Lo_poly_Spaceship_02_by_Liz_Reddington">
+                                    Spaceship 2
+                                </option>
+                                <option value="Lo_poly_Spaceship_03_by_Liz_Reddington">
+                                    Spaceship 3
+                                </option>
+                                <option value="Lo_poly_Spaceship_04_by_Liz_Reddington">
+                                    Spaceship 4
+                                </option>
+                                <option value="Lo_poly_Spaceship_05_by_Liz_Reddington">
+                                    Spaceship 5
+                                </option>
                             </select>
                         </div>
                         <button id="flightSpawnBtn" class="old-ui btn-with-icon">
@@ -419,11 +434,11 @@
                             <span class="material-symbols-outlined">rocket</span>
                             AUTOPILOT
                         </button>
-
                     </div>
 
                     <div id="management-panel" class="ui-panel">
-                        <div class="panel-header">Solar System Management
+                        <div class="panel-header">
+                            Solar System Management
                             <button
                                 id="btn-close-management-panel"
                                 class="old-ui btn-danger btn-icon-only ml-auto mb-0"
@@ -630,17 +645,37 @@
                             </div>
 
                             <div class="control-group" id="createTiltGroup" style="display: none">
-                                <label>Axial Tilt
+                                <label
+                                    >Axial Tilt
                                     <span id="create-tilt-val" class="val-display">0°</span>
                                 </label>
-                                <input type="range" id="createTilt" min="-180" max="180" step="1" value="0" />
+                                <input
+                                    type="range"
+                                    id="createTilt"
+                                    min="-180"
+                                    max="180"
+                                    step="1"
+                                    value="0"
+                                />
                             </div>
 
-                            <div class="control-group" id="createAzimuthGroup" style="display: none">
-                                <label>Tilt Azimuth
+                            <div
+                                class="control-group"
+                                id="createAzimuthGroup"
+                                style="display: none"
+                            >
+                                <label
+                                    >Tilt Azimuth
                                     <span id="create-azimuth-val" class="val-display">0°</span>
                                 </label>
-                                <input type="range" id="createAzimuth" min="-180" max="180" step="1" value="0" />
+                                <input
+                                    type="range"
+                                    id="createAzimuth"
+                                    min="-180"
+                                    max="180"
+                                    step="1"
+                                    value="0"
+                                />
                             </div>
 
                             <div class="control-group" id="planetTypeGroup" style="display: none">
@@ -863,17 +898,37 @@
                                 </div>
 
                                 <div class="control-group" id="editTiltGroup" style="display: none">
-                                    <label>Axial Tilt
+                                    <label
+                                        >Axial Tilt
                                         <span id="edit-tilt-val" class="val-display">0°</span>
                                     </label>
-                                    <input type="range" id="editTilt" min="-180" max="180" step="1" value="0" />
+                                    <input
+                                        type="range"
+                                        id="editTilt"
+                                        min="-180"
+                                        max="180"
+                                        step="1"
+                                        value="0"
+                                    />
                                 </div>
 
-                                <div class="control-group" id="editAzimuthGroup" style="display: none">
-                                    <label>Tilt Azimuth
+                                <div
+                                    class="control-group"
+                                    id="editAzimuthGroup"
+                                    style="display: none"
+                                >
+                                    <label
+                                        >Tilt Azimuth
                                         <span id="edit-azimuth-val" class="val-display">0°</span>
                                     </label>
-                                    <input type="range" id="editAzimuth" min="-180" max="180" step="1" value="0" />
+                                    <input
+                                        type="range"
+                                        id="editAzimuth"
+                                        min="-180"
+                                        max="180"
+                                        step="1"
+                                        value="0"
+                                    />
                                 </div>
 
                                 <div class="button-group">

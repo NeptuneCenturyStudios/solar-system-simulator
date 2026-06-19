@@ -7,6 +7,9 @@ import { performanceSettings } from '../utilities/consts';
 export class PerformancePanel extends Panel {
     enableShadowsCheckbox: HTMLInputElement | null;
     enableParticleEffectsCheckbox: HTMLInputElement | null;
+    substepsSlider: HTMLInputElement | null = null;
+    substepsDisplay: HTMLElement | null = null;
+    substepsResetBtn: HTMLButtonElement | null = null;
     btnClose: HTMLButtonElement | null;
 
     constructor(elementId: string) {
@@ -49,6 +52,27 @@ export class PerformancePanel extends Panel {
             this.enableParticleEffectsCheckbox.onchange = () => {
                 performanceSettings.particleEffectsEnabled =
                     this.enableParticleEffectsCheckbox!.checked;
+            };
+        }
+
+        this.substepsSlider = document.getElementById('substepsSlider') as HTMLInputElement | null;
+        this.substepsDisplay = document.getElementById('substeps-val');
+        if (this.substepsSlider) {
+            this.substepsSlider.oninput = () => {
+                const value = parseInt(this.substepsSlider!.value, 10);
+                if (this.substepsDisplay) this.substepsDisplay.textContent = `${value}`;
+                this.emit('substepsChange', { value });
+            };
+        }
+
+        this.substepsResetBtn = document.getElementById(
+            'substepsResetBtn'
+        ) as HTMLButtonElement | null;
+        if (this.substepsResetBtn) {
+            this.substepsResetBtn.onclick = () => {
+                if (this.substepsSlider) this.substepsSlider.value = '64';
+                if (this.substepsDisplay) this.substepsDisplay.textContent = '64';
+                this.emit('substepsChange', { value: 64 });
             };
         }
     }
