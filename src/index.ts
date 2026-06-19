@@ -72,12 +72,12 @@ import {
     FLIGHT_ROLL_SPEED,
     FLIGHT_ROLL_ACCEL,
     FLIGHT_ROLL_FRICTION,
-    FLIGHT_STEER_SMOOTHING,
+    FLIGHT_STEER_SMOOTH_RATE,
     FLIGHT_STEER_DEADZONE,
     FLIGHT_WARP_CHARGE_TIME,
     FLIGHT_MAX_BANK_ANGLE,
     FLIGHT_MAX_BANK_PITCH,
-    FLIGHT_BANK_LERP_RATE,
+    FLIGHT_BANK_LERP_SPEED,
 
     // Autopilot tuning constants moved from index.ts
     AUTOPILOT_APPROACH_SPEED,
@@ -5066,10 +5066,12 @@ function updateFlightControls(dt: number) {
     }
     const rawX = applyDeadzone(rawXFull);
     const rawY = applyDeadzone(rawYFull);
-    // Exponential lerp — gives a weighted, inertia-like feel to the controls
+    // Exponential smoothing — frame-rate independent; same feel at any fps.
+    // steerAlpha and bankAlpha derived from per-second rates: alpha = 1 - exp(-rate * dt)
     if (manualInput) {
-        flightState.steerX += (rawX - flightState.steerX) * FLIGHT_STEER_SMOOTHING;
-        flightState.steerY += (rawY - flightState.steerY) * FLIGHT_STEER_SMOOTHING;
+        const steerAlpha = 1 - Math.exp(-FLIGHT_STEER_SMOOTH_RATE * dt);
+        flightState.steerX += (rawX - flightState.steerX) * steerAlpha;
+        flightState.steerY += (rawY - flightState.steerY) * steerAlpha;
 
         // Yaw: rotate around camera's own local Y axis so left/right steering always
         // matches the screen regardless of orientation (including upside-down flight).
@@ -5089,12 +5091,13 @@ function updateFlightControls(dt: number) {
         flightState.flightCameraQuat.multiply(pitchQuat);
 
         // Animate visual banking of ship mesh relative to camera frame.
+        const bankAlpha = 1 - Math.exp(-FLIGHT_BANK_LERP_SPEED * dt);
         flightState.shipBankRoll +=
             (flightState.steerX * FLIGHT_MAX_BANK_ANGLE - flightState.shipBankRoll) *
-            FLIGHT_BANK_LERP_RATE;
+            bankAlpha;
         flightState.shipBankPitch +=
             (flightState.steerY * FLIGHT_MAX_BANK_PITCH - flightState.shipBankPitch) *
-            FLIGHT_BANK_LERP_RATE;
+            bankAlpha;
 
         // Apply banking offset to ship mesh: camera frame * cosmetic bank/pitch rotation.
         const bankQuat = new THREE.Quaternion().setFromEuler(
