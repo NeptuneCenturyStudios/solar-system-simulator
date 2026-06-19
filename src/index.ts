@@ -100,6 +100,7 @@ import {
     SUN_RADIUS,
     DIST_SCALE,
     WEAPON_DAMAGE,
+    TEXT_SPRITE_Z,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -799,7 +800,7 @@ function createFPSSprite() {
     fpsSprite.position.set(
         window.innerWidth / 2 - 110, // Right side minus (sprite half-width + padding)
         window.innerHeight / 2 - 30, // Top minus padding
-        0
+        TEXT_SPRITE_Z
     );
 
     uiScene.add(fpsSprite);
@@ -830,7 +831,7 @@ function createStatsSprite() {
     statsSprite.position.set(
         window.innerWidth / 2 - 255, // Right aligned
         window.innerHeight / 2 - 270, // Below FPS counter (slightly lower to fit extra line)
-        0
+        TEXT_SPRITE_Z
     );
 
     uiScene.add(statsSprite);
@@ -851,7 +852,7 @@ function createSpeedSprite() {
     speedSprite = new THREE.Sprite(material);
     speedSprite.scale.set(400, 400, 1);
     // Bottom-right corner: sprite center is 200px from right/bottom edges + 10px margin
-    speedSprite.position.set(window.innerWidth / 2 - 210, -(window.innerHeight / 2 - 210), 0);
+    speedSprite.position.set(window.innerWidth / 2 - 210, -(window.innerHeight / 2 - 210), TEXT_SPRITE_Z);
     speedSprite.visible = false;
     uiScene.add(speedSprite);
 }
