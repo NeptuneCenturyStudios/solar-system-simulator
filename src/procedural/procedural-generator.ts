@@ -153,6 +153,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         const inputSeed = (seed ?? '').trim();
         this.masterSeed = inputSeed.length > 0 ? inputSeed : generateSeedString();
+        this.seed = this.masterSeed;
 
         console.info('[procedural] using master seed:', this.masterSeed);
 

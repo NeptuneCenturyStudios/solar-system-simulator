@@ -1,6 +1,9 @@
 import type { Body } from '../bodies/body';
 
 export abstract class SolarSystemGenerator {
+    /** The seed this generator resolved or generated. Populated after construction. */
+    public seed: string = '';
+
     constructor() {}
 
     /**

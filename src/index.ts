@@ -288,6 +288,61 @@ import { BlackHoleSystemGenerator } from './procedural/black-hole-system-generat
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
 import { EffectiveGForce } from './types';
 
+// ── URL seed parameter helpers ──────────────────────────────────────────────
+const SEED_TYPE_NORMAL = 'normal';
+const SEED_TYPE_BLACKHOLE = 'blackhole';
+
+/** Current seed value (with type prefix) that was last pushed to the URL. */
+let _lastPushedSeedValue: string | null = null;
+
+interface ParsedSeed {
+    type: 'normal' | 'blackhole';
+    seed: string;
+}
+
+function parseSeedFromURL(): ParsedSeed | null {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('seed');
+    if (!raw) return null;
+
+    const underscoreIdx = raw.indexOf('_');
+    if (underscoreIdx <= 0) return null;
+
+    const type = raw.substring(0, underscoreIdx);
+    const seed = raw.substring(underscoreIdx + 1);
+    if (!seed) return null;
+
+    if (type === SEED_TYPE_NORMAL) {
+        return { type: 'normal', seed };
+    }
+    if (type === SEED_TYPE_BLACKHOLE) {
+        return { type: 'blackhole', seed };
+    }
+    return null;
+}
+
+function buildSeedValue(type: 'normal' | 'blackhole', seed: string): string {
+    return `${type}_${seed}`;
+}
+
+function updateURLWithSeed(type: 'normal' | 'blackhole', seed: string): void {
+    const value = buildSeedValue(type, seed);
+    if (value === _lastPushedSeedValue) return;
+    _lastPushedSeedValue = value;
+    const url = new URL(window.location.href);
+    url.searchParams.set('seed', value);
+    window.history.pushState({ seed: value }, '', url.toString());
+}
+
+function clearURLSeed(): void {
+    _lastPushedSeedValue = null;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('seed')) {
+        url.searchParams.delete('seed');
+        window.history.replaceState({ seed: null }, '', url.toString());
+    }
+}
+
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: { message: string; notificationType: NotificationType }) {
     const entry = new EventLogEntry(event.message, event.notificationType);
@@ -2018,12 +2073,15 @@ async function spawn({
     // Empty / procedural mode: starfield only (no bodies)
     if (mode === SimulationStartMode.Empty) {
         selectedBody = null;
+        clearURLSeed();
         return;
     }
 
     // Black Hole mode: procedurally generated black hole + 1–3 stars in siphon range
     if (mode === SimulationStartMode.BlackHole && generator) {
         simulationState.bodies = generator.generateSolarSystem();
+
+        updateURLWithSeed(SEED_TYPE_BLACKHOLE, generator.seed);
 
         syncAllStarLightTargets();
         selectedBody = null;
@@ -2074,6 +2132,12 @@ async function spawn({
             if (runId !== w[runIdKey]) return; // stale completion
 
             simulationState.bodies = bodies;
+
+            // Push URL seed after successful generation
+            if (gen) {
+                updateURLWithSeed(SEED_TYPE_NORMAL, gen.seed);
+            }
+
             syncAllStarLightTargets();
             selectedBody = null;
             manuallySelectedBody = null;
@@ -2116,6 +2180,7 @@ async function spawn({
     }
 
     // Default mode: build the solar system
+    clearURLSeed();
     const normalGenerator = new NormalSolarSystemGenerator(dependencies, scene, {
         jupiterTexture,
         saturnTexture,
@@ -6578,7 +6643,68 @@ window.addEventListener(
     true
 );
 
-// Show modal initially; simulation starts after user choice
-startupModal.open({ allowCancel: false });
+// ── Initialize: check for URL seed or show startup modal ────────────────────
+(async function initializeApp() {
+    const urlSeed = parseSeedFromURL();
+    if (urlSeed) {
+        // Skip startup modal — proceed directly to generation
+        applyStartupGMultiplier();
+        uiManager.managementPanel.hide();
+
+        const mode = urlSeed.type === SEED_TYPE_BLACKHOLE
+            ? SimulationStartMode.BlackHole
+            : SimulationStartMode.Procedural;
+
+        // For procedural, make the modal overlay visible before spawn shows progress
+        if (mode === SimulationStartMode.Procedural && proceduralModal.element) {
+            proceduralModal.element.classList.add('visible');
+        }
+
+        await spawn({ mode, seed: urlSeed.seed });
+        applyDefaultCameraTogglesAfterSpawn();
+    } else {
+        startupModal.open({ allowCancel: false });
+    }
+})();
+
+// ── popstate listener for back/forward navigation ───────────────────────────
+window.addEventListener('popstate', async (event) => {
+    const currentSeed = parseSeedFromURL();
+
+    // If there's no seed in the URL now (e.g. navigated back to a page without one)
+    if (!currentSeed) {
+        // Only reload if we were previously showing a seeded system
+        if (_lastPushedSeedValue !== null) {
+            _lastPushedSeedValue = null;
+            applyStartupGMultiplier();
+            uiManager.managementPanel.hide();
+            startupModal.hide();
+            await spawn({ mode: SimulationStartMode.Default });
+            applyDefaultCameraTogglesAfterSpawn();
+        }
+        return;
+    }
+
+    // Avoid re-generating the same system
+    const fullValue = buildSeedValue(currentSeed.type, currentSeed.seed);
+    if (fullValue === _lastPushedSeedValue) return;
+    _lastPushedSeedValue = fullValue;
+
+    applyStartupGMultiplier();
+    uiManager.managementPanel.hide();
+    startupModal.hide();
+
+    const mode = currentSeed.type === SEED_TYPE_BLACKHOLE
+        ? SimulationStartMode.BlackHole
+        : SimulationStartMode.Procedural;
+
+    if (mode === SimulationStartMode.Procedural && proceduralModal.element) {
+        proceduralModal.element.classList.add('visible');
+    }
+
+    await spawn({ mode, seed: currentSeed.seed });
+    applyDefaultCameraTogglesAfterSpawn();
+});
+
 refreshBodiesTable();
 animate();

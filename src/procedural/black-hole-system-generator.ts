@@ -37,6 +37,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         this.scene = scene;
         const inputSeed = (seed ?? '').trim();
         this.masterSeed = inputSeed.length > 0 ? inputSeed : generateSeedString();
+        this.seed = this.masterSeed;
         console.info('[black-hole-system] using master seed:', this.masterSeed);
     }
 
