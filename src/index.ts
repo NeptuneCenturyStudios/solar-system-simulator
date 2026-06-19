@@ -3236,8 +3236,12 @@ function setFocusBody(bodyOrNull: Body | null, { zoom = false } = {}) {
     refreshBodiesTable();
 }
 
+let _lastFrameTime: number = performance.now();
 function animate() {
     const now = performance.now();
+    // Real wall-clock frame time (capped at 100ms to guard against tab-hidden spikes).
+    const wallDt = Math.min((now - _lastFrameTime) / 1000, 0.1);
+    _lastFrameTime = now;
     requestAnimationFrame(animate);
     const tScale = timeScale;
     const steps = stepsPerFrame;
@@ -3279,7 +3283,7 @@ function animate() {
     }
 
     if (isFlightModeActive) {
-        updateFlightControls(SIM.BASE_FRAME_DT);
+        updateFlightControls(wallDt);
         // Camera is repositioned AFTER the physics loop (see updateFlightCamera below)
         // so it always reflects the ship's final post-physics position.
     }
