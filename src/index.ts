@@ -907,7 +907,11 @@ function createSpeedSprite() {
     speedSprite = new THREE.Sprite(material);
     speedSprite.scale.set(400, 400, 1);
     // Bottom-right corner: sprite center is 200px from right/bottom edges + 10px margin
-    speedSprite.position.set(window.innerWidth / 2 - 210, -(window.innerHeight / 2 - 210), TEXT_SPRITE_Z);
+    speedSprite.position.set(
+        window.innerWidth / 2 - 210,
+        -(window.innerHeight / 2 - 210),
+        TEXT_SPRITE_Z
+    );
     speedSprite.visible = false;
     uiScene.add(speedSprite);
 }
@@ -918,11 +922,15 @@ const ambientMusic = new AmbientSoundManager();
 // it falls back to starting on the first user gesture.
 ambientMusic.init();
 const _retryMusic = (): void => {
+    console.log('Retrying ambient music initialization...');
     ambientMusic.init();
     document.removeEventListener('pointerdown', _retryMusic);
+    document.removeEventListener('touchstart', _retryMusic);
     document.removeEventListener('keydown', _retryMusic);
 };
+
 document.addEventListener('pointerdown', _retryMusic);
+document.addEventListener('touchstart', _retryMusic);
 document.addEventListener('keydown', _retryMusic);
 const warpEffect = new WarpEffect(scene);
 const flightHUD = new FlightHUD(
@@ -1138,9 +1146,9 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
     }
 
     if (gizmo.target === body) {
-    gizmo.update();
-    velArc.update();
-    orbitPrediction.update(simulationState.bodies, simulationState.gMultiplier);
+        gizmo.update();
+        velArc.update();
+        orbitPrediction.update(simulationState.bodies, simulationState.gMultiplier);
         if (posIndicator.yAxisIndicator && posIndicator.yAxisRing) {
             posIndicator.updateIndicator(
                 posIndicator.yAxisIndicator,
@@ -1568,7 +1576,11 @@ function createNewBody(
             radius: planetRadius,
             rotationSpeed: planetRotationSpeed,
             bodySubtype: planetBodySubtype,
-        } = randomPlanetParams(resolvedPlanetType, { mass: customMass, radius: customRadius, seed: planetSeed });
+        } = randomPlanetParams(resolvedPlanetType, {
+            mass: customMass,
+            radius: customRadius,
+            seed: planetSeed,
+        });
 
         const isSolidPlanet =
             resolvedPlanetType === 'solid' ||
@@ -1761,8 +1773,18 @@ function createNewBody(
                 color: 0xffffff, // keep texture untinted
                 emissive: 0x000000,
                 emissiveIntensity: 0,
-                roughness: moonType === 'desert' || moonType === 'temperate' ? 0.95 : moonType === 'volcanic' ? 0.6 : 0.7,
-                metalness: moonType === 'desert' || moonType === 'temperate' ? 0.02 : moonType === 'volcanic' ? 0.15 : 0.7,
+                roughness:
+                    moonType === 'desert' || moonType === 'temperate'
+                        ? 0.95
+                        : moonType === 'volcanic'
+                          ? 0.6
+                          : 0.7,
+                metalness:
+                    moonType === 'desert' || moonType === 'temperate'
+                        ? 0.02
+                        : moonType === 'volcanic'
+                          ? 0.15
+                          : 0.7,
                 transparent: false,
                 depthTest: true,
                 depthWrite: true,
@@ -2004,7 +2026,7 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
  * Spawns a new simulation based on the specified mode and seed. Initializes the environment, cleans up existing bodies and effects,
  * and sets up the initial state for the simulation.
  * @param param0 An object containing the mode and seed for the simulation spawn.
- * @returns 
+ * @returns
  */
 async function spawn({
     mode = SimulationStartMode.Default,
@@ -2087,6 +2109,11 @@ async function spawn({
         syncAllStarLightTargets();
         selectedBody = null;
 
+        // Focus on the first body in the list, which will probably be a star (e.g., the Sun).
+        if (simulationState.bodies.length > 0) {
+            triggerZoomToBody(simulationState.bodies[0]);
+        }
+
         const shadowCheckboxForSpawn = document.getElementById('enableShadows') as HTMLInputElement;
         toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
         return;
@@ -2126,9 +2153,7 @@ async function spawn({
         proceduralModal.on('cancelRequested', onProceduralCancel);
 
         try {
-            const bodies = gen
-                ? await gen.generateSolarSystemAsync()
-                : [];
+            const bodies = gen ? await gen.generateSolarSystemAsync() : [];
 
             if (runId !== w[runIdKey]) return; // stale completion
 
@@ -2142,6 +2167,11 @@ async function spawn({
             syncAllStarLightTargets();
             selectedBody = null;
             manuallySelectedBody = null;
+
+            // Focus on the first body in the list, which will probably be a star (e.g., the Sun).
+            if (simulationState.bodies.length > 0) {
+                triggerZoomToBody(simulationState.bodies[0]);
+            }
 
             // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
             // immediately without requiring the user to toggle the checkbox.
@@ -2193,6 +2223,11 @@ async function spawn({
     simulationState.bodies = normalGenerator.generateSolarSystem();
     syncAllStarLightTargets();
     selectedBody = null;
+
+    // Focus on the first body in the list, which will probably be a star (e.g., the Sun).
+    if (simulationState.bodies.length > 0) {
+        triggerZoomToBody(simulationState.bodies[0]);
+    }
 
     // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
     // immediately without requiring the user to toggle the checkbox.
@@ -3604,7 +3639,13 @@ function animate() {
 
     // Update weapon bolts (advance positions, collision check, camera-relative upload).
     if (flightState.isActive && flightState.activeShip) {
-        shipWeapon.update(wallDt, simulationState.bodies, camera.position, flightState.activeShip);
+        shipWeapon.update(
+            wallDt,
+            dtTotal,
+            simulationState.bodies,
+            camera.position,
+            flightState.activeShip
+        );
     }
 
     // Filter dead explosions
@@ -5107,11 +5148,9 @@ function updateFlightControls(dt: number) {
         // Animate visual banking of ship mesh relative to camera frame.
         const bankAlpha = 1 - Math.exp(-FLIGHT_BANK_LERP_SPEED * dt);
         flightState.shipBankRoll +=
-            (flightState.steerX * FLIGHT_MAX_BANK_ANGLE - flightState.shipBankRoll) *
-            bankAlpha;
+            (flightState.steerX * FLIGHT_MAX_BANK_ANGLE - flightState.shipBankRoll) * bankAlpha;
         flightState.shipBankPitch +=
-            (flightState.steerY * FLIGHT_MAX_BANK_PITCH - flightState.shipBankPitch) *
-            bankAlpha;
+            (flightState.steerY * FLIGHT_MAX_BANK_PITCH - flightState.shipBankPitch) * bankAlpha;
 
         // Apply banking offset to ship mesh: camera frame * cosmetic bank/pitch rotation.
         const bankQuat = new THREE.Quaternion().setFromEuler(
@@ -5312,7 +5351,7 @@ function spawnShip() {
     flightControlsPanel.setAutopilotState(autopilotState.isActive, true);
     refreshBodiesTable();
 
-    ambientMusic.enterFlightMode();
+    ambientMusic.startPlayback();
 
     // Close the flight controls panel
     flightControlsPanel.hide();
@@ -6671,9 +6710,10 @@ window.addEventListener(
         applyStartupGMultiplier();
         uiManager.managementPanel.hide();
 
-        const mode = urlSeed.type === SEED_TYPE_BLACKHOLE
-            ? SimulationStartMode.BlackHole
-            : SimulationStartMode.Procedural;
+        const mode =
+            urlSeed.type === SEED_TYPE_BLACKHOLE
+                ? SimulationStartMode.BlackHole
+                : SimulationStartMode.Procedural;
 
         // For procedural, make the modal overlay visible before spawn shows progress
         if (mode === SimulationStartMode.Procedural && proceduralModal.element) {
@@ -6714,9 +6754,10 @@ window.addEventListener('popstate', async () => {
     uiManager.managementPanel.hide();
     startupModal.hide();
 
-    const mode = currentSeed.type === SEED_TYPE_BLACKHOLE
-        ? SimulationStartMode.BlackHole
-        : SimulationStartMode.Procedural;
+    const mode =
+        currentSeed.type === SEED_TYPE_BLACKHOLE
+            ? SimulationStartMode.BlackHole
+            : SimulationStartMode.Procedural;
 
     if (mode === SimulationStartMode.Procedural && proceduralModal.element) {
         proceduralModal.element.classList.add('visible');

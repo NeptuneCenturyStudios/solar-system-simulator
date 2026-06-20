@@ -175,13 +175,18 @@ export class ShipWeapon {
      * Advance all bolts, expire old ones, check sphere collisions, and upload
      * camera-relative positions to the GPU buffer.
      *
-     * @param dt             Delta time (seconds).
+     * @param wallDt         Wall-clock delta time (seconds) — used for lifetime so bolt
+     *                       flight duration is consistent regardless of FPS.
+     * @param simDt          Total physics simulation advance this frame (seconds) — used
+     *                       for position so bolts stay in sync with the ship's physics
+     *                       movement (dtTotal = BASE_FRAME_DT × TIME_SCALE × tScale).
      * @param bodies         All active simulation bodies for collision testing.
      * @param cameraPosition World-space camera position for camera-relative rendering.
      * @param excludeBody    Body to skip in collision checks (player's ship).
      */
     update(
-        dt: number,
+        wallDt: number,
+        simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
         excludeBody?: Body
@@ -190,14 +195,14 @@ export class ShipWeapon {
 
         for (let i = 0; i < this.projectiles.length; i++) {
             const p = this.projectiles[i];
-            p.timeRemaining -= dt;
+            p.timeRemaining -= wallDt;
 
             if (p.timeRemaining <= 0) {
                 toRemove.add(i);
                 continue;
             }
 
-            p.position.addScaledVector(p.velocity, dt);
+            p.position.addScaledVector(p.velocity, simDt);
 
             // Sphere–sphere hit test.
             for (const body of bodies) {

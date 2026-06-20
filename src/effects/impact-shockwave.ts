@@ -31,7 +31,7 @@ export class ImpactShockwave implements IEffect {
         this.active = true;
         this.scene = scene;
         this.age = 0;
-        this.baseRadius = Math.max(5, bodyRadius * 0.3);
+        this.baseRadius = Math.max(5, bodyRadius * 0.001);
 
         // Place the flash at the impact position on the planet surface.
         // Snap outward so the sphere is visually sitting on the surface.
@@ -40,14 +40,14 @@ export class ImpactShockwave implements IEffect {
         else outward.set(0, 1, 0);
         this.worldPos = bodyCenter.clone().addScaledVector(outward, bodyRadius);
 
-        const geo = new THREE.SphereGeometry(1, 16, 8);
+        const geo = new THREE.SphereGeometry(1, 16, 16);
         this.mat = new THREE.MeshBasicMaterial({
             color: new THREE.Color(0x44bbff).lerp(new THREE.Color(0xffffff), 0.4),
             transparent: true,
-            opacity: 2.0,
+            opacity: 1,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            depthTest: false,
+            depthTest: true,
         });
 
         this.sphere = new THREE.Mesh(geo, this.mat);
@@ -64,7 +64,7 @@ export class ImpactShockwave implements IEffect {
 
         const progress = Math.min(this.age / this.maxAge, 1.0);
         // Expand from 1× to 4× while fading out
-        this.sphere.scale.setScalar(this.baseRadius * (1.0 + progress * 3.0));
+        this.sphere.scale.setScalar(this.baseRadius * (1.0 + progress * 1.001));
         this.mat.opacity = Math.max(0, 2.0 * Math.pow(1.0 - progress, 1.5));
 
         if (progress >= 1.0) {

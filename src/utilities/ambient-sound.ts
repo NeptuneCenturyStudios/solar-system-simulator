@@ -27,7 +27,7 @@ export class AmbientSoundManager {
 
     private state: ManagerState = 'idle';
     /** Which track index number is currently loaded/playing. */
-    private currentTrackIndex: number | null = null;
+    private currentTrackIndex: number = -1;
     /** Timer handle for the between-track delay. */
     private delayTimer: ReturnType<typeof setTimeout> | null = null;
     /** True once init() has been called. */
@@ -51,12 +51,11 @@ export class AmbientSoundManager {
     }
 
     /**
-     * Called when the player enters flight mode.
      * If nothing is currently playing or we're in the inter-track delay,
      * a new track starts right away.  If a track is already playing, it
      * continues uninterrupted.
      */
-    enterFlightMode(): void {
+    startPlayback(): void {
         if (!this.initialized) return;
         if (this.state === 'idle') {
             this.playNextTrack();
@@ -94,34 +93,41 @@ export class AmbientSoundManager {
         this.setupAudioContext();
 
         // Initialize the playlist with track URLs
-        this.playlist = [];
+        const tempList = [];
 
-        this.playlist.push(this.buildTrackUrl('alex-morgan-underwater-dreamscape-537486.mp3'));
-        this.playlist.push(this.buildTrackUrl('cfl_turningpages-submerged-pulse-523340.mp3'));
-        this.playlist.push(this.buildTrackUrl('delosound-space-ambient-cinematic-442834.mp3'));
-        this.playlist.push(this.buildTrackUrl('freemusicforvideo-space-ambient-495614.mp3'));
-        this.playlist.push(this.buildTrackUrl('leberch-space-440026.mp3'));
-        this.playlist.push(this.buildTrackUrl('leberch-space-ambient-509783.mp3'));
-        this.playlist.push(this.buildTrackUrl('monume-space-ambient-498030.mp3'));
-        this.playlist.push(this.buildTrackUrl('shadowsandechoes-deep-quest-dark-driving-tension-394142.mp3'));
-        this.playlist.push(this.buildTrackUrl('sigmamusicart-tension-background-music-460023.mp3'));
-        this.playlist.push(this.buildTrackUrl('slimeyfox-hydrostatic-drones-479105.mp3'));
-        this.playlist.push(this.buildTrackUrl('the_mountain-spaceship-155569.mp3'));
-        this.playlist.push(this.buildTrackUrl('universfield-haunting-music-box-289437.mp3'));
-        this.playlist.push(this.buildTrackUrl('musheran-low-rumbling-176033.mp3'));
-        this.playlist.push(this.buildTrackUrl('nickpanekaiassets-drones-of-dread-dark-cinematic-industrial-ambient-497226.mp3'));
-        this.playlist.push(this.buildTrackUrl('vjgalaxy-melodic-techno-09-513318.mp3'));
-        this.playlist.push(this.buildTrackUrl('slimeyfox-hyperwoofer-tremormorph-541638.mp3'));
-        this.playlist.push(this.buildTrackUrl('pwlpl-progressive-techno-cinematic-tension-arc-543153.mp3'));
-        this.playlist.push(this.buildTrackUrl('absolutesound-cinematic-guitar-adventure-505779.mp3'));
-        this.playlist.push(this.buildTrackUrl('leberch-mysterious-cinematic-255712.mp3'));
-        this.playlist.push(this.buildTrackUrl('cfl_turningpages-vast-hollow-tidal-533251.mp3'));
-        this.playlist.push(this.buildTrackUrl('universfield-ambient-space-background-350710.mp3'));
-        this.playlist.push(this.buildTrackUrl('cfl_turningpages-minimalist-pulse-2-529872.mp3'));
-        this.playlist.push(this.buildTrackUrl('databend-dark-electronic-pulse-background-546935.mp3'));
-        this.playlist.push(this.buildTrackUrl('leberch-atmosphere-pulse-263075.mp3'));
-        this.playlist.push(this.buildTrackUrl('joyinsound-drone-perspectives-399304.mp3'));
-        this.playlist.push(this.buildTrackUrl('fabienroch-nebulous-173888.mp3'));
+        tempList.push(this.buildTrackUrl('alex-morgan-underwater-dreamscape-537486.mp3'));
+        tempList.push(this.buildTrackUrl('cfl_turningpages-submerged-pulse-523340.mp3'));
+        tempList.push(this.buildTrackUrl('delosound-space-ambient-cinematic-442834.mp3'));
+        tempList.push(this.buildTrackUrl('freemusicforvideo-space-ambient-495614.mp3'));
+        tempList.push(this.buildTrackUrl('leberch-space-440026.mp3'));
+        tempList.push(this.buildTrackUrl('leberch-space-ambient-509783.mp3'));
+        tempList.push(this.buildTrackUrl('monume-space-ambient-498030.mp3'));
+        tempList.push(this.buildTrackUrl('shadowsandechoes-deep-quest-dark-driving-tension-394142.mp3'));
+        tempList.push(this.buildTrackUrl('sigmamusicart-tension-background-music-460023.mp3'));
+        tempList.push(this.buildTrackUrl('slimeyfox-hydrostatic-drones-479105.mp3'));
+        tempList.push(this.buildTrackUrl('the_mountain-spaceship-155569.mp3'));
+        tempList.push(this.buildTrackUrl('universfield-haunting-music-box-289437.mp3'));
+        tempList.push(this.buildTrackUrl('musheran-low-rumbling-176033.mp3'));
+        tempList.push(this.buildTrackUrl('nickpanekaiassets-drones-of-dread-dark-cinematic-industrial-ambient-497226.mp3'));
+        tempList.push(this.buildTrackUrl('vjgalaxy-melodic-techno-09-513318.mp3'));
+        tempList.push(this.buildTrackUrl('slimeyfox-hyperwoofer-tremormorph-541638.mp3'));
+        tempList.push(this.buildTrackUrl('pwlpl-progressive-techno-cinematic-tension-arc-543153.mp3'));
+        tempList.push(this.buildTrackUrl('absolutesound-cinematic-guitar-adventure-505779.mp3'));
+        tempList.push(this.buildTrackUrl('leberch-mysterious-cinematic-255712.mp3'));
+        tempList.push(this.buildTrackUrl('cfl_turningpages-vast-hollow-tidal-533251.mp3'));
+        tempList.push(this.buildTrackUrl('universfield-ambient-space-background-350710.mp3'));
+        tempList.push(this.buildTrackUrl('cfl_turningpages-minimalist-pulse-2-529872.mp3'));
+        tempList.push(this.buildTrackUrl('databend-dark-electronic-pulse-background-546935.mp3'));
+        tempList.push(this.buildTrackUrl('leberch-atmosphere-pulse-263075.mp3'));
+        tempList.push(this.buildTrackUrl('joyinsound-drone-perspectives-399304.mp3'));
+        tempList.push(this.buildTrackUrl('fabienroch-nebulous-173888.mp3'));
+
+        // Randomize the playlist order
+        for (let i = tempList.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tempList[i], tempList[j]] = [tempList[j], tempList[i]];
+        }
+        this.playlist = tempList;
 
     }
 
@@ -134,16 +140,18 @@ export class AmbientSoundManager {
     }
 
     /**
-     * Pick a random track index that differs from the one currently (or last) playing.
+     * Pick the next track index in sequence, looping back to the beginning if necessary.
+     * This ensures a linear progression through the playlist rather than random selection.
      */
     private pickTrackIndex(): number {
         if (!this.playlist.length) return -1;
 
-        let idx: number;
-        do {
-            idx = Math.floor(Math.random() * this.playlist.length);
-        } while (idx === this.currentTrackIndex);
-        return idx;
+        // Advance the index by one until we reach the end of the playout and then go back to the beginning
+        let nextIndex = this.currentTrackIndex + 1;
+        if (nextIndex >= this.playlist.length) {
+            nextIndex = 0;
+        }
+        return nextIndex;
     }
 
     /**
@@ -157,10 +165,11 @@ export class AmbientSoundManager {
     /**
      * Play a random track.
      */
-    private playNextTrack(): void {
+    public playNextTrack(): void {
         if (!this.ctx || !this.gainNode) return;
 
         const index = this.pickTrackIndex();
+        if (index === -1) return; // no tracks available
         this.currentTrackIndex = index;
 
         const url = this.trackUrl(index);
@@ -198,8 +207,10 @@ export class AmbientSoundManager {
             this.startDelay(() => this.playNextTrack());
         });
 
-        audio.play().catch(() => {
+        audio.play().catch((err) => {
             // Autoplay policy — should not happen since init() is called after a gesture
+            console.error('Failed to play audio track:', err);
+            this.dispose();
         });
     }
 
