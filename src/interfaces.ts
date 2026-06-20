@@ -9,6 +9,7 @@ import { NotificationType } from './event-log/event-log';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
 import { ITidalLockOptions } from './bodies/celestial-body';
 import { EffectiveGForce } from './types';
+import { Spaceship } from './bodies/spaceship';
 /**
  * Represents the rotation of a body in 3D space
  */
@@ -110,4 +111,75 @@ export interface IAccretionTarget {
 export interface IMassTransferBody extends IAccretionTarget {
     siphonEffects: Map<string, IPipelineFeedEffect>;
     enqueueAccretionParticle(angle: number): void;
+}
+
+/**
+ * Structural interface for the flight state, representing the current state of the player's spaceship and flight-related parameters.
+ */
+export interface IFlightState {
+    isActive: boolean;
+    activeShip: Spaceship | null;
+    isCockpitView: boolean;
+
+    /** Current thrust speed; persists after key release (W increases, S decreases). */
+    currentSpeed: number;
+
+    /** Accumulated mouse pointer offset from screen centre (x/y pixels, capped). */
+    pointerOffsetX: number;
+    pointerOffsetY: number;
+
+    rollLeft: boolean;
+    rollRight: boolean;
+
+    /** Current angular roll velocity (rad/s). Decays when key released. */
+    rollVelocity: number;
+
+    /** Smoothed steering values in [-1, 1]. Lerp toward raw target each frame. */
+    steerX: number;
+    steerY: number;
+
+    /** Whether advanced (additive) flight physics are active. */
+    isAdvancedMode: boolean;
+
+    // Pre-flight camera snapshot
+    prevCameraPos: THREE.Vector3;
+    prevCameraUp: THREE.Vector3;
+    prevCameraQuat: THREE.Quaternion;
+    prevControlsTarget: THREE.Vector3;
+
+    /** Last spawned ship; persists after exit so user can re-enter it. */
+    knownShip: Spaceship | null;
+
+    /** True while any thrust key (W/S/Shift) was held this frame. */
+    thrustActive: boolean;
+
+    /** Seconds space bar has been held in flight mode. */
+    warpCharge: number;
+
+    /** True while space bar is being held down to charge warp. */
+    warpCharging: boolean;
+
+    /** True when warp speed is active. */
+    warpActive: boolean;
+
+    /** True while decelerating back from warp speed. */
+    warpDecelerating: boolean;
+
+    /** True while rapidly decelerating from boost speed back to normal max. */
+    boostDecelerating: boolean;
+
+    /** Camera reference frame quaternion, independent of ship mesh banking. */
+    flightCameraQuat: THREE.Quaternion;
+
+    /** Visual roll offset of ship mesh relative to camera frame (radians). */
+    shipBankRoll: number;
+
+    /** Visual pitch offset of ship mesh relative to camera frame (radians). */
+    shipBankPitch: number;
+
+    /** True while LMB is held during flight — fires weapon particles each frame. */
+    isFiring: boolean;
+
+    /** Whether Shift was held on the previous frame. */
+    prevShiftHeld: boolean;
 }

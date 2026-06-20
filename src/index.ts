@@ -101,6 +101,8 @@ import {
     DIST_SCALE,
     WEAPON_DAMAGE,
     TEXT_SPRITE_Z,
+    FLIGHT_THRUST_DECEL_TOLERANCE,
+    FLIGHT_WARP_DECEL_TOLERANCE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -179,7 +181,7 @@ import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
 import { PerformancePanel } from './ui/performance-panel';
 import { EventLogEntry, NotificationType } from './event-log/event-log';
-import { IStateDependencies } from './interfaces';
+import { IFlightState, IStateDependencies } from './interfaces';
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
 import { UIManager } from './ui/ui-manager';
@@ -706,7 +708,7 @@ const simulationState = {
 };
 
 // --- Flight mode state ---
-const flightState = {
+const flightState: IFlightState = {
     isActive: false,
     activeShip: null as Spaceship | null,
     isCockpitView: false,
@@ -755,6 +757,8 @@ const flightState = {
     shipBankPitch: 0,
     /** True while LMB is held during flight — fires weapon particles each frame. */
     isFiring: false,
+    /** Whether Shift was held on the previous frame — used to detect Shift-release transitions. */
+    prevShiftHeld: false,
 };
 
 // --- Autopilot state ---
@@ -3454,7 +3458,7 @@ function animate() {
     const oldPos = focusObj && focusObj.mesh ? focusObj.mesh.position.clone() : new THREE.Vector3();
 
     // Physics integration loop
-    updateSimulation(simulationState, autopilotState, steps, dt, updateAutopilot);
+    updateSimulation(simulationState, autopilotState, flightState, steps, dt, updateAutopilot);
 
     // Collision detection and trail updates (outside integration loop for performance)
     if (!interactionState.isRepositioning) {
@@ -4885,7 +4889,7 @@ function updateFlightControls(dt: number) {
     //             logic maintain boost speed until Shift is released.
     if (flightState.warpDecelerating) {
         const fwdSpd = ship.velocity.dot(forward);
-        if (fwdSpd > FLIGHT_BOOST_MAX_SPEED) {
+        if (fwdSpd > FLIGHT_BOOST_MAX_SPEED + FLIGHT_WARP_DECEL_TOLERANCE) {
             // Phase 1: decel from warp speed to boost max using warp decel rate.
             const newSpd = Math.max(FLIGHT_BOOST_MAX_SPEED, fwdSpd - FLIGHT_WARP_DECEL * dt);
             ship.velocity.copy(forward).multiplyScalar(newSpd);
@@ -4915,7 +4919,11 @@ function updateFlightControls(dt: number) {
     // When Shift is released above FLIGHT_MAX_SPEED, rapidly decelerate back down.
     if (flightState.boostDecelerating) {
         const fwdSpd = ship.velocity.dot(forward);
-        if (fwdSpd > FLIGHT_MAX_SPEED) {
+        // Use a small epsilon tolerance (0.01) for the completion check so that
+        // gravity's tiny per-frame velocity contribution doesn't prevent the decel
+        // from ever finishing — without this the ship can get stuck permanently
+        // in boost-decel mode, fighting gravity every frame.
+        if (fwdSpd > FLIGHT_MAX_SPEED + FLIGHT_THRUST_DECEL_TOLERANCE) {
             const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_BOOST_DECEL * dt);
             ship.velocity.copy(forward).multiplyScalar(newSpd);
             flightState.currentSpeed = newSpd;
@@ -4978,10 +4986,13 @@ function updateFlightControls(dt: number) {
     const thrustActive = manualInput && (keys.shift || wEffective || keys.s);
     if (manualInput) flightState.thrustActive = thrustActive;
 
-    // Trigger boost decel when Shift is released while still above normal max speed
+    // Trigger boost decel when Shift is *released* while still above normal max speed.
+    // This must only fire on a Shift-release transition (prevShiftHeld was true, now false),
+    // not when the ship is simply coasting and gravity accelerated past FLIGHT_MAX_SPEED.
+    const shiftJustReleased = flightState.prevShiftHeld && !keys.shift;
     if (
         manualInput &&
-        !keys.shift &&
+        shiftJustReleased &&
         !flightState.boostDecelerating &&
         !flightState.warpActive &&
         !flightState.warpDecelerating
@@ -5224,6 +5235,9 @@ function updateFlightControls(dt: number) {
         const muzzlePos = ship.mesh.position.clone().addScaledVector(forward, ship.radius * 4);
         shipWeapon.tryFire(dt, muzzlePos, aimDir, ship.velocity);
     }
+
+    // ── Track prevShiftHeld for next frame's Shift-release detection ──────
+    flightState.prevShiftHeld = keys.shift;
 }
 
 /** Spawn a spaceship in front of the camera and enter flight mode.
@@ -5389,6 +5403,14 @@ function exitFlightMode() {
     flightState.steerY = 0;
     flightState.isFiring = false;
     shipWeapon.reset();
+
+    // Clear deceleration and warp flags so on re-entry the ship isn't
+    // artificially clamped back to FLIGHT_MAX_SPEED.
+    flightState.boostDecelerating = false;
+    flightState.warpDecelerating = false;
+    flightState.warpCharging = false;
+    flightState.warpCharge = 0;
+    flightState.prevShiftHeld = false;
 
     flightState.isActive = false;
     flightState.activeShip = null;

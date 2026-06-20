@@ -8,8 +8,7 @@ import { CelestialBody } from '../bodies/celestial-body';
 import { Spaceship } from '../bodies/spaceship';
 import { NotificationType } from '../event-log/event-log';
 import { EffectiveGForce } from '../types';
-
-
+import { IFlightState } from '../interfaces';
 
 /**
  * Represents the state of the physics simulation, including all bodies, explosions, and simulation parameters.
@@ -28,7 +27,13 @@ export interface ISimulationState {
 /**
  * Autopilot state and phase information used to control the ship's automatic navigation behavior
  */
-export type AutopilotPhase = 'ALIGN' | 'WARP_CHARGING' | 'WARP' | 'APPROACH' | 'BRAKE' | 'CIRCULARIZE';
+export type AutopilotPhase =
+    | 'ALIGN'
+    | 'WARP_CHARGING'
+    | 'WARP'
+    | 'APPROACH'
+    | 'BRAKE'
+    | 'CIRCULARIZE';
 
 /**
  * Represents the state of the autopilot, including its activity status, target body, current phase, and various timers.
@@ -59,7 +64,12 @@ export interface IAutopilotState {
  * @param {number} angleRad The orbital angle in radians (0 = +X axis, π/2 = +Z axis)
  * @returns An object containing the position and velocity vectors for the circular orbit
  */
-export function calculateTrajectory(gForce: EffectiveGForce, distance: number, parentMass: number, angleRad: number = 0) {
+export function calculateTrajectory(
+    gForce: EffectiveGForce,
+    distance: number,
+    parentMass: number,
+    angleRad: number = 0
+) {
     const speed = Math.sqrt((gForce * parentMass) / distance);
 
     const cosA = Math.cos(angleRad);
@@ -82,7 +92,12 @@ export function calculateTrajectory(gForce: EffectiveGForce, distance: number, p
  * @param {number} eccentricity The eccentricity of the orbit (0 = circular, 1 = parabolic)
  * @returns The orbital speed for the given parameters
  */
-export function calculateOrbitalSpeed(gForce: number, distance: number, hostMass: number, eccentricity: number) {
+export function calculateOrbitalSpeed(
+    gForce: number,
+    distance: number,
+    hostMass: number,
+    eccentricity: number
+) {
     const circularSpeed = Math.sqrt((gForce * hostMass) / distance);
     const speed = circularSpeed * Math.sqrt(Math.max(0, 1 - eccentricity));
 
@@ -100,6 +115,7 @@ export function calculateOrbitalSpeed(gForce: number, distance: number, hostMass
 export function updateSimulation(
     simulationState: ISimulationState,
     autopilotState: IAutopilotState,
+    flightState: IFlightState,
     steps: number,
     dt: number,
     updateAutopilot: (dt: number) => void
@@ -107,7 +123,7 @@ export function updateSimulation(
     // Physics integration loop
     for (let i = 0; i < steps; i++) {
         // Apply physics to bodies
-        updatePhysics(simulationState);
+        updatePhysics(simulationState, flightState);
 
         // Apply autopilot thrust impulse each substep so it scales correctly with timeScale.
         // Running once per frame at BASE_FRAME_DT would let the ship fly through brake zones
@@ -152,9 +168,18 @@ function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number, G: number) {
  * Update the physics simulation for all bodies in the simulation state, calculating gravitational accelerations.
  * @param simulationState The current state of the simulation, including all bodies.
  */
-function updatePhysics(simulationState: ISimulationState) {
+function updatePhysics(simulationState: ISimulationState, flightState: IFlightState) {
     // Calculate accelerations for all bodies
     for (const body of simulationState.bodies) {
+        // Don't integrate physics if the ship is decelerating in warp or boost mode
+        if (
+            body === flightState.knownShip &&
+            (flightState.warpDecelerating || flightState.boostDecelerating)
+        ) {
+            console.info('Skipping physics integration for the known ship while decelerating in warp or boost mode.');
+            continue;
+        }
+
         const totalAcc = new THREE.Vector3(0, 0, 0);
 
         // Calculate pull from ALL OTHER bodies (n-body simulation)
@@ -174,7 +199,6 @@ function updatePhysics(simulationState: ISimulationState) {
         body.tempAcc = totalAcc;
     }
 }
-
 
 /**
  * Set the visual radius for any body. Delegates to the body's setRadius method.
@@ -209,8 +233,6 @@ function collisionScoreEscapeVelocity(body: Body) {
 
     return m / r;
 }
-
-
 
 export function chooseCollisionWinner(b1: Body, b2: Body) {
     // Spaceships always lose — they should never absorb anything.

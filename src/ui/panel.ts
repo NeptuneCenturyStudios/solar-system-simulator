@@ -68,6 +68,7 @@ export class Panel {
     hide() {
         if (this.element) {
             this.element.classList.remove('visible');
+            this.emit('closed');
         }
     }
 
