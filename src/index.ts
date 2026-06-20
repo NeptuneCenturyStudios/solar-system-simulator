@@ -392,16 +392,16 @@ uiScene.add(flightSteeringLine);
 const crosshairPositions = new Float32Array([
     -CROSSHAIR_SIZE,
     0,
-    0,
+    TEXT_SPRITE_Z,
     CROSSHAIR_SIZE,
     0,
-    0, // horizontal arm
+    TEXT_SPRITE_Z, // horizontal arm
     0,
     -CROSSHAIR_SIZE,
-    0,
+    TEXT_SPRITE_Z,
     0,
     CROSSHAIR_SIZE,
-    0, // vertical arm
+    TEXT_SPRITE_Z, // vertical arm
 ]);
 const crosshairGeo = new THREE.BufferGeometry();
 crosshairGeo.setAttribute('position', new THREE.BufferAttribute(crosshairPositions, 3));
@@ -3628,9 +3628,9 @@ function animate() {
         const startY = steeringLinePositions[1];
         const endX = steeringLinePositions[3];
         const endY = steeringLinePositions[4];
-        steeringEndMarker.position.set(endX, endY, 0);
+        steeringEndMarker.position.set(endX, endY, TEXT_SPRITE_Z);
         steeringEndMarker.visible = true;
-        steeringOriginMarker.position.set(startX, startY, 0);
+        steeringOriginMarker.position.set(startX, startY, TEXT_SPRITE_Z);
         steeringOriginMarker.visible = true;
     } else {
         steeringEndMarker.visible = false;
@@ -5189,10 +5189,10 @@ function updateFlightControls(dt: number) {
 
     steeringLinePositions[0] = noseScreenX;
     steeringLinePositions[1] = noseScreenY;
-    steeringLinePositions[2] = 0;
+    steeringLinePositions[2] = TEXT_SPRITE_Z;
     steeringLinePositions[3] = noseScreenX + displayOffX;
     steeringLinePositions[4] = noseScreenY - displayOffY;
-    steeringLinePositions[5] = 0;
+    steeringLinePositions[5] = TEXT_SPRITE_Z;
     steeringLineGeo.attributes.position.needsUpdate = true;
 
     // Move origin ring and aim reticle to their screen positions.
@@ -6404,17 +6404,17 @@ window.addEventListener('resize', () => {
 
     // Reposition FPS counter
     if (fpsSprite) {
-        fpsSprite.position.set(window.innerWidth / 2 - 110, window.innerHeight / 2 - 30, 0);
+        fpsSprite.position.set(window.innerWidth / 2 - 110, window.innerHeight / 2 - 30, TEXT_SPRITE_Z);
     }
 
     // Reposition stats display
     if (statsSprite) {
-        statsSprite.position.set(window.innerWidth / 2 - 255, window.innerHeight / 2 - 270, 0);
+        statsSprite.position.set(window.innerWidth / 2 - 255, window.innerHeight / 2 - 270, TEXT_SPRITE_Z);
     }
 
     // Reposition hint display (top-center)
     if (flightHUD.hintSprite) {
-        flightHUD.hintSprite.position.set(0, window.innerHeight / 2 - 55, 0);
+        flightHUD.hintSprite.position.set(0, window.innerHeight / 2 - 55, TEXT_SPRITE_Z);
     }
 
     // Reposition event log
