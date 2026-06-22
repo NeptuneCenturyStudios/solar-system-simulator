@@ -3,7 +3,12 @@
  * Audio files are loaded and decoded once on first use, then cached.
  * The AudioContext is created lazily so it is always triggered by a user
  * gesture, satisfying browser autoplay policy.
+ *
+ * Volume is controlled by the global performanceSettings.sfxVolume (0–1).
+ * When sfxVolume is 0, no sounds play.
  */
+
+import { performanceSettings } from './consts';
 
 let ctx: AudioContext | null = null;
 let blasterBuffer: AudioBuffer | null = null;
@@ -38,12 +43,16 @@ function loadAndCache(
         .catch(() => {});
 }
 
-function playBuffer(ac: AudioContext, buffer: AudioBuffer, gain = 0.8): void {
+function playBuffer(ac: AudioContext, buffer: AudioBuffer, baseGain = 0.8): void {
+    // Respect global SFX volume: if 0, don't play anything
+    const vol = performanceSettings.sfxVolume;
+    if (vol <= 0) return;
+
     const t = ac.currentTime;
     const source = ac.createBufferSource();
     source.buffer = buffer;
     const gainNode = ac.createGain();
-    gainNode.gain.setValueAtTime(gain, t);
+    gainNode.gain.setValueAtTime(baseGain * vol, t);
     source.connect(gainNode);
     gainNode.connect(ac.destination);
     source.start(t);
@@ -85,7 +94,7 @@ export function playWeaponImpact(): void {
 
 // ── Warp loop sound ──────────────────────────────────────────────────────────
 
-/** Default volume for the warp loop (0–1). */
+/** Base volume for the warp loop (0–1) — multiplied by performanceSettings.sfxVolume at play time. */
 const WARP_VOLUME = 0.6;
 /** Fade-out duration in seconds when warp ends. */
 const WARP_FADE_DURATION = 1.5;
@@ -121,6 +130,9 @@ export interface WarpSoundController {
  * The first call triggers a fetch+decode; subsequent calls use the cached buffer.
  * Each call creates a new source + gain node pair so multiple ships can warp
  * simultaneously (though only one ship exists in practice).
+ *
+ * The effective gain is WARP_VOLUME * performanceSettings.sfxVolume, multiplied
+ * by the caller's speedVolume × distanceFade passed via setVolume().
  */
 export function playWarpLoop(): WarpSoundController | null {
     try {
@@ -136,13 +148,16 @@ export function playWarpLoop(): WarpSoundController | null {
         // If the buffer isn't loaded yet, the caller should retry next frame
         if (!warpBuffer) return null;
 
+        // Compute initial gain including global SFX volume
+        const initialGain = WARP_VOLUME * performanceSettings.sfxVolume;
+
         const t = ac.currentTime;
         const source = ac.createBufferSource();
         source.buffer = warpBuffer;
         source.loop = true;
 
         const gainNode = ac.createGain();
-        gainNode.gain.setValueAtTime(WARP_VOLUME, t);
+        gainNode.gain.setValueAtTime(initialGain, t);
 
         source.connect(gainNode);
         gainNode.connect(ac.destination);
@@ -158,7 +173,8 @@ export function playWarpLoop(): WarpSoundController | null {
 
             setVolume(vol: number): void {
                 if (_disposed || _isFadingOut) return;
-                gainNode.gain.setValueAtTime(vol * WARP_VOLUME, ac.currentTime);
+                // Multiply caller's volume by the global SFX volume
+                gainNode.gain.setValueAtTime(vol * WARP_VOLUME * performanceSettings.sfxVolume, ac.currentTime);
             },
 
             stop(duration: number = WARP_FADE_DURATION): void {

@@ -10,12 +10,16 @@
  *
  * Uses HTMLAudioElement + MediaElementAudioSourceNode for streaming
  * playback with Web-Audio-API gain-node fades.
+ *
+ * Volume is controlled by `setVolume()` (0–1). When volume is 0 the current
+ * track stops and the delay timer is cancelled; when set back > 0 playback
+ * resumes with a new track.
  */
 
 const FADE_DURATION = 1.5; // seconds
 const DELAY_MIN = 60; // seconds
 const DELAY_MAX = 180; // seconds
-const VOLUME = 0.4;
+const VOLUME = 0.4; // base internal volume level
 
 type ManagerState = 'idle' | 'fading-out' | 'playing' | 'delaying';
 
@@ -34,6 +38,9 @@ export class AmbientSoundManager {
     private initialized = false;
     /** Array of track URLs, initialized once. */
     private playlist: string[] = [];
+
+    /** User-set volume multiplier (0–1). Applied on top of VOLUME. */
+    private _userVolume: number = 1.0;
 
     // ── Public API ──────────────────────────────────────────────────────────
 
@@ -68,6 +75,42 @@ export class AmbientSoundManager {
             this.playNextTrack();
         }
         // state === 'playing' || 'fading-out': nothing to do, music continues
+    }
+
+    /**
+     * Set the user volume (0–1).  When set to 0 the current track stops
+     * and the inter-track delay is cancelled.  When set from 0 back to
+     * a positive value a new track starts immediately.
+     */
+    setVolume(vol: number): void {
+        const clamped = Math.max(0, Math.min(1, vol));
+        this._userVolume = clamped;
+
+        if (!this.initialized || !this.ctx || !this.gainNode) return;
+
+        // Stop playback entirely when volume is 0
+        if (clamped <= 0) {
+            // Cancel any pending delay
+            if (this.delayTimer) {
+                clearTimeout(this.delayTimer);
+                this.delayTimer = null;
+            }
+            // Stop current track immediately
+            this.stopCurrentAudio();
+            this.state = 'idle';
+            return;
+        }
+
+        // If we were stopped (idle) because volume was 0, start the next track
+        if (this.state === 'idle') {
+            this.playNextTrack();
+            return;
+        }
+
+        // Otherwise just update the gain node volume
+        const now = this.ctx.currentTime;
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(VOLUME * clamped, now);
     }
 
     /** Clean up all resources. */
@@ -189,11 +232,12 @@ export class AmbientSoundManager {
         this.currentAudio = audio;
         this.sourceNode = source;
 
-        // Start at silence and fade in
+        // Start at silence and fade in (respecting user volume)
         const now = this.ctx.currentTime;
+        const targetGain = VOLUME * this._userVolume;
         this.gainNode.gain.cancelScheduledValues(now);
         this.gainNode.gain.setValueAtTime(0, now);
-        this.gainNode.gain.linearRampToValueAtTime(VOLUME, now + FADE_DURATION);
+        this.gainNode.gain.linearRampToValueAtTime(targetGain, now + FADE_DURATION);
 
         this.state = 'playing';
 

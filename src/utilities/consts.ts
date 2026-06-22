@@ -6,6 +6,10 @@
  */
 export const performanceSettings = {
     particleEffectsEnabled: true,
+    /** Master volume for sound effects (0–1). 0 = muted. */
+    sfxVolume: 1.0,
+    /** Master volume for background music (0–1). 0 = muted. */
+    musicVolume: 1.0,
 };
 
 export enum SimulationStartMode {

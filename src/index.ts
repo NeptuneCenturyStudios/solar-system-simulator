@@ -179,7 +179,7 @@ import { ShipWeapon } from './ship-effects/ship-weapon';
 import { StartupModal } from './ui/startup-modal';
 import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
-import { PerformancePanel } from './ui/performance-panel';
+import { OptionsPanel } from './ui/options-panel';
 import { EventLogEntry, NotificationType } from './event-log/event-log';
 import { IFlightState, IStateDependencies } from './interfaces';
 import { Sun } from './bodies/sun';
@@ -4108,7 +4108,7 @@ const uiManager = new UIManager('ui-container');
 const startupModal = new StartupModal('startup-overlay');
 const proceduralModal = new ProceduralGeneratorModal();
 const aboutModal = new AboutModal('about-overlay', 'btn-about', 'aboutCloseBtn');
-const performancePanel = new PerformancePanel('performance-panel');
+const optionsPanel = new OptionsPanel('options-panel');
 uiManager.managementPanel.registerGetFocusObject(() => {
     const body = cameraState.focusBody;
     return body && !body._isDisposed && simulationState.bodies.includes(body) ? body : null;
@@ -4119,7 +4119,7 @@ startupModal.initialize();
 proceduralModal.initialize();
 startupModal.setProceduralModal(proceduralModal);
 aboutModal.initialize();
-performancePanel.initialize();
+optionsPanel.initialize();
 
 // Wire Flight Controls button and panel events
 
@@ -4127,7 +4127,7 @@ const flightControlsPanel = uiManager.flightControlsPanel;
 const performanceOptionsBtn = document.getElementById('btn-performance-options');
 if (performanceOptionsBtn) {
     performanceOptionsBtn.onclick = () => {
-        const visible = performancePanel.toggle();
+        const visible = optionsPanel.toggle();
         if (visible) {
             performanceOptionsBtn.classList.add('active');
         } else {
@@ -4135,7 +4135,7 @@ if (performanceOptionsBtn) {
         }
     };
 
-    performancePanel.on('closed', () => {
+    optionsPanel.on('closed', () => {
         performanceOptionsBtn.classList.remove('active');
     });
 }
@@ -5595,7 +5595,7 @@ uiManager.mainPanel.on('lockToSunChange', ({ checked }: { checked: boolean }) =>
     cameraState.lockToSun = checked;
 });
 
-performancePanel.on('shadowsChange', ({ checked }: { checked: boolean }) => {
+optionsPanel.on('shadowsChange', ({ checked }: { checked: boolean }) => {
     toggleShadows(checked);
 });
 
@@ -5641,8 +5641,17 @@ uiManager.mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
     });
 });
 
-performancePanel.on('substepsChange', ({ value }: { value: number }) => {
+optionsPanel.on('substepsChange', ({ value }: { value: number }) => {
     stepsPerFrame = value;
+});
+
+optionsPanel.on('sfxVolumeChange', () => {
+    // performanceSettings.sfxVolume is already updated by the panel
+    // sfxVolume is read live by audio.ts playBuffer() and playWarpLoop() each call
+});
+
+optionsPanel.on('musicVolumeChange', ({ value }: { value: number }) => {
+    ambientMusic.setVolume(value);
 });
 
 uiManager.on('timeScaleChange', ({ value }: { value: number }) => {

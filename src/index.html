@@ -343,13 +343,13 @@
                         </div>
                     </div>
 
-                    <div id="performance-panel" class="ui-panel">
+                    <div id="options-panel" class="ui-panel">
                         <div class="panel-header">
-                            Performance Options
+                            Options
                             <button
-                                id="btn-close-performance-panel"
+                                id="btn-close-options-panel"
                                 class="old-ui btn-danger btn-icon-only ml-auto mb-0"
-                                title="Close Performance Options"
+                                title="Close Options"
                             >
                                 <span class="material-symbols-outlined">close</span>
                             </button>
@@ -381,6 +381,56 @@
                                     class="old-ui btn-slider-reset"
                                     id="substepsResetBtn"
                                     title="Reset to default (64)"
+                                >
+                                    <span class="material-symbols-outlined">replay</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Sound Effects Volume
+                                <span id="sfx-volume-val" class="val-display">100%</span></label
+                            >
+                            <div class="slider-row">
+                                <input
+                                    type="range"
+                                    id="sfxVolumeSlider"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    value="100"
+                                    title="Controls the volume of weapon sounds, impacts, and warp loop effects."
+                                />
+                                <button
+                                    class="old-ui btn-slider-reset"
+                                    id="sfxVolumeResetBtn"
+                                    title="Reset to 100%"
+                                >
+                                    <span class="material-symbols-outlined">replay</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Background Music Volume
+                                <span id="music-volume-val" class="val-display">100%</span></label
+                            >
+                            <div class="slider-row">
+                                <input
+                                    type="range"
+                                    id="musicVolumeSlider"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    value="100"
+                                    title="Controls the volume of ambient background music."
+                                />
+                                <button
+                                    class="old-ui btn-slider-reset"
+                                    id="musicVolumeResetBtn"
+                                    title="Reset to 100%"
                                 >
                                     <span class="material-symbols-outlined">replay</span>
                                 </button>
