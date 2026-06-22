@@ -1579,6 +1579,8 @@ function createNewBody(
             mass: planetMass,
             radius: planetRadius,
             rotationSpeed: planetRotationSpeed,
+            rotationTilt: planetRotationTilt,
+            rotationAzimuth: planetRotationAzimuth,
             bodySubtype: planetBodySubtype,
         } = randomPlanetParams(resolvedPlanetType, {
             mass: customMass,
@@ -1604,6 +1606,8 @@ function createNewBody(
             radius: planetRadius,
             mass: planetMass,
             rotationSpeed: planetRotationSpeed,
+            rotationTilt: planetRotationTilt,
+            rotationAzimuth: planetRotationAzimuth,
             hasRings,
             textureSeed: planetSeed,
         });

@@ -25,7 +25,7 @@ export function createMainSequenceStarFromParams(
         name: string;
         pos: THREE.Vector3;
         vel: THREE.Vector3;
-        rotation?: { tilt: number; speed: number };
+        rotation?: { tilt: number; speed: number; azimuth?: number };
     }
 ): MainSequenceStar {
     return new MainSequenceStar(dependencies, scene, {
@@ -39,7 +39,7 @@ export function createMainSequenceStarFromParams(
         lightIntensity: params.lightIntensity,
         lightDistance: 524400,
         rotation:
-            rotation ?? { tilt: params.rotationTilt, speed: params.rotationSpeed },
+            rotation ?? { tilt: params.rotationTilt, speed: params.rotationSpeed, azimuth: params.rotationAzimuth },
         mesh: undefined, // use default star material/mesh
     });
 }

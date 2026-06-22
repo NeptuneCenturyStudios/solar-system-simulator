@@ -59,6 +59,7 @@ export interface StarParams {
     lightIntensity: number;
     rotationTilt: number;
     rotationSpeed: number;
+    rotationAzimuth: number;
     /** The seed actually used to derive this star's properties. */
     seed: string;
 }
@@ -101,6 +102,7 @@ export function randomStarParams(
         lightIntensity?: number | null;
         rotationTilt?: number | null;
         rotationSpeed?: number | null;
+        rotationAzimuth?: number | null;
     } = {}
 ): StarParams {
     const inputSeed = (opts.seed ?? '').trim();
@@ -154,6 +156,11 @@ export function randomStarParams(
             ? opts.rotationSpeed
             : rng.range(0.03, 0.12);
 
+    const rotationAzimuth =
+        typeof opts.rotationAzimuth === 'number' && isFinite(opts.rotationAzimuth)
+            ? opts.rotationAzimuth
+            : rng.range(0, 360);
+
     // Defensive: ensure outputs are finite + positive (prevents NaN geometry in THREE)
     const safeMass = isFinitePositiveNumber(mass) ? mass : minMass;
     const safeRadius = isFinitePositiveNumber(radius) ? radius : minRadius;
@@ -167,6 +174,8 @@ export function randomStarParams(
     const safeRotationTilt = isFinitePositiveNumber(rotationTilt) ? rotationTilt : 0;
     const safeRotationSpeed =
         isFinitePositiveNumber(rotationSpeed) ? rotationSpeed : 0.08;
+    const safeRotationAzimuth =
+        typeof rotationAzimuth === 'number' && isFinite(rotationAzimuth) ? rotationAzimuth : 0;
 
     return {
         mass: safeMass,
@@ -175,6 +184,7 @@ export function randomStarParams(
         lightIntensity: safeLightIntensity,
         rotationTilt: safeRotationTilt,
         rotationSpeed: safeRotationSpeed,
+        rotationAzimuth: safeRotationAzimuth,
         seed,
     };
 }
@@ -220,6 +230,8 @@ export interface PlanetParams {
     mass: number;
     radius: number;
     rotationSpeed: number;
+    rotationTilt: number;
+    rotationAzimuth: number;
     /**
      * Always BodyTypeEnum.Planet for custom planets.
      * (Gas/ice/volcanic are expressed via `bodySubtype`.)
@@ -333,6 +345,8 @@ export function randomPlanetParams(
         mass,
         radius,
         rotationSpeed: 0.1 + rng.next() * 0.4,
+        rotationTilt: rng.range(0, 90),
+        rotationAzimuth: rng.range(0, 360),
         bodyType: BodyTypeEnum.Planet,
         bodySubtype,
     };
@@ -354,6 +368,8 @@ export interface MoonParams {
     /** Distance from parent centre (world units). */
     distance: number;
     rotationSpeed: number;
+    rotationTilt: number;
+    rotationAzimuth: number;
     /** Seed actually used to derive this moon's properties. */
     seed: string;
 }
@@ -418,6 +434,8 @@ export function randomMoonParams(
         radius: safeRadius,
         distance: safeDistance,
         rotationSpeed: 0.15 + rng.next() * 0.35,
+        rotationTilt: rng.range(0, 30),
+        rotationAzimuth: rng.range(0, 360),
         seed,
     };
 }

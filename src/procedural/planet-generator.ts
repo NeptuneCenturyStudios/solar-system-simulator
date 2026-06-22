@@ -276,6 +276,8 @@ export function generateProceduralPlanets(params: {
             radius: planetParams.radius,
             mass: planetParams.mass,
             rotationSpeed: planetParams.rotationSpeed,
+            rotationTilt: planetParams.rotationTilt,
+            rotationAzimuth: planetParams.rotationAzimuth,
             textureIndex,
             textureSeed: subSeed,
         });
@@ -300,6 +302,8 @@ export function generateProceduralPlanets(params: {
             c.radius = Math.max(1, c.radius);
             c.mass = Math.max(1e-6, c.mass);
             c.rotationSpeed = 0.1;
+            c.rotationTilt = 0;
+            c.rotationAzimuth = 0;
         }
     }
 

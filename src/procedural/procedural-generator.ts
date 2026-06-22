@@ -236,6 +236,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
             const rotationTiltOk = Number.isFinite(params.rotationTilt);
             const rotationSpeedOk = Number.isFinite(params.rotationSpeed) && params.rotationSpeed > 0;
+            const rotationAzimuthOk = Number.isFinite(params.rotationAzimuth);
 
             const starOk =
                 Number.isFinite(params.mass) &&
@@ -252,6 +253,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             const rotation = {
                 tilt: rotationTiltOk ? params.rotationTilt : 0,
                 speed: rotationSpeedOk ? params.rotationSpeed : 0.08,
+                azimuth: rotationAzimuthOk ? params.rotationAzimuth : 0,
             };
 
             if (!posOk || !velOk || !starOk) {
@@ -521,6 +523,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             const rotation = {
                 tilt: Number.isFinite(params.rotationTilt) ? params.rotationTilt : 0,
                 speed: Number.isFinite(params.rotationSpeed) && params.rotationSpeed > 0 ? params.rotationSpeed : 0.08,
+                azimuth: Number.isFinite(params.rotationAzimuth) ? params.rotationAzimuth : 0,
             };
 
             bodies.push(

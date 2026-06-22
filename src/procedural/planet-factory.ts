@@ -42,6 +42,8 @@ export type ProceduralPlanetCreation = {
     radius: number;
     mass: number;
     rotationSpeed: number;
+    rotationTilt: number;
+    rotationAzimuth: number;
 
     /**
      * Optional override for whether this planet should have rings.
@@ -141,7 +143,7 @@ function createCommonPlanetOptions(
     mesh: THREE.Mesh,
     hasRings: boolean
 ): Planet | DwarfPlanet {
-    const { radius, pos, vel, mass, id, name, bodySubtype, rotationSpeed, bodyType, textureSeed } = creation;
+    const { radius, pos, vel, mass, id, name, bodySubtype, rotationSpeed, rotationTilt, rotationAzimuth, bodyType, textureSeed } = creation;
 
     const commonOptions = {
         radius,
@@ -154,7 +156,7 @@ function createCommonPlanetOptions(
         trailColor: 0x888888,
         maxTrail: 3000,
         hasRings,
-        rotation: { tilt: 0, speed: rotationSpeed },
+        rotation: { tilt: rotationTilt, speed: rotationSpeed, azimuth: rotationAzimuth },
         mesh,
         seed: textureSeed,
     };

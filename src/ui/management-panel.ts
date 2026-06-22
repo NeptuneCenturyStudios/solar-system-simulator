@@ -15,7 +15,7 @@ import {
 import { isBodyType } from '../utilities/utilities.js';
 import { Star } from '../bodies/star.js';
 import { Body } from '../bodies/body.js';
-import { randomStarParams } from '../utilities/body-params.js';
+import { randomStarParams, randomPlanetParams, randomMoonParams } from '../utilities/body-params.js';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
 interface CreateSliderInitState {
@@ -1268,8 +1268,9 @@ export class ManagementPanel extends Panel {
 
             setValue(this.createRadiusSlider, radius);
             if (this.createTiltGroup?.style.display !== 'none') {
-                setValue(this.createTiltSlider, randInt(-180, 180));
-                setValue(this.createAzimuthSlider, randInt(-180, 180));
+                const tiltAzimuthParams = randomPlanetParams(planetType as Parameters<typeof randomPlanetParams>[0]);
+                setValue(this.createTiltSlider, Math.round(tiltAzimuthParams.rotationTilt));
+                setValue(this.createAzimuthSlider, Math.round(tiltAzimuthParams.rotationAzimuth));
             }
             return;
         }
@@ -1332,8 +1333,9 @@ export class ManagementPanel extends Panel {
 
             setValue(this.createRadiusSlider, rand(radiusMin, radiusMax));
             if (this.createTiltGroup?.style.display !== 'none') {
-                setValue(this.createTiltSlider, randInt(-180, 180));
-                setValue(this.createAzimuthSlider, randInt(-180, 180));
+                const moonTiltAzimuthParams = randomMoonParams(EARTH_RADIUS);
+                setValue(this.createTiltSlider, Math.round(moonTiltAzimuthParams.rotationTilt));
+                setValue(this.createAzimuthSlider, Math.round(moonTiltAzimuthParams.rotationAzimuth));
             }
             return;
         }
@@ -1421,7 +1423,7 @@ export class ManagementPanel extends Panel {
 
         if (this.createTiltGroup?.style.display !== 'none') {
             setValue(this.createTiltSlider, inclinationDeg);
-            setValue(this.createAzimuthSlider, Math.floor(Math.random() * 361) - 180);
+            setValue(this.createAzimuthSlider, Math.round(params.rotationAzimuth));
         }
     }
 

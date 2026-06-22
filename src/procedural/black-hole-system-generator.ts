@@ -113,7 +113,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
                 name: generateProceduralBodyName(BodyTypeEnum.Star, primaryStarNameOptions),
                 pos: star0Placement.pos,
                 vel: star0Placement.vel,
-                rotation: { tilt: primaryStarParams.rotationTilt, speed: primaryStarParams.rotationSpeed },
+                rotation: { tilt: primaryStarParams.rotationTilt, speed: primaryStarParams.rotationSpeed, azimuth: primaryStarParams.rotationAzimuth },
             }
         );
         bodies.push(primaryStar);
@@ -150,7 +150,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
                 name: generateProceduralBodyName(BodyTypeEnum.Star, nameOptions),
                 pos,
                 vel,
-                rotation: { tilt: params.rotationTilt, speed: params.rotationSpeed },
+                rotation: { tilt: params.rotationTilt, speed: params.rotationSpeed, azimuth: params.rotationAzimuth },
             });
 
             bodies.push(star);

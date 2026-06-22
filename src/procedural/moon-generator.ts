@@ -23,6 +23,8 @@ export type ProceduralMoonCreation = {
     radius: number;
     mass: number;
     rotationSpeed: number;
+    rotationTilt: number;
+    rotationAzimuth: number;
 
     /** Used to pick a moon "planet-like" texture pool (excluding gas/ice moon types). */
     moonType: MoonTypeEnum;
@@ -297,6 +299,8 @@ export function generateProceduralMoons(params: {
                 radius: moonParams.radius,
                 mass: moonParams.mass,
                 rotationSpeed: moonParams.rotationSpeed,
+                rotationTilt: moonParams.rotationTilt,
+                rotationAzimuth: moonParams.rotationAzimuth,
 
                 moonType,
                 moonTextureIndex,
