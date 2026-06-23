@@ -41,7 +41,9 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         console.info('[black-hole-system] using master seed:', this.masterSeed);
     }
 
-    generateSolarSystem(): Body[] {
+    async generateSolarSystemAsync(): Promise<Body[]> {
+        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
         const bodies: Body[] = [];
 
         const bhParams = randomBlackHoleParams();
@@ -88,6 +90,8 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         // Apply the binary orbit velocity to the black hole
         blackHole.velocity.copy(bhPlacement.vel);
         bodies.push(blackHole);
+
+        await yieldToEventLoop();
 
         const primaryStarNameOptions =
             starCount > 1

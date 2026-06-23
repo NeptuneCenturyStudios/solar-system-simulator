@@ -7,15 +7,10 @@ export abstract class SolarSystemGenerator {
     constructor() {}
 
     /**
-     * Generates actual bodies suitable for direct use as `simulationState.bodies`.
-     */
-    abstract generateSolarSystem(): Body[];
-
-    /**
-     * Async entrypoint used by the UI for progressive generation.
-     * Default implementation falls back to the synchronous method.
+     * Generates a solar system asynchronously. This method is intended for use by the UI for progressive generation.
+     * Must be implemented by subclasses to return a promise that resolves to an array of `Body` instances representing the solar system.
      */
     async generateSolarSystemAsync(): Promise<Body[]> {
-        return this.generateSolarSystem();
+        throw new Error('generateSolarSystemAsync must be implemented by subclasses.');
     }
 }

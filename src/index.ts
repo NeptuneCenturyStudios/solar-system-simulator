@@ -2110,7 +2110,7 @@ async function spawn({
 
     // Black Hole mode: procedurally generated black hole + 1–3 stars in siphon range
     if (mode === SimulationStartMode.BlackHole && generator) {
-        simulationState.bodies = generator.generateSolarSystem();
+        simulationState.bodies = await generator.generateSolarSystemAsync();
 
         updateURLWithSeed(SEED_TYPE_BLACKHOLE, generator.seed);
 
@@ -2228,7 +2228,7 @@ async function spawn({
         plutoTexture,
         ceresTexture,
     });
-    simulationState.bodies = normalGenerator.generateSolarSystem();
+    simulationState.bodies = await normalGenerator.generateSolarSystemAsync();
     syncAllStarLightTargets();
     selectedBody = null;
 
