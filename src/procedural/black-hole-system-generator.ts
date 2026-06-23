@@ -64,7 +64,8 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
             EARTH_DIST * 0.08
         );
         const binMaxSep = EARTH_DIST * 0.9;
-        const binarySep = binMinSep + rngFor(this.masterSeed, 'binarySep').next() * (binMaxSep - binMinSep);
+        const binarySep =
+            binMinSep + rngFor(this.masterSeed, 'binarySep').next() * (binMaxSep - binMinSep);
 
         const binaryYaw = rngFor(this.masterSeed, 'binaryYaw').range(0, Math.PI * 2);
         const binaryIncDeg = rngFor(this.masterSeed, 'binaryInc').range(5, 45);
@@ -117,7 +118,11 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
                 name: generateProceduralBodyName(BodyTypeEnum.Star, primaryStarNameOptions),
                 pos: star0Placement.pos,
                 vel: star0Placement.vel,
-                rotation: { tilt: primaryStarParams.rotationTilt, speed: primaryStarParams.rotationSpeed, azimuth: primaryStarParams.rotationAzimuth },
+                rotation: {
+                    tilt: primaryStarParams.rotationTilt,
+                    speed: primaryStarParams.rotationSpeed,
+                    azimuth: primaryStarParams.rotationAzimuth,
+                },
             }
         );
         bodies.push(primaryStar);
@@ -128,7 +133,8 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
 
             const minOrbit = Math.max(params.radius * 5 + bhParams.radius, EARTH_DIST * 0.08);
             const maxOrbit = EARTH_DIST * 0.9;
-            const orbitDist = minOrbit + rngFor(this.masterSeed, 'starDist', i).next() * (maxOrbit - minOrbit);
+            const orbitDist =
+                minOrbit + rngFor(this.masterSeed, 'starDist', i).next() * (maxOrbit - minOrbit);
             const orbitAngle = rngFor(this.masterSeed, 'starAngle', i).next() * Math.PI * 2;
 
             const inclinationDeg = rngFor(this.masterSeed, 'starInclination', i).range(-25, 25);
@@ -154,7 +160,11 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
                 name: generateProceduralBodyName(BodyTypeEnum.Star, nameOptions),
                 pos,
                 vel,
-                rotation: { tilt: params.rotationTilt, speed: params.rotationSpeed, azimuth: params.rotationAzimuth },
+                rotation: {
+                    tilt: params.rotationTilt,
+                    speed: params.rotationSpeed,
+                    azimuth: params.rotationAzimuth,
+                },
             });
 
             bodies.push(star);

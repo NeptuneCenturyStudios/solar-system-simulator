@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../../utilities/prng';
-import { clamp01, dot, fbm3D, hashStringToU32, mix3, normalizeSafe, smoothstep, Vec3 } from '../noise-utils';
+import {
+    clamp01,
+    dot,
+    fbm3D,
+    hashStringToU32,
+    mix3,
+    normalizeSafe,
+    smoothstep,
+    Vec3,
+} from '../noise-utils';
 
 const TEXTURE_WIDTH = 2048;
 const TEXTURE_HEIGHT = 1024;
@@ -62,9 +71,10 @@ function yieldToEventLoop(): Promise<void> {
  * Core generation: computes the colour + normal canvas textures.
  * Returns the raw canvases so callers can decide whether to yield.
  */
-function renderDesertMaps(
-    seed: string,
-): { canvas: HTMLCanvasElement; normalCanvas: HTMLCanvasElement } {
+function renderDesertMaps(seed: string): {
+    canvas: HTMLCanvasElement;
+    normalCanvas: HTMLCanvasElement;
+} {
     const cacheKey = seed.trim();
 
     const seedU32 = hashStringToU32(cacheKey);
@@ -178,7 +188,8 @@ function renderDesertMaps(
             const craterRimBand =
                 smoothstep(CRATER_RIM_EDGE0, CRATER_RIM_EDGE1, craterRidged) -
                 smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
-            const craterMask = hotMask * flatMask * smoothstep(CRATER_MASK_EDGE0, CRATER_MASK_EDGE1, craterRidged);
+            const craterMask =
+                hotMask * flatMask * smoothstep(CRATER_MASK_EDGE0, CRATER_MASK_EDGE1, craterRidged);
 
             height[y * INTERNAL_WIDTH + x] =
                 dunesNMasked +
@@ -294,7 +305,10 @@ function renderDesertMaps(
     return { canvas, normalCanvas };
 }
 
-function canvasesToTextures(canvas: HTMLCanvasElement, normalCanvas: HTMLCanvasElement): DesertMaps {
+function canvasesToTextures(
+    canvas: HTMLCanvasElement,
+    normalCanvas: HTMLCanvasElement
+): DesertMaps {
     const colorTex = new THREE.CanvasTexture(canvas);
     colorTex.colorSpace = THREE.SRGBColorSpace;
     colorTex.wrapS = THREE.RepeatWrapping;
@@ -456,7 +470,8 @@ async function getOrCreateDesertMapsAsync(seed: string): Promise<DesertMaps> {
             const craterRimBand =
                 smoothstep(CRATER_RIM_EDGE0, CRATER_RIM_EDGE1, craterRidged) -
                 smoothstep(CRATER_INNER_EDGE0, CRATER_INNER_EDGE1, craterRidged);
-            const craterMask = hotMask * flatMask * smoothstep(CRATER_MASK_EDGE0, CRATER_MASK_EDGE1, craterRidged);
+            const craterMask =
+                hotMask * flatMask * smoothstep(CRATER_MASK_EDGE0, CRATER_MASK_EDGE1, craterRidged);
 
             height[y * INTERNAL_WIDTH + x] =
                 dunesNMasked +

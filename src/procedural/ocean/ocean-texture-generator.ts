@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../../utilities/prng';
-import { clamp01, dot, fbm3D, hashStringToU32, lerp, mix3, normalizeSafe, smoothstep } from '../noise-utils';
+import {
+    clamp01,
+    dot,
+    fbm3D,
+    hashStringToU32,
+    lerp,
+    mix3,
+    normalizeSafe,
+    smoothstep,
+} from '../noise-utils';
 
 const TEXTURE_WIDTH = 2048;
 const TEXTURE_HEIGHT = 1024;
@@ -42,7 +51,7 @@ const ISLAND_GATE_SCALE = 90.0;
 const ISLAND_GATE_OCTAVES = 2;
 
 // Island thresholds
-const ISLAND_RIDGED_EDGE0 = 0.60;
+const ISLAND_RIDGED_EDGE0 = 0.6;
 const ISLAND_RIDGED_EDGE1 = 0.85;
 
 const ISLAND_GATE_EDGE0 = 0.45;
@@ -54,7 +63,7 @@ const WATER_WAVINESS = 0.0035;
 const ISLAND_HEIGHT = 0.055;
 
 // Shore band thresholds (narrower for crisp coast)
-const SHOREBAND_EDGE0 = 0.20;
+const SHOREBAND_EDGE0 = 0.2;
 const SHOREBAND_EDGE1 = 0.28;
 
 // Normal map strength
@@ -67,11 +76,11 @@ const POLAR_FLAT_END = 0.99;
 const POLAR_DETAIL_MIN = 0.45;
 
 // Palette
-const waterDeep: Vec3 = { x: 0.00, y: 0.050, z: 0.480 };
-const waterMid: Vec3 = { x: 0.00, y: 0.150, z: 0.720 };
-const waterShallow: Vec3 = { x: 0.060, y: 0.340, z: 0.850 };
-const landSand: Vec3 = { x: 0.70, y: 0.86, z: 0.35 };
-const landRock: Vec3 = { x: 0.22, y: 0.48, z: 0.20 };
+const waterDeep: Vec3 = { x: 0.0, y: 0.05, z: 0.48 };
+const waterMid: Vec3 = { x: 0.0, y: 0.15, z: 0.72 };
+const waterShallow: Vec3 = { x: 0.06, y: 0.34, z: 0.85 };
+const landSand: Vec3 = { x: 0.7, y: 0.86, z: 0.35 };
+const landRock: Vec3 = { x: 0.22, y: 0.48, z: 0.2 };
 
 // =============================================================================
 // Shared helpers
@@ -103,7 +112,10 @@ function canvasesToTextures(canvas: HTMLCanvasElement, normalCanvas: HTMLCanvasE
 /**
  * Synchronous core: renders colour + normal canvases immediately.
  */
-function renderOceanMaps(seed: string): { canvas: HTMLCanvasElement; normalCanvas: HTMLCanvasElement } {
+function renderOceanMaps(seed: string): {
+    canvas: HTMLCanvasElement;
+    normalCanvas: HTMLCanvasElement;
+} {
     const cacheKey = `${OCEAN_TEXTURE_GENERATOR_REV}|${seed.trim()}`;
 
     const seedU32 = hashStringToU32(cacheKey);
@@ -208,7 +220,11 @@ function renderOceanMaps(seed: string): { canvas: HTMLCanvasElement; normalCanva
                 seedU32
             );
 
-            const islandRidgedMask = smoothstep(ISLAND_RIDGED_EDGE0, ISLAND_RIDGED_EDGE1, islandRidged);
+            const islandRidgedMask = smoothstep(
+                ISLAND_RIDGED_EDGE0,
+                ISLAND_RIDGED_EDGE1,
+                islandRidged
+            );
             const islandGate = smoothstep(ISLAND_GATE_EDGE0, ISLAND_GATE_EDGE1, gateN);
 
             const baseMod = smoothstep(0.25, 0.8, 0.5 + 0.5 * islandBase);
@@ -247,24 +263,25 @@ function renderOceanMaps(seed: string): { canvas: HTMLCanvasElement; normalCanva
             height[y * INTERNAL_WIDTH + x] = h;
 
             // Color
-            const waterTraw = clamp01(0.15 + 0.70 * clamp01(0.5 + 0.5 * waterN));
+            const waterTraw = clamp01(0.15 + 0.7 * clamp01(0.5 + 0.5 * waterN));
             const waterT = clamp01(Math.pow(waterTraw, 1.2));
             let col = mix3(waterDeep, waterMid, waterT);
 
             const band = clamp01(
                 0.5 +
-                    0.5 * fbm3D(
-                        xLocalEff * (NOISE_WATER_SCALE * 0.55) + (ox + 10.1),
-                        yLocal * (NOISE_WATER_SCALE * 0.55) + (oy - 20.2),
-                        zLocalEff * (NOISE_WATER_SCALE * 0.55) + (oz + 30.3),
-                        2,
-                        seedU32
-                    )
+                    0.5 *
+                        fbm3D(
+                            xLocalEff * (NOISE_WATER_SCALE * 0.55) + (ox + 10.1),
+                            yLocal * (NOISE_WATER_SCALE * 0.55) + (oy - 20.2),
+                            zLocalEff * (NOISE_WATER_SCALE * 0.55) + (oz + 30.3),
+                            2,
+                            seedU32
+                        )
             );
             col = mix3(col, waterMid, band * 0.12);
 
             const shorelineCol = mix3(waterMid, waterShallow, shoreBand);
-            col = mix3(col, shorelineCol, shoreBand * 0.20);
+            col = mix3(col, shorelineCol, shoreBand * 0.2);
 
             if (islandMaskSharp > 0.001) {
                 const landN = fbm3D(
@@ -489,7 +506,11 @@ async function getOrCreateOceanMapsAsync(seed: string): Promise<OceanMaps> {
                 seedU32
             );
 
-            const islandRidgedMask = smoothstep(ISLAND_RIDGED_EDGE0, ISLAND_RIDGED_EDGE1, islandRidged);
+            const islandRidgedMask = smoothstep(
+                ISLAND_RIDGED_EDGE0,
+                ISLAND_RIDGED_EDGE1,
+                islandRidged
+            );
             const islandGate = smoothstep(ISLAND_GATE_EDGE0, ISLAND_GATE_EDGE1, gateN);
             const baseMod = smoothstep(0.25, 0.8, 0.5 + 0.5 * islandBase);
 
@@ -522,23 +543,25 @@ async function getOrCreateOceanMapsAsync(seed: string): Promise<OceanMaps> {
             const h = lerp(waterHeight, landHeight, islandMaskSharp);
             height[y * INTERNAL_WIDTH + x] = h;
 
-            const waterTraw = clamp01(0.15 + 0.70 * clamp01(0.5 + 0.5 * waterN));
+            const waterTraw = clamp01(0.15 + 0.7 * clamp01(0.5 + 0.5 * waterN));
             const waterT = clamp01(Math.pow(waterTraw, 1.2));
             let col = mix3(waterDeep, waterMid, waterT);
 
             const band = clamp01(
-                0.5 + 0.5 * fbm3D(
-                    xLocalEff * (NOISE_WATER_SCALE * 0.55) + (ox + 10.1),
-                    yLocal * (NOISE_WATER_SCALE * 0.55) + (oy - 20.2),
-                    zLocalEff * (NOISE_WATER_SCALE * 0.55) + (oz + 30.3),
-                    2,
-                    seedU32
-                )
+                0.5 +
+                    0.5 *
+                        fbm3D(
+                            xLocalEff * (NOISE_WATER_SCALE * 0.55) + (ox + 10.1),
+                            yLocal * (NOISE_WATER_SCALE * 0.55) + (oy - 20.2),
+                            zLocalEff * (NOISE_WATER_SCALE * 0.55) + (oz + 30.3),
+                            2,
+                            seedU32
+                        )
             );
             col = mix3(col, waterMid, band * 0.12);
 
             const shorelineCol = mix3(waterMid, waterShallow, shoreBand);
-            col = mix3(col, shorelineCol, shoreBand * 0.20);
+            col = mix3(col, shorelineCol, shoreBand * 0.2);
 
             if (islandMaskSharp > 0.001) {
                 const landN = fbm3D(

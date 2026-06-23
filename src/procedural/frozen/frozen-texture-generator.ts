@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../../utilities/prng';
-import { clamp01, dot, fbm3D, hashStringToU32, mix3, normalizeSafe, smoothstep, Vec3 } from '../noise-utils';
+import {
+    clamp01,
+    dot,
+    fbm3D,
+    hashStringToU32,
+    mix3,
+    normalizeSafe,
+    smoothstep,
+    Vec3,
+} from '../noise-utils';
 
 const TEXTURE_WIDTH = 2048;
 const TEXTURE_HEIGHT = 1024;
@@ -21,22 +30,22 @@ const NOISE_CRATER_OCTAVES = 4;
 // Ice band thresholds — widened for large smooth patches
 const ICE_DEEP_EDGE0 = 0.0;
 const ICE_DEEP_EDGE1 = 0.15;
-const ICE_MID_EDGE0 = 0.10;
+const ICE_MID_EDGE0 = 0.1;
 const ICE_MID_EDGE1 = 0.28;
 const ICE_SURFACE_EDGE0 = 0.22;
 const ICE_SURFACE_EDGE1 = 0.65;
 const SNOW_EDGE0 = 0.55;
 const SNOW_EDGE1 = 0.88;
 const EXPOSED_ROCK_EDGE0 = 0.85;
-const EXPOSED_ROCK_EDGE1 = 1.00;
+const EXPOSED_ROCK_EDGE1 = 1.0;
 
 // Crater impact thresholds (reduced influence)
 const CRATER_RIM_EDGE0 = 0.55;
-const CRATER_RIM_EDGE1 = 0.80;
+const CRATER_RIM_EDGE1 = 0.8;
 const CRATER_INNER_EDGE0 = 0.78;
 const CRATER_INNER_EDGE1 = 0.92;
-const CRATER_MASK_EDGE0 = 0.60;
-const CRATER_MASK_EDGE1 = 0.90;
+const CRATER_MASK_EDGE0 = 0.6;
+const CRATER_MASK_EDGE1 = 0.9;
 const CRATER_RIM_STRENGTH = 0.02;
 const CRATER_DEPTH_STRENGTH = 0.01;
 
@@ -46,16 +55,16 @@ const NORMAL_STRENGTH = 0.6;
 // Polar flattening
 const POLAR_FLAT_START = 0.65;
 const POLAR_FLAT_END = 0.99;
-const POLAR_DETAIL_MIN = 0.40;
+const POLAR_DETAIL_MIN = 0.4;
 
 const YIELD_EVERY_ROWS = 8;
 
 // ====== Palette ======
-const iceDeep: Vec3 = { x: 0.50, y: 0.65, z: 0.85 };
-const iceMid: Vec3 = { x: 0.65, y: 0.80, z: 0.92 };
-const iceSurface: Vec3 = { x: 0.82, y: 0.90, z: 0.97 };
+const iceDeep: Vec3 = { x: 0.5, y: 0.65, z: 0.85 };
+const iceMid: Vec3 = { x: 0.65, y: 0.8, z: 0.92 };
+const iceSurface: Vec3 = { x: 0.82, y: 0.9, z: 0.97 };
 const snowWhite: Vec3 = { x: 0.94, y: 0.96, z: 0.99 };
-const pureWhite: Vec3 = { x: 0.98, y: 0.99, z: 1.00 };
+const pureWhite: Vec3 = { x: 0.98, y: 0.99, z: 1.0 };
 const rockGray: Vec3 = { x: 0.65, y: 0.66, z: 0.68 };
 const darkRock: Vec3 = { x: 0.55, y: 0.56, z: 0.58 };
 
@@ -75,7 +84,10 @@ function yieldToEventLoop(): Promise<void> {
 // Shared helpers
 // =============================================================================
 
-function canvasesToTextures(canvas: HTMLCanvasElement, normalCanvas: HTMLCanvasElement): FrozenMaps {
+function canvasesToTextures(
+    canvas: HTMLCanvasElement,
+    normalCanvas: HTMLCanvasElement
+): FrozenMaps {
     const colorTex = new THREE.CanvasTexture(canvas);
     colorTex.colorSpace = THREE.SRGBColorSpace;
     colorTex.wrapS = THREE.RepeatWrapping;
@@ -101,7 +113,10 @@ function canvasesToTextures(canvas: HTMLCanvasElement, normalCanvas: HTMLCanvasE
 /**
  * Synchronous core: renders the colour + normal canvases immediately.
  */
-function renderFrozenMaps(seed: string): { canvas: HTMLCanvasElement; normalCanvas: HTMLCanvasElement } {
+function renderFrozenMaps(seed: string): {
+    canvas: HTMLCanvasElement;
+    normalCanvas: HTMLCanvasElement;
+} {
     const cacheKey = seed.trim();
 
     const seedU32 = hashStringToU32(cacheKey);
@@ -227,23 +242,31 @@ function renderFrozenMaps(seed: string): { canvas: HTMLCanvasElement; normalCanv
             col = mix3(col, pureWhite, snowT * 0.6);
             col = mix3(col, rockGray, rockT * latGradient * 0.35);
 
-            const microVar = clamp01(0.5 + 0.5 * fbm3D(
-                xLocalEff * (NOISE_ICE_SCALE * 2.5) + (ox + 50.1),
-                yLocal * (NOISE_ICE_SCALE * 2.5) + (oy - 70.2),
-                zLocalEff * (NOISE_ICE_SCALE * 2.5) + (oz + 90.3),
-                2,
-                seedU32
-            ));
+            const microVar = clamp01(
+                0.5 +
+                    0.5 *
+                        fbm3D(
+                            xLocalEff * (NOISE_ICE_SCALE * 2.5) + (ox + 50.1),
+                            yLocal * (NOISE_ICE_SCALE * 2.5) + (oy - 70.2),
+                            zLocalEff * (NOISE_ICE_SCALE * 2.5) + (oz + 90.3),
+                            2,
+                            seedU32
+                        )
+            );
             const iceTint: Vec3 = { x: 0.0, y: 0.01, z: 0.02 };
-            col = { x: col.x + iceTint.x * microVar, y: col.y + iceTint.y * microVar, z: col.z + iceTint.z * microVar };
+            col = {
+                x: col.x + iceTint.x * microVar,
+                y: col.y + iceTint.y * microVar,
+                z: col.z + iceTint.z * microVar,
+            };
 
             if (craterMask > 0) {
                 col = mix3(col, darkRock, craterInner * craterMask * 0.08);
-                col = mix3(col, iceSurface, craterRimBand * craterMask * 0.10);
+                col = mix3(col, iceSurface, craterRimBand * craterMask * 0.1);
             }
 
             const polarEnhance = clamp01(1 - latGradient);
-            col = mix3(col, pureWhite, polarEnhance * 0.20);
+            col = mix3(col, pureWhite, polarEnhance * 0.2);
 
             const contrast = 0.92 + 0.08 * iceN;
             col = { x: col.x * contrast, y: col.y * contrast, z: col.z * contrast };
@@ -466,23 +489,31 @@ async function getOrCreateFrozenMapsAsync(seed: string): Promise<FrozenMaps> {
             col = mix3(col, pureWhite, snowT * 0.6);
             col = mix3(col, rockGray, rockT * latGradient * 0.35);
 
-            const microVar = clamp01(0.5 + 0.5 * fbm3D(
-                xLocalEff * (NOISE_ICE_SCALE * 2.5) + (ox + 50.1),
-                yLocal * (NOISE_ICE_SCALE * 2.5) + (oy - 70.2),
-                zLocalEff * (NOISE_ICE_SCALE * 2.5) + (oz + 90.3),
-                2,
-                seedU32
-            ));
+            const microVar = clamp01(
+                0.5 +
+                    0.5 *
+                        fbm3D(
+                            xLocalEff * (NOISE_ICE_SCALE * 2.5) + (ox + 50.1),
+                            yLocal * (NOISE_ICE_SCALE * 2.5) + (oy - 70.2),
+                            zLocalEff * (NOISE_ICE_SCALE * 2.5) + (oz + 90.3),
+                            2,
+                            seedU32
+                        )
+            );
             const iceTint: Vec3 = { x: 0.0, y: 0.01, z: 0.02 };
-            col = { x: col.x + iceTint.x * microVar, y: col.y + iceTint.y * microVar, z: col.z + iceTint.z * microVar };
+            col = {
+                x: col.x + iceTint.x * microVar,
+                y: col.y + iceTint.y * microVar,
+                z: col.z + iceTint.z * microVar,
+            };
 
             if (craterMask > 0) {
                 col = mix3(col, darkRock, craterInner * craterMask * 0.08);
-                col = mix3(col, iceSurface, craterRimBand * craterMask * 0.10);
+                col = mix3(col, iceSurface, craterRimBand * craterMask * 0.1);
             }
 
             const polarEnhance = clamp01(1 - latGradient);
-            col = mix3(col, pureWhite, polarEnhance * 0.20);
+            col = mix3(col, pureWhite, polarEnhance * 0.2);
             const contrast = 0.92 + 0.08 * iceN;
             col = { x: col.x * contrast, y: col.y * contrast, z: col.z * contrast };
 

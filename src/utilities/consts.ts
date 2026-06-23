@@ -25,7 +25,7 @@ export const MAX_PARTICLE_ALPHA = 1.0;
 
 // === Simulation Scale and Physics Constants ===
 export const SCALE_FACTOR = 1;
-export const G_SCALE = 1//10000000;
+export const G_SCALE = 1; //10000000;
 // Tuned so that SUN_MASS = 33,000,000 exactly
 export const MASS_SCALE = 6.025757575757576e22;
 export const RADIUS_SCALE = 100;
@@ -108,17 +108,17 @@ export const PLUTO_AXIS = 119.61;
 // Mapping: azimuth = (ecliptic longitude of pole) − 270°  (mod 360°)
 // At azimuth=0 the tilt faces +Z; azimuth=90 faces +X (vernal equinox direction).
 // Source: IAU 2015 Cartographic Coordinates and Rotational Elements.
-export const SUN_AZIMUTH     = 76;   // IAU α₀=286.13°, δ₀= 63.87° → λ_pole≈346°
-export const MERCURY_AZIMUTH = 48;   // IAU α₀=281.01°, δ₀= 61.45° → λ_pole≈318°
-export const VENUS_AZIMUTH   = 119;  // IAU α₀=272.76°, δ₀= 67.16° → λ_pole≈  29°
-export const EARTH_AZIMUTH   = 180;  // IAU α₀=  0.00°, δ₀= 90.00° → λ_pole≈  90°
-export const MARS_AZIMUTH    = 83;   // IAU α₀=317.68°, δ₀= 52.89° → λ_pole≈353°
-export const JUPITER_AZIMUTH = 23;   // IAU α₀=268.06°, δ₀= 64.50° → λ_pole≈293°
-export const SATURN_AZIMUTH  = 171;  // IAU α₀= 40.59°, δ₀= 83.54° → λ_pole≈  81°
-export const URANUS_AZIMUTH  = 348;  // IAU α₀=257.31°, δ₀=-15.18° → λ_pole≈258°
-export const NEPTUNE_AZIMUTH = 49;   // IAU α₀=299.36°, δ₀= 43.46° → λ_pole≈319°
-export const PLUTO_AZIMUTH   = 227;  // IAU α₀=132.99°, δ₀= -6.16° → λ_pole≈137°
-export const CERES_AZIMUTH   = 101;  // IAU α₀=291.42°, δ₀= 66.76° → λ_pole≈  11°
+export const SUN_AZIMUTH = 76; // IAU α₀=286.13°, δ₀= 63.87° → λ_pole≈346°
+export const MERCURY_AZIMUTH = 48; // IAU α₀=281.01°, δ₀= 61.45° → λ_pole≈318°
+export const VENUS_AZIMUTH = 119; // IAU α₀=272.76°, δ₀= 67.16° → λ_pole≈  29°
+export const EARTH_AZIMUTH = 180; // IAU α₀=  0.00°, δ₀= 90.00° → λ_pole≈  90°
+export const MARS_AZIMUTH = 83; // IAU α₀=317.68°, δ₀= 52.89° → λ_pole≈353°
+export const JUPITER_AZIMUTH = 23; // IAU α₀=268.06°, δ₀= 64.50° → λ_pole≈293°
+export const SATURN_AZIMUTH = 171; // IAU α₀= 40.59°, δ₀= 83.54° → λ_pole≈  81°
+export const URANUS_AZIMUTH = 348; // IAU α₀=257.31°, δ₀=-15.18° → λ_pole≈258°
+export const NEPTUNE_AZIMUTH = 49; // IAU α₀=299.36°, δ₀= 43.46° → λ_pole≈319°
+export const PLUTO_AZIMUTH = 227; // IAU α₀=132.99°, δ₀= -6.16° → λ_pole≈137°
+export const CERES_AZIMUTH = 101; // IAU α₀=291.42°, δ₀= 66.76° → λ_pole≈  11°
 
 // === Planetary System: Real Orbital Periods (seconds) ===
 export const MERCURY_ORBITAL_PERIOD_REAL = 87.969 * 24 * 3600; // days to seconds
@@ -297,7 +297,8 @@ export const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
 /** Threshold distance for switching from boost to normal approach decel. */
 export const AUTOPILOT_BOOST_THRESHOLD =
     1.5 *
-    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED - AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
+    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
+        AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
         (2 * AUTOPILOT_BOOST_DECEL) +
         (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL));
 

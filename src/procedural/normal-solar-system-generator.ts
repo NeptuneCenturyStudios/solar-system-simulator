@@ -117,8 +117,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             createMoon(earth, this.scene, {
                 distance: MOON_DIST_FROM_EARTH,
                 radius: MOON_RADIUS,
-                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
-                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
                 mass: MOON_MASS,
                 id: 'moon',
                 name: 'Moon',
@@ -136,8 +136,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 distance: ISS_DIST_FROM_EARTH,
                 radius: ISS_RADIUS,
                 mass: ISS_MASS,
-                pos: new THREE.Vector3(0,0,0), // Will be overridden in createSatellite
-                vel: new THREE.Vector3(0,0,0), // Will be overridden in createSatellite
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createSatellite
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createSatellite
                 id: 'iss',
                 name: 'ISS',
                 trailColor: 0xffffff,
@@ -158,20 +158,17 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Vesta (~2.36 AU) — already had random angle, but now uses the helper for consistency
         const vestaAngle = randomAngle();
-        const vestaTrajectory = calculateTrajectory(this.dependencies.getG(), VESTA_DISTANCE, SUN_MASS, vestaAngle);
+        const vestaTrajectory = calculateTrajectory(
+            this.dependencies.getG(),
+            VESTA_DISTANCE,
+            SUN_MASS,
+            vestaAngle
+        );
         const vesta = new Asteroid(this.dependencies, this.scene, {
             radius: VESTA_RADIUS,
             color: 0xb8a890,
-            pos: [
-                vestaTrajectory.pos.x,
-                (Math.random() - 0.5) * 1639,
-                vestaTrajectory.pos.z,
-            ],
-            vel: [
-                vestaTrajectory.vel.x,
-                0,
-                vestaTrajectory.vel.z,
-            ],
+            pos: [vestaTrajectory.pos.x, (Math.random() - 0.5) * 1639, vestaTrajectory.pos.z],
+            vel: [vestaTrajectory.vel.x, 0, vestaTrajectory.vel.z],
             mass: VESTA_MASS,
             id: 'vesta',
             name: 'Vesta',
@@ -184,20 +181,17 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Pallas (~2.77 AU)
         const pallasAngle = randomAngle();
-        const pallasTrajectory = calculateTrajectory(this.dependencies.getG(), PALLAS_DISTANCE, SUN_MASS, pallasAngle);
+        const pallasTrajectory = calculateTrajectory(
+            this.dependencies.getG(),
+            PALLAS_DISTANCE,
+            SUN_MASS,
+            pallasAngle
+        );
         const pallas = new Asteroid(this.dependencies, this.scene, {
             radius: PALLAS_RADIUS,
             color: 0x8a8a8a,
-            pos: [
-                pallasTrajectory.pos.x,
-                (Math.random() - 0.5) * 2185,
-                pallasTrajectory.pos.z,
-            ],
-            vel: [
-                pallasTrajectory.vel.x,
-                0,
-                pallasTrajectory.vel.z,
-            ],
+            pos: [pallasTrajectory.pos.x, (Math.random() - 0.5) * 2185, pallasTrajectory.pos.z],
+            vel: [pallasTrajectory.vel.x, 0, pallasTrajectory.vel.z],
             mass: PALLAS_MASS,
             id: 'pallas',
             name: 'Pallas',
@@ -210,20 +204,17 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Hygiea (~3.14 AU)
         const hygieaAngle = randomAngle();
-        const hygieaTrajectory = calculateTrajectory(this.dependencies.getG(), HYGIEA_DISTANCE, SUN_MASS, hygieaAngle);
+        const hygieaTrajectory = calculateTrajectory(
+            this.dependencies.getG(),
+            HYGIEA_DISTANCE,
+            SUN_MASS,
+            hygieaAngle
+        );
         const hygiea = new Asteroid(this.dependencies, this.scene, {
             radius: HYGIEA_RADIUS,
             color: 0x7a7a7a,
-            pos: [
-                hygieaTrajectory.pos.x,
-                (Math.random() - 0.5) * 1093,
-                hygieaTrajectory.pos.z,
-            ],
-            vel: [
-                hygieaTrajectory.vel.x,
-                0,
-                hygieaTrajectory.vel.z,
-            ],
+            pos: [hygieaTrajectory.pos.x, (Math.random() - 0.5) * 1093, hygieaTrajectory.pos.z],
+            vel: [hygieaTrajectory.vel.x, 0, hygieaTrajectory.vel.z],
             mass: HYGIEA_MASS,
             id: 'hygiea',
             name: 'Hygiea',
@@ -246,15 +237,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: randomAngle(),
                 distance: IO_DIST_FROM_JUPITER,
                 radius: IO_RADIUS,
-                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
-                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
                 mass: IO_MASS,
                 id: 'camIo',
                 name: 'Io',
                 trailColor: 0xffdd77,
                 maxTrail: 800,
                 yVariation: 109,
-                moonType: MoonTypeEnum.Terrestrial
+                moonType: MoonTypeEnum.Terrestrial,
             })
         );
         await yieldToEventLoop();
@@ -264,15 +255,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: randomAngle(),
                 distance: EUROPA_DIST_FROM_JUPITER,
                 radius: EUROPA_RADIUS,
-                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
-                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
                 mass: EUROPA_MASS,
                 id: 'camEuropa',
                 name: 'Europa',
                 trailColor: 0xccddee,
                 maxTrail: 1000,
                 yVariation: 164,
-                moonType: MoonTypeEnum.Terrestrial
+                moonType: MoonTypeEnum.Terrestrial,
             })
         );
         await yieldToEventLoop();
@@ -282,15 +273,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: randomAngle(),
                 distance: GANYMEDE_DIST_FROM_JUPITER,
                 radius: GANYMEDE_RADIUS,
-                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
-                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
                 mass: GANYMEDE_MASS,
                 id: 'camGanymede',
                 name: 'Ganymede',
                 trailColor: 0xcccccc,
                 maxTrail: 1200,
                 yVariation: 219,
-                moonType: MoonTypeEnum.Terrestrial
+                moonType: MoonTypeEnum.Terrestrial,
             })
         );
         await yieldToEventLoop();
@@ -300,15 +291,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: randomAngle(),
                 distance: CALLISTO_DIST_FROM_JUPITER,
                 radius: CALLISTO_RADIUS,
-                pos: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
-                vel: new THREE.Vector3(0,0,0), // Will be overridden in createMoon
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
                 mass: CALLISTO_MASS,
                 id: 'camCallisto',
                 name: 'Callisto',
                 trailColor: 0xaa9988,
                 maxTrail: 1500,
                 yVariation: 273,
-                moonType: MoonTypeEnum.Terrestrial
+                moonType: MoonTypeEnum.Terrestrial,
             })
         );
         await yieldToEventLoop();

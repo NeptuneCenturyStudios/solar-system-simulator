@@ -184,9 +184,8 @@ export class ShipFlame implements IShipEffect {
         dt: number,
         cameraPos: THREE.Vector3
     ): void {
-
         // Check if particles are enabled
-        if (!performanceSettings.particleEffectsEnabled){
+        if (!performanceSettings.particleEffectsEnabled) {
             this.hide();
             return;
         }

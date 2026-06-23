@@ -46,7 +46,7 @@ export class ParticleExplosion implements IEffect {
         this.scene = scene;
 
         for (let i = 0; i < this.count; i++) {
-            this.worldPositions[i * 3]     = pos.x;
+            this.worldPositions[i * 3] = pos.x;
             this.worldPositions[i * 3 + 1] = pos.y;
             this.worldPositions[i * 3 + 2] = pos.z;
             // Velocity scales with body radius.  Much slower than before so
@@ -262,7 +262,7 @@ export class ParticleExplosion implements IEffect {
 
         // Advance float64 world positions — keeps sub-km precision at any simulation distance.
         for (let i = 0; i < this.count; i++) {
-            this.worldPositions[i * 3]     += this.velocities[i].x * (dt * 60);
+            this.worldPositions[i * 3] += this.velocities[i].x * (dt * 60);
             this.worldPositions[i * 3 + 1] += this.velocities[i].y * (dt * 60);
             this.worldPositions[i * 3 + 2] += this.velocities[i].z * (dt * 60);
         }
@@ -275,7 +275,7 @@ export class ParticleExplosion implements IEffect {
             const cpy = cameraPosition.y;
             const cpz = cameraPosition.z;
             for (let i = 0; i < this.count; i++) {
-                this.positions[i * 3]     = this.worldPositions[i * 3]     - cpx;
+                this.positions[i * 3] = this.worldPositions[i * 3] - cpx;
                 this.positions[i * 3 + 1] = this.worldPositions[i * 3 + 1] - cpy;
                 this.positions[i * 3 + 2] = this.worldPositions[i * 3 + 2] - cpz;
             }
@@ -283,7 +283,7 @@ export class ParticleExplosion implements IEffect {
         } else {
             // Fallback: write world positions directly (no camera-relative correction)
             for (let i = 0; i < this.count; i++) {
-                this.positions[i * 3]     = this.worldPositions[i * 3];
+                this.positions[i * 3] = this.worldPositions[i * 3];
                 this.positions[i * 3 + 1] = this.worldPositions[i * 3 + 1];
                 this.positions[i * 3 + 2] = this.worldPositions[i * 3 + 2];
             }

@@ -185,7 +185,13 @@ import { GenericComet } from './bodies/generic-comet';
 import { UIManager } from './ui/ui-manager';
 
 // State singletons
-import { autopilotState, cameraState, flightState, interactionState, simulationState } from './simulation/simulation';
+import {
+    autopilotState,
+    cameraState,
+    flightState,
+    interactionState,
+    simulationState,
+} from './simulation/simulation';
 
 const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
 const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
@@ -348,7 +354,11 @@ function clearURLSeed(): void {
 }
 
 // --- Event notifications (replaces sprite-based event log) ---
-function addEvent(event: { message: string; notificationType: NotificationType, logMethod?: LogMethods }) {
+function addEvent(event: {
+    message: string;
+    notificationType: NotificationType;
+    logMethod?: LogMethods;
+}) {
     const entry = new EventLogEntry(event.message, event.notificationType, event.logMethod);
 
     // Add the event message to the console as well for better visibility
@@ -4052,7 +4062,7 @@ flightControlsPanel.on('autopilot', () => {
         addEvent({
             message: 'Autopilot: select a target body first.',
             notificationType: NotificationType.Warning,
-            logMethod: LogMethods.Alert
+            logMethod: LogMethods.Alert,
         });
         return;
     }

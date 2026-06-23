@@ -33,8 +33,9 @@ export class Neptune extends Planet {
         angleRad: number = 0
     ) {
         const gEff = dependencies.getG();
-        const timeScale = NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, gEff, SUN_MASS);
-        const rotSpeed = (2 * Math.PI / (16.11 * 3600)) * timeScale;
+        const timeScale =
+            NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, gEff, SUN_MASS);
+        const rotSpeed = ((2 * Math.PI) / (16.11 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, NEPTUNE_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(NEPTUNE_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({

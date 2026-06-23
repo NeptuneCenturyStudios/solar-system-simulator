@@ -7,8 +7,6 @@ import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { Moon } from '../bodies/moon';
 import { BodyTypeEnum, MoonTypeEnum } from '../bodies/body-enums';
 
-
-
 /**
  * Flight speed HUD texture — drawn in the same style as the FPS counter
  * @param speed - The current speed of the spacecraft.
@@ -250,33 +248,32 @@ export function createStatsTexture(body: Body) {
         y += lineHeight;
     } else if (body instanceof Moon) {
         const moonType = body.moonType;
-            let moonTypeLabel: string;
-            switch (moonType) {
-               case MoonTypeEnum.Terrestrial:
-                    moonTypeLabel = 'Terrestrial';
-                    break;
-                case MoonTypeEnum.Temperate:
-                    moonTypeLabel = 'Temperate';
-                    break;
-                case MoonTypeEnum.Volcanic:
-                    moonTypeLabel = 'Volcanic';
-                    break;
-                case MoonTypeEnum.Ocean:
-                    moonTypeLabel = 'Ocean';
-                    break;
-                case MoonTypeEnum.Frozen:
-                    moonTypeLabel = 'Frozen';
-                    break;
-                case MoonTypeEnum.Desert:
-                    moonTypeLabel = 'Desert';
-                    break;
-                default:
-                    moonTypeLabel = String(moonType);
-            }
+        let moonTypeLabel: string;
+        switch (moonType) {
+            case MoonTypeEnum.Terrestrial:
+                moonTypeLabel = 'Terrestrial';
+                break;
+            case MoonTypeEnum.Temperate:
+                moonTypeLabel = 'Temperate';
+                break;
+            case MoonTypeEnum.Volcanic:
+                moonTypeLabel = 'Volcanic';
+                break;
+            case MoonTypeEnum.Ocean:
+                moonTypeLabel = 'Ocean';
+                break;
+            case MoonTypeEnum.Frozen:
+                moonTypeLabel = 'Frozen';
+                break;
+            case MoonTypeEnum.Desert:
+                moonTypeLabel = 'Desert';
+                break;
+            default:
+                moonTypeLabel = String(moonType);
+        }
 
-            drawStat('Sub Type: ', moonTypeLabel, y);
-            y += lineHeight;
-      
+        drawStat('Sub Type: ', moonTypeLabel, y);
+        y += lineHeight;
     }
 
     // Mass

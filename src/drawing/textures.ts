@@ -23,7 +23,7 @@ export const fictionalTerrestrialTextures: THREE.Texture[] = [
     loadSrgbTexture('./assets/textures/fictional_1.jpg'),
     loadSrgbTexture('./assets/textures/fictional_2.jpg'),
     loadSrgbTexture('./assets/textures/fictional_3.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_4.jpg')
+    loadSrgbTexture('./assets/textures/fictional_4.jpg'),
 ];
 
 // Deterministic textures for additional custom solid planet/moon subtypes.
@@ -62,11 +62,11 @@ export function getRoughnessForPlanetTexture(planetSubType: PlanetTypeEnum): num
         case PlanetTypeEnum.Volcanic:
             return 0.6; // Volcanic planets have a moderate roughness for a slightly rough appearance
         case PlanetTypeEnum.Ocean:
-            return 0.4; // Ocean planets have a low roughness for a smoother, more reflective appearance    
+            return 0.4; // Ocean planets have a low roughness for a smoother, more reflective appearance
         case PlanetTypeEnum.Frozen:
             return 0.5; // Frozen planets have a moderate roughness for a slightly rough, icy appearance
         case PlanetTypeEnum.Desert:
-            return 0.95; // Desert planets have a high roughness for a very rough, matte appearance  
+            return 0.95; // Desert planets have a high roughness for a very rough, matte appearance
         case PlanetTypeEnum.Temperate:
             return 0.5; // Temperate planets have a moderate roughness for a balanced appearance
         case PlanetTypeEnum.Terrestrial:

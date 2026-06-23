@@ -56,7 +56,11 @@ const SHAPE_ELLIPTICAL = 3; // squashed sphere
 function randomUnitVector(): THREE.Vector3 {
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    return new THREE.Vector3(Math.sin(phi) * Math.cos(theta), Math.sin(phi) * Math.sin(theta), Math.cos(phi));
+    return new THREE.Vector3(
+        Math.sin(phi) * Math.cos(theta),
+        Math.sin(phi) * Math.sin(theta),
+        Math.cos(phi)
+    );
 }
 
 export class PlanetaryNebula implements IEffect {
@@ -122,18 +126,22 @@ export class PlanetaryNebula implements IEffect {
 
         // Random global orientation – ensures bipolar/ring nebulae appear at varied angles
         const orientation = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI * 2, Math.random() * Math.PI)
+            new THREE.Euler(
+                Math.random() * Math.PI,
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI
+            )
         );
 
         // Elliptical squash factor along one axis (0.3 = very flat, 0.85 = almost round)
         const ellipticScale = 0.3 + Math.random() * 0.55;
 
         // Bipolar cone half-angle (radians): 27°–81°
-        const biCone = (0.15 + Math.random() * 0.30) * Math.PI;
+        const biCone = (0.15 + Math.random() * 0.3) * Math.PI;
 
         // Physical expansion speed: 15–80 km/s, converted to sim units (÷ DIST_SCALE).
         const baseSpeed = (15 + Math.random() * 65) / DIST_SCALE;
-        const speedVariation = baseSpeed * 0.30;
+        const speedVariation = baseSpeed * 0.3;
 
         // ---- Particle budget ---------------------------------------------
         this.count = 12000;
@@ -176,7 +184,7 @@ export class PlanetaryNebula implements IEffect {
                             sign * Math.cos(coneAngle),
                             Math.sin(coneAngle) * Math.sin(azimuth)
                         );
-                        if (isInner) speed *= 1.10;
+                        if (isInner) speed *= 1.1;
                     }
                     break;
                 }
@@ -190,7 +198,11 @@ export class PlanetaryNebula implements IEffect {
                     } else {
                         const theta = Math.random() * Math.PI * 2;
                         const spread = 0.16 + Math.random() * 0.14;
-                        dir.set(Math.cos(theta), (Math.random() - 0.5) * spread * 2, Math.sin(theta)).normalize();
+                        dir.set(
+                            Math.cos(theta),
+                            (Math.random() - 0.5) * spread * 2,
+                            Math.sin(theta)
+                        ).normalize();
                         if (isInner) speed *= 1.08;
                     }
                     break;
@@ -234,7 +246,11 @@ export class PlanetaryNebula implements IEffect {
             this.colors[i * 4 + 2] = col.b;
 
             // Halo wisps start semi-transparent; inner ring starts bright
-            this.colors[i * 4 + 3] = isHalo ? 0.12 + Math.random() * 0.30 : isInner ? 0.70 + Math.random() * 0.30 : 0.55 + Math.random() * 0.40;
+            this.colors[i * 4 + 3] = isHalo
+                ? 0.12 + Math.random() * 0.3
+                : isInner
+                  ? 0.7 + Math.random() * 0.3
+                  : 0.55 + Math.random() * 0.4;
 
             // ---- Particle size attribute --------------------------------
             if (isInner) {

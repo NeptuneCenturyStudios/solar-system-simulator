@@ -31,8 +31,9 @@ export class Venus extends Planet {
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
         const gEff = dependencies.getG();
-        const timeScale = VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, gEff, SUN_MASS);
-        const rotSpeed = (-2 * Math.PI / (5832.5 * 3600)) * timeScale; // retrograde
+        const timeScale =
+            VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, gEff, SUN_MASS);
+        const rotSpeed = ((-2 * Math.PI) / (5832.5 * 3600)) * timeScale; // retrograde
         const trajectory = calculateTrajectory(gEff, VENUS_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(VENUS_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({

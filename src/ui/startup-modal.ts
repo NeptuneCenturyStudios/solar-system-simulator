@@ -91,8 +91,8 @@ export class StartupModal extends Panel {
                 e.preventDefault();
                 e.stopPropagation();
             };
-            ['mousedown', 'mouseup', 'mousemove', 'click', 'wheel', 'keydown', 'keyup'].forEach((evt) =>
-                this.element!.addEventListener(evt, stop, { passive: false })
+            ['mousedown', 'mouseup', 'mousemove', 'click', 'wheel', 'keydown', 'keyup'].forEach(
+                (evt) => this.element!.addEventListener(evt, stop, { passive: false })
             );
         }
 
@@ -104,7 +104,9 @@ export class StartupModal extends Panel {
                 if (!this._proceduralModal) return;
                 this.hide();
                 if (this.element) this.element.style.pointerEvents = 'none';
-                const result = await this._proceduralModal.prompt({ title: 'Generate Black Hole System' });
+                const result = await this._proceduralModal.prompt({
+                    title: 'Generate Black Hole System',
+                });
                 if (result === null) {
                     this.open({ allowCancel: this._allowCancel });
                 } else {

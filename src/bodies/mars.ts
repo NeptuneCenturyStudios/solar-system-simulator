@@ -30,8 +30,9 @@ export class Mars extends Planet {
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
         const gEff = dependencies.getG();
-        const timeScale = MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, gEff, SUN_MASS);
-        const rotSpeed = (2 * Math.PI / (24.623 * 3600)) * timeScale;
+        const timeScale =
+            MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, gEff, SUN_MASS);
+        const rotSpeed = ((2 * Math.PI) / (24.623 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, MARS_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(MARS_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({

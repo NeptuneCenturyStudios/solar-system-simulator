@@ -26,7 +26,7 @@ export class ISS extends Satellite {
         const placeholderMesh = new THREE.Mesh(placeholderGeometry, placeholderMaterial);
 
         options.mesh = placeholderMesh;
-        
+
         // ── Base class ────────────────────────────────────────────────────────
         super(dependencies, scene, options);
 

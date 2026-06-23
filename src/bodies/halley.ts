@@ -22,7 +22,11 @@ export class Halley extends Comet {
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Halley belongs.
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, trueAnomaly: number = Math.PI) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        trueAnomaly: number = Math.PI
+    ) {
         // Halley-like elliptical orbit
         const perihelion = COMET_PERIHELION_DIST; // Just outside Mars (scaled)
         const aphelion = COMET_APHELION_DIST; // Scaled
@@ -60,7 +64,7 @@ export class Halley extends Comet {
             .addScaledVector(et, r * Math.sin(nu));
 
         // vis-viva perifocal formula: v = sqrt(GM/p) * [-sin(ν) ê_r + (e+cos(ν)) ê_t]
-        const velScale = Math.sqrt(gEff * SUN_MASS / semiLatusRectum);
+        const velScale = Math.sqrt((gEff * SUN_MASS) / semiLatusRectum);
         const vel = new THREE.Vector3()
             .addScaledVector(er, -velScale * Math.sin(nu))
             .addScaledVector(et, velScale * (ecc + Math.cos(nu)));

@@ -9,14 +9,7 @@ export type ProceduralGenerationWorkUnit = {
      * Optional grouping so we can distinguish phases (stars/planets/moons/asteroids)
      * in logs/UI without changing the progress bar semantics.
      */
-    phase?:
-        | 'stars'
-        | 'planets'
-        | 'moons'
-        | 'asteroids'
-        | 'black-holes'
-        | 'comets'
-        | 'finalizing';
+    phase?: 'stars' | 'planets' | 'moons' | 'asteroids' | 'black-holes' | 'comets' | 'finalizing';
 };
 
 export type ProceduralGenerationProgress = {

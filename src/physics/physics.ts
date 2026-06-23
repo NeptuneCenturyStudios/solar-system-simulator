@@ -12,12 +12,11 @@ import { IFlightState, ISimulationState, IAutopilotState } from '../interfaces';
 // ── Scratch vectors for allocation-free physics ──────────────────────────────
 // Reused by getAcc() and updatePhysics() to eliminate GC churn in the hot path.
 const _scratchDiff = new THREE.Vector3();
-const _scratchZero  = new THREE.Vector3(0, 0, 0);
+const _scratchZero = new THREE.Vector3(0, 0, 0);
 /** Pool of accelerations recycled each frame so updatePhysics never calls `new`. */
 const _accPool: THREE.Vector3[] = [];
 /** Number of bodies that _accPool was sized for on the last frame. */
 let _accPoolSize = 0;
-
 
 /**
  * Calculate position and velocity for a circular orbit around a parent body

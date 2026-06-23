@@ -1,4 +1,4 @@
-import { SCALE_FACTOR, SUN_MASS } from "../utilities/consts";
+import { SCALE_FACTOR, SUN_MASS } from '../utilities/consts';
 
 /**
  * Calculates the event horizon radius for a black hole of a given mass.

@@ -13,15 +13,15 @@ import { Spaceship } from './bodies/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
 
 export interface ISimulationState {
-  timeScale: number;
-  isPaused: boolean;
-  savedTimeScale: number;
-  lastT: number;
-  bodies: Body[];
-  explosions: ParticleExplosion[];
-  impacts: ImpactShockwave[];
-  showNames: boolean;
-  gMultiplier: number;
+    timeScale: number;
+    isPaused: boolean;
+    savedTimeScale: number;
+    lastT: number;
+    bodies: Body[];
+    explosions: ParticleExplosion[];
+    impacts: ImpactShockwave[];
+    showNames: boolean;
+    gMultiplier: number;
 }
 
 /**
@@ -202,79 +202,79 @@ export interface IFlightState {
  * Interaction state interface, defining the structure for tracking user input and manipulation states within the simulation.
  */
 export interface IInteractionState {
-  isRepositioning: boolean;
-  isChangingVelocity: boolean;
-  isMiddleMouseVelocity: boolean;
-  isMouseLookActive: boolean;
-  isDragging: boolean;
+    isRepositioning: boolean;
+    isChangingVelocity: boolean;
+    isMiddleMouseVelocity: boolean;
+    isMouseLookActive: boolean;
+    isDragging: boolean;
 
-  activeAxis: string | null;
-  wasRunningBeforeDrag: boolean;
+    activeAxis: string | null;
+    wasRunningBeforeDrag: boolean;
 
-  dragTarget: Body | null;
-  dragCameraOffset: THREE.Vector3;
-  dragPlane: THREE.Plane;
+    dragTarget: Body | null;
+    dragCameraOffset: THREE.Vector3;
+    dragPlane: THREE.Plane;
 
-  // Velocity editing UX
-  velocityEditMode: 'xz' | 'y';
-  velocityEditHadRunningBeforeDrag: boolean;
+    // Velocity editing UX
+    velocityEditMode: 'xz' | 'y';
+    velocityEditHadRunningBeforeDrag: boolean;
 
-  // Drag tracking for repositioning
-  dragStartIntersection: THREE.Vector3 | null;
-  dragStartPosition: THREE.Vector3 | null;
+    // Drag tracking for repositioning
+    dragStartIntersection: THREE.Vector3 | null;
+    dragStartPosition: THREE.Vector3 | null;
 
-  // Touch camera gesture state (mobile)
-  isTouchGestureActive: boolean;
-  touchGestureMode: 'rotate' | 'pinch' | null;
-  lastTouchX: number;
-  lastTouchY: number;
-  lastPinchDist: number;
+    // Touch camera gesture state (mobile)
+    isTouchGestureActive: boolean;
+    touchGestureMode: 'rotate' | 'pinch' | null;
+    lastTouchX: number;
+    lastTouchY: number;
+    lastPinchDist: number;
 
-  // Mobile: ignore synthetic mouse events after touch
-  touchIgnoreUntil: number;
-};
+    // Mobile: ignore synthetic mouse events after touch
+    touchIgnoreUntil: number;
+}
 
 /**
  * Camera state interface, defining the structure for tracking the current state and controls of the camera within the simulation.
  */
 export interface ICameraState {
-  isFreeCameraMode: boolean;
-  isLookAtMode: boolean;
-  lockToSun: boolean;
+    isFreeCameraMode: boolean;
+    isLookAtMode: boolean;
+    lockToSun: boolean;
 
-  // Target mode controls gizmo visibility behavior
-  isTargetMode: boolean;
+    // Target mode controls gizmo visibility behavior
+    isTargetMode: boolean;
 
-  // Legacy/debug identifier
-  focusID: string;
+    // Legacy/debug identifier
+    focusID: string;
 
-  // Canonical camera focus target
-  focusBody: Body | null;
+    // Canonical camera focus target
+    focusBody: Body | null;
 
-  offset: THREE.Vector3;
-  lastPlanetAngle: number;
+    offset: THREE.Vector3;
+    lastPlanetAngle: number;
 
-  speed: number;
-  rotationSpeed: number;
+    speed: number;
+    rotationSpeed: number;
 
-  keys: {
-    w: boolean;
-    a: boolean;
-    s: boolean;
-    d: boolean;
-    c: boolean;
-    space: boolean;
-    shift: boolean;
-  };
+    keys: {
+        w: boolean;
+        a: boolean;
+        s: boolean;
+        d: boolean;
+        c: boolean;
+        space: boolean;
+        shift: boolean;
+    };
 
-  arrowKeys: {
-    left: boolean;
-    right: boolean;
-    up: boolean;
-    down: boolean;
-  };
+    arrowKeys: {
+        left: boolean;
+        right: boolean;
+        up: boolean;
+        down: boolean;
+    };
 
-  pendingCollisionFocusBody: Body | null;
+    pendingCollisionFocusBody: Body | null;
 }
 
 /**

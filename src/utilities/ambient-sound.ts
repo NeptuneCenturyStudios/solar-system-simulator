@@ -128,7 +128,7 @@ export class AmbientSoundManager {
 
     private buildTrackUrl(filename: string): string {
         const base = new URL('../assets/sounds/music/', import.meta.url).href;
-        return  `${base}/${filename}`;
+        return `${base}/${filename}`;
     }
 
     private initializePlaylist(): void {
@@ -145,16 +145,24 @@ export class AmbientSoundManager {
         tempList.push(this.buildTrackUrl('leberch-space-440026.mp3'));
         tempList.push(this.buildTrackUrl('leberch-space-ambient-509783.mp3'));
         tempList.push(this.buildTrackUrl('monume-space-ambient-498030.mp3'));
-        tempList.push(this.buildTrackUrl('shadowsandechoes-deep-quest-dark-driving-tension-394142.mp3'));
+        tempList.push(
+            this.buildTrackUrl('shadowsandechoes-deep-quest-dark-driving-tension-394142.mp3')
+        );
         tempList.push(this.buildTrackUrl('sigmamusicart-tension-background-music-460023.mp3'));
         tempList.push(this.buildTrackUrl('slimeyfox-hydrostatic-drones-479105.mp3'));
         tempList.push(this.buildTrackUrl('the_mountain-spaceship-155569.mp3'));
         tempList.push(this.buildTrackUrl('universfield-haunting-music-box-289437.mp3'));
         tempList.push(this.buildTrackUrl('musheran-low-rumbling-176033.mp3'));
-        tempList.push(this.buildTrackUrl('nickpanekaiassets-drones-of-dread-dark-cinematic-industrial-ambient-497226.mp3'));
+        tempList.push(
+            this.buildTrackUrl(
+                'nickpanekaiassets-drones-of-dread-dark-cinematic-industrial-ambient-497226.mp3'
+            )
+        );
         tempList.push(this.buildTrackUrl('vjgalaxy-melodic-techno-09-513318.mp3'));
         tempList.push(this.buildTrackUrl('slimeyfox-hyperwoofer-tremormorph-541638.mp3'));
-        tempList.push(this.buildTrackUrl('pwlpl-progressive-techno-cinematic-tension-arc-543153.mp3'));
+        tempList.push(
+            this.buildTrackUrl('pwlpl-progressive-techno-cinematic-tension-arc-543153.mp3')
+        );
         tempList.push(this.buildTrackUrl('absolutesound-cinematic-guitar-adventure-505779.mp3'));
         tempList.push(this.buildTrackUrl('leberch-mysterious-cinematic-255712.mp3'));
         tempList.push(this.buildTrackUrl('cfl_turningpages-vast-hollow-tidal-533251.mp3'));
@@ -171,7 +179,6 @@ export class AmbientSoundManager {
             [tempList[i], tempList[j]] = [tempList[j], tempList[i]];
         }
         this.playlist = tempList;
-
     }
 
     private setupAudioContext(): void {

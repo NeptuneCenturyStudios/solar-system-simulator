@@ -483,8 +483,7 @@ export class FlightHUD {
     private _getActiveContextHint(): { visible: boolean; lines: string[] } {
         // Highest priority: velocity dragging hint (existing behavior)
         const draggingVel =
-            this.interactionState.isChangingVelocity ||
-            this.interactionState.isMiddleMouseVelocity;
+            this.interactionState.isChangingVelocity || this.interactionState.isMiddleMouseVelocity;
         if (draggingVel) {
             const mode = this.interactionState.velocityEditMode || 'xz';
             return {
@@ -513,10 +512,7 @@ export class FlightHUD {
                     : `Selected: click Target (crosshair) to enable arrows | Then drag arrows to move / change velocity`;
                 return {
                     visible: true,
-                    lines: [
-                        `Free Camera: WASD move | Space up | C down | Shift = fast`,
-                        bodyLine,
-                    ],
+                    lines: [`Free Camera: WASD move | Space up | C down | Shift = fast`, bodyLine],
                 };
             }
 

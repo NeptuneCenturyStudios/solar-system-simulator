@@ -18,16 +18,26 @@ import type { CelestialBody } from './celestial-body';
 import { MoonTypeEnum } from './body-enums';
 import { IMoonCreationOptions } from '../interfaces';
 
-export function createMoon(parent: CelestialBody, scene: THREE.Scene, config: IMoonCreationOptions): Moon {
+export function createMoon(
+    parent: CelestialBody,
+    scene: THREE.Scene,
+    config: IMoonCreationOptions
+): Moon {
     const moonType = config.moonType;
 
     const seededFromConfig = new SeededRandom(`${config.id}|moonTexture`);
     const pickFictionalDeterministic = (): THREE.Texture => {
-        const idx = Math.abs(Math.floor(seededFromConfig.next() * fictionalTerrestrialTextures.length));
+        const idx = Math.abs(
+            Math.floor(seededFromConfig.next() * fictionalTerrestrialTextures.length)
+        );
         return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
     };
 
-    const trajectory = calculateTrajectory(parent.dependencies.getG(), config.distance, parent.mass);
+    const trajectory = calculateTrajectory(
+        parent.dependencies.getG(),
+        config.distance,
+        parent.mass
+    );
 
     const angle = config.angle !== undefined ? config.angle : 0;
 

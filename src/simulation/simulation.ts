@@ -2,7 +2,13 @@ import * as THREE from 'three';
 import { ImpactShockwave } from '../effects/impact-shockwave';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { Body } from '../bodies/body';
-import { IAutopilotState, ICameraState, IFlightState, IInteractionState, ISimulationState } from '../interfaces';
+import {
+    IAutopilotState,
+    ICameraState,
+    IFlightState,
+    IInteractionState,
+    ISimulationState,
+} from '../interfaces';
 import { Spaceship } from '../bodies/spaceship';
 
 /**

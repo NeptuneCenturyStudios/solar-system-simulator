@@ -15,7 +15,11 @@ import {
 import { isBodyType } from '../utilities/utilities.js';
 import { Star } from '../bodies/star.js';
 import { Body } from '../bodies/body.js';
-import { randomStarParams, randomPlanetParams, randomMoonParams } from '../utilities/body-params.js';
+import {
+    randomStarParams,
+    randomPlanetParams,
+    randomMoonParams,
+} from '../utilities/body-params.js';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
 interface CreateSliderInitState {
@@ -138,7 +142,9 @@ export class ManagementPanel extends Panel {
     constructor(elementId: string | HTMLElement) {
         super(elementId);
 
-        this.getFocusObject = function () { return null; };
+        this.getFocusObject = function () {
+            return null;
+        };
 
         this.btnClose = null;
 
@@ -271,17 +277,13 @@ export class ManagementPanel extends Panel {
         this.moonValidationMessage = document.getElementById('moonValidationMessage');
         this.planetTypeGroup = document.getElementById('planetTypeGroup');
         this.moonTypeGroup = document.getElementById('moonTypeGroup');
-        this.moonTypeSelect = document.getElementById(
-            'moonTypeSelect'
-        ) as HTMLSelectElement | null;
+        this.moonTypeSelect = document.getElementById('moonTypeSelect') as HTMLSelectElement | null;
         this.hasAtmosphereRow = document.getElementById('hasAtmosphereRow');
         this.hasAtmosphereCheckbox = document.getElementById(
             'hasAtmosphere'
         ) as HTMLInputElement | null;
         this.hasRingsRow = document.getElementById('hasRingsRow');
-        this.hasRingsCheckbox = document.getElementById(
-            'hasRings'
-        ) as HTMLInputElement | null;
+        this.hasRingsCheckbox = document.getElementById('hasRings') as HTMLInputElement | null;
         this.randomizeCreateBtn = document.getElementById(
             'randomizeCreateBtn'
         ) as HTMLButtonElement | null;
@@ -356,26 +358,40 @@ export class ManagementPanel extends Panel {
         this.createTiltSlider = document.getElementById('createTilt') as HTMLInputElement | null;
         this.createTiltDisplay = document.getElementById('create-tilt-val');
         this.createAzimuthGroup = document.getElementById('createAzimuthGroup');
-        this.createAzimuthSlider = document.getElementById('createAzimuth') as HTMLInputElement | null;
+        this.createAzimuthSlider = document.getElementById(
+            'createAzimuth'
+        ) as HTMLInputElement | null;
         this.createAzimuthDisplay = document.getElementById('create-azimuth-val');
 
         // Live display updates for create-form sliders
         if (this.createTiltSlider && this.createTiltDisplay) {
-            const s = this.createTiltSlider, d = this.createTiltDisplay;
-            s.oninput = () => { d.textContent = `${s.value}°`; };
+            const s = this.createTiltSlider,
+                d = this.createTiltDisplay;
+            s.oninput = () => {
+                d.textContent = `${s.value}°`;
+            };
         }
         if (this.createAzimuthSlider && this.createAzimuthDisplay) {
-            const s = this.createAzimuthSlider, d = this.createAzimuthDisplay;
-            s.oninput = () => { d.textContent = `${s.value}°`; };
+            const s = this.createAzimuthSlider,
+                d = this.createAzimuthDisplay;
+            s.oninput = () => {
+                d.textContent = `${s.value}°`;
+            };
         }
         // Live display updates for edit-form sliders
         if (this.editTiltSlider && this.editTiltDisplay) {
-            const s = this.editTiltSlider, d = this.editTiltDisplay;
-            s.oninput = () => { d.textContent = `${s.value}°`; };
+            const s = this.editTiltSlider,
+                d = this.editTiltDisplay;
+            s.oninput = () => {
+                d.textContent = `${s.value}°`;
+            };
         }
         if (this.editAzimuthSlider && this.editAzimuthDisplay) {
-            const s = this.editAzimuthSlider, d = this.editAzimuthDisplay;
-            s.oninput = () => { d.textContent = `${s.value}°`; };
+            const s = this.editAzimuthSlider,
+                d = this.editAzimuthDisplay;
+            s.oninput = () => {
+                d.textContent = `${s.value}°`;
+            };
         }
 
         this.applyEditBtn = document.getElementById('applyEditBtn') as HTMLButtonElement | null;
@@ -629,8 +645,10 @@ export class ManagementPanel extends Panel {
 
                 // Show tilt/azimuth only for planet and moon
                 const showTilt = bodyType === 'planet' || bodyType === 'moon';
-                if (this.createTiltGroup) this.createTiltGroup.style.display = showTilt ? 'block' : 'none';
-                if (this.createAzimuthGroup) this.createAzimuthGroup.style.display = showTilt ? 'block' : 'none';
+                if (this.createTiltGroup)
+                    this.createTiltGroup.style.display = showTilt ? 'block' : 'none';
+                if (this.createAzimuthGroup)
+                    this.createAzimuthGroup.style.display = showTilt ? 'block' : 'none';
 
                 const planetType = this.getSelectedPlanetType();
                 // Temperate bodies should always have atmosphere (forced in src/index.ts),
@@ -657,8 +675,7 @@ export class ManagementPanel extends Panel {
                 const canHaveRings = bodyType === 'planet';
                 if (this.hasRingsRow)
                     this.hasRingsRow.style.display = canHaveRings ? 'flex' : 'none';
-                if (this.hasRingsCheckbox && !canHaveRings)
-                    this.hasRingsCheckbox.checked = false;
+                if (this.hasRingsCheckbox && !canHaveRings) this.hasRingsCheckbox.checked = false;
 
                 this.validateMoonCreation();
             } else {
@@ -878,9 +895,7 @@ export class ManagementPanel extends Panel {
                     ? parseFloat(this.inclinationSlider.value)
                     : 0;
                 const planetType =
-                    bodyType === 'moon'
-                        ? this.getSelectedMoonType()
-                        : this.getSelectedPlanetType();
+                    bodyType === 'moon' ? this.getSelectedMoonType() : this.getSelectedPlanetType();
                 const hasAtmosphere =
                     this.hasAtmosphereCheckbox &&
                     this.hasAtmosphereRow &&
@@ -1217,8 +1232,7 @@ export class ManagementPanel extends Panel {
                 'temperate',
             ] as const;
             if (planetTypeSelect && planetTypeSelect.options.length > 0) {
-                const randomSubtype =
-                    planetTypes[Math.floor(Math.random() * planetTypes.length)];
+                const randomSubtype = planetTypes[Math.floor(Math.random() * planetTypes.length)];
                 planetTypeSelect.value = randomSubtype;
             }
 
@@ -1268,7 +1282,9 @@ export class ManagementPanel extends Panel {
 
             setValue(this.createRadiusSlider, radius);
             if (this.createTiltGroup?.style.display !== 'none') {
-                const tiltAzimuthParams = randomPlanetParams(planetType as Parameters<typeof randomPlanetParams>[0]);
+                const tiltAzimuthParams = randomPlanetParams(
+                    planetType as Parameters<typeof randomPlanetParams>[0]
+                );
                 setValue(this.createTiltSlider, Math.round(tiltAzimuthParams.rotationTilt));
                 setValue(this.createAzimuthSlider, Math.round(tiltAzimuthParams.rotationAzimuth));
             }
@@ -1291,22 +1307,16 @@ export class ManagementPanel extends Panel {
             ] as const;
 
             if (moonTypeSelect && moonTypeSelect.options.length > 0) {
-                const randomSubtype =
-                    moonTypes[Math.floor(Math.random() * moonTypes.length)];
+                const randomSubtype = moonTypes[Math.floor(Math.random() * moonTypes.length)];
                 moonTypeSelect.value = randomSubtype;
             }
 
             const moonType = this.getSelectedMoonType();
             const canHaveAtmosphere = moonType !== 'temperate';
 
-            if (
-                this.hasAtmosphereCheckbox &&
-                this.hasAtmosphereRow?.style.display !== 'none'
-            ) {
+            if (this.hasAtmosphereCheckbox && this.hasAtmosphereRow?.style.display !== 'none') {
                 // If temperate, checkbox is hidden/forced by UI; still keep value consistent.
-                this.hasAtmosphereCheckbox.checked = canHaveAtmosphere
-                    ? randBool()
-                    : false;
+                this.hasAtmosphereCheckbox.checked = canHaveAtmosphere ? randBool() : false;
             }
 
             const moonMassMin = MOON_MASS * 0.5;
@@ -1335,7 +1345,10 @@ export class ManagementPanel extends Panel {
             if (this.createTiltGroup?.style.display !== 'none') {
                 const moonTiltAzimuthParams = randomMoonParams(EARTH_RADIUS);
                 setValue(this.createTiltSlider, Math.round(moonTiltAzimuthParams.rotationTilt));
-                setValue(this.createAzimuthSlider, Math.round(moonTiltAzimuthParams.rotationAzimuth));
+                setValue(
+                    this.createAzimuthSlider,
+                    Math.round(moonTiltAzimuthParams.rotationAzimuth)
+                );
             }
             return;
         }
@@ -1708,7 +1721,9 @@ export class ManagementPanel extends Panel {
         }
 
         // Show tilt/azimuth sliders only for bodies that have axial rotation (CelestialBody).
-        const hasTilt = 'rotation' in body && (body as { rotation?: { tilt?: number } }).rotation?.tilt !== undefined;
+        const hasTilt =
+            'rotation' in body &&
+            (body as { rotation?: { tilt?: number } }).rotation?.tilt !== undefined;
         setGroupVisible(this.editTiltGroup, hasTilt);
         setGroupVisible(this.editAzimuthGroup, hasTilt);
         if (hasTilt && this.editTiltSlider && this.editTiltDisplay) {

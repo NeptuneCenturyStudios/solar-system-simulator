@@ -68,10 +68,7 @@ export class ShipWeapon {
         // 2 vertices per bolt (tail + head), 3 floats each.
         this.positions = new Float32Array(maxProjectiles * 2 * 3).fill(0);
         this.geometry = new THREE.BufferGeometry();
-        this.geometry.setAttribute(
-            'position',
-            new THREE.BufferAttribute(this.positions, 3)
-        );
+        this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
         this.geometry.setDrawRange(0, 0);
 
         this.material = new THREE.LineBasicMaterial({
@@ -100,7 +97,7 @@ export class ShipWeapon {
         this.headMaterial = new THREE.PointsMaterial({
             color: WEAPON_PARTICLE_COLOR,
             size: WEAPON_BOLT_HEAD_SIZE,
-            sizeAttenuation: true,   // world-unit size — shrinks naturally with distance
+            sizeAttenuation: true, // world-unit size — shrinks naturally with distance
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -158,9 +155,7 @@ export class ShipWeapon {
         // Linear speed: base offset + current ship speed, capped so bolts stay visible
         // at boost/warp (uncapped, extreme ship speeds shrink the attenuated point to nothing).
         const relativeSpeed = Math.min(WEAPON_MAX_SPEED, WEAPON_BASE_SPEED + shipVelocity.length());
-        const velocity = direction.clone()
-            .multiplyScalar(relativeSpeed)
-            .add(shipVelocity);
+        const velocity = direction.clone().multiplyScalar(relativeSpeed).add(shipVelocity);
 
         playWeaponFire();
         this.projectiles.push({
@@ -246,7 +241,7 @@ export class ShipWeapon {
 
             const base = i * 6;
             // Tail vertex (relative to camera)
-            this.positions[base]     = tailX - cpx;
+            this.positions[base] = tailX - cpx;
             this.positions[base + 1] = tailY - cpy;
             this.positions[base + 2] = tailZ - cpz;
             // Head vertex (relative to camera)
@@ -262,7 +257,7 @@ export class ShipWeapon {
         // ── Head points (same camera-relative origin) ────────────────────────
         for (let i = 0; i < count; i++) {
             const p = this.projectiles[i];
-            this.headPositions[i * 3]     = p.position.x - cpx;
+            this.headPositions[i * 3] = p.position.x - cpx;
             this.headPositions[i * 3 + 1] = p.position.y - cpy;
             this.headPositions[i * 3 + 2] = p.position.z - cpz;
         }

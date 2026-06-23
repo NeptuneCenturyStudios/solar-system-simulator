@@ -7,7 +7,12 @@ import type { ProceduralCometCreation } from './comet-factory';
 import type { IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
-import { applyInclinationX, applyYawY, buildUnitPositionDirection, safeUnitCross } from './orbital-math';
+import {
+    applyInclinationX,
+    applyYawY,
+    buildUnitPositionDirection,
+    safeUnitCross,
+} from './orbital-math';
 import { rngFor } from './seed-utils';
 
 export function generateProceduralComets(params: {
@@ -31,9 +36,8 @@ export function generateProceduralComets(params: {
     const maxStarRadius = Math.max(...starParams.map((s) => s.radius));
     const totalStarMass = starParams.reduce((sum, s) => sum + s.mass, 0);
 
-    const binarySeparation = starCount > 1
-        ? starPlacements[0]!.pos.distanceTo(starPlacements[1]!.pos)
-        : 0;
+    const binarySeparation =
+        starCount > 1 ? starPlacements[0]!.pos.distanceTo(starPlacements[1]!.pos) : 0;
 
     const S_STABLE_FRACTION = 0.3;
     const P_STABLE_MULTIPLE = 2.0;
@@ -42,7 +46,11 @@ export function generateProceduralComets(params: {
     const sMaxDist = starCount > 1 ? binarySeparation * S_STABLE_FRACTION : 0;
     const sZoneValid = starCount > 1 && sMaxDist > sMinDist;
 
-    const pMinDist = Math.max(EARTH_DIST * minDistAU, maxStarRadius * 20, binarySeparation * P_STABLE_MULTIPLE);
+    const pMinDist = Math.max(
+        EARTH_DIST * minDistAU,
+        maxStarRadius * 20,
+        binarySeparation * P_STABLE_MULTIPLE
+    );
     const pMaxDist = Math.max(EARTH_DIST * maxDistAU, binarySeparation * 20.0);
     const pZoneValid = pMinDist < pMaxDist;
 
@@ -103,16 +111,13 @@ export function generateProceduralComets(params: {
         // AND stay far enough from the host that periapsis velocity remains integrable.
         // r_peri = distance × (1−e)/(1+e); minPeriapsis ≥ distance×0.15 caps e ≈ 0.74 max.
         const minPeriapsis = isSType
-            ? Math.max(
-                starParams[hostStarIndex]!.radius * 5,
-                distance * 0.15
-              )
+            ? Math.max(starParams[hostStarIndex]!.radius * 5, distance * 0.15)
             : Math.max(
-                maxStarRadius * 5,
-                starPlacements[0]!.pos.length() + starParams[0]!.radius * 3,
-                starCount > 1 ? starPlacements[1]!.pos.length() + starParams[1]!.radius * 3 : 0,
-                binarySeparation * P_STABLE_MULTIPLE,
-                distance * 0.15
+                  maxStarRadius * 5,
+                  starPlacements[0]!.pos.length() + starParams[0]!.radius * 3,
+                  starCount > 1 ? starPlacements[1]!.pos.length() + starParams[1]!.radius * 3 : 0,
+                  binarySeparation * P_STABLE_MULTIPLE,
+                  distance * 0.15
               );
         const eMax = Math.max(0, (distance - minPeriapsis) / (distance + minPeriapsis));
 

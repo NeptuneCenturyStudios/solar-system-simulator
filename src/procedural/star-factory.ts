@@ -38,8 +38,11 @@ export function createMainSequenceStarFromParams(
         temperature: params.temperature,
         lightIntensity: params.lightIntensity,
         lightDistance: 524400,
-        rotation:
-            rotation ?? { tilt: params.rotationTilt, speed: params.rotationSpeed, azimuth: params.rotationAzimuth },
+        rotation: rotation ?? {
+            tilt: params.rotationTilt,
+            speed: params.rotationSpeed,
+            azimuth: params.rotationAzimuth,
+        },
         mesh: undefined, // use default star material/mesh
     });
 }

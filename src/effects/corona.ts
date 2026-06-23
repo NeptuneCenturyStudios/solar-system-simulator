@@ -161,7 +161,11 @@ export class Corona implements IEffect {
             p[xIdx + 2] += vz * frameScale;
 
             // If anything went non-finite, reset this particle.
-            if (!Number.isFinite(p[xIdx]) || !Number.isFinite(p[xIdx + 1]) || !Number.isFinite(p[xIdx + 2])) {
+            if (
+                !Number.isFinite(p[xIdx]) ||
+                !Number.isFinite(p[xIdx + 1]) ||
+                !Number.isFinite(p[xIdx + 2])
+            ) {
                 this.resetParticle(i);
             } else if (this.lives[i] >= 1.0) {
                 this.resetParticle(i);

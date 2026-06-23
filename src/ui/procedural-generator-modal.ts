@@ -35,15 +35,31 @@ export class ProceduralGeneratorModal extends Panel {
     initialize() {
         this._headerEl = this.element?.querySelector('.modal-header') as HTMLElement | null;
         this._seedInput = document.getElementById('proceduralSeedInput') as HTMLInputElement | null;
-        this._cancelBtn = document.getElementById('proceduralCancelBtn') as HTMLButtonElement | null;
-        this._createBtn = document.getElementById('proceduralCreateBtn') as HTMLButtonElement | null;
+        this._cancelBtn = document.getElementById(
+            'proceduralCancelBtn'
+        ) as HTMLButtonElement | null;
+        this._createBtn = document.getElementById(
+            'proceduralCreateBtn'
+        ) as HTMLButtonElement | null;
 
-        this._seedSectionEl = document.getElementById('procedural-seed-section') as HTMLElement | null;
-        this._progressSectionEl = document.getElementById('procedural-progress-section') as HTMLElement | null;
-        this._progressStatusEl = document.getElementById('procedural-progress-status') as HTMLElement | null;
-        this._progressTextEl = document.getElementById('procedural-progress-text') as HTMLElement | null;
-        this._progressBarFillEl = document.getElementById('procedural-progress-bar-fill') as HTMLElement | null;
-        this._progressErrorEl = document.getElementById('procedural-progress-error') as HTMLElement | null;
+        this._seedSectionEl = document.getElementById(
+            'procedural-seed-section'
+        ) as HTMLElement | null;
+        this._progressSectionEl = document.getElementById(
+            'procedural-progress-section'
+        ) as HTMLElement | null;
+        this._progressStatusEl = document.getElementById(
+            'procedural-progress-status'
+        ) as HTMLElement | null;
+        this._progressTextEl = document.getElementById(
+            'procedural-progress-text'
+        ) as HTMLElement | null;
+        this._progressBarFillEl = document.getElementById(
+            'procedural-progress-bar-fill'
+        ) as HTMLElement | null;
+        this._progressErrorEl = document.getElementById(
+            'procedural-progress-error'
+        ) as HTMLElement | null;
 
         if (this._createBtn) {
             this._createBtn.addEventListener('click', (e) => {

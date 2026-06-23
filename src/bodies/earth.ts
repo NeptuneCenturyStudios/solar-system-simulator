@@ -30,9 +30,9 @@ earthCloudsTexture.wrapS = THREE.RepeatWrapping;
 earthCloudsTexture.wrapT = THREE.RepeatWrapping;
 
 type EarthUniforms = {
-    nightTexture:  { value: THREE.Texture };
+    nightTexture: { value: THREE.Texture };
     starPositions: { value: THREE.Vector3[] };
-    numStars:      { value: number };
+    numStars: { value: number };
     earthPosition: { value: THREE.Vector3 };
 };
 
@@ -145,15 +145,16 @@ export class Earth extends Planet {
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
         const gEff = dependencies.getG();
-        const timeScale = EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, gEff, SUN_MASS);
-        const rotSpeed = (2 * Math.PI / (23.934 * 3600)) * timeScale;
+        const timeScale =
+            EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, gEff, SUN_MASS);
+        const rotSpeed = ((2 * Math.PI) / (23.934 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, EARTH_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
 
         const customUniforms: EarthUniforms = {
-            nightTexture:  { value: earthNightTexture },
+            nightTexture: { value: earthNightTexture },
             starPositions: { value: Array.from({ length: MAX_STARS }, () => new THREE.Vector3()) },
-            numStars:      { value: 0 },
+            numStars: { value: 0 },
             earthPosition: { value: new THREE.Vector3() },
         };
 
@@ -201,7 +202,12 @@ export class Earth extends Planet {
 
         // Shader-based atmosphere shell (slightly outside the cloud layer).
         // This stays visible from both inside (surface cam) and outside views.
-        this.atmosphereShell = createEarthAtmosphereShell(scene, this.radius * 1.07, 0x5599ff, this.mesh);
+        this.atmosphereShell = createEarthAtmosphereShell(
+            scene,
+            this.radius * 1.07,
+            0x5599ff,
+            this.mesh
+        );
 
         // Clouds rotate slightly faster than Earth to simulate moving atmosphere.
         this.cloudRotationSpeed = rotSpeed * 1.3;
@@ -211,9 +217,9 @@ export class Earth extends Planet {
         super.update(acc, dt);
 
         // Feed live star positions into the day/night shader each frame.
-        const stars = this.dependencies.getBodies().filter(
-            b => isBodyType(b, BodyTypeEnum.Star) && !b._isDisposed
-        );
+        const stars = this.dependencies
+            .getBodies()
+            .filter((b) => isBodyType(b, BodyTypeEnum.Star) && !b._isDisposed);
 
         const count = Math.min(stars.length, MAX_STARS);
         this.customUniforms.numStars.value = count;

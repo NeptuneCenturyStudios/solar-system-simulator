@@ -11,7 +11,11 @@ import { BodyTypeEnum, MoonTypeEnum } from './body-enums';
 export class Moon extends CelestialBody {
     moonType: MoonTypeEnum;
 
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, options: IMoonCreationOptions) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        options: IMoonCreationOptions
+    ) {
         super(
             dependencies,
             scene,

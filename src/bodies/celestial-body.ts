@@ -120,7 +120,9 @@ export class CelestialBody extends Body {
 
             if (tidalLock.spinAxisWorld) {
                 if (Array.isArray(tidalLock.spinAxisWorld)) {
-                    this.tidalLockSpinAxis = new THREE.Vector3(...tidalLock.spinAxisWorld).normalize();
+                    this.tidalLockSpinAxis = new THREE.Vector3(
+                        ...tidalLock.spinAxisWorld
+                    ).normalize();
                 } else {
                     this.tidalLockSpinAxis = new THREE.Vector3(
                         tidalLock.spinAxisWorld.x,
@@ -131,7 +133,9 @@ export class CelestialBody extends Body {
             }
 
             if (tidalLock.faceAxisLocal) {
-                this.tidalLockFaceAxisLocal = new THREE.Vector3(...tidalLock.faceAxisLocal).normalize();
+                this.tidalLockFaceAxisLocal = new THREE.Vector3(
+                    ...tidalLock.faceAxisLocal
+                ).normalize();
             }
 
             this.tidalLockAngularSpeed = tidalLock.angularSpeed;
@@ -402,8 +406,13 @@ export class CelestialBody extends Body {
             const spinAxis = this.tidalLockSpinAxis.clone().normalize();
 
             if (!this._tidalLockOmegaInitialized && this.tidalLockAngularSpeed === 0) {
-                const r0 = new THREE.Vector3().subVectors(this.mesh.position, this.tidalLockTarget.mesh.position);
-                const vrel0 = this.velocity.clone().sub(this.tidalLockTarget.velocity || new THREE.Vector3());
+                const r0 = new THREE.Vector3().subVectors(
+                    this.mesh.position,
+                    this.tidalLockTarget.mesh.position
+                );
+                const vrel0 = this.velocity
+                    .clone()
+                    .sub(this.tidalLockTarget.velocity || new THREE.Vector3());
                 const rLenSq = Math.max(1e-12, r0.lengthSq());
                 this.tidalLockAngularSpeed = r0.clone().cross(vrel0).length() / rLenSq;
                 this._tidalLockOmegaInitialized = true;
@@ -428,15 +437,18 @@ export class CelestialBody extends Body {
 
                     const cross = new THREE.Vector3().crossVectors(faceWorld, toTargetPlanar);
                     const sign = Math.sign(cross.dot(spinAxis)) || 1;
-                    const angle = Math.acos(
-                        THREE.MathUtils.clamp(faceWorld.dot(toTargetPlanar), -1, 1)
-                    ) * sign;
+                    const angle =
+                        Math.acos(THREE.MathUtils.clamp(faceWorld.dot(toTargetPlanar), -1, 1)) *
+                        sign;
 
                     // Prevent violent snap/oscillation when other transforms (e.g. user-applied
                     // tilt/azimuth) temporarily put the body far from its desired tidal-locked
                     // orientation. We cap the per-update correction angle.
                     const maxCorrectionRad = 0.25;
-                    const correctionAngle = Math.max(-maxCorrectionRad, Math.min(maxCorrectionRad, angle));
+                    const correctionAngle = Math.max(
+                        -maxCorrectionRad,
+                        Math.min(maxCorrectionRad, angle)
+                    );
 
                     this.mesh.rotateOnAxis(spinAxis, correctionAngle);
                 }
@@ -471,7 +483,7 @@ export class CelestialBody extends Body {
 
         // Write new world-space position into the ring buffer — no Vector3 allocation, no Array.shift().
         const h3 = this._trailHead * 3;
-        this._trailRing[h3]     = this.mesh.position.x;
+        this._trailRing[h3] = this.mesh.position.x;
         this._trailRing[h3 + 1] = this.mesh.position.y;
         this._trailRing[h3 + 2] = this.mesh.position.z;
         this._trailHead = (this._trailHead + 1) % this.maxTrail;
@@ -482,14 +494,14 @@ export class CelestialBody extends Body {
         const cx = cameraPos.x;
         const cy = cameraPos.y;
         const cz = cameraPos.z;
-        const count  = this._trailCount;
-        const maxT   = this.maxTrail;
+        const count = this._trailCount;
+        const maxT = this.maxTrail;
 
         if (count < maxT) {
             // Ring not yet full — elements are stored in order starting at index 0.
             for (let i = 0; i < count; i++) {
                 const s = i * 3;
-                this.trailPositions[s]     = this._trailRing[s]     - cx;
+                this.trailPositions[s] = this._trailRing[s] - cx;
                 this.trailPositions[s + 1] = this._trailRing[s + 1] - cy;
                 this.trailPositions[s + 2] = this._trailRing[s + 2] - cz;
             }
@@ -501,14 +513,14 @@ export class CelestialBody extends Body {
             for (let i = 0; i < tail; i++) {
                 const src = (head + i) * 3;
                 const dst = i * 3;
-                this.trailPositions[dst]     = this._trailRing[src]     - cx;
+                this.trailPositions[dst] = this._trailRing[src] - cx;
                 this.trailPositions[dst + 1] = this._trailRing[src + 1] - cy;
                 this.trailPositions[dst + 2] = this._trailRing[src + 2] - cz;
             }
             for (let i = 0; i < head; i++) {
                 const src = i * 3;
                 const dst = (tail + i) * 3;
-                this.trailPositions[dst]     = this._trailRing[src]     - cx;
+                this.trailPositions[dst] = this._trailRing[src] - cx;
                 this.trailPositions[dst + 1] = this._trailRing[src + 1] - cy;
                 this.trailPositions[dst + 2] = this._trailRing[src + 2] - cz;
             }
@@ -517,7 +529,6 @@ export class CelestialBody extends Body {
         this.trailGeo.attributes.position.needsUpdate = true;
         this.trailGeo.setDrawRange(0, count);
     }
-
 
     updateLabel(newName: string) {
         this.name = newName;

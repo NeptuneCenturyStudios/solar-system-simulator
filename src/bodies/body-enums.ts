@@ -22,7 +22,7 @@ export enum BodyTypeEnum {
 
 /**
  * PlanetTypeEnum defines subtypes for planets, which can be used to determine texture choices and other characteristics.
- * These are not mutually exclusive flags, but rather distinct categories that a planet can belong to. 
+ * These are not mutually exclusive flags, but rather distinct categories that a planet can belong to.
  * For example, a planet with bodyType Planet could have a subtype of 'gas_giant' or 'desert', which would influence its appearance and behavior in the simulation.
  */
 export enum PlanetTypeEnum {

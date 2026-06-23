@@ -51,7 +51,15 @@ export class GridHelperManager {
     }
 
     /** Recreate the grid helper at the given size/divisions/center. */
-    create({ size, divisions, center }: { size: number; divisions: number; center: THREE.Vector3 | null }): void {
+    create({
+        size,
+        divisions,
+        center,
+    }: {
+        size: number;
+        divisions: number;
+        center: THREE.Vector3 | null;
+    }): void {
         // GridHelper doesn't support resizing — dispose and recreate.
         this.dispose();
 
@@ -69,7 +77,11 @@ export class GridHelperManager {
     }
 
     /** Compute the required size, divisions, and center for the given target body. */
-    calcRequired(targetBody: Body | null): { size: number; divisions: number; center: THREE.Vector3 } {
+    calcRequired(targetBody: Body | null): {
+        size: number;
+        divisions: number;
+        center: THREE.Vector3;
+    } {
         if (!targetBody || targetBody._isDisposed || !targetBody.mesh) {
             return {
                 size: 12000,
@@ -114,7 +126,11 @@ export class GridHelperManager {
      * @param isDragging Whether a drag (reposition or velocity change) is currently active.
      */
     ensure(targetBody: Body | null, isDragging = false): void {
-        const { size: requiredSize, divisions: requiredDivisions, center } = this.calcRequired(targetBody);
+        const {
+            size: requiredSize,
+            divisions: requiredDivisions,
+            center,
+        } = this.calcRequired(targetBody);
 
         const currentSize = this.gridState.size || 0;
         const currentDivisions = this.gridState.divisions || 0;

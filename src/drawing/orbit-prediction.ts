@@ -71,10 +71,7 @@ export class OrbitPredictionManager {
 
         for (const other of allBodies) {
             if (other === body || other._isDisposed || !other.mesh) continue;
-            const diff = new THREE.Vector3().subVectors(
-                other.mesh.position,
-                body.mesh.position
-            );
+            const diff = new THREE.Vector3().subVectors(other.mesh.position, body.mesh.position);
             const r = diff.length();
             if (r < 0.01) continue; // too close, skip to avoid division by near-zero
             const accel = (G * other.mass) / (r * r);
@@ -100,9 +97,10 @@ export class OrbitPredictionManager {
         } else {
             xPeri = r.clone().projectOnPlane(orbitNormal);
             if (xPeri.lengthSq() < 1e-12) {
-                const ref = Math.abs(orbitNormal.y) < 0.99
-                    ? new THREE.Vector3(0, 1, 0)
-                    : new THREE.Vector3(1, 0, 0);
+                const ref =
+                    Math.abs(orbitNormal.y) < 0.99
+                        ? new THREE.Vector3(0, 1, 0)
+                        : new THREE.Vector3(1, 0, 0);
                 xPeri = new THREE.Vector3().crossVectors(ref, orbitNormal);
             }
             xPeri.normalize();
@@ -141,10 +139,7 @@ export class OrbitPredictionManager {
         primary: Body,
         gMultiplier: number
     ): THREE.Vector3[] | null {
-        const r = new THREE.Vector3().subVectors(
-            body.mesh.position,
-            primary.mesh.position
-        );
+        const r = new THREE.Vector3().subVectors(body.mesh.position, primary.mesh.position);
         const v = body.velocity.clone().sub(primary.velocity);
 
         const rLen = r.length();
@@ -168,7 +163,7 @@ export class OrbitPredictionManager {
         const e = eVec.length();
 
         // Semi-major axis from vis-viva: v^2 = mu(2/r - 1/a)
-        const invA = (2 / rLen) - (vLen * vLen) / mu;
+        const invA = 2 / rLen - (vLen * vLen) / mu;
         if (Math.abs(invA) < 1e-20) return null; // parabolic, treat as unbound
 
         const a = 1 / invA;
@@ -216,7 +211,7 @@ export class OrbitPredictionManager {
             const denom = 1 + effectiveE * cosNu;
             if (denom <= 1e-10) continue;
 
-            const radius = a * (1 - effectiveE * effectiveE) / denom;
+            const radius = (a * (1 - effectiveE * effectiveE)) / denom;
             const xP = radius * cosNu;
             const yP = radius * sinNu;
 

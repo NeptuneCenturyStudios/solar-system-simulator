@@ -152,7 +152,6 @@ export class CoordinateGizmo {
                 emissive: new THREE.Color(0x00ccff).multiplyScalar(0.2),
                 specular: new THREE.Color(0xffffff),
                 shininess: 100,
-
             })
         );
         this.azimuthKnob.userData = { isAzimuthGizmo: true };
@@ -205,7 +204,10 @@ export class CoordinateGizmo {
 
         // Tilt ring: only shown for bodies that have axial tilt (CelestialBody subclasses).
         // Duck-type check avoids a circular import (gizmo ← celestial-body ← star ← …).
-        if ('rotation' in body && (body as { rotation: { tilt: number } }).rotation?.tilt !== undefined) {
+        if (
+            'rotation' in body &&
+            (body as { rotation: { tilt: number } }).rotation?.tilt !== undefined
+        ) {
             this.tiltRing.visible = true;
             this.tiltKnob.visible = true;
             this.azimuthRing.visible = true;
@@ -215,7 +217,7 @@ export class CoordinateGizmo {
             // Rebuild ring geometry with the correct orbit radius. Tube radius is kept at a
             // fixed ~2% of the ring radius so the ring always looks like a thin wire at any scale.
             const tiltRadius = 80 * scaleFactor;
-            const azRadius   = 70 * scaleFactor;
+            const azRadius = 70 * scaleFactor;
             const TUBE_RADIUS = Math.max(tiltRadius * 0.022, 0.5);
             const AZ_TUBE_RADIUS = Math.max(azRadius * 0.022, 0.5);
             this.tiltRing.geometry.dispose();
@@ -323,11 +325,7 @@ export class CoordinateGizmo {
         const tiltRadialX = sinTilt * sinAz;
         const tiltRadialY = cosTilt;
         const tiltRadialZ = sinTilt * cosAz;
-        this.tiltKnob.position.set(
-            Rt * tiltRadialX,
-            Rt * tiltRadialY,
-            Rt * tiltRadialZ
-        );
+        this.tiltKnob.position.set(Rt * tiltRadialX, Rt * tiltRadialY, Rt * tiltRadialZ);
 
         // Azimuth knob: centered on the ring tube centerline in the XZ plane.
         const azRadialX = sinAz;

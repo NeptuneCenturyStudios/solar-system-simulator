@@ -69,7 +69,11 @@ export class Spaceship extends Body {
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
         this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF, -0.9 * SF);
-        this.thirdPersonOffset = new THREE.Vector3(0, SPACESHIP_RADIUS * 0.35, -SPACESHIP_RADIUS * 1.8);
+        this.thirdPersonOffset = new THREE.Vector3(
+            0,
+            SPACESHIP_RADIUS * 0.35,
+            -SPACESHIP_RADIUS * 1.8
+        );
 
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
@@ -90,9 +94,7 @@ export class Spaceship extends Body {
                 materials.preload();
                 const objLoader = new OBJLoader();
                 objLoader.setMaterials(materials);
-                return objLoader.loadAsync(
-                    `./assets/models/${modelName}.obj`
-                );
+                return objLoader.loadAsync(`./assets/models/${modelName}.obj`);
             })
             .then((group) => {
                 // Compute bounding box of the unscaled model (group at world origin, no parent).

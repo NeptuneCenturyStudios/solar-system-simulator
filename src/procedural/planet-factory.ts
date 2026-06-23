@@ -66,9 +66,7 @@ export type ProceduralPlanetCreation = {
     textureSeed?: string;
 };
 
-function computeRingPresence(
-    creation: ProceduralPlanetCreation
-): { hasRings: boolean } {
+function computeRingPresence(creation: ProceduralPlanetCreation): { hasRings: boolean } {
     const { id, bodySubtype, hasRings, bodyType } = creation;
 
     const GAS_GIANT_RINGS_PROB = 0.85;
@@ -80,11 +78,13 @@ function computeRingPresence(
         bodySubtype === PlanetTypeEnum.GasGiant
             ? ringRng.chance(GAS_GIANT_RINGS_PROB)
             : bodySubtype === PlanetTypeEnum.IceGiant
-                ? ringRng.chance(ICE_GIANT_RINGS_PROB)
-                : ringRng.chance(SOLID_RINGS_PROB);
+              ? ringRng.chance(ICE_GIANT_RINGS_PROB)
+              : ringRng.chance(SOLID_RINGS_PROB);
 
     const resolved =
-        typeof hasRings === 'boolean' && bodyType === BodyTypeEnum.Planet ? hasRings : hasRingsProbabilistic;
+        typeof hasRings === 'boolean' && bodyType === BodyTypeEnum.Planet
+            ? hasRings
+            : hasRingsProbabilistic;
 
     return { hasRings: resolved };
 }
@@ -109,13 +109,12 @@ function pickTextureForGasIceSubtype(
     textureIndex: number | undefined
 ): THREE.Texture {
     const idx = Math.max(0, textureIndex ?? 0);
-    if (subtype === PlanetTypeEnum.GasGiant) return fictionalGasTextures[idx % fictionalGasTextures.length]!;
+    if (subtype === PlanetTypeEnum.GasGiant)
+        return fictionalGasTextures[idx % fictionalGasTextures.length]!;
     return fictionalIceTextures[idx % fictionalIceTextures.length]!;
 }
 
-function buildMeshMaterial(
-    creation: ProceduralPlanetCreation
-): THREE.MeshStandardMaterial {
+function buildMeshMaterial(creation: ProceduralPlanetCreation): THREE.MeshStandardMaterial {
     const { bodySubtype, textureIndex } = creation;
 
     const texture =
@@ -143,7 +142,20 @@ function createCommonPlanetOptions(
     mesh: THREE.Mesh,
     hasRings: boolean
 ): Planet | DwarfPlanet {
-    const { radius, pos, vel, mass, id, name, bodySubtype, rotationSpeed, rotationTilt, rotationAzimuth, bodyType, textureSeed } = creation;
+    const {
+        radius,
+        pos,
+        vel,
+        mass,
+        id,
+        name,
+        bodySubtype,
+        rotationSpeed,
+        rotationTilt,
+        rotationAzimuth,
+        bodyType,
+        textureSeed,
+    } = creation;
 
     const commonOptions = {
         radius,

@@ -33,8 +33,9 @@ export class Saturn extends Planet {
         angleRad: number = 0
     ) {
         const gEff = dependencies.getG();
-        const timeScale = SATURN_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(SATURN_DIST, gEff, SUN_MASS);
-        const rotSpeed = (2 * Math.PI / (10.656 * 3600)) * timeScale;
+        const timeScale =
+            SATURN_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(SATURN_DIST, gEff, SUN_MASS);
+        const rotSpeed = ((2 * Math.PI) / (10.656 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, SATURN_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(SATURN_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({

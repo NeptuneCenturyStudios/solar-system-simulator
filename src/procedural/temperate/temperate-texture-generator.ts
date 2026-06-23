@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../../utilities/prng';
-import { clamp01, dot, fbm3D, hashStringToU32, lerp, mix3, normalizeSafe, smoothstep, Vec3 } from '../noise-utils';
+import {
+    clamp01,
+    dot,
+    fbm3D,
+    hashStringToU32,
+    lerp,
+    mix3,
+    normalizeSafe,
+    smoothstep,
+    Vec3,
+} from '../noise-utils';
 
 const TEXTURE_WIDTH = 2048;
 const TEXTURE_HEIGHT = 1024;
@@ -54,11 +64,11 @@ const SHORE_EDGE1 = 0.32;
 
 // Mountain ridge thresholds
 const RIDGE_EDGE0 = 0.55;
-const RIDGE_EDGE1 = 0.80;
+const RIDGE_EDGE1 = 0.8;
 
 // Polar cap latitude — normalized latitude where ice begins to appear
 const ICE_LAT_START = 0.72;
-const ICE_LAT_END = 0.90;
+const ICE_LAT_END = 0.9;
 
 // =============================================================================
 // Height shaping
@@ -79,7 +89,7 @@ const NORMAL_STRENGTH_LAND = 0.7;
 // Polar flattening
 const POLAR_FLAT_START = 0.65;
 const POLAR_FLAT_END = 0.99;
-const POLAR_DETAIL_MIN = 0.40;
+const POLAR_DETAIL_MIN = 0.4;
 
 // =============================================================================
 // Color Palette — Earth-like
@@ -93,25 +103,25 @@ const oceanCoastal: Vec3 = { x: 0.12, y: 0.45, z: 0.82 };
 
 // Land — forest / vegetation (temperate Earth-like greens)
 const forestDark: Vec3 = { x: 0.08, y: 0.25, z: 0.06 };
-const forestMid: Vec3 = { x: 0.12, y: 0.38, z: 0.10 };
-const grassland: Vec3 = { x: 0.30, y: 0.55, z: 0.15 };
-const savanna: Vec3 = { x: 0.55, y: 0.65, z: 0.20 };
+const forestMid: Vec3 = { x: 0.12, y: 0.38, z: 0.1 };
+const grassland: Vec3 = { x: 0.3, y: 0.55, z: 0.15 };
+const savanna: Vec3 = { x: 0.55, y: 0.65, z: 0.2 };
 
 // Arid / desert regions
 const desertSand: Vec3 = { x: 0.72, y: 0.62, z: 0.38 };
 const desertRock: Vec3 = { x: 0.55, y: 0.48, z: 0.32 };
 
 // Mountains / bare rock
-const mountainRock: Vec3 = { x: 0.40, y: 0.38, z: 0.34 };
-const mountainSnow: Vec3 = { x: 0.78, y: 0.80, z: 0.85 };
+const mountainRock: Vec3 = { x: 0.4, y: 0.38, z: 0.34 };
+const mountainSnow: Vec3 = { x: 0.78, y: 0.8, z: 0.85 };
 
 // Polar ice
-const iceColor: Vec3 = { x: 0.70, y: 0.76, z: 0.88 };
-const iceBright: Vec3 = { x: 0.88, y: 0.90, z: 0.95 };
+const iceColor: Vec3 = { x: 0.7, y: 0.76, z: 0.88 };
+const iceBright: Vec3 = { x: 0.88, y: 0.9, z: 0.95 };
 const snowWhite: Vec3 = { x: 0.95, y: 0.96, z: 0.98 };
 
 // Sand/beach fringe
-const beachSand: Vec3 = { x: 0.80, y: 0.75, z: 0.55 };
+const beachSand: Vec3 = { x: 0.8, y: 0.75, z: 0.55 };
 
 // =============================================================================
 // Types & Caches
@@ -133,7 +143,10 @@ function yieldToEventLoop(): Promise<void> {
 // Canvas → THREE.Texture helpers
 // =============================================================================
 
-function canvasesToTextures(canvas: HTMLCanvasElement, normalCanvas: HTMLCanvasElement): TemperateMaps {
+function canvasesToTextures(
+    canvas: HTMLCanvasElement,
+    normalCanvas: HTMLCanvasElement
+): TemperateMaps {
     const colorTex = new THREE.CanvasTexture(canvas);
     colorTex.colorSpace = THREE.SRGBColorSpace;
     colorTex.wrapS = THREE.RepeatWrapping;
@@ -160,7 +173,10 @@ function canvasesToTextures(canvas: HTMLCanvasElement, normalCanvas: HTMLCanvasE
 // Synchronous render: colour + normal canvases
 // =============================================================================
 
-function renderTemperateMaps(seed: string): { canvas: HTMLCanvasElement; normalCanvas: HTMLCanvasElement } {
+function renderTemperateMaps(seed: string): {
+    canvas: HTMLCanvasElement;
+    normalCanvas: HTMLCanvasElement;
+} {
     const cacheKey = seed.trim();
 
     const seedU32 = hashStringToU32(cacheKey);
@@ -302,7 +318,11 @@ function renderTemperateMaps(seed: string): { canvas: HTMLCanvasElement; normalC
             // Coast gate — compare directly to per-planet seeded threshold.
             // combinedGate clusters ~N(0.5, std 0.08); landThreshold [0.48, 0.62]
             // produces 8–55% land depending on seed, always majority ocean.
-            const landMask = smoothstep(landThreshold, landThreshold + COAST_GATE_WIDTH, combinedGate);
+            const landMask = smoothstep(
+                landThreshold,
+                landThreshold + COAST_GATE_WIDTH,
+                combinedGate
+            );
             const landMaskSharp = Math.pow(landMask, 1.8);
 
             // Shore band (transition zone between water and land)
@@ -335,15 +355,17 @@ function renderTemperateMaps(seed: string): { canvas: HTMLCanvasElement; normalC
             let col = mix3(oceanDeep, oceanMid, waterT);
             // Subtle banding
             const band = clamp01(
-                0.5 + 0.5 * fbm3D(
-                    xLocalEff * (NOISE_COAST_SCALE * 0.4) + (ox + 10.0),
-                    yLocal * (NOISE_COAST_SCALE * 0.4) + (oy - 20.0),
-                    zLocalEff * (NOISE_COAST_SCALE * 0.4) + (oz + 30.0),
-                    2,
-                    seedU32
-                )
+                0.5 +
+                    0.5 *
+                        fbm3D(
+                            xLocalEff * (NOISE_COAST_SCALE * 0.4) + (ox + 10.0),
+                            yLocal * (NOISE_COAST_SCALE * 0.4) + (oy - 20.0),
+                            zLocalEff * (NOISE_COAST_SCALE * 0.4) + (oz + 30.0),
+                            2,
+                            seedU32
+                        )
             );
-            col = mix3(col, oceanMid, band * 0.10);
+            col = mix3(col, oceanMid, band * 0.1);
 
             // Shallow coastal water
             const shallowCol = mix3(oceanMid, oceanShallow, shoreBand);
@@ -370,7 +392,8 @@ function renderTemperateMaps(seed: string): { canvas: HTMLCanvasElement; normalC
                 // Mix based on latitude + biome noise
                 const equatorialBias = clamp01(1 - latFactor * 1.5);
                 const temperateBias = clamp01(1 - Math.abs(latFactor - 0.4) * 2.5);
-                const aridBias = clamp01(1 - Math.abs(latFactor - 0.3) * 8.0) * (1 - equatorialBias) * 0.5;
+                const aridBias =
+                    clamp01(1 - Math.abs(latFactor - 0.3) * 8.0) * (1 - equatorialBias) * 0.5;
 
                 // Green blend
                 const greenMix = mix3(forestDark, forestMid, biome);
@@ -388,8 +411,12 @@ function renderTemperateMaps(seed: string): { canvas: HTMLCanvasElement; normalC
                 // Elevation coloring: low = green, mid = brown/tan, high = rock, peak = snow
                 const elevFactor = terrainElev; // 0..1
                 if (elevFactor > 0.65) {
-                    const rockFade = (elevFactor - 0.65) / 0.30;
-                    landCol = mix3(landCol, mix3(mountainRock, mountainSnow, clamp01((elevFactor - 0.80) / 0.15)), rockFade * 0.5);
+                    const rockFade = (elevFactor - 0.65) / 0.3;
+                    landCol = mix3(
+                        landCol,
+                        mix3(mountainRock, mountainSnow, clamp01((elevFactor - 0.8) / 0.15)),
+                        rockFade * 0.5
+                    );
                 } else if (elevFactor < 0.35) {
                     // Lowland — might get coastal/sandy
                     const coastLatBias = clamp01(absLatSphere * 2.5);
@@ -416,7 +443,7 @@ function renderTemperateMaps(seed: string): { canvas: HTMLCanvasElement; normalC
 
                 // Wet sand fringe at coast
                 const wetSand = mix3(oceanShallow, beachSand, 0.3);
-                const wetT = Math.pow(shoreBand, 0.8) * 0.20;
+                const wetT = Math.pow(shoreBand, 0.8) * 0.2;
                 col = mix3(col, wetSand, wetT);
             }
 
@@ -673,7 +700,11 @@ async function getOrCreateTemperateMapsAsync(seed: string): Promise<TemperateMap
             const coastRemap = clamp01(0.5 + 0.5 * coastN);
             const combinedGate = clamp01(continentRemap * 0.6 + coastRemap * 0.4);
 
-            const landMask = smoothstep(landThreshold, landThreshold + COAST_GATE_WIDTH, combinedGate);
+            const landMask = smoothstep(
+                landThreshold,
+                landThreshold + COAST_GATE_WIDTH,
+                combinedGate
+            );
             const landMaskSharp = Math.pow(landMask, 1.8);
             const shoreBand = smoothstep(SHORE_EDGE0, SHORE_EDGE1, landMaskSharp);
 
@@ -700,15 +731,17 @@ async function getOrCreateTemperateMapsAsync(seed: string): Promise<TemperateMap
             let col = mix3(oceanDeep, oceanMid, waterT);
 
             const bandN = clamp01(
-                0.5 + 0.5 * fbm3D(
-                    xLocalEff * (NOISE_COAST_SCALE * 0.4) + (ox + 10.0),
-                    yLocal * (NOISE_COAST_SCALE * 0.4) + (oy - 20.0),
-                    zLocalEff * (NOISE_COAST_SCALE * 0.4) + (oz + 30.0),
-                    2,
-                    seedU32
-                )
+                0.5 +
+                    0.5 *
+                        fbm3D(
+                            xLocalEff * (NOISE_COAST_SCALE * 0.4) + (ox + 10.0),
+                            yLocal * (NOISE_COAST_SCALE * 0.4) + (oy - 20.0),
+                            zLocalEff * (NOISE_COAST_SCALE * 0.4) + (oz + 30.0),
+                            2,
+                            seedU32
+                        )
             );
-            col = mix3(col, oceanMid, bandN * 0.10);
+            col = mix3(col, oceanMid, bandN * 0.1);
 
             const shallowCol = mix3(oceanMid, oceanShallow, shoreBand);
             col = mix3(col, shallowCol, shoreBand * 0.25);
@@ -730,7 +763,8 @@ async function getOrCreateTemperateMapsAsync(seed: string): Promise<TemperateMap
 
                 const equatorialBias = clamp01(1 - latFactor * 1.5);
                 const temperateBias = clamp01(1 - Math.abs(latFactor - 0.4) * 2.5);
-                const aridBias = clamp01(1 - Math.abs(latFactor - 0.3) * 8.0) * (1 - equatorialBias) * 0.5;
+                const aridBias =
+                    clamp01(1 - Math.abs(latFactor - 0.3) * 8.0) * (1 - equatorialBias) * 0.5;
 
                 const greenMix = mix3(forestDark, forestMid, biome);
                 const temperateMix = mix3(grassland, savanna, biome);
@@ -746,8 +780,12 @@ async function getOrCreateTemperateMapsAsync(seed: string): Promise<TemperateMap
 
                 const elevFactor = terrainElev;
                 if (elevFactor > 0.65) {
-                    const rockFade = (elevFactor - 0.65) / 0.30;
-                    landCol = mix3(landCol, mix3(mountainRock, mountainSnow, clamp01((elevFactor - 0.80) / 0.15)), rockFade * 0.5);
+                    const rockFade = (elevFactor - 0.65) / 0.3;
+                    landCol = mix3(
+                        landCol,
+                        mix3(mountainRock, mountainSnow, clamp01((elevFactor - 0.8) / 0.15)),
+                        rockFade * 0.5
+                    );
                 } else if (elevFactor < 0.35) {
                     const coastLatBias = clamp01(absLatSphere * 2.5);
                     landCol = mix3(landCol, beachSand, (1 - biome) * coastLatBias * 0.15);
@@ -769,7 +807,7 @@ async function getOrCreateTemperateMapsAsync(seed: string): Promise<TemperateMap
                 col = mix3(col, landCol, landBlend);
 
                 const wetSand = mix3(oceanShallow, beachSand, 0.3);
-                const wetT = Math.pow(shoreBand, 0.8) * 0.20;
+                const wetT = Math.pow(shoreBand, 0.8) * 0.2;
                 col = mix3(col, wetSand, wetT);
             }
 

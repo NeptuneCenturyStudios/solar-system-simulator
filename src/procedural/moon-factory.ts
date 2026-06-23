@@ -31,7 +31,11 @@ function pickMoonTextureForMoonType(
     return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
 }
 
-function createMoonMesh(radius: number, texture: THREE.Texture, moonType: MoonTypeEnum): THREE.Mesh {
+function createMoonMesh(
+    radius: number,
+    texture: THREE.Texture,
+    moonType: MoonTypeEnum
+): THREE.Mesh {
     const geometry = new THREE.SphereGeometry(radius, 32, 32);
 
     const material = new THREE.MeshStandardMaterial({
@@ -59,15 +63,13 @@ function createMoonTidalLock(parent: CelestialBody, safeRotationSpeed: number): 
     };
 }
 
-function buildMoon(
-    params: {
-        dependencies: IStateDependencies;
-        scene: THREE.Scene;
-        creation: ProceduralMoonCreation;
-        parent: CelestialBody;
-        mesh: THREE.Mesh;
-    }
-): CelestialBody {
+function buildMoon(params: {
+    dependencies: IStateDependencies;
+    scene: THREE.Scene;
+    creation: ProceduralMoonCreation;
+    parent: CelestialBody;
+    mesh: THREE.Mesh;
+}): CelestialBody {
     const { dependencies, scene, creation, parent, mesh } = params;
 
     const {
@@ -89,7 +91,8 @@ function buildMoon(
 
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
     const safeMass = Number.isFinite(mass) && mass > 0 ? mass : 0.5;
-    const safeRotationSpeed = Number.isFinite(rotationSpeed) && rotationSpeed > 0 ? rotationSpeed : 0.1;
+    const safeRotationSpeed =
+        Number.isFinite(rotationSpeed) && rotationSpeed > 0 ? rotationSpeed : 0.1;
 
     const safeDistance = Number.isFinite(distance) && distance > 0 ? distance : 1;
     const safeAngle = Number.isFinite(angle) ? angle : 0;
@@ -137,11 +140,7 @@ export function createMoonBodyFromProceduralCreation(params: {
 }): CelestialBody {
     const { creation } = params;
 
-    const {
-        radius,
-        moonType,
-        moonTextureIndex,
-    } = creation;
+    const { radius, moonType, moonTextureIndex } = creation;
 
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
 

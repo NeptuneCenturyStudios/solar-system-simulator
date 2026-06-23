@@ -99,7 +99,10 @@ export class SurfaceCameraManager {
                 : null);
 
         const isEnabled = this.isEligibleBody(selected);
-        this.uiManager.mainPanel.setSurfaceCameraState({ isActive: this.state.isActive, isEnabled });
+        this.uiManager.mainPanel.setSurfaceCameraState({
+            isActive: this.state.isActive,
+            isEnabled,
+        });
     }
 
     exit(): void {
@@ -177,16 +180,15 @@ export class SurfaceCameraManager {
         const b = s.body;
         const center = b.mesh!.position;
 
-        const gravityUp = s.anchorLocalDir
-            .clone()
-            .applyQuaternion(b.mesh!.quaternion)
-            .normalize();
+        const gravityUp = s.anchorLocalDir.clone().applyQuaternion(b.mesh!.quaternion).normalize();
 
         const worldRadius = (b.radius || 0) * (b.mesh?.scale?.x || 1);
         const minEyeClearance = Math.max(worldRadius * 0.001, 0.05);
         const eyeOffset = Math.max(s.eyeHeight, minEyeClearance);
 
-        const surfacePoint = center.clone().add(gravityUp.clone().multiplyScalar(worldRadius + eyeOffset));
+        const surfacePoint = center
+            .clone()
+            .add(gravityUp.clone().multiplyScalar(worldRadius + eyeOffset));
 
         const worldRefA = new THREE.Vector3(0, 1, 0);
         const worldRefB = new THREE.Vector3(0, 0, 1);

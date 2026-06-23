@@ -245,7 +245,10 @@ function maybeSecondToken(rng: SeededRandom, chance: number): string {
     return makeWordFromSyllables(rng, { minSyllables: 2, maxSyllables: 3 });
 }
 
-export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: ProceduralBodyNameOptions): string {
+export function generateProceduralBodyName(
+    bodyType: BodyTypeEnum,
+    options: ProceduralBodyNameOptions
+): string {
     // Primary name token(s) + suffix/roman are generated from rngPrimary.
     // Secondary-name presence/token is generated from rngSecond so we don't
     // disturb existing suffix/roman choices for the same seed.
@@ -257,12 +260,14 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
     switch (bodyType) {
         case BodyTypeEnum.Star: {
             const starMemberCount =
-                typeof options.starSystemMemberCount === 'number' && Number.isFinite(options.starSystemMemberCount)
+                typeof options.starSystemMemberCount === 'number' &&
+                Number.isFinite(options.starSystemMemberCount)
                     ? options.starSystemMemberCount
                     : undefined;
 
             const starMemberIndex =
-                typeof options.starSystemMemberIndex === 'number' && Number.isFinite(options.starSystemMemberIndex)
+                typeof options.starSystemMemberIndex === 'number' &&
+                Number.isFinite(options.starSystemMemberIndex)
                     ? options.starSystemMemberIndex
                     : undefined;
 
@@ -287,7 +292,8 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                     return 'M';
                 }
 
-                return typeof options.starTemperatureK === 'number' && Number.isFinite(options.starTemperatureK)
+                return typeof options.starTemperatureK === 'number' &&
+                    Number.isFinite(options.starTemperatureK)
                     ? spectralClassFromTemperature(options.starTemperatureK)
                     : (() => {
                           // Deterministically derive spectral class from RNG outputs.
@@ -315,7 +321,9 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
             };
 
             // Sometimes add an adjective-like suffix token; often omit to keep names short.
-            const adjective = rngPrimary.chance(0.45) ? pickFrom(rngPrimary, suffixByClass[cls]) : '';
+            const adjective = rngPrimary.chance(0.45)
+                ? pickFrom(rngPrimary, suffixByClass[cls])
+                : '';
 
             const firstToken = `${core}${adjective}`;
             const secondToken = maybeSecondToken(rngSecond, 0.55);
@@ -327,7 +335,9 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
                     options.starSystemSuffixStyle === 'romans'
                         ? options.starSystemSuffixStyle
                         : (() => {
-                              const styleRng = new SeededRandom(`${options.seed}|star-system-suffix-style`);
+                              const styleRng = new SeededRandom(
+                                  `${options.seed}|star-system-suffix-style`
+                              );
                               return styleRng.chance(0.5) ? 'letters' : 'romans';
                           })();
 
@@ -368,11 +378,12 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
             ];
 
             const suffix = pickFrom(rngPrimary, nameEndingBank);
-            const maybeRoman = rngPrimary.chance(0.25) ? ` ${romanFromSequence(rngPrimary, sequence)}` : '';
+            const maybeRoman = rngPrimary.chance(0.25)
+                ? ` ${romanFromSequence(rngPrimary, sequence)}`
+                : '';
 
             return `${firstToken}${secondToken ? ` ${secondToken}` : ''}${suffix}${maybeRoman}`;
         }
-
 
         case BodyTypeEnum.DwarfPlanet: {
             const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
@@ -411,7 +422,10 @@ export function generateProceduralBodyName(bodyType: BodyTypeEnum, options: Proc
             }
 
             // Fallback when we don't have a parent.
-            const fallback = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
+            const fallback = makeWordFromSyllables(rngPrimary, {
+                minSyllables: 2,
+                maxSyllables: 3,
+            });
             return `${fallback}${secondToken ? ` ${secondToken}` : ''}`;
         }
 

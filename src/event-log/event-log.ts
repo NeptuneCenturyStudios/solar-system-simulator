@@ -6,9 +6,9 @@ export enum NotificationType {
     Info = 'info',
 }
 
-export enum LogMethods{
+export enum LogMethods {
     Console,
-    Alert
+    Alert,
 }
 
 /**
@@ -23,7 +23,11 @@ export class EventLogEntry {
     notificationType: NotificationType;
     logMethod: LogMethods;
 
-    constructor(message: string, notificationType: NotificationType = NotificationType.Info, logMethod: LogMethods = LogMethods.Console) {
+    constructor(
+        message: string,
+        notificationType: NotificationType = NotificationType.Info,
+        logMethod: LogMethods = LogMethods.Console
+    ) {
         this.message = message;
         this.notificationType = notificationType;
         this.logMethod = logMethod;

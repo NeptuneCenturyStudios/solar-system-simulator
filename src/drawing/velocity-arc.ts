@@ -22,12 +22,20 @@ export class VelocityArcManager {
 
     private scene: THREE.Scene;
     private gizmo: CoordinateGizmo;
-    private interactionState: { isChangingVelocity: boolean; isMiddleMouseVelocity: boolean; velocityEditMode: string };
+    private interactionState: {
+        isChangingVelocity: boolean;
+        isMiddleMouseVelocity: boolean;
+        velocityEditMode: string;
+    };
 
     constructor(
         scene: THREE.Scene,
         gizmo: CoordinateGizmo,
-        interactionState: { isChangingVelocity: boolean; isMiddleMouseVelocity: boolean; velocityEditMode: string }
+        interactionState: {
+            isChangingVelocity: boolean;
+            isMiddleMouseVelocity: boolean;
+            velocityEditMode: string;
+        }
     ) {
         this.scene = scene;
         this.gizmo = gizmo;
@@ -101,10 +109,14 @@ export class VelocityArcManager {
     /** Update arc positions, rotations and visibility each frame. */
     update(): void {
         const draggingVel =
-            this.interactionState.isChangingVelocity ||
-            this.interactionState.isMiddleMouseVelocity;
+            this.interactionState.isChangingVelocity || this.interactionState.isMiddleMouseVelocity;
 
-        if (!this.gizmo?.target || this.gizmo.target._isDisposed || !this.gizmo.target.mesh || !draggingVel) {
+        if (
+            !this.gizmo?.target ||
+            this.gizmo.target._isDisposed ||
+            !this.gizmo.target.mesh ||
+            !draggingVel
+        ) {
             this.arcXZ.visible = false;
             this.arcY.visible = false;
             return;
@@ -177,8 +189,7 @@ export class VelocityArcManager {
         }
 
         // Thicken + brighten the active arc during the drag
-        const activeArc =
-            this.interactionState.velocityEditMode === 'xz' ? this.arcXZ : this.arcY;
+        const activeArc = this.interactionState.velocityEditMode === 'xz' ? this.arcXZ : this.arcY;
         if (activeArc && activeArc.material) {
             activeArc.material.opacity = VEL_ARC_ACTIVE_OPACITY;
         }

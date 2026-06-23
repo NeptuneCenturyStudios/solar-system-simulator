@@ -106,8 +106,6 @@ export class MainPanel extends Panel {
                 this.emit('namesChange', { checked: this.showNamesCheckbox!.checked });
             };
         }
-
-        
     }
 
     updateTimeScaleDisplay(value: string) {

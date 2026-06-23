@@ -39,7 +39,6 @@ import {
 } from './consts';
 import { SeededRandom } from './prng';
 
-
 // ---------------------------------------------------------------------------
 // Star
 // ---------------------------------------------------------------------------
@@ -112,18 +111,16 @@ export function randomStarParams(
 
     const minMass = SUN_MASS * 0.08;
     const maxMass = SUN_MASS * 150;
-    const mass =
-        isFinitePositiveNumber(opts.mass)
-            ? opts.mass
-            : minMass * Math.pow(maxMass / minMass, rng.next());
+    const mass = isFinitePositiveNumber(opts.mass)
+        ? opts.mass
+        : minMass * Math.pow(maxMass / minMass, rng.next());
 
     const minRadius = SUN_RADIUS * 0.15;
     const maxRadius = 200000 * SCALE_FACTOR;
     const computedRadius = calculateStarRadius(mass, SUN_MASS, SUN_RADIUS);
-    const radius =
-        isFinitePositiveNumber(opts.radius)
-            ? opts.radius
-            : Math.min(Math.max(computedRadius, minRadius), maxRadius);
+    const radius = isFinitePositiveNumber(opts.radius)
+        ? opts.radius
+        : Math.min(Math.max(computedRadius, minRadius), maxRadius);
 
     const temperature =
         typeof opts.temperature === 'number' && isFinite(opts.temperature)
@@ -136,10 +133,9 @@ export function randomStarParams(
     const lightMin = STAR_LIGHT_INTENSITY_MIN;
     const lightMax = STAR_LIGHT_INTENSITY_MAX;
 
-    const rawLightIntensity =
-        isFinitePositiveNumber(opts.lightIntensity)
-            ? opts.lightIntensity
-            : lightMin * Math.pow(lightMax / lightMin, rng.next());
+    const rawLightIntensity = isFinitePositiveNumber(opts.lightIntensity)
+        ? opts.lightIntensity
+        : lightMin * Math.pow(lightMax / lightMin, rng.next());
 
     const lightIntensity = Math.min(Math.max(rawLightIntensity, lightMin), lightMax);
 
@@ -152,7 +148,9 @@ export function randomStarParams(
             : rng.range(0, 90);
 
     const rotationSpeed =
-        typeof opts.rotationSpeed === 'number' && isFinite(opts.rotationSpeed) && opts.rotationSpeed > 0
+        typeof opts.rotationSpeed === 'number' &&
+        isFinite(opts.rotationSpeed) &&
+        opts.rotationSpeed > 0
             ? opts.rotationSpeed
             : rng.range(0.03, 0.12);
 
@@ -168,12 +166,10 @@ export function randomStarParams(
         typeof temperature === 'number' && isFinite(temperature) && temperature > 0
             ? temperature
             : 5778;
-    const safeLightIntensity =
-        isFinitePositiveNumber(lightIntensity) ? lightIntensity : lightMin;
+    const safeLightIntensity = isFinitePositiveNumber(lightIntensity) ? lightIntensity : lightMin;
 
     const safeRotationTilt = isFinitePositiveNumber(rotationTilt) ? rotationTilt : 0;
-    const safeRotationSpeed =
-        isFinitePositiveNumber(rotationSpeed) ? rotationSpeed : 0.08;
+    const safeRotationSpeed = isFinitePositiveNumber(rotationSpeed) ? rotationSpeed : 0.08;
     const safeRotationAzimuth =
         typeof rotationAzimuth === 'number' && isFinite(rotationAzimuth) ? rotationAzimuth : 0;
 
@@ -223,8 +219,6 @@ export function randomBlackHoleParams(
 
     return { mass, radius };
 }
-
-
 
 export interface PlanetParams {
     mass: number;
@@ -295,23 +289,16 @@ export function randomPlanetParams(
     const massMin = isSolidLike ? solidMassMin : isGasGiant ? gasMassMin : iceMassMin;
     const massMax = isSolidLike ? solidMassMax : isGasGiant ? gasMassMax : iceMassMax;
 
-    const radiusMin = isSolidLike
-        ? solidRadiusMin
-        : isGasGiant
-          ? gasRadiusMin
-          : iceRadiusMin;
-    const radiusMax = isSolidLike
-        ? solidRadiusMax
-        : isGasGiant
-          ? gasRadiusMax
-          : iceRadiusMax;
+    const radiusMin = isSolidLike ? solidRadiusMin : isGasGiant ? gasRadiusMin : iceRadiusMin;
+    const radiusMax = isSolidLike ? solidRadiusMax : isGasGiant ? gasRadiusMax : iceRadiusMax;
 
     // Sample mass log-uniform between min/max, unless overridden.
-    const sampledMass =
-        massMin * Math.pow(massMax / Math.max(1e-12, massMin), rng.next());
+    const sampledMass = massMin * Math.pow(massMax / Math.max(1e-12, massMin), rng.next());
 
     const mass =
-        typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0 ? opts.mass : sampledMass;
+        typeof opts.mass === 'number' && isFinite(opts.mass) && opts.mass > 0
+            ? opts.mass
+            : sampledMass;
 
     // Derive radius from the mass using a power-law anchored at min/max,
     // unless overridden.
@@ -491,8 +478,7 @@ export function randomAsteroidParams(
         )
     );
     const derivedRadius =
-        ASTEROID_MIN_RADIUS +
-        (ASTEROID_MAX_RADIUS - ASTEROID_MIN_RADIUS) * Math.pow(massT, 1 / 3);
+        ASTEROID_MIN_RADIUS + (ASTEROID_MAX_RADIUS - ASTEROID_MIN_RADIUS) * Math.pow(massT, 1 / 3);
 
     const radius =
         typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0

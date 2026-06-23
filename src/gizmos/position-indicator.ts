@@ -102,14 +102,20 @@ export class PositionIndicatorManager {
         if (gridHelper && !gridHelper.parent) this.scene.add(gridHelper);
         if (this.yAxisIndicator && !this.yAxisIndicator.parent) this.scene.add(this.yAxisIndicator);
         if (this.yAxisRing && !this.yAxisRing.parent) this.scene.add(this.yAxisRing);
-        if (this.velocityTipIndicator && !this.velocityTipIndicator.parent) this.scene.add(this.velocityTipIndicator);
-        if (this.velocityTipRing && !this.velocityTipRing.parent) this.scene.add(this.velocityTipRing);
+        if (this.velocityTipIndicator && !this.velocityTipIndicator.parent)
+            this.scene.add(this.velocityTipIndicator);
+        if (this.velocityTipRing && !this.velocityTipRing.parent)
+            this.scene.add(this.velocityTipRing);
 
         if (gridHelper) gridHelper.visible = true;
         this.setMode(mode);
 
         if ((mode === 'position' || mode === 'both') && this.gizmo?.target?.mesh) {
-            this.updateIndicator(this.yAxisIndicator, this.yAxisRing, this.gizmo.target.mesh.position);
+            this.updateIndicator(
+                this.yAxisIndicator,
+                this.yAxisRing,
+                this.gizmo.target.mesh.position
+            );
         }
     }
 

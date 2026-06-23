@@ -112,7 +112,9 @@ export function generateProceduralMoons(params: {
         const planetSubtype = planet.bodySubtype;
 
         // Planet-local RNG (deterministic even if loop order changes)
-        const planetMoonRng = new SeededRandom(`${masterSeed}|moons|planet:${planetIndex}|${planet.id}`);
+        const planetMoonRng = new SeededRandom(
+            `${masterSeed}|moons|planet:${planetIndex}|${planet.id}`
+        );
 
         const moonCount = pickMoonCount(planetSubtype, planetMoonRng);
         if (moonCount <= 0) continue;
@@ -191,10 +193,10 @@ export function generateProceduralMoons(params: {
 
                 if (temperate) {
                     return [
-                        { value: MoonTypeEnum.Temperate, weight: 0.40 },
+                        { value: MoonTypeEnum.Temperate, weight: 0.4 },
                         { value: MoonTypeEnum.Terrestrial, weight: 0.25 },
                         { value: MoonTypeEnum.Ocean, weight: 0.15 },
-                        { value: MoonTypeEnum.Desert, weight: 0.10 },
+                        { value: MoonTypeEnum.Desert, weight: 0.1 },
                         { value: MoonTypeEnum.Frozen, weight: 0.07 },
                         { value: MoonTypeEnum.Volcanic, weight: 0.03 },
                     ];
@@ -204,7 +206,7 @@ export function generateProceduralMoons(params: {
                     return [
                         { value: MoonTypeEnum.Ocean, weight: 0.45 },
                         { value: MoonTypeEnum.Terrestrial, weight: 0.28 },
-                        { value: MoonTypeEnum.Desert, weight: 0.10 },
+                        { value: MoonTypeEnum.Desert, weight: 0.1 },
                         { value: MoonTypeEnum.Frozen, weight: 0.07 },
                         { value: MoonTypeEnum.Volcanic, weight: 0.05 },
                         { value: MoonTypeEnum.Temperate, weight: 0.05 },
@@ -246,22 +248,22 @@ export function generateProceduralMoons(params: {
 
                 if (solid) {
                     return [
-                        { value: MoonTypeEnum.Terrestrial, weight: 0.40 },
+                        { value: MoonTypeEnum.Terrestrial, weight: 0.4 },
                         { value: MoonTypeEnum.Volcanic, weight: 0.15 },
                         { value: MoonTypeEnum.Ocean, weight: 0.13 },
-                        { value: MoonTypeEnum.Desert, weight: 0.10 },
-                        { value: MoonTypeEnum.Frozen, weight: 0.10 },
+                        { value: MoonTypeEnum.Desert, weight: 0.1 },
+                        { value: MoonTypeEnum.Frozen, weight: 0.1 },
                         { value: MoonTypeEnum.Temperate, weight: 0.12 },
                     ];
                 }
 
                 // gas_giant / ice_giant parent: still pick a moonType independently.
                 return [
-                    { value: MoonTypeEnum.Terrestrial, weight: 0.40 },
+                    { value: MoonTypeEnum.Terrestrial, weight: 0.4 },
                     { value: MoonTypeEnum.Ocean, weight: 0.15 },
                     { value: MoonTypeEnum.Frozen, weight: 0.12 },
-                    { value: MoonTypeEnum.Desert, weight: 0.10 },
-                    { value: MoonTypeEnum.Volcanic, weight: 0.10 },
+                    { value: MoonTypeEnum.Desert, weight: 0.1 },
+                    { value: MoonTypeEnum.Volcanic, weight: 0.1 },
                     { value: MoonTypeEnum.Temperate, weight: 0.13 },
                 ];
             })();

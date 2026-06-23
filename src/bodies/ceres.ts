@@ -28,10 +28,16 @@ export class Ceres extends DwarfPlanet {
      * @param scene The THREE.Scene to which Ceres belongs.
      * @param ceresTexture The texture to use for rendering Ceres.
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, ceresTexture: THREE.Texture, angleRad: number = 0) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        ceresTexture: THREE.Texture,
+        angleRad: number = 0
+    ) {
         const gEff = dependencies.getG();
-        const timeScale = CERES_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(CERES_DISTANCE, gEff, SUN_MASS);
-        const rotSpeed = (2 * Math.PI / (9.074 * 3600)) * timeScale;
+        const timeScale =
+            CERES_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(CERES_DISTANCE, gEff, SUN_MASS);
+        const rotSpeed = ((2 * Math.PI) / (9.074 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, CERES_DISTANCE, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(CERES_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({

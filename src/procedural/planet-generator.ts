@@ -125,9 +125,8 @@ export function generateProceduralPlanets(params: {
     // For multi-star systems, compute the binary separation to classify orbit types.
     // S-type: planet orbits one star, stable within ~0.3 × binarySeparation of that star.
     // P-type: planet orbits the barycentre, stable beyond ~2.0 × binarySeparation.
-    const binarySeparation = starCount > 1
-        ? starPlacements[0]!.pos.distanceTo(starPlacements[1]!.pos)
-        : 0;
+    const binarySeparation =
+        starCount > 1 ? starPlacements[0]!.pos.distanceTo(starPlacements[1]!.pos) : 0;
 
     const S_STABLE_FRACTION = 0.3;
     const P_STABLE_MULTIPLE = 2.0;
@@ -136,7 +135,11 @@ export function generateProceduralPlanets(params: {
     const sMaxDist = binarySeparation * S_STABLE_FRACTION;
     const sZoneValid = starCount > 1 && sMaxDist > sMinDist;
 
-    const pMinDist = Math.max(EARTH_DIST * 0.25, maxStarRadius * 12, binarySeparation * P_STABLE_MULTIPLE);
+    const pMinDist = Math.max(
+        EARTH_DIST * 0.25,
+        maxStarRadius * 12,
+        binarySeparation * P_STABLE_MULTIPLE
+    );
     const pMaxDist = Math.max(EARTH_DIST * 8, binarySeparation * 10.0);
     const pZoneValid = pMinDist < pMaxDist;
 
@@ -203,8 +206,12 @@ export function generateProceduralPlanets(params: {
         // P-type orbits use the system barycenter (always at origin).
         const hostStarIndex = plan.isSType ? plan.hostStarIndex : -1;
         const hostMass = plan.isSType ? starParams[plan.hostStarIndex]!.mass : totalStarMass;
-        const hostPos = plan.isSType ? starPlacements[plan.hostStarIndex]!.pos : new THREE.Vector3(0, 0, 0);
-        const hostVel = plan.isSType ? starPlacements[plan.hostStarIndex]!.vel : new THREE.Vector3(0, 0, 0);
+        const hostPos = plan.isSType
+            ? starPlacements[plan.hostStarIndex]!.pos
+            : new THREE.Vector3(0, 0, 0);
+        const hostVel = plan.isSType
+            ? starPlacements[plan.hostStarIndex]!.vel
+            : new THREE.Vector3(0, 0, 0);
 
         const subSeed = `${masterSeed}|planet:${i}|orbit:${plan.isSType ? `stype:${hostStarIndex}` : 'ptype'}|type:${customTypeString}|t:${distanceT01.toFixed(3)}`;
 
@@ -236,16 +243,13 @@ export function generateProceduralPlanets(params: {
         // r_peri = distance × (1−e)/(1+e); clamp so periapsis clears all stars
         // and stays integrable (distance×0.3 floor caps e ≈ 0.54 max).
         const minPeriapsis = plan.isSType
-            ? Math.max(
-                starParams[plan.hostStarIndex]!.radius * 5,
-                distance * 0.3
-              )
+            ? Math.max(starParams[plan.hostStarIndex]!.radius * 5, distance * 0.3)
             : Math.max(
-                maxStarRadius * 5,
-                starPlacements[0]!.pos.length() + starParams[0]!.radius * 3,
-                starCount > 1 ? starPlacements[1]!.pos.length() + starParams[1]!.radius * 3 : 0,
-                binarySeparation * P_STABLE_MULTIPLE,
-                distance * 0.3
+                  maxStarRadius * 5,
+                  starPlacements[0]!.pos.length() + starParams[0]!.radius * 3,
+                  starCount > 1 ? starPlacements[1]!.pos.length() + starParams[1]!.radius * 3 : 0,
+                  binarySeparation * P_STABLE_MULTIPLE,
+                  distance * 0.3
               );
         const eMax = Math.max(0, (distance - minPeriapsis) / (distance + minPeriapsis));
         const eccentricity = Math.min(orbitalRng.range(0, 0.6), eMax);

@@ -27,7 +27,13 @@ import { generateProceduralBlackHoles } from './black-hole-generator';
 import { createBlackHoleBodyFromProceduralCreation } from './black-hole-factory';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
-import { applyInclinationX, applyYawY, buildUnitPositionDirection, safeUnitCross, generateBinaryPlacements } from './orbital-math';
+import {
+    applyInclinationX,
+    applyYawY,
+    buildUnitPositionDirection,
+    safeUnitCross,
+    generateBinaryPlacements,
+} from './orbital-math';
 import { rngFor } from './seed-utils';
 
 // Import the background texture upgrader
@@ -160,9 +166,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         this.prng = new SeededRandom(this.masterSeed);
     }
 
-    async generateSolarSystemAsync(
-        reporter?: ProceduralGenerationReporter
-    ): Promise<Body[]> {
+    async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<Body[]> {
         const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
         const inventory = generateSystemBodyInventory(this.prng);
@@ -196,12 +200,21 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             const sepMin = Math.max((starParams[0].radius + starParams[1].radius) * 2, rMax * 10);
             const sepMax = sepMin * 50;
 
-            const separationDistance = rngFor(this.masterSeed, 'binarySeparation', 0).range(sepMin, sepMax);
+            const separationDistance = rngFor(this.masterSeed, 'binarySeparation', 0).range(
+                sepMin,
+                sepMax
+            );
             const yawRad = rngFor(this.masterSeed, 'binaryYaw', 0).range(0, Math.PI * 2);
             const inclinationDeg = rngFor(this.masterSeed, 'binaryInclination', 0).range(5, 85);
             const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
-            placements = generateBinaryPlacements(masses as [number, number], separationDistance, yawRad, inclinationRad, this.dependencies.getG());
+            placements = generateBinaryPlacements(
+                masses as [number, number],
+                separationDistance,
+                yawRad,
+                inclinationRad,
+                this.dependencies.getG()
+            );
         } else {
             const radii = starParams.map((p) => p.radius) as [number, number, number];
 
@@ -281,7 +294,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
         // Stars
         const sharedStarNameSeed =
-            starCount > 1 ? `${this.masterSeed}|star-name-base` : `${this.masterSeed}|star-name-base|single`;
+            starCount > 1
+                ? `${this.masterSeed}|star-name-base`
+                : `${this.masterSeed}|star-name-base|single`;
 
         for (let i = 0; i < starCount; i++) {
             const params = starParams[i];
@@ -289,7 +304,10 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
             const rotation = {
                 tilt: Number.isFinite(params.rotationTilt) ? params.rotationTilt : 0,
-                speed: Number.isFinite(params.rotationSpeed) && params.rotationSpeed > 0 ? params.rotationSpeed : 0.08,
+                speed:
+                    Number.isFinite(params.rotationSpeed) && params.rotationSpeed > 0
+                        ? params.rotationSpeed
+                        : 0.08,
                 azimuth: Number.isFinite(params.rotationAzimuth) ? params.rotationAzimuth : 0,
             };
 
@@ -342,7 +360,10 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             reporter?.report({
                 completed,
                 total: totalBodies,
-                workUnit: { phase: 'planets', label: `Planet ${i + 1}/${planetCreations.length} ✓` },
+                workUnit: {
+                    phase: 'planets',
+                    label: `Planet ${i + 1}/${planetCreations.length} ✓`,
+                },
             });
             await yieldToEventLoop();
         }
@@ -391,7 +412,10 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             reporter?.report({
                 completed,
                 total: totalBodies,
-                workUnit: { phase: 'asteroids', label: `Asteroid: ${i + 1}/${asteroidCreations.length} ✓` },
+                workUnit: {
+                    phase: 'asteroids',
+                    label: `Asteroid: ${i + 1}/${asteroidCreations.length} ✓`,
+                },
             });
 
             await yieldToEventLoop();
@@ -411,7 +435,10 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             reporter?.report({
                 completed,
                 total: totalBodies,
-                workUnit: { phase: 'black-holes', label: `Black Hole: ${i + 1}/${blackHoleCreations.length} ✓` },
+                workUnit: {
+                    phase: 'black-holes',
+                    label: `Black Hole: ${i + 1}/${blackHoleCreations.length} ✓`,
+                },
             });
 
             await yieldToEventLoop();

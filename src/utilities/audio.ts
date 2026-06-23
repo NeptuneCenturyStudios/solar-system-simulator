@@ -31,11 +31,7 @@ function getCtx(): AudioContext {
     return ctx;
 }
 
-function loadAndCache(
-    ac: AudioContext,
-    url: string,
-    onReady: (buf: AudioBuffer) => void
-): void {
+function loadAndCache(ac: AudioContext, url: string, onReady: (buf: AudioBuffer) => void): void {
     fetch(url)
         .then((r) => r.arrayBuffer())
         .then((ab) => ac.decodeAudioData(ab))
@@ -65,7 +61,9 @@ export function playWeaponFire(): void {
         if (!blasterLoadStarted) {
             blasterLoadStarted = true;
             const url = new URL('../assets/sounds/spaceship-blaster.wav', import.meta.url).href;
-            loadAndCache(ac, url, (buf) => { blasterBuffer = buf; });
+            loadAndCache(ac, url, (buf) => {
+                blasterBuffer = buf;
+            });
         }
         if (blasterBuffer) playBuffer(ac, blasterBuffer);
     } catch {
@@ -81,7 +79,9 @@ export function playWeaponImpact(): void {
             impactLoadStarted = true;
             for (const path of IMPACT_FILES) {
                 const url = new URL(path, import.meta.url).href;
-                loadAndCache(ac, url, (buf) => { impactBuffers.push(buf); });
+                loadAndCache(ac, url, (buf) => {
+                    impactBuffers.push(buf);
+                });
             }
         }
         if (impactBuffers.length === 0) return;
@@ -142,7 +142,9 @@ export function playWarpLoop(): WarpSoundController | null {
         if (!warpLoadStarted) {
             warpLoadStarted = true;
             const url = new URL('../assets/sounds/warp-loop-1.mp3', import.meta.url).href;
-            loadAndCache(ac, url, (buf) => { warpBuffer = buf; });
+            loadAndCache(ac, url, (buf) => {
+                warpBuffer = buf;
+            });
         }
 
         // If the buffer isn't loaded yet, the caller should retry next frame
@@ -174,7 +176,10 @@ export function playWarpLoop(): WarpSoundController | null {
             setVolume(vol: number): void {
                 if (_disposed || _isFadingOut) return;
                 // Multiply caller's volume by the global SFX volume
-                gainNode.gain.setValueAtTime(vol * WARP_VOLUME * performanceSettings.sfxVolume, ac.currentTime);
+                gainNode.gain.setValueAtTime(
+                    vol * WARP_VOLUME * performanceSettings.sfxVolume,
+                    ac.currentTime
+                );
             },
 
             stop(duration: number = WARP_FADE_DURATION): void {
@@ -187,19 +192,26 @@ export function playWarpLoop(): WarpSoundController | null {
                 gainNode.gain.linearRampToValueAtTime(0, now + duration);
                 // Schedule cleanup after the ramp completes.
                 source.stop(now + duration + 0.05);
-                setTimeout(() => {
-                    if (_disposed) return;
-                    _disposed = true;
-                    source.disconnect();
-                    gainNode.disconnect();
-                }, (duration + 0.1) * 1000);
+                setTimeout(
+                    () => {
+                        if (_disposed) return;
+                        _disposed = true;
+                        source.disconnect();
+                        gainNode.disconnect();
+                    },
+                    (duration + 0.1) * 1000
+                );
             },
 
             dispose(): void {
                 if (_disposed) return;
                 _disposed = true;
                 _isFadingOut = true;
-                try { source.stop(); } catch { /* already stopped */ }
+                try {
+                    source.stop();
+                } catch {
+                    /* already stopped */
+                }
                 source.disconnect();
                 gainNode.disconnect();
             },

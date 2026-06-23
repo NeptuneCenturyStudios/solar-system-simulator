@@ -30,8 +30,9 @@ export class Mercury extends Planet {
      */
     constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
         const gEff = dependencies.getG();
-        const timeScale = MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, gEff, SUN_MASS);
-        const rotSpeed = (2 * Math.PI / (1407.5 * 3600)) * timeScale;
+        const timeScale =
+            MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, gEff, SUN_MASS);
+        const rotSpeed = ((2 * Math.PI) / (1407.5 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, MERCURY_DIST, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(MERCURY_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
