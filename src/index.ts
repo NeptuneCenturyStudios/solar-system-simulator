@@ -2640,8 +2640,10 @@ function onMouseDown(event: MouseEvent) {
             const isDifferentSelection = prevSelectedBody !== clickedBody;
 
             // Keep camera focus object-based; do not depend on preset camera ids.
-            // This fixes follow/look-at for newly created bodies (they have no id).
-            setFocusBody(clickedBody, { zoom: cameraState.isLookAtMode && isDifferentSelection });
+            const isAlreadyLookAtTarget = cameraState.focusBody === clickedBody;
+            setFocusBody(clickedBody, {
+                zoom: cameraState.isLookAtMode && isDifferentSelection && !isAlreadyLookAtTarget,
+            });
 
             // Clear any camera preset highlight (manual selection).
             // Do NOT clear LOOK AT / FREE / TARGET highlights, those are toggles with independent state.
@@ -6461,12 +6463,20 @@ window.addEventListener('resize', () => {
 
     // Reposition FPS counter
     if (fpsSprite) {
-        fpsSprite.position.set(window.innerWidth / 2 - 110, window.innerHeight / 2 - 30, TEXT_SPRITE_Z);
+        fpsSprite.position.set(
+            window.innerWidth / 2 - 110,
+            window.innerHeight / 2 - 30,
+            TEXT_SPRITE_Z
+        );
     }
 
     // Reposition stats display
     if (statsSprite) {
-        statsSprite.position.set(window.innerWidth / 2 - 255, window.innerHeight / 2 - 270, TEXT_SPRITE_Z);
+        statsSprite.position.set(
+            window.innerWidth / 2 - 255,
+            window.innerHeight / 2 - 270,
+            TEXT_SPRITE_Z
+        );
     }
 
     // Reposition hint display (top-center)
