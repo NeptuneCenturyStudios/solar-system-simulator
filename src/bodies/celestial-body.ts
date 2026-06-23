@@ -11,6 +11,9 @@ import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { BodyTypeEnum } from './body-enums';
 
+// Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
+const _Y_AXIS = new THREE.Vector3(0, 1, 0);
+
 export interface ITidalLockOptions {
     target: CelestialBody;
     spinAxisWorld: THREE.Vector3;
@@ -29,7 +32,12 @@ export class CelestialBody extends Body {
     rotation: IRotation;
     baseColor: THREE.Color;
     maxTrail: number;
-    history: THREE.Vector3[];
+    /** Ring buffer storing raw world-space trail positions (maxTrail * 3 floats). */
+    _trailRing: Float32Array;
+    /** Write head — next slot to overwrite; also points to oldest entry when ring is full. */
+    _trailHead: number;
+    /** Number of valid samples currently in the ring (capped at maxTrail). */
+    _trailCount: number;
     trailGeo: THREE.BufferGeometry;
     trailPositions: Float32Array;
     trail: THREE.Line | null;
@@ -133,7 +141,9 @@ export class CelestialBody extends Body {
         this.baseColor = new THREE.Color(color);
 
         this.maxTrail = maxTrail;
-        this.history = [];
+        this._trailRing = new Float32Array(maxTrail * 3);
+        this._trailHead = 0;
+        this._trailCount = 0;
         this.trailGeo = new THREE.BufferGeometry();
 
         // Preallocate a fixed-size trail position buffer
@@ -433,12 +443,21 @@ export class CelestialBody extends Body {
             }
         } else {
             if (this.rotationSpeed !== 0) {
-                this.mesh.rotateOnAxis(new THREE.Vector3(0, 1, 0), this.rotationSpeed * dt);
+                this.mesh.rotateOnAxis(_Y_AXIS, this.rotationSpeed * dt);
             }
         }
+    }
+
+    /**
+     * Update purely visual properties that don't affect physics.
+     * Called once per rendered frame (after all substeps) rather than per substep.
+     * @param dtTotal Total elapsed simulation time for this frame (sum of all substep dts).
+     */
+    updateVisuals(dtTotal: number) {
+        if (this._isDisposed) return;
 
         if (this.clouds && typeof this.cloudRotationSpeed === 'number') {
-            this.clouds.rotation.y += this.cloudRotationSpeed * dt;
+            this.clouds.rotation.y += this.cloudRotationSpeed * dtTotal;
         }
 
         if (this.rings) {
@@ -449,23 +468,54 @@ export class CelestialBody extends Body {
 
     updateTrail(cameraPos: THREE.Vector3) {
         if (this._isDisposed) return;
-        this.history.push(this.mesh.position.clone());
-        if (this.history.length > this.maxTrail) this.history.shift();
+
+        // Write new world-space position into the ring buffer — no Vector3 allocation, no Array.shift().
+        const h3 = this._trailHead * 3;
+        this._trailRing[h3]     = this.mesh.position.x;
+        this._trailRing[h3 + 1] = this.mesh.position.y;
+        this._trailRing[h3 + 2] = this.mesh.position.z;
+        this._trailHead = (this._trailHead + 1) % this.maxTrail;
+        if (this._trailCount < this.maxTrail) this._trailCount++;
 
         if (this.trail) this.trail.position.copy(cameraPos);
 
-        const cx = cameraPos.x,
-            cy = cameraPos.y,
-            cz = cameraPos.z;
+        const cx = cameraPos.x;
+        const cy = cameraPos.y;
+        const cz = cameraPos.z;
+        const count  = this._trailCount;
+        const maxT   = this.maxTrail;
 
-        for (let i = 0; i < this.history.length; i++) {
-            this.trailPositions[i * 3] = this.history[i].x - cx;
-            this.trailPositions[i * 3 + 1] = this.history[i].y - cy;
-            this.trailPositions[i * 3 + 2] = this.history[i].z - cz;
+        if (count < maxT) {
+            // Ring not yet full — elements are stored in order starting at index 0.
+            for (let i = 0; i < count; i++) {
+                const s = i * 3;
+                this.trailPositions[s]     = this._trailRing[s]     - cx;
+                this.trailPositions[s + 1] = this._trailRing[s + 1] - cy;
+                this.trailPositions[s + 2] = this._trailRing[s + 2] - cz;
+            }
+        } else {
+            // Ring is full — oldest sample is at _trailHead.
+            // Copy in two contiguous segments to avoid per-element modulo arithmetic.
+            const head = this._trailHead;
+            const tail = maxT - head; // elements from head..maxT-1 (oldest first)
+            for (let i = 0; i < tail; i++) {
+                const src = (head + i) * 3;
+                const dst = i * 3;
+                this.trailPositions[dst]     = this._trailRing[src]     - cx;
+                this.trailPositions[dst + 1] = this._trailRing[src + 1] - cy;
+                this.trailPositions[dst + 2] = this._trailRing[src + 2] - cz;
+            }
+            for (let i = 0; i < head; i++) {
+                const src = i * 3;
+                const dst = (tail + i) * 3;
+                this.trailPositions[dst]     = this._trailRing[src]     - cx;
+                this.trailPositions[dst + 1] = this._trailRing[src + 1] - cy;
+                this.trailPositions[dst + 2] = this._trailRing[src + 2] - cz;
+            }
         }
 
         this.trailGeo.attributes.position.needsUpdate = true;
-        this.trailGeo.setDrawRange(0, this.history.length);
+        this.trailGeo.setDrawRange(0, count);
     }
 
 

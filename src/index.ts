@@ -3280,6 +3280,20 @@ function setFocusBody(bodyOrNull: Body | null, { zoom = false } = {}) {
 }
 
 let _lastFrameTime: number = performance.now();
+
+// \u2500\u2500 Animate-loop scratch vectors \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Pre-allocated once to eliminate per-frame GC pressure from common operations.
+const _animCamDirection = new THREE.Vector3();
+const _animCamRight = new THREE.Vector3();
+const _animCamMovement = new THREE.Vector3();
+const _animOldPos = new THREE.Vector3();
+// Pre-allocated star-direction array for the Earth atmosphere shell (8 stars max).
+const _ATMO_MAX_STARS = 8;
+const _animStarDirsWorld: THREE.Vector3[] = Array.from(
+    { length: _ATMO_MAX_STARS },
+    () => new THREE.Vector3(1, 0, 0)
+);
+
 function animate() {
     const now = performance.now();
     // Real wall-clock frame time (capped at 100ms to guard against tab-hidden spikes).
@@ -3359,39 +3373,36 @@ function animate() {
     // WASD camera movement (works in both free camera and normal mode, but NOT in flight mode)
     if (!isFlightModeActive) {
         const speed = (keys.shift ? cameraSpeed * 10 : cameraSpeed) * SCALE_FACTOR;
-        const direction = new THREE.Vector3();
+        camera.getWorldDirection(_animCamDirection);
+        _animCamRight.crossVectors(camera.up, _animCamDirection).normalize();
 
-        camera.getWorldDirection(direction);
-        const right = new THREE.Vector3();
-        right.crossVectors(camera.up, direction).normalize();
+        _animCamMovement.set(0, 0, 0);
+        if (keys.w) _animCamMovement.addScaledVector(_animCamDirection, speed);
+        if (keys.s) _animCamMovement.addScaledVector(_animCamDirection, -speed);
+        if (keys.a) _animCamMovement.addScaledVector(_animCamRight, speed);
+        if (keys.d) _animCamMovement.addScaledVector(_animCamRight, -speed);
+        if (keys.space) _animCamMovement.y += speed;
+        if (keys.c) _animCamMovement.y -= speed;
 
-        const movement = new THREE.Vector3();
-        if (keys.w) movement.add(direction.clone().multiplyScalar(speed));
-        if (keys.s) movement.add(direction.clone().multiplyScalar(-speed));
-        if (keys.a) movement.add(right.clone().multiplyScalar(speed));
-        if (keys.d) movement.add(right.clone().multiplyScalar(-speed));
-        if (keys.space) movement.y += speed;
-        if (keys.c) movement.y -= speed;
-
-        const didMove = movement.length() > 0;
+        const didMove = _animCamMovement.lengthSq() > 0;
 
         if (didMove) {
-            camera.position.add(movement);
+            camera.position.add(_animCamMovement);
 
             // In normal mode (except 'None'), also move the orbit controls target to maintain relative position
             // For 'None' mode, keep target fixed at center [0,0,0]
             if (!isFreeCameraMode && focusID !== 'camNone') {
-                controls.target.add(movement);
+                controls.target.add(_animCamMovement);
             }
 
             // If dragging gizmo arrow, move the planet along that specific axis
             if (interactionState.isRepositioning && gizmo.target && activeAxis) {
                 if (activeAxis === 'x') {
-                    gizmo.target.mesh.position.x += movement.x;
+                    gizmo.target.mesh.position.x += _animCamMovement.x;
                 } else if (activeAxis === 'y') {
-                    gizmo.target.mesh.position.y += movement.y;
+                    gizmo.target.mesh.position.y += _animCamMovement.y;
                 } else if (activeAxis === 'z') {
-                    gizmo.target.mesh.position.z += movement.z;
+                    gizmo.target.mesh.position.z += _animCamMovement.z;
                 }
             }
 
@@ -3459,7 +3470,12 @@ function animate() {
     } // end if (!isFlightModeActive) WASD movement
 
     const focusObj = getFocusObject();
-    const oldPos = focusObj && focusObj.mesh ? focusObj.mesh.position.clone() : new THREE.Vector3();
+    if (focusObj?.mesh) {
+        _animOldPos.copy(focusObj.mesh.position);
+    } else {
+        _animOldPos.set(0, 0, 0);
+    }
+    const oldPos = _animOldPos;
 
     // Physics integration loop
     updateSimulation(simulationState, autopilotState, flightState, steps, dt, updateAutopilot);
@@ -3475,6 +3491,8 @@ function animate() {
 
             // Update the trail position for b1
             if (b1 instanceof CelestialBody) b1.updateTrail(camera.position);
+            // Update cloud rotation and ring sync once per frame (not per substep)
+            if (b1 instanceof CelestialBody) b1.updateVisuals(dtTotal);
             // Update comet tail with camera-relative rendering (dtTotal = full frame delta)
             if (b1 instanceof Comet) b1.updateTail(dtTotal, camera.position);
 
@@ -3899,22 +3917,22 @@ function animate() {
         const stars = simulationState.bodies.filter(
             (b) => b instanceof Star && !b._isDisposed
         ) as Star[];
-        const MAX_STARS = 8;
 
-        const starDirsWorld = Array.from({ length: MAX_STARS }, () => new THREE.Vector3(1, 0, 0));
+        // Reset pre-allocated direction array to default before filling.
+        for (let i = 0; i < _ATMO_MAX_STARS; i++) _animStarDirsWorld[i].set(1, 0, 0);
         const earthPos = earthBodyForShell.mesh.position;
 
-        const count = Math.min(MAX_STARS, stars.length);
+        const count = Math.min(_ATMO_MAX_STARS, stars.length);
         for (let i = 0; i < count; i++) {
             const star = stars[i];
             if (!star.mesh) continue;
             const dir = star.mesh.position.clone().sub(earthPos);
             if (dir.lengthSq() > 1e-12) dir.normalize();
-            starDirsWorld[i].copy(dir);
+            _animStarDirsWorld[i].copy(dir);
         }
 
         earthBodyForShell.atmosphereShell.update({
-            starDirsWorld,
+            starDirsWorld: _animStarDirsWorld,
             numStars: count,
             cameraPosWorld: camera.position,
         });

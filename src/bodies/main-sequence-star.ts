@@ -23,6 +23,16 @@ import { Corona } from '../effects/corona';
 import { StarGlow } from '../effects/star-glow';
 import { BodyTypeEnum } from './body-enums';
 
+// Cached reference to the star-death checkbox — avoids a DOM query on every physics substep.
+let _starDeathCheckboxEl: HTMLInputElement | null | undefined;
+function _isStarDeathEnabled(): boolean {
+    if (_starDeathCheckboxEl === undefined) {
+        _starDeathCheckboxEl =
+            (document.getElementById('enableStarDeath') as HTMLInputElement | null) ?? null;
+    }
+    return _starDeathCheckboxEl?.checked ?? false;
+}
+
 export class MainSequenceStar extends Star {
     fuel: number | null;
     maxFuel: number | null;
@@ -91,8 +101,7 @@ export class MainSequenceStar extends Star {
             this.corona.points.position.copy(this.mesh.position);
         }
 
-        const starDeathEnabled =
-            (document.getElementById('enableStarDeath') as HTMLInputElement)?.checked || false;
+        const starDeathEnabled = _isStarDeathEnabled();
         if (starDeathEnabled && this.fuel !== null && this.fuel > 0) {
             const referenceMass = 1000;
             const massRatio = this.mass / referenceMass;
