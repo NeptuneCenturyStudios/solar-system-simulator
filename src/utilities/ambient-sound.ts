@@ -19,7 +19,7 @@
 const FADE_DURATION = 1.5; // seconds
 const DELAY_MIN = 60; // seconds
 const DELAY_MAX = 180; // seconds
-const VOLUME = 0.4; // base internal volume level
+const VOLUME = 1; // base internal volume level
 
 type ManagerState = 'idle' | 'fading-out' | 'playing' | 'delaying';
 

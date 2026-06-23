@@ -185,6 +185,7 @@ export class Body {
                                 mat.dispose();
                             });
                         } else {
+                            console.info(`Disposing material for ${child.name || child.id}`);
                             child.material.dispose();
                         }
                     }

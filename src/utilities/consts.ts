@@ -289,9 +289,6 @@ export const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 1.5;
 
 /** Relative-speed threshold at which BRAKE hands off to CIRCULARIZE (u/s). */
 export const AUTOPILOT_BRAKE_DONE_SPEED = 2 * SCALE_FACTOR;
-
-/** Maximum timeScale at which autopilot may engage. Above this it refuses with a warning. */
-export const AUTOPILOT_MAX_TIMESCALE = 50;
 /** Duration (seconds) to show the "Stable Orbit" HUD notification. */
 export const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
 /** Duration (seconds) to show the "Autopilot blocked" HUD notification. */

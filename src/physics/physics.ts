@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
-import { ParticleExplosion } from '../effects/particle-explosion';
 import { G, PLUTO_DIST } from '../utilities/consts';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { BlackHole } from '../bodies/black-hole';
@@ -8,7 +7,7 @@ import { CelestialBody } from '../bodies/celestial-body';
 import { Spaceship } from '../bodies/spaceship';
 import { NotificationType } from '../event-log/event-log';
 import { EffectiveGForce } from '../types';
-import { IFlightState } from '../interfaces';
+import { IFlightState, ISimulationState, IAutopilotState } from '../interfaces';
 
 // ── Scratch vectors for allocation-free physics ──────────────────────────────
 // Reused by getAcc() and updatePhysics() to eliminate GC churn in the hot path.
@@ -19,51 +18,6 @@ const _accPool: THREE.Vector3[] = [];
 /** Number of bodies that _accPool was sized for on the last frame. */
 let _accPoolSize = 0;
 
-/**
- * Represents the state of the physics simulation, including all bodies, explosions, and simulation parameters.
- */
-export interface ISimulationState {
-    timeScale: number;
-    isPaused: boolean;
-    savedTimeScale: number;
-    lastT: number;
-    bodies: Body[];
-    explosions: ParticleExplosion[];
-    showNames: boolean;
-    gMultiplier: number;
-}
-
-/**
- * Autopilot state and phase information used to control the ship's automatic navigation behavior
- */
-export type AutopilotPhase =
-    | 'ALIGN'
-    | 'WARP_CHARGING'
-    | 'WARP'
-    | 'APPROACH'
-    | 'BRAKE'
-    | 'CIRCULARIZE';
-
-/**
- * Represents the state of the autopilot, including its activity status, target body, current phase, and various timers.
- */
-export interface IAutopilotState {
-    isActive: boolean;
-    targetBody: Body | null;
-    phase: AutopilotPhase | null;
-    /** Stable-orbit notification timer (seconds remaining to display). */
-    orbitNotifyTimer: number;
-    /** True while the autopilot WARP phase is active (post-charge). */
-    isWarpActive: boolean;
-    /** Accumulated charge time (seconds) during the WARP_CHARGING phase. */
-    warpChargeTimer: number;
-    /** True while the approach phase is using boost speed. */
-    isBoostActive: boolean;
-    /** Distance from target when BRAKE phase started — used to compute the
-     *  0→1 blend factor that rotates the desired velocity from 'stop' to
-     *  'orbital velocity' as the ship closes on the orbit radius. */
-    brakeEntryDistance: number;
-}
 
 /**
  * Calculate position and velocity for a circular orbit around a parent body

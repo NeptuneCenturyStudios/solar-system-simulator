@@ -10,6 +10,20 @@ import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums'
 import { ITidalLockOptions } from './bodies/celestial-body';
 import { EffectiveGForce } from './types';
 import { Spaceship } from './bodies/spaceship';
+import { ImpactShockwave } from './effects/impact-shockwave';
+
+export interface ISimulationState {
+  timeScale: number;
+  isPaused: boolean;
+  savedTimeScale: number;
+  lastT: number;
+  bodies: Body[];
+  explosions: ParticleExplosion[];
+  impacts: ImpactShockwave[];
+  showNames: boolean;
+  gMultiplier: number;
+}
+
 /**
  * Represents the rotation of a body in 3D space
  */
@@ -182,4 +196,115 @@ export interface IFlightState {
 
     /** Whether Shift was held on the previous frame. */
     prevShiftHeld: boolean;
+}
+
+/**
+ * Interaction state interface, defining the structure for tracking user input and manipulation states within the simulation.
+ */
+export interface IInteractionState {
+  isRepositioning: boolean;
+  isChangingVelocity: boolean;
+  isMiddleMouseVelocity: boolean;
+  isMouseLookActive: boolean;
+  isDragging: boolean;
+
+  activeAxis: string | null;
+  wasRunningBeforeDrag: boolean;
+
+  dragTarget: Body | null;
+  dragCameraOffset: THREE.Vector3;
+  dragPlane: THREE.Plane;
+
+  // Velocity editing UX
+  velocityEditMode: 'xz' | 'y';
+  velocityEditHadRunningBeforeDrag: boolean;
+
+  // Drag tracking for repositioning
+  dragStartIntersection: THREE.Vector3 | null;
+  dragStartPosition: THREE.Vector3 | null;
+
+  // Touch camera gesture state (mobile)
+  isTouchGestureActive: boolean;
+  touchGestureMode: 'rotate' | 'pinch' | null;
+  lastTouchX: number;
+  lastTouchY: number;
+  lastPinchDist: number;
+
+  // Mobile: ignore synthetic mouse events after touch
+  touchIgnoreUntil: number;
+};
+
+/**
+ * Camera state interface, defining the structure for tracking the current state and controls of the camera within the simulation.
+ */
+export interface ICameraState {
+  isFreeCameraMode: boolean;
+  isLookAtMode: boolean;
+  lockToSun: boolean;
+
+  // Target mode controls gizmo visibility behavior
+  isTargetMode: boolean;
+
+  // Legacy/debug identifier
+  focusID: string;
+
+  // Canonical camera focus target
+  focusBody: Body | null;
+
+  offset: THREE.Vector3;
+  lastPlanetAngle: number;
+
+  speed: number;
+  rotationSpeed: number;
+
+  keys: {
+    w: boolean;
+    a: boolean;
+    s: boolean;
+    d: boolean;
+    c: boolean;
+    space: boolean;
+    shift: boolean;
+  };
+
+  arrowKeys: {
+    left: boolean;
+    right: boolean;
+    up: boolean;
+    down: boolean;
+  };
+
+  pendingCollisionFocusBody: Body | null;
+}
+
+/**
+ * Autopilot state and phase information used to control the ship's automatic navigation behavior
+ */
+export type AutopilotPhase =
+    | 'ALIGN'
+    | 'WARP_CHARGING'
+    | 'WARP'
+    | 'APPROACH'
+    | 'BRAKE'
+    | 'CIRCULARIZE';
+
+/**
+ * Represents the state of the autopilot, including its activity status, target body, current phase, and various timers.
+ */
+export interface IAutopilotState {
+    isActive: boolean;
+    targetBody: Body | null;
+    phase: AutopilotPhase | null;
+    /** Stable-orbit notification timer (seconds remaining to display). */
+    orbitNotifyTimer: number;
+    /** True while the autopilot WARP phase is active (post-charge). */
+    isWarpActive: boolean;
+    /** Accumulated charge time (seconds) during the WARP_CHARGING phase. */
+    warpChargeTimer: number;
+    /** True while the approach phase is using boost speed. */
+    isBoostActive: boolean;
+    /** Distance from target when BRAKE phase started — used to compute the
+     *  0→1 blend factor that rotates the desired velocity from 'stop' to
+     *  'orbital velocity' as the ship closes on the orbit radius. */
+    brakeEntryDistance: number;
 }

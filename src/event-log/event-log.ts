@@ -6,6 +6,11 @@ export enum NotificationType {
     Info = 'info',
 }
 
+export enum LogMethods{
+    Console,
+    Alert
+}
+
 /**
  * A single event notification entry.
  *
@@ -16,10 +21,12 @@ export class EventLogEntry {
     message: string;
     timestamp: number;
     notificationType: NotificationType;
+    logMethod: LogMethods;
 
-    constructor(message: string, notificationType: NotificationType = NotificationType.Info) {
+    constructor(message: string, notificationType: NotificationType = NotificationType.Info, logMethod: LogMethods = LogMethods.Console) {
         this.message = message;
         this.notificationType = notificationType;
+        this.logMethod = logMethod;
         this.timestamp = performance.now();
     }
 }
