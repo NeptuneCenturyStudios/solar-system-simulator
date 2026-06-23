@@ -10,6 +10,15 @@ import { NotificationType } from '../event-log/event-log';
 import { EffectiveGForce } from '../types';
 import { IFlightState } from '../interfaces';
 
+// ── Scratch vectors for allocation-free physics ──────────────────────────────
+// Reused by getAcc() and updatePhysics() to eliminate GC churn in the hot path.
+const _scratchDiff = new THREE.Vector3();
+const _scratchZero  = new THREE.Vector3(0, 0, 0);
+/** Pool of accelerations recycled each frame so updatePhysics never calls `new`. */
+const _accPool: THREE.Vector3[] = [];
+/** Number of bodies that _accPool was sized for on the last frame. */
+let _accPoolSize = 0;
+
 /**
  * Represents the state of the physics simulation, including all bodies, explosions, and simulation parameters.
  */
@@ -148,20 +157,19 @@ export function updateSimulation(
  * @returns The gravitational acceleration vector.
  */
 function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number, G: number) {
-    // 1. Compute scaled distance vector
-    const diff = new THREE.Vector3().subVectors(p2, p1);
+    // 1. Compute scaled distance vector using scratch (no allocation)
+    _scratchDiff.subVectors(p2, p1);
 
     // 2. Scaled distance magnitude
-    const r = diff.length();
+    const r = _scratchDiff.length();
 
-    if (r < 0.01) return new THREE.Vector3(0, 0, 0);
+    if (r < 0.01) return _scratchZero;
 
     // 3. Gravitational acceleration in scaled units
     const accMag = (G * m2) / (r * r);
 
-    // 4. Normalize and scale
-    diff.normalize();
-    return diff.multiplyScalar(accMag);
+    // 4. Normalize and scale (in-place on scratch)
+    return _scratchDiff.normalize().multiplyScalar(accMag);
 }
 
 /**
@@ -169,27 +177,42 @@ function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number, G: number) {
  * @param simulationState The current state of the simulation, including all bodies.
  */
 function updatePhysics(simulationState: ISimulationState, flightState: IFlightState) {
-    // Calculate accelerations for all bodies
-    for (const body of simulationState.bodies) {
-        // Don't integrate physics if the ship is decelerating in warp or boost mode
+    const bodies = simulationState.bodies;
+    const len = bodies.length;
+    const gEff = G * simulationState.gMultiplier;
+
+    // Grow the reuse pool if needed (never shrinks — avoids allocation churn).
+    if (len > _accPoolSize) {
+        for (let i = _accPoolSize; i < len; i++) {
+            _accPool[i] = new THREE.Vector3(0, 0, 0);
+        }
+        _accPoolSize = len;
+    }
+
+    for (let idx = 0; idx < len; idx++) {
+        const body = bodies[idx];
+        if (!body || body._isDisposed || !body.mesh) continue;
+
+        // Don't integrate physics if the ship is decelerating in warp or boost mode.
+        // (kept as a silent skip — no console.info on the hot path)
         if (
             body === flightState.knownShip &&
             (flightState.warpDecelerating || flightState.boostDecelerating)
         ) {
-            console.info('Skipping physics integration for the known ship while decelerating in warp or boost mode.');
             continue;
         }
 
-        const totalAcc = new THREE.Vector3(0, 0, 0);
+        const totalAcc = _accPool[idx];
+        totalAcc.set(0, 0, 0);
 
         // Calculate pull from ALL OTHER bodies (n-body simulation)
-        for (const other of simulationState.bodies) {
+        for (const other of bodies) {
             if (other !== body && !other?._isDisposed && other.mesh) {
                 const accFromOther = getAcc(
                     body.mesh.position,
                     other.mesh.position,
                     other.mass,
-                    G * simulationState.gMultiplier
+                    gEff
                 );
                 totalAcc.add(accFromOther);
             }
