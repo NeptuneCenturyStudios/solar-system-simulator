@@ -2307,6 +2307,7 @@ function onMouseDown(event: MouseEvent) {
         gizmo.target
     ) {
         isMiddleMouseVelocity = true;
+        interactionState.isMiddleMouseVelocity = true;
         console.log('[drag] MMB velocity start', gizmo.target?.name);
 
         // Set up drag plane THROUGH the body position (prevents initial jump / cursor separation)
@@ -2386,6 +2387,7 @@ function onMouseDown(event: MouseEvent) {
         : [];
     if (velIntersects.length > 0 && gizmo.target) {
         isChangingVelocity = true;
+        interactionState.isChangingVelocity = true;
         controls.enabled = false;
         console.log('[drag] LMB velocity start', gizmo.target?.name);
 
@@ -3108,6 +3110,7 @@ function onMouseUp(event: MouseEvent) {
     // Middle mouse button release
     if (event.button === 1) {
         isMiddleMouseVelocity = false;
+        interactionState.isMiddleMouseVelocity = false;
 
         // If LMB velocity drag is still active, do NOT hide the grid/indicators/arcs.
         // This prevents "grid disappearing" when the user releases MMB while still dragging with LMB.
@@ -3138,6 +3141,7 @@ function onMouseUp(event: MouseEvent) {
 
         interactionState.isRepositioning = false;
         isChangingVelocity = false;
+        interactionState.isChangingVelocity = false;
         isTilting = false;
         isAzimuthDragging = false;
         activeAxis = null;

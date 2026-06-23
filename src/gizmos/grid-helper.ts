@@ -55,7 +55,7 @@ export class GridHelperManager {
         // GridHelper doesn't support resizing — dispose and recreate.
         this.dispose();
 
-        this.gridHelper = new THREE.GridHelper(size, divisions, 0x444444, 0x222222);
+        this.gridHelper = new THREE.GridHelper(size, divisions, 0x888888, 0x444444);
         if (center) {
             this.gridHelper.position.set(center.x, 0, center.z);
         } else {
