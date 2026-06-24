@@ -12,6 +12,15 @@ import { EffectiveGForce } from './types';
 import { Spaceship } from './bodies/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
 
+/**
+ * The interface for a solar system, containing an array of celestial bodies and a space texture.
+ */
+export interface ISolarSystem{
+    bodies: Body[];
+    /** The space texture representing the background of the solar system. Can be null if not yet generated. */
+    spaceTexture: THREE.Texture | null;
+}
+
 export interface ISimulationState {
     timeScale: number;
     isPaused: boolean;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { IAutopilotState } from '../physics/physics';
 import { Body } from '../bodies/body';
 import { AUTOPILOT_ORBIT_NOTIFY_DURATION, TEXT_SPRITE_Z } from '../utilities/consts';
+import { IAutopilotState } from '../interfaces';
 
 export type AutopilotHudState =
     | 'ALIGN'

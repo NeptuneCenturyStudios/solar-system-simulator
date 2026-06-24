@@ -5,7 +5,7 @@ import { generateSystemBodyInventory } from './system-body-inventory-generator';
 import { randomStarParams, type StarParams } from '../utilities/body-params';
 import type { Body } from '../bodies/body';
 import type { CelestialBody } from '../bodies/celestial-body';
-import type { IStateDependencies } from '../interfaces';
+import type { ISolarSystem, IStateDependencies } from '../interfaces';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 
 import { generateProceduralBodyName } from './body-naming';
@@ -166,7 +166,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         this.prng = new SeededRandom(this.masterSeed);
     }
 
-    async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<Body[]> {
+    async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
         const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
         const inventory = generateSystemBodyInventory(this.prng);
@@ -464,6 +464,11 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             await yieldToEventLoop();
         }
 
-        return bodies;
+        // TODO: PRNG a space texture
+
+        return {
+            bodies,
+            spaceTexture: null,
+        };
     }
 }

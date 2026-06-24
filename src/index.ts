@@ -291,7 +291,6 @@ uiCamera.position.z = 10;
 import Noty from 'noty';
 import 'noty/lib/noty.css';
 import { createFPSTexture, createSpeedTexture, createStatsTexture } from './drawing/text-rendering';
-import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { ProceduralGenerator } from './procedural/procedural-generator';
 import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
 import { BlackHoleSystemGenerator } from './procedural/black-hole-system-generator';
@@ -1922,19 +1921,8 @@ async function spawn({
     mode?: SimulationStartMode;
     seed?: string;
 } = {}) {
-    // Store the generator used to create the solar system. For now, it will be for procedural generation only.
-    let generator: SolarSystemGenerator | null = null;
 
     applyEnvironmentDefaultsForMode(mode);
-
-    // Procedural mode seed plumbing (for now: only log + keep the system empty).
-    if (mode === SimulationStartMode.Procedural) {
-        generator = new ProceduralGenerator(seed, dependencies, scene);
-    }
-
-    if (mode === SimulationStartMode.BlackHole) {
-        generator = new BlackHoleSystemGenerator(dependencies, scene, seed);
-    }
 
     // Unified cleanup: always dispose existing bodies (stars included).
     // No special-casing is required here; Star.die(true) is already the canonical disposal path.
@@ -1988,8 +1976,14 @@ async function spawn({
     }
 
     // Black Hole mode: procedurally generated black hole + 1–3 stars in siphon range
-    if (mode === SimulationStartMode.BlackHole && generator) {
-        simulationState.bodies = await generator.generateSolarSystemAsync();
+    if (mode === SimulationStartMode.BlackHole) {
+        const generator = new BlackHoleSystemGenerator(dependencies, scene, seed);
+        const solarSystem = await generator.generateSolarSystemAsync();
+        simulationState.bodies = solarSystem.bodies;
+        // TODO: Apply the space texture from the generated solar system
+        // if (solarSystem.spaceTexture) {
+        //     setSpaceTexture(solarSystem.spaceTexture);
+        // }
 
         updateURLWithSeed(SEED_TYPE_BLACKHOLE, generator.seed);
 
@@ -2028,8 +2022,6 @@ async function spawn({
         w[runIdKey] = (w[runIdKey] ?? 0) + 1;
         const runId = w[runIdKey] as number;
 
-        const gen = generator;
-
         const onProceduralCancel = () => {
             // UI: lock progress status to "Canceling" immediately
             proceduralModal.markCancelRequested();
@@ -2040,15 +2032,17 @@ async function spawn({
         proceduralModal.on('cancelRequested', onProceduralCancel);
 
         try {
-            const bodies = gen ? await gen.generateSolarSystemAsync() : [];
+            const generator = new ProceduralGenerator(seed, dependencies, scene);
+            const solarSystem = await generator.generateSolarSystemAsync();
 
             if (runId !== w[runIdKey]) return; // stale completion
 
-            simulationState.bodies = bodies;
+            simulationState.bodies = solarSystem.bodies;
+            // TODO: Apply space texture
 
             // Push URL seed after successful generation
-            if (gen) {
-                updateURLWithSeed(SEED_TYPE_NORMAL, gen.seed);
+            if (generator) {
+                updateURLWithSeed(SEED_TYPE_NORMAL, generator.seed);
             }
 
             syncAllStarLightTargets();
@@ -2107,7 +2101,11 @@ async function spawn({
         plutoTexture,
         ceresTexture,
     });
-    simulationState.bodies = await normalGenerator.generateSolarSystemAsync();
+    const solarSystem = await normalGenerator.generateSolarSystemAsync();
+    simulationState.bodies = solarSystem.bodies;
+    // TODO: Apply space texture
+
+
     syncAllStarLightTargets();
     selectedBody = null;
 

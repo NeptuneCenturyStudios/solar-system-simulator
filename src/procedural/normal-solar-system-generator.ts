@@ -19,7 +19,7 @@ import { Ceres } from '../bodies/ceres';
 import { Asteroid } from '../bodies/asteroid';
 
 import { createSatellite } from '../utilities/utilities';
-import type { IStateDependencies } from '../interfaces';
+import type { ISolarSystem, IStateDependencies } from '../interfaces';
 import { createMoon } from '../bodies/create-moon';
 
 import {
@@ -54,6 +54,7 @@ import {
     HYGIEA_RADIUS,
 } from '../utilities/consts';
 import { MoonTypeEnum } from '../bodies/body-enums';
+import { loadSrgbTexture } from '../drawing/textures';
 
 type Textures = {
     jupiterTexture: THREE.Texture;
@@ -77,7 +78,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         this.textures = textures;
     }
 
-    async generateSolarSystemAsync(): Promise<Body[]> {
+    async generateSolarSystemAsync(): Promise<ISolarSystem> {
         const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
         const {
             jupiterTexture,
@@ -324,6 +325,12 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         bodies.push(new Halley(this.dependencies, this.scene, randomAngle()));
         await yieldToEventLoop();
 
-        return bodies;
+        // Use default space texture
+        const skydomeTexture = loadSrgbTexture('./assets/textures/space-1.jpg');
+
+        return {
+            bodies,
+            spaceTexture: skydomeTexture,
+        };
     }
 }

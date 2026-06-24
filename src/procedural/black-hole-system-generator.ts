@@ -9,7 +9,7 @@ import { EARTH_DIST } from '../utilities/consts';
 import { createMainSequenceStarFromParams } from './star-factory';
 import { generateBinaryPlacements } from './orbital-math';
 import type { Body } from '../bodies/body';
-import type { IStateDependencies } from '../interfaces';
+import type { ISolarSystem, IStateDependencies } from '../interfaces';
 import { rngFor } from './seed-utils';
 
 function generateSeedString(): string {
@@ -41,7 +41,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         console.info('[black-hole-system] using master seed:', this.masterSeed);
     }
 
-    async generateSolarSystemAsync(): Promise<Body[]> {
+    async generateSolarSystemAsync(): Promise<ISolarSystem> {
         const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
         const bodies: Body[] = [];
@@ -170,6 +170,11 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
             bodies.push(star);
         }
 
-        return bodies;
+        // TODO: PRNG a space texture
+
+        return {
+            bodies,
+            spaceTexture: null,
+        };
     }
 }
