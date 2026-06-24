@@ -326,7 +326,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await yieldToEventLoop();
 
         // Use default space texture
-        const skydomeTexture = loadSrgbTexture('./assets/textures/space-1.jpg');
+        const skydomeTexture = loadSrgbTexture('./assets/textures/skydome/space-1.jpg');
 
         return {
             bodies,

@@ -18,7 +18,7 @@ import { ImpactShockwave } from './effects/impact-shockwave';
 export interface ISolarSystem{
     bodies: Body[];
     /** The space texture representing the background of the solar system. Can be null if not yet generated. */
-    spaceTexture: THREE.Texture | null;
+    spaceTexture: THREE.Texture;
 }
 
 export interface ISimulationState {

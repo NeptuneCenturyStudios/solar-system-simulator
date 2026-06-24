@@ -201,7 +201,7 @@ const plutoTexture = loadSrgbTexture('./assets/textures/pluto.jpg');
 const ceresTexture = loadSrgbTexture('./assets/textures/ceres.jpg');
 
 // Background texture (skydome)
-const skydomeTexture = loadSrgbTexture('./assets/textures/stars.jpg');
+const skydomeTexture = loadSrgbTexture('./assets/textures/skydome/space-1.jpg');
 skydomeTexture.wrapS = THREE.RepeatWrapping;
 skydomeTexture.wrapT = THREE.RepeatWrapping;
 skydomeTexture.repeat.set(2, 1);
@@ -251,6 +251,22 @@ const skydomeMaterial = new THREE.MeshBasicMaterial({
 const skydome = new THREE.Mesh(skydomeGeometry, skydomeMaterial);
 skydome.renderOrder = -1000;
 scene.add(skydome);
+
+/**
+ * Sets the skydome background texture.
+ * @param texture The new texture to be applied to the skydome background.
+ */
+function setSpaceTexture(texture: THREE.Texture): void {
+    // Dispose the old texture map on the material
+    const oldMap = skydomeMaterial.map;
+    if (oldMap) oldMap.dispose();
+    skydomeMaterial.map = texture;
+    skydomeMaterial.needsUpdate = true;
+    // Apply wrapping so the texture tiles across the dome
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(2, 1);
+}
 
 // === Ambient light from stars (base level of illumination) ===
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -1921,7 +1937,6 @@ async function spawn({
     mode?: SimulationStartMode;
     seed?: string;
 } = {}) {
-
     applyEnvironmentDefaultsForMode(mode);
 
     // Unified cleanup: always dispose existing bodies (stars included).
@@ -1979,11 +1994,10 @@ async function spawn({
     if (mode === SimulationStartMode.BlackHole) {
         const generator = new BlackHoleSystemGenerator(dependencies, scene, seed);
         const solarSystem = await generator.generateSolarSystemAsync();
+        // Set the bodies
         simulationState.bodies = solarSystem.bodies;
-        // TODO: Apply the space texture from the generated solar system
-        // if (solarSystem.spaceTexture) {
-        //     setSpaceTexture(solarSystem.spaceTexture);
-        // }
+        // Apply the space texture from the generated solar system
+        setSpaceTexture(solarSystem.spaceTexture);
 
         updateURLWithSeed(SEED_TYPE_BLACKHOLE, generator.seed);
 
@@ -2038,7 +2052,8 @@ async function spawn({
             if (runId !== w[runIdKey]) return; // stale completion
 
             simulationState.bodies = solarSystem.bodies;
-            // TODO: Apply space texture
+            // Apply the space texture from the generated solar system
+            setSpaceTexture(solarSystem.spaceTexture);
 
             // Push URL seed after successful generation
             if (generator) {
@@ -2103,8 +2118,8 @@ async function spawn({
     });
     const solarSystem = await normalGenerator.generateSolarSystemAsync();
     simulationState.bodies = solarSystem.bodies;
-    // TODO: Apply space texture
-
+    // Apply the space texture from the generated solar system
+    setSpaceTexture(solarSystem.spaceTexture);
 
     syncAllStarLightTargets();
     selectedBody = null;
