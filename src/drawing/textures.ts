@@ -52,7 +52,7 @@ export const fictionalAtmosphereTextures: THREE.Texture[] = [
     loadSrgbTexture('./assets/textures/fictional_atmosphere_1.jpg'),
     loadSrgbTexture('./assets/textures/fictional_atmosphere_2.jpg'),
 ];
-const SPACE_TEXTURE_COUNT = 11;
+const SPACE_TEXTURE_COUNT = 13;
 
 /**
  * Get the list of space background textures.

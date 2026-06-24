@@ -20,6 +20,19 @@ export function rngFor(
 }
 
 /**
+ * Generates a new seed string using either the crypto API or Math.random as a fallback.
+ * @returns A string representing a newly generated seed.
+ */
+export function generateSeedString(): string {
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const bytes = new Uint32Array(2);
+        crypto.getRandomValues(bytes);
+        return `${bytes[0].toString(16)}${bytes[1].toString(16)}`;
+    }
+    return `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+}
+
+/**
  * Get a random space texture based on the provided master seed.
  * @param masterSeed The master seed used to deterministically select a space texture.
  * @returns The selected space texture as an ISpaceBackground object.

@@ -321,6 +321,8 @@ import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-gen
 import { BlackHoleSystemGenerator } from './procedural/black-hole-system-generator';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
 import { EffectiveGForce } from './types';
+import { SolarSystemGenerator } from './procedural/solar-system-generator';
+import { EmptySystemGenerator } from './procedural/empty-system-generator';
 
 // ── URL seed parameter helpers ──────────────────────────────────────────────
 const SEED_TYPE_NORMAL = 'normal';
@@ -1934,20 +1936,10 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
 }
 
 /**
- * Spawns a new simulation based on the specified mode and seed. Initializes the environment, cleans up existing bodies and effects,
- * and sets up the initial state for the simulation.
- * @param param0 An object containing the mode and seed for the simulation spawn.
- * @returns
+ * Cleans up the entire solar system, disposing of all celestial bodies, explosions, impacts, supernovas, and planetary nebulae.
+ * Resets the simulation state and notifies the UI of the reset.
  */
-async function spawn({
-    mode = SimulationStartMode.Default,
-    seed,
-}: {
-    mode?: SimulationStartMode;
-    seed?: string;
-} = {}) {
-    applyEnvironmentDefaultsForMode(mode);
-
+function cleanUpSolarSystem() {
     // Unified cleanup: always dispose existing bodies (stars included).
     // No special-casing is required here; Star.die(true) is already the canonical disposal path.
     for (const b of simulationState.bodies || []) {
@@ -1992,149 +1984,68 @@ async function spawn({
         console.error('Error dispatching bodies:reset event:', e);
     }
 
-    // Empty / procedural mode: starfield only (no bodies)
-    if (mode === SimulationStartMode.Empty) {
-        selectedBody = null;
-        clearURLSeed();
-        return;
-    }
-
-    // Black Hole mode: procedurally generated black hole + 1–3 stars in siphon range
-    if (mode === SimulationStartMode.BlackHole) {
-        const generator = new BlackHoleSystemGenerator(dependencies, scene, seed);
-        const solarSystem = await generator.generateSolarSystemAsync();
-        // Set the bodies
-        simulationState.bodies = solarSystem.bodies;
-        // Apply the space texture from the generated solar system
-        await loadSpaceTexture(solarSystem.spaceTexture.filename);
-        // Sync the texture with the management panel UI
-        uiManager.managementPanel.setSelectedSpaceTexture(solarSystem.spaceTexture);
-
-        updateURLWithSeed(SEED_TYPE_BLACKHOLE, generator.seed);
-
-        syncAllStarLightTargets();
-        selectedBody = null;
-
-        // Focus on the first body in the list, which will probably be a star (e.g., the Sun).
-        if (simulationState.bodies.length > 0) {
-            triggerZoomToBody(simulationState.bodies[0]);
-        }
-
-        const shadowCheckboxForSpawn = document.getElementById('enableShadows') as HTMLInputElement;
-        toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
-        return;
-    }
-
-    // Procedural generation (async + progress reporting)
-    if (mode === SimulationStartMode.Procedural) {
-        // Keep the solar system empty until generation finishes.
-        simulationState.bodies = [];
-        selectedBody = null;
-        manuallySelectedBody = null;
-
-        const abortController = new AbortController();
-
-        // The procedural modal is already visible from the startup modal's prompt flow.
-        // Switch to progress UI now that generation is starting.
-        proceduralModal.showProgressUI();
-        proceduralModal.setInputsLocked(true);
-
-        // Guard against out-of-order completion when user resets/spawns again.
-        // (We store the counter on window to avoid needing module-scope vars in this huge file.)
-        const runIdKey = '__procRunId__';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const w = window as any;
-        w[runIdKey] = (w[runIdKey] ?? 0) + 1;
-        const runId = w[runIdKey] as number;
-
-        const onProceduralCancel = () => {
-            // UI: lock progress status to "Canceling" immediately
-            proceduralModal.markCancelRequested();
-            abortController.abort();
-        };
-
-        // Index.ts owns cancellation (abort); UI is owned by proceduralModal.
-        proceduralModal.on('cancelRequested', onProceduralCancel);
-
-        try {
-            const generator = new ProceduralGenerator(seed, dependencies, scene);
-            const solarSystem = await generator.generateSolarSystemAsync();
-
-            if (runId !== w[runIdKey]) return; // stale completion
-
-            simulationState.bodies = solarSystem.bodies;
-            // Apply the space texture from the generated solar system
-            await loadSpaceTexture(solarSystem.spaceTexture.filename);
-            // Sync the texture with the management panel UI
-            uiManager.managementPanel.setSelectedSpaceTexture(solarSystem.spaceTexture);
-
-            // Push URL seed after successful generation
-            if (generator) {
-                updateURLWithSeed(SEED_TYPE_NORMAL, generator.seed);
-            }
-
-            syncAllStarLightTargets();
-            selectedBody = null;
-            manuallySelectedBody = null;
-
-            // Focus on the first body in the list, which will probably be a star (e.g., the Sun).
-            if (simulationState.bodies.length > 0) {
-                triggerZoomToBody(simulationState.bodies[0]);
-            }
-
-            // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
-            // immediately without requiring the user to toggle the checkbox.
-            const shadowCheckboxForSpawn = document.getElementById(
-                'enableShadows'
-            ) as HTMLInputElement;
-            toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
-
-            // Refresh UI now that bodies exist
-            try {
-                uiManager.managementPanel?.setSelectedBody?.(null);
-                gizmo.attach(null);
-                refreshBodiesTable();
-                flightHUD.forceHintRefresh();
-            } catch {
-                // Empty
-            }
-
-            // Success path: hide procedural overlay, keep simulation running.
-            proceduralModal.setInputsLocked(false);
-            proceduralModal.hide();
-        } catch (e) {
-            if (runId !== w[runIdKey]) return;
-
-            console.error('[procedural] generation failed:', e);
-
-            // Keep bodies empty on error
-            simulationState.bodies = [];
-
-            proceduralModal.setInputsLocked(false);
-            proceduralModal.setProgressStatusText('Generation failed.');
-            proceduralModal.setProgressErrorVisible(true);
-            proceduralModal.showSeedSectionForRetry();
-        }
-
-        return;
-    }
-
-    // Default mode: build the solar system
     clearURLSeed();
-    const normalGenerator = new NormalSolarSystemGenerator(dependencies, scene, {
-        jupiterTexture,
-        saturnTexture,
-        uranusTexture,
-        neptuneTexture,
-        plutoTexture,
-        ceresTexture,
-    });
-    const solarSystem = await normalGenerator.generateSolarSystemAsync();
+
+    selectedBody = null;
+}
+
+/**
+ * Spawns a new simulation based on the specified mode and seed. Initializes the environment, cleans up existing bodies and effects,
+ * and sets up the initial state for the simulation.
+ * @param param0 An object containing the mode and seed for the simulation spawn.
+ * @returns
+ */
+async function spawn({
+    mode = SimulationStartMode.Default,
+    seed,
+}: {
+    mode?: SimulationStartMode;
+    seed?: string;
+} = {}) {
+    applyEnvironmentDefaultsForMode(mode);
+
+    cleanUpSolarSystem();
+
+    let generator: SolarSystemGenerator;
+    let seedType: typeof SEED_TYPE_NORMAL | typeof SEED_TYPE_BLACKHOLE | null = null;
+
+    if (mode === SimulationStartMode.Default) {
+        // Normal solar system generator
+        generator = new NormalSolarSystemGenerator(dependencies, scene, {
+            jupiterTexture,
+            saturnTexture,
+            uranusTexture,
+            neptuneTexture,
+            plutoTexture,
+            ceresTexture,
+        });
+    } else if (mode === SimulationStartMode.Procedural) {
+        // Procedural system generator
+        generator = new ProceduralGenerator(seed, dependencies, scene);
+        seedType = SEED_TYPE_NORMAL;
+    } else if (mode === SimulationStartMode.BlackHole) {
+        // Black hole system generator
+        generator = new BlackHoleSystemGenerator(dependencies, scene, seed);
+        seedType = SEED_TYPE_BLACKHOLE;
+    } else {
+        // Empty system generator
+        generator = new EmptySystemGenerator(dependencies, scene);
+    }
+
+    // Generate the solar system using the selected generator
+    const solarSystem = await generator.generateSolarSystemAsync();
+
+    // Set the bodies
     simulationState.bodies = solarSystem.bodies;
     // Apply the space texture from the generated solar system
     await loadSpaceTexture(solarSystem.spaceTexture.filename);
     // Sync the texture with the management panel UI
     uiManager.managementPanel.setSelectedSpaceTexture(solarSystem.spaceTexture);
+
+    // Update the url with the seed and seed type
+    if (seedType) {
+        updateURLWithSeed(seedType, generator.seed);
+    }
 
     syncAllStarLightTargets();
     selectedBody = null;
@@ -2144,11 +2055,8 @@ async function spawn({
         triggerZoomToBody(simulationState.bodies[0]);
     }
 
-    // Initialise castShadow / receiveShadow on all newly spawned bodies so shadows work
-    // immediately without requiring the user to toggle the checkbox.
     const shadowCheckboxForSpawn = document.getElementById('enableShadows') as HTMLInputElement;
     toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
-    return;
 }
 
 function togglePause() {

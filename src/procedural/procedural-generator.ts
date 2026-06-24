@@ -34,7 +34,7 @@ import {
     safeUnitCross,
     generateBinaryPlacements,
 } from './orbital-math';
-import { pickRandomSpaceTexture, rngFor } from './seed-utils';
+import { generateSeedString, pickRandomSpaceTexture, rngFor } from './seed-utils';
 
 // Import the background texture upgrader
 import { upgradeProceduralTexture } from './texture-upgrader';
@@ -43,20 +43,6 @@ type StarPlacement = {
     pos: THREE.Vector3;
     vel: THREE.Vector3;
 };
-
-function generateSeedString(): string {
-    return (() => {
-        const randPart =
-            typeof crypto !== 'undefined' && crypto.getRandomValues
-                ? (() => {
-                      const bytes = new Uint32Array(2);
-                      crypto.getRandomValues(bytes);
-                      return `${bytes[0].toString(16)}${bytes[1].toString(16)}`;
-                  })()
-                : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-        return `${randPart}`;
-    })();
-}
 
 function deriveSubSeed(masterSeed: string, index: number): string {
     return `${masterSeed}|star:${index}`;

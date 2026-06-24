@@ -10,16 +10,7 @@ import { createMainSequenceStarFromParams } from './star-factory';
 import { generateBinaryPlacements } from './orbital-math';
 import type { Body } from '../bodies/body';
 import type { ISolarSystem, IStateDependencies } from '../interfaces';
-import { pickRandomSpaceTexture, rngFor } from './seed-utils';
-
-function generateSeedString(): string {
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-        const bytes = new Uint32Array(2);
-        crypto.getRandomValues(bytes);
-        return `${bytes[0].toString(16)}${bytes[1].toString(16)}`;
-    }
-    return `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-}
+import { generateSeedString, pickRandomSpaceTexture, rngFor } from './seed-utils';
 
 /**
  * Generates a black hole system: one procedurally-named black hole + 1–3 procedurally-named stars.
