@@ -6520,7 +6520,9 @@ startupModal.on('generateBlackHole', async ({ seed }: { seed: string }) => {
 startupModal.on('generateProcedural', async ({ seed }: { seed: string }) => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
-
+    proceduralModal.hide();
+    startupModal.hide();
+    
     await spawn({ mode: SimulationStartMode.Procedural, seed });
     applyDefaultCameraTogglesAfterSpawn();
 });
