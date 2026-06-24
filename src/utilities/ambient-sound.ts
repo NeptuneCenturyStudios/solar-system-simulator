@@ -172,12 +172,19 @@ export class AmbientSoundManager {
         tempList.push(this.buildTrackUrl('leberch-atmosphere-pulse-263075.mp3'));
         tempList.push(this.buildTrackUrl('joyinsound-drone-perspectives-399304.mp3'));
         tempList.push(this.buildTrackUrl('fabienroch-nebulous-173888.mp3'));
+        tempList.push(this.buildTrackUrl('kaazoom-tension-20224.mp3'));
+        tempList.push(this.buildTrackUrl('romansenykmusic-drone-cinematic-mysterious-144210.mp3'));
+        tempList.push(this.buildTrackUrl('sergepavkinmusic-endless-space-149636.mp3'));
+        tempList.push(this.buildTrackUrl('sergepavkinmusic-outer-space-188045.mp3'));
+        tempList.push(this.buildTrackUrl('universfield-starlight-harmonies-185900.mp3'));
 
-        // Randomize the playlist order
+        // Randomize the playlist order so that the tracks play in a different sequence each time,
+        // providing a varied listening experience and only repeating tracks after all have been played once.
         for (let i = tempList.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [tempList[i], tempList[j]] = [tempList[j], tempList[i]];
         }
+
         this.playlist = tempList;
     }
 
