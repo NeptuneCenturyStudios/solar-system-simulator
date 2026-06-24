@@ -1,5 +1,5 @@
 ﻿import * as THREE from 'three';
-
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 // Tell typescript about our custom events that has detail property
@@ -200,7 +200,6 @@ const neptuneTexture = loadSrgbTexture('./assets/textures/neptune.jpg');
 const plutoTexture = loadSrgbTexture('./assets/textures/pluto.jpg');
 const ceresTexture = loadSrgbTexture('./assets/textures/ceres.jpg');
 
-
 // Custom/random atmosphere textures (used for custom mode planets/moons when "Has Atmosphere" is checked)
 const fictionalAtmosphereTextures = [
     loadSrgbTexture('./assets/textures/fictional_atmosphere_1.jpg'),
@@ -218,8 +217,6 @@ window.addEventListener('beforeunload', (e) => {
     return ''; // Some browsers use the return value
 });
 
-
-
 // Create the scene
 const scene = new THREE.Scene();
 
@@ -230,27 +227,43 @@ let currentSpaceTexture: THREE.Texture | null = null;
  * Loads the default space texture and sets it as the scene's background.
  * @returns A promise that resolves once the texture is loaded and applied.
  */
-async function loadDefaultSpaceTexture(): Promise<void> {
-    const textureLoader = new THREE.TextureLoader();
+async function loadSpaceTexture(textureFilename: string): Promise<void> {
     return new Promise((resolve, reject) => {
-        textureLoader.load(
-            './assets/textures/skydome/space-default.jpg',
-            (texture) => {
-                setSpaceTexture(texture);
-                resolve();
-            },
-            undefined,
-            (err) => reject(err)
-        );
+        // Load texture in another thread
+        setTimeout(() => {
+            // If the filename ends with .hdr, use the HDRLoader instead of TextureLoader
+            if (textureFilename.toLowerCase().endsWith('.hdr')) {
+                const hdrLoader = new HDRLoader();
+                hdrLoader.load(
+                    textureFilename,
+                    (texture) => {
+                        setSpaceTexture(texture, true);
+                        resolve();
+                    },
+                    undefined,
+                    (err) => reject(err)
+                );
+            } else {
+                const textureLoader = new THREE.TextureLoader();
+                textureLoader.load(
+                    textureFilename,
+                    (texture) => {
+                        setSpaceTexture(texture);
+                        resolve();
+                    },
+                    undefined,
+                    (err) => reject(err)
+                );
+            }
+        }, 0);
     });
 }
-
 
 /**
  * Sets the skydome background texture.
  * @param texture The new texture to be applied to the skydome background.
  */
-function setSpaceTexture(texture: THREE.Texture): void {
+function setSpaceTexture(texture: THREE.Texture, isHDR: boolean = false): void {
     // Dispose the old texture if it exists
     if (scene.background) {
         (scene.background as THREE.Texture).dispose();
@@ -258,7 +271,7 @@ function setSpaceTexture(texture: THREE.Texture): void {
 
     // Set the scene's background to the provided texture
     texture.mapping = THREE.EquirectangularReflectionMapping;
-    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.colorSpace = isHDR ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
     scene.background = texture;
 
     currentSpaceTexture = texture;
@@ -1993,7 +2006,9 @@ async function spawn({
         // Set the bodies
         simulationState.bodies = solarSystem.bodies;
         // Apply the space texture from the generated solar system
-        setSpaceTexture(solarSystem.spaceTexture);
+        await loadSpaceTexture(solarSystem.spaceTexture.filename);
+        // Sync the texture with the management panel UI
+        uiManager.managementPanel.setSelectedSpaceTexture(solarSystem.spaceTexture);
 
         updateURLWithSeed(SEED_TYPE_BLACKHOLE, generator.seed);
 
@@ -2049,7 +2064,9 @@ async function spawn({
 
             simulationState.bodies = solarSystem.bodies;
             // Apply the space texture from the generated solar system
-            setSpaceTexture(solarSystem.spaceTexture);
+            await loadSpaceTexture(solarSystem.spaceTexture.filename);
+            // Sync the texture with the management panel UI
+            uiManager.managementPanel.setSelectedSpaceTexture(solarSystem.spaceTexture);
 
             // Push URL seed after successful generation
             if (generator) {
@@ -2115,7 +2132,9 @@ async function spawn({
     const solarSystem = await normalGenerator.generateSolarSystemAsync();
     simulationState.bodies = solarSystem.bodies;
     // Apply the space texture from the generated solar system
-    setSpaceTexture(solarSystem.spaceTexture);
+    await loadSpaceTexture(solarSystem.spaceTexture.filename);
+    // Sync the texture with the management panel UI
+    uiManager.managementPanel.setSelectedSpaceTexture(solarSystem.spaceTexture);
 
     syncAllStarLightTargets();
     selectedBody = null;
@@ -5518,6 +5537,14 @@ uiManager.managementPanel.on('gChange', ({ value }: { value: number }) => {
     simulationState.gMultiplier = value;
 });
 
+uiManager.managementPanel.on(
+    'spaceTextureChange',
+    async ({ texturePath }: { texturePath: string }) => {
+        // Apply the space texture from the user's selection
+        await loadSpaceTexture(texturePath);
+    }
+);
+
 const enableSkydomeCheckbox = document.getElementById('enableSkydome') as HTMLInputElement;
 if (enableSkydomeCheckbox) {
     enableSkydomeCheckbox.onchange = () => {
@@ -6675,7 +6702,7 @@ window.addEventListener(
         // Load the default space texture to display while the startup modal is active before the user
         // does anything. This will get replaced once the actual space texture is loaded during the simulation setup.
         // Note: Build your own system doesn't have a generator yet, so it doesn't replace this texture yet.
-        await loadDefaultSpaceTexture();
+        await loadSpaceTexture('./assets/textures/skydome/space-default.jpg');
         // Display the startup modal.
         startupModal.open({ allowCancel: false });
     }

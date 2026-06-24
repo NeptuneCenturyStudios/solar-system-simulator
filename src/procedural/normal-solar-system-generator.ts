@@ -54,7 +54,7 @@ import {
     HYGIEA_RADIUS,
 } from '../utilities/consts';
 import { MoonTypeEnum } from '../bodies/body-enums';
-import { loadSrgbTexture } from '../drawing/textures';
+import { spaceTextures } from '../drawing/textures';
 
 type Textures = {
     jupiterTexture: THREE.Texture;
@@ -326,11 +326,11 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await yieldToEventLoop();
 
         // Use default space texture
-        const skydomeTexture = loadSrgbTexture('./assets/textures/skydome/space-1.jpg');
+        const spaceTexture = spaceTextures[0];
 
         return {
             bodies,
-            spaceTexture: skydomeTexture,
+            spaceTexture: spaceTexture,
         };
     }
 }

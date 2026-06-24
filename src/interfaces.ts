@@ -18,7 +18,7 @@ import { ImpactShockwave } from './effects/impact-shockwave';
 export interface ISolarSystem{
     bodies: Body[];
     /** The space texture representing the background of the solar system. Can be null if not yet generated. */
-    spaceTexture: THREE.Texture;
+    spaceTexture: ISpaceBackground;
 }
 
 export interface ISimulationState {
@@ -316,4 +316,12 @@ export interface IAutopilotState {
      *  0→1 blend factor that rotates the desired velocity from 'stop' to
      *  'orbital velocity' as the ship closes on the orbit radius. */
     brakeEntryDistance: number;
+}
+
+/**
+ * Represents a space background texture, including its display name and the filename of the texture image.
+ */
+export interface ISpaceBackground {
+    name: string;
+    filename: string;
 }

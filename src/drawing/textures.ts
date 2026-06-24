@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
+import { ISpaceBackground } from '../interfaces';
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -51,6 +52,28 @@ export const fictionalAtmosphereTextures: THREE.Texture[] = [
     loadSrgbTexture('./assets/textures/fictional_atmosphere_1.jpg'),
     loadSrgbTexture('./assets/textures/fictional_atmosphere_2.jpg'),
 ];
+const SPACE_TEXTURE_COUNT = 11;
+
+/**
+ * Get the list of space background textures.
+ * @returns An array of ISpaceBackground objects representing the available space textures.
+ */
+function getSpaceTextures() : ISpaceBackground[]{
+    const textures: ISpaceBackground[] = [];
+    for (let skydomeIndex = 1; skydomeIndex <= SPACE_TEXTURE_COUNT; skydomeIndex++) {
+        textures.push({
+            name: `Space ${skydomeIndex}`,
+            filename: `./assets/textures/skydome/space-${skydomeIndex}.jpg`
+        });
+    }
+    return textures;
+}
+
+/**
+ * An array of ISpaceBackground objects representing the available space textures.
+ */
+export const spaceTextures: ISpaceBackground[] = getSpaceTextures();
+
 
 /**
  * Gets the appropriate roughness value for a planet based on its subtype, which can be used to create a more visually distinct appearance for different types of planets.

@@ -1,4 +1,5 @@
-import { loadSrgbTexture } from '../drawing/textures';
+import { spaceTextures } from '../drawing/textures';
+import { ISpaceBackground } from '../interfaces';
 import { SeededRandom } from '../utilities/prng';
 
 export function deriveSeed(
@@ -18,8 +19,13 @@ export function rngFor(
     return new SeededRandom(deriveSeed(masterSeed, ...parts));
 }
 
-export function pickRandomSpaceTexture(masterSeed: string){
+/**
+ * Get a random space texture based on the provided master seed.
+ * @param masterSeed The master seed used to deterministically select a space texture.
+ * @returns The selected space texture as an ISpaceBackground object.
+ */
+export function pickRandomSpaceTexture(masterSeed: string): ISpaceBackground {
      const skydomeIndex = rngFor(masterSeed, 'skydome').rangeInt(1, 11);
-     const skydomeTexture = loadSrgbTexture(`./assets/textures/skydome/space-${skydomeIndex}.jpg`);
-     return skydomeTexture;
+     const spaceTexture = spaceTextures[skydomeIndex - 1];
+     return spaceTexture;
 }

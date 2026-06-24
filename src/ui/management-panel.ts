@@ -21,6 +21,8 @@ import {
     randomMoonParams,
 } from '../utilities/body-params.js';
 import { BodyTypeEnum } from '../bodies/body-enums';
+import { spaceTextures } from '../drawing/textures';
+import { ISpaceBackground } from '../interfaces';
 
 interface CreateSliderInitState {
     mass: number | null;
@@ -126,6 +128,7 @@ export class ManagementPanel extends Panel {
 
     // Environment toggles (owned by ManagementPanel)
     enableKuiperBeltCheckbox: HTMLInputElement | null;
+    spaceTextureSelect: HTMLSelectElement | null;
     gravitationalConstantSlider: HTMLInputElement | null;
     gravitationalConstantDisplay: HTMLElement | null;
     gravitationalConstantResetBtn: HTMLButtonElement | null;
@@ -237,6 +240,7 @@ export class ManagementPanel extends Panel {
 
         // Environment toggles (owned by ManagementPanel)
         this.enableKuiperBeltCheckbox = null;
+        this.spaceTextureSelect = null;
         this.gravitationalConstantSlider = null;
         this.gravitationalConstantDisplay = null;
         this.gravitationalConstantResetBtn = null;
@@ -407,6 +411,26 @@ export class ManagementPanel extends Panel {
             const kuiperBeltCheckbox = this.enableKuiperBeltCheckbox;
             kuiperBeltCheckbox.onchange = () => {
                 this.emit('kuiperBeltChange', { checked: kuiperBeltCheckbox.checked });
+            };
+        }
+
+        this.spaceTextureSelect = document.getElementById(
+            'spaceTextureSelect'
+        ) as HTMLSelectElement | null;
+
+        if (this.spaceTextureSelect) {
+            //   Build list of textures
+            spaceTextures.forEach((texture) => {
+                const option = document.createElement('option');
+                option.value = texture.filename;
+                option.textContent = texture.name;
+                this.spaceTextureSelect!.appendChild(option);
+            });
+
+            this.spaceTextureSelect.onchange = () => {
+                this.emit('spaceTextureChange', {
+                    texturePath: this.spaceTextureSelect!.value,
+                });
             };
         }
 
@@ -1752,6 +1776,16 @@ export class ManagementPanel extends Panel {
             this.orbitParentDisplay.textContent = this.selectedBody.name || 'Unnamed';
         } else {
             this.orbitParentDisplay.textContent = 'None';
+        }
+    }
+
+    /**
+     * Selects the space texture in the UI based on the provided texture filename.
+     * @param spaceBackground The space background object containing the filename of the space texture to select in the UI.
+     */
+    setSelectedSpaceTexture(spaceBackground: ISpaceBackground): void {
+        if (this.spaceTextureSelect) {
+            this.spaceTextureSelect.value = spaceBackground.filename;
         }
     }
 }
