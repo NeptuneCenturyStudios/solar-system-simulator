@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { DIST_SCALE, SCALE_FACTOR } from '../utilities/consts.js';
+import {
+    DIST_SCALE,
+    FLIGHT_MAX_SPEED,
+    performanceSettings,
+    SCALE_FACTOR,
+} from '../utilities/consts.js';
 
 // ─── Tunnel geometry constants ───────────────────────────────────────────────
 const SF = SCALE_FACTOR;
@@ -207,10 +212,25 @@ export class WarpEffect {
         shipVelocity: THREE.Vector3,
         maxSpeed: number
     ): void {
+        // Check performance settings
+        if (!performanceSettings.particleEffectsEnabled) {
+            this.lines.visible = false;
+            return;
+        }
+
         // Anchor geometry to the ship.
         this.lines.position.copy(shipPos);
 
+        // Get the current speed of the ship.
         const speed = shipVelocity.length();
+
+        // If ship speed is below FLIGHT_MAX_SPEED, then return. We don't need to display the warp effect
+        if (speed <= FLIGHT_MAX_SPEED) {
+            this.lines.visible = false;
+            return;
+        }
+
+        this.lines.visible = true;
 
         // Opacity ramps linearly: 0 at rest → 1 at 3% maxSpeed.
         this.speedOpacity = Math.min(speed / (maxSpeed / 33.33), 1);

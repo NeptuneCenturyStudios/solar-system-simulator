@@ -10,8 +10,7 @@ import { createMainSequenceStarFromParams } from './star-factory';
 import { generateBinaryPlacements } from './orbital-math';
 import type { Body } from '../bodies/body';
 import type { ISolarSystem, IStateDependencies } from '../interfaces';
-import { rngFor } from './seed-utils';
-import { loadSrgbTexture } from '../drawing/textures';
+import { pickRandomSpaceTexture, rngFor } from './seed-utils';
 
 function generateSeedString(): string {
     if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
@@ -172,8 +171,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         }
 
         // Pick a PRNG skydome texture based on the master seed
-        const skydomeIndex = rngFor(this.masterSeed, 'skydome').rangeInt(1, 12);
-        const skydomeTexture = loadSrgbTexture(`./assets/textures/skydome/space-${skydomeIndex}.jpg`);
+        const skydomeTexture = pickRandomSpaceTexture(this.masterSeed);
 
         return {
             bodies,

@@ -200,23 +200,6 @@ const neptuneTexture = loadSrgbTexture('./assets/textures/neptune.jpg');
 const plutoTexture = loadSrgbTexture('./assets/textures/pluto.jpg');
 const ceresTexture = loadSrgbTexture('./assets/textures/ceres.jpg');
 
-// Background texture (skydome)
-const skydomeTexture = loadSrgbTexture('./assets/textures/skydome/space-1.jpg');
-skydomeTexture.wrapS = THREE.RepeatWrapping;
-skydomeTexture.wrapT = THREE.RepeatWrapping;
-skydomeTexture.repeat.set(2, 1);
-
-// // Custom/random textures for custom gas giants
-// const fictionalGasTextures = [
-//     loadSrgbTexture('./assets/textures/fictional_gas_1.jpg'),
-//     loadSrgbTexture('./assets/textures/fictional_gas_2.jpg'),
-// ];
-
-// // Custom/random textures for custom ice giants
-// const fictionalIceTextures = [
-//     loadSrgbTexture('./assets/textures/fictional_ice_1.jpg'),
-//     loadSrgbTexture('./assets/textures/fictional_ice_2.jpg'),
-// ];
 
 // Custom/random atmosphere textures (used for custom mode planets/moons when "Has Atmosphere" is checked)
 const fictionalAtmosphereTextures = [
@@ -235,37 +218,50 @@ window.addEventListener('beforeunload', (e) => {
     return ''; // Some browsers use the return value
 });
 
-// Function to create/update body stats texture
 
+
+// Create the scene
 const scene = new THREE.Scene();
 
-// --- Skydome background ---
-// A huge inverted sphere that always follows the camera, giving a textured space background.
-// This is separate from the point-starfield so users can toggle each independently.
-const skydomeGeometry = new THREE.SphereGeometry(3_000_000_000 / DIST_SCALE, 48, 24);
-const skydomeMaterial = new THREE.MeshBasicMaterial({
-    map: skydomeTexture,
-    side: THREE.BackSide,
-    depthWrite: false,
-});
-const skydome = new THREE.Mesh(skydomeGeometry, skydomeMaterial);
-skydome.renderOrder = -1000;
-scene.add(skydome);
+// Current space texture
+let currentSpaceTexture: THREE.Texture | null = null;
+
+/**
+ * Loads the default space texture and sets it as the scene's background.
+ * @returns A promise that resolves once the texture is loaded and applied.
+ */
+async function loadDefaultSpaceTexture(): Promise<void> {
+    const textureLoader = new THREE.TextureLoader();
+    return new Promise((resolve, reject) => {
+        textureLoader.load(
+            './assets/textures/skydome/space-default.jpg',
+            (texture) => {
+                setSpaceTexture(texture);
+                resolve();
+            },
+            undefined,
+            (err) => reject(err)
+        );
+    });
+}
+
 
 /**
  * Sets the skydome background texture.
  * @param texture The new texture to be applied to the skydome background.
  */
 function setSpaceTexture(texture: THREE.Texture): void {
-    // Dispose the old texture map on the material
-    const oldMap = skydomeMaterial.map;
-    if (oldMap) oldMap.dispose();
-    skydomeMaterial.map = texture;
-    skydomeMaterial.needsUpdate = true;
-    // Apply wrapping so the texture tiles across the dome
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(2, 1);
+    // Dispose the old texture if it exists
+    if (scene.background) {
+        (scene.background as THREE.Texture).dispose();
+    }
+
+    // Set the scene's background to the provided texture
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    scene.background = texture;
+
+    currentSpaceTexture = texture;
 }
 
 // === Ambient light from stars (base level of illumination) ===
@@ -3496,9 +3492,6 @@ function animate() {
         }
     }
 
-    // Keep skydome centered on the camera so it appears infinitely far away
-    skydome.position.copy(camera.position);
-
     gizmo.update();
     velArc.update();
     orbitPrediction.update(simulationState.bodies, simulationState.gMultiplier);
@@ -5528,7 +5521,9 @@ uiManager.managementPanel.on('gChange', ({ value }: { value: number }) => {
 const enableSkydomeCheckbox = document.getElementById('enableSkydome') as HTMLInputElement;
 if (enableSkydomeCheckbox) {
     enableSkydomeCheckbox.onchange = () => {
-        skydome.visible = enableSkydomeCheckbox.checked;
+        const checked = enableSkydomeCheckbox.checked;
+        // Show or hide the background
+        scene.background = checked ? currentSpaceTexture : null;
     };
 }
 
@@ -6383,7 +6378,6 @@ if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) kuiperBeltPoint
 if (uiManager.managementPanel.enableKuiperBeltCheckbox)
     uiManager.managementPanel.enableKuiperBeltCheckbox.checked = false;
 
-if (skydome) skydome.visible = true;
 if (enableSkydomeCheckbox) enableSkydomeCheckbox.checked = true;
 
 function handleBodyBecameInvalid(body: Body | null | undefined) {
@@ -6678,6 +6672,11 @@ window.addEventListener(
         await spawn({ mode, seed: urlSeed.seed });
         applyDefaultCameraTogglesAfterSpawn();
     } else {
+        // Load the default space texture to display while the startup modal is active before the user
+        // does anything. This will get replaced once the actual space texture is loaded during the simulation setup.
+        // Note: Build your own system doesn't have a generator yet, so it doesn't replace this texture yet.
+        await loadDefaultSpaceTexture();
+        // Display the startup modal.
         startupModal.open({ allowCancel: false });
     }
 })();

@@ -34,11 +34,10 @@ import {
     safeUnitCross,
     generateBinaryPlacements,
 } from './orbital-math';
-import { rngFor } from './seed-utils';
+import { pickRandomSpaceTexture, rngFor } from './seed-utils';
 
 // Import the background texture upgrader
 import { upgradeProceduralTexture } from './texture-upgrader';
-import { loadSrgbTexture } from '../drawing/textures';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -466,8 +465,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         }
 
         // Pick a PRNG skydome texture based on the master seed
-        const skydomeIndex = rngFor(this.masterSeed, 'skydome').rangeInt(1, 12);
-        const skydomeTexture = loadSrgbTexture(`./assets/textures/skydome/space-${skydomeIndex}.jpg`);
+        const skydomeTexture = pickRandomSpaceTexture(this.masterSeed);
 
         return {
             bodies,
