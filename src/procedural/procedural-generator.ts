@@ -137,7 +137,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
     private dependencies: IStateDependencies;
     private scene: THREE.Scene;
 
-    constructor(seed: string | undefined, dependencies: IStateDependencies, scene: THREE.Scene) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, seed: string | undefined) {
         super();
 
         this.dependencies = dependencies;

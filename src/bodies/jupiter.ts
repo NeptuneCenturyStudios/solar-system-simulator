@@ -14,6 +14,7 @@ import {
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
+import { loadSrgbTexture } from '../drawing/textures.js';
 
 /**
  * Represents the planet Jupiter in the simulation, including its texture and orbital properties.
@@ -24,12 +25,10 @@ export class Jupiter extends Planet {
      * Constructs a new Jupiter object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Jupiter belongs.
-     * @param jupiterTexture The texture to use for rendering Jupiter.
      */
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        jupiterTexture: THREE.Texture,
         angleRad: number = 0
     ) {
         const gEff = dependencies.getG();
@@ -37,9 +36,10 @@ export class Jupiter extends Planet {
             JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (9.925 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, JUPITER_DIST, SUN_MASS, angleRad);
+        const texture = loadSrgbTexture('./assets/textures/bodies/2k/jupiter.jpg');
         const geometry = new THREE.SphereGeometry(JUPITER_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
-            map: jupiterTexture,
+            map: texture,
             color: 0xffffff,
             emissive: 0x000000,
             emissiveIntensity: 0,

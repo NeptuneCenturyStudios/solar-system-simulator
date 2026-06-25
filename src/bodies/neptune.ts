@@ -14,6 +14,7 @@ import {
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
+import { loadSrgbTexture } from '../drawing/textures.js';
 
 /**
  * Represents the planet Neptune in the simulation, including its texture and orbital properties.
@@ -24,12 +25,10 @@ export class Neptune extends Planet {
      * Constructs a new Neptune object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Neptune belongs.
-     * @param neptuneTexture The texture to use for rendering Neptune.
      */
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        neptuneTexture: THREE.Texture,
         angleRad: number = 0
     ) {
         const gEff = dependencies.getG();
@@ -37,9 +36,10 @@ export class Neptune extends Planet {
             NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (16.11 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, NEPTUNE_DIST, SUN_MASS, angleRad);
+        const texture = loadSrgbTexture('./assets/textures/bodies/2k/neptune.jpg');
         const geometry = new THREE.SphereGeometry(NEPTUNE_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
-            map: neptuneTexture,
+            map: texture,
             color: 0xffffff,
             emissive: 0x000000,
             emissiveIntensity: 0,

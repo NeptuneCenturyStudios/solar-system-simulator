@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { ISpaceBackground } from '../interfaces';
 
@@ -27,13 +28,6 @@ export const fictionalTerrestrialTextures: THREE.Texture[] = [
     loadSrgbTexture('./assets/textures/fictional_4.jpg'),
 ];
 
-// Deterministic textures for additional custom solid planet/moon subtypes.
-export const fictionalFrozenTexture = loadSrgbTexture('./assets/textures/frozen_temp.jpg');
-export const fictionalOceanTexture = loadSrgbTexture('./assets/textures/ocean_temp.jpg');
-export const fictionalDesertTexture = loadSrgbTexture('./assets/textures/desert_temp.jpg');
-export const fictionalTemperateTexture = loadSrgbTexture('./assets/textures/earth_day.jpg');
-export const fictionalVolcanicTexture = loadSrgbTexture('./assets/textures/volcanic_temp.jpg');
-
 // Custom/random textures for custom gas giants
 // (kept here because these are not part of the fictional solid pool)
 export const fictionalGasTextures: THREE.Texture[] = [
@@ -52,7 +46,116 @@ export const fictionalAtmosphereTextures: THREE.Texture[] = [
     loadSrgbTexture('./assets/textures/fictional_atmosphere_1.jpg'),
     loadSrgbTexture('./assets/textures/fictional_atmosphere_2.jpg'),
 ];
+
 const SPACE_TEXTURE_COUNT = 13;
+const PROCEDURAL_TEMPORATE_TEXTURES = 5;
+const PROCEDURAL_VOLCANIC_TEXTURES = 5;
+const PROCEDURAL_OCEAN_TEXTURES = 5;
+const PROCEDURAL_FROZEN_TEXTURES = 5;
+const PROCEDURAL_DESERT_TEXTURES = 5;
+const PROCEDURAL_TERRESTRIAL_TEXTURES = 5;
+
+/**
+ * Generates an array of THREE.Texture objects representing the available temperate planet textures for procedural generation.
+ * @returns An array of THREE.Texture objects.
+ */
+function getTemperateTextures(): THREE.Texture[] {
+    const textures: THREE.Texture[] = [];
+    for (let i = 1; i <= PROCEDURAL_TEMPORATE_TEXTURES; i++) {
+        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/temperate-${i}.jpg`));
+    }
+    return textures;
+}
+
+/**
+ * An array of THREE.Texture objects representing the available temperate planet textures for procedural generation.
+ */
+export const temperateTextures = getTemperateTextures();
+
+/**
+ * Generates an array of THREE.Texture objects representing the available volcanic planet textures for procedural generation.
+ * @returns An array of THREE.Texture objects.
+ */
+function getVolcanicTextures(): THREE.Texture[] {
+    const textures: THREE.Texture[] = [];
+    for (let i = 1; i <= PROCEDURAL_VOLCANIC_TEXTURES; i++) {
+        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/volcanic-${i}.jpg`));
+    }
+    return textures;
+}
+
+/**
+ * An array of THREE.Texture objects representing the available volcanic planet textures for procedural generation.
+ */
+export const volcanicTextures = getVolcanicTextures();
+
+/**
+ * Gets the list of ocean textures for procedural generation.
+ * @returns An array of THREE.Texture objects.
+ */
+function getOceanTextures(): THREE.Texture[] {
+    const textures: THREE.Texture[] = [];
+    for (let i = 1; i <= PROCEDURAL_OCEAN_TEXTURES; i++) {
+        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/ocean-${i}.jpg`));
+    }
+    return textures;
+}
+
+/**
+ * An array of THREE.Texture objects representing the available ocean planet textures for procedural generation.
+ */
+export const oceanTextures = getOceanTextures();
+
+/**
+ * Gets the list of frozen textures for procedural generation.
+ * @returns An array of THREE.Texture objects.
+ */
+function getFrozenTextures(): THREE.Texture[] {
+    const textures: THREE.Texture[] = [];
+    for (let i = 1; i <= PROCEDURAL_FROZEN_TEXTURES; i++) {
+        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/frozen-${i}.jpg`));
+    }
+    return textures;
+}
+
+/**
+ * An array of THREE.Texture objects representing the available frozen planet textures for procedural generation.
+ */
+export const frozenTextures = getFrozenTextures();
+
+/**
+ * Gets the list of desert textures for procedural generation.
+ * @returns An array of THREE.Texture objects.
+ */
+function getDesertTextures(): THREE.Texture[] {
+    const textures: THREE.Texture[] = [];
+    for (let i = 1; i <= PROCEDURAL_DESERT_TEXTURES; i++) {
+        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/desert-${i}.jpg`));
+    }
+    return textures;
+}
+
+/**
+ * An array of THREE.Texture objects representing the available desert planet textures for procedural generation.
+ */
+export const desertTextures = getDesertTextures();
+
+/**
+ * Gets the list of terrestrial textures for procedural generation.
+ * @returns An array of THREE.Texture objects.
+ */
+function getTerrestrialTextures(): THREE.Texture[] {
+    const textures: THREE.Texture[] = [];
+    for (let i = 1; i <= PROCEDURAL_TERRESTRIAL_TEXTURES; i++) {
+        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/terrestrial-${i}.jpg`));
+    }
+    return textures;
+}
+
+/**
+ * An array of THREE.Texture objects representing the available terrestrial planet textures for procedural generation.
+ */
+export const terrestrialTextures = getTerrestrialTextures();
 
 /**
  * Get the list of space background textures.
@@ -169,4 +272,69 @@ export function getMetalnessForMoonTexture(moonType: MoonTypeEnum): number {
         default:
             return 0.25; // Default metalness for other moon types
     }
+}
+
+let currentSpaceTexture: THREE.Texture | null = null;
+
+/**
+ * Loads the default space texture and sets it as the scene's background.
+ * @returns A promise that resolves once the texture is loaded and applied.
+ */
+export async function loadSpaceTexture(scene: THREE.Scene, textureFilename: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        // Load texture in another thread
+        setTimeout(() => {
+            // If the filename ends with .hdr, use the HDRLoader instead of TextureLoader
+            if (textureFilename.toLowerCase().endsWith('.hdr')) {
+                const hdrLoader = new HDRLoader();
+                hdrLoader.load(
+                    textureFilename,
+                    (texture) => {
+                        setSpaceTexture(scene, texture, true);
+                        resolve();
+                    },
+                    undefined,
+                    (err) => reject(err)
+                );
+            } else {
+                const textureLoader = new THREE.TextureLoader();
+                textureLoader.load(
+                    textureFilename,
+                    (texture) => {
+                        setSpaceTexture(scene, texture);
+                        resolve();
+                    },
+                    undefined,
+                    (err) => reject(err)
+                );
+            }
+        }, 0);
+    });
+}
+
+/**
+ * Shows or hides the space background in the scene.
+ * @param scene The Three.js scene.
+ * @param visible Whether the space background should be visible.
+ */
+export function showSpaceBackground(scene: THREE.Scene, visible: boolean): void {
+    scene.background = visible ? currentSpaceTexture : null;
+}
+
+/**
+ * Sets the skydome background texture.
+ * @param texture The new texture to be applied to the skydome background.
+ */
+function setSpaceTexture(scene: THREE.Scene, texture: THREE.Texture, isHDR: boolean = false): void {
+    // Dispose the old texture if it exists
+    if (scene.background) {
+        (scene.background as THREE.Texture).dispose();
+    }
+
+    // Set the scene's background to the provided texture
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    texture.colorSpace = isHDR ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
+    scene.background = texture;
+
+    currentSpaceTexture = texture;
 }

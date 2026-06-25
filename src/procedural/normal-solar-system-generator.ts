@@ -56,39 +56,20 @@ import {
 import { MoonTypeEnum } from '../bodies/body-enums';
 import { spaceTextures } from '../drawing/textures';
 
-type Textures = {
-    jupiterTexture: THREE.Texture;
-    saturnTexture: THREE.Texture;
-    uranusTexture: THREE.Texture;
-    neptuneTexture: THREE.Texture;
-    plutoTexture: THREE.Texture;
-    ceresTexture: THREE.Texture;
-};
-
 export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
     private readonly scene: THREE.Scene;
-    private readonly textures: Textures;
 
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, textures: Textures) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene) {
         super();
 
         this.dependencies = dependencies;
         this.scene = scene;
-        this.textures = textures;
     }
 
     async generateSolarSystemAsync(): Promise<ISolarSystem> {
         const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
-        const {
-            jupiterTexture,
-            saturnTexture,
-            uranusTexture,
-            neptuneTexture,
-            plutoTexture,
-            ceresTexture,
-        } = this.textures;
-
+   
         const bodies: Body[] = [];
 
         // Helper to generate a random orbital angle
@@ -154,7 +135,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await yieldToEventLoop();
         // Ceres (~2.77 AU)
         const ceresAngle = randomAngle();
-        bodies.push(new Ceres(this.dependencies, this.scene, ceresTexture, ceresAngle));
+        bodies.push(new Ceres(this.dependencies, this.scene, ceresAngle));
         await yieldToEventLoop();
 
         // Vesta (~2.36 AU) — already had random angle, but now uses the helper for consistency
@@ -228,7 +209,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         // Jupiter (+ 4 Galilean moons)
         const jupiterAngle = randomAngle();
-        const jupiter = new Jupiter(this.dependencies, this.scene, jupiterTexture, jupiterAngle);
+        const jupiter = new Jupiter(this.dependencies, this.scene, jupiterAngle);
         bodies.push(jupiter);
         await yieldToEventLoop();
 
@@ -306,19 +287,19 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await yieldToEventLoop();
 
         // Saturn
-        bodies.push(new Saturn(this.dependencies, this.scene, saturnTexture, randomAngle()));
+        bodies.push(new Saturn(this.dependencies, this.scene, randomAngle()));
         await yieldToEventLoop();
 
         // Uranus
-        bodies.push(new Uranus(this.dependencies, this.scene, uranusTexture, randomAngle()));
+        bodies.push(new Uranus(this.dependencies, this.scene, randomAngle()));
         await yieldToEventLoop();
 
         // Neptune
-        bodies.push(new Neptune(this.dependencies, this.scene, neptuneTexture, randomAngle()));
+        bodies.push(new Neptune(this.dependencies, this.scene, randomAngle()));
         await yieldToEventLoop();
 
         // Pluto
-        bodies.push(new Pluto(this.dependencies, this.scene, plutoTexture, randomAngle()));
+        bodies.push(new Pluto(this.dependencies, this.scene, randomAngle()));
         await yieldToEventLoop();
 
         // Comet (Halley) — random orbital angle preserves elliptical orbit shape

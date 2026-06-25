@@ -5,14 +5,9 @@ import { SeededRandom } from '../utilities/prng';
 import {
     moonTexture,
     fictionalTerrestrialTextures,
-    fictionalVolcanicTexture,
-    fictionalFrozenTexture,
-    fictionalOceanTexture,
-    fictionalTemperateTexture,
     getRoughnessForMoonTexture,
     getMetalnessForMoonTexture,
 } from '../drawing/textures';
-import { getDesertTexture } from '../procedural/desert/desert-texture-generator';
 
 import type { CelestialBody } from './celestial-body';
 import { MoonTypeEnum } from './body-enums';
@@ -52,20 +47,7 @@ export function createMoon(
     const moonName = config.name || 'Moon';
     const moonGeometry = new THREE.SphereGeometry(config.radius, 32, 32);
 
-    const moonMap: THREE.Texture =
-        moonType === MoonTypeEnum.Temperate
-            ? fictionalTemperateTexture
-            : moonType === MoonTypeEnum.Volcanic
-              ? fictionalVolcanicTexture
-              : moonType === MoonTypeEnum.Ocean
-                ? fictionalOceanTexture
-                : moonType === MoonTypeEnum.Frozen
-                  ? fictionalFrozenTexture
-                  : moonType === MoonTypeEnum.Desert
-                    ? getDesertTexture(`${config.id}|moonType|desert`)
-                    : moonName === 'Moon'
-                      ? moonTexture
-                      : pickFictionalDeterministic();
+    const moonMap: THREE.Texture = moonName === 'Moon' ? moonTexture : pickFictionalDeterministic();
 
     const moonMaterial = new THREE.MeshStandardMaterial({
         map: moonMap,

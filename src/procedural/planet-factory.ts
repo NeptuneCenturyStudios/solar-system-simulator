@@ -4,16 +4,16 @@ import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { SeededRandom } from '../utilities/prng';
 import {
-    fictionalTerrestrialTextures,
-    fictionalVolcanicTexture,
-    fictionalFrozenTexture,
-    fictionalOceanTexture,
-    fictionalDesertTexture,
-    fictionalTemperateTexture,
     fictionalGasTextures,
     fictionalIceTextures,
     getMetalnessForPlanetTexture,
     getRoughnessForPlanetTexture,
+    terrestrialTextures,
+    volcanicTextures,
+    oceanTextures,
+    frozenTextures,
+    desertTextures,
+    temperateTextures,
 } from '../drawing/textures';
 
 import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
@@ -89,19 +89,40 @@ function computeRingPresence(creation: ProceduralPlanetCreation): { hasRings: bo
     return { hasRings: resolved };
 }
 
-function pickTextureForSolidSubtype(
-    subtype: PlanetTypeEnum,
-    textureIndex: number | undefined
-): THREE.Texture {
-    // Always use static JPG textures — procedural upgrades happen asynchronously.
-    if (subtype === PlanetTypeEnum.Volcanic) return fictionalVolcanicTexture;
-    if (subtype === PlanetTypeEnum.Frozen) return fictionalFrozenTexture;
-    if (subtype === PlanetTypeEnum.Desert) return fictionalDesertTexture;
-    if (subtype === PlanetTypeEnum.Ocean) return fictionalOceanTexture;
-    if (subtype === PlanetTypeEnum.Temperate) return fictionalTemperateTexture;
+/**
+ * Given a planet type and a seeded random number generator, this function selects an appropriate texture for the planet.
+ * @param planetType The type of the planet for which to pick a texture.
+ * @param rng A seeded random number generator to ensure reproducible results.
+ * @returns A texture suitable for the given planet type, or null if no texture is available.
+ */
+export function pickTextureForPlanetType(
+    planetType: PlanetTypeEnum,
+    rng: SeededRandom
+): THREE.Texture | null {
+    let texturePack: THREE.Texture[] = [];
 
-    const idx = Math.max(0, textureIndex ?? 0);
-    return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
+    if (planetType === PlanetTypeEnum.Terrestrial) {
+        texturePack = terrestrialTextures;
+    }
+    if (planetType === PlanetTypeEnum.Volcanic) {
+        texturePack = volcanicTextures;
+    }
+    if (planetType === PlanetTypeEnum.Ocean) {
+        texturePack = oceanTextures;
+    }
+    if (planetType === PlanetTypeEnum.Frozen) {
+        texturePack = frozenTextures;
+    }
+    if (planetType === PlanetTypeEnum.Desert) {
+        texturePack = desertTextures;
+    }
+    if (planetType === PlanetTypeEnum.Temperate) {
+        texturePack = temperateTextures;
+    }
+
+    // Pick random texture from the selected pack using the seeded RNG
+    const texture = rng.pick(texturePack);
+    return texture;
 }
 
 function pickTextureForGasIceSubtype(
@@ -115,12 +136,18 @@ function pickTextureForGasIceSubtype(
 }
 
 function buildMeshMaterial(creation: ProceduralPlanetCreation): THREE.MeshStandardMaterial {
-    const { bodySubtype, textureIndex } = creation;
+    const { bodySubtype, textureIndex, textureSeed } = creation;
+
+    if (!textureSeed) {
+        throw new Error('Texture seed is required for deterministic planet texture selection.');
+    }
+
+    const rng = new SeededRandom(textureSeed);
 
     const texture =
         bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant
             ? pickTextureForGasIceSubtype(bodySubtype, textureIndex)
-            : pickTextureForSolidSubtype(bodySubtype, textureIndex);
+            : pickTextureForPlanetType(bodySubtype, rng);
 
     return new THREE.MeshStandardMaterial({
         map: texture,

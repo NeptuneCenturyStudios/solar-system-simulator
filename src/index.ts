@@ -1,5 +1,5 @@
 ﻿import * as THREE from 'three';
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 // Tell typescript about our custom events that has detail property
@@ -127,11 +127,8 @@ import {
 } from './utilities/body-params';
 import {
     loadSrgbTexture,
-    fictionalTerrestrialTextures,
-    fictionalVolcanicTexture,
-    fictionalOceanTexture,
-    fictionalFrozenTexture,
-    fictionalTemperateTexture,
+    loadSpaceTexture,
+    showSpaceBackground,
 } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
@@ -168,7 +165,6 @@ import { MainSequenceStar } from './bodies/main-sequence-star';
 import { createMainSequenceStarFromParams } from './procedural/star-factory';
 import { createPlanetBodyFromProceduralCreation } from './procedural/planet-factory';
 import { upgradeProceduralTexture } from './procedural/texture-upgrader';
-import { getDesertTexture } from './procedural/desert/desert-texture-generator';
 import { Asteroid } from './bodies/asteroid';
 import { Comet } from './bodies/comet';
 
@@ -193,13 +189,6 @@ import {
     simulationState,
 } from './simulation/simulation';
 
-const jupiterTexture = loadSrgbTexture('./assets/textures/jupiter.jpg');
-const saturnTexture = loadSrgbTexture('./assets/textures/saturn.jpg');
-const uranusTexture = loadSrgbTexture('./assets/textures/uranus.jpg');
-const neptuneTexture = loadSrgbTexture('./assets/textures/neptune.jpg');
-const plutoTexture = loadSrgbTexture('./assets/textures/pluto.jpg');
-const ceresTexture = loadSrgbTexture('./assets/textures/ceres.jpg');
-
 // Custom/random atmosphere textures (used for custom mode planets/moons when "Has Atmosphere" is checked)
 const fictionalAtmosphereTextures = [
     loadSrgbTexture('./assets/textures/fictional_atmosphere_1.jpg'),
@@ -219,63 +208,6 @@ window.addEventListener('beforeunload', (e) => {
 
 // Create the scene
 const scene = new THREE.Scene();
-
-// Current space texture
-let currentSpaceTexture: THREE.Texture | null = null;
-
-/**
- * Loads the default space texture and sets it as the scene's background.
- * @returns A promise that resolves once the texture is loaded and applied.
- */
-async function loadSpaceTexture(textureFilename: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        // Load texture in another thread
-        setTimeout(() => {
-            // If the filename ends with .hdr, use the HDRLoader instead of TextureLoader
-            if (textureFilename.toLowerCase().endsWith('.hdr')) {
-                const hdrLoader = new HDRLoader();
-                hdrLoader.load(
-                    textureFilename,
-                    (texture) => {
-                        setSpaceTexture(texture, true);
-                        resolve();
-                    },
-                    undefined,
-                    (err) => reject(err)
-                );
-            } else {
-                const textureLoader = new THREE.TextureLoader();
-                textureLoader.load(
-                    textureFilename,
-                    (texture) => {
-                        setSpaceTexture(texture);
-                        resolve();
-                    },
-                    undefined,
-                    (err) => reject(err)
-                );
-            }
-        }, 0);
-    });
-}
-
-/**
- * Sets the skydome background texture.
- * @param texture The new texture to be applied to the skydome background.
- */
-function setSpaceTexture(texture: THREE.Texture, isHDR: boolean = false): void {
-    // Dispose the old texture if it exists
-    if (scene.background) {
-        (scene.background as THREE.Texture).dispose();
-    }
-
-    // Set the scene's background to the provided texture
-    texture.mapping = THREE.EquirectangularReflectionMapping;
-    texture.colorSpace = isHDR ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace;
-    scene.background = texture;
-
-    currentSpaceTexture = texture;
-}
 
 // === Ambient light from stars (base level of illumination) ===
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -324,6 +256,7 @@ import { EffectiveGForce } from './types';
 import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { EmptySystemGenerator } from './procedural/empty-system-generator';
 import { settingsStore } from './settings/settings-store';
+import { pickMoonTextureForMoonType } from './procedural/moon-factory';
 
 // ── URL seed parameter helpers ──────────────────────────────────────────────
 const SEED_TYPE_NORMAL = 'normal';
@@ -1312,27 +1245,27 @@ function createPresetBody(presetKey: string) {
             break;
         }
         case 'jupiter': {
-            newBody = new Jupiter(dependencies, scene, jupiterTexture);
+            newBody = new Jupiter(dependencies, scene);
             break;
         }
         case 'saturn': {
-            newBody = new Saturn(dependencies, scene, saturnTexture);
+            newBody = new Saturn(dependencies, scene);
             break;
         }
         case 'uranus': {
-            newBody = new Uranus(dependencies, scene, uranusTexture);
+            newBody = new Uranus(dependencies, scene);
             break;
         }
         case 'neptune': {
-            newBody = new Neptune(dependencies, scene, neptuneTexture);
+            newBody = new Neptune(dependencies, scene);
             break;
         }
         case 'pluto': {
-            newBody = new Pluto(dependencies, scene, plutoTexture);
+            newBody = new Pluto(dependencies, scene);
             break;
         }
         case 'ceres': {
-            newBody = new Ceres(dependencies, scene, ceresTexture);
+            newBody = new Ceres(dependencies, scene);
             break;
         }
         default:
@@ -1646,38 +1579,28 @@ function createNewBody(
                 | 'frozen'
                 | 'desert';
 
-            // Texture selection:
-            // - desert: generated seam-safe procedural desert texture (like planets)
-            // - temperate: earth_day texture for now
-            // - others: deterministic fictional sub-planet textures
-            // - solid: pooled fictional textures (seeded)
-            let moonMap: THREE.Texture;
-            switch (moonType) {
-                case 'desert':
-                    moonMap = getDesertTexture(moonTextureSeed);
-                    break;
-                case 'temperate':
-                    moonMap = fictionalTemperateTexture;
-                    break;
-                case 'volcanic':
-                    moonMap = fictionalVolcanicTexture;
-                    break;
-                case 'ocean':
-                    moonMap = fictionalOceanTexture;
-                    break;
-                case 'frozen':
-                    moonMap = fictionalFrozenTexture;
-                    break;
-                case 'solid':
-                default: {
-                    const seeded = new SeededRandom(moonTextureSeed);
-                    const idx =
-                        Math.floor(seeded.next() * fictionalTerrestrialTextures.length) %
-                        fictionalTerrestrialTextures.length;
-                    moonMap = fictionalTerrestrialTextures[Math.abs(idx)]!;
-                    break;
+            // Map planetType to MoonTypeEnum
+            const moonTypeEnum = (() => {
+                switch (moonType) {
+                    case 'desert':
+                        return MoonTypeEnum.Desert;
+                    case 'temperate':
+                        return MoonTypeEnum.Temperate;
+                    case 'volcanic':
+                        return MoonTypeEnum.Volcanic;
+                    case 'ocean':
+                        return MoonTypeEnum.Ocean;
+                    case 'frozen':
+                        return MoonTypeEnum.Frozen;
+                    case 'solid':
+                    default:
+                        return MoonTypeEnum.Terrestrial;
                 }
-            }
+            })();
+
+            const rng = new SeededRandom(moonTextureSeed);
+
+            const moonMap = pickMoonTextureForMoonType(moonTypeEnum, rng);
 
             const moonMaterial = new THREE.MeshStandardMaterial({
                 map: moonMap,
@@ -2009,17 +1932,10 @@ async function spawn({
 
     if (mode === SimulationStartMode.Default) {
         // Normal solar system generator
-        generator = new NormalSolarSystemGenerator(dependencies, scene, {
-            jupiterTexture,
-            saturnTexture,
-            uranusTexture,
-            neptuneTexture,
-            plutoTexture,
-            ceresTexture,
-        });
+        generator = new NormalSolarSystemGenerator(dependencies, scene);
     } else if (mode === SimulationStartMode.Procedural) {
         // Procedural system generator
-        generator = new ProceduralGenerator(seed, dependencies, scene);
+        generator = new ProceduralGenerator(dependencies, scene, seed);
         seedType = SEED_TYPE_NORMAL;
     } else if (mode === SimulationStartMode.BlackHole) {
         // Black hole system generator
@@ -2036,7 +1952,8 @@ async function spawn({
     // Set the bodies
     simulationState.bodies = solarSystem.bodies;
     // Apply the space texture from the generated solar system
-    await loadSpaceTexture(solarSystem.spaceTexture.filename);
+    await loadSpaceTexture(scene, solarSystem.spaceTexture.filename);
+
     // Sync the texture with the management panel UI
     uiManager.managementPanel.setSelectedSpaceTexture(solarSystem.spaceTexture);
 
@@ -5448,7 +5365,7 @@ uiManager.managementPanel.on(
     'spaceTextureChange',
     async ({ texturePath }: { texturePath: string }) => {
         // Apply the space texture from the user's selection
-        await loadSpaceTexture(texturePath);
+        await loadSpaceTexture(scene, texturePath);
     }
 );
 
@@ -5457,7 +5374,7 @@ if (enableSkydomeCheckbox) {
     enableSkydomeCheckbox.onchange = () => {
         const checked = enableSkydomeCheckbox.checked;
         // Show or hide the background
-        scene.background = checked ? currentSpaceTexture : null;
+        showSpaceBackground(scene, checked);
     };
 }
 
@@ -5485,7 +5402,6 @@ uiManager.mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
         }
     });
 });
-
 
 optionsPanel.on('sfxVolumeChange', () => {
     // settingsStore.settings.sfxVolume is already updated by the panel
@@ -6518,7 +6434,7 @@ startupModal.on('generateProcedural', async ({ seed }: { seed: string }) => {
     uiManager.managementPanel.hide();
     proceduralModal.hide();
     startupModal.hide();
-    
+
     await spawn({ mode: SimulationStartMode.Procedural, seed });
     applyDefaultCameraTogglesAfterSpawn();
 });
@@ -6610,7 +6526,7 @@ window.addEventListener(
         // Load the default space texture to display while the startup modal is active before the user
         // does anything. This will get replaced once the actual space texture is loaded during the simulation setup.
         // Note: Build your own system doesn't have a generator yet, so it doesn't replace this texture yet.
-        await loadSpaceTexture('./assets/textures/skydome/space-default.jpg');
+        await loadSpaceTexture(scene, './assets/textures/skydome/space-default.jpg');
         // Display the startup modal.
         startupModal.open({ allowCancel: false });
     }

@@ -14,6 +14,7 @@ import {
 import { IStateDependencies } from '../interfaces.js';
 import { DwarfPlanet } from './dwarf-planet';
 import { PlanetTypeEnum } from './body-enums.js';
+import { loadSrgbTexture } from '../drawing/textures.js';
 
 /**
  * Represents the dwarf planet Pluto in the simulation, including its texture and orbital properties.
@@ -24,12 +25,10 @@ export class Pluto extends DwarfPlanet {
      * Constructs a new Pluto object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Pluto belongs.
-     * @param plutoTexture The texture to use for rendering Pluto.
      */
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        plutoTexture: THREE.Texture,
         angleRad: number = 0
     ) {
         const gEff = dependencies.getG();
@@ -37,9 +36,10 @@ export class Pluto extends DwarfPlanet {
             PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, gEff, SUN_MASS);
         const rotSpeed = ((-2 * Math.PI) / (153.3 * 3600)) * timeScale; // retrograde
         const trajectory = calculateTrajectory(gEff, PLUTO_DIST, SUN_MASS, angleRad);
+        const texture = loadSrgbTexture('./assets/textures/bodies/2k/pluto.jpg');
         const geometry = new THREE.SphereGeometry(PLUTO_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
-            map: plutoTexture,
+            map: texture,
             color: 0xffffff,
             emissive: 0x000000,
             emissiveIntensity: 0,

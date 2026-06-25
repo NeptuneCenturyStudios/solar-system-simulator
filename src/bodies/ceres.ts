@@ -16,6 +16,7 @@ import { IStateDependencies } from '../interfaces.js';
 
 import { DwarfPlanet } from './dwarf-planet';
 import { PlanetTypeEnum } from './body-enums.js';
+import { loadSrgbTexture } from '../drawing/textures.js';
 
 /**
  * Represents the dwarf planet Ceres in the simulation.
@@ -26,12 +27,10 @@ export class Ceres extends DwarfPlanet {
      * Constructs a new Ceres object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Ceres belongs.
-     * @param ceresTexture The texture to use for rendering Ceres.
      */
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        ceresTexture: THREE.Texture,
         angleRad: number = 0
     ) {
         const gEff = dependencies.getG();
@@ -39,9 +38,10 @@ export class Ceres extends DwarfPlanet {
             CERES_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(CERES_DISTANCE, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (9.074 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, CERES_DISTANCE, SUN_MASS, angleRad);
+        const texture = loadSrgbTexture('./assets/textures/ceres.jpg');
         const geometry = new THREE.SphereGeometry(CERES_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
-            map: ceresTexture,
+            map: texture,
             color: 0xffffff,
             emissive: 0x000000,
             emissiveIntensity: 0,
