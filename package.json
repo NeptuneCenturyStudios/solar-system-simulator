@@ -11,7 +11,7 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "lint": "eslint .",
-        "typecheck": "tsc --noEmit"
+        "tsc": "tsc --noEmit"
     },
     "keywords": [],
     "author": "",

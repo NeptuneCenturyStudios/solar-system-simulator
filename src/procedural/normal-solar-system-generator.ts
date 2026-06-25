@@ -54,7 +54,7 @@ import {
     HYGIEA_RADIUS,
 } from '../utilities/consts';
 import { MoonTypeEnum } from '../bodies/body-enums';
-import { spaceTextures } from '../drawing/textures';
+import { callistoTexture, europaTexture, ganymedeTexture, ioTexture, moonTexture, spaceTextures } from '../drawing/textures';
 
 export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
@@ -99,13 +99,14 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             createMoon(earth, this.scene, {
                 distance: MOON_DIST_FROM_EARTH,
                 radius: MOON_RADIUS,
-                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
-                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden
                 mass: MOON_MASS,
                 id: 'moon',
                 name: 'Moon',
                 trailColor: 0xffffff,
                 maxTrail: 1500,
+                texture: moonTexture,
                 moonType: MoonTypeEnum.Terrestrial,
                 angle: randomAngle(),
             })
@@ -219,8 +220,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: randomAngle(),
                 distance: IO_DIST_FROM_JUPITER,
                 radius: IO_RADIUS,
-                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
-                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden
                 mass: IO_MASS,
                 id: 'camIo',
                 name: 'Io',
@@ -228,6 +229,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 maxTrail: 800,
                 yVariation: 109,
                 moonType: MoonTypeEnum.Terrestrial,
+                texture: ioTexture,
             })
         );
         await yieldToEventLoop();
@@ -246,6 +248,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 maxTrail: 1000,
                 yVariation: 164,
                 moonType: MoonTypeEnum.Terrestrial,
+                texture: europaTexture,
             })
         );
         await yieldToEventLoop();
@@ -264,6 +267,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 maxTrail: 1200,
                 yVariation: 219,
                 moonType: MoonTypeEnum.Terrestrial,
+                texture: ganymedeTexture,
             })
         );
         await yieldToEventLoop();
@@ -282,6 +286,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 maxTrail: 1500,
                 yVariation: 273,
                 moonType: MoonTypeEnum.Terrestrial,
+                texture: callistoTexture,
             })
         );
         await yieldToEventLoop();

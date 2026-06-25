@@ -84,7 +84,7 @@ function createMoonTidalLock(parent: CelestialBody, safeRotationSpeed: number): 
     };
 }
 
-function buildMoon(params: {
+function buildProceduralMoon(params: {
     dependencies: IStateDependencies;
     scene: THREE.Scene;
     creation: ProceduralMoonCreation;
@@ -184,7 +184,7 @@ export function createMoonBodyFromProceduralCreation(params: {
 
     const mesh = createMoonMesh(safeRadius, texture, moonType);
 
-    return buildMoon({
+    return buildProceduralMoon({
         dependencies: params.dependencies,
         scene: params.scene,
         creation,

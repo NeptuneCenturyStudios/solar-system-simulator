@@ -74,6 +74,7 @@ export interface ISatelliteCreationOptions extends ICelestialBodyCreationOptions
 
 export interface IMoonCreationOptions extends ISatelliteCreationOptions {
     moonType: MoonTypeEnum;
+    texture?: THREE.Texture;
 }
 
 export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {

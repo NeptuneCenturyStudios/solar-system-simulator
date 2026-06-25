@@ -129,6 +129,9 @@ import {
     loadSrgbTexture,
     loadSpaceTexture,
     showSpaceBackground,
+    getRoughnessForMoonTexture,
+    getMetalnessForMoonTexture,
+    moonTexture,
 } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
@@ -1230,11 +1233,12 @@ function createPresetBody(presetKey: string) {
                 distance: MOON_DIST_FROM_EARTH,
                 radius: MOON_RADIUS,
                 mass: MOON_MASS,
-                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
-                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden
                 id: createUniqueId('moon'),
                 name: 'Moon',
                 moonType: MoonTypeEnum.Terrestrial,
+                texture: moonTexture,
                 trailColor: 0xffffff,
                 maxTrail: 1500,
             });
@@ -1607,18 +1611,8 @@ function createNewBody(
                 color: 0xffffff, // keep texture untinted
                 emissive: 0x000000,
                 emissiveIntensity: 0,
-                roughness:
-                    moonType === 'desert' || moonType === 'temperate'
-                        ? 0.95
-                        : moonType === 'volcanic'
-                          ? 0.6
-                          : 0.7,
-                metalness:
-                    moonType === 'desert' || moonType === 'temperate'
-                        ? 0.02
-                        : moonType === 'volcanic'
-                          ? 0.15
-                          : 0.7,
+                roughness: getRoughnessForMoonTexture(moonTypeEnum),
+                metalness: getMetalnessForMoonTexture(moonTypeEnum),
                 transparent: false,
                 depthTest: true,
                 depthWrite: true,

@@ -18,7 +18,11 @@ export function loadSrgbTexture(url: string): THREE.Texture {
     return tex;
 }
 
-export const moonTexture = loadSrgbTexture('./assets/textures/moon.jpg');
+export const moonTexture = loadSrgbTexture('./assets/textures/bodies/2k/moon.jpg');
+export const ioTexture = loadSrgbTexture('./assets/textures/bodies/2k/io.jpg');
+export const europaTexture = loadSrgbTexture('./assets/textures/bodies/2k/europa.jpg');
+export const ganymedeTexture = loadSrgbTexture('./assets/textures/bodies/2k/ganymede.jpg');
+export const callistoTexture = loadSrgbTexture('./assets/textures/bodies/2k/callisto.jpg');
 
 // Random pool of textures for terrestrial planets/moons
 export const fictionalTerrestrialTextures: THREE.Texture[] = [

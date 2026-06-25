@@ -3,8 +3,6 @@ import { Moon } from './moon';
 import { calculateTrajectory } from '../physics/physics';
 import { SeededRandom } from '../utilities/prng';
 import {
-    moonTexture,
-    fictionalTerrestrialTextures,
     getRoughnessForMoonTexture,
     getMetalnessForMoonTexture,
 } from '../drawing/textures';
@@ -12,6 +10,7 @@ import {
 import type { CelestialBody } from './celestial-body';
 import { MoonTypeEnum } from './body-enums';
 import { IMoonCreationOptions } from '../interfaces';
+import { pickMoonTextureForMoonType } from '../procedural/moon-factory';
 
 export function createMoon(
     parent: CelestialBody,
@@ -20,13 +19,9 @@ export function createMoon(
 ): Moon {
     const moonType = config.moonType;
 
+    // If a texture is provided in the config, use it; otherwise, pick a texture based on the moon type
     const seededFromConfig = new SeededRandom(`${config.id}|moonTexture`);
-    const pickFictionalDeterministic = (): THREE.Texture => {
-        const idx = Math.abs(
-            Math.floor(seededFromConfig.next() * fictionalTerrestrialTextures.length)
-        );
-        return fictionalTerrestrialTextures[idx % fictionalTerrestrialTextures.length]!;
-    };
+    const texture = config.texture ?? pickMoonTextureForMoonType(moonType, seededFromConfig);
 
     const trajectory = calculateTrajectory(
         parent.dependencies.getG(),
@@ -47,10 +42,8 @@ export function createMoon(
     const moonName = config.name || 'Moon';
     const moonGeometry = new THREE.SphereGeometry(config.radius, 32, 32);
 
-    const moonMap: THREE.Texture = moonName === 'Moon' ? moonTexture : pickFictionalDeterministic();
-
     const moonMaterial = new THREE.MeshStandardMaterial({
-        map: moonMap,
+        map: texture,
         color: 0xffffff,
         emissive: 0x000000,
         emissiveIntensity: 0,
