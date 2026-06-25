@@ -385,28 +385,28 @@ export function generateProceduralBodyName(
             return `${firstToken}${secondToken ? ` ${secondToken}` : ''}${suffix}${maybeRoman}`;
         }
 
+        case BodyTypeEnum.Planet:
         case BodyTypeEnum.DwarfPlanet: {
-            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
-            const roman = romanFromSequence(rngPrimary, sequence);
+            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 4 });
             const secondToken = maybeSecondToken(rngSecond, 0.5);
 
-            if (secondToken) {
-                return `${core} ${secondToken} ${roman}`;
+            // Optional weighted planet-like suffix (e.g. 'Prime', 'Major', 'Minor', etc.). This can be extended to include other common planetary suffixes as needed.
+            function getSuffix() {
+                const roll = rngPrimary.next();
+                if (roll < 0.01) return 'Prime';
+                if (roll < 0.02) return 'Alpha';
+                if (roll < 0.03) return 'Beta';
+                if (roll < 0.04) return 'Minor';
+                if (roll < 0.05) return 'Major';
+                if (roll < 0.06) return 'Majoris';
+                if (roll < 0.07) return 'Minoris';
+
+                return null;
             }
 
-            return `${core} ${roman}`;
-        }
+            const suffix = getSuffix();
 
-        case BodyTypeEnum.Planet: {
-            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
-            const roman = romanFromSequence(rngPrimary, sequence);
-            const secondToken = maybeSecondToken(rngSecond, 0.5);
-
-            if (secondToken) {
-                return `${core} ${secondToken} ${roman}`;
-            }
-
-            return `${core} ${roman}`;
+            return `${core}${secondToken ? ` ${secondToken}` : ''}${suffix ? ` ${suffix}` : ''}`;
         }
 
         case BodyTypeEnum.Moon:
@@ -417,7 +417,6 @@ export function generateProceduralBodyName(
             const secondToken = maybeSecondToken(rngSecond, 0.6);
 
             if (parentName.length > 0) {
-                // Requested vibe: "<Parent> III" (with optional "<Parent> Opus III")
                 return `${parentName}${secondToken ? ` ${secondToken}` : ''} ${roman}`;
             }
 
@@ -459,9 +458,9 @@ export function generateProceduralBodyName(
 
             const secondToken = maybeSecondToken(rngSecond, 0.55);
 
-            // Primary: "<Core> Singularity <Letter>"
-            // With second: "<Core> Singularity Opus <Letter>"
-            return `${core} ${secondToken ? ` ${secondToken}` : ''} ${letter}`;
+            // Primary: "<Core> <Letter>"
+            // With second: "<Core> Opus <Letter>"
+            return `${core}${secondToken ? ` ${secondToken}` : ''} ${letter}`;
         }
 
         default: {

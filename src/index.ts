@@ -6604,6 +6604,8 @@ window.addEventListener(
 
         await spawn({ mode, seed: urlSeed.seed });
         applyDefaultCameraTogglesAfterSpawn();
+
+        proceduralModal.hide();
     } else {
         // Load the default space texture to display while the startup modal is active before the user
         // does anything. This will get replaced once the actual space texture is loaded during the simulation setup.
