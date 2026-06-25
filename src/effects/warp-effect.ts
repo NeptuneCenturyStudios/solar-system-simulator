@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import {
     DIST_SCALE,
     FLIGHT_MAX_SPEED,
-    performanceSettings,
     SCALE_FACTOR,
 } from '../utilities/consts.js';
+import { settingsStore } from '../settings/settings-store.js';
 
 // ─── Tunnel geometry constants ───────────────────────────────────────────────
 const SF = SCALE_FACTOR;
@@ -213,7 +213,7 @@ export class WarpEffect {
         maxSpeed: number
     ): void {
         // Check performance settings
-        if (!performanceSettings.particleEffectsEnabled) {
+        if (!settingsStore.settings.particleEffectsEnabled) {
             this.lines.visible = false;
             return;
         }

@@ -4,7 +4,8 @@ import { SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyTypeEnum } from './body-enums.js';
 import { CelestialBody } from './celestial-body';
 import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces.js';
-import { performanceSettings } from '../utilities/consts';
+import { settingsStore } from '../settings/settings-store.js';
+
 
 /**
  * This class represents a comet, which is a type of celestial body with a nucleus and a tail. The tail is created using a particle system that emits particles in the opposite direction
@@ -213,7 +214,7 @@ float alpha = vLife * strength;`
         }
 
         // If particle effects are disabled, skip tail updates for performance
-        if (!performanceSettings.particleEffectsEnabled) {
+        if (!settingsStore.settings.particleEffectsEnabled) {
             this.tailParticles.visible = false;
             return;
         } else {

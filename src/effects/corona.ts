@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
-import { performanceSettings } from '../utilities/consts';
+import { settingsStore } from '../settings/settings-store';
 
 /**
  * Reusable star corona particle effect.
@@ -132,7 +132,7 @@ export class Corona implements IEffect {
     update(dt: number) {
         if (!dt) return;
 
-        const particlesEnabled = performanceSettings.particleEffectsEnabled;
+        const particlesEnabled = settingsStore.settings.particleEffectsEnabled;
         if (particlesEnabled !== this._lastParticlesEnabled) {
             this._lastParticlesEnabled = particlesEnabled;
             this.material.visible = particlesEnabled;

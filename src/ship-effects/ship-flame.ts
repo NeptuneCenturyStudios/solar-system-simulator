@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { performanceSettings, SPACESHIP_RADIUS } from '../utilities/consts.js';
+import { SPACESHIP_RADIUS } from '../utilities/consts.js';
 import { IShipEffect } from './ship-effect-base';
+import { settingsStore } from '../settings/settings-store.js';
 /** Maximum number of live particles in the pool. */
 const MAX_PARTICLES = 120;
 /** Half-angle of the exhaust cone in radians. */
@@ -185,7 +186,7 @@ export class ShipFlame implements IShipEffect {
         cameraPos: THREE.Vector3
     ): void {
         // Check if particles are enabled
-        if (!performanceSettings.particleEffectsEnabled) {
+        if (!settingsStore.settings.particleEffectsEnabled) {
             this.hide();
             return;
         }

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
-import { DIST_SCALE, performanceSettings } from '../utilities/consts';
+import { DIST_SCALE } from '../utilities/consts';
+import { settingsStore } from '../settings/settings-store';
 
 /** Number of simultaneous flash beam pairs in the pool. */
 const JET_POOL_SIZE = 16;
@@ -258,7 +259,7 @@ gl_FragColor = vec4(outgoingLight * alpha, alpha);`
     update(dt: number): void {
         if (!this.active) return;
 
-        const particlesEnabled = performanceSettings.particleEffectsEnabled;
+        const particlesEnabled = settingsStore.settings.particleEffectsEnabled;
 
         if (particlesEnabled !== this._particlesWereEnabled) {
             this._particlesWereEnabled = particlesEnabled;

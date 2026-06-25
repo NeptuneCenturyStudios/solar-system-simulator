@@ -7,9 +7,9 @@ import { IStateDependencies, ISiphonTarget, IAccretionTarget } from '../interfac
 import {
     MIN_PARTICLE_ALPHA,
     MAX_PARTICLE_ALPHA,
-    performanceSettings,
     DIST_SCALE,
 } from '../utilities/consts';
+import { settingsStore } from '../settings/settings-store';
 
 /** Maximum number of simultaneously in-flight siphon particles per stream. */
 const PARTICLE_COUNT = 800;
@@ -400,7 +400,7 @@ export class MassSiphonEffect implements IPipelineFeedEffect {
             return;
         }
 
-        const particlesEnabled = performanceSettings.particleEffectsEnabled;
+        const particlesEnabled = settingsStore.settings.particleEffectsEnabled;
 
         // ── Handle toggling between particles and line ────────────────────────
         if (particlesEnabled !== this._lastParticlesEnabled) {

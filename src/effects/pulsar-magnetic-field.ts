@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
-import { performanceSettings } from '../utilities/consts';
+import { settingsStore } from '../settings/settings-store';
 
 /**
  * Number of azimuthal loops evenly spaced around the magnetic axis.
@@ -39,7 +39,7 @@ const FIELD_LOOP_RADIUS_MULT = 20;
  *  - Offset 10–45° from the spin (rotation) axis
  *  - Precesses (spins) around the rotation axis as the pulsar rotates
  *
- * **Particles mode** (performanceSettings.particleEffectsEnabled = true):
+ * **Particles mode** (settingsStore.settings.particleEffectsEnabled = true):
  *  Small particles travel continuously along each field line, with colour
  *  lerping from blue at the equatorial bulge to near-white at the poles.
  *
@@ -114,7 +114,7 @@ export class PulsarMagneticField implements IEffect {
         const absDt = Math.abs(dt);
         this.spinPhase += this.rotationSpeed * absDt;
 
-        const particlesEnabled = performanceSettings.particleEffectsEnabled;
+        const particlesEnabled = settingsStore.settings.particleEffectsEnabled;
 
         // Handle mode toggle
         if (particlesEnabled !== this._lastParticlesEnabled) {

@@ -1,5 +1,5 @@
 import { Panel } from './panel';
-import { performanceSettings } from '../utilities/consts';
+import { SettingKey, settingsStore } from '../settings/settings-store';
 
 /**
  * Panel for managing performance-related settings.
@@ -45,7 +45,7 @@ export class OptionsPanel extends Panel {
 
         if (this.enableShadowsCheckbox) {
             this.enableShadowsCheckbox.onchange = () => {
-                this.emit('shadowsChange', { checked: this.enableShadowsCheckbox!.checked });
+                this.applyEnableShadows();
             };
         }
 
@@ -54,12 +54,8 @@ export class OptionsPanel extends Panel {
         ) as HTMLInputElement | null;
 
         if (this.enableParticleEffectsCheckbox) {
-            // Sync global state to checkbox initial value
-            performanceSettings.particleEffectsEnabled = this.enableParticleEffectsCheckbox.checked;
-
             this.enableParticleEffectsCheckbox.onchange = () => {
-                performanceSettings.particleEffectsEnabled =
-                    this.enableParticleEffectsCheckbox!.checked;
+                this.applyEnableParticleEffects();
             };
         }
 
@@ -67,9 +63,7 @@ export class OptionsPanel extends Panel {
         this.substepsDisplay = document.getElementById('substeps-val');
         if (this.substepsSlider) {
             this.substepsSlider.oninput = () => {
-                const value = parseInt(this.substepsSlider!.value, 10);
-                if (this.substepsDisplay) this.substepsDisplay.textContent = `${value}`;
-                this.emit('substepsChange', { value });
+                this.applySubsteps();
             };
         }
 
@@ -80,7 +74,7 @@ export class OptionsPanel extends Panel {
             this.substepsResetBtn.onclick = () => {
                 if (this.substepsSlider) this.substepsSlider.value = '64';
                 if (this.substepsDisplay) this.substepsDisplay.textContent = '64';
-                this.emit('substepsChange', { value: 64 });
+                this.applySubsteps();
             };
         }
 
@@ -94,23 +88,15 @@ export class OptionsPanel extends Panel {
         ) as HTMLButtonElement | null;
 
         if (this.sfxVolumeSlider) {
-            // Sync global state from initial slider value
-            performanceSettings.sfxVolume = parseInt(this.sfxVolumeSlider.value, 10) / 100;
-
             this.sfxVolumeSlider.oninput = () => {
-                const value = parseInt(this.sfxVolumeSlider!.value, 10);
-                performanceSettings.sfxVolume = value / 100;
-                if (this.sfxVolumeDisplay) this.sfxVolumeDisplay.textContent = `${value}%`;
-                this.emit('sfxVolumeChange', { value: value / 100 });
+                this.applySfxVolume();
             };
         }
 
         if (this.sfxVolumeResetBtn) {
             this.sfxVolumeResetBtn.onclick = () => {
                 if (this.sfxVolumeSlider) this.sfxVolumeSlider.value = '100';
-                performanceSettings.sfxVolume = 1.0;
-                if (this.sfxVolumeDisplay) this.sfxVolumeDisplay.textContent = '100%';
-                this.emit('sfxVolumeChange', { value: 1.0 });
+                this.applySfxVolume();
             };
         }
 
@@ -124,24 +110,96 @@ export class OptionsPanel extends Panel {
         ) as HTMLButtonElement | null;
 
         if (this.musicVolumeSlider) {
-            // Sync global state from initial slider value
-            performanceSettings.musicVolume = parseInt(this.musicVolumeSlider.value, 10) / 100;
-
             this.musicVolumeSlider.oninput = () => {
-                const value = parseInt(this.musicVolumeSlider!.value, 10);
-                performanceSettings.musicVolume = value / 100;
-                if (this.musicVolumeDisplay) this.musicVolumeDisplay.textContent = `${value}%`;
-                this.emit('musicVolumeChange', { value: value / 100 });
+                this.applyMusicVolume();
             };
         }
 
         if (this.musicVolumeResetBtn) {
             this.musicVolumeResetBtn.onclick = () => {
                 if (this.musicVolumeSlider) this.musicVolumeSlider.value = '100';
-                performanceSettings.musicVolume = 1.0;
-                if (this.musicVolumeDisplay) this.musicVolumeDisplay.textContent = '100%';
-                this.emit('musicVolumeChange', { value: 1.0 });
+                this.applyMusicVolume();
             };
         }
+
+        // Load from settings store
+        const s = settingsStore.settings;
+
+        if (this.enableShadowsCheckbox) {
+            this.enableShadowsCheckbox.checked = s.enableShadows;
+            this.applyEnableShadows();
+        }
+
+        if (this.enableParticleEffectsCheckbox) {
+            this.enableParticleEffectsCheckbox.checked = s.particleEffectsEnabled;
+            this.applyEnableParticleEffects();
+        }
+
+        if (this.substepsSlider) {
+            this.substepsSlider.value = s.substeps.toString();
+            this.applySubsteps();
+        }
+
+        if (this.sfxVolumeSlider) {
+            const v = Math.round(s.sfxVolume * 100);
+            this.sfxVolumeSlider.value = v.toString();
+            this.applySfxVolume();
+        }
+
+        if (this.musicVolumeSlider) {
+            const v = Math.round(s.musicVolume * 100);
+            this.musicVolumeSlider.value = v.toString();
+            this.applyMusicVolume();
+        }
+    }
+
+    /**
+     * Apply the current state of the "Enable Shadows" checkbox to the settings store and emit an event.
+     */
+    private applyEnableShadows(): void {
+        const checked = this.enableShadowsCheckbox!.checked;
+        settingsStore.update(SettingKey.EnableShadows, checked);
+        this.emit('shadowsChange', { checked });
+    }
+
+    /**
+     * Apply the current state of the "Enable Particle Effects" checkbox to the settings store and emit an event.
+     */
+    private applyEnableParticleEffects(): void {
+        const checked = this.enableParticleEffectsCheckbox!.checked;
+        settingsStore.update(SettingKey.ParticleEffectsEnabled, checked);
+        this.emit('particleEffectsChange', { value: checked });
+    }
+
+    /**
+     * Apply the current substeps value from the slider to the settings store and emit an event.
+     */
+    private applySubsteps(): void {
+        const value = parseInt(this.substepsSlider!.value, 10);
+        settingsStore.update(SettingKey.Substeps, value);
+        if (this.substepsDisplay) this.substepsDisplay.textContent = `${value}`;
+        this.emit('substepsChange', { value });
+    }
+
+    /**
+     * Apply the current SFX volume from the slider to the settings store and emit an event.
+     */
+    private applySfxVolume(): void {
+        const value = parseInt(this.sfxVolumeSlider!.value, 10);
+        const normalized = value / 100;
+        settingsStore.update(SettingKey.SfxVolume, normalized);
+        if (this.sfxVolumeDisplay) this.sfxVolumeDisplay.textContent = `${value}%`;
+        this.emit('sfxVolumeChange', { value: normalized });
+    }
+
+    /**
+     * Apply the current music volume from the slider to the settings store and emit an event.
+     */
+    private applyMusicVolume(): void {
+        const value = parseInt(this.musicVolumeSlider!.value, 10);
+        const normalized = value / 100;
+        settingsStore.update(SettingKey.MusicVolume, normalized);
+        if (this.musicVolumeDisplay) this.musicVolumeDisplay.textContent = `${value}%`;
+        this.emit('musicVolumeChange', { value: normalized });
     }
 }

@@ -323,6 +323,7 @@ import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums'
 import { EffectiveGForce } from './types';
 import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { EmptySystemGenerator } from './procedural/empty-system-generator';
+import { settingsStore } from './settings/settings-store';
 
 // ── URL seed parameter helpers ──────────────────────────────────────────────
 const SEED_TYPE_NORMAL = 'normal';
@@ -733,9 +734,6 @@ const dependencies: IStateDependencies = {
 const SIM = Object.freeze({
     BASE_FRAME_DT,
 });
-
-// Physics accuracy: adjustable substeps per frame (16–128, default 64)
-let stepsPerFrame = 64;
 
 // --- Velocity editing arc helpers ---
 const velArc = new VelocityArcManager(scene, gizmo, interactionState);
@@ -3122,7 +3120,7 @@ function animate() {
     _lastFrameTime = now;
     requestAnimationFrame(animate);
     const tScale = timeScale;
-    const steps = stepsPerFrame;
+    const steps = settingsStore.settings.substeps;
     const dt = (SIM.BASE_FRAME_DT * TIME_SCALE * tScale) / steps;
     const dtTotal = dt * steps;
 
@@ -5487,12 +5485,9 @@ uiManager.mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
     });
 });
 
-optionsPanel.on('substepsChange', ({ value }: { value: number }) => {
-    stepsPerFrame = value;
-});
 
 optionsPanel.on('sfxVolumeChange', () => {
-    // performanceSettings.sfxVolume is already updated by the panel
+    // settingsStore.settings.sfxVolume is already updated by the panel
     // sfxVolume is read live by audio.ts playBuffer() and playWarpLoop() each call
 });
 

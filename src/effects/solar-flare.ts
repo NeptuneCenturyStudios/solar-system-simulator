@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
-import { performanceSettings } from '../utilities/consts';
+import { settingsStore } from '../settings/settings-store';
 
 export type SolarFlareType = 'small' | 'large';
 
@@ -273,7 +273,7 @@ export class SolarFlare implements IEffect {
     update(dt: number): void {
         if (!this.active) return;
         // Check if particles are enabled
-        if (!performanceSettings.particleEffectsEnabled) {
+        if (!settingsStore.settings.particleEffectsEnabled) {
             this.points.visible = false;
             return;
         } else {

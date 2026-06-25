@@ -4,11 +4,12 @@
  * The AudioContext is created lazily so it is always triggered by a user
  * gesture, satisfying browser autoplay policy.
  *
- * Volume is controlled by the global performanceSettings.sfxVolume (0–1).
+ * Volume is controlled by the global settingsStore.settings.sfxVolume (0–1).
  * When sfxVolume is 0, no sounds play.
  */
 
-import { performanceSettings } from './consts';
+import { settingsStore } from "../settings/settings-store";
+
 
 let ctx: AudioContext | null = null;
 let blasterBuffer: AudioBuffer | null = null;
@@ -41,7 +42,7 @@ function loadAndCache(ac: AudioContext, url: string, onReady: (buf: AudioBuffer)
 
 function playBuffer(ac: AudioContext, buffer: AudioBuffer, baseGain = 0.8): void {
     // Respect global SFX volume: if 0, don't play anything
-    const vol = performanceSettings.sfxVolume;
+    const vol = settingsStore.settings.sfxVolume;
     if (vol <= 0) return;
 
     const t = ac.currentTime;
@@ -94,7 +95,7 @@ export function playWeaponImpact(): void {
 
 // ── Warp loop sound ──────────────────────────────────────────────────────────
 
-/** Base volume for the warp loop (0–1) — multiplied by performanceSettings.sfxVolume at play time. */
+/** Base volume for the warp loop (0–1) — multiplied by settingsStore.settings.sfxVolume at play time. */
 const WARP_VOLUME = 0.6;
 /** Fade-out duration in seconds when warp ends. */
 const WARP_FADE_DURATION = 1.5;
@@ -131,7 +132,7 @@ export interface WarpSoundController {
  * Each call creates a new source + gain node pair so multiple ships can warp
  * simultaneously (though only one ship exists in practice).
  *
- * The effective gain is WARP_VOLUME * performanceSettings.sfxVolume, multiplied
+ * The effective gain is WARP_VOLUME * settingsStore.settings.sfxVolume, multiplied
  * by the caller's speedVolume × distanceFade passed via setVolume().
  */
 export function playWarpLoop(): WarpSoundController | null {
@@ -151,7 +152,7 @@ export function playWarpLoop(): WarpSoundController | null {
         if (!warpBuffer) return null;
 
         // Compute initial gain including global SFX volume
-        const initialGain = WARP_VOLUME * performanceSettings.sfxVolume;
+        const initialGain = WARP_VOLUME * settingsStore.settings.sfxVolume;
 
         const t = ac.currentTime;
         const source = ac.createBufferSource();
@@ -177,7 +178,7 @@ export function playWarpLoop(): WarpSoundController | null {
                 if (_disposed || _isFadingOut) return;
                 // Multiply caller's volume by the global SFX volume
                 gainNode.gain.setValueAtTime(
-                    vol * WARP_VOLUME * performanceSettings.sfxVolume,
+                    vol * WARP_VOLUME * settingsStore.settings.sfxVolume,
                     ac.currentTime
                 );
             },

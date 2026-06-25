@@ -10,7 +10,6 @@ import {
     BROWN_DWARF_MASS_THRESHOLD,
     MIN_BLACK_HOLE_MASS,
     MIN_NEUTRON_STAR_MASS,
-    performanceSettings,
 } from '../utilities/consts';
 import { BlackHole } from './black-hole';
 import { WhiteDwarf } from './white-dwarf';
@@ -22,6 +21,7 @@ import { triggerScreenFlash } from '../effects/screen-flash';
 import { Corona } from '../effects/corona';
 import { StarGlow } from '../effects/star-glow';
 import { BodyTypeEnum } from './body-enums';
+import { settingsStore } from '../settings/settings-store';
 
 // Cached reference to the star-death checkbox — avoids a DOM query on every physics substep.
 let _starDeathCheckboxEl: HTMLInputElement | null | undefined;
@@ -311,7 +311,7 @@ export class MainSequenceStar extends Star {
     }
 
     _triggerSolarFlare() {
-        if (!this.mesh || this._isDisposed || !performanceSettings.particleEffectsEnabled) {
+        if (!this.mesh || this._isDisposed || !settingsStore.settings.particleEffectsEnabled) {
             return;
         }
 

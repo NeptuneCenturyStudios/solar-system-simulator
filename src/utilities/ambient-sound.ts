@@ -16,6 +16,8 @@
  * resumes with a new track.
  */
 
+import { settingsStore } from "../settings/settings-store";
+
 const FADE_DURATION = 1.5; // seconds
 const DELAY_MIN = 60; // seconds
 const DELAY_MAX = 180; // seconds
@@ -38,9 +40,6 @@ export class AmbientSoundManager {
     private initialized = false;
     /** Array of track URLs, initialized once. */
     private playlist: string[] = [];
-
-    /** User-set volume multiplier (0–1). Applied on top of VOLUME. */
-    private _userVolume: number = 1.0;
 
     // ── Public API ──────────────────────────────────────────────────────────
 
@@ -84,7 +83,6 @@ export class AmbientSoundManager {
      */
     setVolume(vol: number): void {
         const clamped = Math.max(0, Math.min(1, vol));
-        this._userVolume = clamped;
 
         if (!this.initialized || !this.ctx || !this.gainNode) return;
 
@@ -223,7 +221,7 @@ export class AmbientSoundManager {
      * Play a random track.
      */
     public playNextTrack(): void {
-        if (!this.ctx || !this.gainNode) return;
+        if (!this.ctx || !this.gainNode || settingsStore.settings.musicVolume === 0) return;
 
         const index = this.pickTrackIndex();
         if (index === -1) return; // no tracks available
@@ -248,7 +246,7 @@ export class AmbientSoundManager {
 
         // Start at silence and fade in (respecting user volume)
         const now = this.ctx.currentTime;
-        const targetGain = VOLUME * this._userVolume;
+        const targetGain = VOLUME * settingsStore.settings.musicVolume;
         this.gainNode.gain.cancelScheduledValues(now);
         this.gainNode.gain.setValueAtTime(0, now);
         this.gainNode.gain.linearRampToValueAtTime(targetGain, now + FADE_DURATION);

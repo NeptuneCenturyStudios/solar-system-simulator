@@ -4,9 +4,9 @@ import { IStateDependencies } from '../interfaces';
 import {
     MIN_PARTICLE_ALPHA,
     MAX_PARTICLE_ALPHA,
-    performanceSettings,
     SCALE_FACTOR,
 } from '../utilities/consts';
+import { settingsStore } from '../settings/settings-store';
 
 /** Color pair defining the gradient from the hot inner edge to the cool outer edge. */
 export interface IAccretionDiskColors {
@@ -57,7 +57,7 @@ interface IAccretionDiskState {
  * pipeline where particles are queued from external sources (siphon streams, collisions,
  * supernovae) and gradually injected one at a time.
  *
- * When `performanceSettings.particleEffectsEnabled` is false, renders a static spiral
+ * When `settingsStore.settings.particleEffectsEnabled` is false, renders a static spiral
  * line instead of particles.
  *
  * Ownership: the class creates and manages its own `THREE.Points` object in the scene.
@@ -170,7 +170,7 @@ export class AccretionDiskEffect implements IEffect {
      */
     enqueueAccretionParticle(angle: number): void {
         if (!this._state) return;
-        if (!performanceSettings.particleEffectsEnabled) return;
+        if (!settingsStore.settings.particleEffectsEnabled) return;
         this._state.seedQueue.push(angle);
     }
 
@@ -181,7 +181,7 @@ export class AccretionDiskEffect implements IEffect {
      */
     seedAccretionDisk(count: number): void {
         if (!this._state) return;
-        if (!performanceSettings.particleEffectsEnabled) return;
+        if (!settingsStore.settings.particleEffectsEnabled) return;
         const total = Math.round(count * this._hostRadius);
         for (let i = 0; i < total; i++) {
             this._state.seedQueue.push(Math.random() * 2 * Math.PI);
@@ -191,7 +191,7 @@ export class AccretionDiskEffect implements IEffect {
     update(dt: number): void {
         if (!this.active || !this._state) return;
 
-        const particlesEnabled = performanceSettings.particleEffectsEnabled;
+        const particlesEnabled = settingsStore.settings.particleEffectsEnabled;
 
         // ── Handle toggling between particles and spiral line ─────────────────
         if (particlesEnabled !== this._lastParticlesEnabled) {
