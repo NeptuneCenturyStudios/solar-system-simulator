@@ -3100,7 +3100,8 @@ function setFocusBody(bodyOrNull: Body | null, { zoom = false } = {}) {
 
 let _lastFrameTime: number = performance.now();
 
-// \u2500\u2500 Animate-loop scratch vectors \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Animate-loop scratch vectors and pre-allocated objects.
+// These are created once to eliminate per-frame garbage collection pressure from common operations.
 // Pre-allocated once to eliminate per-frame GC pressure from common operations.
 const _animCamDirection = new THREE.Vector3();
 const _animCamRight = new THREE.Vector3();
