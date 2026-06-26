@@ -3084,7 +3084,49 @@ function animate() {
             const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
             bgShip.velocity.copy(bgFwd).multiplyScalar(FLIGHT_WARP_SPEED);
         } else {
-            flightState.warpActive = false;
+            flightState.warpActive = false;flightState.warpActive = false;
+        }
+    }
+
+    
+    // Background deceleration: when the player cancels autopilot warp (or manual warp)
+    // while outside the cockpit, the ship needs to decelerate from warp speed to normal
+    // speed.  This mirrors the two-phase deceleration logic in updateFlightControls().
+    if (!isFlightModeActive && (flightState.warpDecelerating || flightState.boostDecelerating)) {
+        const _bgShip = flightState.knownShip;
+        if (_bgShip && !_bgShip._isDisposed && _bgShip.mesh) {
+            const _bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(_bgShip.mesh.quaternion);
+            const _bgFwdSpd = _bgShip.velocity.dot(_bgFwd);
+            if (flightState.warpDecelerating) {
+                if (_bgFwdSpd > FLIGHT_BOOST_MAX_SPEED + FLIGHT_WARP_DECEL_TOLERANCE) {
+                    // Phase 1: decel from warp speed to boost max using warp decel rate.
+                    const _newSpd = Math.max(FLIGHT_BOOST_MAX_SPEED, _bgFwdSpd - FLIGHT_WARP_DECEL * dtTotal);
+                    _bgShip.velocity.copy(_bgFwd).multiplyScalar(_newSpd);
+                    flightState.currentSpeed = _newSpd;
+                } else {
+                    // Reached boost speed — end warp decel, start boost decel.
+                    flightState.warpDecelerating = false;
+                    flightState.boostDecelerating = true;
+                    flightState.currentSpeed = _bgFwdSpd;
+                    warpEffect.stop();
+                }
+            } else if (flightState.boostDecelerating) {
+                if (_bgFwdSpd > FLIGHT_MAX_SPEED + FLIGHT_THRUST_DECEL_TOLERANCE) {
+                    // Phase 2: decel from boost speed to normal max using boost decel rate.
+                    const _newSpd = Math.max(FLIGHT_MAX_SPEED, _bgFwdSpd - FLIGHT_BOOST_DECEL * dtTotal);
+                    _bgShip.velocity.copy(_bgFwd).multiplyScalar(_newSpd);
+                    flightState.currentSpeed = _newSpd;
+                } else {
+                    // Fully decelerated — done.
+                    flightState.boostDecelerating = false;
+                    flightState.currentSpeed = Math.min(_bgFwdSpd, FLIGHT_MAX_SPEED);
+                    warpEffect.stop();
+                }
+            }
+        } else {
+            // Ship lost — clear flags.
+            flightState.warpDecelerating = false;
+            flightState.boostDecelerating = false;
         }
     }
 
@@ -4434,7 +4476,12 @@ function cancelAutopilot(message?: string) {
     if (!autopilotState.isActive) return;
     if (autopilotState.isWarpActive) {
         autopilotState.isWarpActive = false;
-        warpEffect.stop();
+        warpEffect.stop();        // If the player cancelled mid-warp while not in the cockpit, trigger
+        // background deceleration so the ship slows down normally instead of
+        // continuing at warp speed indefinitely.
+        if (!flightState.isActive) {
+            flightState.warpDecelerating = true;
+        }
     }
     // Hide the charge bar if it was showing.
     if (autopilotState.phase === 'WARP_CHARGING') {
