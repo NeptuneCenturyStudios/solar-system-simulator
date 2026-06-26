@@ -5,6 +5,7 @@ import { Moon } from '../bodies/moon';
 import {
     getRoughnessForMoonTexture,
     getMetalnessForMoonTexture,
+    getVolcanicEmissiveMap,
     volcanicTextures,
     terrestrialTextures,
     oceanTextures,
@@ -70,6 +71,19 @@ function createMoonMesh(
         depthTest: true,
         depthWrite: true,
     });
+
+    // Volcanic moons get a derived emissive map so lava areas actually glow
+    if (moonType === MoonTypeEnum.Volcanic && texture) {
+        const texIdx = volcanicTextures.indexOf(texture);
+        const emissiveUrl = texIdx !== -1
+            ? `./assets/textures/bodies/2k/procedural/volcanic-${texIdx + 1}.jpg`
+            : null;
+        if (emissiveUrl) {
+            material.emissiveMap = getVolcanicEmissiveMap(emissiveUrl);
+            material.emissive = new THREE.Color(0xff3300);
+            material.emissiveIntensity = 0.6;
+        }
+    }
 
     return new THREE.Mesh(geometry, material);
 }

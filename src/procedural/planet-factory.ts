@@ -8,6 +8,7 @@ import {
     fictionalIceTextures,
     getMetalnessForPlanetTexture,
     getRoughnessForPlanetTexture,
+    getVolcanicEmissiveMap,
     terrestrialTextures,
     volcanicTextures,
     oceanTextures,
@@ -149,7 +150,7 @@ function buildMeshMaterial(creation: ProceduralPlanetCreation): THREE.MeshStanda
             ? pickTextureForGasIceSubtype(bodySubtype, textureIndex)
             : pickTextureForPlanetType(bodySubtype, rng);
 
-    return new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshStandardMaterial({
         map: texture,
         color: 0xffffff,
         emissive: 0x000000,
@@ -160,6 +161,21 @@ function buildMeshMaterial(creation: ProceduralPlanetCreation): THREE.MeshStanda
         depthTest: true,
         depthWrite: true,
     });
+
+    // Volcanic planets get a derived emissive map so lava areas actually glow
+    if (bodySubtype === PlanetTypeEnum.Volcanic && texture) {
+        const texIdx = volcanicTextures.indexOf(texture);
+        const emissiveUrl = texIdx !== -1
+            ? `./assets/textures/bodies/2k/procedural/volcanic-${texIdx + 1}.jpg`
+            : null;
+        if (emissiveUrl) {
+            material.emissiveMap = getVolcanicEmissiveMap(emissiveUrl);
+            material.emissive = new THREE.Color(0xff3300);
+            material.emissiveIntensity = 0.6;
+        }
+    }
+
+    return material;
 }
 
 function createCommonPlanetOptions(

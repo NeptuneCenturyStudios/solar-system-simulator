@@ -4476,7 +4476,8 @@ function cancelAutopilot(message?: string) {
     if (!autopilotState.isActive) return;
     if (autopilotState.isWarpActive) {
         autopilotState.isWarpActive = false;
-        warpEffect.stop();        // If the player cancelled mid-warp while not in the cockpit, trigger
+        warpEffect.stop();
+        // If the player cancelled mid-warp while not in the cockpit, trigger
         // background deceleration so the ship slows down normally instead of
         // continuing at warp speed indefinitely.
         if (!flightState.isActive) {
@@ -5484,6 +5485,14 @@ uiManager.on('reset', () => {
 uiManager.mainPanel.on('autopilot', ({ body }: { body: Body }) => {
     if (!body || body._isDisposed) return;
     engageAutopilot(body);
+});
+
+// "Enter Ship" button from the bodies table
+uiManager.mainPanel.on('enterShip', ({ body }: { body: Body }) => {
+    if (!body || body._isDisposed) return;
+    if (flightState.isActive) return;
+    flightState.knownShip = body as Spaceship;
+    spawnShip();
 });
 
 // Manual selection from Bodies table

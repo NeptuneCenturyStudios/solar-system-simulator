@@ -218,8 +218,10 @@ export class MainPanel extends Panel {
                                       const isApTarget =
                                           autopilotTarget && r.body === autopilotTarget;
                                       const flyBtnHtml =
-                                          !r.isShip && hasShip
-                                              ? `<td style="padding:2px 4px;"><button class="old-ui fly-here-btn mb-0${isApTarget ? ' active' : ''}" data-flyhere="1" title="${isApTarget ? 'Cancel autopilot' : 'Fly to this body'}" style="font-size:0.72em;padding:2px 6px;cursor:pointer;">${isApTarget ? '✕' : '✈'}</button></td>`
+                                          r.isShip
+                                              ? `<td style="padding:2px 4px;"><button class="old-ui enter-ship-btn mb-0" data-entership="1" title="Enter ship" style="font-size:0.8em;padding:2px 6px;cursor:pointer;"><span class="material-symbols-outlined" style="font-size:1em;">login</span></button></td>`
+                                              : !r.isShip && hasShip
+                                              ? `<td style="padding:2px 4px;"><button class="old-ui fly-here-btn mb-0${isApTarget ? ' active' : ''}" data-flyhere="1" title="${isApTarget ? 'Cancel autopilot' : 'Fly to this body'}" style="font-size:0.8em;padding:2px 6px;cursor:pointer;">${isApTarget ? '<span class="material-symbols-outlined" style="font-size:1em;">close</span>' : '<span class="material-symbols-outlined" style="font-size:1em;">flight</span>'}</button></td>`
                                               : `<td></td>`;
                                       return `
                                           <tr class="${isSel ? 'selected' : ''}" data-row="1">
@@ -247,6 +249,15 @@ export class MainPanel extends Panel {
                     const row = safeRows[idx];
                     if (!row || !row.body) return;
                     this.emit('autopilot', { body: row.body });
+                });
+            }
+            const enterShipBtn = tr.querySelector('[data-entership]');
+            if (enterShipBtn) {
+                enterShipBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const row = safeRows[idx];
+                    if (!row || !row.body) return;
+                    this.emit('enterShip', { body: row.body });
                 });
             }
             tr.addEventListener('click', () => {
