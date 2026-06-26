@@ -16,7 +16,7 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
 
-const marsTexture = loadSrgbTexture('./assets/textures/mars.jpg');
+
 
 /**
  * Represents the planet Mars in the simulation, including its texture and orbital properties.
@@ -34,9 +34,10 @@ export class Mars extends Planet {
             MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (24.623 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, MARS_DIST, SUN_MASS, angleRad);
+        const texture = loadSrgbTexture('./assets/textures/bodies/2k/mars.jpg');
         const geometry = new THREE.SphereGeometry(MARS_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
-            map: marsTexture,
+            map: texture,
             color: 0xffffff,
             emissive: 0x000000,
             emissiveIntensity: 0,

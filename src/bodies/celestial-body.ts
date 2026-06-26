@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Body } from './body';
 import { isBodyType } from '../utilities/utilities';
-import { IRotation } from '../interfaces';
+import { IAtmosphereOptions, IRotation } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
 import { triggerScreenFlash } from '../effects/screen-flash';
@@ -10,10 +10,14 @@ import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { BodyTypeEnum } from './body-enums';
+import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/earth-atmosphere-shell';
 
 // Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
 const _Y_AXIS = new THREE.Vector3(0, 1, 0);
 
+/**
+ * Tidal locking options
+ */
 export interface ITidalLockOptions {
     target: CelestialBody;
     spinAxisWorld: THREE.Vector3;
@@ -44,6 +48,7 @@ export class CelestialBody extends Body {
     rings: THREE.Points | null = null;
     clouds: THREE.Mesh | null = null;
     cloudRotationSpeed: number = 0;
+    atmosphereShell: AtmosphereShellHandle | null = null;
 
     // Tidal lock properties
     tidalLockEnabled: boolean;
@@ -77,8 +82,9 @@ export class CelestialBody extends Body {
         rotation: IRotation = { tilt: 0, speed: 0 },
         mesh?: THREE.Mesh,
         tidalLock?: ITidalLockOptions,
-        seed?: string
-    ) {
+        seed?: string,
+        atmosphere?: IAtmosphereOptions
+        ) {
         // Create a simple material if one isn't provided
         if (!mesh) {
             mesh = new THREE.Mesh(
@@ -103,6 +109,11 @@ export class CelestialBody extends Body {
         this.color = color;
         this.bodyType = bodyType;
         this.rotation = rotation;
+
+        // Create the atmosphere shell if atmosphere options were provided
+        if (atmosphere) {
+            this.atmosphereShell = createAtmosphereShell(scene, atmosphere.radius, atmosphere.tint, mesh);
+        }
 
         this.setRotation(rotation);
 

@@ -54,13 +54,13 @@ export class MainSequenceStar extends Star {
         options: IStarCreationOptions
     ) {
         const textures = {
-            sunTexture: loadSrgbTexture('./assets/textures/sun.jpg'),
-            redStarTexture: loadSrgbTexture('./assets/textures/red-star.jpg'),
-            orangeStarTexture: loadSrgbTexture('./assets/textures/orange_star.jpg'),
-            whiteStarTexture: loadSrgbTexture('./assets/textures/white_star.jpg'),
-            blueStarTexture: loadSrgbTexture('./assets/textures/blue-star.jpg'),
-            whiteDwarfTexture: loadSrgbTexture('./assets/textures/white_dwarf.jpg'),
-            brownDwarfTexture: loadSrgbTexture('./assets/textures/brown_dwarf.jpg'),
+            sunTexture: loadSrgbTexture('./assets/textures/bodies/2k/sun.jpg'),
+            redStarTexture: loadSrgbTexture('./assets/textures/bodies/2k/red-star.jpg'),
+            orangeStarTexture: loadSrgbTexture('./assets/textures/bodies/2k/orange_star.jpg'),
+            whiteStarTexture: loadSrgbTexture('./assets/textures/bodies/2k/white_star.jpg'),
+            blueStarTexture: loadSrgbTexture('./assets/textures/bodies/2k/blue-star.jpg'),
+            whiteDwarfTexture: loadSrgbTexture('./assets/textures/bodies/2k/white_dwarf.jpg'),
+            brownDwarfTexture: loadSrgbTexture('./assets/textures/bodies/2k/brown_dwarf.jpg'),
         };
         super(dependencies, scene, options, textures);
 

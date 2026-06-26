@@ -126,12 +126,12 @@ import {
     randomAsteroidParams,
 } from './utilities/body-params';
 import {
-    loadSrgbTexture,
     loadSpaceTexture,
     showSpaceBackground,
     getRoughnessForMoonTexture,
     getMetalnessForMoonTexture,
     moonTexture,
+    cloudTextures,
 } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
@@ -191,12 +191,6 @@ import {
     interactionState,
     simulationState,
 } from './simulation/simulation';
-
-// Custom/random atmosphere textures (used for custom mode planets/moons when "Has Atmosphere" is checked)
-const fictionalAtmosphereTextures = [
-    loadSrgbTexture('./assets/textures/fictional_atmosphere_1.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_atmosphere_2.jpg'),
-];
 
 // Note: Ctrl+W cannot be prevented due to browser security restrictions
 // Browsers intentionally allow users to always close tabs with Ctrl+W
@@ -1460,8 +1454,7 @@ function createNewBody(
             newBody
         ) {
             const atmosphereRng = new SeededRandom(`${newBody.id}|atmosphere|custom-solid`);
-            const atmosphereTex =
-                atmosphereRng.pick(fictionalAtmosphereTextures) ?? fictionalAtmosphereTextures[0];
+            const atmosphereTex = atmosphereRng.pick(cloudTextures) ?? cloudTextures[0];
 
             const cloudsMat = new THREE.MeshStandardMaterial({
                 map: atmosphereTex,
@@ -1653,9 +1646,7 @@ function createNewBody(
             // Temperate moons should always have atmosphere/clouds (UI checkbox hidden for temperate).
             if (hasAtmosphere || planetType === 'temperate') {
                 const atmosphereRng = new SeededRandom(`${newBody.id}|atmosphere|custom-moon`);
-                const atmosphereTex =
-                    atmosphereRng.pick(fictionalAtmosphereTextures) ??
-                    fictionalAtmosphereTextures[0];
+                const atmosphereTex = atmosphereRng.pick(cloudTextures) ?? cloudTextures[0];
 
                 const cloudsMat = new THREE.MeshStandardMaterial({
                     map: atmosphereTex,
@@ -3019,11 +3010,11 @@ const _animCamRight = new THREE.Vector3();
 const _animCamMovement = new THREE.Vector3();
 const _animOldPos = new THREE.Vector3();
 // Pre-allocated star-direction array for the Earth atmosphere shell (8 stars max).
-const _ATMO_MAX_STARS = 8;
-const _animStarDirsWorld: THREE.Vector3[] = Array.from(
-    { length: _ATMO_MAX_STARS },
-    () => new THREE.Vector3(1, 0, 0)
-);
+//const _ATMO_MAX_STARS = 8;
+// const _animStarDirsWorld: THREE.Vector3[] = Array.from(
+//     { length: _ATMO_MAX_STARS },
+//     () => new THREE.Vector3(1, 0, 0)
+// );
 
 function animate() {
     const now = performance.now();
@@ -3084,11 +3075,11 @@ function animate() {
             const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
             bgShip.velocity.copy(bgFwd).multiplyScalar(FLIGHT_WARP_SPEED);
         } else {
-            flightState.warpActive = false;flightState.warpActive = false;
+            flightState.warpActive = false;
+            flightState.warpActive = false;
         }
     }
 
-    
     // Background deceleration: when the player cancels autopilot warp (or manual warp)
     // while outside the cockpit, the ship needs to decelerate from warp speed to normal
     // speed.  This mirrors the two-phase deceleration logic in updateFlightControls().
@@ -3100,7 +3091,10 @@ function animate() {
             if (flightState.warpDecelerating) {
                 if (_bgFwdSpd > FLIGHT_BOOST_MAX_SPEED + FLIGHT_WARP_DECEL_TOLERANCE) {
                     // Phase 1: decel from warp speed to boost max using warp decel rate.
-                    const _newSpd = Math.max(FLIGHT_BOOST_MAX_SPEED, _bgFwdSpd - FLIGHT_WARP_DECEL * dtTotal);
+                    const _newSpd = Math.max(
+                        FLIGHT_BOOST_MAX_SPEED,
+                        _bgFwdSpd - FLIGHT_WARP_DECEL * dtTotal
+                    );
                     _bgShip.velocity.copy(_bgFwd).multiplyScalar(_newSpd);
                     flightState.currentSpeed = _newSpd;
                 } else {
@@ -3113,7 +3107,10 @@ function animate() {
             } else if (flightState.boostDecelerating) {
                 if (_bgFwdSpd > FLIGHT_MAX_SPEED + FLIGHT_THRUST_DECEL_TOLERANCE) {
                     // Phase 2: decel from boost speed to normal max using boost decel rate.
-                    const _newSpd = Math.max(FLIGHT_MAX_SPEED, _bgFwdSpd - FLIGHT_BOOST_DECEL * dtTotal);
+                    const _newSpd = Math.max(
+                        FLIGHT_MAX_SPEED,
+                        _bgFwdSpd - FLIGHT_BOOST_DECEL * dtTotal
+                    );
                     _bgShip.velocity.copy(_bgFwd).multiplyScalar(_newSpd);
                     flightState.currentSpeed = _newSpd;
                 } else {
@@ -3331,44 +3328,76 @@ function animate() {
         }
     }
 
-    // Update material brightness based on distance from star (inverse square law)
-    const sunBody = simulationState.bodies.find(
-        (b) => b && !b._isDisposed && isBodyType(b, BodyTypeEnum.Star)
-    );
-    if (sunBody) {
-        for (const body of simulationState.bodies) {
-            if (
-                body &&
-                !body._isDisposed &&
-                body.mesh &&
-                body instanceof CelestialBody &&
-                !isBodyType(body, BodyTypeEnum.Star)
-            ) {
-                // Calculate distance from sun
-                const dx = body.mesh.position.x - sunBody.mesh.position.x;
-                const dy = body.mesh.position.y - sunBody.mesh.position.y;
-                const dz = body.mesh.position.z - sunBody.mesh.position.z;
-                const distanceFromSun = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    // Consolidate body loop
+    // Per body updates can be consolidated here?
+    for (const body of simulationState.bodies) {
+        if (body._isDisposed) continue;
 
-                // Use inverse square law with a reference distance (Earth's orbit)
-                const referenceDistance = 21850; // Earth's distance
-                const minBrightness = 0.05; // Pluto will be quite dim but still visible
-                const brightnessRaw =
-                    (referenceDistance * referenceDistance) / (distanceFromSun * distanceFromSun);
-                // Prevent inverse-square boost from overexposing near-star bodies (looks like "glow").
-                // Preset far planets remain unchanged because brightnessRaw is already << 1.
-                const brightness = Math.max(minBrightness, Math.min(1.0, brightnessRaw));
+        if (body instanceof Star) {
+            const sunBody = body;
+            // Update material brightness based on distance from star (inverse square law)
+            for (const body of simulationState.bodies) {
+                if (
+                    body &&
+                    !body._isDisposed &&
+                    body.mesh &&
+                    body instanceof CelestialBody &&
+                    !isBodyType(body, BodyTypeEnum.Star)
+                ) {
+                    // Calculate distance from sun
+                    const dx = body.mesh.position.x - sunBody.mesh.position.x;
+                    const dy = body.mesh.position.y - sunBody.mesh.position.y;
+                    const dz = body.mesh.position.z - sunBody.mesh.position.z;
+                    const distanceFromSun = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-                // Apply brightness to material colors (clouds/atmosphere should match the planet too).
-                if (body.mesh.material instanceof THREE.MeshStandardMaterial) {
-                    body.mesh.material.color.copy(body.baseColor).multiplyScalar(brightness);
-                }
+                    // Use inverse square law with a reference distance (Earth's orbit)
+                    const referenceDistance = 21000; // Earth's distance
+                    const minBrightness = 0.05; // Pluto will be quite dim but still visible
+                    const brightnessRaw =
+                        (referenceDistance * referenceDistance) /
+                        (distanceFromSun * distanceFromSun);
+                    // Prevent inverse-square boost from overexposing near-star bodies (looks like "glow").
+                    // Preset far planets remain unchanged because brightnessRaw is already << 1.
+                    const brightness = Math.max(minBrightness, Math.min(1.0, brightnessRaw));
 
-                if (body.clouds?.material instanceof THREE.MeshStandardMaterial) {
-                    body.clouds.material.color.copy(body.baseColor).multiplyScalar(brightness);
+                    // Apply brightness to material colors (clouds/atmosphere should match the planet too).
+                    if (body.mesh.material instanceof THREE.MeshStandardMaterial) {
+                        body.mesh.material.color.copy(body.baseColor).multiplyScalar(brightness);
+                    }
+
+                    if (body.clouds?.material instanceof THREE.MeshStandardMaterial) {
+                        body.clouds.material.color.copy(body.baseColor).multiplyScalar(brightness);
+                    }
                 }
             }
         }
+
+        // // Update atmosphere shell for the current celestial body so it reacts to star lighting.
+        // if (body instanceof CelestialBody && body?.atmosphereShell) {
+        //     // Compute multi-star directions so the atmosphere shell glows on any star-lit side (up to MAX_STARS).
+        //     const stars = simulationState.bodies.filter(
+        //         (b) => b instanceof Star && !b._isDisposed
+        //     ) as Star[];
+
+        //     // Reset pre-allocated direction array to default before filling.
+        //     for (let i = 0; i < _ATMO_MAX_STARS; i++) _animStarDirsWorld[i].set(1, 0, 0);
+        //     const bodyPos = body.mesh.position;
+
+        //     const count = Math.min(_ATMO_MAX_STARS, stars.length);
+        //     for (let i = 0; i < count; i++) {
+        //         const star = stars[i];
+        //         if (!star.mesh) continue;
+        //         const dir = star.mesh.position.clone().sub(bodyPos);
+        //         if (dir.lengthSq() > 1e-12) dir.normalize();
+        //         _animStarDirsWorld[i].copy(dir);
+        //     }
+
+        //     body.atmosphereShell.update({
+        //         starDirsWorld: _animStarDirsWorld,
+        //         numStars: count,
+        //         cameraPosWorld: camera.position,
+        //     });
+        // }
     }
 
     gizmo.update();
@@ -3675,37 +3704,6 @@ function animate() {
 
     if (!isSurfaceModeActive && !isFreeCameraMode && !isFlightModeActive) {
         controls.update();
-    }
-
-    // Update Earth atmosphere shell (visible in both surface cam and exterior views)
-    const earthBodyForShell = simulationState.bodies.find(
-        (b): b is Earth => b instanceof Earth && !b._isDisposed
-    );
-
-    if (earthBodyForShell?.atmosphereShell) {
-        // Compute multi-star directions so the atmosphere shell glows on any star-lit side (up to MAX_STARS).
-        const stars = simulationState.bodies.filter(
-            (b) => b instanceof Star && !b._isDisposed
-        ) as Star[];
-
-        // Reset pre-allocated direction array to default before filling.
-        for (let i = 0; i < _ATMO_MAX_STARS; i++) _animStarDirsWorld[i].set(1, 0, 0);
-        const earthPos = earthBodyForShell.mesh.position;
-
-        const count = Math.min(_ATMO_MAX_STARS, stars.length);
-        for (let i = 0; i < count; i++) {
-            const star = stars[i];
-            if (!star.mesh) continue;
-            const dir = star.mesh.position.clone().sub(earthPos);
-            if (dir.lengthSq() > 1e-12) dir.normalize();
-            _animStarDirsWorld[i].copy(dir);
-        }
-
-        earthBodyForShell.atmosphereShell.update({
-            starDirsWorld: _animStarDirsWorld,
-            numStars: count,
-            cameraPosWorld: camera.position,
-        });
     }
 
     syncAllStarLightTargets();

@@ -61,6 +61,10 @@ export class Jupiter extends Planet {
             hasRings: false,
             rotation: { tilt: JUPITER_AXIS, speed: rotSpeed, azimuth: JUPITER_AZIMUTH },
             mesh: mesh,
+            // atmosphere: {
+            //     radius: JUPITER_RADIUS * 1.07,
+            //     tint: 0xffcc88,
+            // },
         });
     }
 }

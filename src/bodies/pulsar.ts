@@ -76,7 +76,7 @@ export class Pulsar extends Star implements IMassTransferBody {
         progenitorRotation: IRotation,
         progenitorRadius: number
     ) {
-        const pulsarTexture = loadSrgbTexture('./assets/textures/pulsar.jpg');
+        const pulsarTexture = loadSrgbTexture('./assets/textures/bodies/2k/pulsar.jpg');
         const pulsarRadius = massToNeutronStarRadius(mass);
 
         // Angular momentum conservation: I * ω = const, I ∝ R²

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 const MAX_STARS = 8;
 
-type EarthAtmosphereShellUniforms = {
+type AtmosphereShellUniforms = {
     uStarDirs: { value: THREE.Vector3[] };
     uNumStars: { value: number };
     uCameraPosWorld: { value: THREE.Vector3 };
@@ -14,7 +14,7 @@ type EarthAtmosphereShellUniforms = {
     uAlphaMax: { value: number };
 };
 
-export type EarthAtmosphereShellHandle = {
+export type AtmosphereShellHandle = {
     mesh: THREE.Mesh;
     update: (opts: {
         starDirsWorld: THREE.Vector3[];
@@ -33,17 +33,17 @@ export type EarthAtmosphereShellHandle = {
  * - dayFactor uses MAX(dot(N, L_i)) across up to MAX_STARS star directions,
  *   so the atmosphere blue glow appears on any star-lit side.
  */
-export function createEarthAtmosphereShell(
+export function createAtmosphereShell(
     scene: THREE.Scene,
     radius: number,
     tint: THREE.Color | number = 0x5599ff,
     parent: THREE.Object3D | null = null
-): EarthAtmosphereShellHandle {
+): AtmosphereShellHandle {
     const geometry = new THREE.SphereGeometry(radius, 48, 24);
 
     const starDirs = Array.from({ length: MAX_STARS }, () => new THREE.Vector3(1, 0, 0));
 
-    const uniforms: EarthAtmosphereShellUniforms = {
+    const uniforms: AtmosphereShellUniforms = {
         uStarDirs: { value: starDirs },
         uNumStars: { value: 0 },
         uCameraPosWorld: { value: new THREE.Vector3() },

@@ -13,6 +13,14 @@ import { Spaceship } from './bodies/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
 
 /**
+ * Options for configuring an atmosphere on a celestial body, including its radius and tint color.
+ */
+export interface IAtmosphereOptions{
+    radius: number;
+    tint: number;
+}
+
+/**
  * The interface for a solar system, containing an array of celestial bodies and a space texture.
  */
 export interface ISolarSystem{
@@ -80,6 +88,7 @@ export interface IMoonCreationOptions extends ISatelliteCreationOptions {
 export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {
     hasRings?: boolean;
     bodySubtype: PlanetTypeEnum;
+    atmosphere?: IAtmosphereOptions;
 }
 
 export interface IStateDependencies {

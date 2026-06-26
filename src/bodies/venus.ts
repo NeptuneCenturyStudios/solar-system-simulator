@@ -16,9 +16,6 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
 
-const venusTexture = loadSrgbTexture('./assets/textures/venus.jpg');
-const venusAtmosphereTexture = loadSrgbTexture('./assets/textures/venus_atmosphere.jpg');
-
 /**
  * Represents the planet Venus in the simulation, including its surface and cloud layer.
  * Sets up Venus's trajectory, material, and cloud rendering.
@@ -35,6 +32,7 @@ export class Venus extends Planet {
             VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, gEff, SUN_MASS);
         const rotSpeed = ((-2 * Math.PI) / (5832.5 * 3600)) * timeScale; // retrograde
         const trajectory = calculateTrajectory(gEff, VENUS_DIST, SUN_MASS, angleRad);
+        const venusTexture = loadSrgbTexture('./assets/textures/bodies/2k/venus.jpg');
         const geometry = new THREE.SphereGeometry(VENUS_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: venusTexture,
@@ -59,19 +57,26 @@ export class Venus extends Planet {
             hasRings: false,
             rotation: { tilt: VENUS_AXIS, speed: rotSpeed, azimuth: VENUS_AZIMUTH },
             mesh: mesh,
+            // atmosphere: {
+            //     radius: VENUS_RADIUS * 1.07,
+            //     tint: 0xffdd88,
+            // },
         });
 
+        const venusAtmosphereTexture = loadSrgbTexture(
+            './assets/textures/bodies/2k/venus_atmosphere.jpg'
+        );
         const cloudsMat = new THREE.MeshStandardMaterial({
             map: venusAtmosphereTexture,
             color: 0xffffff,
             transparent: true,
-            opacity: 0.45,
+            opacity: 0.85,
             depthWrite: false,
             roughness: 1.0,
             metalness: 0.0,
         });
 
-        const cloudsGeo = new THREE.SphereGeometry(this.radius * 1.03, 32, 32);
+        const cloudsGeo = new THREE.SphereGeometry(this.radius * 1.03, 64, 64);
         this.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
         this.clouds.renderOrder = 2;
         this.clouds.userData = { parentBody: this };

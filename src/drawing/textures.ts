@@ -24,14 +24,6 @@ export const europaTexture = loadSrgbTexture('./assets/textures/bodies/2k/europa
 export const ganymedeTexture = loadSrgbTexture('./assets/textures/bodies/2k/ganymede.jpg');
 export const callistoTexture = loadSrgbTexture('./assets/textures/bodies/2k/callisto.jpg');
 
-// Random pool of textures for terrestrial planets/moons
-export const fictionalTerrestrialTextures: THREE.Texture[] = [
-    loadSrgbTexture('./assets/textures/fictional_1.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_2.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_3.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_4.jpg'),
-];
-
 // Custom/random textures for custom gas giants
 // (kept here because these are not part of the fictional solid pool)
 export const fictionalGasTextures: THREE.Texture[] = [
@@ -45,19 +37,14 @@ export const fictionalIceTextures: THREE.Texture[] = [
     loadSrgbTexture('./assets/textures/fictional_ice_2.jpg'),
 ];
 
-// Custom/random atmosphere textures (used for custom mode planets/moons when "Has Atmosphere" is checked)
-export const fictionalAtmosphereTextures: THREE.Texture[] = [
-    loadSrgbTexture('./assets/textures/fictional_atmosphere_1.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_atmosphere_2.jpg'),
-];
-
 const SPACE_TEXTURE_COUNT = 13;
 const PROCEDURAL_TEMPORATE_TEXTURES = 5;
 const PROCEDURAL_VOLCANIC_TEXTURES = 5;
 const PROCEDURAL_OCEAN_TEXTURES = 5;
 const PROCEDURAL_FROZEN_TEXTURES = 5;
 const PROCEDURAL_DESERT_TEXTURES = 5;
-const PROCEDURAL_TERRESTRIAL_TEXTURES = 5;
+const PROCEDURAL_TERRESTRIAL_TEXTURES = 9;
+const PROCEDURAL_CLOUD_TEXTURES = 2;
 
 /**
  * Generates an array of THREE.Texture objects representing the available temperate planet textures for procedural generation.
@@ -180,6 +167,23 @@ function getSpaceTextures() : ISpaceBackground[]{
  * An array of ISpaceBackground objects representing the available space textures.
  */
 export const spaceTextures: ISpaceBackground[] = getSpaceTextures();
+
+/**
+ * Gets the list of cloud textures for procedural generation.
+ * @returns An array of THREE.Texture objects.
+ */
+function getCloudTextures(): THREE.Texture[] {
+    const textures: THREE.Texture[] = [];
+    for (let i = 1; i <= PROCEDURAL_CLOUD_TEXTURES; i++) {
+        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/clouds-${i}.jpg`));
+    }
+    return textures;
+}
+
+/**
+ * An array of THREE.Texture objects representing the available cloud textures for procedural generation.
+ */
+export const cloudTextures = getCloudTextures();
 
 
 // =============================================================================

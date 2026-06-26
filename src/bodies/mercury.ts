@@ -16,8 +16,6 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
 
-const mercuryTexture = loadSrgbTexture('./assets/textures/mercury.jpg');
-
 /**
  * Represents the planet Mercury in the simulation, including its texture and orbital properties.
  * Sets up Mercury's trajectory, material, and physical parameters.
@@ -34,9 +32,11 @@ export class Mercury extends Planet {
             MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (1407.5 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, MERCURY_DIST, SUN_MASS, angleRad);
+
+        const texture = loadSrgbTexture('./assets/textures/bodies/2k/mercury.jpg');
         const geometry = new THREE.SphereGeometry(MERCURY_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
-            map: mercuryTexture,
+            map: texture,
             color: 0xffffff,
             emissive: 0x000000,
             emissiveIntensity: 0,

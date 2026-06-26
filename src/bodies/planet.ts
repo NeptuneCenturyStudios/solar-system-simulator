@@ -32,7 +32,8 @@ export class Planet extends CelestialBody {
             options.rotation,
             options.mesh,
             undefined,
-            options.seed
+            options.seed,
+            options.atmosphere
         );
 
         this.planetType = options.bodySubtype;

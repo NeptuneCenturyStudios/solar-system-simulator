@@ -14,18 +14,14 @@ import { createUniqueId, isBodyType } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
-import {
-    createEarthAtmosphereShell,
-    EarthAtmosphereShellHandle,
-} from '../effects/earth-atmosphere-shell.js';
 import { BodyTypeEnum, PlanetTypeEnum } from './body-enums.js';
 
 // Maximum number of stars supported by the day/night shader.
 const MAX_STARS = 8;
 
-const earthDayTexture = loadSrgbTexture('./assets/textures/earth_day.jpg');
-const earthNightTexture = loadSrgbTexture('./assets/textures/earth_night.jpg');
-const earthCloudsTexture = loadSrgbTexture('./assets/textures/earth_clouds.jpg');
+const earthDayTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_day.jpg');
+const earthNightTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_night.jpg');
+const earthCloudsTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_clouds.jpg');
 earthCloudsTexture.wrapS = THREE.RepeatWrapping;
 earthCloudsTexture.wrapT = THREE.RepeatWrapping;
 
@@ -136,8 +132,7 @@ varying vec3 vEarthWorldNormal;`
  */
 export class Earth extends Planet {
     private customUniforms: EarthUniforms;
-    public atmosphereShell: EarthAtmosphereShellHandle | null = null;
-
+   
     /**
      * Constructs a new Earth object with its unique properties, orbit, and cloud layer.
      * @param dependencies State dependencies for the simulation.
@@ -177,6 +172,10 @@ export class Earth extends Planet {
             maxTrail: 4500,
             bodySubtype: PlanetTypeEnum.Terrestrial,
             mesh: mesh,
+            // atmosphere: {
+            //     radius: EARTH_RADIUS * 1.07,
+            //     tint: 0x5599ff,
+            // },
         });
 
         this.customUniforms = customUniforms;
@@ -192,22 +191,13 @@ export class Earth extends Planet {
             metalness: 0.0,
         });
 
-        const cloudsGeo = new THREE.SphereGeometry(this.radius * 1.03, 32, 32);
+        const cloudsGeo = new THREE.SphereGeometry(this.radius * 1.03, 64, 64);
         this.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
         this.clouds.renderOrder = 2;
         this.clouds.receiveShadow = true;
         // Make cloud sphere selectable (raycaster maps back to owning body)
         this.clouds.userData = { parentBody: this };
         this.mesh.add(this.clouds);
-
-        // Shader-based atmosphere shell (slightly outside the cloud layer).
-        // This stays visible from both inside (surface cam) and outside views.
-        this.atmosphereShell = createEarthAtmosphereShell(
-            scene,
-            this.radius * 1.07,
-            0x5599ff,
-            this.mesh
-        );
 
         // Clouds rotate slightly faster than Earth to simulate moving atmosphere.
         this.cloudRotationSpeed = rotSpeed * 1.3;
