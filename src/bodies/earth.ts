@@ -21,9 +21,6 @@ const MAX_STARS = 8;
 
 const earthDayTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_day.jpg');
 const earthNightTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_night.jpg');
-const earthCloudsTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_clouds.jpg');
-earthCloudsTexture.wrapS = THREE.RepeatWrapping;
-earthCloudsTexture.wrapT = THREE.RepeatWrapping;
 
 type EarthUniforms = {
     nightTexture: { value: THREE.Texture };
@@ -132,7 +129,7 @@ varying vec3 vEarthWorldNormal;`
  */
 export class Earth extends Planet {
     private customUniforms: EarthUniforms;
-   
+
     /**
      * Constructs a new Earth object with its unique properties, orbit, and cloud layer.
      * @param dependencies State dependencies for the simulation.
@@ -180,13 +177,24 @@ export class Earth extends Planet {
 
         this.customUniforms = customUniforms;
 
+        const earthCloudsTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_clouds.jpg');
+        earthCloudsTexture.wrapS = THREE.ClampToEdgeWrapping;
+        earthCloudsTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+        // earthCloudsTexture.repeat.set(-1, 1);
+        // earthCloudsTexture.offset.set(1, 0);
+
+        // earthCloudsTexture.rotation = 0;
+
         // Cloud layer (UV sphere slightly above surface)
         const cloudsMat = new THREE.MeshStandardMaterial({
             map: earthCloudsTexture,
-            color: 0xffffff,
+            alphaMap: earthCloudsTexture,
             transparent: true,
-            opacity: 0.45,
+            opacity: 1.0,
             depthWrite: false,
+            depthTest: true,
+            color: 0xffffff,
             roughness: 1.0,
             metalness: 0.0,
         });

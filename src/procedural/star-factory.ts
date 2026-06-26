@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import type { StarParams } from '../utilities/body-params';
 import type { IStateDependencies } from '../interfaces';
+import { STAR_LIGHT_DISTANCE } from '../utilities/consts';
 
 /**
  * Scene-dependent body factory for a "main sequence star" using the shared, pure
@@ -37,7 +38,7 @@ export function createMainSequenceStarFromParams(
         name,
         temperature: params.temperature,
         lightIntensity: params.lightIntensity,
-        lightDistance: 524400,
+        lightDistance: STAR_LIGHT_DISTANCE,
         rotation: rotation ?? {
             tilt: params.rotationTilt,
             speed: params.rotationSpeed,

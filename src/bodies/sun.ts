@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { IStateDependencies } from '../interfaces';
 import { createUniqueId } from '../utilities/utilities';
-import { DIST_SCALE, SUN_AXIS, SUN_AZIMUTH, SUN_MASS, SUN_RADIUS } from '../utilities/consts';
+import { STAR_LIGHT_DISTANCE, SUN_AXIS, SUN_AZIMUTH, SUN_LIGHT_INTENSITY, SUN_MASS, SUN_RADIUS } from '../utilities/consts';
 import { MainSequenceStar } from './main-sequence-star';
 
 export class Sun extends MainSequenceStar {
@@ -15,8 +15,8 @@ export class Sun extends MainSequenceStar {
             id: createUniqueId('sun'),
             name: 'Sun',
             temperature: 5778,
-            lightIntensity: 2_000_000_000,
-            lightDistance: 1_500_000_000 / DIST_SCALE,
+            lightIntensity: SUN_LIGHT_INTENSITY,
+            lightDistance: STAR_LIGHT_DISTANCE,
             rotation: { tilt: SUN_AXIS, speed: rotSpeed, azimuth: SUN_AZIMUTH },
             mesh: undefined, // Todo, implment star material/mesh in MainSequenceStar and use here
         });

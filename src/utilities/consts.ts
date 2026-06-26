@@ -118,6 +118,8 @@ export const URANUS_ORBITAL_PERIOD_REAL = 30685.4 * 24 * 3600;
 export const NEPTUNE_ORBITAL_PERIOD_REAL = 60190.03 * 24 * 3600;
 export const PLUTO_ORBITAL_PERIOD_REAL = 90560 * 24 * 3600;
 
+export const SUN_LIGHT_INTENSITY = 10_000;
+
 // === Planetary System: Per-planet Time Scale Factors ===
 // Used by individual body classes to compute rotation speed at construction time,
 // accounting for the effective G (including gMultiplier) via dependencies.getG().
@@ -203,8 +205,10 @@ export const KUIPER_BELT_VERTICAL_SPREAD = (100000000 / DIST_SCALE) * SCALE_FACT
 export const SHADOW_MAP_SIZE = 8192;
 
 // Star light intensity bounds (used for procedural stars + custom star creation)
-export const STAR_LIGHT_INTENSITY_MIN = 200_000_000;
-export const STAR_LIGHT_INTENSITY_MAX = 4_000_000_000;
+export const STAR_LIGHT_INTENSITY_MIN = 1_000;
+export const STAR_LIGHT_INTENSITY_MAX = 15_000;
+export const STAR_LIGHT_DISTANCE = PLUTO_DIST + (10_000_000_000 / DIST_SCALE);
+export const STAR_LIGHT_DECAY = 0.45; // Tuned for model
 
 export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;
 export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4;

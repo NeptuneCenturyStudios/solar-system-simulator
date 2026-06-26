@@ -5,6 +5,7 @@ import {
     SUN_RADIUS,
     STAR_LIGHT_INTENSITY_MIN,
     STAR_LIGHT_INTENSITY_MAX,
+    STAR_LIGHT_DECAY,
 } from '../utilities/consts';
 import { isBodyType } from '../utilities/utilities';
 import { CelestialBody } from './celestial-body';
@@ -51,7 +52,7 @@ export class Star extends CelestialBody {
     // Lighting effects
     lightIntensity: number;
     ambientLight: THREE.AmbientLight | null;
-    sunLight: THREE.DirectionalLight | null;
+    sunLight: THREE.PointLight | null;
 
     /**
      * @param {object} dependencies - same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
@@ -247,26 +248,32 @@ export class Star extends CelestialBody {
     }
 
     createLight(pos: THREE.Vector3, intensity: number, distance: number) {
-        const light = new THREE.DirectionalLight(0xffffff, Math.max(1.0, intensity / 20000000));
+        console.log(
+            'Creating light at position:',
+            pos,
+            'with intensity:',
+            intensity,
+            'and distance:',
+            distance
+        );
+        const light = new THREE.PointLight(0xffffff, intensity, distance);
         light.position.set(pos.x, pos.y, pos.z);
-
-        light.target = new THREE.Object3D();
-        light.target.position.set(0, 0, 0); //21850
-        this.scene.add(light.target);
+        light.decay = STAR_LIGHT_DECAY;
+        // this.scene.add(light);
 
         light.castShadow = true;
-        light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-        light.shadow.bias = -0.00001;
-        light.shadow.normalBias = 0.01;
+        // light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+        // light.shadow.bias = -0.00001;
+        // light.shadow.normalBias = 0.01;
 
-        const shadowSize = 5000;
-        light.shadow.camera.left = -shadowSize;
-        light.shadow.camera.right = shadowSize;
-        light.shadow.camera.top = shadowSize;
-        light.shadow.camera.bottom = -shadowSize;
-        light.shadow.camera.near = 1;
-        light.shadow.camera.far = 100000;
-        light.shadow.camera.updateProjectionMatrix();
+        // const shadowSize = 5000;
+        // light.shadow.camera.left = -shadowSize;
+        // light.shadow.camera.right = shadowSize;
+        // light.shadow.camera.top = shadowSize;
+        // light.shadow.camera.bottom = -shadowSize;
+        // light.shadow.camera.near = 1;
+        // light.shadow.camera.far = 100000;
+        // light.shadow.camera.updateProjectionMatrix();
 
         light.userData.distance = distance;
 
@@ -307,7 +314,7 @@ export class Star extends CelestialBody {
 
         this.lightIntensity = clamped;
         if (this.sunLight) {
-            this.sunLight.intensity = clamped / 20000000;
+            this.sunLight.intensity = clamped;
         }
     }
 
@@ -349,34 +356,14 @@ export class Star extends CelestialBody {
         super.setRadius(newRadius);
     }
 
-    setLightDistance(distance: number) {
-        if (!this.sunLight) return;
-        this.sunLight.userData.distance = distance;
-        if (this.sunLight.shadow && this.sunLight.shadow.camera) {
-            this.sunLight.shadow.camera.far = Math.min(distance * 0.5, 500000);
-            this.sunLight.shadow.camera.updateProjectionMatrix();
-        }
-    }
-
-    /**
-     * Dynamically tunes the directional light's orthographic shadow frustum to tightly
-     * wrap the given body. Called every frame by syncAllStarLightTargets() when a valid
-     * non-star body is in focus, so shadows work correctly at any scale or orbital distance.
-     */
-    updateShadowFrustumForBody(body: CelestialBody) {
-        if (!this.sunLight) return;
-        const dist = this.mesh.position.distanceTo(body.mesh.position);
-        const size = body.radius * 4;
-        this.sunLight.shadow.camera.left = -size;
-        this.sunLight.shadow.camera.right = size;
-        this.sunLight.shadow.camera.top = size;
-        this.sunLight.shadow.camera.bottom = -size;
-        this.sunLight.shadow.camera.near = 1;
-        // Ensure far always exceeds the ortho frustum width to avoid near==far edge cases.
-        this.sunLight.shadow.camera.far = Math.max(dist * 1.2, size * 2);
-        this.sunLight.shadow.camera.updateProjectionMatrix();
-        this.sunLight.shadow.needsUpdate = true;
-    }
+    // setLightDistance(distance: number) {
+    //     if (!this.sunLight) return;
+    //     this.sunLight.userData.distance = distance;
+    //     if (this.sunLight.shadow && this.sunLight.shadow.camera) {
+    //         this.sunLight.shadow.camera.far = Math.min(distance * 0.5, 500000);
+    //         this.sunLight.shadow.camera.updateProjectionMatrix();
+    //     }
+    // }
 
     die(skipExplosion = false) {
         if (this._isDisposed) return;
@@ -412,9 +399,12 @@ export class Star extends CelestialBody {
                 this.sunLight.visible = false;
                 this.scene.remove(this.sunLight);
 
-                if (this.sunLight.target) {
-                    this.scene.remove(this.sunLight.target);
-                    //this.sunLight.target = null;
+                // if (this.sunLight.target) {
+                //     this.scene.remove(this.sunLight.target);
+                //     //this.sunLight.target = null;
+                // }
+                if (this.sunLight) {
+                    this.scene.remove(this.sunLight);
                 }
 
                 try {
