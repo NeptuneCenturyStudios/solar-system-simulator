@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import {
-    SHADOW_MAP_SIZE,
     SUN_MASS,
     SUN_RADIUS,
     STAR_LIGHT_INTENSITY_MIN,
@@ -261,20 +260,6 @@ export class Star extends CelestialBody {
         light.decay = STAR_LIGHT_DECAY;
         // this.scene.add(light);
 
-        light.castShadow = true;
-        // light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-        // light.shadow.bias = -0.00001;
-        // light.shadow.normalBias = 0.01;
-
-        // const shadowSize = 5000;
-        // light.shadow.camera.left = -shadowSize;
-        // light.shadow.camera.right = shadowSize;
-        // light.shadow.camera.top = shadowSize;
-        // light.shadow.camera.bottom = -shadowSize;
-        // light.shadow.camera.near = 1;
-        // light.shadow.camera.far = 100000;
-        // light.shadow.camera.updateProjectionMatrix();
-
         light.userData.distance = distance;
 
         this.scene.add(light);
@@ -288,21 +273,6 @@ export class Star extends CelestialBody {
 
         if (this.sunLight) {
             this.sunLight.position.copy(this.mesh.position);
-            if (this.sunLight.castShadow) {
-                this.sunLight.shadow.needsUpdate = true;
-            }
-        }
-    }
-
-    setShadowsEnabled(enabled: boolean) {
-        if (!this.sunLight) return;
-        this.sunLight.castShadow = enabled;
-        if (enabled) {
-            this.sunLight.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-            this.sunLight.shadow.bias = -0.00001;
-            this.sunLight.shadow.normalBias = 0.01;
-            // Shadow frustum is managed dynamically per-body each frame.
-            this.sunLight.shadow.needsUpdate = true;
         }
     }
 
@@ -405,12 +375,6 @@ export class Star extends CelestialBody {
                 // }
                 if (this.sunLight) {
                     this.scene.remove(this.sunLight);
-                }
-
-                try {
-                    this.sunLight.shadow?.map?.dispose?.();
-                } catch {
-                    // ignore
                 }
 
                 this.sunLight = null;

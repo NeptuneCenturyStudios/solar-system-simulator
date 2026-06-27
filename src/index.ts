@@ -207,12 +207,14 @@ window.addEventListener('beforeunload', (e) => {
 const scene = new THREE.Scene();
 
 // === Ambient light from stars (base level of illumination) ===
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
 scene.add(ambientLight);
 
 // --- Camera and renderer setup ---
 const CAMERA_FAR_PLANE =
-    PLUTO_DIST + (300000000 / DIST_SCALE) * SCALE_FACTOR + (2000000000 / DIST_SCALE) * SCALE_FACTOR;
+    PLUTO_DIST +
+    (300_000_000 / DIST_SCALE) * SCALE_FACTOR +
+    (2_000_000_000 / DIST_SCALE) * SCALE_FACTOR;
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
@@ -224,9 +226,6 @@ const MAX_CAMERA_VIEW_DISTANCE = camera.far * 0.98;
 const INITIAL_CAMERA_DISTANCE = SUN_RADIUS * 8;
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); // Better depth precision at extreme scales
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true; // Must be true to initialize shadow infrastructure
-renderer.shadowMap.type = THREE.VSMShadowMap; // Better for large-scale shadows
-
 document.body.appendChild(renderer.domElement);
 
 const lensingEffect = new GravitationalLensingEffect(renderer);
@@ -1058,83 +1057,6 @@ function getPrimaryStar() {
     );
 }
 
-// function syncAllStarLightTargets() {
-//     const stars = simulationState.bodies.filter(
-//         (b): b is Star => b instanceof Star && !b._isDisposed
-//     );
-//     if (stars.length === 0) return;
-
-//     // Priority chain: find the best non-star body to use as the light direction target.
-//     // Stars are excluded — targeting a star with its own light produces a near-zero direction.
-//     //
-//     // Last-resort: closest non-star body to the camera. This is critical for free-cam mode —
-//     // when the user deselects a body they were just viewing, the camera is still near that planet
-//     // so it stays the light target and the correct side remains illuminated.
-//     const _closestNonStarBody = (() => {
-//         let closest: Body | null = null;
-//         let closestDist = Infinity;
-//         for (const b of simulationState.bodies) {
-//             if (!b || b._isDisposed || b instanceof Star || !b.mesh) continue;
-//             const d = camera.position.distanceTo(b.mesh.position);
-//             if (d < closestDist) {
-//                 closestDist = d;
-//                 closest = b;
-//             }
-//         }
-//         return closest;
-//     })();
-
-//     const activeLightTarget =
-//         (selectedBody &&
-//         !selectedBody._isDisposed &&
-//         !(selectedBody instanceof Star) &&
-//         simulationState.bodies.includes(selectedBody)
-//             ? selectedBody
-//             : manuallySelectedBody &&
-//                 !manuallySelectedBody._isDisposed &&
-//                 !(manuallySelectedBody instanceof Star) &&
-//                 simulationState.bodies.includes(manuallySelectedBody)
-//               ? manuallySelectedBody
-//               : cameraState.focusBody &&
-//                   !cameraState.focusBody._isDisposed &&
-//                   !(cameraState.focusBody instanceof Star) &&
-//                   simulationState.bodies.includes(cameraState.focusBody)
-//                 ? cameraState.focusBody
-//                 : _closestNonStarBody) ?? null;
-
-//     // Shadows are only needed when: the user has them enabled, we're not in free cam (user
-//     // requirement), and there is a non-star body to project shadows onto.
-//     const shadowsUserEnabled =
-//         (document.getElementById('enableShadows') as HTMLInputElement)?.checked ?? false;
-//     const shouldCastShadows =
-//         shadowsUserEnabled && !cameraState.isFreeCameraMode && activeLightTarget != null;
-
-//     for (const star of stars) {
-//         if (!star.sunLight?.target) continue;
-
-//         if (activeLightTarget?.mesh) {
-//             star.sunLight.target.position.copy(activeLightTarget.mesh.position);
-//         } else {
-//             // Star-relative fallback: offset +X from the star so the direction is always
-//             // well-defined regardless of where the star is in world space.
-//             star.sunLight.target.position.set(
-//                 star.mesh.position.x + 1,
-//                 star.mesh.position.y,
-//                 star.mesh.position.z
-//             );
-//         }
-
-//         if (star.sunLight.target.parent) {
-//             star.sunLight.target.updateMatrixWorld();
-//         }
-
-//         star.sunLight.castShadow = shouldCastShadows;
-//         if (shouldCastShadows && activeLightTarget instanceof CelestialBody) {
-//             star.updateShadowFrustumForBody(activeLightTarget);
-//         }
-//     }
-// }
-
 // State management
 const lineMat = new THREE.LineBasicMaterial({ color: 0xff0000 });
 const lineGeo = new THREE.BufferGeometry().setFromPoints([
@@ -1458,18 +1380,17 @@ function createNewBody(
             const atmosphereTex = atmosphereRng.pick(cloudTextures) ?? cloudTextures[0];
 
             // Cloud layer (UV sphere slightly above surface)
-                    const cloudsMat = new THREE.MeshStandardMaterial({
-                        map: atmosphereTex,
-                        alphaMap: atmosphereTex,
-                        transparent: true,
-                        opacity: 1.0,
-                        depthWrite: false,
-                        depthTest: true,
-                        color: 0xffffff,
-                        roughness: 1.0,
-                        metalness: 0.0,
-                    });
-            
+            const cloudsMat = new THREE.MeshStandardMaterial({
+                map: atmosphereTex,
+                alphaMap: atmosphereTex,
+                transparent: true,
+                opacity: 1.0,
+                depthWrite: false,
+                depthTest: true,
+                color: 0xffffff,
+                roughness: 1.0,
+                metalness: 0.0,
+            });
 
             const cloudsRadius =
                 Number.isFinite(newBody.radius) && newBody.radius > 0
@@ -1959,9 +1880,6 @@ async function spawn({
     if (simulationState.bodies.length > 0) {
         triggerZoomToBody(simulationState.bodies[0]);
     }
-
-    const shadowCheckboxForSpawn = document.getElementById('enableShadows') as HTMLInputElement;
-    toggleShadows(shadowCheckboxForSpawn ? shadowCheckboxForSpawn.checked : true);
 }
 
 function togglePause() {
@@ -1985,23 +1903,6 @@ function togglePause() {
 
 function handlePauseShortcut() {
     togglePause();
-}
-
-function toggleShadows(enabled: boolean) {
-    renderer.shadowMap.enabled = enabled;
-
-    // Update all celestial bodies
-    simulationState.bodies.forEach((body) => {
-        if (body && body.mesh) {
-            if (body instanceof Star) {
-                body.setShadowsEnabled(enabled);
-            } else {
-                // Update non-star bodies
-                body.mesh.castShadow = enabled;
-                body.mesh.receiveShadow = enabled;
-            }
-        }
-    });
 }
 
 function onMouseDown(event: MouseEvent) {
@@ -3333,78 +3234,6 @@ function animate() {
         }
     }
 
-    // // Consolidate body loop
-    // // Per body updates can be consolidated here?
-    // for (const body of simulationState.bodies) {
-    //     if (body._isDisposed) continue;
-
-    //     // if (body instanceof Star) {
-    //     //     const sunBody = body;
-    //     //     // Update material brightness based on distance from star (inverse square law)
-    //     //     for (const body of simulationState.bodies) {
-    //     //         if (
-    //     //             body &&
-    //     //             !body._isDisposed &&
-    //     //             body.mesh &&
-    //     //             body instanceof CelestialBody &&
-    //     //             !isBodyType(body, BodyTypeEnum.Star)
-    //     //         ) {
-    //     //             // Calculate distance from sun
-    //     //             const dx = body.mesh.position.x - sunBody.mesh.position.x;
-    //     //             const dy = body.mesh.position.y - sunBody.mesh.position.y;
-    //     //             const dz = body.mesh.position.z - sunBody.mesh.position.z;
-    //     //             const distanceFromSun = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-    //     //             // Use inverse square law with a reference distance (Earth's orbit)
-    //     //             const referenceDistance = 21000; // Earth's distance
-    //     //             const minBrightness = 0.05; // Pluto will be quite dim but still visible
-    //     //             const brightnessRaw =
-    //     //                 (referenceDistance * referenceDistance) /
-    //     //                 (distanceFromSun * distanceFromSun);
-    //     //             // Prevent inverse-square boost from overexposing near-star bodies (looks like "glow").
-    //     //             // Preset far planets remain unchanged because brightnessRaw is already << 1.
-    //     //             const brightness = Math.max(minBrightness, Math.min(1.0, brightnessRaw));
-
-    //     //             // Apply brightness to material colors (clouds/atmosphere should match the planet too).
-    //     //             if (body.mesh.material instanceof THREE.MeshStandardMaterial) {
-    //     //                 body.mesh.material.color.copy(body.baseColor).multiplyScalar(brightness);
-    //     //             }
-
-    //     //             if (body.clouds?.material instanceof THREE.MeshStandardMaterial) {
-    //     //                 body.clouds.material.color.copy(body.baseColor).multiplyScalar(brightness);
-    //     //             }
-    //     //         }
-    //     //     }
-    //     // }
-
-    //     // // Update atmosphere shell for the current celestial body so it reacts to star lighting.
-    //     // if (body instanceof CelestialBody && body?.atmosphereShell) {
-    //     //     // Compute multi-star directions so the atmosphere shell glows on any star-lit side (up to MAX_STARS).
-    //     //     const stars = simulationState.bodies.filter(
-    //     //         (b) => b instanceof Star && !b._isDisposed
-    //     //     ) as Star[];
-
-    //     //     // Reset pre-allocated direction array to default before filling.
-    //     //     for (let i = 0; i < _ATMO_MAX_STARS; i++) _animStarDirsWorld[i].set(1, 0, 0);
-    //     //     const bodyPos = body.mesh.position;
-
-    //     //     const count = Math.min(_ATMO_MAX_STARS, stars.length);
-    //     //     for (let i = 0; i < count; i++) {
-    //     //         const star = stars[i];
-    //     //         if (!star.mesh) continue;
-    //     //         const dir = star.mesh.position.clone().sub(bodyPos);
-    //     //         if (dir.lengthSq() > 1e-12) dir.normalize();
-    //     //         _animStarDirsWorld[i].copy(dir);
-    //     //     }
-
-    //     //     body.atmosphereShell.update({
-    //     //         starDirsWorld: _animStarDirsWorld,
-    //     //         numStars: count,
-    //     //         cameraPosWorld: camera.position,
-    //     //     });
-    //     // }
-    // }
-
     gizmo.update();
     velArc.update();
     orbitPrediction.update(simulationState.bodies, simulationState.gMultiplier);
@@ -4014,11 +3843,6 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
     const currentDist = dir.length();
     dir.normalize();
 
-    // Keep a sensible minimum distance so we don't clip into the body (only if we have a body target)
-    // const minDist =
-    //     target && simulationState.bodies.includes(target) && !target._isDisposed
-    //         ? Math.max((target.radius || 1) * 2.2, 10)
-    //         : 10;
     const maxDist = MAX_ZOOM_OUT_DISTANCE;
     const targetDistance =
         target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
@@ -4028,7 +3852,7 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
         MAX_CAMERA_VIEW_DISTANCE,
         Math.max(
             targetDistance * 2,
-            targetDistance + (500000000 / DIST_SCALE) * SCALE_FACTOR,
+            targetDistance + (5_000_000_000 / DIST_SCALE) * SCALE_FACTOR,
             maxDist
         )
     );
@@ -5184,8 +5008,12 @@ function exitFlightMode() {
     ) {
         flightState.knownShip = flightState.activeShip;
     } else {
-        // Ship was destroyed — clear the known reference too
+        // Ship was destroyed — clear the known reference too.
+        // Also kill warp state so the background updater doesn't force the
+        // respawned ship to warp speed, and hide the frozen tunnel immediately.
         flightState.knownShip = null;
+        flightState.warpActive = false;
+        warpEffect.forceHide();
     }
 
     // Zero all steering state FIRST, before clearing isActive,
@@ -5390,10 +5218,6 @@ uiManager.mainPanel.on('zoomOut', () => {
 
 uiManager.mainPanel.on('lockToSunChange', ({ checked }: { checked: boolean }) => {
     cameraState.lockToSun = checked;
-});
-
-optionsPanel.on('shadowsChange', ({ checked }: { checked: boolean }) => {
-    toggleShadows(checked);
 });
 
 uiManager.managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {

@@ -115,14 +115,6 @@ export class Halley extends Comet {
                 scaledBbox.getCenter(center);
                 group.position.sub(center);
 
-                // Enable shadows on every sub-mesh
-                group.traverse((child) => {
-                    if ((child as THREE.Mesh).isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
-                });
-
                 this.mesh.add(group);
             })
             .catch((e) => {

@@ -75,9 +75,6 @@ export class Spaceship extends Body {
             -SPACESHIP_RADIUS * 1.8
         );
 
-        this.mesh.castShadow = true;
-        this.mesh.receiveShadow = true;
-
         // Engine exhaust trail (Line-based, no gaps at any speed)
         this.trail = new ShipFlame(scene);
 
@@ -117,10 +114,8 @@ export class Spaceship extends Body {
                 group.updateMatrixWorld(true);
                 const localBbox = new THREE.Box3().setFromObject(group);
 
-                // Enable shadows on every sub-mesh.
                 group.traverse((child) => {
                     if ((child as THREE.Mesh).isMesh) {
-                        child.castShadow = true;
                         child.renderOrder = 2; // draw after effects (renderOrder 1)
                     }
                 });

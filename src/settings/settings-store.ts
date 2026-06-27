@@ -2,7 +2,6 @@
 const STORAGE_KEY = 'spaceSimSettings';
 
 export const enum SettingKey {
-    EnableShadows = 'enableShadows',
     ParticleEffectsEnabled = 'particleEffectsEnabled',
     Substeps = 'substeps',
     SfxVolume = 'sfxVolume',
@@ -10,7 +9,6 @@ export const enum SettingKey {
 }
 
 export interface SpaceSimSettings {
-    enableShadows: boolean;
     particleEffectsEnabled: boolean;
     substeps: number;
     sfxVolume: number;
@@ -18,7 +16,6 @@ export interface SpaceSimSettings {
 }
 
 const defaultSettings: SpaceSimSettings = {
-    enableShadows: false,
     particleEffectsEnabled: true,
     substeps: 64,
     sfxVolume: 1.0,

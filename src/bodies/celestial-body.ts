@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Body } from './body';
-import { isBodyType } from '../utilities/utilities';
 import { IAtmosphereOptions, IRotation } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
@@ -335,12 +334,6 @@ export class CelestialBody extends Body {
             }
         } catch (e) {
             console.error('Error updating body geometry radius:', e);
-        }
-
-        if (this.mesh) {
-            const isBodyStar = isBodyType(this, BodyTypeEnum.Star);
-            this.mesh.castShadow = !isBodyStar;
-            this.mesh.receiveShadow = !isBodyStar;
         }
 
         try {

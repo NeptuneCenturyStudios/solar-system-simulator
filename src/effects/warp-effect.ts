@@ -199,6 +199,16 @@ export class WarpEffect {
     }
 
     /**
+     * Immediately hide the warp effect regardless of ship speed.
+     * Call when the ship is destroyed mid-warp so the frozen tunnel
+     * doesn't linger after flight mode exits.
+     */
+    forceHide(): void {
+        this.speedOpacity = 0;
+        this._applyOpacity();
+    }
+
+    /**
      * Call every frame while a ship exists in the scene.
      *
      * @param dt           Delta time in seconds.

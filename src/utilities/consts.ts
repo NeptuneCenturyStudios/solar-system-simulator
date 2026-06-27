@@ -202,7 +202,6 @@ export const KUIPER_BELT_COUNT = 12000;
 export const KUIPER_BELT_INNER_DIST = (4500000000 / DIST_SCALE) * SCALE_FACTOR; // 4,500,000,000 km
 export const KUIPER_BELT_OUTER_DIST = (7500000000 / DIST_SCALE) * SCALE_FACTOR; // 7,500,000,000 km
 export const KUIPER_BELT_VERTICAL_SPREAD = (100000000 / DIST_SCALE) * SCALE_FACTOR; // 100,000,000 km
-export const SHADOW_MAP_SIZE = 8192;
 
 // Star light intensity bounds (used for procedural stars + custom star creation)
 export const STAR_LIGHT_INTENSITY_MIN = 1_000;

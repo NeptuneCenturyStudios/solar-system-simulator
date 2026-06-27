@@ -30,9 +30,6 @@ export class ISS extends Satellite {
         // ── Base class ────────────────────────────────────────────────────────
         super(dependencies, scene, options);
 
-        this.mesh.castShadow = true;
-        this.mesh.receiveShadow = true;
-
         // ── Async OBJ + MTL load ──────────────────────────────────────────────
         const mtlLoader = new MTLLoader();
         mtlLoader.setPath('./assets/models/');
@@ -63,13 +60,6 @@ export class ISS extends Satellite {
                 // Compute LOCAL bbox now — before adding to this.mesh — so world space
                 // equals mesh-local space and the values are valid as local offsets.
                 group.updateMatrixWorld(true);
-
-                // Enable shadows on every sub-mesh.
-                group.traverse((child) => {
-                    if ((child as THREE.Mesh).isMesh) {
-                        child.castShadow = true;
-                    }
-                });
 
                 // Orient ISS so its long axis points north/south (Z axis)
                 //group.rotation.y = Math.PI / 2; // Adjust as needed based on your model

@@ -5,7 +5,6 @@ import { SettingKey, settingsStore } from '../settings/settings-store';
  * Panel for managing performance-related settings.
  */
 export class OptionsPanel extends Panel {
-    enableShadowsCheckbox: HTMLInputElement | null;
     enableParticleEffectsCheckbox: HTMLInputElement | null;
     substepsSlider: HTMLInputElement | null = null;
     substepsDisplay: HTMLElement | null = null;
@@ -22,7 +21,6 @@ export class OptionsPanel extends Panel {
 
     constructor(elementId: string) {
         super(elementId);
-        this.enableShadowsCheckbox = null;
         this.enableParticleEffectsCheckbox = null;
         this.btnClose = null;
     }
@@ -36,16 +34,6 @@ export class OptionsPanel extends Panel {
             this.btnClose.onclick = () => {
                 this.toggle();
                 this.emit('closed');
-            };
-        }
-
-        this.enableShadowsCheckbox = document.getElementById(
-            'enableShadows'
-        ) as HTMLInputElement | null;
-
-        if (this.enableShadowsCheckbox) {
-            this.enableShadowsCheckbox.onchange = () => {
-                this.applyEnableShadows();
             };
         }
 
@@ -125,11 +113,6 @@ export class OptionsPanel extends Panel {
         // Load from settings store
         const s = settingsStore.settings;
 
-        if (this.enableShadowsCheckbox) {
-            this.enableShadowsCheckbox.checked = s.enableShadows;
-            this.applyEnableShadows();
-        }
-
         if (this.enableParticleEffectsCheckbox) {
             this.enableParticleEffectsCheckbox.checked = s.particleEffectsEnabled;
             this.applyEnableParticleEffects();
@@ -151,15 +134,6 @@ export class OptionsPanel extends Panel {
             this.musicVolumeSlider.value = v.toString();
             this.applyMusicVolume();
         }
-    }
-
-    /**
-     * Apply the current state of the "Enable Shadows" checkbox to the settings store and emit an event.
-     */
-    private applyEnableShadows(): void {
-        const checked = this.enableShadowsCheckbox!.checked;
-        settingsStore.update(SettingKey.EnableShadows, checked);
-        this.emit('shadowsChange', { checked });
     }
 
     /**
