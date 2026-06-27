@@ -150,7 +150,7 @@ export class AmbientSoundManager {
         tempList.push(this.buildTrackUrl('slimeyfox-hydrostatic-drones-479105.mp3'));
         tempList.push(this.buildTrackUrl('the_mountain-spaceship-155569.mp3'));
         tempList.push(this.buildTrackUrl('universfield-haunting-music-box-289437.mp3'));
-        tempList.push(this.buildTrackUrl('musheran-low-rumbling-176033.mp3'));
+        tempList.push(this.buildTrackUrl('audiocoffee-dark-space-148895.mp3'));
         tempList.push(
             this.buildTrackUrl(
                 'nickpanekaiassets-drones-of-dread-dark-cinematic-industrial-ambient-497226.mp3'

@@ -16,6 +16,7 @@ import {
 import type { ProceduralMoonCreation } from './moon-generator';
 import { MoonTypeEnum } from '../bodies/body-enums';
 import { SeededRandom } from '../utilities/prng';
+import { addCloudLayer } from './planet-factory';
 
 /**
  * Given a moon type and a seeded random number generator, this function selects an appropriate texture for the moon.
@@ -198,11 +199,15 @@ export function createMoonBodyFromProceduralCreation(params: {
 
     const mesh = createMoonMesh(safeRadius, texture, moonType);
 
-    return buildProceduralMoon({
+    const body = buildProceduralMoon({
         dependencies: params.dependencies,
         scene: params.scene,
         creation,
         parent: params.parent,
         mesh,
     });
+
+    addCloudLayer(body, moonType, textureSeed, creation.rotationSpeed);
+
+    return body;
 }

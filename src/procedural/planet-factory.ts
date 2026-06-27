@@ -15,9 +15,11 @@ import {
     frozenTextures,
     desertTextures,
     temperateTextures,
+    cloudTextures,
 } from '../drawing/textures';
 
-import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
+import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
+import type { CelestialBody } from '../bodies/celestial-body';
 
 export type ProceduralPlanetSubtype =
     | 'solid'
@@ -223,6 +225,68 @@ function createCommonPlanetOptions(
     return new Planet(dependencies, scene, commonOptions);
 }
 
+/** Probability (0–1) that a given planet/moon subtype has a cloud layer. */
+const CLOUD_CHANCE: Record<string, number> = {
+    [PlanetTypeEnum.Temperate]: 1.0,
+    [PlanetTypeEnum.Ocean]: 0.75,
+    [PlanetTypeEnum.Terrestrial]: 0.4,
+    [PlanetTypeEnum.Desert]: 0.2,
+    [PlanetTypeEnum.Frozen]: 0.2,
+    [PlanetTypeEnum.Volcanic]: 0.15,
+};
+
+/**
+ * Attaches a procedural cloud layer to the given body if the type and seeded RNG
+ * determine that it should have one. Gas giants and ice giants are always skipped.
+ *
+ * @param body          The CelestialBody to attach clouds to.
+ * @param subtype       The planet or moon subtype enum value.
+ * @param seed          Deterministic seed string for this body.
+ * @param rotationSpeed The body's base rotation speed (clouds rotate at 1.3×).
+ */
+export function addCloudLayer(
+    body: CelestialBody,
+    subtype: PlanetTypeEnum | MoonTypeEnum,
+    seed: string,
+    rotationSpeed: number
+): void {
+    // Gas/ice giants never get a cloud layer via this path.
+    if (subtype === PlanetTypeEnum.GasGiant || subtype === PlanetTypeEnum.IceGiant) return;
+
+    const chance = CLOUD_CHANCE[subtype] ?? 0;
+    if (chance <= 0) return;
+
+    const enableRng = new SeededRandom(`${seed}|clouds-enabled`);
+    if (chance < 1.0 && !enableRng.chance(chance)) return;
+
+    if (cloudTextures.length === 0) return;
+
+    const textureRng = new SeededRandom(`${seed}|clouds-texture`);
+    const cloudTexture = textureRng.pick(cloudTextures);
+    if (!cloudTexture) return;
+
+    const cloudsMat = new THREE.MeshStandardMaterial({
+        map: cloudTexture,
+        alphaMap: cloudTexture,
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        depthTest: true,
+        color: 0xffffff,
+        roughness: 1.0,
+        metalness: 0.0,
+    });
+
+    const cloudsGeo = new THREE.SphereGeometry(body.radius * 1.03, 64, 64);
+    body.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
+    body.clouds.renderOrder = 2;
+    body.clouds.receiveShadow = true;
+    body.clouds.userData = { parentBody: body };
+    body.mesh.add(body.clouds);
+
+    body.cloudRotationSpeed = rotationSpeed * 1.3;
+}
+
 export function createPlanetBodyFromProceduralCreation(
     dependencies: IStateDependencies,
     scene: THREE.Scene,
@@ -233,5 +297,9 @@ export function createPlanetBodyFromProceduralCreation(
     const mesh = new THREE.Mesh(geometry, material);
 
     const { hasRings } = computeRingPresence(creation);
-    return createCommonPlanetOptions(dependencies, scene, creation, mesh, hasRings);
+    const body = createCommonPlanetOptions(dependencies, scene, creation, mesh, hasRings);
+
+    addCloudLayer(body, creation.bodySubtype, creation.textureSeed!, creation.rotationSpeed);
+
+    return body;
 }

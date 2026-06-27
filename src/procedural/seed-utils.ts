@@ -42,3 +42,23 @@ export function pickRandomSpaceTexture(masterSeed: string): ISpaceBackground {
      const spaceTexture = spaceTextures[skydomeIndex - 1];
      return spaceTexture;
 }
+
+/**
+ * Picks a value from a weighted list using the provided seeded RNG.
+ * Weights are clamped to 0 before normalisation — negative weights count as zero.
+ */
+export function pickWeighted<T>(
+    rng: SeededRandom,
+    choices: Array<{ value: T; weight: number }>
+): T {
+    const totalWeight = choices.reduce((sum, c) => sum + Math.max(0, c.weight), 0);
+    if (totalWeight <= 0) return choices[0]!.value;
+
+    const roll = rng.next() * totalWeight;
+    let acc = 0;
+    for (const c of choices) {
+        acc += Math.max(0, c.weight);
+        if (roll < acc) return c.value;
+    }
+    return choices[choices.length - 1]!.value;
+}

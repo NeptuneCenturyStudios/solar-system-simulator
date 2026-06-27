@@ -6,6 +6,8 @@ import { randomMoonParams } from '../utilities/body-params';
 import { generateProceduralBodyName } from './body-naming';
 import type { ProceduralPlanetCreation } from './planet-factory';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
+import { pickWeighted } from './seed-utils';
+import { clamp01 } from './noise-utils';
 
 export type ProceduralMoonCreation = {
     id: string;
@@ -37,25 +39,6 @@ export type ProceduralMoonCreation = {
 
     parentIndex: number;
 };
-
-function clamp01(v: number): number {
-    return Math.max(0, Math.min(1, v));
-}
-
-function pickWeighted<T>(rng: SeededRandom, choices: Array<{ value: T; weight: number }>): T {
-    const totalWeight = choices.reduce((sum, c) => sum + Math.max(0, c.weight), 0);
-    if (totalWeight <= 0) return choices[0]!.value;
-
-    const roll = rng.next() * totalWeight;
-    let acc = 0;
-
-    for (const c of choices) {
-        acc += Math.max(0, c.weight);
-        if (roll < acc) return c.value;
-    }
-
-    return choices[choices.length - 1]!.value;
-}
 
 function pickMoonCount(subtype: PlanetTypeEnum, rng: SeededRandom): number {
     // Heuristic:

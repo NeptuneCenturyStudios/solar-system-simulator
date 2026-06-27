@@ -1,32 +1,11 @@
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { SeededRandom } from '../utilities/prng';
+import { pickWeighted } from './seed-utils';
 
 export type SystemBodyInventoryEntry = {
     bodyType: BodyTypeEnum;
     count: number;
 };
-
-type WeightedChoice<T> = {
-    value: T;
-    weight: number;
-};
-
-function pickWeighted<T>(prng: SeededRandom, choices: Array<WeightedChoice<T>>): T {
-    const totalWeight = choices.reduce((sum, c) => sum + Math.max(0, c.weight), 0);
-    if (totalWeight <= 0) {
-        // Defensive fallback: choose first choice deterministically (weights were bad)
-        return choices[0]?.value;
-    }
-
-    const roll = prng.next() * totalWeight;
-    let acc = 0;
-    for (const c of choices) {
-        acc += Math.max(0, c.weight);
-        if (roll < acc) return c.value;
-    }
-    // Floating point fallback
-    return choices[choices.length - 1]!.value;
-}
 
 function pickCountStars(prng: SeededRandom): number {
     // 1–3 with very high chance of 1, low chance of 2, very low chance of 3
@@ -64,7 +43,7 @@ function pickCountPlanets(prng: SeededRandom): number {
     const w0 = 0.1;
     const decay = 0.45;
 
-    const choices: Array<WeightedChoice<number>> = [];
+    const choices: Array<{ value: number; weight: number }> = [];
     choices.push({ value: 0, weight: w0 });
     for (let n = 1; n <= maxPlanets; n++) {
         choices.push({ value: n, weight: Math.pow(decay, n - 1) });

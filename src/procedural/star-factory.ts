@@ -4,6 +4,15 @@ import type { StarParams } from '../utilities/body-params';
 import type { IStateDependencies } from '../interfaces';
 import { STAR_LIGHT_DISTANCE } from '../utilities/consts';
 
+export type ProceduralStarCreation = {
+    id: string;
+    name: string;
+    pos: THREE.Vector3;
+    vel: THREE.Vector3;
+    starParams: StarParams;
+    rotation?: { tilt: number; speed: number; azimuth?: number };
+};
+
 /**
  * Scene-dependent body factory for a "main sequence star" using the shared, pure
  * parameter generator (`randomStarParams` / `StarParams`).
@@ -45,5 +54,24 @@ export function createMainSequenceStarFromParams(
             azimuth: params.rotationAzimuth,
         },
         mesh: undefined, // use default star material/mesh
+    });
+}
+
+/**
+ * Instantiates a scene-attached {@link MainSequenceStar} from a procedural
+ * creation descriptor, matching the generator-factory pattern used by all
+ * other body types.
+ */
+export function createStarBodyFromProceduralCreation(
+    dependencies: IStateDependencies,
+    scene: THREE.Scene,
+    creation: ProceduralStarCreation
+): MainSequenceStar {
+    return createMainSequenceStarFromParams(dependencies, scene, creation.starParams, {
+        id: creation.id,
+        name: creation.name,
+        pos: creation.pos,
+        vel: creation.vel,
+        rotation: creation.rotation,
     });
 }

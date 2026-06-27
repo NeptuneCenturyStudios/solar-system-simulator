@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { G } from '../utilities/consts';
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 export type BinaryPlacement = {
     pos: THREE.Vector3;
     vel: THREE.Vector3;
@@ -100,4 +104,128 @@ export function generateBinaryPlacements(
         { pos: pos1, vel: vel1 },
         { pos: pos2, vel: vel2 },
     ];
+}
+
+// ---------------------------------------------------------------------------
+// Shared orbit planning utilities
+// ---------------------------------------------------------------------------
+
+/** Minimal RNG interface required by {@link pickOrbitType}. */
+interface OrbitTypeRng {
+    chance(probability: number): boolean;
+}
+
+/**
+ * Selects S-type vs P-type orbit and, for S-type, which host star to orbit.
+ *
+ * S-type: body orbits one star (stable within ~0.3 × binary separation).
+ * P-type: body orbits the system barycentre (stable beyond ~2.0 × binary separation).
+ */
+export function pickOrbitType(params: {
+    rng: OrbitTypeRng;
+    starCount: number;
+    sZoneValid: boolean;
+    pZoneValid: boolean;
+}): { isSType: boolean; hostStarIndex: number } {
+    const { rng, starCount, sZoneValid, pZoneValid } = params;
+
+    let isSType: boolean;
+    let hostStarIndex = 0;
+
+    if (starCount === 1) {
+        isSType = false;
+    } else if (sZoneValid && pZoneValid) {
+        isSType = rng.chance(0.5);
+    } else if (sZoneValid) {
+        isSType = true;
+    } else {
+        isSType = false;
+    }
+
+    if (isSType) {
+        hostStarIndex = rng.chance(0.5) ? 1 : 0;
+    }
+
+    return { isSType, hostStarIndex };
+}
+
+/**
+ * Computes the minimum periapsis distance, ensuring the orbit clears all stars
+ * and remains numerically stable.
+ *
+ * @param distanceFraction  Lower bound as a fraction of semi-major axis distance
+ *                          (0.3 for planets/asteroids, 0.15 for comets).
+ */
+export function computeMinPeriapsis(params: {
+    isSType: boolean;
+    hostStarIndex: number;
+    distance: number;
+    distanceFraction: number;
+    starParams: Array<{ radius: number }>;
+    starPlacements: Array<{ pos: THREE.Vector3 }>;
+    maxStarRadius: number;
+    binarySeparation: number;
+    P_STABLE_MULTIPLE: number;
+}): number {
+    const {
+        isSType,
+        hostStarIndex,
+        distance,
+        distanceFraction,
+        starParams,
+        starPlacements,
+        maxStarRadius,
+        binarySeparation,
+        P_STABLE_MULTIPLE,
+    } = params;
+
+    const starCount = starParams.length;
+
+    if (isSType) {
+        return Math.max(starParams[hostStarIndex]!.radius * 5, distance * distanceFraction);
+    }
+
+    return Math.max(
+        maxStarRadius * 5,
+        starPlacements[0]!.pos.length() + starParams[0]!.radius * 3,
+        starCount > 1 ? starPlacements[1]!.pos.length() + starParams[1]!.radius * 3 : 0,
+        binarySeparation * P_STABLE_MULTIPLE,
+        distance * distanceFraction
+    );
+}
+
+/**
+ * Converts a semi-major axis distance and periapsis floor into a maximum
+ * eccentricity that keeps the orbit integrable.
+ */
+export function computeMaxEccentricity(distance: number, minPeriapsis: number): number {
+    return Math.max(0, (distance - minPeriapsis) / (distance + minPeriapsis));
+}
+
+/**
+ * Defensive finite check for orbit creation descriptors.
+ * Resets position and velocity to the origin and clamps radius/mass to safe
+ * minimums if any component is non-finite (NaN or ±Infinity).
+ */
+export function sanitizeOrbitCreations<
+    T extends { pos: THREE.Vector3; vel: THREE.Vector3; radius: number; mass: number },
+>(creations: T[], fallbacks?: { minRadius?: number; minMass?: number }): void {
+    for (const c of creations) {
+        const ok =
+            Number.isFinite(c.pos.x) &&
+            Number.isFinite(c.pos.y) &&
+            Number.isFinite(c.pos.z) &&
+            Number.isFinite(c.vel.x) &&
+            Number.isFinite(c.vel.y) &&
+            Number.isFinite(c.vel.z) &&
+            Number.isFinite(c.radius) &&
+            Number.isFinite(c.mass);
+
+        if (!ok) {
+            c.pos.set(0, 0, 0);
+            c.vel.set(0, 0, 0);
+            if (!Number.isFinite(c.radius)) c.radius = Math.max(0, fallbacks?.minRadius ?? 0);
+            if (!Number.isFinite(c.mass)) c.mass = Math.max(0, fallbacks?.minMass ?? 0);
+        }
+    }
 }

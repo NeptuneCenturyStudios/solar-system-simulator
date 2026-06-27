@@ -10,34 +10,24 @@ import { PlanetBodyType, type ProceduralPlanetSubtype } from './planet-factory';
 import { randomPlanetParams } from '../utilities/body-params';
 import { SeededRandom } from '../utilities/prng';
 
-import { buildUnitPositionDirection, safeUnitCross } from './orbital-math';
-import { rngFor } from './seed-utils';
+import {
+    buildUnitPositionDirection,
+    computeMaxEccentricity,
+    computeMinPeriapsis,
+    pickOrbitType,
+    safeUnitCross,
+} from './orbital-math';
+import { pickWeighted, rngFor } from './seed-utils';
+import { clamp01 } from './noise-utils';
 
 type StarPlacement = {
     pos: THREE.Vector3;
     vel: THREE.Vector3;
 };
 
-function pickWeighted<T>(rng: SeededRandom, choices: Array<{ value: T; weight: number }>): T {
-    const totalWeight = choices.reduce((sum, c) => sum + Math.max(0, c.weight), 0);
-    if (totalWeight <= 0) return choices[0]!.value;
-
-    const roll = rng.next() * totalWeight;
-    let acc = 0;
-    for (const c of choices) {
-        acc += Math.max(0, c.weight);
-        if (roll < acc) return c.value;
-    }
-    return choices[choices.length - 1]!.value;
-}
-
 function smoothGaussian(x: number, mu: number, sigma: number): number {
     const d = x - mu;
     return Math.exp(-(d * d) / (2 * sigma * sigma));
-}
-
-function clamp01(v: number): number {
-    return Math.max(0, Math.min(1, v));
 }
 
 function pickPlanetSubtypeByDistance(params: {
@@ -151,22 +141,12 @@ export function generateProceduralPlanets(params: {
         const distanceRng = rngFor(masterSeed, 'planetDistance', k);
         const orbitTypeRng = rngFor(masterSeed, 'planetOrbitType', k);
 
-        let isSType: boolean;
-        let hostStarIndex = 0;
-
-        if (starCount === 1) {
-            isSType = false;
-        } else if (sZoneValid && pZoneValid) {
-            isSType = orbitTypeRng.chance(0.5);
-        } else if (sZoneValid) {
-            isSType = true;
-        } else {
-            isSType = false;
-        }
-
-        if (isSType) {
-            hostStarIndex = orbitTypeRng.chance(0.5) ? 1 : 0;
-        }
+        const { isSType, hostStarIndex } = pickOrbitType({
+            rng: orbitTypeRng,
+            starCount,
+            sZoneValid,
+            pZoneValid,
+        });
 
         const zoneMin = isSType ? sMinDist : pMinDist;
         const zoneMax = isSType ? sMaxDist : pMaxDist;
@@ -242,16 +222,18 @@ export function generateProceduralPlanets(params: {
 
         // r_peri = distance × (1−e)/(1+e); clamp so periapsis clears all stars
         // and stays integrable (distance×0.3 floor caps e ≈ 0.54 max).
-        const minPeriapsis = plan.isSType
-            ? Math.max(starParams[plan.hostStarIndex]!.radius * 5, distance * 0.3)
-            : Math.max(
-                  maxStarRadius * 5,
-                  starPlacements[0]!.pos.length() + starParams[0]!.radius * 3,
-                  starCount > 1 ? starPlacements[1]!.pos.length() + starParams[1]!.radius * 3 : 0,
-                  binarySeparation * P_STABLE_MULTIPLE,
-                  distance * 0.3
-              );
-        const eMax = Math.max(0, (distance - minPeriapsis) / (distance + minPeriapsis));
+        const minPeriapsis = computeMinPeriapsis({
+            isSType: plan.isSType,
+            hostStarIndex: plan.hostStarIndex,
+            distance,
+            distanceFraction: 0.3,
+            starParams,
+            starPlacements,
+            maxStarRadius,
+            binarySeparation,
+            P_STABLE_MULTIPLE,
+        });
+        const eMax = computeMaxEccentricity(distance, minPeriapsis);
         const eccentricity = Math.min(orbitalRng.range(0, 0.6), eMax);
         const speed = calculateOrbitalSpeed(dependencies.getG(), distance, hostMass, eccentricity);
 

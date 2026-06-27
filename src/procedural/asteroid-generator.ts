@@ -12,6 +12,10 @@ import {
     applyInclinationX,
     applyYawY,
     buildUnitPositionDirection,
+    computeMaxEccentricity,
+    computeMinPeriapsis,
+    pickOrbitType,
+    sanitizeOrbitCreations,
     safeUnitCross,
 } from './orbital-math';
 import { rngFor } from './seed-utils';
@@ -62,22 +66,12 @@ export function generateProceduralAsteroids(params: {
         const asteroidParams = randomAsteroidParams({ seed: subSeed });
 
         const orbitTypeRng = rngFor(masterSeed, 'asteroidOrbitType', i);
-        let isSType: boolean;
-        let hostStarIndex = 0;
-
-        if (starCount === 1) {
-            isSType = false;
-        } else if (sZoneValid && pZoneValid) {
-            isSType = orbitTypeRng.chance(0.5);
-        } else if (sZoneValid) {
-            isSType = true;
-        } else {
-            isSType = false;
-        }
-
-        if (isSType) {
-            hostStarIndex = orbitTypeRng.chance(0.5) ? 1 : 0;
-        }
+        const { isSType, hostStarIndex } = pickOrbitType({
+            rng: orbitTypeRng,
+            starCount,
+            sZoneValid,
+            pZoneValid,
+        });
 
         const hostMass = isSType ? starParams[hostStarIndex]!.mass : totalStarMass;
         const hostPos = isSType ? starPlacements[hostStarIndex]!.pos : new THREE.Vector3(0, 0, 0);
@@ -112,16 +106,18 @@ export function generateProceduralAsteroids(params: {
 
         // r_peri = distance × (1−e)/(1+e); clamp so periapsis clears all stars
         // and stays integrable (distance×0.3 floor caps e ≈ 0.54 max).
-        const minPeriapsis = isSType
-            ? Math.max(starParams[hostStarIndex]!.radius * 5, distance * 0.3)
-            : Math.max(
-                  maxStarRadius * 5,
-                  starPlacements[0]!.pos.length() + starParams[0]!.radius * 3,
-                  starCount > 1 ? starPlacements[1]!.pos.length() + starParams[1]!.radius * 3 : 0,
-                  binarySeparation * P_STABLE_MULTIPLE,
-                  distance * 0.3
-              );
-        const eMax = Math.max(0, (distance - minPeriapsis) / (distance + minPeriapsis));
+        const minPeriapsis = computeMinPeriapsis({
+            isSType,
+            hostStarIndex,
+            distance,
+            distanceFraction: 0.3,
+            starParams,
+            starPlacements,
+            maxStarRadius,
+            binarySeparation,
+            P_STABLE_MULTIPLE,
+        });
+        const eMax = computeMaxEccentricity(distance, minPeriapsis);
 
         const eccRng = rngFor(masterSeed, 'asteroidEccentricity', i);
         // Asteroids have higher orbital eccentricities (0–0.4).
@@ -147,25 +143,7 @@ export function generateProceduralAsteroids(params: {
         });
     }
 
-    // Defensive finite check.
-    for (const c of creations) {
-        const ok =
-            Number.isFinite(c.pos.x) &&
-            Number.isFinite(c.pos.y) &&
-            Number.isFinite(c.pos.z) &&
-            Number.isFinite(c.vel.x) &&
-            Number.isFinite(c.vel.y) &&
-            Number.isFinite(c.vel.z) &&
-            Number.isFinite(c.radius) &&
-            Number.isFinite(c.mass);
-
-        if (!ok) {
-            c.pos.set(0, 0, 0);
-            c.vel.set(0, 0, 0);
-            c.radius = Math.max(0.05, c.radius);
-            c.mass = Math.max(1e-6, c.mass);
-        }
-    }
+    sanitizeOrbitCreations(creations, { minRadius: 0.05, minMass: 1e-6 });
 
     return creations;
 }
