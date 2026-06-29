@@ -11,6 +11,7 @@ import { generateBinaryPlacements } from './orbital-math';
 import type { Body } from '../bodies/body';
 import type { ISolarSystem, IStateDependencies } from '../interfaces';
 import { generateSeedString, pickRandomSpaceTexture, rngFor } from './seed-utils';
+import { ProceduralGenerationReporter } from './procedural-generation-progress';
 
 /**
  * Generates a black hole system: one procedurally-named black hole + 1–3 procedurally-named stars.
@@ -32,8 +33,8 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         console.info('[black-hole-system] using master seed:', this.masterSeed);
     }
 
-    async generateSolarSystemAsync(): Promise<ISolarSystem> {
-        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+    async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
+        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(() => {setTimeout(resolve, 1000);}, 0));
 
         const bodies: Body[] = [];
 
@@ -46,6 +47,9 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         const starCount = rngFor(this.masterSeed, 'starCount').rangeInt(1, 3);
         const sharedStarNameSeed = `${this.masterSeed}|star-name-base`;
         const gForce = this.dependencies.getG();
+
+        const totalBodies = 1 + starCount; // 1 black hole + number of stars
+        reporter?.setTotal(totalBodies);
 
         // --- Binary orbit: black hole + first star around shared barycentre ---
         const primaryStarParams = randomStarParams({ seed: `${this.masterSeed}|star:0` });
@@ -79,9 +83,19 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
             bhName,
             { tilt: 0, speed: 0 }
         );
+
         // Apply the binary orbit velocity to the black hole
         blackHole.velocity.copy(bhPlacement.vel);
         bodies.push(blackHole);
+
+        // Report completion of black hole creation
+        let completed = 0;
+        completed++;
+        reporter?.report({
+            completed: completed,
+            total: totalBodies,
+            workUnit: { phase: 'black-holes', label: 'Creating black hole' },
+        });
 
         await yieldToEventLoop();
 
@@ -117,6 +131,16 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
             }
         );
         bodies.push(primaryStar);
+
+        // Report completion of black hole creation
+        completed++;
+        reporter?.report({
+            completed: completed,
+            total: totalBodies,
+            workUnit: { phase: 'stars', label: 'Star 1 created' },
+        });
+
+        await yieldToEventLoop();
 
         // --- Additional stars (i ≥ 1): simple circular orbits around the barycentre (origin) ---
         for (let i = 1; i < starCount; i++) {
@@ -159,6 +183,16 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
             });
 
             bodies.push(star);
+
+            // Report completion of this star's creation
+            completed++;
+            reporter?.report({
+                completed: completed,
+                total: totalBodies,
+                workUnit: { phase: 'stars', label: `Star ${i + 1} created` },
+            });
+
+            await yieldToEventLoop();
         }
 
         // Pick a PRNG skydome texture based on the master seed

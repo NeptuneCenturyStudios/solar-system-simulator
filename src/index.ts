@@ -178,7 +178,7 @@ import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
 import { OptionsPanel } from './ui/options-panel';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
-import { IStateDependencies } from './interfaces';
+import { IProceduralGeneratorPromptResult, IStateDependencies } from './interfaces';
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
 import { UIManager } from './ui/ui-manager';
@@ -1827,13 +1827,10 @@ function cleanUpSolarSystem() {
  * @param param0 An object containing the mode and seed for the simulation spawn.
  * @returns
  */
-async function spawn({
+async function spawn(
     mode = SimulationStartMode.Default,
-    seed,
-}: {
-    mode?: SimulationStartMode;
-    seed?: string;
-} = {}) {
+    proceduralResult?: IProceduralGeneratorPromptResult
+) {
     applyEnvironmentDefaultsForMode(mode);
 
     cleanUpSolarSystem();
@@ -1844,13 +1841,13 @@ async function spawn({
     if (mode === SimulationStartMode.Default) {
         // Normal solar system generator
         generator = new NormalSolarSystemGenerator(dependencies, scene);
-    } else if (mode === SimulationStartMode.Procedural) {
+    } else if (mode === SimulationStartMode.Procedural && proceduralResult) {
         // Procedural system generator
-        generator = new ProceduralGenerator(dependencies, scene, seed);
+        generator = new ProceduralGenerator(dependencies, scene, proceduralResult?.seed);
         seedType = SEED_TYPE_NORMAL;
     } else if (mode === SimulationStartMode.BlackHole) {
         // Black hole system generator
-        generator = new BlackHoleSystemGenerator(dependencies, scene, seed);
+        generator = new BlackHoleSystemGenerator(dependencies, scene, proceduralResult?.seed);
         seedType = SEED_TYPE_BLACKHOLE;
     } else {
         // Empty system generator
@@ -1858,7 +1855,9 @@ async function spawn({
     }
 
     // Generate the solar system using the selected generator
-    const solarSystem = await generator.generateSolarSystemAsync();
+    const solarSystem = await generator.generateSolarSystemAsync(
+        proceduralResult?.progressReporter
+    );
 
     // Set the bodies
     simulationState.bodies = solarSystem.bodies;
@@ -6284,7 +6283,7 @@ startupModal.on('launchDefault', async () => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
-    await spawn({ mode: SimulationStartMode.Default });
+    await spawn(SimulationStartMode.Default);
     applyDefaultCameraTogglesAfterSpawn();
 });
 
@@ -6292,39 +6291,41 @@ startupModal.on('launchEmpty', async () => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
-    await spawn({ mode: SimulationStartMode.Empty });
+    await spawn(SimulationStartMode.Empty);
     applyDefaultCameraTogglesAfterSpawn();
 });
 
-startupModal.on('generateBlackHole', async ({ seed }: { seed: string }) => {
+startupModal.on('generateBlackHole', async (result: IProceduralGeneratorPromptResult) => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
-    proceduralModal.hide();
-    startupModal.hide();
 
-    await spawn({ mode: SimulationStartMode.BlackHole, seed });
+    startupModal.hide();
+    proceduralModal.showProgressUI();
+    await spawn(SimulationStartMode.BlackHole, result);
     applyDefaultCameraTogglesAfterSpawn();
+    proceduralModal.hide();
 });
 
-startupModal.on('generateProcedural', async ({ seed }: { seed: string }) => {
+startupModal.on('generateProcedural', async (result: IProceduralGeneratorPromptResult) => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
-    proceduralModal.hide();
-    startupModal.hide();
 
-    await spawn({ mode: SimulationStartMode.Procedural, seed });
+    startupModal.hide();
+    proceduralModal.showProgressUI();
+    await spawn(SimulationStartMode.Procedural, result);
     applyDefaultCameraTogglesAfterSpawn();
+    proceduralModal.hide();
 });
 
 startupModal.on('cancel', () => {
     startupModal.hide();
 });
 
-// Retry: user clicked Create on the seed form after a failed generation.
-proceduralModal.on('create', async ({ seed }: { seed: string }) => {
-    await spawn({ mode: SimulationStartMode.Procedural, seed });
-    applyDefaultCameraTogglesAfterSpawn();
-});
+// // Retry: user clicked Create on the seed form after a failed generation.
+// proceduralModal.on('create', async ({ seed }: { seed: string }) => {
+//     await spawn({ mode: SimulationStartMode.Procedural, seed });
+//     applyDefaultCameraTogglesAfterSpawn();
+// });
 
 // Retry cancel: user clicked Cancel on the seed form after a failed generation.
 proceduralModal.on('cancelFromRetry', () => {
@@ -6390,12 +6391,13 @@ window.addEventListener(
                 ? SimulationStartMode.BlackHole
                 : SimulationStartMode.Procedural;
 
-        // For procedural, make the modal overlay visible before spawn shows progress
-        if (mode === SimulationStartMode.Procedural && proceduralModal.element) {
-            proceduralModal.element.classList.add('visible');
-        }
+        proceduralModal.show();
+        const progressReporter = proceduralModal.showProgressUI();
 
-        await spawn({ mode, seed: urlSeed.seed });
+        await spawn(mode, {
+            seed: urlSeed.seed,
+            progressReporter: progressReporter,
+        });
         applyDefaultCameraTogglesAfterSpawn();
 
         proceduralModal.hide();
@@ -6421,7 +6423,7 @@ window.addEventListener('popstate', async () => {
             applyStartupGMultiplier();
             uiManager.managementPanel.hide();
             startupModal.hide();
-            await spawn({ mode: SimulationStartMode.Default });
+            await spawn(SimulationStartMode.Default);
             applyDefaultCameraTogglesAfterSpawn();
         }
         return;
@@ -6445,7 +6447,7 @@ window.addEventListener('popstate', async () => {
         proceduralModal.element.classList.add('visible');
     }
 
-    await spawn({ mode, seed: currentSeed.seed });
+    await spawn(mode, { seed: currentSeed.seed });
     applyDefaultCameraTogglesAfterSpawn();
 });
 

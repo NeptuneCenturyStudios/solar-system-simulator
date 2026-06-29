@@ -1,3 +1,8 @@
+import { IProceduralGeneratorPromptResult } from '../interfaces';
+import {
+    ProceduralGenerationProgress,
+    ProceduralGenerationReporter,
+} from '../procedural/procedural-generation-progress';
 import { Panel } from './panel';
 
 type ModalState = 'idle' | 'seed-entry' | 'generating' | 'retry';
@@ -28,8 +33,21 @@ export class ProceduralGeneratorModal extends Panel {
     private _promptResolve: ((value: { seed: string } | null) => void) | null = null;
     private _headerEl: HTMLElement | null = null;
 
+    private _progressReporter: ProceduralGenerationReporter;
+
     constructor() {
         super('procedural-overlay');
+
+        this._progressReporter = {
+            setTotal: (total: number) => {
+                console.log(`Total: ${total}`);
+                
+            },
+            report: (progress: ProceduralGenerationProgress) => {
+                console.log(`Progress: ${progress.completed}/${progress.total}`);
+                this.reportProgress(progress.completed, progress.total, progress.workUnit?.label);
+            },
+        };
     }
 
     initialize() {
@@ -107,13 +125,19 @@ export class ProceduralGeneratorModal extends Panel {
      * Safe to call while the modal is already visible (e.g. after a failed generation).
      * @param opts.title Optional header text override (restored after the promise resolves).
      */
-    prompt(opts: { title?: string } = {}): Promise<{ seed: string } | null> {
+    prompt(opts: { title?: string } = {}): Promise<IProceduralGeneratorPromptResult | null> {
         return new Promise((resolve) => {
             this._promptResolve = (value) => {
                 if (opts.title && this._headerEl) {
                     this._headerEl.textContent = 'Generate Procedural System';
                 }
-                resolve(value);
+
+                const returnValue: IProceduralGeneratorPromptResult = {
+                    seed: value?.seed ?? '',
+                    progressReporter: this._progressReporter,
+                };
+
+                resolve(returnValue);
             };
             if (opts.title && this._headerEl) {
                 this._headerEl.textContent = opts.title;
@@ -156,10 +180,20 @@ export class ProceduralGeneratorModal extends Panel {
         if (this._progressSectionEl) this._progressSectionEl.style.display = 'block';
         if (this._progressErrorEl) this._progressErrorEl.style.display = 'none';
         this._setProgressStatus('Generating...');
+
+        // While generating, disable the Cancel button to prevent interruption. It will be re-enabled once generation is complete.
         if (this._cancelBtn) {
-            this._cancelBtn.disabled = false;
+            this._cancelBtn.disabled = true;
             this._cancelBtn.style.pointerEvents = 'auto';
         }
+
+        // Also disable the Create button to prevent starting a new generation while one is in progress.
+        if (this._createBtn) {
+            this._createBtn.disabled = true;
+            this._createBtn.style.pointerEvents = 'auto';
+        }
+
+        return this._progressReporter;
     }
 
     /**
@@ -186,6 +220,7 @@ export class ProceduralGeneratorModal extends Panel {
     }
 
     reportProgress(completed: number, total: number, workUnitLabel?: string) {
+        console.log(`Progress: ${completed} / ${total}`);
         if (this._progressBarFillEl) {
             const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
             this._progressBarFillEl.style.width = `${pct}%`;

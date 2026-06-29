@@ -53,7 +53,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
     }
 
     async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
-        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(() => {setTimeout(resolve, 1000);}, 0));
 
         const inventory = generateSystemBodyInventory(this.prng);
 
@@ -158,6 +158,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         for (let i = 0; i < planetCreations.length; i++) {
             const creation = planetCreations[i]!;
 
+            completed++;
             reporter?.report({
                 completed,
                 total: totalBodies,

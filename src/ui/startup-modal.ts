@@ -110,7 +110,7 @@ export class StartupModal extends Panel {
                 if (result === null) {
                     this.open({ allowCancel: this._allowCancel });
                 } else {
-                    this.emit('generateBlackHole', { seed: result.seed });
+                    this.emit('generateBlackHole', result);
                 }
             };
         }
@@ -124,7 +124,7 @@ export class StartupModal extends Panel {
                 if (result === null) {
                     this.open({ allowCancel: this._allowCancel });
                 } else {
-                    this.emit('generateProcedural', { seed: result.seed });
+                    this.emit('generateProcedural', result);
                 }
             };
         }
