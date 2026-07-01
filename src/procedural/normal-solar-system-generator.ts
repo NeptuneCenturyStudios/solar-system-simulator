@@ -68,7 +68,6 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     }
 
     async generateSolarSystemAsync(): Promise<ISolarSystem> {
-        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
    
         const bodies: Body[] = [];
 
@@ -78,21 +77,21 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         // Sun (static at origin)
         const sun = new Sun(this.dependencies, this.scene);
         bodies.push(sun);
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Mercury
         bodies.push(new Mercury(this.dependencies, this.scene, randomAngle()));
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Venus
         bodies.push(new Venus(this.dependencies, this.scene, randomAngle()));
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Earth (+ Moon)
         const earthAngle = randomAngle();
         const earth = new Earth(this.dependencies, this.scene, earthAngle);
         bodies.push(earth);
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Moon gets its own random angle around Earth
         bodies.push(
@@ -111,7 +110,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: randomAngle(),
             })
         );
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Satellite (ISS) — random angle around Earth
         bodies.push(
@@ -129,15 +128,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: randomAngle(),
             })
         );
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Mars
         bodies.push(new Mars(this.dependencies, this.scene, randomAngle()));
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
         // Ceres (~2.77 AU)
         const ceresAngle = randomAngle();
         bodies.push(new Ceres(this.dependencies, this.scene, ceresAngle));
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Vesta (~2.36 AU) — already had random angle, but now uses the helper for consistency
         const vestaAngle = randomAngle();
@@ -160,7 +159,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             roughness: 0.9,
         });
         bodies.push(vesta);
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Pallas (~2.77 AU)
         const pallasAngle = randomAngle();
@@ -183,7 +182,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             roughness: 0.9,
         });
         bodies.push(pallas);
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Hygiea (~3.14 AU)
         const hygieaAngle = randomAngle();
@@ -206,13 +205,13 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             roughness: 0.9,
         });
         bodies.push(hygiea);
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Jupiter (+ 4 Galilean moons)
         const jupiterAngle = randomAngle();
         const jupiter = new Jupiter(this.dependencies, this.scene, jupiterAngle);
         bodies.push(jupiter);
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Jovian moons each get their own random angle around Jupiter
         bodies.push(
@@ -232,7 +231,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: ioTexture,
             })
         );
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         bodies.push(
             createMoon(jupiter, this.scene, {
@@ -251,7 +250,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: europaTexture,
             })
         );
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         bodies.push(
             createMoon(jupiter, this.scene, {
@@ -270,7 +269,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: ganymedeTexture,
             })
         );
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         bodies.push(
             createMoon(jupiter, this.scene, {
@@ -289,27 +288,27 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: callistoTexture,
             })
         );
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Saturn
         bodies.push(new Saturn(this.dependencies, this.scene, randomAngle()));
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Uranus
         bodies.push(new Uranus(this.dependencies, this.scene, randomAngle()));
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Neptune
         bodies.push(new Neptune(this.dependencies, this.scene, randomAngle()));
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Pluto
         bodies.push(new Pluto(this.dependencies, this.scene, randomAngle()));
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Comet (Halley) — random orbital angle preserves elliptical orbit shape
         bodies.push(new Halley(this.dependencies, this.scene, randomAngle()));
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Use default space texture
         const spaceTexture = spaceTextures[0];

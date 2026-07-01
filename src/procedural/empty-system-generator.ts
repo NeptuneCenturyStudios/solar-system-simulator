@@ -23,11 +23,10 @@ export class EmptySystemGenerator extends SolarSystemGenerator {
     }
 
     async generateSolarSystemAsync(): Promise<ISolarSystem> {
-        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
         const bodies: Body[] = [];
 
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // Pick a PRNG skydome texture based on the master seed
         const skydomeTexture = pickRandomSpaceTexture(this.masterSeed);

@@ -34,7 +34,6 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
     }
 
     async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
-        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(() => {setTimeout(resolve, 1000);}, 0));
 
         const bodies: Body[] = [];
 
@@ -97,7 +96,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
             workUnit: { phase: 'black-holes', label: 'Creating black hole' },
         });
 
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         const primaryStarNameOptions =
             starCount > 1
@@ -140,7 +139,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
             workUnit: { phase: 'stars', label: 'Star 1 created' },
         });
 
-        await yieldToEventLoop();
+        await this.yieldToEventLoop();
 
         // --- Additional stars (i ≥ 1): simple circular orbits around the barycentre (origin) ---
         for (let i = 1; i < starCount; i++) {
@@ -192,7 +191,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
                 workUnit: { phase: 'stars', label: `Star ${i + 1} created` },
             });
 
-            await yieldToEventLoop();
+            await this.yieldToEventLoop();
         }
 
         // Pick a PRNG skydome texture based on the master seed
