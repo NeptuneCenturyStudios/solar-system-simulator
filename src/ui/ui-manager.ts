@@ -2,6 +2,7 @@ import { FlightControlsPanel } from './flight-controls-panel';
 import { MainPanel } from './main-panel';
 import { ManagementPanel } from './management-panel';
 import { Panel } from './panel';
+import { PlaylistPanel } from './playlist-panel';
 
 export class UIManager extends Panel {
     toolbarBottom: HTMLElement | null = null;
@@ -19,12 +20,14 @@ export class UIManager extends Panel {
     btnDonate: HTMLButtonElement | null = null;
     btnEditSolarSystem: HTMLButtonElement | null = null;
     btnFlightControls: HTMLButtonElement | null = null;
+    btnPlaylist: HTMLButtonElement | null = null;
     btnReset: HTMLButtonElement | null = null;
 
     // Panels
     mainPanel: MainPanel;
     flightControlsPanel: FlightControlsPanel;
     managementPanel: ManagementPanel;
+    playlistPanel: PlaylistPanel;
 
     // State variables
     timeScale: number = 1;
@@ -36,10 +39,12 @@ export class UIManager extends Panel {
         this.flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
         this.managementPanel = new ManagementPanel('management-panel');
         this.mainPanel = new MainPanel('system-explorer');
+        this.playlistPanel = new PlaylistPanel('playlist-panel');
 
         this.flightControlsPanel.initialize();
         this.managementPanel.initialize();
         this.mainPanel.initialize();
+        this.playlistPanel.initialize();
     }
 
     initialize(): void {
@@ -61,6 +66,7 @@ export class UIManager extends Panel {
             'btn-edit-solar-system'
         ) as HTMLButtonElement;
         this.btnFlightControls = document.getElementById('flightControlsBtn') as HTMLButtonElement;
+        this.btnPlaylist = document.getElementById('btn-playlist') as HTMLButtonElement;
         this.btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
 
         // Block events on UI elements to prevent them from affecting the 3D scene
@@ -154,6 +160,18 @@ export class UIManager extends Panel {
             };
         }
 
+        if (this.btnPlaylist) {
+            this.btnPlaylist.onclick = () => {
+                const visible = this.playlistPanel.toggle();
+                if (visible) {
+                    this.btnPlaylist?.classList.add('active');
+                    this.emit('playlistOpened');
+                } else {
+                    this.btnPlaylist?.classList.remove('active');
+                }
+            };
+        }
+
         // Listen to panel events to update button states
         this.mainPanel.on('closed', () => {
             this.btnOpenExplorer?.classList.remove('active');
@@ -165,6 +183,10 @@ export class UIManager extends Panel {
 
         this.flightControlsPanel.on('closed', () => {
             this.btnFlightControls?.classList.remove('active');
+        });
+
+        this.playlistPanel.on('closed', () => {
+            this.btnPlaylist?.classList.remove('active');
         });
     }
 

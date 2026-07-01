@@ -5280,6 +5280,43 @@ optionsPanel.on('musicVolumeChange', ({ value }: { value: number }) => {
     ambientMusic.setVolume(value);
 });
 
+// ── Playlist panel wiring ────────────────────────────────────────────────
+
+ambientMusic.onTrackChange = (index: number) => {
+    uiManager.playlistPanel.setCurrentTrack(index);
+    uiManager.playlistPanel.setPlayingState(true);
+};
+
+uiManager.on('playlistOpened', () => {
+    uiManager.playlistPanel.setPlaylist(
+        ambientMusic.getShuffledPlaylist(),
+        ambientMusic.getCurrentTrackIndex()
+    );
+    uiManager.playlistPanel.setPlayingState(!ambientMusic.isPaused);
+});
+
+uiManager.playlistPanel.on('prev', () => {
+    ambientMusic.skipToPrev();
+});
+
+uiManager.playlistPanel.on('next', () => {
+    ambientMusic.skipToNext();
+});
+
+uiManager.playlistPanel.on('playPause', () => {
+    if (ambientMusic.isPaused) {
+        ambientMusic.resume();
+        uiManager.playlistPanel.setPlayingState(true);
+    } else {
+        ambientMusic.pause();
+        uiManager.playlistPanel.setPlayingState(false);
+    }
+});
+
+uiManager.playlistPanel.on('trackSelected', (index: number) => {
+    ambientMusic.playTrackAt(index);
+});
+
 uiManager.on('timeScaleChange', ({ value }: { value: number }) => {
     const newSpeed = value;
     const direction = newSpeed < 0 ? ' REVERSE' : '';

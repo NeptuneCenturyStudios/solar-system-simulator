@@ -17,13 +17,14 @@
  */
 
 import { settingsStore } from "../settings/settings-store";
+import { createPlaylistEntry, PLAYLIST_FILENAMES, type PlaylistEntry } from "./playlist";
 
 const FADE_DURATION = 1.5; // seconds
 const DELAY_MIN = 60; // seconds
 const DELAY_MAX = 180; // seconds
 const VOLUME = 1; // base internal volume level
 
-type ManagerState = 'idle' | 'fading-out' | 'playing' | 'delaying';
+type ManagerState = 'idle' | 'fading-out' | 'playing' | 'delaying' | 'paused';
 
 export class AmbientSoundManager {
     private ctx: AudioContext | null = null;
@@ -38,8 +39,12 @@ export class AmbientSoundManager {
     private delayTimer: ReturnType<typeof setTimeout> | null = null;
     /** True once init() has been called. */
     private initialized = false;
-    /** Array of track URLs, initialized once. */
-    private playlist: string[] = [];
+    /** Whether playback is currently paused by the user. */
+    isPaused = false;
+    /** Called whenever a new track starts playing, with the track's index in the shuffled playlist. */
+    onTrackChange: ((index: number) => void) | null = null;
+    /** Array of track entries (shuffled at init), initialized once. */
+    private playlist: PlaylistEntry[] = [];
 
     // ── Public API ──────────────────────────────────────────────────────────
 
@@ -111,6 +116,104 @@ export class AmbientSoundManager {
         this.gainNode.gain.setValueAtTime(VOLUME * clamped, now);
     }
 
+    /**
+     * Pause the current track with a fade-out. No-op if already paused or not playing.
+     */
+    pause(): void {
+        if (this.state !== 'playing' || !this.ctx || !this.gainNode || !this.currentAudio) return;
+        const now = this.ctx.currentTime;
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
+        this.gainNode.gain.linearRampToValueAtTime(0, now + FADE_DURATION);
+        const audio = this.currentAudio;
+        setTimeout(() => {
+            audio.pause();
+        }, FADE_DURATION * 1000);
+        this.state = 'paused';
+        this.isPaused = true;
+    }
+
+    /**
+     * Resume the current track with a fade-in. No-op if not paused.
+     */
+    resume(): void {
+        if (this.state !== 'paused' || !this.ctx || !this.gainNode || !this.currentAudio) return;
+        const audio = this.currentAudio;
+        audio.play().catch((err) => {
+            console.error('Failed to resume audio track:', err);
+        });
+        const now = this.ctx.currentTime;
+        const targetGain = VOLUME * settingsStore.settings.musicVolume;
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(0, now);
+        this.gainNode.gain.linearRampToValueAtTime(targetGain, now + FADE_DURATION);
+        this.state = 'playing';
+        this.isPaused = false;
+    }
+
+    /**
+     * Skip to the next track immediately, cancelling any inter-track delay.
+     */
+    skipToNext(): void {
+        if (!this.initialized) return;
+        if (this.delayTimer) {
+            clearTimeout(this.delayTimer);
+            this.delayTimer = null;
+        }
+        this.isPaused = false;
+        this.stopCurrentAudio();
+        this.state = 'idle';
+        this.playNextTrack();
+    }
+
+    /**
+     * Skip to the previous track (wrapping around to the end), cancelling any delay.
+     */
+    skipToPrev(): void {
+        if (!this.initialized) return;
+        if (this.delayTimer) {
+            clearTimeout(this.delayTimer);
+            this.delayTimer = null;
+        }
+        this.isPaused = false;
+        this.stopCurrentAudio();
+        this.state = 'idle';
+        // Step back two so that pickTrackIndex() (+1) lands on the previous track
+        this.currentTrackIndex = this.currentTrackIndex - 2;
+        if (this.currentTrackIndex < -1) {
+            this.currentTrackIndex = this.playlist.length - 2;
+        }
+        this.playNextTrack();
+    }
+
+    /**
+     * Immediately play the track at the given index in the shuffled playlist.
+     * Subsequent tracks will play in sequential order from that position.
+     */
+    playTrackAt(index: number): void {
+        if (!this.initialized || index < 0 || index >= this.playlist.length) return;
+        if (this.delayTimer) {
+            clearTimeout(this.delayTimer);
+            this.delayTimer = null;
+        }
+        this.isPaused = false;
+        this.stopCurrentAudio();
+        this.state = 'idle';
+        // Set index one behind so pickTrackIndex() returns the requested index
+        this.currentTrackIndex = index - 1;
+        this.playNextTrack();
+    }
+
+    /** Returns a shallow copy of the shuffled playlist. Only valid after init(). */
+    getShuffledPlaylist(): PlaylistEntry[] {
+        return [...this.playlist];
+    }
+
+    /** Returns the index of the currently playing/paused track, or -1 if none. */
+    getCurrentTrackIndex(): number {
+        return this.currentTrackIndex;
+    }
+
     /** Clean up all resources. */
     dispose(): void {
         if (this.delayTimer) clearTimeout(this.delayTimer);
@@ -124,60 +227,14 @@ export class AmbientSoundManager {
 
     // ── Internal helpers ────────────────────────────────────────────────────
 
-    private buildTrackUrl(filename: string): string {
-        const base = new URL('../assets/sounds/music/', import.meta.url).href;
-        return `${base}/${filename}`;
-    }
-
     private initializePlaylist(): void {
         if (!this.initialized) return;
         this.setupAudioContext();
 
-        // Initialize the playlist with track URLs
-        const tempList = [];
+        // Build PlaylistEntry objects from the raw filename list
+        const tempList: PlaylistEntry[] = PLAYLIST_FILENAMES.map(createPlaylistEntry);
 
-        tempList.push(this.buildTrackUrl('alex-morgan-underwater-dreamscape-537486.mp3'));
-        tempList.push(this.buildTrackUrl('cfl_turningpages-submerged-pulse-523340.mp3'));
-        tempList.push(this.buildTrackUrl('delosound-space-ambient-cinematic-442834.mp3'));
-        tempList.push(this.buildTrackUrl('freemusicforvideo-space-ambient-495614.mp3'));
-        tempList.push(this.buildTrackUrl('leberch-space-440026.mp3'));
-        tempList.push(this.buildTrackUrl('leberch-space-ambient-509783.mp3'));
-        tempList.push(this.buildTrackUrl('monume-space-ambient-498030.mp3'));
-        tempList.push(
-            this.buildTrackUrl('shadowsandechoes-deep-quest-dark-driving-tension-394142.mp3')
-        );
-        tempList.push(this.buildTrackUrl('sigmamusicart-tension-background-music-460023.mp3'));
-        tempList.push(this.buildTrackUrl('slimeyfox-hydrostatic-drones-479105.mp3'));
-        tempList.push(this.buildTrackUrl('the_mountain-spaceship-155569.mp3'));
-        tempList.push(this.buildTrackUrl('universfield-haunting-music-box-289437.mp3'));
-        tempList.push(this.buildTrackUrl('audiocoffee-dark-space-148895.mp3'));
-        tempList.push(
-            this.buildTrackUrl(
-                'nickpanekaiassets-drones-of-dread-dark-cinematic-industrial-ambient-497226.mp3'
-            )
-        );
-        tempList.push(this.buildTrackUrl('vjgalaxy-melodic-techno-09-513318.mp3'));
-        tempList.push(this.buildTrackUrl('slimeyfox-hyperwoofer-tremormorph-541638.mp3'));
-        tempList.push(
-            this.buildTrackUrl('pwlpl-progressive-techno-cinematic-tension-arc-543153.mp3')
-        );
-        tempList.push(this.buildTrackUrl('absolutesound-cinematic-guitar-adventure-505779.mp3'));
-        tempList.push(this.buildTrackUrl('leberch-mysterious-cinematic-255712.mp3'));
-        tempList.push(this.buildTrackUrl('cfl_turningpages-vast-hollow-tidal-533251.mp3'));
-        tempList.push(this.buildTrackUrl('universfield-ambient-space-background-350710.mp3'));
-        tempList.push(this.buildTrackUrl('cfl_turningpages-minimalist-pulse-2-529872.mp3'));
-        tempList.push(this.buildTrackUrl('databend-dark-electronic-pulse-background-546935.mp3'));
-        tempList.push(this.buildTrackUrl('leberch-atmosphere-pulse-263075.mp3'));
-        tempList.push(this.buildTrackUrl('joyinsound-drone-perspectives-399304.mp3'));
-        tempList.push(this.buildTrackUrl('fabienroch-nebulous-173888.mp3'));
-        tempList.push(this.buildTrackUrl('kaazoom-tension-20224.mp3'));
-        tempList.push(this.buildTrackUrl('romansenykmusic-drone-cinematic-mysterious-144210.mp3'));
-        tempList.push(this.buildTrackUrl('sergepavkinmusic-endless-space-149636.mp3'));
-        tempList.push(this.buildTrackUrl('sergepavkinmusic-outer-space-188045.mp3'));
-        tempList.push(this.buildTrackUrl('universfield-starlight-harmonies-185900.mp3'));
-
-        // Randomize the playlist order so that the tracks play in a different sequence each time,
-        // providing a varied listening experience and only repeating tracks after all have been played once.
+        // Fisher-Yates shuffle so the order differs each session
         for (let i = tempList.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [tempList[i], tempList[j]] = [tempList[j], tempList[i]];
@@ -210,11 +267,10 @@ export class AmbientSoundManager {
     }
 
     /**
-     * Build the full URL for a given track index.
+     * Return the URL of the track at the given index in the shuffled playlist.
      */
     private trackUrl(index: number): string {
-        // Return the URL of the track at the given index from the playlist.
-        return this.playlist[index];
+        return this.playlist[index].url;
     }
 
     /**
@@ -252,6 +308,10 @@ export class AmbientSoundManager {
         this.gainNode.gain.linearRampToValueAtTime(targetGain, now + FADE_DURATION);
 
         this.state = 'playing';
+        this.isPaused = false;
+
+        // Notify listeners that a new track has started
+        this.onTrackChange?.(index);
 
         // When the track ends naturally, start the inter-track delay
         audio.addEventListener('ended', () => {
