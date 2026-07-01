@@ -53,7 +53,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
     }
 
     async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
-        const yieldToEventLoop = async () => new Promise<void>((resolve) => setTimeout(() => {setTimeout(resolve, 1000);}, 0));
+        
 
         const inventory = generateSystemBodyInventory(this.prng);
 
@@ -150,23 +150,13 @@ export class ProceduralGenerator extends SolarSystemGenerator {
 
             completed++;
             report({ phase: 'stars', label: `Stars: ${completed}/${totalBodies}` });
-            await yieldToEventLoop();
+            await this.yieldToEventLoop();
         }
 
         // Planets (instant — JPG textures)
         const planetBodies: Body[] = [];
         for (let i = 0; i < planetCreations.length; i++) {
             const creation = planetCreations[i]!;
-
-            completed++;
-            reporter?.report({
-                completed,
-                total: totalBodies,
-                workUnit: {
-                    phase: 'planets',
-                    label: `Planet ${i + 1}/${planetCreations.length}…`,
-                },
-            });
 
             const planetBody = createPlanetBodyFromProceduralCreation(
                 this.dependencies,
@@ -189,7 +179,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                     label: `Planet ${i + 1}/${planetCreations.length} ✓`,
                 },
             });
-            await yieldToEventLoop();
+            await this.yieldToEventLoop();
         }
 
         // Moons
@@ -219,7 +209,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 workUnit: { phase: 'moons', label: `Moon: ${i + 1}/${moonCreations.length} ✓` },
             });
 
-            await yieldToEventLoop();
+            await this.yieldToEventLoop();
         }
 
         // Asteroids
@@ -242,7 +232,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 },
             });
 
-            await yieldToEventLoop();
+            await this.yieldToEventLoop();
         }
 
         // Black Holes
@@ -265,7 +255,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 },
             });
 
-            await yieldToEventLoop();
+            await this.yieldToEventLoop();
         }
 
         // Comets
@@ -285,7 +275,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 workUnit: { phase: 'comets', label: `Comet: ${i + 1}/${cometCreations.length} ✓` },
             });
 
-            await yieldToEventLoop();
+            await this.yieldToEventLoop();
         }
 
         // Pick a PRNG skydome texture based on the master seed
