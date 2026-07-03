@@ -3,6 +3,7 @@ import { createTextTexture } from '../drawing/text-texture.js';
 import { BodyTypeEnum } from './body-enums.js';
 import { HP_MASS_MULTIPLIER } from '../utilities/consts.js';
 import { playWeaponImpact } from '../utilities/audio.js';
+import { IDeathOptions } from '../interfaces.js';
 
 /**
  * This class represents the basic body that has gravitational properties, update, and die methods.
@@ -165,7 +166,7 @@ export class Body {
         this.mass = mass;
     }
 
-    die() {
+    die(deathOptions?: IDeathOptions) {
         if (this._isDisposed) return;
 
         this._isDisposed = true;
@@ -195,7 +196,9 @@ export class Body {
             // Remove the mesh from the scene
             this.scene.remove(this.mesh);
 
-            playWeaponImpact();
+            if (!deathOptions || !deathOptions.skipImpactSound) {
+                playWeaponImpact();
+            }
         }
 
         try {

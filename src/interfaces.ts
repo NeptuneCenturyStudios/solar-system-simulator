@@ -336,6 +336,18 @@ export interface ISpaceBackground {
     filename: string;
 }
 
+/**
+ * Represents the result of a procedural generator prompt, including the seed used for generation.
+ */
 export interface IProceduralGeneratorPromptResult {
     seed: string;
 }
+
+/**
+ * Represents the options that can be specified when a body dies, such as whether to play the weapon impact sound effect.
+ */
+export interface IDeathOptions {
+    skipImpactSound?: boolean;
+    skipExplosion?: boolean;
+}
+

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyTypeEnum } from './body-enums.js';
 import { CelestialBody } from './celestial-body';
-import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces.js';
+import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces.js';
 import { settingsStore } from '../settings/settings-store.js';
 
 
@@ -350,9 +350,9 @@ float alpha = vLife * strength;`
         this.tailMat.size = particleWorldSize;
     }
 
-    die(skipEffects = false) {
+    die(deathOptions?: IDeathOptions) {
         this.disposeTail();
-        super.die(skipEffects);
+        super.die(deathOptions);
     }
 
     disposeTail() {

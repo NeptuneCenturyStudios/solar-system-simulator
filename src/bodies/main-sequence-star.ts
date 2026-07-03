@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Star, IStarCreationOptions } from './star';
-import { IStateDependencies } from '../interfaces';
+import { IDeathOptions, IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { loadSrgbTexture } from '../drawing/textures';
 import { createUniqueId } from '../utilities/utilities';
@@ -198,7 +198,7 @@ export class MainSequenceStar extends Star {
         this._syncBaselineRadiusIfStable();
     }
 
-    override die(skipExplosion = false) {
+    override die(deathOptions?: IDeathOptions) {
         try {
             if (this.sunGlow) {
                 this.sunGlow.dispose();
@@ -225,7 +225,7 @@ export class MainSequenceStar extends Star {
         } catch {
             // ignore
         }
-        super.die(skipExplosion);
+        super.die(deathOptions);
     }
 
     override setTemperature(temp: number) {
@@ -382,7 +382,7 @@ export class MainSequenceStar extends Star {
                 console.error('Error creating pulsar:', e);
             }
 
-            this.die(true);
+            this.die({ skipExplosion: true });
         } else if (this.initialMass >= MIN_BLACK_HOLE_MASS) {
             try {
                 const blackHoleMass = this.mass * 0.9999;
@@ -411,7 +411,7 @@ export class MainSequenceStar extends Star {
                 console.error('Error creating black hole:', e);
             }
 
-            this.die(true);
+            this.die({ skipExplosion: true });
         } else {
             try {
                 const newWhiteDwarf = new WhiteDwarf(
@@ -451,7 +451,7 @@ export class MainSequenceStar extends Star {
                 console.error('Error creating planetary nebula:', e);
             }
 
-            this.die(true);
+            this.die({ skipExplosion: true });
         }
     }
 

@@ -1774,11 +1774,11 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
  */
 function cleanUpSolarSystem() {
     // Unified cleanup: always dispose existing bodies (stars included).
-    // No special-casing is required here; Star.die(true) is already the canonical disposal path.
+    // No special-casing is required here; Star.die({ skipExplosion: true }) is already the canonical disposal path.
     for (const b of simulationState.bodies || []) {
         if (!b || b._isDisposed) continue;
         try {
-            b.die();
+            b.die({ skipExplosion: true, skipImpactSound: true });
         } catch (e) {
             console.error('Error disposing body during spawn loop:', e);
         }
@@ -6127,9 +6127,6 @@ window.addEventListener('resize', () => {
         flightHUD.hintSprite.position.set(0, window.innerHeight / 2 - 55, TEXT_SPRITE_Z);
     }
 
-    // Reposition event log
-
-    warpEffect.resize(window.innerWidth, window.innerHeight);
     lensingEffect.resize(window.innerWidth, window.innerHeight);
 });
 

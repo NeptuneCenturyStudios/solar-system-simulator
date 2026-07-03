@@ -9,7 +9,7 @@ import {
 import { isBodyType } from '../utilities/utilities';
 import { CelestialBody } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
-import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces';
+import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from './body-enums';
 
 /**
@@ -335,7 +335,7 @@ export class Star extends CelestialBody {
     //     }
     // }
 
-    die(skipExplosion = false) {
+    die(deathOptions?: IDeathOptions) {
         if (this._isDisposed) return;
 
         try {
@@ -393,7 +393,7 @@ export class Star extends CelestialBody {
             // ignore
         }
 
-        if (!skipExplosion) {
+        if (!deathOptions?.skipExplosion) {
             try {
                 triggerScreenFlash();
             } catch {
@@ -401,6 +401,6 @@ export class Star extends CelestialBody {
             }
         }
 
-        super.die(true);
+        super.die(deathOptions);
     }
 }

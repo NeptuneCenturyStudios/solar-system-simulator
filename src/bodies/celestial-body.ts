@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Body } from './body';
-import { IAtmosphereOptions, IRotation } from '../interfaces';
+import { IAtmosphereOptions, IDeathOptions, IRotation } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
 import { triggerScreenFlash } from '../effects/screen-flash';
@@ -214,10 +214,10 @@ export class CelestialBody extends Body {
         }
     }
 
-    die(skipExplosion = false) {
+    die(deathOptions?: IDeathOptions) {
         if (this._isDisposed) return;
 
-        super.die();
+        super.die(deathOptions);
 
         if (typeof this.dependencies.addEvent !== 'undefined') {
             this.dependencies.addEvent({
@@ -226,7 +226,7 @@ export class CelestialBody extends Body {
             });
         }
 
-        if (!skipExplosion) {
+        if (!deathOptions || !deathOptions.skipExplosion) {
             try {
                 const exp = new ParticleExplosion(
                     this.dependencies,

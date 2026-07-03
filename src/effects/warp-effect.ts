@@ -275,12 +275,6 @@ export class WarpEffect {
         this._applyOpacity();
     }
 
-    /** No-op — kept for call-site compatibility with the previous 2-D version. */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    resize(_width: number, _height: number): void {
-        /* no-op */
-    }
-
     private _applyOpacity(): void {
         const final = this.speedOpacity * this.distanceFade;
         this.mat.opacity = final;

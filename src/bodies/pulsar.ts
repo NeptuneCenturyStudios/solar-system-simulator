@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Star, IStarCreationOptions } from './star';
-import { IStateDependencies, ISiphonTarget, IMassTransferBody } from '../interfaces';
+import { IStateDependencies, ISiphonTarget, IMassTransferBody, IDeathOptions } from '../interfaces';
 import { loadSrgbTexture } from '../drawing/textures';
 import { IRotation } from '../interfaces';
 import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, DIST_SCALE } from '../utilities/consts';
@@ -324,7 +324,7 @@ export class Pulsar extends Star implements IMassTransferBody {
         }
     }
 
-    override die(skipExplosion = false): void {
+    override die(deathOptions?: IDeathOptions): void {
         try {
             this.beam?.dispose();
         } catch {
@@ -353,6 +353,6 @@ export class Pulsar extends Star implements IMassTransferBody {
             }
         }
         this.siphonEffects.clear();
-        super.die(skipExplosion);
+        super.die(deathOptions);
     }
 }

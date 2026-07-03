@@ -402,6 +402,6 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
         this.siphonEffects.clear();
 
         // Call parent die (no explosion for black hole)
-        super.die(true);
+        super.die({ skipExplosion: true });
     }
 }

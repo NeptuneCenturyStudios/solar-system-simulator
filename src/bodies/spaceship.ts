@@ -7,6 +7,7 @@ import { IShipEffect } from '../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
 import { WarpSoundController, playWarpLoop } from '../utilities/audio.js';
+import { IDeathOptions } from '../interfaces';
 //import { ShipFlame } from '../ship-effects/ship-flame.js';
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
@@ -156,11 +157,11 @@ export class Spaceship extends Body {
     /**
      * Override die() to clean up the warp sound controller.
      */
-    die(): void {
+    die(deathOptions?: IDeathOptions): void {
         if (this._warpSound) {
             this._warpSound.dispose();
             this._warpSound = null;
         }
-        super.die();
+        super.die(deathOptions);
     }
 }
