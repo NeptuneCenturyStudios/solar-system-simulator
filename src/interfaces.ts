@@ -11,7 +11,6 @@ import { ITidalLockOptions } from './bodies/celestial-body';
 import { EffectiveGForce } from './types';
 import { Spaceship } from './bodies/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
-import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
 
 /**
  * Options for configuring an atmosphere on a celestial body, including its radius and tint color.
@@ -339,5 +338,4 @@ export interface ISpaceBackground {
 
 export interface IProceduralGeneratorPromptResult {
     seed: string;
-    progressReporter?: ProceduralGenerationReporter;
 }

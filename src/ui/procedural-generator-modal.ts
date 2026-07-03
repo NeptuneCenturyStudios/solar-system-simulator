@@ -134,7 +134,6 @@ export class ProceduralGeneratorModal extends Panel {
 
                 const returnValue: IProceduralGeneratorPromptResult = {
                     seed: value?.seed ?? '',
-                    progressReporter: this._progressReporter,
                 };
 
                 resolve(returnValue);

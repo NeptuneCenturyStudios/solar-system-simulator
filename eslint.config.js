@@ -10,14 +10,14 @@ export default tseslint.config(
         files: ['**/*.{js,mjs,cjs,ts,mts,cts}'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended, eslintConfigPrettier],
         rules: {
-            // "@typescript-eslint/no-unused-vars": [
-            //   "error",
-            //   {
-            //     argsIgnorePattern: "^_",
-            //     varsIgnorePattern: "^_",
-            //     caughtErrorsIgnorePattern: "^_"
-            //   }
-            // ],
+            "@typescript-eslint/no-unused-vars": [
+              "error",
+              {
+                argsIgnorePattern: "^_",
+                varsIgnorePattern: "^_",
+                caughtErrorsIgnorePattern: "^_"
+              }
+            ],
             // "no-unused-vars": "off",
             // "no-undef": "off",
             // "no-case-declarations": "off",

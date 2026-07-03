@@ -254,6 +254,7 @@ import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { EmptySystemGenerator } from './procedural/empty-system-generator';
 import { settingsStore } from './settings/settings-store';
 import { pickMoonTextureForMoonType } from './procedural/moon-factory';
+import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
 
 // ── URL seed parameter helpers ──────────────────────────────────────────────
 const SEED_TYPE_NORMAL = 'normal';
@@ -1829,7 +1830,8 @@ function cleanUpSolarSystem() {
  */
 async function spawn(
     mode = SimulationStartMode.Default,
-    proceduralResult?: IProceduralGeneratorPromptResult
+    proceduralResult?: IProceduralGeneratorPromptResult,
+    progressReporter?: ProceduralGenerationReporter
 ) {
     applyEnvironmentDefaultsForMode(mode);
 
@@ -1855,9 +1857,7 @@ async function spawn(
     }
 
     // Generate the solar system using the selected generator
-    const solarSystem = await generator.generateSolarSystemAsync(
-        proceduralResult?.progressReporter
-    );
+    const solarSystem = await generator.generateSolarSystemAsync(progressReporter);
 
     // Set the bodies
     simulationState.bodies = solarSystem.bodies;
@@ -6337,8 +6337,8 @@ startupModal.on('generateBlackHole', async (result: IProceduralGeneratorPromptRe
     uiManager.managementPanel.hide();
 
     startupModal.hide();
-    proceduralModal.showProgressUI();
-    await spawn(SimulationStartMode.BlackHole, result);
+    const progressReporter =proceduralModal.showProgressUI();
+    await spawn(SimulationStartMode.BlackHole, result, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
     proceduralModal.hide();
 });
@@ -6348,8 +6348,8 @@ startupModal.on('generateProcedural', async (result: IProceduralGeneratorPromptR
     uiManager.managementPanel.hide();
 
     startupModal.hide();
-    proceduralModal.showProgressUI();
-    await spawn(SimulationStartMode.Procedural, result);
+    const progressReporter = proceduralModal.showProgressUI();
+    await spawn(SimulationStartMode.Procedural, result, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
     proceduralModal.hide();
 });
@@ -6431,10 +6431,13 @@ window.addEventListener(
         proceduralModal.show();
         const progressReporter = proceduralModal.showProgressUI();
 
-        await spawn(mode, {
-            seed: urlSeed.seed,
-            progressReporter: progressReporter,
-        });
+        await spawn(
+            mode,
+            {
+                seed: urlSeed.seed,
+            },
+            progressReporter
+        );
         applyDefaultCameraTogglesAfterSpawn();
 
         proceduralModal.hide();
@@ -6480,11 +6483,10 @@ window.addEventListener('popstate', async () => {
             ? SimulationStartMode.BlackHole
             : SimulationStartMode.Procedural;
 
-    if (mode === SimulationStartMode.Procedural && proceduralModal.element) {
-        proceduralModal.element.classList.add('visible');
-    }
+    proceduralModal.show();
+        const progressReporter = proceduralModal.showProgressUI();
 
-    await spawn(mode, { seed: currentSeed.seed });
+    await spawn(mode, { seed: currentSeed.seed }, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
 });
 
