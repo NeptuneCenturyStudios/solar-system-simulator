@@ -98,6 +98,7 @@ export class StartupModal extends Panel {
 
         if (this.launchDefaultBtn) this.launchDefaultBtn.onclick = () => {
             this._proceduralModal?.show();
+            this._proceduralModal?.setTitle('Generate Solar System');
 
             this.emit('launchDefault');
         };

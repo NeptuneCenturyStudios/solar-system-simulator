@@ -6465,8 +6465,12 @@ window.addEventListener('popstate', async () => {
             applyStartupGMultiplier();
             uiManager.managementPanel.hide();
             startupModal.hide();
-            await spawn(SimulationStartMode.Default);
+            proceduralModal.show();
+            proceduralModal.setTitle('Generate Solar System');
+            const progressReporter = proceduralModal.showProgressUI();
+            await spawn(SimulationStartMode.Default, undefined, progressReporter);
             applyDefaultCameraTogglesAfterSpawn();
+            proceduralModal.hide();
         }
         return;
     }
@@ -6490,6 +6494,7 @@ window.addEventListener('popstate', async () => {
 
     await spawn(mode, { seed: currentSeed.seed }, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
+    proceduralModal.hide();
 });
 
 refreshBodiesTable();

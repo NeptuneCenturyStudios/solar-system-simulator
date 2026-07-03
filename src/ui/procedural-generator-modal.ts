@@ -138,8 +138,10 @@ export class ProceduralGeneratorModal extends Panel {
 
                 resolve(returnValue);
             };
-            if (opts.title && this._headerEl) {
-                this._headerEl.textContent = opts.title;
+
+            // Set title
+            if (opts.title) {
+                this.setTitle(opts.title);
             }
             this._cancelRequested = false;
             this._state = 'seed-entry';
@@ -170,9 +172,23 @@ export class ProceduralGeneratorModal extends Panel {
     }
 
     /**
+     * Sets the title of the prompt.
+     * @param title The title of the prompt
+     */
+    setTitle(title: string) {
+        if (this._headerEl) {
+            this._headerEl.textContent = title;
+        }
+    }
+
+    /**
      * Switches to the progress display. Call this immediately before starting generation.
      */
-    showProgressUI() {
+    showProgressUI(title?: string) {
+        if (title) {
+            this.setTitle(title);
+        }
+
         this._state = 'generating';
         if (this.element) this.element.style.pointerEvents = 'auto';
         if (this._seedSectionEl) this._seedSectionEl.style.display = 'none';
