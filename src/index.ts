@@ -6320,8 +6320,10 @@ startupModal.on('launchDefault', async () => {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
     startupModal.hide();
-    await spawn(SimulationStartMode.Default);
+    const progressReporter = proceduralModal.showProgressUI();
+    await spawn(SimulationStartMode.Default, undefined, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
+    proceduralModal.hide();
 });
 
 startupModal.on('launchEmpty', async () => {
@@ -6337,7 +6339,7 @@ startupModal.on('generateBlackHole', async (result: IProceduralGeneratorPromptRe
     uiManager.managementPanel.hide();
 
     startupModal.hide();
-    const progressReporter =proceduralModal.showProgressUI();
+    const progressReporter = proceduralModal.showProgressUI();
     await spawn(SimulationStartMode.BlackHole, result, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
     proceduralModal.hide();
@@ -6484,7 +6486,7 @@ window.addEventListener('popstate', async () => {
             : SimulationStartMode.Procedural;
 
     proceduralModal.show();
-        const progressReporter = proceduralModal.showProgressUI();
+    const progressReporter = proceduralModal.showProgressUI();
 
     await spawn(mode, { seed: currentSeed.seed }, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();

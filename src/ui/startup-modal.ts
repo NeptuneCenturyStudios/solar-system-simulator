@@ -96,7 +96,11 @@ export class StartupModal extends Panel {
             );
         }
 
-        if (this.launchDefaultBtn) this.launchDefaultBtn.onclick = () => this.emit('launchDefault');
+        if (this.launchDefaultBtn) this.launchDefaultBtn.onclick = () => {
+            this._proceduralModal?.show();
+
+            this.emit('launchDefault');
+        };
         if (this.launchEmptyBtn) this.launchEmptyBtn.onclick = () => this.emit('launchEmpty');
 
         if (this.launchBlackHoleBtn) {

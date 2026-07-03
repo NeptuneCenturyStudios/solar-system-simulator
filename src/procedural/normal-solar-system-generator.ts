@@ -55,6 +55,10 @@ import {
 } from '../utilities/consts';
 import { MoonTypeEnum } from '../bodies/body-enums';
 import { callistoTexture, europaTexture, ganymedeTexture, ioTexture, moonTexture, spaceTextures } from '../drawing/textures';
+import type {
+    ProceduralGenerationReporter,
+    ProceduralGenerationWorkUnit,
+} from './procedural-generation-progress';
 
 export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
@@ -67,9 +71,23 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         this.scene = scene;
     }
 
-    async generateSolarSystemAsync(): Promise<ISolarSystem> {
-   
+    async generateSolarSystemAsync(progressReporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
         const bodies: Body[] = [];
+
+        // Total bodies: Sun + 9 planets + Ceres + 3 asteroids + 5 moons + ISS + Halley = 21
+        const totalBodies = 21;
+        let completed = 0;
+
+        const report = (workUnit?: ProceduralGenerationWorkUnit) => {
+            progressReporter?.report({
+                completed,
+                total: totalBodies,
+                workUnit,
+            });
+        };
+
+        // Set total upfront
+        progressReporter?.setTotal(totalBodies);
 
         // Helper to generate a random orbital angle
         const randomAngle = () => Math.random() * Math.PI * 2;
@@ -77,20 +95,28 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         // Sun (static at origin)
         const sun = new Sun(this.dependencies, this.scene);
         bodies.push(sun);
+        completed++;
+        report({ phase: 'stars', label: `Sun` });
         await this.yieldToEventLoop();
 
         // Mercury
         bodies.push(new Mercury(this.dependencies, this.scene, randomAngle()));
+        completed++;
+        report({ phase: 'planets', label: `Mercury ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Venus
         bodies.push(new Venus(this.dependencies, this.scene, randomAngle()));
+        completed++;
+        report({ phase: 'planets', label: `Venus ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Earth (+ Moon)
         const earthAngle = randomAngle();
         const earth = new Earth(this.dependencies, this.scene, earthAngle);
         bodies.push(earth);
+        completed++;
+        report({ phase: 'planets', label: `Earth ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Moon gets its own random angle around Earth
@@ -110,6 +136,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: randomAngle(),
             })
         );
+        completed++;
+        report({ phase: 'moons', label: `Moon ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Satellite (ISS) — random angle around Earth
@@ -128,17 +156,24 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 angle: randomAngle(),
             })
         );
+        completed++;
+        report({ phase: 'finalizing', label: `ISS ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Mars
         bodies.push(new Mars(this.dependencies, this.scene, randomAngle()));
+        completed++;
+        report({ phase: 'planets', label: `Mars ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
+
         // Ceres (~2.77 AU)
         const ceresAngle = randomAngle();
         bodies.push(new Ceres(this.dependencies, this.scene, ceresAngle));
+        completed++;
+        report({ phase: 'planets', label: `Ceres ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Vesta (~2.36 AU) — already had random angle, but now uses the helper for consistency
+        // Vesta (~2.36 AU)
         const vestaAngle = randomAngle();
         const vestaTrajectory = calculateTrajectory(
             this.dependencies.getG(),
@@ -159,6 +194,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             roughness: 0.9,
         });
         bodies.push(vesta);
+        completed++;
+        report({ phase: 'asteroids', label: `Vesta ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Pallas (~2.77 AU)
@@ -182,6 +219,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             roughness: 0.9,
         });
         bodies.push(pallas);
+        completed++;
+        report({ phase: 'asteroids', label: `Pallas ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Hygiea (~3.14 AU)
@@ -205,12 +244,16 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             roughness: 0.9,
         });
         bodies.push(hygiea);
+        completed++;
+        report({ phase: 'asteroids', label: `Hygiea ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Jupiter (+ 4 Galilean moons)
         const jupiterAngle = randomAngle();
         const jupiter = new Jupiter(this.dependencies, this.scene, jupiterAngle);
         bodies.push(jupiter);
+        completed++;
+        report({ phase: 'planets', label: `Jupiter ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Jovian moons each get their own random angle around Jupiter
@@ -231,6 +274,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: ioTexture,
             })
         );
+        completed++;
+        report({ phase: 'moons', label: `Io ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         bodies.push(
@@ -250,6 +295,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: europaTexture,
             })
         );
+        completed++;
+        report({ phase: 'moons', label: `Europa ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         bodies.push(
@@ -269,6 +316,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: ganymedeTexture,
             })
         );
+        completed++;
+        report({ phase: 'moons', label: `Ganymede ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         bodies.push(
@@ -288,26 +337,38 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: callistoTexture,
             })
         );
+        completed++;
+        report({ phase: 'moons', label: `Callisto ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Saturn
         bodies.push(new Saturn(this.dependencies, this.scene, randomAngle()));
+        completed++;
+        report({ phase: 'planets', label: `Saturn ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Uranus
         bodies.push(new Uranus(this.dependencies, this.scene, randomAngle()));
+        completed++;
+        report({ phase: 'planets', label: `Uranus ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Neptune
         bodies.push(new Neptune(this.dependencies, this.scene, randomAngle()));
+        completed++;
+        report({ phase: 'planets', label: `Neptune ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Pluto
         bodies.push(new Pluto(this.dependencies, this.scene, randomAngle()));
+        completed++;
+        report({ phase: 'planets', label: `Pluto ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Comet (Halley) — random orbital angle preserves elliptical orbit shape
         bodies.push(new Halley(this.dependencies, this.scene, randomAngle()));
+        completed++;
+        report({ phase: 'comets', label: `Halley's Comet ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Use default space texture
