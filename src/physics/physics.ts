@@ -77,7 +77,7 @@ export function calculateOrbitalSpeed(
 export function updateSimulation(
     simulationState: ISimulationState,
     autopilotState: IAutopilotState,
-    flightState: IFlightState,
+    _flightState: IFlightState,
     steps: number,
     dt: number,
     updateAutopilot: (dt: number) => void
@@ -85,7 +85,7 @@ export function updateSimulation(
     // Physics integration loop
     for (let i = 0; i < steps; i++) {
         // Apply physics to bodies
-        updatePhysics(simulationState, flightState);
+        updatePhysics(simulationState);
 
         // Apply autopilot thrust impulse each substep so it scales correctly with timeScale.
         // Running once per frame at BASE_FRAME_DT would let the ship fly through brake zones
@@ -129,7 +129,7 @@ function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number, G: number) {
  * Update the physics simulation for all bodies in the simulation state, calculating gravitational accelerations.
  * @param simulationState The current state of the simulation, including all bodies.
  */
-function updatePhysics(simulationState: ISimulationState, flightState: IFlightState) {
+function updatePhysics(simulationState: ISimulationState) {
     const bodies = simulationState.bodies;
     const len = bodies.length;
     const gEff = G * simulationState.gMultiplier;
@@ -146,14 +146,14 @@ function updatePhysics(simulationState: ISimulationState, flightState: IFlightSt
         const body = bodies[idx];
         if (!body || body._isDisposed || !body.mesh) continue;
 
-        // Don't integrate physics if the ship is decelerating in warp or boost mode.
-        // (kept as a silent skip — no console.info on the hot path)
-        if (
-            body === flightState.knownShip &&
-            (flightState.warpDecelerating || flightState.boostDecelerating)
-        ) {
-            continue;
-        }
+        // // Don't integrate physics if the ship is decelerating in warp or boost mode.
+        // // (kept as a silent skip — no console.info on the hot path)
+        // if (
+        //     body === flightState.knownShip &&
+        //     (flightState.warpDecelerating || flightState.boostDecelerating)
+        // ) {
+        //     continue;
+        // }
 
         const totalAcc = _accPool[idx];
         totalAcc.set(0, 0, 0);

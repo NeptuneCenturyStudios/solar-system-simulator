@@ -4601,9 +4601,7 @@ function updateFlightControls(dt: number) {
     // W only counts as active thrust once the ship has decelerated to normal max speed.
     // This prevents W from snapping the ship from boost speed (500) down to normal max (100)
     // in one frame when pressed mid-deceleration.
-    const wEffective =
-        manualInput && keys.w && (flightState.currentSpeed <= FLIGHT_MAX_SPEED || keys.shift);
-    const thrustActive = manualInput && (keys.shift || wEffective || keys.s);
+    const thrustActive = manualInput && (keys.shift || keys.w || keys.s);
     if (manualInput) flightState.thrustActive = thrustActive;
 
     // Trigger boost decel when Shift is *released* while still above normal max speed.
@@ -4635,38 +4633,48 @@ function updateFlightControls(dt: number) {
         // steering/roll still processed below
     } else if (manualInput && !flightState.isAdvancedMode) {
         // ── Simple mode ──────────────────────────────────────────────────────────
-        // While a thrust key is held: currentSpeed is updated by hold-to-accelerate
-        // and the full velocity is OVERWRITTEN to match the current forward direction.
-        // This gives direct, arcade-style control of the ship vector.
+        // While a thrust key is held: forward thrust is ADDED to velocity (like
+        // advanced mode) so gravity accumulates freely and is never overwritten.
+        // The key difference from advanced mode: perpendicular drift is always decayed
+        // while a thrust key is held, giving direct arcade-style feel.
         // When no key is held the ship coasts freely and gravity accumulates.
         if (thrustActive) {
-            const maxSpeed = keys.shift ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
-            const accel = keys.shift ? FLIGHT_BOOST_ACCEL : FLIGHT_THRUST_ACCEL;
-            const decel = keys.shift ? FLIGHT_BOOST_DECEL : FLIGHT_THRUST_DECEL;
-            // Ignore boost while above boost max speed (e.g. decelerating from warp);
-            // the ship should coast down through FLIGHT_BOOST_MAX_SPEED naturally.
-            const shiftEffective = keys.shift && flightState.currentSpeed <= FLIGHT_BOOST_MAX_SPEED;
-            if (shiftEffective || wEffective) {
-                flightState.currentSpeed = Math.min(
-                    flightState.currentSpeed + accel * dt,
-                    maxSpeed
-                );
-            } else {
-                // keys.s
-                flightState.currentSpeed = Math.max(
-                    flightState.currentSpeed - decel * dt,
-                    -FLIGHT_MAX_SPEED
-                );
+            // Use the real forward speed (includes gravity) for effectiveness checks.
+            const shiftEffective = keys.shift && fwdSpeed < FLIGHT_BOOST_MAX_SPEED;
+            const wEffective = keys.w && fwdSpeed < FLIGHT_MAX_SPEED;
+
+            if (shiftEffective) {
+                // Boost: add forward thrust toward boost max.
+                const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            } else if (wEffective && !keys.shift) {
+                // Normal thrust: add forward thrust toward normal max.
+                const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            } else if (keys.s) {
+                // Decelerate.
+                const ceiling = fwdSpeed > 0 ? -FLIGHT_MAX_SPEED : 0;
+                const decelRate = fwdSpeed > FLIGHT_MAX_SPEED
+                    ? FLIGHT_BOOST_DECEL
+                    : FLIGHT_THRUST_DECEL;
+                const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
             }
-            // Gradually normalise trajectory toward the ship's forward axis while thrusting.
-            // Decompose current velocity into forward + perpendicular components,
-            // decay the perpendicular part, then reassemble — no jarring snap.
-            const perpVel = ship.velocity.clone().addScaledVector(forward, -fwdSpeed);
+            // else: shift held above boost max, or no effective thrust key → coast.
+            // Gravity accumulates naturally since we never overwrite velocity.
+
+            // Decay perpendicular drift when any thrust key is held (even if not effective),
+            // giving the direct nose-points-where-you-go feel of simple mode.
+            const newFwdSpd = ship.velocity.dot(forward);
+            const perpVel = ship.velocity.clone().addScaledVector(forward, -newFwdSpd);
             const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * dt);
             perpVel.multiplyScalar(decay);
-            ship.velocity.copy(forward).multiplyScalar(flightState.currentSpeed).add(perpVel);
+            ship.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
+
+            // Sync display value from real velocity.
+            flightState.currentSpeed = ship.velocity.dot(forward);
         } else {
-            // Coasting: sync display value from real forward velocity
+            // Coasting: sync display value from real forward velocity.
             flightState.currentSpeed = fwdSpeed;
         }
     } else if (manualInput) {
