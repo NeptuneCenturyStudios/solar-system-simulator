@@ -182,7 +182,7 @@ export const FLIGHT_MAX_SPEED = C * 0.01; // normal max speed cap (units/s) of l
 export const FLIGHT_BOOST_MAX_SPEED = C * 1; // boost ceiling = 5x light speed
 export const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.264; // acceleration rate while W/S held (u/s²)
 export const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.264; // deceleration rate while W/S held (u/s²)
-export const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01; // tolerance for deceleration to stop (u/s²)
+export const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.1; // tolerance for deceleration to stop (u/s²)
 export const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.264; // acceleration rate while Shift held (u/s²)
 export const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED * 0.264; // decel rate after boost ends (u/s²)
 export const FLIGHT_WARP_SPEED = C * 100; // top warp speed (u/s) — FLIGHT_BOOST_MAX_SPEED already contains SCALE_FACTOR

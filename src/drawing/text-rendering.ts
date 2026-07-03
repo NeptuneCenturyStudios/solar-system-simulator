@@ -14,6 +14,9 @@ import { BodyTypeEnum, MoonTypeEnum } from '../bodies/body-enums';
  * @param pos - Optional position vector of the spacecraft.
  * @param vel - Optional velocity vector of the spacecraft.
  * @param isWarp - Whether the spacecraft is in warp mode.
+ * @param isBraking - Whether the spacecraft is actively decelerating (boost decel, warp decel, autopilot brake, or S-key braking).
+ * @param shipThrustRate - The ship's effective accel/decel rate in u/s² (0 = coasting or warp-active).
+ * @param gravRate - Total gravitational acceleration magnitude on the ship in u/s².
  * @returns A THREE.js texture representing the speed HUD.
  */
 export function createSpeedTexture(
@@ -21,46 +24,102 @@ export function createSpeedTexture(
     isBoosting: boolean,
     pos?: THREE.Vector3,
     vel?: THREE.Vector3,
-    isWarp = false
+    isWarp = false,
+    isBraking = false,
+    shipThrustRate = 0,
+    gravRate = 0
 ) {
     const hasExtra = !!(pos && vel);
     // Canvas is sized so that sprite scale = canvas × 0.625 matches the FPS counter pixel density.
     // 640×640 canvas → 400×400 sprite pixels on screen.
     const W = 640;
-    const H = hasExtra ? 640 : 200;
+    const H = hasExtra ? 640 : 240;
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    const color = isWarp ? '#ff4488' : isBoosting ? '#ff9944' : '#00ffcc';
+    const color = isWarp
+        ? '#ff4488'
+        : isBraking
+          ? '#ff6644'
+          : isBoosting
+            ? '#ff9944'
+            : '#00ffcc';
     const glow = isWarp
         ? 'rgba(255,68,136,0.9)'
-        : isBoosting
-          ? 'rgba(255,153,68,0.85)'
-          : 'rgba(0,255,204,0.85)';
+        : isBraking
+          ? 'rgba(255,102,68,0.9)'
+          : isBoosting
+            ? 'rgba(255,153,68,0.85)'
+            : 'rgba(0,255,204,0.85)';
     const dim = 'rgba(0,255,204,0.5)';
 
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
 
-    // ── Speed ─────────────────────────────────────────────────────────────────
+    // ── Mode label ────────────────────────────────────────────────────────────
     ctx.fillStyle = color;
     ctx.shadowColor = glow;
     ctx.shadowBlur = 12;
     ctx.font = '36px monospace';
-    ctx.fillText(isWarp ? 'WARP' : isBoosting ? 'BOOST' : 'SPEED', W - 24, hasExtra ? 44 : 56);
+    if (isWarp) {
+        ctx.fillText('WARP', W - 24, hasExtra ? 44 : 56);
+    } else if (isBraking) {
+        ctx.fillText('SPEED - BRAKING', W - 24, hasExtra ? 44 : 56);
+    } else if (isBoosting) {
+        ctx.fillText('BOOST', W - 24, hasExtra ? 44 : 56);
+    } else {
+        ctx.fillText('SPEED', W - 24, hasExtra ? 44 : 56);
+    }
 
+    // ── Thrust rate vs Gravity rate ───────────────────────────────────────────
+    // Shows the ship's effective accel/decel force against the gravitational pull.
+    // Gravity turns red when it exceeds the ship's thrust rate.
+    {
+        const accelY = hasExtra ? 82 : 100;
+        ctx.font = '26px monospace';
+        ctx.shadowBlur = 0;
+
+        const thrustStr = shipThrustRate.toFixed(1);
+        const sepStr = '  \u2014  '; // em-dash separator
+        const gravStr = gravRate.toFixed(1);
+
+        const gravColor =
+            gravRate > shipThrustRate + 0.001 ? '#ff4444' : 'rgba(200,200,200,0.45)';
+
+        // Draw right-to-left to preserve textAlign = 'right'
+        ctx.fillStyle = gravColor;
+        ctx.shadowColor = gravRate > shipThrustRate + 0.001 ? 'rgba(255,68,68,0.7)' : 'transparent';
+        ctx.shadowBlur = gravRate > shipThrustRate + 0.001 ? 6 : 0;
+        ctx.fillText(gravStr, W - 24, accelY);
+
+        const gravWidth = ctx.measureText(gravStr).width;
+        ctx.fillStyle = 'rgba(200,200,200,0.3)';
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.fillText(sepStr, W - 24 - gravWidth, accelY);
+
+        const sepWidth = ctx.measureText(sepStr).width;
+        ctx.fillStyle = shipThrustRate > 0 ? color : 'rgba(200,200,200,0.35)';
+        ctx.shadowColor = shipThrustRate > 0 ? glow : 'transparent';
+        ctx.shadowBlur = shipThrustRate > 0 ? 6 : 0;
+        ctx.fillText(thrustStr, W - 24 - gravWidth - sepWidth, accelY);
+    }
+
+    // ── Speed value ───────────────────────────────────────────────────────────
+    ctx.fillStyle = color;
+    ctx.shadowColor = glow;
     ctx.shadowBlur = 28;
     ctx.font = 'bold 68px monospace';
-    ctx.fillText(Math.abs(speed).toFixed(1), W - 24, hasExtra ? 120 : 140);
+    ctx.fillText(Math.abs(speed).toFixed(1), W - 24, hasExtra ? 140 : 172);
 
     if (hasExtra) {
         const lh = 56; // canvas-pixel line height for data rows
 
         // ── Position ──────────────────────────────────────────────────────────
-        let y = 194;
+        let y = 214;
         ctx.shadowBlur = 8;
         ctx.font = '32px monospace';
         ctx.fillStyle = dim;

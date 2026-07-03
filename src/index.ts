@@ -3641,13 +3641,48 @@ function animate() {
                     (autopilotState.phase === 'APPROACH' && autopilotState.isBoostActive) ||
                     (autopilotState.phase === 'BRAKE' &&
                         (flightState.activeShip?.velocity?.length() ?? 0) > FLIGHT_MAX_SPEED));
+            const hudIsBraking =
+                !hudIsWarp &&
+                (flightState.boostDecelerating ||
+                    flightState.warpDecelerating ||
+                    autopilotState.phase === 'BRAKE' ||
+                    (keys.s && flightState.currentSpeed > 0));
+
+            // Determine the ship's effective thrust/decel rate for the accel-vs-gravity display.
+            const hudShipThrustRate: number = (() => {
+                if (flightState.warpDecelerating) return FLIGHT_WARP_DECEL;
+                if (flightState.boostDecelerating) return FLIGHT_BOOST_DECEL;
+                if (hudIsWarp) return 0; // warp drives velocity directly — no per-rate concept
+                if (hudIsBoosting) return FLIGHT_BOOST_ACCEL;
+                if (hudIsBraking)
+                    return flightState.currentSpeed > FLIGHT_MAX_SPEED
+                        ? FLIGHT_BOOST_DECEL
+                        : FLIGHT_THRUST_DECEL;
+                if (!autopilotState.isActive && keys.w) return FLIGHT_THRUST_ACCEL;
+                if (autopilotState.isActive && autopilotState.phase === 'BRAKE')
+                    return AUTOPILOT_DECEL;
+                if (
+                    autopilotState.isActive &&
+                    (autopilotState.phase === 'APPROACH' ||
+                        autopilotState.phase === 'CIRCULARIZE' ||
+                        autopilotState.phase === 'ALIGN')
+                )
+                    return AUTOPILOT_ACCEL;
+                return 0;
+            })();
+            // Gravity acceleration magnitude acting on the ship this frame (u/s²)
+            const hudGravRate = ship?.tempAcc?.length() ?? 0;
+
             speedSprite.material.map?.dispose();
             speedSprite.material.map = createSpeedTexture(
                 flightState.currentSpeed,
                 hudIsBoosting,
                 ship?.mesh?.position,
                 ship?.velocity,
-                hudIsWarp
+                hudIsWarp,
+                hudIsBraking,
+                hudShipThrustRate,
+                hudGravRate
             );
             speedSprite.material.needsUpdate = true;
         }
@@ -4509,11 +4544,11 @@ function updateFlightControls(dt: number) {
     //             logic maintain boost speed until Shift is released.
     if (flightState.warpDecelerating) {
         const fwdSpd = ship.velocity.dot(forward);
-        if (fwdSpd > FLIGHT_BOOST_MAX_SPEED + FLIGHT_WARP_DECEL_TOLERANCE) {
+        const unclampedWarpSpd = fwdSpd - FLIGHT_WARP_DECEL * dt;
+        if (unclampedWarpSpd > FLIGHT_BOOST_MAX_SPEED) {
             // Phase 1: decel from warp speed to boost max using warp decel rate.
-            const newSpd = Math.max(FLIGHT_BOOST_MAX_SPEED, fwdSpd - FLIGHT_WARP_DECEL * dt);
-            ship.velocity.copy(forward).multiplyScalar(newSpd);
-            flightState.currentSpeed = newSpd;
+            ship.velocity.copy(forward).multiplyScalar(unclampedWarpSpd);
+            flightState.currentSpeed = unclampedWarpSpd;
         } else {
             // Reached boost speed — end the warp decel phase.
             flightState.warpDecelerating = false;
@@ -4539,15 +4574,16 @@ function updateFlightControls(dt: number) {
     // When Shift is released above FLIGHT_MAX_SPEED, rapidly decelerate back down.
     if (flightState.boostDecelerating) {
         const fwdSpd = ship.velocity.dot(forward);
-        // Use a small epsilon tolerance (0.01) for the completion check so that
-        // gravity's tiny per-frame velocity contribution doesn't prevent the decel
-        // from ever finishing — without this the ship can get stuck permanently
-        // in boost-decel mode, fighting gravity every frame.
-        if (fwdSpd > FLIGHT_MAX_SPEED + FLIGHT_THRUST_DECEL_TOLERANCE) {
-            const newSpd = Math.max(FLIGHT_MAX_SPEED, fwdSpd - FLIGHT_BOOST_DECEL * dt);
-            ship.velocity.copy(forward).multiplyScalar(newSpd);
-            flightState.currentSpeed = newSpd;
+        const unclampedBoostSpd = fwdSpd - FLIGHT_BOOST_DECEL * dt;
+        if (unclampedBoostSpd > FLIGHT_MAX_SPEED) {
+            // Still above max after this decel step — continue decelerating.
+            ship.velocity.copy(forward).multiplyScalar(unclampedBoostSpd);
+            flightState.currentSpeed = unclampedBoostSpd;
         } else {
+            // This decel step reaches or overshoots FLIGHT_MAX_SPEED — exit.
+            // Using the unclamped value (rather than a fixed tolerance) makes this
+            // immune to strong gravity re-adding speed above the floor each frame,
+            // which caused perpetual braking mode when gravity > tolerance.
             flightState.boostDecelerating = false;
             flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_MAX_SPEED);
         }
