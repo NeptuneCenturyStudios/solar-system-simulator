@@ -6171,6 +6171,25 @@ window.addEventListener('resize', () => {
         flightHUD.hintSprite.position.set(0, window.innerHeight / 2 - 55, TEXT_SPRITE_Z);
     }
 
+    // Reposition warp charge / warp active sprite (bottom-center)
+    if (flightHUD.warpSprite) {
+        flightHUD.warpSprite.position.set(0, -(window.innerHeight / 2 - 50), TEXT_SPRITE_Z);
+    }
+
+    // Reposition orbit notify sprite (bottom-center, above warp)
+    if (flightHUD.orbitNotifySprite) {
+        flightHUD.orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), TEXT_SPRITE_Z);
+    }
+
+    // Reposition speed indicator (bottom-right)
+    if (speedSprite) {
+        speedSprite.position.set(
+            window.innerWidth / 2 - 210,
+            -(window.innerHeight / 2 - 210),
+            TEXT_SPRITE_Z
+        );
+    }
+
     lensingEffect.resize(window.innerWidth, window.innerHeight);
 });
 
