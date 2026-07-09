@@ -127,17 +127,22 @@ export class ProceduralGeneratorModal extends Panel {
      */
     prompt(opts: { title?: string } = {}): Promise<IProceduralGeneratorPromptResult | null> {
         return new Promise((resolve) => {
-            this._promptResolve = (value) => {
-                if (opts.title && this._headerEl) {
-                    this._headerEl.textContent = 'Generate Procedural System';
-                }
+        this._promptResolve = (value) => {
+            if (value === null) {
+                resolve(null);
+                return;
+            }
 
-                const returnValue: IProceduralGeneratorPromptResult = {
-                    seed: value?.seed ?? '',
-                };
+            if (opts.title && this._headerEl) {
+                this._headerEl.textContent = 'Generate Procedural System';
+            }
 
-                resolve(returnValue);
+            const returnValue: IProceduralGeneratorPromptResult = {
+                seed: value?.seed ?? '',
             };
+
+            resolve(returnValue);
+        };
 
             // Set title
             if (opts.title) {
