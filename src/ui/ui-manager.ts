@@ -3,6 +3,7 @@ import { MainPanel } from './main-panel';
 import { ManagementPanel } from './management-panel';
 import { Panel } from './panel';
 import { PlaylistPanel } from './playlist-panel';
+import { TextureGeneratorPanel } from './texture-generator-panel';
 
 export class UIManager extends Panel {
     toolbarBottom: HTMLElement | null = null;
@@ -21,6 +22,7 @@ export class UIManager extends Panel {
     btnEditSolarSystem: HTMLButtonElement | null = null;
     btnFlightControls: HTMLButtonElement | null = null;
     btnPlaylist: HTMLButtonElement | null = null;
+    btnTextureGenerator: HTMLButtonElement | null = null;
     btnReset: HTMLButtonElement | null = null;
 
     // Panels
@@ -28,6 +30,7 @@ export class UIManager extends Panel {
     flightControlsPanel: FlightControlsPanel;
     managementPanel: ManagementPanel;
     playlistPanel: PlaylistPanel;
+    textureGeneratorPanel: TextureGeneratorPanel;
 
     // State variables
     timeScale: number = 1;
@@ -40,11 +43,13 @@ export class UIManager extends Panel {
         this.managementPanel = new ManagementPanel('management-panel');
         this.mainPanel = new MainPanel('system-explorer');
         this.playlistPanel = new PlaylistPanel('playlist-panel');
+        this.textureGeneratorPanel = new TextureGeneratorPanel('texture-generator-panel');
 
         this.flightControlsPanel.initialize();
         this.managementPanel.initialize();
         this.mainPanel.initialize();
         this.playlistPanel.initialize();
+        this.textureGeneratorPanel.initialize();
     }
 
     initialize(): void {
@@ -67,6 +72,7 @@ export class UIManager extends Panel {
         ) as HTMLButtonElement;
         this.btnFlightControls = document.getElementById('flightControlsBtn') as HTMLButtonElement;
         this.btnPlaylist = document.getElementById('btn-playlist') as HTMLButtonElement;
+        this.btnTextureGenerator = document.getElementById('btn-texture-generator') as HTMLButtonElement;
         this.btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
 
         // Block events on UI elements to prevent them from affecting the 3D scene
@@ -187,6 +193,21 @@ export class UIManager extends Panel {
 
         this.playlistPanel.on('closed', () => {
             this.btnPlaylist?.classList.remove('active');
+        });
+
+        if (this.btnTextureGenerator) {
+            this.btnTextureGenerator.onclick = () => {
+                const visible = this.textureGeneratorPanel.toggle();
+                if (visible) {
+                    this.btnTextureGenerator?.classList.add('active');
+                } else {
+                    this.btnTextureGenerator?.classList.remove('active');
+                }
+            };
+        }
+
+        this.textureGeneratorPanel.on('closed', () => {
+            this.btnTextureGenerator?.classList.remove('active');
         });
     }
 

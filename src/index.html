@@ -249,6 +249,14 @@
                     </button>
 
                     <button
+                        id="btn-texture-generator"
+                        class="btn toolbar-btn"
+                        title="Texture Generator"
+                    >
+                        <span class="material-symbols-outlined">texture</span>
+                    </button>
+
+                    <button
                         id="btn-reset"
                         class="btn toolbar-btn btn-warning"
                         title="Re-launch System"
@@ -1052,6 +1060,173 @@
                             </button>
                         </div>
                     </div>
+
+                    <div id="texture-generator-panel" class="ui-panel">
+                        <div style="display: flex; flex-direction: column; height: 100%">
+                            <div class="panel-header">
+                                Texture Generator
+                                <button
+                                    id="btn-close-texture-generator-panel"
+                                    class="old-ui btn-danger btn-icon-only ml-auto mb-0"
+                                    title="Close Texture Generator"
+                                >
+                                    <span class="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+
+                            <!-- Preview -->
+                            <div style="position: relative; margin-bottom: 10px; border: 1px solid var(--new-ui-border); border-radius: 4px; overflow: hidden; background: #000; line-height: 0;">
+                                <canvas
+                                    id="texture-generator-preview"
+                                    width="512"
+                                    height="256"
+                                    style="width: 100%; height: auto; display: block;"
+                                ></canvas>
+                                <div
+                                    id="texture-gen-preview-loading"
+                                    style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); font-size: 0.8em; color: #00ffcc;"
+                                >
+                                    <span class="material-symbols-outlined loading-icon" style="margin-right: 6px">progress_activity</span>
+                                    Generating…
+                                </div>
+                            </div>
+
+                            <!-- Scrollable controls -->
+                            <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 2px;">
+
+                                <div class="control-group">
+                                    <label for="textureTypeSelect">Texture Type</label>
+                                    <select id="textureTypeSelect">
+                                        <option value="gas_giant" selected>Gas Giant</option>
+                                    </select>
+                                </div>
+
+                                <div class="control-group">
+                                    <label for="textureGenSeedInput">Seed</label>
+                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                        <input
+                                            type="text"
+                                            id="textureGenSeedInput"
+                                            class="text-input"
+                                            value="gas-giant"
+                                            style="flex: 1 1 auto; margin-bottom: 0;"
+                                            placeholder="Seed string"
+                                        />
+                                        <button
+                                            id="btn-texture-gen-randomize-seed"
+                                            class="old-ui btn-icon-only"
+                                            title="Randomize seed"
+                                            style="flex-shrink: 0;"
+                                        >
+                                            <span class="material-symbols-outlined">casino</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="control-group">
+                                    <label for="textureGenResolutionSelect">Resolution</label>
+                                    <select id="textureGenResolutionSelect">
+                                        <option value="2048x1024" selected>2048 × 1024</option>
+                                        <option value="4096x2048">4096 × 2048</option>
+                                        <option value="8192x4096">8192 × 4096</option>
+                                    </select>
+                                </div>
+
+                                <div class="control-group">
+                                    <label for="textureGenPaletteSelect">Colour Palette</label>
+                                    <select id="textureGenPaletteSelect">
+                                        <option value="jupiter" selected>Jupiter</option>
+                                        <option value="saturn">Saturn</option>
+                                        <option value="ice">Ice Giant</option>
+                                        <option value="alien">Alien</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
+
+                                <!-- Custom colour pickers — hidden until palette = custom -->
+                                <div id="textureGenCustomColorRow" style="display: none;">
+                                    <div class="control-group">
+                                        <label for="textureGenCustomBandColor">Band Colour</label>
+                                        <input
+                                            type="color"
+                                            id="textureGenCustomBandColor"
+                                            value="#c2884a"
+                                            style="width: 100%; height: 32px; padding: 2px; cursor: pointer; background: transparent; border: 1px solid var(--new-ui-border); border-radius: 4px;"
+                                        />
+                                    </div>
+                                    <div class="control-group">
+                                        <label for="textureGenCustomStormColor">Storm Colour</label>
+                                        <input
+                                            type="color"
+                                            id="textureGenCustomStormColor"
+                                            value="#ffffff"
+                                            style="width: 100%; height: 32px; padding: 2px; cursor: pointer; background: transparent; border: 1px solid var(--new-ui-border); border-radius: 4px;"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="control-group">
+                                    <label>Band Scale <span id="textureGenBandScaleVal" class="val-display">8</span></label>
+                                    <div class="slider-row">
+                                        <input type="range" id="textureGenBandScaleSlider" min="1" max="20" step="1" value="8" title="Number of horizontal band cycles" />
+                                    </div>
+                                </div>
+
+                                <div class="control-group">
+                                    <label>Turbulence <span id="textureGenTurbulenceVal" class="val-display">0.40</span></label>
+                                    <div class="slider-row">
+                                        <input type="range" id="textureGenTurbulenceSlider" min="0" max="100" step="1" value="40" title="How wavy or distorted the bands appear" />
+                                    </div>
+                                </div>
+
+                                <div class="control-group">
+                                    <label>Detail <span id="textureGenDetailVal" class="val-display">0.30</span></label>
+                                    <div class="slider-row">
+                                        <input type="range" id="textureGenDetailSlider" min="0" max="100" step="1" value="30" title="High-frequency noise within each band" />
+                                    </div>
+                                </div>
+
+                                <div class="control-group">
+                                    <label>Storm Count <span id="textureGenStormCountVal" class="val-display">2</span></label>
+                                    <div class="slider-row">
+                                        <input type="range" id="textureGenStormCountSlider" min="0" max="5" step="1" value="2" title="Number of oval storm features" />
+                                    </div>
+                                </div>
+
+                                <div class="control-group">
+                                    <label>Storm Size <span id="textureGenStormSizeVal" class="val-display">0.10</span></label>
+                                    <div class="slider-row">
+                                        <input type="range" id="textureGenStormSizeSlider" min="2" max="25" step="1" value="10" title="Relative radius of each storm" />
+                                    </div>
+                                </div>
+
+                                <div class="control-group">
+                                    <label>Contrast <span id="textureGenContrastVal" class="val-display">1.5</span></label>
+                                    <div class="slider-row">
+                                        <input type="range" id="textureGenContrastSlider" min="5" max="30" step="1" value="15" title="Contrast between adjacent bands" />
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <!-- Download -->
+                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--new-ui-border); display: flex; align-items: center; gap: 8px;">
+                                <button id="btn-texture-gen-download" class="old-ui btn-with-icon" style="flex: 1 1 auto;">
+                                    <span class="material-symbols-outlined">download</span>
+                                    DOWNLOAD
+                                </button>
+                                <span
+                                    id="texture-gen-download-loading"
+                                    style="display: none; color: #00ffcc; font-size: 0.8em; white-space: nowrap; align-items: center; gap: 4px;"
+                                >
+                                    <span class="material-symbols-outlined loading-icon">progress_activity</span>
+                                    Rendering…
+                                </span>
+                            </div>
+
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
