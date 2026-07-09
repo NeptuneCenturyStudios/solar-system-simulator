@@ -38,8 +38,12 @@ export class TextureGeneratorPanel extends Panel {
     // Palette
     paletteSelect: HTMLSelectElement | null = null;
     customColorRow: HTMLElement | null = null;
-    customBandColorInput: HTMLInputElement | null = null;
-    customStormColorInput: HTMLInputElement | null = null;
+    customBandColor1Input: HTMLInputElement | null = null;
+    customBandColor2Input: HTMLInputElement | null = null;
+    customBandColor3Input: HTMLInputElement | null = null;
+    customEquatorialColor1Input: HTMLInputElement | null = null;
+    customEquatorialColor2Input: HTMLInputElement | null = null;
+    customEquatorialColor3Input: HTMLInputElement | null = null;
 
     // Parameter sliders
     bandScaleSlider: HTMLInputElement | null = null;
@@ -59,6 +63,9 @@ export class TextureGeneratorPanel extends Panel {
 
     contrastSlider: HTMLInputElement | null = null;
     contrastDisplay: HTMLElement | null = null;
+
+    equatorialWidthSlider: HTMLInputElement | null = null;
+    equatorialWidthDisplay: HTMLElement | null = null;
 
     // Download
     btnDownload: HTMLButtonElement | null = null;
@@ -105,18 +112,39 @@ export class TextureGeneratorPanel extends Panel {
 
         this.customColorRow = document.getElementById('textureGenCustomColorRow');
 
-        this.customBandColorInput = document.getElementById(
-            'textureGenCustomBandColor'
+        this.customBandColor1Input = document.getElementById(
+            'textureGenCustomBandColor1'
         ) as HTMLInputElement | null;
 
-        this.customStormColorInput = document.getElementById(
-            'textureGenCustomStormColor'
+        this.customBandColor2Input = document.getElementById(
+            'textureGenCustomBandColor2'
         ) as HTMLInputElement | null;
 
-        this.bandScaleSlider = document.getElementById(
-            'textureGenBandScaleSlider'
+        this.customBandColor3Input = document.getElementById(
+            'textureGenCustomBandColor3'
         ) as HTMLInputElement | null;
-        this.bandScaleDisplay = document.getElementById('textureGenBandScaleVal');
+
+        this.customEquatorialColor1Input = document.getElementById(
+            'textureGenCustomEquatorialColor1'
+        ) as HTMLInputElement | null;
+
+        this.customEquatorialColor2Input = document.getElementById(
+            'textureGenCustomEquatorialColor2'
+        ) as HTMLInputElement | null;
+
+        this.customEquatorialColor3Input = document.getElementById(
+            'textureGenCustomEquatorialColor3'
+        ) as HTMLInputElement | null;
+
+        this.contrastSlider = document.getElementById(
+            'textureGenContrastSlider'
+        ) as HTMLInputElement | null;
+        this.contrastDisplay = document.getElementById('textureGenContrastVal');
+
+        this.equatorialWidthSlider = document.getElementById(
+            'textureGenEquatorialWidthSlider'
+        ) as HTMLInputElement | null;
+        this.equatorialWidthDisplay = document.getElementById('textureGenEquatorialWidthVal');
 
         this.turbulenceSlider = document.getElementById(
             'textureGenTurbulenceSlider'
@@ -179,12 +207,12 @@ export class TextureGeneratorPanel extends Panel {
             };
         }
 
-        if (this.customBandColorInput) {
-            this.customBandColorInput.oninput = scheduleOnInput;
-        }
-        if (this.customStormColorInput) {
-            this.customStormColorInput.oninput = scheduleOnInput;
-        }
+        if (this.customBandColor1Input) this.customBandColor1Input.oninput = scheduleOnInput;
+        if (this.customBandColor2Input) this.customBandColor2Input.oninput = scheduleOnInput;
+        if (this.customBandColor3Input) this.customBandColor3Input.oninput = scheduleOnInput;
+        if (this.customEquatorialColor1Input) this.customEquatorialColor1Input.oninput = scheduleOnInput;
+        if (this.customEquatorialColor2Input) this.customEquatorialColor2Input.oninput = scheduleOnInput;
+        if (this.customEquatorialColor3Input) this.customEquatorialColor3Input.oninput = scheduleOnInput;
 
         for (const slider of [
             this.bandScaleSlider,
@@ -193,6 +221,7 @@ export class TextureGeneratorPanel extends Panel {
             this.stormCountSlider,
             this.stormSizeSlider,
             this.contrastSlider,
+            this.equatorialWidthSlider,
         ]) {
             if (slider) slider.oninput = () => { this.syncDisplayValues(); scheduleOnInput(); };
         }
@@ -234,6 +263,10 @@ export class TextureGeneratorPanel extends Panel {
             const v = (parseInt(this.contrastSlider.value, 10) / 10).toFixed(1);
             this.contrastDisplay.textContent = v;
         }
+        if (this.equatorialWidthSlider && this.equatorialWidthDisplay) {
+            const v = (parseInt(this.equatorialWidthSlider.value, 10) / 100).toFixed(2);
+            this.equatorialWidthDisplay.textContent = v;
+        }
     }
 
     private syncCustomColorVisibility() {
@@ -253,8 +286,13 @@ export class TextureGeneratorPanel extends Panel {
             stormSize: parseInt(this.stormSizeSlider?.value ?? '10', 10) / 100,
             contrast: parseInt(this.contrastSlider?.value ?? '15', 10) / 10,
             palette: (this.paletteSelect?.value ?? 'jupiter') as GasGiantTextureParams['palette'],
-            customBandColor: this.customBandColorInput?.value ?? '#c2884a',
-            customStormColor: this.customStormColorInput?.value ?? '#ffffff',
+            customBandColor1: this.customBandColor1Input?.value ?? '#c2884a',
+            customBandColor2: this.customBandColor2Input?.value ?? '#4a88c2',
+            customBandColor3: this.customBandColor3Input?.value ?? '#c24a4a',
+            customEquatorialColor1: this.customEquatorialColor1Input?.value ?? '#6ab0e0',
+            customEquatorialColor2: this.customEquatorialColor2Input?.value ?? '#e0a060',
+            customEquatorialColor3: this.customEquatorialColor3Input?.value ?? '#60e090',
+            equatorialWidth: parseInt(this.equatorialWidthSlider?.value ?? '30', 10) / 100,
         };
     }
 

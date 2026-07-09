@@ -227,6 +227,7 @@ const INITIAL_CAMERA_DISTANCE = SUN_RADIUS * 8;
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); // Better depth precision at extreme scales
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+renderer.domElement.classList.add('webgl-canvas');
 
 const lensingEffect = new GravitationalLensingEffect(renderer);
 

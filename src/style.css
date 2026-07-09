@@ -791,11 +791,20 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 /* Mobile gesture support:
    Disable browser-native touch scrolling/zooming on the WebGL canvas,
    so OrbitControls touch rotate + pinch zoom can work reliably. */
-canvas {
+.webgl-canvas {
     touch-action: none;
     position: fixed;
     inset: 0;
     z-index: 0;
+}
+
+/* UI canvas elements (e.g. texture generator preview) must not inherit
+   the fixed full-viewport positioning applied to the WebGL canvas. */
+.ui-canvas {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    touch-action: auto;
 }
 
 .loading-icon {
