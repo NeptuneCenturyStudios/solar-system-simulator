@@ -20,6 +20,7 @@ import {
 
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import type { CelestialBody } from '../bodies/celestial-body';
+import { createAtmosphereShell } from '../effects/earth-atmosphere-shell';
 
 export type ProceduralPlanetSubtype =
     | 'solid'
@@ -285,6 +286,41 @@ export function createPlanetBodyFromProceduralCreation(
     const body = createCommonPlanetOptions(dependencies, scene, creation, mesh, hasRings);
 
     addCloudLayer(body, creation.bodySubtype, creation.textureSeed!, creation.rotationSpeed);
+
+    // Add atmosphere shell for gas/ice giants and for solid planets that got a cloud layer.
+    const isGasOrIce = creation.bodySubtype === PlanetTypeEnum.GasGiant || creation.bodySubtype === PlanetTypeEnum.IceGiant;
+    if (isGasOrIce || body.clouds) {
+        // Pick a tint based on the subtype — use a seeded hash so it's deterministic.
+        const tintRng = new SeededRandom(`${creation.textureSeed!}|atmosphere-tint`);
+        let tint: number;
+        if (creation.bodySubtype === PlanetTypeEnum.GasGiant) {
+            tint = 0xffcc88; // warm amber
+        } else if (creation.bodySubtype === PlanetTypeEnum.IceGiant) {
+            tint = 0x5599ff; // ice blue
+        } else if (creation.bodySubtype === PlanetTypeEnum.Temperate) {
+            tint = 0x77aaff; // soft blue
+        } else if (creation.bodySubtype === PlanetTypeEnum.Ocean) {
+            tint = 0x4477cc; // deep blue
+        } else if (creation.bodySubtype === PlanetTypeEnum.Desert) {
+            tint = 0xffbb66; // warm tan
+        } else if (creation.bodySubtype === PlanetTypeEnum.Frozen) {
+            tint = 0xaaccee; // pale ice blue
+        } else if (creation.bodySubtype === PlanetTypeEnum.Volcanic) {
+            tint = 0xff8844; // orange haze
+        } else {
+            tint = 0x88aaff; // generic blue (Terrestrial or fallback)
+        }
+        // Slight random tint variation to avoid all planets of the same subtype looking identical.
+        const tintColor = new THREE.Color(tint);
+        const shift = (tintRng.next() - 0.5) * 0.08;
+        tintColor.offsetHSL(shift, 0, 0);
+        body.atmosphereShell = createAtmosphereShell(
+            scene,
+            creation.radius * 1.07,
+            tintColor,
+            mesh
+        );
+    }
 
     return body;
 }

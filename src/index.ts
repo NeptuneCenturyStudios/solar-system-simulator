@@ -3167,8 +3167,8 @@ function animate() {
 
             // Update the trail position for b1
             if (b1 instanceof CelestialBody) b1.updateTrail(camera.position);
-            // Update cloud rotation and ring sync once per frame (not per substep)
-            if (b1 instanceof CelestialBody) b1.updateVisuals(dtTotal);
+            // Update cloud rotation, ring sync, and atmosphere shell once per frame (not per substep)
+            if (b1 instanceof CelestialBody) b1.updateVisuals(dtTotal, camera.position);
             // Update comet tail with camera-relative rendering (dtTotal = full frame delta)
             if (b1 instanceof Comet) b1.updateTail(dtTotal, camera.position);
 
@@ -3380,6 +3380,13 @@ function animate() {
             );
         }
     }
+
+    // Pre-compute star directions for atmosphere shell updates.
+    const _atmoStars = simulationState.bodies.filter(
+        (b) => b && !b._isDisposed && isBodyType(b, BodyTypeEnum.Star)
+    );
+    const _atmoStarDirs = _atmoStars.map(() => new THREE.Vector3());
+    const _atmoNumStars = Math.min(_atmoStars.length, 8);
 
     // Update label scales based on distance from camera
     // Always update scale, visibility is controlled by checkbox

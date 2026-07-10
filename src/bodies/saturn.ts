@@ -61,6 +61,10 @@ export class Saturn extends Planet {
             hasRings: true,
             rotation: { tilt: SATURN_AXIS, speed: rotSpeed, azimuth: SATURN_AZIMUTH },
             mesh: mesh,
+            atmosphere: {
+                radius: SATURN_RADIUS * 1.07,
+                tint: 0xffeebb,
+            },
         });
     }
 }

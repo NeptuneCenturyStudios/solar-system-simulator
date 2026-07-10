@@ -59,6 +59,10 @@ export class Mars extends Planet {
             hasRings: false,
             rotation: { tilt: MARS_AXIS, speed: rotSpeed, azimuth: MARS_AZIMUTH },
             mesh: mesh,
+            atmosphere: {
+                radius: MARS_RADIUS * 1.05,
+                tint: 0xff8866,
+            },
         });
     }
 }

@@ -169,10 +169,10 @@ export class Earth extends Planet {
             maxTrail: 4500,
             bodySubtype: PlanetTypeEnum.Terrestrial,
             mesh: mesh,
-            // atmosphere: {
-            //     radius: EARTH_RADIUS * 1.07,
-            //     tint: 0x5599ff,
-            // },
+            atmosphere: {
+                radius: EARTH_RADIUS * 1.07,
+                tint: 0x5599ff,
+            },
         });
 
         this.customUniforms = customUniforms;

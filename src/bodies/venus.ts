@@ -57,10 +57,10 @@ export class Venus extends Planet {
             hasRings: false,
             rotation: { tilt: VENUS_AXIS, speed: rotSpeed, azimuth: VENUS_AZIMUTH },
             mesh: mesh,
-            // atmosphere: {
-            //     radius: VENUS_RADIUS * 1.07,
-            //     tint: 0xffdd88,
-            // },
+            atmosphere: {
+                radius: VENUS_RADIUS * 1.07,
+                tint: 0xffdd88,
+            },
         });
 
         const venusAtmosphereTexture = loadSrgbTexture(

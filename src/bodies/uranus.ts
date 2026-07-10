@@ -61,6 +61,10 @@ export class Uranus extends Planet {
             hasRings: false,
             rotation: { tilt: URANUS_AXIS, speed: rotSpeed, azimuth: URANUS_AZIMUTH },
             mesh: mesh,
+            atmosphere: {
+                radius: URANUS_RADIUS * 1.07,
+                tint: 0x88ddff,
+            },
         });
     }
 }

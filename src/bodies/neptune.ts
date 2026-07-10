@@ -61,6 +61,10 @@ export class Neptune extends Planet {
             hasRings: false,
             rotation: { tilt: NEPTUNE_AXIS, speed: rotSpeed, azimuth: NEPTUNE_AZIMUTH },
             mesh: mesh,
+            atmosphere: {
+                radius: NEPTUNE_RADIUS * 1.07,
+                tint: 0x4488ff,
+            },
         });
     }
 }

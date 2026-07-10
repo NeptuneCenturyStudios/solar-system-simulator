@@ -243,6 +243,22 @@ export class CelestialBody extends Body {
             }
         }
 
+        // Atmosphere shell
+        if (this.atmosphereShell) {
+            try {
+                this.scene.remove(this.atmosphereShell.mesh);
+                this.atmosphereShell.mesh.geometry.dispose();
+                if (Array.isArray(this.atmosphereShell.mesh.material)) {
+                    this.atmosphereShell.mesh.material.forEach((mat: THREE.Material) => mat.dispose());
+                } else {
+                    this.atmosphereShell.mesh.material.dispose();
+                }
+            } catch {
+                // ignore cleanup errors
+            }
+            this.atmosphereShell = null;
+        }
+
         // Clouds
         if (this.clouds) {
             this.scene.remove(this.clouds);
@@ -468,8 +484,9 @@ export class CelestialBody extends Body {
      * Update purely visual properties that don't affect physics.
      * Called once per rendered frame (after all substeps) rather than per substep.
      * @param dtTotal Total elapsed simulation time for this frame (sum of all substep dts).
+     * @param cameraPos Camera world position (used for atmosphere shell fresnel calculation).
      */
-    updateVisuals(dtTotal: number) {
+    updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
         if (this._isDisposed) return;
 
         if (this.clouds && typeof this.cloudRotationSpeed === 'number') {
@@ -479,6 +496,13 @@ export class CelestialBody extends Body {
         if (this.rings) {
             this.rings.position.copy(this.mesh.position);
             this.rings.quaternion.copy(this.mesh.quaternion);
+        }
+
+        // Update atmosphere shell with current camera position (simple fresnel glow).
+        if (this.atmosphereShell && cameraPos) {
+            this.atmosphereShell.update({
+                cameraPosWorld: cameraPos,
+            });
         }
     }
 
