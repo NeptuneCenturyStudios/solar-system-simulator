@@ -20,7 +20,7 @@ import {
 
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import type { CelestialBody } from '../bodies/celestial-body';
-import { createAtmosphereShell } from '../effects/earth-atmosphere-shell';
+import { createAtmosphereShell } from '../effects/atmosphere-shell';
 
 export type ProceduralPlanetSubtype =
     | 'solid'

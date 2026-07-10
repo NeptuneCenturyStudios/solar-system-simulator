@@ -9,7 +9,7 @@ import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { BodyTypeEnum } from './body-enums';
-import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/earth-atmosphere-shell';
+import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/atmosphere-shell';
 
 // Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
 const _Y_AXIS = new THREE.Vector3(0, 1, 0);
