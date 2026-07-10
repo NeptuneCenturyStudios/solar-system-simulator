@@ -249,9 +249,6 @@ export function generateProceduralPlanets(params: {
             planetSubtype: subtype,
         });
 
-        // Texture pool index: deterministic-ish from i (keeps stable across seeds if planetCount fixed).
-        const textureIndex = i;
-
         planetCreations.push({
             id,
             name,
@@ -264,7 +261,6 @@ export function generateProceduralPlanets(params: {
             rotationSpeed: planetParams.rotationSpeed,
             rotationTilt: planetParams.rotationTilt,
             rotationAzimuth: planetParams.rotationAzimuth,
-            textureIndex,
             textureSeed: subSeed,
         });
     }

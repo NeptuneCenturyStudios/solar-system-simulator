@@ -4,8 +4,8 @@ import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { SeededRandom } from '../utilities/prng';
 import {
-    fictionalGasTextures,
-    fictionalIceTextures,
+    gasGiantTextures,
+    iceGiantTextures,
     getMetalnessForPlanetTexture,
     getRoughnessForPlanetTexture,
     getVolcanicEmissiveMap,
@@ -53,14 +53,6 @@ export type ProceduralPlanetCreation = {
      * UI-only feature: only applies to planets (not dwarf planets).
      */
     hasRings?: boolean;
-
-    /**
-     * For texture pools with multiple options:
-     * - 'solid' uses fictionalTextures
-     * - 'gas_giant' uses fictionalGasTextures
-     * - 'ice_giant' uses fictionalIceTextures
-     */
-    textureIndex?: number;
 
     /**
      * Seed used for deterministic textures (currently: desert/ocean/frozen).
@@ -122,24 +114,20 @@ export function pickTextureForPlanetType(
     if (planetType === PlanetTypeEnum.Temperate) {
         texturePack = temperateTextures;
     }
+    if (planetType === PlanetTypeEnum.GasGiant) {
+        texturePack = gasGiantTextures;
+    }
+    if (planetType === PlanetTypeEnum.IceGiant) {
+        texturePack = iceGiantTextures;
+    }
 
     // Pick random texture from the selected pack using the seeded RNG
     const texture = rng.pick(texturePack);
     return texture;
 }
 
-function pickTextureForGasIceSubtype(
-    subtype: PlanetTypeEnum,
-    textureIndex: number | undefined
-): THREE.Texture {
-    const idx = Math.max(0, textureIndex ?? 0);
-    if (subtype === PlanetTypeEnum.GasGiant)
-        return fictionalGasTextures[idx % fictionalGasTextures.length]!;
-    return fictionalIceTextures[idx % fictionalIceTextures.length]!;
-}
-
 function buildMeshMaterial(creation: ProceduralPlanetCreation): THREE.MeshStandardMaterial {
-    const { bodySubtype, textureIndex, textureSeed } = creation;
+    const { bodySubtype, textureSeed } = creation;
 
     if (!textureSeed) {
         throw new Error('Texture seed is required for deterministic planet texture selection.');
@@ -147,10 +135,7 @@ function buildMeshMaterial(creation: ProceduralPlanetCreation): THREE.MeshStanda
 
     const rng = new SeededRandom(textureSeed);
 
-    const texture =
-        bodySubtype === PlanetTypeEnum.GasGiant || bodySubtype === PlanetTypeEnum.IceGiant
-            ? pickTextureForGasIceSubtype(bodySubtype, textureIndex)
-            : pickTextureForPlanetType(bodySubtype, rng);
+    const texture = pickTextureForPlanetType(bodySubtype, rng);
 
     const material = new THREE.MeshStandardMaterial({
         map: texture,

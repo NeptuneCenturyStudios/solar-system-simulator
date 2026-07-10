@@ -146,6 +146,11 @@ export class TextureGeneratorPanel extends Panel {
         ) as HTMLInputElement | null;
         this.equatorialWidthDisplay = document.getElementById('textureGenEquatorialWidthVal');
 
+        this.bandScaleSlider = document.getElementById(
+            'textureGenBandScaleSlider'
+        ) as HTMLInputElement | null;
+        this.bandScaleDisplay = document.getElementById('textureGenBandScaleVal');
+
         this.turbulenceSlider = document.getElementById(
             'textureGenTurbulenceSlider'
         ) as HTMLInputElement | null;

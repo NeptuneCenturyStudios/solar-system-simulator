@@ -24,19 +24,6 @@ export const europaTexture = loadSrgbTexture('./assets/textures/bodies/2k/europa
 export const ganymedeTexture = loadSrgbTexture('./assets/textures/bodies/2k/ganymede.jpg');
 export const callistoTexture = loadSrgbTexture('./assets/textures/bodies/2k/callisto.jpg');
 
-// Custom/random textures for custom gas giants
-// (kept here because these are not part of the fictional solid pool)
-export const fictionalGasTextures: THREE.Texture[] = [
-    loadSrgbTexture('./assets/textures/fictional_gas_1.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_gas_2.jpg'),
-];
-
-// Custom/random textures for custom ice giants
-export const fictionalIceTextures: THREE.Texture[] = [
-    loadSrgbTexture('./assets/textures/fictional_ice_1.jpg'),
-    loadSrgbTexture('./assets/textures/fictional_ice_2.jpg'),
-];
-
 const SPACE_TEXTURE_COUNT = 13;
 const PROCEDURAL_TEMPORATE_TEXTURES = 5;
 const PROCEDURAL_VOLCANIC_TEXTURES = 5;
@@ -44,6 +31,8 @@ const PROCEDURAL_OCEAN_TEXTURES = 5;
 const PROCEDURAL_FROZEN_TEXTURES = 5;
 const PROCEDURAL_DESERT_TEXTURES = 5;
 const PROCEDURAL_TERRESTRIAL_TEXTURES = 9;
+const PROCEDURAL_GAS_GIANT_TEXTURES = 5;
+const PROCEDURAL_ICE_GIANT_TEXTURES = 5;
 const PROCEDURAL_CLOUD_TEXTURES = 2;
 
 /**
@@ -147,6 +136,40 @@ function getTerrestrialTextures(): THREE.Texture[] {
  * An array of THREE.Texture objects representing the available terrestrial planet textures for procedural generation.
  */
 export const terrestrialTextures = getTerrestrialTextures();
+
+/**
+ * Gets the list of terrestrial textures for procedural generation.
+ * @returns An array of THREE.Texture objects.
+ */
+function getGasGiantTextures(): THREE.Texture[] {
+    const textures: THREE.Texture[] = [];
+    for (let i = 1; i <= PROCEDURAL_GAS_GIANT_TEXTURES; i++) {
+        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/gas-giant-${i}.png`));
+    }
+    return textures;
+}
+
+/**
+ * An array of THREE.Texture objects representing the available gas giant planet textures for procedural generation.
+ */
+export const gasGiantTextures = getGasGiantTextures();
+
+/**
+ * Gets the list of ice giant textures for procedural generation.
+ * @return An array of THREE.Texture objects.
+ */
+function getIceGiantTextures(): THREE.Texture[] {
+    const textures: THREE.Texture[] = [];
+    for (let i = 1; i <= PROCEDURAL_ICE_GIANT_TEXTURES; i++) {
+        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/ice-giant-${i}.png`));
+    }
+    return textures;
+}
+
+/**
+ * An array of THREE.Texture objects representing the available ice giant planet textures for procedural generation.
+ */
+export const iceGiantTextures = getIceGiantTextures();
 
 /**
  * Get the list of space background textures.
