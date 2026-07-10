@@ -67,6 +67,9 @@ export class TextureGeneratorPanel extends Panel {
     equatorialWidthSlider: HTMLInputElement | null = null;
     equatorialWidthDisplay: HTMLElement | null = null;
 
+    colorVariationSlider: HTMLInputElement | null = null;
+    colorVariationDisplay: HTMLElement | null = null;
+
     // Download
     btnDownload: HTMLButtonElement | null = null;
     downloadLoading: HTMLElement | null = null;
@@ -145,7 +148,10 @@ export class TextureGeneratorPanel extends Panel {
             'textureGenEquatorialWidthSlider'
         ) as HTMLInputElement | null;
         this.equatorialWidthDisplay = document.getElementById('textureGenEquatorialWidthVal');
-
+        this.colorVariationSlider = document.getElementById(
+            'textureGenColorVariationSlider'
+        ) as HTMLInputElement | null;
+        this.colorVariationDisplay = document.getElementById('textureGenColorVariationVal');
         this.bandScaleSlider = document.getElementById(
             'textureGenBandScaleSlider'
         ) as HTMLInputElement | null;
@@ -227,6 +233,7 @@ export class TextureGeneratorPanel extends Panel {
             this.stormSizeSlider,
             this.contrastSlider,
             this.equatorialWidthSlider,
+            this.colorVariationSlider,
         ]) {
             if (slider) slider.oninput = () => { this.syncDisplayValues(); scheduleOnInput(); };
         }
@@ -272,6 +279,10 @@ export class TextureGeneratorPanel extends Panel {
             const v = (parseInt(this.equatorialWidthSlider.value, 10) / 100).toFixed(2);
             this.equatorialWidthDisplay.textContent = v;
         }
+        if (this.colorVariationSlider && this.colorVariationDisplay) {
+            const v = (parseInt(this.colorVariationSlider.value, 10) / 100).toFixed(2);
+            this.colorVariationDisplay.textContent = v;
+        }
     }
 
     private syncCustomColorVisibility() {
@@ -298,6 +309,7 @@ export class TextureGeneratorPanel extends Panel {
             customEquatorialColor2: this.customEquatorialColor2Input?.value ?? '#e0a060',
             customEquatorialColor3: this.customEquatorialColor3Input?.value ?? '#60e090',
             equatorialWidth: parseInt(this.equatorialWidthSlider?.value ?? '30', 10) / 100,
+            colorVariation: parseInt(this.colorVariationSlider?.value ?? '100', 10) / 100,
         };
     }
 

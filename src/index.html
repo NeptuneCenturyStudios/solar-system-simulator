@@ -38,25 +38,25 @@
                         >
                     </div>
                 </div>
-                <button id="startupLaunchDefaultBtn" class="old-ui btn-with-icon">
+                <button id="startupLaunchDefaultBtn" class="old-ui btn-with-icon mb-3">
                     <span class="material-symbols-outlined">orbit</span>
                     LAUNCH SOLAR SYSTEM
                 </button>
-                <button id="startupLaunchEmptyBtn" class="old-ui btn-with-icon">
+                <button id="startupLaunchEmptyBtn" class="old-ui btn-with-icon mb-3">
                     <span class="material-symbols-outlined">build</span>
                     BUILD YOUR OWN SYSTEM
                 </button>
-                <button id="startupLaunchGenerateBtn" class="old-ui btn-with-icon">
+                <button id="startupLaunchGenerateBtn" class="old-ui btn-with-icon mb-3">
                     <span class="material-symbols-outlined">auto_fix_high</span>
                     GENERATE
                 </button>
-                <button id="startupLaunchBlackHoleBtn" class="old-ui btn-dark btn-with-icon">
+                <button id="startupLaunchBlackHoleBtn" class="old-ui btn-dark btn-with-icon mb-3">
                     <span class="material-symbols-outlined">brightness_1</span>
                     BLACK HOLE
                 </button>
                 <button
                     id="startupCancelBtn"
-                    class="old-ui btn-with-icon btn-danger"
+                    class="old-ui btn-with-icon btn-danger mb-3"
                     style="display: none"
                 >
                     <span class="material-symbols-outlined">close</span>
@@ -86,13 +86,13 @@
                         style="display: none"
                     >
                         <div>
-                            <div style="display: flex; align-items: center">
-                                <span class="material-symbols-outlined loading-icon"
+                            <div style="display: flex; align-items: center" class="mb-1">
+                                <span class="material-symbols-outlined loading-icon mr-1"
                                     >progress_activity</span
                                 >
 
                                 <div
-                                    style="font-weight: bold; color: #00ffcc; margin-bottom: 8px"
+                                    style="font-weight: bold; color: #00ffcc;"
                                     id="procedural-progress-status"
                                 >
                                     Preparing...
@@ -488,11 +488,11 @@
                                 </option>
                             </select>
                         </div>
-                        <button id="flightSpawnBtn" class="old-ui btn-with-icon">
+                        <button id="flightSpawnBtn" class="old-ui btn-with-icon mb-3">
                             <span class="material-symbols-outlined">rocket_launch</span>
                             SPAWN SPACESHIP
                         </button>
-                        <button id="flightAutopilotBtn" class="old-ui btn-with-icon" disabled>
+                        <button id="flightAutopilotBtn" class="old-ui btn-with-icon mb-3" disabled>
                             <span class="material-symbols-outlined">rocket</span>
                             AUTOPILOT
                         </button>
@@ -549,7 +549,7 @@
                                 </button>
                             </div>
                         </div>
-                        <button id="addBodyBtn" class="old-ui btn-with-icon">
+                        <button id="addBodyBtn" class="old-ui btn-with-icon mb-3">
                             <span class="material-symbols-outlined">add</span>
                             ADD
                         </button>
@@ -788,7 +788,7 @@
                                 <button
                                     id="randomizeCreateBtn"
                                     type="button"
-                                    class="old-ui btn-with-icon"
+                                    class="old-ui btn-with-icon mb-3"
                                 >
                                     <span class="material-symbols-outlined">shuffle</span>
                                     RANDOMIZE
@@ -810,7 +810,7 @@
                             </div>
                         </div>
 
-                        <button id="editBodyBtn" class="old-ui btn-with-icon">
+                        <button id="editBodyBtn" class="old-ui btn-with-icon mb-3">
                             <span class="material-symbols-outlined">edit</span>
                             EDIT
                         </button>
@@ -1074,26 +1074,55 @@
                         </div>
 
                         <!-- Preview -->
-                        <div style="position: relative; margin-bottom: 10px; border: 1px solid var(--new-ui-border); border-radius: 4px; overflow: hidden; background: #000; line-height: 0;">
+                        <div
+                            style="
+                                position: relative;
+                                margin-bottom: 10px;
+                                border: 1px solid var(--new-ui-border);
+                                border-radius: 4px;
+                                overflow: hidden;
+                                background: #000;
+                                line-height: 0;
+                            "
+                        >
                             <canvas
                                 id="texture-generator-preview"
                                 class="ui-canvas"
                                 width="512"
                                 height="256"
-                                style="width: 100%; height: auto; display: block;"
+                                style="width: 100%; height: auto; display: block"
                             ></canvas>
                             <div
                                 id="texture-gen-preview-loading"
-                                style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); font-size: 0.8em; color: #00ffcc;"
+                                style="
+                                    display: none;
+                                    position: absolute;
+                                    inset: 0;
+                                    align-items: center;
+                                    justify-content: center;
+                                    background: rgba(0, 0, 0, 0.55);
+                                    font-size: 0.8em;
+                                    color: #00ffcc;
+                                "
                             >
-                                <span class="material-symbols-outlined loading-icon" style="margin-right: 6px">progress_activity</span>
+                                <span
+                                    class="material-symbols-outlined loading-icon"
+                                    style="margin-right: 6px"
+                                    >progress_activity</span
+                                >
                                 Generating…
                             </div>
                         </div>
 
                         <!-- Scrollable controls -->
-                        <div style="overflow-y: auto; max-height: 55vh; padding-right: 2px; scrollbar-width: thin;">
-
+                        <div
+                            style="
+                                overflow-y: auto;
+                                max-height: 55vh;
+                                padding-right: 2px;
+                                scrollbar-width: thin;
+                            "
+                        >
                             <div class="control-group">
                                 <label for="textureTypeSelect">Texture Type</label>
                                 <select id="textureTypeSelect">
@@ -1103,20 +1132,20 @@
 
                             <div class="control-group">
                                 <label for="textureGenSeedInput">Seed</label>
-                                <div style="display: flex; gap: 6px; align-items: center;">
+                                <div style="display: flex; gap: 6px; align-items: center">
                                     <input
                                         type="text"
                                         id="textureGenSeedInput"
                                         class="text-input"
                                         value="gas-giant"
-                                        style="flex: 1 1 auto; margin-bottom: 0;"
+                                        style="flex: 1 1 auto; margin-bottom: 0"
                                         placeholder="Seed string"
                                     />
                                     <button
                                         id="btn-texture-gen-randomize-seed"
                                         class="old-ui btn-icon-only"
                                         title="Randomize seed"
-                                        style="flex-shrink: 0;"
+                                        style="flex-shrink: 0"
                                     >
                                         <span class="material-symbols-outlined">casino</span>
                                     </button>
@@ -1144,111 +1173,379 @@
                             </div>
 
                             <!-- Custom colour pickers — hidden until palette = custom -->
-                            <div id="textureGenCustomColorRow" style="display: none;">
+                            <div id="textureGenCustomColorRow" style="display: none">
                                 <div class="control-group">
                                     <label>Band Colours</label>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+                                    <div
+                                        style="
+                                            display: grid;
+                                            grid-template-columns: 1fr 1fr 1fr;
+                                            gap: 6px;
+                                        "
+                                    >
                                         <div>
-                                            <div style="font-size: 0.75em; color: #aaa; margin-bottom: 3px;">Color 1</div>
-                                            <input type="color" id="textureGenCustomBandColor1" value="#c2884a" style="width: 100%; height: 32px; padding: 2px; cursor: pointer; background: transparent; border: 1px solid var(--new-ui-border); border-radius: 4px;" />
+                                            <div
+                                                style="
+                                                    font-size: 0.75em;
+                                                    color: #aaa;
+                                                    margin-bottom: 3px;
+                                                "
+                                            >
+                                                Color 1
+                                            </div>
+                                            <input
+                                                type="color"
+                                                id="textureGenCustomBandColor1"
+                                                value="#c2884a"
+                                                style="
+                                                    width: 100%;
+                                                    height: 32px;
+                                                    padding: 2px;
+                                                    cursor: pointer;
+                                                    background: transparent;
+                                                    border: 1px solid var(--new-ui-border);
+                                                    border-radius: 4px;
+                                                "
+                                            />
                                         </div>
                                         <div>
-                                            <div style="font-size: 0.75em; color: #aaa; margin-bottom: 3px;">Color 2</div>
-                                            <input type="color" id="textureGenCustomBandColor2" value="#4a88c2" style="width: 100%; height: 32px; padding: 2px; cursor: pointer; background: transparent; border: 1px solid var(--new-ui-border); border-radius: 4px;" />
+                                            <div
+                                                style="
+                                                    font-size: 0.75em;
+                                                    color: #aaa;
+                                                    margin-bottom: 3px;
+                                                "
+                                            >
+                                                Color 2
+                                            </div>
+                                            <input
+                                                type="color"
+                                                id="textureGenCustomBandColor2"
+                                                value="#4a88c2"
+                                                style="
+                                                    width: 100%;
+                                                    height: 32px;
+                                                    padding: 2px;
+                                                    cursor: pointer;
+                                                    background: transparent;
+                                                    border: 1px solid var(--new-ui-border);
+                                                    border-radius: 4px;
+                                                "
+                                            />
                                         </div>
                                         <div>
-                                            <div style="font-size: 0.75em; color: #aaa; margin-bottom: 3px;">Color 3</div>
-                                            <input type="color" id="textureGenCustomBandColor3" value="#c24a4a" style="width: 100%; height: 32px; padding: 2px; cursor: pointer; background: transparent; border: 1px solid var(--new-ui-border); border-radius: 4px;" />
+                                            <div
+                                                style="
+                                                    font-size: 0.75em;
+                                                    color: #aaa;
+                                                    margin-bottom: 3px;
+                                                "
+                                            >
+                                                Color 3
+                                            </div>
+                                            <input
+                                                type="color"
+                                                id="textureGenCustomBandColor3"
+                                                value="#c24a4a"
+                                                style="
+                                                    width: 100%;
+                                                    height: 32px;
+                                                    padding: 2px;
+                                                    cursor: pointer;
+                                                    background: transparent;
+                                                    border: 1px solid var(--new-ui-border);
+                                                    border-radius: 4px;
+                                                "
+                                            />
                                         </div>
                                     </div>
                                 </div>
                                 <div class="control-group">
                                     <label>Equatorial Colours</label>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+                                    <div
+                                        style="
+                                            display: grid;
+                                            grid-template-columns: 1fr 1fr 1fr;
+                                            gap: 6px;
+                                        "
+                                    >
                                         <div>
-                                            <div style="font-size: 0.75em; color: #aaa; margin-bottom: 3px;">Color 1</div>
-                                            <input type="color" id="textureGenCustomEquatorialColor1" value="#6ab0e0" style="width: 100%; height: 32px; padding: 2px; cursor: pointer; background: transparent; border: 1px solid var(--new-ui-border); border-radius: 4px;" />
+                                            <div
+                                                style="
+                                                    font-size: 0.75em;
+                                                    color: #aaa;
+                                                    margin-bottom: 3px;
+                                                "
+                                            >
+                                                Color 1
+                                            </div>
+                                            <input
+                                                type="color"
+                                                id="textureGenCustomEquatorialColor1"
+                                                value="#6ab0e0"
+                                                style="
+                                                    width: 100%;
+                                                    height: 32px;
+                                                    padding: 2px;
+                                                    cursor: pointer;
+                                                    background: transparent;
+                                                    border: 1px solid var(--new-ui-border);
+                                                    border-radius: 4px;
+                                                "
+                                            />
                                         </div>
                                         <div>
-                                            <div style="font-size: 0.75em; color: #aaa; margin-bottom: 3px;">Color 2</div>
-                                            <input type="color" id="textureGenCustomEquatorialColor2" value="#e0a060" style="width: 100%; height: 32px; padding: 2px; cursor: pointer; background: transparent; border: 1px solid var(--new-ui-border); border-radius: 4px;" />
+                                            <div
+                                                style="
+                                                    font-size: 0.75em;
+                                                    color: #aaa;
+                                                    margin-bottom: 3px;
+                                                "
+                                            >
+                                                Color 2
+                                            </div>
+                                            <input
+                                                type="color"
+                                                id="textureGenCustomEquatorialColor2"
+                                                value="#e0a060"
+                                                style="
+                                                    width: 100%;
+                                                    height: 32px;
+                                                    padding: 2px;
+                                                    cursor: pointer;
+                                                    background: transparent;
+                                                    border: 1px solid var(--new-ui-border);
+                                                    border-radius: 4px;
+                                                "
+                                            />
                                         </div>
                                         <div>
-                                            <div style="font-size: 0.75em; color: #aaa; margin-bottom: 3px;">Color 3</div>
-                                            <input type="color" id="textureGenCustomEquatorialColor3" value="#60e090" style="width: 100%; height: 32px; padding: 2px; cursor: pointer; background: transparent; border: 1px solid var(--new-ui-border); border-radius: 4px;" />
+                                            <div
+                                                style="
+                                                    font-size: 0.75em;
+                                                    color: #aaa;
+                                                    margin-bottom: 3px;
+                                                "
+                                            >
+                                                Color 3
+                                            </div>
+                                            <input
+                                                type="color"
+                                                id="textureGenCustomEquatorialColor3"
+                                                value="#60e090"
+                                                style="
+                                                    width: 100%;
+                                                    height: 32px;
+                                                    padding: 2px;
+                                                    cursor: pointer;
+                                                    background: transparent;
+                                                    border: 1px solid var(--new-ui-border);
+                                                    border-radius: 4px;
+                                                "
+                                            />
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="control-group">
-                                <label>Band Scale <span id="textureGenBandScaleVal" class="val-display">8</span></label>
+                                <label
+                                    >Color Variation
+                                    <span id="textureGenColorVariationVal" class="val-display"
+                                        >1.00</span
+                                    ></label
+                                >
                                 <div class="slider-row">
-                                    <input type="range" id="textureGenBandScaleSlider" min="1" max="20" step="1" value="8" title="Number of horizontal band cycles" />
+                                    <input
+                                        type="range"
+                                        id="textureGenColorVariationSlider"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="100"
+                                        title="How much palette colours diverge from the average (0 = monochromatic, 1 = full variation)"
+                                    />
                                 </div>
                             </div>
 
                             <div class="control-group">
-                                <label>Turbulence <span id="textureGenTurbulenceVal" class="val-display">0.40</span></label>
+                                <label
+                                    >Band Scale
+                                    <span id="textureGenBandScaleVal" class="val-display"
+                                        >8</span
+                                    ></label
+                                >
                                 <div class="slider-row">
-                                    <input type="range" id="textureGenTurbulenceSlider" min="0" max="100" step="1" value="40" title="How wavy or distorted the bands appear" />
+                                    <input
+                                        type="range"
+                                        id="textureGenBandScaleSlider"
+                                        min="1"
+                                        max="20"
+                                        step="1"
+                                        value="8"
+                                        title="Number of horizontal band cycles"
+                                    />
                                 </div>
                             </div>
 
                             <div class="control-group">
-                                <label>Detail <span id="textureGenDetailVal" class="val-display">0.30</span></label>
+                                <label
+                                    >Turbulence
+                                    <span id="textureGenTurbulenceVal" class="val-display"
+                                        >0.40</span
+                                    ></label
+                                >
                                 <div class="slider-row">
-                                    <input type="range" id="textureGenDetailSlider" min="0" max="100" step="1" value="30" title="High-frequency noise within each band" />
+                                    <input
+                                        type="range"
+                                        id="textureGenTurbulenceSlider"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="40"
+                                        title="How wavy or distorted the bands appear"
+                                    />
                                 </div>
                             </div>
 
                             <div class="control-group">
-                                <label>Storm Count <span id="textureGenStormCountVal" class="val-display">2</span></label>
+                                <label
+                                    >Detail
+                                    <span id="textureGenDetailVal" class="val-display"
+                                        >0.30</span
+                                    ></label
+                                >
                                 <div class="slider-row">
-                                    <input type="range" id="textureGenStormCountSlider" min="0" max="5" step="1" value="2" title="Number of oval storm features" />
+                                    <input
+                                        type="range"
+                                        id="textureGenDetailSlider"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="30"
+                                        title="High-frequency noise within each band"
+                                    />
                                 </div>
                             </div>
 
                             <div class="control-group">
-                                <label>Storm Size <span id="textureGenStormSizeVal" class="val-display">0.10</span></label>
+                                <label
+                                    >Storm Count
+                                    <span id="textureGenStormCountVal" class="val-display"
+                                        >2</span
+                                    ></label
+                                >
                                 <div class="slider-row">
-                                    <input type="range" id="textureGenStormSizeSlider" min="2" max="25" step="1" value="10" title="Relative radius of each storm" />
+                                    <input
+                                        type="range"
+                                        id="textureGenStormCountSlider"
+                                        min="0"
+                                        max="5"
+                                        step="1"
+                                        value="2"
+                                        title="Number of oval storm features"
+                                    />
                                 </div>
                             </div>
 
                             <div class="control-group">
-                                <label>Contrast <span id="textureGenContrastVal" class="val-display">1.5</span></label>
+                                <label
+                                    >Storm Size
+                                    <span id="textureGenStormSizeVal" class="val-display"
+                                        >0.10</span
+                                    ></label
+                                >
                                 <div class="slider-row">
-                                    <input type="range" id="textureGenContrastSlider" min="5" max="30" step="1" value="15" title="Contrast between adjacent bands" />
+                                    <input
+                                        type="range"
+                                        id="textureGenStormSizeSlider"
+                                        min="2"
+                                        max="25"
+                                        step="1"
+                                        value="10"
+                                        title="Relative radius of each storm"
+                                    />
                                 </div>
                             </div>
 
                             <div class="control-group">
-                                <label>Equatorial Width <span id="textureGenEquatorialWidthVal" class="val-display">0.30</span></label>
+                                <label
+                                    >Contrast
+                                    <span id="textureGenContrastVal" class="val-display"
+                                        >1.5</span
+                                    ></label
+                                >
                                 <div class="slider-row">
-                                    <input type="range" id="textureGenEquatorialWidthSlider" min="0" max="100" step="1" value="30" title="How far from the equator the secondary colour palette extends (0 = none, 1 = full sphere)" />
+                                    <input
+                                        type="range"
+                                        id="textureGenContrastSlider"
+                                        min="5"
+                                        max="30"
+                                        step="1"
+                                        value="15"
+                                        title="Contrast between adjacent bands"
+                                    />
                                 </div>
                             </div>
 
+                            <div class="control-group">
+                                <label
+                                    >Equatorial Width
+                                    <span id="textureGenEquatorialWidthVal" class="val-display"
+                                        >0.30</span
+                                    ></label
+                                >
+                                <div class="slider-row">
+                                    <input
+                                        type="range"
+                                        id="textureGenEquatorialWidthSlider"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="30"
+                                        title="How far from the equator the secondary colour palette extends (0 = none, 1 = full sphere)"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Download -->
-                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--new-ui-border); display: flex; align-items: center; gap: 8px;">
-                            <button id="btn-texture-gen-download" class="old-ui btn-with-icon" style="flex: 1 1 auto;">
+                        <div
+                            style="
+                                margin-top: 10px;
+                                padding-top: 10px;
+                                border-top: 1px solid var(--new-ui-border);
+                                display: flex;
+                                align-items: center;
+                                gap: 8px;
+                            "
+                        >
+                            <button
+                                id="btn-texture-gen-download"
+                                class="old-ui btn-with-icon"
+                                style="flex: 1 1 auto"
+                            >
                                 <span class="material-symbols-outlined">download</span>
                                 DOWNLOAD
                             </button>
                             <span
                                 id="texture-gen-download-loading"
-                                style="display: none; color: #00ffcc; font-size: 0.8em; white-space: nowrap; align-items: center; gap: 4px;"
+                                style="
+                                    display: none;
+                                    color: #00ffcc;
+                                    font-size: 0.8em;
+                                    white-space: nowrap;
+                                    align-items: center;
+                                    gap: 4px;
+                                "
                             >
-                                <span class="material-symbols-outlined loading-icon">progress_activity</span>
+                                <span class="material-symbols-outlined loading-icon"
+                                    >progress_activity</span
+                                >
                                 Rendering…
                             </span>
                         </div>
-
                     </div>
-
                 </div>
             </div>
 

@@ -9,7 +9,7 @@
     --new-ui-bg: rgba(5, 10, 25, 0.5);
     --new-ui-backdrop-filter: blur(10px);
     --new-ui-border: rgba(34, 68, 102, 1);
-    --new-ui-border-radius: 1rem;
+    --new-ui-border-radius: 0.5rem;
     --new-ui-color: #fff;
     --new-ui-label-color: #00ffcc;
     --new-ui-panel-header-color: #00ffcc;
@@ -39,8 +39,24 @@
     margin-left: auto !important;
 }
 
+.ml-1 {
+    margin-left: 0.25rem !important;
+}
+
+.mr-1 {
+    margin-right: 0.25rem !important;
+}
+
 .mb-0 {
     margin-bottom: 0 !important;
+}
+
+.mb-1 {
+    margin-bottom: 0.25rem !important;
+}
+
+.mb-3 {
+    margin-bottom: 1rem !important;
 }
 
 /* Reset default styles and set up base styles */
@@ -328,14 +344,30 @@ body {
 
 select {
     width: 100%;
-    padding: 8px;
-    background: #004488;
+    padding: 10px 12px;
+    background: var(--new-ui-input-bg);
     color: white;
-    border: 1px solid #00ffcc;
-    border-radius: 4px;
-    cursor: pointer;
+    border: 1px solid #224466;
+    border-radius: var(--new-ui-border-radius);
+    height: 42px;
+    font-family: monospace;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+}
 
-    margin-bottom: 10px;
+select:hover {
+    border-color: #00ffcc;
+    background: rgba(0, 68, 136, 0.7);
+}
+
+select:focus {
+    outline: none;
+    border: 1px solid #00ffcc;
+    background: rgba(0, 68, 136, 0.8);
+    box-shadow:
+        0 0 12px rgba(0, 255, 204, 0.4),
+        inset 0 1px 3px rgba(0, 255, 204, 0.1);
+    transform: translateY(-1px);
 }
 
 select option {
@@ -412,10 +444,9 @@ button.old-ui {
     background: var(--new-ui-button-bg);
     color: white;
     border: 1px solid #2a547e;
-    border-radius: var(--new-ui-table-border-radius);
+    border-radius: var(--new-ui-border-radius);
     cursor: pointer;
-
-    margin-bottom: 15px;
+    height: 42px;
     transition: all 0.2s ease;
 }
 
@@ -539,8 +570,8 @@ button.old-ui.btn-danger:active {
     background: var(--new-ui-input-bg);
     color: white;
     border: 1px solid #224466;
-    border-radius: 4px;
-
+    border-radius: var(--new-ui-border-radius);
+    height: 42px;
     font-family: monospace;
     transition: all 0.3s ease;
     box-sizing: border-box;

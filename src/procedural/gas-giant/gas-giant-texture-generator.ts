@@ -36,6 +36,8 @@ export interface GasGiantTextureParams {
     customEquatorialColor3: string;
     /** Width of the equatorial colour zone. 0 = none, 1 = full sphere. */
     equatorialWidth: number;
+    /** How much palette colours diverge from the palette average. 0 = monochromatic, 1 = full palette variation. */
+    colorVariation: number;
 }
 
 export const DEFAULT_GAS_GIANT_PARAMS: GasGiantTextureParams = {
@@ -54,6 +56,7 @@ export const DEFAULT_GAS_GIANT_PARAMS: GasGiantTextureParams = {
     customEquatorialColor2: '#e0a060',
     customEquatorialColor3: '#60e090',
     equatorialWidth: 0.30,
+    colorVariation: 1.0,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -168,6 +171,16 @@ function getEquatorialStops(params: GasGiantTextureParams): PaletteStop[] {
     if (params.palette === 'custom')
         return buildCustomPalette(params.customEquatorialColor1, params.customEquatorialColor2, params.customEquatorialColor3);
     return EQUATORIAL_PALETTES[params.palette];
+}
+
+/** Lerps each palette stop toward the mean of all stops, controlled by `variation`.
+ *  variation=1 → original palette; variation=0 → all stops equal the average colour. */
+function applyColorVariation(stops: PaletteStop[], variation: number): PaletteStop[] {
+    if (variation >= 1) return stops;
+    const avg: Vec3 = { x: 0, y: 0, z: 0 };
+    for (const s of stops) { avg.x += s.x; avg.y += s.y; avg.z += s.z; }
+    avg.x /= stops.length; avg.y /= stops.length; avg.z /= stops.length;
+    return stops.map(s => mix3(avg, s, variation));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -294,8 +307,8 @@ export async function renderGasGiantTexture(
     const turbSeedU32 = hashStringToU32(`${params.seed}|turb`);
     const detailSeedU32 = hashStringToU32(`${params.seed}|detail`);
 
-    const stops = getStops(params);
-    const equatorialStops = getEquatorialStops(params);
+    const stops = applyColorVariation(getStops(params), params.colorVariation);
+    const equatorialStops = applyColorVariation(getEquatorialStops(params), params.colorVariation);
     const storms = buildStorms(params);
 
     // Scale noise inputs so that frequency is consistent across resolutions
