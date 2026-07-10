@@ -5,7 +5,9 @@ import { Body } from '../bodies/body';
 import { Star } from '../bodies/star';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { Moon } from '../bodies/moon';
-import { BodyTypeEnum, MoonTypeEnum } from '../bodies/body-enums';
+import { MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
+import { Planet } from '../bodies/planet';
+import { DwarfPlanet } from '../bodies/dwarf-planet';
 
 /**
  * Flight speed HUD texture — drawn in the same style as the FPS counter
@@ -261,54 +263,45 @@ export function createStatsTexture(body: Body) {
 
     // Planet / Moon Type (shows the "sub type" like planets already do)
     if (
-        body.bodyType &&
-        (body.bodyType & BodyTypeEnum.Planet || body.bodyType & BodyTypeEnum.DwarfPlanet) &&
-        'planetType' in body &&
-        (body as unknown as { planetType?: string }).planetType
+        body instanceof Planet || body instanceof DwarfPlanet
     ) {
         // Map enum/string to display label
-        const planetType = (body as unknown as { planetType?: string }).planetType;
         let planetTypeLabel: string;
 
-        switch (planetType) {
-            case 'gas_giant':
-            case 'GasGiant':
+        switch (body.planetType) {
+            case PlanetTypeEnum.GasGiant:
                 planetTypeLabel = 'Gas Giant';
                 break;
-            case 'ice_giant':
-            case 'IceGiant':
+            case PlanetTypeEnum.IceGiant:
                 planetTypeLabel = 'Ice Giant';
                 break;
-            case 'solid':
-            case 'Terrestrial':
+            case PlanetTypeEnum.Terrestrial:
                 planetTypeLabel = 'Terrestrial';
                 break;
-            case 'volcanic':
-            case 'Volcanic':
+            case PlanetTypeEnum.Volcanic:
                 planetTypeLabel = 'Volcanic';
                 break;
-            case 'ocean':
-            case 'Ocean':
+            case PlanetTypeEnum.Ocean:
                 planetTypeLabel = 'Ocean';
                 break;
-            case 'frozen':
-            case 'Frozen':
+            case PlanetTypeEnum.Frozen:
                 planetTypeLabel = 'Frozen';
                 break;
-            case 'desert':
-            case 'Desert':
+            case PlanetTypeEnum.Desert:
                 planetTypeLabel = 'Desert';
                 break;
+            case PlanetTypeEnum.Temperate:
+                planetTypeLabel = 'Temperate';
+                break;
             default:
-                planetTypeLabel = String(planetType);
+                planetTypeLabel = 'Unknown';
         }
 
         drawStat('Sub Type: ', planetTypeLabel, y);
         y += lineHeight;
     } else if (body instanceof Moon) {
-        const moonType = body.moonType;
         let moonTypeLabel: string;
-        switch (moonType) {
+        switch (body.moonType) {
             case MoonTypeEnum.Terrestrial:
                 moonTypeLabel = 'Terrestrial';
                 break;
@@ -328,7 +321,7 @@ export function createStatsTexture(body: Body) {
                 moonTypeLabel = 'Desert';
                 break;
             default:
-                moonTypeLabel = String(moonType);
+                moonTypeLabel = 'Unknown';
         }
 
         drawStat('Sub Type: ', moonTypeLabel, y);

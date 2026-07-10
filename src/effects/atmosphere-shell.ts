@@ -1,25 +1,21 @@
 import * as THREE from 'three';
 
-type AtmosphereShellUniforms = {
-    uCameraPosWorld: { value: THREE.Vector3 };
-    uTint: { value: THREE.Color };
-    uFresnelPower: { value: number };
-    uAlphaMax: { value: number };
-};
-
 export type AtmosphereShellHandle = {
-    mesh: THREE.Mesh;
-    update: (opts: {
-        cameraPosWorld: THREE.Vector3;
-    }) => void;
+    dispose: () => void;
+    /** No-op — sprite follows parent transform automatically. Kept for API compatibility. */
+    update: (opts: { cameraPosWorld: THREE.Vector3 }) => void;
     setVisible: (visible: boolean) => void;
 };
 
 /**
- * Thin, shader-based atmosphere "haze shell".
+ * Atmosphere haze rendered as a billboard sprite with a radial-gradient canvas texture.
  *
- * Renders from both inside and outside (DoubleSide).
- * Simple fresnel-based glow with a base tint color — no star lighting.
+ * The gradient is transparent over the planet disc and glows outward from the limb,
+ * producing a soft haze that fades away — similar to the star-glow effect but without
+ * the pulse and sized for a planetary atmosphere.
+ *
+ * The sprite is added as a child of `parent` (the planet mesh) so it follows the planet
+ * automatically with no per-frame update required.
  */
 export function createAtmosphereShell(
     scene: THREE.Scene,
@@ -27,79 +23,70 @@ export function createAtmosphereShell(
     tint: THREE.Color | number = 0x5599ff,
     parent: THREE.Object3D | null = null
 ): AtmosphereShellHandle {
-    const geometry = new THREE.SphereGeometry(radius, 48, 24);
+    const color = tint instanceof THREE.Color ? tint.clone() : new THREE.Color(tint);
 
-    const uniforms: AtmosphereShellUniforms = {
-        uCameraPosWorld: { value: new THREE.Vector3() },
-        uTint: { value: tint instanceof THREE.Color ? tint : new THREE.Color(tint) },
-        uFresnelPower: { value: 1.75 },
-        uAlphaMax: { value: 0.76 },
-    };
+    // How many times larger than `radius` the sprite is on each side.
+    // With this value the planet disc edge sits at ~67 % of the sprite's half-width
+    // (accounting for the atmosphere radius being ~1.07 × planet radius), leaving
+    // ~33 % for the haze ring to bloom and fade.
+    const SCALE_MULT = 2.8;
+    const CANVAS_SIZE = 256;
+    const HALF = CANVAS_SIZE / 2;
 
-    const material = new THREE.ShaderMaterial({
-        uniforms: uniforms as unknown as Record<string, THREE.IUniform>,
+    // Planet disc edge as a fraction of the sprite's half-width.
+    // radius ≈ 1.07 × planet radius, so:  disc_frac = (1/1.07) × (2/SCALE_MULT) ≈ 0.668
+    const discEdge = (2 / SCALE_MULT) * (1 / 1.07);
+
+    const r = Math.round(color.r * 255);
+    const g = Math.round(color.g * 255);
+    const b = Math.round(color.b * 255);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = CANVAS_SIZE;
+    canvas.height = CANVAS_SIZE;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    const grad = ctx.createRadialGradient(HALF, HALF, 0, HALF, HALF, HALF);
+    grad.addColorStop(0,                             'rgba(0, 0, 0, 0)');
+    grad.addColorStop(Math.max(discEdge - 0.07, 0), 'rgba(0, 0, 0, 0)');
+    grad.addColorStop(discEdge,                      `rgba(${r}, ${g}, ${b}, 0.85)`);
+    grad.addColorStop(Math.min(discEdge + 0.18, 1), `rgba(${r}, ${g}, ${b}, 0.12)`);
+    grad.addColorStop(1,                             'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+
+    const mat = new THREE.SpriteMaterial({
+        map: tex,
         transparent: true,
+        blending: THREE.AdditiveBlending,
+        opacity: 0.8,
         depthWrite: false,
         depthTest: true,
-        side: THREE.DoubleSide,
-        vertexShader: `
-            varying vec3 vNormalWS;
-            varying vec3 vWorldPos;
-
-            void main() {
-                vec4 worldPos4 = modelMatrix * vec4(position, 1.0);
-                vWorldPos = worldPos4.xyz;
-
-                // Convert normal to world-space with inverse-transpose baked-in via mat3(modelMatrix)
-                vNormalWS = normalize(mat3(modelMatrix) * normal);
-
-                gl_Position = projectionMatrix * viewMatrix * worldPos4;
-            }
-        `,
-        fragmentShader: `
-            uniform vec3 uCameraPosWorld;
-            uniform vec3 uTint;
-            uniform float uFresnelPower;
-            uniform float uAlphaMax;
-
-            varying vec3 vNormalWS;
-            varying vec3 vWorldPos;
-
-            void main() {
-                vec3 N = normalize(vNormalWS);
-
-                // View direction (from fragment to camera).
-                vec3 V = normalize(uCameraPosWorld - vWorldPos);
-
-                // Fresnel / limb glow: strongest near the horizon.
-                float fres = pow(1.0 - max(dot(N, V), 0.0), uFresnelPower);
-
-                // Alpha: limb glow capped by max opacity.
-                float alpha = clamp(fres, 0.0, uAlphaMax);
-
-                // Color: tint scaled by fresnel strength.
-                vec3 col = uTint * (0.65 + 0.85 * fres);
-
-                gl_FragColor = vec4(col, alpha);
-            }
-        `,
     });
 
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.frustumCulled = false;
-    mesh.visible = true;
-    mesh.renderOrder = 1;
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.setScalar(radius * SCALE_MULT);
+    sprite.renderOrder = 1;
 
-    if (parent) parent.add(mesh);
-    else scene.add(mesh);
+    if (parent) parent.add(sprite);
+    else scene.add(sprite);
 
     return {
-        mesh,
-        update: ({ cameraPosWorld }) => {
-            uniforms.uCameraPosWorld.value.copy(cameraPosWorld);
+        dispose: () => {
+            if (sprite.parent) sprite.parent.remove(sprite);
+            tex.dispose();
+            mat.dispose();
         },
-        setVisible: (visible: boolean) => {
-            mesh.visible = visible;
+        update: (_opts) => {
+            // No-op: sprite position is inherited from parent mesh.
+        },
+        setVisible: (visible) => {
+            sprite.visible = visible;
         },
     };
 }

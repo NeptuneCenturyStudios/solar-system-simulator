@@ -17,6 +17,7 @@ import type { ProceduralMoonCreation } from './moon-generator';
 import { MoonTypeEnum } from '../bodies/body-enums';
 import { SeededRandom } from '../utilities/prng';
 import { addCloudLayer } from './planet-factory';
+import { createAtmosphereShell } from '../effects/atmosphere-shell';
 
 /**
  * Given a moon type and a seeded random number generator, this function selects an appropriate texture for the moon.
@@ -208,6 +209,33 @@ export function createMoonBodyFromProceduralCreation(params: {
     });
 
     addCloudLayer(body, moonType, textureSeed, creation.rotationSpeed);
+
+    if (body.clouds) {
+        const tintRng = new SeededRandom(`${textureSeed}|atmosphere-tint`);
+        let tint: number;
+        if (moonType === MoonTypeEnum.Temperate) {
+            tint = 0x77aaff;
+        } else if (moonType === MoonTypeEnum.Ocean) {
+            tint = 0x4477cc;
+        } else if (moonType === MoonTypeEnum.Desert) {
+            tint = 0xffbb66;
+        } else if (moonType === MoonTypeEnum.Frozen) {
+            tint = 0xaaccee;
+        } else if (moonType === MoonTypeEnum.Volcanic) {
+            tint = 0xff8844;
+        } else {
+            tint = 0x88aaff; // Terrestrial or fallback
+        }
+        const tintColor = new THREE.Color(tint);
+        const shift = (tintRng.next() - 0.5) * 0.08;
+        tintColor.offsetHSL(shift, 0, 0);
+        body.atmosphereShell = createAtmosphereShell(
+            params.scene,
+            safeRadius * 1.07,
+            tintColor,
+            body.mesh
+        );
+    }
 
     return body;
 }
