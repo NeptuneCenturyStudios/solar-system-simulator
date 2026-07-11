@@ -92,7 +92,7 @@
                                 >
 
                                 <div
-                                    style="font-weight: bold; color: #00ffcc;"
+                                    style="font-weight: bold; color: #00ffcc"
                                     id="procedural-progress-status"
                                 >
                                     Preparing...
@@ -197,6 +197,22 @@
                         >
                     </div>
                 </div>
+                <div class="modal-actions mb-3">
+                    <button
+                        id="reportIssues"
+                        class="old-ui btn-with-icon"
+                        onclick="
+                            window.open(
+                                'https://github.com/NeptuneCenturyStudios/solar-system-simulator/issues',
+                                '_blank'
+                            )
+                        "
+                    >
+                        <span class="material-symbols-outlined">bug_report</span>
+                        REPORT ISSUES
+                    </button>
+                </div>
+
                 <div class="modal-actions">
                     <button id="aboutCloseBtn" class="old-ui btn-with-icon">
                         <span class="material-symbols-outlined">close</span>
@@ -248,13 +264,13 @@
                         <span class="material-symbols-outlined">rocket</span>
                     </button>
 
-                    <button
+                    <!-- <button
                         id="btn-texture-generator"
                         class="btn toolbar-btn"
                         title="Texture Generator"
                     >
                         <span class="material-symbols-outlined">texture</span>
-                    </button>
+                    </button> -->
 
                     <button
                         id="btn-reset"
