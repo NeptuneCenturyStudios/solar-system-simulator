@@ -12,7 +12,7 @@ export abstract class SolarSystemGenerator {
      * @returns A promise that resolves after yielding to the event loop, allowing the UI to remain responsive.
      */
     async yieldToEventLoop(): Promise<void> {
-        return new Promise<void>((resolve) => setTimeout(() => {setTimeout(resolve, 100);}, 0));
+        return new Promise<void>((resolve) => setTimeout(() => {setTimeout(resolve, 10);}, 0));
     }
 
     /**
