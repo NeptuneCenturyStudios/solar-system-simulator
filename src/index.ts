@@ -2968,7 +2968,7 @@ function animate() {
     }
 
     if (isFlightModeActive) {
-        updateFlightControls(wallDt);
+        updateFlightControls(wallDt, dtTotal);
         // Camera is repositioned AFTER the physics loop (see updateFlightCamera below)
         // so it always reflects the ship's final post-physics position.
     }
@@ -4527,7 +4527,7 @@ function updateAutopilotUI() {
  * Applies per-frame flight controls to the active spaceship.
  * Called from animate() when flightState.isActive.
  */
-function updateFlightControls(dt: number) {
+function updateFlightControls(dt: number, simDt: number) {
     const ship = flightState.activeShip;
     if (!ship || ship._isDisposed || !ship.mesh) {
         exitFlightMode();
@@ -4552,7 +4552,7 @@ function updateFlightControls(dt: number) {
     //             logic maintain boost speed until Shift is released.
     if (flightState.warpDecelerating) {
         const fwdSpd = ship.velocity.dot(forward);
-        const unclampedWarpSpd = fwdSpd - FLIGHT_WARP_DECEL * dt;
+        const unclampedWarpSpd = fwdSpd - FLIGHT_WARP_DECEL * simDt;
         if (unclampedWarpSpd > FLIGHT_BOOST_MAX_SPEED) {
             // Phase 1: decel from warp speed to boost max using warp decel rate.
             ship.velocity.copy(forward).multiplyScalar(unclampedWarpSpd);
@@ -4582,7 +4582,7 @@ function updateFlightControls(dt: number) {
     // When Shift is released above FLIGHT_MAX_SPEED, rapidly decelerate back down.
     if (flightState.boostDecelerating) {
         const fwdSpd = ship.velocity.dot(forward);
-        const unclampedBoostSpd = fwdSpd - FLIGHT_BOOST_DECEL * dt;
+        const unclampedBoostSpd = fwdSpd - FLIGHT_BOOST_DECEL * simDt;
         if (unclampedBoostSpd > FLIGHT_MAX_SPEED) {
             // Still above max after this decel step — continue decelerating.
             ship.velocity.copy(forward).multiplyScalar(unclampedBoostSpd);
@@ -4689,11 +4689,11 @@ function updateFlightControls(dt: number) {
 
             if (shiftEffective) {
                 // Boost: add forward thrust toward boost max.
-                const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
+                const delta = Math.min(FLIGHT_BOOST_ACCEL * simDt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
                 ship.velocity.addScaledVector(forward, delta);
             } else if (wEffective && !keys.shift) {
                 // Normal thrust: add forward thrust toward normal max.
-                const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
+                const delta = Math.min(FLIGHT_THRUST_ACCEL * simDt, FLIGHT_MAX_SPEED - fwdSpeed);
                 ship.velocity.addScaledVector(forward, delta);
             } else if (keys.s) {
                 // Decelerate.
@@ -4701,7 +4701,7 @@ function updateFlightControls(dt: number) {
                 const decelRate = fwdSpeed > FLIGHT_MAX_SPEED
                     ? FLIGHT_BOOST_DECEL
                     : FLIGHT_THRUST_DECEL;
-                const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
+                const delta = Math.max(-decelRate * simDt, ceiling - fwdSpeed);
                 ship.velocity.addScaledVector(forward, delta);
             }
             // else: shift held above boost max, or no effective thrust key → coast.
@@ -4711,7 +4711,7 @@ function updateFlightControls(dt: number) {
             // giving the direct nose-points-where-you-go feel of simple mode.
             const newFwdSpd = ship.velocity.dot(forward);
             const perpVel = ship.velocity.clone().addScaledVector(forward, -newFwdSpd);
-            const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * dt);
+            const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * simDt);
             perpVel.multiplyScalar(decay);
             ship.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
 
@@ -4727,25 +4727,35 @@ function updateFlightControls(dt: number) {
         // components, so orbital mechanics work at all times.
         if (keys.shift) {
             if (fwdSpeed < FLIGHT_BOOST_MAX_SPEED) {
-                const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
+                const delta = Math.min(FLIGHT_BOOST_ACCEL * simDt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
                 ship.velocity.addScaledVector(forward, delta);
             }
         } else if (keys.w) {
             if (fwdSpeed < FLIGHT_MAX_SPEED) {
-                const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
+                const delta = Math.min(FLIGHT_THRUST_ACCEL * simDt, FLIGHT_MAX_SPEED - fwdSpeed);
                 ship.velocity.addScaledVector(forward, delta);
             }
         } else if (keys.s) {
             if (fwdSpeed > -FLIGHT_MAX_SPEED) {
-                const delta = Math.max(-FLIGHT_THRUST_DECEL * dt, -FLIGHT_MAX_SPEED - fwdSpeed);
+                const delta = Math.max(-FLIGHT_THRUST_DECEL * simDt, -FLIGHT_MAX_SPEED - fwdSpeed);
                 ship.velocity.addScaledVector(forward, delta);
             }
         }
         // No thrust: ship coasts freely
         flightState.currentSpeed = ship.velocity.dot(forward);
     } else if (!manualInput) {
-        // Autopilot: sync display speed from real forward velocity (autopilot manages thrust)
-        flightState.currentSpeed = fwdSpeed;
+        // Autopilot: show speed relative to the target body so the HUD reflects what the
+        // autopilot is actually controlling.  Absolute forward speed includes the target's
+        // orbital velocity, which inflates the reading by however much of that velocity
+        // projects onto the approach direction (e.g. ~0.3 u/s for Earth at FLIGHT_MAX_SPEED).
+        // ship.velocity already includes gravity, so gravity-driven speed is still shown.
+        const apTarget = autopilotState.targetBody;
+        if (apTarget?.mesh && !apTarget._isDisposed) {
+            const relVel = new THREE.Vector3().subVectors(ship.velocity, apTarget.velocity);
+            flightState.currentSpeed = relVel.dot(forward);
+        } else {
+            flightState.currentSpeed = fwdSpeed;
+        }
     }
 
     // ── Roll with inertia (A/D) ───────────────────────────────────────────────

@@ -1,4 +1,3 @@
-
 export enum SimulationStartMode {
     Default = 0,
     Empty = 1,
@@ -178,8 +177,8 @@ export const COMET_PERIHELION_DIST = (88000000 / DIST_SCALE) * SCALE_FACTOR;
 export const COMET_APHELION_DIST = (5250000000 / DIST_SCALE) * SCALE_FACTOR;
 
 // === Flight tuning constants ===
-export const FLIGHT_MAX_SPEED = C * 0.01; // normal max speed cap (units/s) of light speed, chosen to allow for a good sense of speed while still leaving room for boost and warp speeds above it
-export const FLIGHT_BOOST_MAX_SPEED = C * 1; // boost ceiling = 5x light speed
+export const FLIGHT_MAX_SPEED = C * .001; // 10km/s at scale
+export const FLIGHT_BOOST_MAX_SPEED = C * 0.5; // Light speed boost
 export const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.264; // acceleration rate while W/S held (u/s²)
 export const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.264; // deceleration rate while W/S held (u/s²)
 export const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.1; // tolerance for deceleration to stop (u/s²)
@@ -206,7 +205,7 @@ export const KUIPER_BELT_VERTICAL_SPREAD = (100000000 / DIST_SCALE) * SCALE_FACT
 // Star light intensity bounds (used for procedural stars + custom star creation)
 export const STAR_LIGHT_INTENSITY_MIN = 1_000;
 export const STAR_LIGHT_INTENSITY_MAX = 15_000;
-export const STAR_LIGHT_DISTANCE = PLUTO_DIST + (10_000_000_000 / DIST_SCALE);
+export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
 export const STAR_LIGHT_DECAY = 0.45; // Tuned for model
 
 export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;

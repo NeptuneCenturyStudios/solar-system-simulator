@@ -450,6 +450,10 @@ button.old-ui {
     transition: all 0.2s ease;
 }
 
+button.old-ui.table-row-btn {
+    height: auto;
+}
+
 button.old-ui:hover {
     background: #0054a899;
     transform: translateY(-1px);
