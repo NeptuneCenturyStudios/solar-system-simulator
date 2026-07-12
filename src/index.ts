@@ -3948,6 +3948,53 @@ const surfaceCam = new SurfaceCameraManager(
 // ── Flight mode functions ────────────────────────────────────────────────────
 
 /**
+ * Build a quaternion that orients the ship with its +Y (top) toward the target body
+ * and its +Z (forward) in the given direction.  This provides a "tidal lock" look
+ * where the ship's belly/side faces the planet instead of pointing its nose at it.
+ *
+ * When fwdDir is nearly parallel to the radial (up) direction, we fall back to a
+ * look-at-along-forward approach that keeps the current forward direction as much
+ * as possible while still lifting +Y toward the body.
+ */
+function computeTopTowardBodyQuat(
+    shipPos: THREE.Vector3,
+    targetPos: THREE.Vector3,
+    fwdDir: THREE.Vector3
+): THREE.Quaternion {
+    const radial = new THREE.Vector3().subVectors(targetPos, shipPos);
+    if (radial.lengthSq() < 1e-10) return new THREE.Quaternion();
+    radial.normalize();
+
+    const fwdLen = fwdDir.length();
+    if (fwdLen < 1e-10) return new THREE.Quaternion();
+    const fwdNorm = fwdDir.clone().normalize();
+
+    // Use Matrix4.lookAt to build the orientation:
+    //
+    //   eye    = shipPos + fwdNorm   (a point "behind" the ship in the
+    //                                  direction it is travelling)
+    //   target = shipPos              (the ship itself)
+    //   up     = radial (toward the body centre)
+    //
+    // The resulting view matrix orients +Z along fwdNorm (since the camera
+    // "looks" from behind the ship toward the ship) and keeps +Y as close
+    // to radial as the orthonormal basis allows.  Three.js handles the
+    // degenerate case where fwdNorm is parallel to radial by applying a
+    // tiny perturbation — but this only happens transiently during the
+    // orbital insertion phases when the thrust vector briefly aligns with
+    // the radial.  The steady-state TIDAL_LOCK phase uses orbital velocity
+    // as fwdDir, which is always perpendicular to radial in a circulat
+    // orbit, so the lock is perfectly stable.
+    const m = new THREE.Matrix4().lookAt(
+        shipPos.clone().add(fwdNorm),
+        shipPos,
+        radial
+    );
+
+    return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+/**
  * Autopilot: steers the ship through three phases to reach a target body and enter a circular orbit.
  * Phase 1 — APPROACH: Orient ship toward predicted intercept and thrust toward target.
  * Phase 2 — BRAKE:    Thrust opposite relative velocity to cancel approach speed near the target.
@@ -4240,10 +4287,8 @@ function updateAutopilot(dt: number) {
             const brakeMag = Math.min(brakeDecel * dt, deltaLen);
             ship.velocity.addScaledVector(thrustDir, brakeMag);
 
-            const targetQuat = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1),
-                thrustDir
-            );
+            // Orient ship with +Y toward the body and +Z along the thrust direction.
+            const targetQuat = computeTopTowardBodyQuat(shipPos, targetPos, thrustDir);
             ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
             flightState.thrustActive = deltaLen > 1;
         } else {
@@ -4313,15 +4358,14 @@ function updateAutopilot(dt: number) {
 
             const targetName = target.name || 'the body';
             addEvent({
-                message: `✓ Autopilot: Stable orbit around ${targetName} achieved.`,
+                message: `✓ Autopilot: Stable orbit around ${targetName} achieved. Tidal lock engaged.`,
                 notificationType: NotificationType.Success,
             });
             autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
             flightHUD.showOrbitNotify();
 
-            autopilotState.isActive = false;
-            autopilotState.phase = null;
-            autopilotState.targetBody = null;
+            // Transition to TIDAL_LOCK phase: keep the ship's top toward the body indefinitely.
+            autopilotState.phase = 'TIDAL_LOCK';
             setTimeout(() => updateAutopilotUI(), 0);
         } else {
             // Drive velocity toward the orbital vector at the gravity-adjusted rate.
@@ -4329,14 +4373,36 @@ function updateAutopilot(dt: number) {
             const mag = Math.min(effectiveRate * dt, deltaLen);
             ship.velocity.addScaledVector(thrustDir, mag);
 
-            // Rotate ship to face thrust direction (cosmetic).
-            const targetQuat = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1),
-                thrustDir
-            );
+            // Orient ship with +Y toward the body and +Z along the thrust direction.
+            const targetQuat = computeTopTowardBodyQuat(shipPos, targetPos, thrustDir);
             ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
             flightState.thrustActive = true;
         }
+    } else if (autopilotState.phase === 'TIDAL_LOCK' && G * simulationState.gMultiplier > 0) {
+        // ── Steady tidal-lock orientation ─────────────────────────────────────
+        // Keep the ship oriented with its top (+Y) toward the body center and
+        // its forward (+Z) along the orbital velocity.  No thrust is applied;
+        // the ship coasts freely in its orbit.  Autopilot stays engaged
+        // indefinitely — cancelling via the CANCEL button or re-selecting the
+        // autopilot target disengages it normally.
+        const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
+        if (radial.lengthSq() < 1e-10) return;
+        radial.normalize();
+
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const tangential = new THREE.Vector3().crossVectors(radial, worldUp).normalize();
+        if (tangential.lengthSq() < 1e-10) {
+            tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
+        }
+
+        // Use the relative velocity direction as forward, falling back to the
+        // tangential orbit direction if the ship's velocity is negligible.
+        const relVel = new THREE.Vector3().subVectors(ship.velocity, target.velocity);
+        const fwdDir = relVel.lengthSq() > 1e-6 ? relVel.clone().normalize() : tangential;
+
+        const lockQuat = computeTopTowardBodyQuat(shipPos, targetPos, fwdDir);
+        ship.mesh.quaternion.rotateTowards(lockQuat, FLIGHT_MAX_TURN_RATE * dt);
+        flightState.thrustActive = false;
     }
 }
 

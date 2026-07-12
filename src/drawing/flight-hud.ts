@@ -10,6 +10,7 @@ export type AutopilotHudState =
     | 'APPROACH'
     | 'BRAKE'
     | 'CIRCULARIZE'
+    | 'TIDAL_LOCK'
     | 'ORBIT'
     | 'BLOCKED'
     | 'NONE';
@@ -142,6 +143,11 @@ function createAutopilotPhaseTexture(
             text = '↻  AUTOPILOT: ENTERING ORBIT';
             color = '#00ffcc';
             glow = 'rgba(0,255,204,0.85)';
+            break;
+        case 'TIDAL_LOCK':
+            text = '☰  AUTOPILOT: ORBIT LOCK ACTIVE';
+            color = '#7ef0ff';
+            glow = 'rgba(100,220,255,0.9)';
             break;
         case 'ORBIT':
             text = '✓  STABLE ORBIT ESTABLISHED';
@@ -366,6 +372,8 @@ export class FlightHUD {
                 desiredHud = 'APPROACH_WARP';
             } else if (this.autopilotState.phase === 'CIRCULARIZE') {
                 desiredHud = 'CIRCULARIZE';
+            } else if (this.autopilotState.phase === 'TIDAL_LOCK') {
+                desiredHud = 'TIDAL_LOCK';
             } else if (this.autopilotState.phase === 'BRAKE') {
                 desiredHud = 'BRAKE';
             } else if (this.autopilotState.isBoostActive) {

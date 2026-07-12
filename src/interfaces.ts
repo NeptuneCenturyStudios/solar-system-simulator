@@ -305,7 +305,8 @@ export type AutopilotPhase =
     | 'WARP'
     | 'APPROACH'
     | 'BRAKE'
-    | 'CIRCULARIZE';
+    | 'CIRCULARIZE'
+    | 'TIDAL_LOCK';
 
 /**
  * Represents the state of the autopilot, including its activity status, target body, current phase, and various timers.
@@ -350,4 +351,3 @@ export interface IDeathOptions {
     skipImpactSound?: boolean;
     skipExplosion?: boolean;
 }
-
