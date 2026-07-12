@@ -78,6 +78,11 @@ import {
     FLIGHT_MAX_BANK_ANGLE,
     FLIGHT_MAX_BANK_PITCH,
     FLIGHT_BANK_LERP_SPEED,
+    FLIGHT_ALT_ORBIT_SENSITIVITY,
+    FLIGHT_ALT_ORBIT_RETURN_SPEED,
+    FLIGHT_ALT_ORBIT_PITCH_MIN,
+    FLIGHT_ALT_ORBIT_PITCH_MAX,
+    FLIGHT_ALT_ORBIT_YAW_MAX,
 
     // Autopilot tuning constants moved from index.ts
     AUTOPILOT_APPROACH_SPEED,
@@ -2305,6 +2310,35 @@ function onMouseMove(event: MouseEvent) {
     // Flight mode: capture mouse movement as pointer offset for steering.
     // The pointer is locked during flight, so event.movementX/Y gives reliable deltas.
     if (flightState.isActive && document.pointerLockElement === renderer.domElement) {
+        // ALT orbit mode: mouse orbits camera around ship instead of steering it.
+        if (flightState.altOrbitActive) {
+            let yawDelta = -(event.movementX || 0) * FLIGHT_ALT_ORBIT_SENSITIVITY;
+            let pitchDelta = (event.movementY || 0) * FLIGHT_ALT_ORBIT_SENSITIVITY;
+
+            // Apply resistance near the orbit limits — movement pushing further toward the limit
+            // is progressively scaled down so the camera feels heavier as it approaches the edge.
+            if (yawDelta !== 0 && Math.sign(yawDelta) === Math.sign(flightState.altOrbitYaw)) {
+                const frac = Math.abs(flightState.altOrbitYaw) / FLIGHT_ALT_ORBIT_YAW_MAX;
+                yawDelta *= Math.max(0, 1 - frac * frac);
+            }
+            if (pitchDelta > 0 && flightState.altOrbitPitch > 0) {
+                const frac = flightState.altOrbitPitch / FLIGHT_ALT_ORBIT_PITCH_MAX;
+                pitchDelta *= Math.max(0, 1 - frac * frac);
+            } else if (pitchDelta < 0 && flightState.altOrbitPitch < 0) {
+                const frac = Math.abs(flightState.altOrbitPitch) / Math.abs(FLIGHT_ALT_ORBIT_PITCH_MIN);
+                pitchDelta *= Math.max(0, 1 - frac * frac);
+            }
+
+            flightState.altOrbitYaw = Math.max(
+                -FLIGHT_ALT_ORBIT_YAW_MAX,
+                Math.min(FLIGHT_ALT_ORBIT_YAW_MAX, flightState.altOrbitYaw + yawDelta)
+            );
+            flightState.altOrbitPitch = Math.max(
+                FLIGHT_ALT_ORBIT_PITCH_MIN,
+                Math.min(FLIGHT_ALT_ORBIT_PITCH_MAX, flightState.altOrbitPitch + pitchDelta)
+            );
+            return; // Skip normal steering accumulation
+        }
         // Ignore mouse movement while autopilot is active so it can't be accidentally
         // steered (or later lurch) from accumulated offsets.
         if (!autopilotState.isActive) {
@@ -3424,24 +3458,62 @@ function animate() {
     if (isFlightModeActive) {
         const ship = flightState.activeShip;
         if (ship && !ship._isDisposed && ship.mesh) {
+            // Lerp orbit angles back to zero when ALT is released (smooth return, shared by both views).
+            if (!flightState.altOrbitActive) {
+                const step = FLIGHT_ALT_ORBIT_RETURN_SPEED * dt;
+                if (Math.abs(flightState.altOrbitYaw) < step) {
+                    flightState.altOrbitYaw = 0;
+                } else {
+                    flightState.altOrbitYaw -= Math.sign(flightState.altOrbitYaw) * step;
+                }
+                if (Math.abs(flightState.altOrbitPitch) < step) {
+                    flightState.altOrbitPitch = 0;
+                } else {
+                    flightState.altOrbitPitch -= Math.sign(flightState.altOrbitPitch) * step;
+                }
+            }
+
+            const hasOrbit = flightState.altOrbitYaw !== 0 || flightState.altOrbitPitch !== 0;
+
             if (flightState.isCockpitView) {
                 const cockpitWorld = ship.cockpitOffset
                     .clone()
                     .applyQuaternion(ship.mesh.quaternion)
                     .add(ship.mesh.position);
                 camera.position.copy(cockpitWorld);
-                const shipUp = new THREE.Vector3(0, 1, 0).applyQuaternion(ship.mesh.quaternion);
-                camera.up.copy(shipUp);
-                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
+
+                // Build the look orientation: ship orientation × optional look-around orbit offset.
+                let lookQuat: THREE.Quaternion = ship.mesh.quaternion;
+                if (hasOrbit) {
+                    const orbitQuat = new THREE.Quaternion().setFromEuler(
+                        new THREE.Euler(flightState.altOrbitPitch, flightState.altOrbitYaw, 0, 'YXZ')
+                    );
+                    lookQuat = ship.mesh.quaternion.clone().multiply(orbitQuat);
+                }
+                const cockpitUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lookQuat);
+                camera.up.copy(cockpitUp);
+                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(lookQuat);
                 camera.lookAt(cockpitWorld.clone().add(forward.multiplyScalar(1000)));
             } else {
-                const offset = ship.thirdPersonOffset
-                    .clone()
-                    .applyQuaternion(flightState.flightCameraQuat);
+                // ── ALT orbit camera: compose an additional rotation on top of flightCameraQuat ──
+                // Build the combined orientation (ship frame × orbit offset).
+                let effectiveCamQuat = flightState.flightCameraQuat;
+                if (hasOrbit) {
+                    const orbitQuat = new THREE.Quaternion()
+                        .setFromEuler(
+                            new THREE.Euler(
+                                flightState.altOrbitPitch,
+                                flightState.altOrbitYaw,
+                                0,
+                                'YXZ'
+                            )
+                        );
+                    effectiveCamQuat = flightState.flightCameraQuat.clone().multiply(orbitQuat);
+                }
+
+                const offset = ship.thirdPersonOffset.clone().applyQuaternion(effectiveCamQuat);
                 camera.position.copy(ship.mesh.position).add(offset);
-                const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(
-                    flightState.flightCameraQuat
-                );
+                const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(effectiveCamQuat);
                 camera.up.copy(cameraUp);
                 camera.lookAt(ship.mesh.position);
                 controls.target.copy(ship.mesh.position);
@@ -4832,7 +4904,7 @@ function updateFlightControls(dt: number, simDt: number) {
         : flightState.rollRight
           ? FLIGHT_ROLL_SPEED
           : 0;
-    if (manualInput && (flightState.rollLeft || flightState.rollRight)) {
+    if (manualInput && !flightState.altOrbitActive && (flightState.rollLeft || flightState.rollRight)) {
         // Ramp up toward target
         const dir = rollTarget > 0 ? 1 : -1;
         flightState.rollVelocity += dir * FLIGHT_ROLL_ACCEL * dt;
@@ -4882,7 +4954,7 @@ function updateFlightControls(dt: number, simDt: number) {
     const rawY = applyDeadzone(rawYFull);
     // Exponential smoothing — frame-rate independent; same feel at any fps.
     // steerAlpha and bankAlpha derived from per-second rates: alpha = 1 - exp(-rate * dt)
-    if (manualInput) {
+    if (manualInput && !flightState.altOrbitActive) {
         const steerAlpha = 1 - Math.exp(-FLIGHT_STEER_SMOOTH_RATE * dt);
         flightState.steerX += (rawX - flightState.steerX) * steerAlpha;
         flightState.steerY += (rawY - flightState.steerY) * steerAlpha;
@@ -4958,6 +5030,18 @@ function updateFlightControls(dt: number, simDt: number) {
     steeringOriginMarker.position.set(noseScreenX, noseScreenY, 0);
     steeringEndMarker.position.set(noseScreenX + displayOffX, noseScreenY - displayOffY, 0);
     steeringEndMarker.visible = true;
+
+    // Hide the steering HUD while ALT orbit mode is active (or camera is returning).
+    // Restore it once the orbit angles have fully zeroed out (and warp is not decelerating).
+    if (flightState.altOrbitActive || flightState.altOrbitYaw !== 0 || flightState.altOrbitPitch !== 0) {
+        flightSteeringLine.visible = false;
+        steeringOriginMarker.visible = false;
+        steeringEndMarker.visible = false;
+    } else if (!flightState.warpDecelerating) {
+        flightSteeringLine.visible = true;
+        steeringOriginMarker.visible = true;
+        // steeringEndMarker is already set visible above
+    }
 
     // ── Weapon firing ────────────────────────────────────────────────────────
     if (flightState.isFiring && !autopilotState.isActive) {
@@ -5154,6 +5238,9 @@ function exitFlightMode() {
     flightState.steerX = 0;
     flightState.steerY = 0;
     flightState.isFiring = false;
+    flightState.altOrbitActive = false;
+    flightState.altOrbitYaw = 0;
+    flightState.altOrbitPitch = 0;
     shipWeapon.reset();
 
     // Clear deceleration and warp flags so on re-entry the ship isn't
@@ -6118,6 +6205,13 @@ window.addEventListener('keydown', (e) => {
     if (key === 'shift') {
         keys.shift = true;
     }
+    if (key === 'alt' && flightState.isActive) {
+        flightState.altOrbitActive = true;
+        // Zero steering offsets so the ship stops turning immediately
+        flightState.pointerOffsetX = 0;
+        flightState.pointerOffsetY = 0;
+        e.preventDefault();
+    }
 
     // Escape exits flight mode
     if (key === 'escape' && flightState.isActive) {
@@ -6173,6 +6267,13 @@ window.addEventListener('keyup', (e) => {
         }
     }
     if (key === 'shift') keys.shift = false;
+    if (key === 'alt' && flightState.isActive) {
+        flightState.altOrbitActive = false;
+        // Zero steering offsets so the ship doesn't lurch when steering resumes
+        flightState.pointerOffsetX = 0;
+        flightState.pointerOffsetY = 0;
+        e.preventDefault();
+    }
 
     if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
         if (!isChangingVelocity && !isMiddleMouseVelocity && !interactionState.isRepositioning) {

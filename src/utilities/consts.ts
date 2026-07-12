@@ -254,6 +254,16 @@ export const FLIGHT_MAX_BANK_ANGLE = 0.35; // max visual roll angle (rad)
 export const FLIGHT_MAX_BANK_PITCH = 0.2; // max visual pitch angle (rad)
 export const FLIGHT_BANK_LERP_SPEED = 13.76; // exponential-decay rate (per second) for banking animation — use: 1 - exp(-rate * dt)
 
+/** Mouse sensitivity for ALT-key orbit camera mode (radians per pixel). */
+export const FLIGHT_ALT_ORBIT_SENSITIVITY = 0.005;
+/** Return speed (rad/s) at which ALT orbit yaw/pitch lerp back to zero on release. */
+export const FLIGHT_ALT_ORBIT_RETURN_SPEED = 24.0;
+/** Pitch clamp limits (radians) for ALT orbit — keeps camera in upper hemisphere (half-sphere). */
+export const FLIGHT_ALT_ORBIT_PITCH_MIN = -60 * (Math.PI / 180); // 60° below ship equator
+export const FLIGHT_ALT_ORBIT_PITCH_MAX = 80 * (Math.PI / 180);  // 80° above ship equator
+/** Yaw clamp limit (radians) for ALT orbit — limits horizontal range to a half-sphere (±90°). */
+export const FLIGHT_ALT_ORBIT_YAW_MAX = 90 * (Math.PI / 180);    // 90° left or right of rear
+
 // === Autopilot tuning constants (derived from flight tuning) ===
 // u/s
 export const AUTOPILOT_APPROACH_SPEED = FLIGHT_MAX_SPEED;

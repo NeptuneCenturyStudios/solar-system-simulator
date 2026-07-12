@@ -215,6 +215,15 @@ export interface IFlightState {
 
     /** Whether Shift was held on the previous frame. */
     prevShiftHeld: boolean;
+
+    /** True while ALT is held — camera orbits the ship instead of steering it. */
+    altOrbitActive: boolean;
+
+    /** Accumulated yaw offset (radians) for the ALT orbit camera, in ship-local space. */
+    altOrbitYaw: number;
+
+    /** Accumulated pitch offset (radians) for the ALT orbit camera, in ship-local space. */
+    altOrbitPitch: number;
 }
 
 /**

@@ -80,6 +80,12 @@ export const flightState: IFlightState = {
     isFiring: false,
     /** Whether Shift was held on the previous frame — used to detect Shift-release transitions. */
     prevShiftHeld: false,
+    /** True while ALT is held — camera orbits the ship instead of steering it. */
+    altOrbitActive: false,
+    /** Accumulated yaw offset (radians) for the ALT orbit camera, in ship-local space. */
+    altOrbitYaw: 0,
+    /** Accumulated pitch offset (radians) for the ALT orbit camera, in ship-local space. */
+    altOrbitPitch: 0,
 };
 
 /**
