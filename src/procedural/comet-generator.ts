@@ -127,9 +127,24 @@ export function generateProceduralComets(params: {
         // Seeded mass and radius (avoids the unseeded Math.random() inside randomCometParams).
         const massRng = rngFor(masterSeed, 'cometMass', i);
         const mass = 0.5 + massRng.next() * 3.5;
-
+        
         const radiusRng = rngFor(masterSeed, 'cometRadius', i);
         const radius = 1 + radiusRng.next() * 2;
+
+        // Comets tumble chaotically: random tilt (0–180° for full 3D tumbling), azimuth
+        // (0–360°), and a spin speed that increases as mass decreases (smaller bodies
+        // spin faster, like real asteroids/comets).
+        const tiltRng = rngFor(masterSeed, 'cometRotationTilt', i);
+        const rotationTilt = tiltRng.range(0, 180);
+
+        const azimuthRng = rngFor(masterSeed, 'cometRotationAzimuth', i);
+        const rotationAzimuth = azimuthRng.range(0, 360);
+
+        // Spin speed: base of 0.3–1.0 rad/s, multiplied by inverse-mass factor so smaller
+        // comets spin faster. Clamped to sensible visual range [0.2, 4.0].
+        const speedRng = rngFor(masterSeed, 'cometRotationSpeed', i);
+        const massFactor = Math.max(0.5, 2.0 / Math.max(0.1, mass));
+        const rotationSpeed = Math.min(4.0, Math.max(0.2, speedRng.range(0.3, 1.0) * massFactor));
 
         const id = `proc_comet_${i}_${subSeed}`;
         const name = generateProceduralBodyName(BodyTypeEnum.Comet, {
@@ -137,7 +152,7 @@ export function generateProceduralComets(params: {
             sequenceNumber: i + 1,
         });
 
-        creations.push({ id, name, pos, vel, mass, radius });
+        creations.push({ id, name, pos, vel, mass, radius, rotationSpeed, rotationTilt, rotationAzimuth });
     }
 
     sanitizeOrbitCreations(creations, { minRadius: 1, minMass: 0.5 });

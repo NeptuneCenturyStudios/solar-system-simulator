@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { CelestialBody } from './celestial-body';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
-import { IStateDependencies } from '../interfaces.js';
+import { IRotation, IStateDependencies } from '../interfaces.js';
 import { BodyTypeEnum } from './body-enums';
 
 export interface IAsteroidOptions {
@@ -18,6 +18,7 @@ export interface IAsteroidOptions {
     maxTrail?: number;
     roughness?: number;
     metalness?: number;
+    rotation?: IRotation;
 }
 
 export class Asteroid extends CelestialBody {
@@ -50,6 +51,8 @@ export class Asteroid extends CelestialBody {
         const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
         const placeholderMesh = new THREE.Mesh(geometryFactory(), placeholderMaterial);
 
+        const rotation = options.rotation ?? { tilt: 0, speed: 0 };
+
         super(
             deps,
             scene,
@@ -64,7 +67,7 @@ export class Asteroid extends CelestialBody {
             trailColor,
             maxTrail,
             false,
-            { tilt: 0, speed: 0 },
+            rotation,
             placeholderMesh
         );
 
@@ -102,15 +105,17 @@ export class Asteroid extends CelestialBody {
                 console.warn('Asteroid OBJ/MTL load failed — using placeholder mesh', e);
             });
 
-        // Override the axis and speed for a more random tumbling motion
-        const rotationAxis = new THREE.Vector3(
-            Math.random() - 0.5,
-            Math.random() - 0.5,
-            Math.random() - 0.5
-        ).normalize();
+        // When no explicit rotation was provided, randomize a tumbling axis and speed.
+        if (!options.rotation) {
+            const rotationAxis = new THREE.Vector3(
+                Math.random() - 0.5,
+                Math.random() - 0.5,
+                Math.random() - 0.5
+            ).normalize();
 
-        const rotationSpeed = 0.6 + Math.random() * 1.2;
+            const rotationSpeed = 0.6 + Math.random() * 1.2;
 
-        this.updateRotation(rotationAxis, rotationSpeed);
+            this.updateRotation(rotationAxis, rotationSpeed);
+        }
     }
 }

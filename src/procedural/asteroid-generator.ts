@@ -133,6 +133,18 @@ export function generateProceduralAsteroids(params: {
             sequenceNumber: i + 1,
         });
 
+        // Asteroids tumble chaotically: random tilt (0–180°), azimuth (0–360°), and
+        // spin speed that increases for smaller bodies.
+        const tiltRng = rngFor(masterSeed, 'asteroidRotationTilt', i);
+        const rotationTilt = tiltRng.range(0, 180);
+
+        const azimuthRng = rngFor(masterSeed, 'asteroidRotationAzimuth', i);
+        const rotationAzimuth = azimuthRng.range(0, 360);
+
+        const speedRng = rngFor(masterSeed, 'asteroidRotationSpeed', i);
+        const massFactor = Math.max(0.5, 2.0 / Math.max(0.1, asteroidParams.mass));
+        const rotationSpeed = Math.min(4.0, Math.max(0.2, speedRng.range(0.3, 1.0) * massFactor));
+
         creations.push({
             id,
             name,
@@ -140,6 +152,9 @@ export function generateProceduralAsteroids(params: {
             vel,
             radius: asteroidParams.radius,
             mass: asteroidParams.mass,
+            rotationSpeed,
+            rotationTilt,
+            rotationAzimuth,
         });
     }
 
