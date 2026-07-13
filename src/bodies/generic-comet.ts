@@ -41,7 +41,7 @@ export class GenericComet extends Comet {
         const mtlLoader = new MTLLoader();
         mtlLoader.setPath('./assets/models/');
         mtlLoader
-            .loadAsync('Asteroid1.mtl')
+            .loadAsync('asteroid1.mtl')
             .then((materials) => {
                 materials.preload();
                 const objLoader = new OBJLoader();
