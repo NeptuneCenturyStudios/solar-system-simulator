@@ -153,7 +153,7 @@ export function generateProceduralStars(params: {
             speed:
                 Number.isFinite(starParams.rotationSpeed) && starParams.rotationSpeed > 0
                     ? starParams.rotationSpeed
-                    : 0.08,
+                    : 0.00008,
             azimuth: Number.isFinite(starParams.rotationAzimuth) ? starParams.rotationAzimuth : 0,
         };
 

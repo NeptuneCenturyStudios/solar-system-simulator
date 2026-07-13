@@ -140,8 +140,9 @@ export function randomStarParams(
     const lightIntensity = Math.min(Math.max(rawLightIntensity, lightMin), lightMax);
 
     // Rotation:
-    // - tilt: [0, 90] (degrees) similar to prior procedural generator behavior
-    // - speed: [0.03, 0.12] similar to prior procedural generator behavior
+    // - tilt: [0, 90] (degrees) — matches prior procedural generator behavior
+    // - speed: [5e-5, 2e-4] — mimics real star rotation rates (Sun ~6.9e-5 rad/s)
+    // - azimuth: [0, 360] (degrees)
     const rotationTilt =
         typeof opts.rotationTilt === 'number' && isFinite(opts.rotationTilt)
             ? opts.rotationTilt
@@ -152,7 +153,7 @@ export function randomStarParams(
         isFinite(opts.rotationSpeed) &&
         opts.rotationSpeed > 0
             ? opts.rotationSpeed
-            : rng.range(0.03, 0.12);
+            : rng.range(0.00005, 0.0002);
 
     const rotationAzimuth =
         typeof opts.rotationAzimuth === 'number' && isFinite(opts.rotationAzimuth)
@@ -169,7 +170,7 @@ export function randomStarParams(
     const safeLightIntensity = isFinitePositiveNumber(lightIntensity) ? lightIntensity : lightMin;
 
     const safeRotationTilt = isFinitePositiveNumber(rotationTilt) ? rotationTilt : 0;
-    const safeRotationSpeed = isFinitePositiveNumber(rotationSpeed) ? rotationSpeed : 0.08;
+    const safeRotationSpeed = isFinitePositiveNumber(rotationSpeed) ? rotationSpeed : 0.00008;
     const safeRotationAzimuth =
         typeof rotationAzimuth === 'number' && isFinite(rotationAzimuth) ? rotationAzimuth : 0;
 
@@ -331,7 +332,11 @@ export function randomPlanetParams(
     return {
         mass,
         radius,
-        rotationSpeed: 0.1 + rng.next() * 0.4,
+        // Rotation speed tuned for simulation time scale.
+        // Real planets range from ~3e-7 (Venus retrograde) to ~1.76e-4 (Jupiter) rad/s.
+        // Sample log-uniform over [5e-5, 3e-4] so the spread naturally covers Earth-like
+        // (~7.3e-5) and Jupiter-like rates, with occasional slightly slower/faster outliers.
+        rotationSpeed: 0.00005 + rng.next() * 0.00025,
         rotationTilt: rng.range(0, 90),
         rotationAzimuth: rng.range(0, 360),
         bodyType: BodyTypeEnum.Planet,
@@ -389,7 +394,7 @@ export function randomMoonParams(
     const distanceMultiplier = 0.75 + rng.next() * 0.5; // [0.75..1.25]
     const distance = distanceBase * distanceMultiplier;
 
-    // Planet-relative sizing so procedural moons can’t come out larger than the host.
+    // Planet-relative sizing so procedural moons can't come out larger than the host.
     // - Only applies to PROCEDURAL defaults (when opts.radius/mass aren't provided).
     const maxDefaultMoonRadius = safeParentRadius * 0.25;
     const minDefaultMoonRadius = Math.max(MOON_RADIUS * 0.05, safeParentRadius * 0.03);
@@ -420,7 +425,9 @@ export function randomMoonParams(
         mass: safeMass,
         radius: safeRadius,
         distance: safeDistance,
-        rotationSpeed: 0.15 + rng.next() * 0.35,
+        // Moons are often tidally locked or slow rotators. Sample from
+        // [5e-5, 2e-4] rad/s to match realistic slow spin rates.
+        rotationSpeed: 0.00005 + rng.next() * 0.00015,
         rotationTilt: rng.range(0, 30),
         rotationAzimuth: rng.range(0, 360),
         seed,

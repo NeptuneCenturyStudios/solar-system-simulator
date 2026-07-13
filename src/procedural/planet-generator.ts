@@ -283,7 +283,7 @@ export function generateProceduralPlanets(params: {
             c.vel.set(0, 0, 0);
             c.radius = Math.max(1, c.radius);
             c.mass = Math.max(1e-6, c.mass);
-            c.rotationSpeed = 0.1;
+            c.rotationSpeed = 0.0001;
             c.rotationTilt = 0;
             c.rotationAzimuth = 0;
         }
