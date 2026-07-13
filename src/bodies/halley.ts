@@ -96,7 +96,7 @@ export class Halley extends Comet {
                 materials.preload();
                 const objLoader = new OBJLoader();
                 objLoader.setMaterials(materials);
-                return objLoader.loadAsync('./assets/models/asteroid.obj');
+                return objLoader.loadAsync('./assets/models/Asteroid.obj');
             })
             .then((group) => {
                 // Compute bounding box of the unscaled model
