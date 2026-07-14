@@ -16,6 +16,13 @@ export const G_SCALE = 1; //10000000;
 export const MASS_SCALE = 6.025757575757576e22;
 export const RADIUS_SCALE = 100;
 export const DIST_SCALE = 100;
+
+// === Free Camera Movement Speeds ===
+// WASD normal speed and shift-boost speed, scaled proportionally to DIST_SCALE
+// so camera feel remains consistent if the world scale changes.
+export const FREE_CAM_NORMAL_SPEED = 10 / DIST_SCALE; // 100 u/s at default DIST_SCALE=100
+export const FREE_CAM_BOOST_SPEED = 100 / DIST_SCALE; // 1000 u/s at default DIST_SCALE=100
+
 // 1. Keep the physically-derived base time scale
 export const BASE_TIME_SCALE = Math.sqrt(DIST_SCALE ** 3 / MASS_SCALE);
 // 2. Choose a user multiplier so that at warp 1, dt matches the old behavior
@@ -177,7 +184,7 @@ export const COMET_PERIHELION_DIST = (88000000 / DIST_SCALE) * SCALE_FACTOR;
 export const COMET_APHELION_DIST = (5250000000 / DIST_SCALE) * SCALE_FACTOR;
 
 // === Flight tuning constants ===
-export const FLIGHT_MAX_SPEED = C * .001; // 10km/s at scale
+export const FLIGHT_MAX_SPEED = C * 0.001; // 10km/s at scale
 export const FLIGHT_BOOST_MAX_SPEED = C * 0.5; // Light speed boost
 export const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.264; // acceleration rate while W/S held (u/s²)
 export const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.264; // deceleration rate while W/S held (u/s²)
@@ -260,9 +267,9 @@ export const FLIGHT_ALT_ORBIT_SENSITIVITY = 0.005;
 export const FLIGHT_ALT_ORBIT_RETURN_SPEED = 24.0;
 /** Pitch clamp limits (radians) for ALT orbit — keeps camera in upper hemisphere (half-sphere). */
 export const FLIGHT_ALT_ORBIT_PITCH_MIN = -60 * (Math.PI / 180); // 60° below ship equator
-export const FLIGHT_ALT_ORBIT_PITCH_MAX = 80 * (Math.PI / 180);  // 80° above ship equator
+export const FLIGHT_ALT_ORBIT_PITCH_MAX = 80 * (Math.PI / 180); // 80° above ship equator
 /** Yaw clamp limit (radians) for ALT orbit — limits horizontal range to a half-sphere (±90°). */
-export const FLIGHT_ALT_ORBIT_YAW_MAX = 90 * (Math.PI / 180);    // 90° left or right of rear
+export const FLIGHT_ALT_ORBIT_YAW_MAX = 90 * (Math.PI / 180); // 90° left or right of rear
 
 // === Autopilot tuning constants (derived from flight tuning) ===
 // u/s

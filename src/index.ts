@@ -107,6 +107,8 @@ import {
     TEXT_SPRITE_Z,
     FLIGHT_THRUST_DECEL_TOLERANCE,
     FLIGHT_WARP_DECEL_TOLERANCE,
+    FREE_CAM_NORMAL_SPEED,
+    FREE_CAM_BOOST_SPEED,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -894,7 +896,7 @@ Object.defineProperty(window, 'dragPlane', {
 });
 
 const keys = cameraState.keys;
-const cameraSpeed = cameraState.speed;
+//const cameraSpeed = cameraState.speed;
 const cameraRotationSpeed = cameraState.rotationSpeed;
 
 function canMoveSelectedBodyWithArrowKeys() {
@@ -3082,7 +3084,7 @@ function animate() {
 
     // WASD camera movement (works in both free camera and normal mode, but NOT in flight mode)
     if (!isFlightModeActive) {
-        const speed = (keys.shift ? cameraSpeed * 10 : cameraSpeed) * SCALE_FACTOR;
+        const speed = keys.shift ? FREE_CAM_BOOST_SPEED : FREE_CAM_NORMAL_SPEED;
         camera.getWorldDirection(_animCamDirection);
         _animCamRight.crossVectors(camera.up, _animCamDirection).normalize();
 

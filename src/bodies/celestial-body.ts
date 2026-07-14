@@ -180,7 +180,7 @@ export class CelestialBody extends Body {
 
         // Deterministic rings (PRNG from body id)
         if (hasRings) {
-            const ringCount = 3000000 / DIST_SCALE;
+            const ringCount = 300000 / DIST_SCALE;
             const ringRng = new SeededRandom(`${name}|rings`);
 
             const ringGeo = new THREE.BufferGeometry();
