@@ -84,6 +84,15 @@ export class Spaceship extends Body {
         if (this.labelLine) this.labelLine.visible = false;
 
         // ── Async OBJ + MTL load ──────────────────────────────────────────────
+        this._loadModel(modelName);
+    }
+
+    /**
+     * Loads an OBJ/MTL model, scales it to fit SPACESHIP_RADIUS, centres it on this.mesh,
+     * and updates cockpit/thruster offsets from the resulting bounding box.
+     * Safe to call from the constructor and from loadModel().
+     */
+    private _loadModel(modelName: string): void {
         const mtlLoader = new MTLLoader();
         mtlLoader.setPath('./assets/models/');
         mtlLoader
@@ -130,6 +139,42 @@ export class Spaceship extends Body {
             .catch((e) => {
                 console.warn('Spaceship OBJ/MTL load failed — using placeholder mesh', e);
             });
+    }
+
+    /**
+     * Swaps the visual model without affecting physics state.
+     * Disposes any previously loaded OBJ group children attached to this.mesh,
+     * resets camera/thruster offsets to constructor defaults, then asynchronously
+     * loads and attaches the new model.
+     * @param modelName Base filename (without extension) of the OBJ/MTL model to load.
+     */
+    loadModel(modelName: string): void {
+        // Remove and dispose any Group children (the previously loaded OBJ models).
+        const groupsToRemove = this.mesh.children.filter(
+            (c) => c instanceof THREE.Group
+        ) as THREE.Group[];
+
+        for (const group of groupsToRemove) {
+            group.traverse((child) => {
+                const mesh = child as THREE.Mesh;
+                if (mesh.isMesh) {
+                    mesh.geometry?.dispose();
+                    if (Array.isArray(mesh.material)) {
+                        mesh.material.forEach((m) => m.dispose());
+                    } else {
+                        mesh.material?.dispose();
+                    }
+                }
+            });
+            this.mesh.remove(group);
+        }
+
+        // Reset offsets to initial defaults (will be overwritten once the new model loads).
+        this.cockpitOffset.set(0, 0.3 * SF, 0.52 * SF);
+        this.thrusterOffset.set(0, -0.1 * SF, -0.9 * SF);
+        this.thirdPersonOffset.set(0, SPACESHIP_RADIUS * 0.35, -SPACESHIP_RADIUS * 1.8);
+
+        this._loadModel(modelName);
     }
 
     /**

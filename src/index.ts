@@ -3880,6 +3880,12 @@ if (performanceOptionsBtn) {
     });
 }
 flightControlsPanel.on('spawnShip', () => spawnShip());
+flightControlsPanel.on('modelChanged', ({ modelName }: { modelName: string }) => {
+    const ship = flightState.knownShip;
+    if (ship && !ship._isDisposed && simulationState.bodies.includes(ship)) {
+        ship.loadModel(modelName);
+    }
+});
 flightControlsPanel.on('toggleView', () => {
     flightState.isCockpitView = !flightState.isCockpitView;
 });

@@ -47,6 +47,11 @@ export class FlightControlsPanel extends Panel {
             this.spawnBtn.onclick = () => this.emit('spawnShip');
         }
 
+        if (this.shipModelSelect) {
+            this.shipModelSelect.onchange = () =>
+                this.emit('modelChanged', { modelName: this.getSelectedModel() });
+        }
+
         if (this.autopilotBtn) {
             this.autopilotBtn.onclick = () => this.emit('autopilot', {});
         }
