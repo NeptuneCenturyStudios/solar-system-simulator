@@ -331,17 +331,9 @@ export const AUTOPILOT_WARP_THRESHOLD =
 // === Ship weapon tuning ===
 /**
  * Base bolt speed added on top of the ship's current speed (units/s).
- * Effective relative speed = min(WEAPON_MAX_SPEED, WEAPON_BASE_SPEED + shipSpeed).
- * Bolts are always exactly WEAPON_BASE_SPEED faster than the ship in camera space —
- * so you can never outrun them, and the feel scales linearly with your velocity.
  */
-export const WEAPON_BASE_SPEED = FLIGHT_MAX_SPEED * 1.1;
-/**
- * Hard cap on bolt relative speed (units/s).
- * Prevents bolts becoming sub-pixel at boost / warp speeds.
- * Defaults to 10× normal max speed.
- */
-export const WEAPON_MAX_SPEED = FLIGHT_MAX_SPEED * 10;
+export const WEAPON_BASE_SPEED = FLIGHT_MAX_SPEED * 20;
+
 /** Seconds a projectile lives before fizzling out. */
 export const WEAPON_PARTICLE_LIFETIME = 4.0;
 /**

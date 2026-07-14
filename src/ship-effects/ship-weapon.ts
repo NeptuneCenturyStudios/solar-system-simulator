@@ -3,7 +3,6 @@ import { Body } from '../bodies/body';
 import { playWeaponFire } from '../utilities/audio.js';
 import {
     WEAPON_BASE_SPEED,
-    WEAPON_MAX_SPEED,
     WEAPON_PARTICLE_LIFETIME,
     WEAPON_BOLT_LENGTH,
     WEAPON_PARTICLE_COLOR,
@@ -152,10 +151,8 @@ export class ShipWeapon {
 
         if (this.projectiles.length >= this.maxProjectiles) return;
 
-        // Linear speed: base offset + current ship speed, capped so bolts stay visible
-        // at boost/warp (uncapped, extreme ship speeds shrink the attenuated point to nothing).
-        const relativeSpeed = Math.min(WEAPON_MAX_SPEED, WEAPON_BASE_SPEED + shipVelocity.length());
-        const velocity = direction.clone().multiplyScalar(relativeSpeed).add(shipVelocity);
+        // Speed is base + ship speed (Galilean relativity)
+        const velocity = direction.clone().multiplyScalar(WEAPON_BASE_SPEED).add(shipVelocity);
 
         playWeaponFire();
         this.projectiles.push({
