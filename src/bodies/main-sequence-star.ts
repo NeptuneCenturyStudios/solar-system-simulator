@@ -382,7 +382,7 @@ export class MainSequenceStar extends Star {
                 console.error('Error creating pulsar:', e);
             }
 
-            this.die({ skipExplosion: true });
+            this.die({ skipExplosion: true, skipImpactSound: true });
         } else if (this.initialMass >= MIN_BLACK_HOLE_MASS) {
             try {
                 const blackHoleMass = this.mass * 0.9999;
@@ -411,7 +411,7 @@ export class MainSequenceStar extends Star {
                 console.error('Error creating black hole:', e);
             }
 
-            this.die({ skipExplosion: true });
+            this.die({ skipExplosion: true, skipImpactSound: true });
         } else {
             try {
                 const newWhiteDwarf = new WhiteDwarf(
@@ -451,7 +451,7 @@ export class MainSequenceStar extends Star {
                 console.error('Error creating planetary nebula:', e);
             }
 
-            this.die({ skipExplosion: true });
+            this.die({ skipExplosion: true, skipImpactSound: true });
         }
     }
 
