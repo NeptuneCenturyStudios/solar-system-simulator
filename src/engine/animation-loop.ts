@@ -48,6 +48,7 @@ import {
     AUTOPILOT_DECEL,
 } from '../utilities/consts';
 import { createFPSTexture, createSpeedTexture, createStatsTexture } from '../drawing/text-rendering';
+import { interactionState, simulationState } from '../simulation/simulation';
 
 // ── Context interface ───────────────────────────────────────────────────────
 
@@ -78,21 +79,15 @@ export interface AnimationContext {
     // index.ts sets ctx.xxx.value and reads ctx.xxx.value.
     selectedBody: { value: Body | null };
     manuallySelectedBody: { value: Body | null };
-    isChangingVelocity: { value: boolean };
     isMiddleMouseVelocity: { value: boolean };
     isFreeCameraMode: { value: boolean };
-    activeAxis: { value: string | null };
     focusID: { value: string };
-    isPaused: { value: boolean };
-    timeScale: { value: number };
-    lastT: { value: number };
     NONE_FOCUS_POSITION: THREE.Vector3;
     dragPlane: THREE.Plane;
     dragCameraOffset: THREE.Vector3;
     supernovas: { value: Supernova[] };
     planetaryNebulae: { value: PlanetaryNebula[] };
     wasRunningBeforeDrag: { value: boolean };
-    fpsLastUpdate: { value: number };
 
     // Managers & effects
     lensingEffect: GravitationalLensingEffect;
@@ -144,13 +139,16 @@ export function runAnimationLoop(ctx: AnimationContext): void {
     const _animCamMovement = new THREE.Vector3();
     const _animOldPos = new THREE.Vector3();
 
+    let fpsLastUpdate = 0;
+    let lastT = performance.now();
+
     function animate(): void {
         const now = performance.now();
         const wallDt = Math.min((now - _lastFrameTime.value) / 1000, 0.1);
         _lastFrameTime.value = now;
         requestAnimationFrame(animate);
 
-        const tScale = ctx.timeScale.value;
+        const tScale = simulationState.timeScale;
         const steps = settingsStore.settings.substeps;
         const dt = (BASE_FRAME_DT * TIME_SCALE * tScale) / steps;
         const dtTotal = dt * steps;
@@ -258,14 +256,14 @@ export function runAnimationLoop(ctx: AnimationContext): void {
                     ctx.controls.target.add(_animCamMovement);
                 }
 
-                if (ctx.interactionState.isRepositioning && ctx.gizmo.target && ctx.activeAxis.value) {
-                    const axis = ctx.activeAxis.value;
+                if (ctx.interactionState.isRepositioning && ctx.gizmo.target && interactionState.activeAxis) {
+                    const axis = interactionState.activeAxis;
                     if (axis === 'x') ctx.gizmo.target.mesh.position.x += _animCamMovement.x;
                     else if (axis === 'y') ctx.gizmo.target.mesh.position.y += _animCamMovement.y;
                     else if (axis === 'z') ctx.gizmo.target.mesh.position.z += _animCamMovement.z;
                 }
 
-                if (ctx.isChangingVelocity.value && ctx.gizmo.target) {
+                if (interactionState.isChangingVelocity && ctx.gizmo.target) {
                     const origin = ctx.gizmo.target.mesh.position;
                     const vEdit = ctx.interactionState.velocityEditMode;
                     if (vEdit === 'y') {
@@ -388,14 +386,14 @@ export function runAnimationLoop(ctx: AnimationContext): void {
 
         // ── Grid / indicators while dragging ─────────────────────────────
         const isDraggingVel =
-            ctx.interactionState.isRepositioning || ctx.isChangingVelocity.value || ctx.isMiddleMouseVelocity.value;
+            ctx.interactionState.isRepositioning || interactionState.isChangingVelocity || ctx.isMiddleMouseVelocity.value;
         if (isDraggingVel && ctx.gizmo.target && !ctx.gizmo.target._isDisposed && ctx.gizmo.target.mesh) {
             ctx.gridHelperManager.ensure(ctx.gizmo.target, true);
             const pi = ctx.posIndicator;
             if (pi.yAxisIndicator && pi.yAxisRing) {
                 pi.updateIndicator(pi.yAxisIndicator, pi.yAxisRing, ctx.gizmo.target.mesh.position);
             }
-            if ((ctx.isChangingVelocity.value || ctx.isMiddleMouseVelocity.value) && pi.velocityTipIndicator && pi.velocityTipRing) {
+            if ((interactionState.isChangingVelocity || ctx.isMiddleMouseVelocity.value) && pi.velocityTipIndicator && pi.velocityTipRing) {
                 const spd = ctx.gizmo.target.velocity.length();
                 const dir = spd > 0 ? ctx.gizmo.target.velocity.clone().normalize() : new THREE.Vector3(1, 0, 0);
                 const tip = ctx.gizmo.target.mesh.position.clone().add(dir.multiplyScalar(spd * 50));
@@ -439,7 +437,7 @@ export function runAnimationLoop(ctx: AnimationContext): void {
         const gv = ctx.gizmo.velocityArrow;
         if (
             ctx.gizmo.target && !ctx.gizmo.target._isDisposed && ctx.gizmo.target.mesh &&
-            gv && gv.visible && (ctx.isChangingVelocity.value || ctx.isMiddleMouseVelocity.value)
+            gv && gv.visible && (interactionState.isChangingVelocity || ctx.isMiddleMouseVelocity.value)
         ) {
             const pi = ctx.posIndicator;
             const spd = ctx.gizmo.target.velocity.length();
@@ -504,7 +502,7 @@ export function runAnimationLoop(ctx: AnimationContext): void {
         }
 
         // ── Warp shake ─────────────────────────────────────────────────────
-        if (!ctx.isPaused.value && (ctx.flightState.warpActive || ctx.autopilotState.isWarpActive)) {
+        if (!simulationState.isPaused && (ctx.flightState.warpActive || ctx.autopilotState.isWarpActive)) {
             if (isFlightModeActive || ctx.warpEffect.lines.visible) {
                 const cf = new THREE.Vector3(); ctx.camera.getWorldDirection(cf);
                 const cr = new THREE.Vector3().crossVectors(cf, ctx.camera.up).normalize();
@@ -531,7 +529,7 @@ export function runAnimationLoop(ctx: AnimationContext): void {
                 const delta = new THREE.Vector3().subVectors(focusObj.mesh.position, oldPos);
                 if (ctx.cameraState.lockToSun) {
                     ctx.camera.position.add(delta); ctx.controls.target.set(0, 0, 0); ctx.camera.lookAt(0, 0, 0);
-                } else if (!ctx.interactionState.isRepositioning && !ctx.isChangingVelocity.value) {
+                } else if (!ctx.interactionState.isRepositioning && !interactionState.isChangingVelocity) {
                     ctx.camera.position.add(delta); ctx.controls.target.copy(focusObj.mesh.position);
                 }
             } else {
@@ -575,8 +573,8 @@ export function runAnimationLoop(ctx: AnimationContext): void {
         ctx.renderer.autoClear = true;
 
         // ── HUD sprites (FPS / stats / speed) ──────────────────────────────
-        if (now - ctx.fpsLastUpdate.value > 100) {
-            const fps = Math.round(1000 / (now - ctx.lastT.value));
+        if (now - fpsLastUpdate > 100) {
+            const fps = Math.round(1000 / (now - lastT));
             if (ctx.fpsSprite.value) {
                 ctx.fpsSprite.value.material.map?.dispose();
                 ctx.fpsSprite.value.material.map = createFPSTexture(fps);
@@ -620,11 +618,11 @@ export function runAnimationLoop(ctx: AnimationContext): void {
                 ctx.statsSprite.value.visible = false;
             }
 
-            ctx.flightHUD.updateAutopilotHUD((now - ctx.lastT.value) / 1000);
-            ctx.fpsLastUpdate.value = now;
+            ctx.flightHUD.updateAutopilotHUD((now - lastT) / 1000);
+            fpsLastUpdate = now;
         }
 
-        ctx.lastT.value = now;
+        lastT = now;
     }
 
     animate();

@@ -48,7 +48,6 @@ import {
     SimulationStartMode,
 
     // HUD / sim constants moved from index.ts
-    BASE_FRAME_DT,
     CROSSHAIR_SIZE,
     VEL_SCALE,
 
@@ -60,9 +59,6 @@ import {
     FLIGHT_MAX_SPEED,
     FLIGHT_WARP_DECEL,
     FLIGHT_WARP_SPEED,
-    WARP_FADE_DIST,
-    WARP_FULL_VIS_DIST,
-    WARP_SHAKE_MAG,
     FLIGHT_BOOST_ACCEL,
 
     // Flight feel constants moved from index.ts
@@ -79,7 +75,6 @@ import {
     FLIGHT_MAX_BANK_PITCH,
     FLIGHT_BANK_LERP_SPEED,
     FLIGHT_ALT_ORBIT_SENSITIVITY,
-    FLIGHT_ALT_ORBIT_RETURN_SPEED,
     FLIGHT_ALT_ORBIT_PITCH_MIN,
     FLIGHT_ALT_ORBIT_PITCH_MAX,
     FLIGHT_ALT_ORBIT_YAW_MAX,
@@ -100,15 +95,10 @@ import {
     AUTOPILOT_APPROACH_MIN_DISTANCE,
     AUTOPILOT_BRAKE_ARC_DIST,
     AUTOPILOT_WARP_THRESHOLD,
-    TIME_SCALE,
     SUN_RADIUS,
     DIST_SCALE,
     WEAPON_DAMAGE,
     TEXT_SPRITE_Z,
-    FLIGHT_THRUST_DECEL_TOLERANCE,
-    FLIGHT_WARP_DECEL_TOLERANCE,
-    FREE_CAM_NORMAL_SPEED,
-    FREE_CAM_BOOST_SPEED,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -119,10 +109,7 @@ import {
 } from './utilities/utilities';
 import { SeededRandom } from './utilities/prng';
 import {
-    absorbBody,
-    chooseCollisionWinner,
     setBodyRadius,
-    updateSimulation,
 } from './physics/physics';
 import {
     randomStarParams,
@@ -176,7 +163,6 @@ import { createMainSequenceStarFromParams } from './procedural/star-factory';
 import { createPlanetBodyFromProceduralCreation } from './procedural/planet-factory';
 import { upgradeProceduralTexture } from './procedural/texture-upgrader';
 import { Asteroid } from './bodies/asteroid';
-import { Comet } from './bodies/comet';
 
 import { Spaceship } from './bodies/spaceship';
 import { ShipWeapon } from './ship-effects/ship-weapon';
@@ -261,7 +247,6 @@ import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums'
 import { EffectiveGForce } from './types';
 import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { EmptySystemGenerator } from './procedural/empty-system-generator';
-import { settingsStore } from './settings/settings-store';
 import { pickMoonTextureForMoonType } from './procedural/moon-factory';
 import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
 
@@ -679,7 +664,7 @@ orbitPrediction.resize(window.innerWidth, window.innerHeight);
 
 // Create FPS counter sprite
 let fpsSprite: THREE.Sprite | null = null;
-let fpsLastUpdate = 0;
+
 function createFPSSprite() {
     const texture = createFPSTexture(60);
     const material = new THREE.SpriteMaterial({
@@ -787,18 +772,13 @@ const flightHUD = new FlightHUD(
 flightHUD.init();
 
 // Backward compatibility aliases
-let activeAxis: string | null = null;
-let isChangingVelocity = false;
 let isMiddleMouseVelocity = false;
-let timeScale = 1;
 let isFreeCameraMode = false;
 let isMouseLookActive = false;
 let focusID = 'camSun';
 let manuallySelectedBody = null as Body | null; // Track bodies clicked in space (without camera buttons)
 const NONE_FOCUS_POSITION = new THREE.Vector3(0, 0, 0); // Center of solar system
-let isPaused = false;
-let savedTimeScale = 1;
-let lastT = performance.now();
+
 
 let supernovas: Supernova[] = []; // Track all supernova effects
 let planetaryNebulae: PlanetaryNebula[] = []; // Track all planetary nebula effects
@@ -811,18 +791,6 @@ const dragPlane = new THREE.Plane();
 
 // Synchronize aliases with state objects
 
-Object.defineProperty(window, 'activeAxis', {
-    get: () => interactionState.activeAxis,
-    set: (v) => {
-        interactionState.activeAxis = v;
-    },
-});
-Object.defineProperty(window, 'isChangingVelocity', {
-    get: () => interactionState.isChangingVelocity,
-    set: (v) => {
-        interactionState.isChangingVelocity = v;
-    },
-});
 Object.defineProperty(window, 'isMiddleMouseVelocity', {
     get: () => interactionState.isMiddleMouseVelocity,
     set: (v) => {
@@ -865,12 +833,6 @@ Object.defineProperty(window, 'savedTimeScale', {
         simulationState.savedTimeScale = v;
     },
 });
-Object.defineProperty(window, 'lastT', {
-    get: () => simulationState.lastT,
-    set: (v) => {
-        simulationState.lastT = v;
-    },
-});
 
 Object.defineProperty(window, 'wasRunningBeforeDrag', {
     get: () => interactionState.wasRunningBeforeDrag,
@@ -905,7 +867,7 @@ function canMoveSelectedBodyWithArrowKeys() {
         !!gizmo.target &&
         !!gizmo.target.mesh &&
         !interactionState.isRepositioning &&
-        !isChangingVelocity &&
+        !interactionState.isChangingVelocity &&
         !isMiddleMouseVelocity
     );
 }
@@ -916,7 +878,7 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
     const body = gizmo.target;
     if (!body?.mesh) return false;
 
-    const wasRunning = !isPaused;
+    const wasRunning = !simulationState.isPaused;
     if (wasRunning) {
         togglePause();
     }
@@ -999,7 +961,7 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
             );
         }
         if (
-            (isChangingVelocity || isMiddleMouseVelocity) &&
+            (interactionState.isChangingVelocity || isMiddleMouseVelocity) &&
             posIndicator.velocityTipIndicator &&
             posIndicator.velocityTipRing
         ) {
@@ -1886,20 +1848,20 @@ async function spawn(
 }
 
 function togglePause() {
-    isPaused = !isPaused;
+    simulationState.isPaused = !simulationState.isPaused;
 
-    if (isPaused) {
+    if (simulationState.isPaused) {
         // Remember the current speed and set to 0
-        savedTimeScale = timeScale;
-        timeScale = 0;
+        simulationState.savedTimeScale = simulationState.timeScale;
+        simulationState.timeScale = 0;
 
         uiManager.setPauseState(true);
         // Keep slider enabled so user can adjust speed while paused
     } else {
         // Restore the saved speed (which may have been adjusted while paused)
-        timeScale = savedTimeScale;
-        const direction = savedTimeScale < 0 ? ' REVERSE' : '';
-        uiManager.mainPanel.updateTimeScaleDisplay(Math.abs(savedTimeScale) + 'x' + direction);
+        simulationState.timeScale = simulationState.savedTimeScale;
+        const direction = simulationState.savedTimeScale < 0 ? ' REVERSE' : '';
+        uiManager.mainPanel.updateTimeScaleDisplay(Math.abs(simulationState.savedTimeScale) + 'x' + direction);
         uiManager.setPauseState(false);
     }
 }
@@ -1925,7 +1887,7 @@ function onMouseDown(event: MouseEvent) {
     // Do not allow MMB velocity edit to start while already doing an LMB velocity drag.
     if (
         event.button === 1 &&
-        !(isChangingVelocity || isMiddleMouseVelocity) &&
+        !(interactionState.isChangingVelocity || isMiddleMouseVelocity) &&
         gizmo.group.visible &&
         gizmo.velocityArrow.visible &&
         gizmo.target
@@ -1968,7 +1930,7 @@ function onMouseDown(event: MouseEvent) {
         // If we're currently dragging velocity with LMB, do NOT pointer-lock.
         // Pointer-lock steals the cursor and breaks the drag-plane mapping used by the velocity gizmo.
         // We'll still rotate the camera using normal mousemove deltas while RMB is held.
-        if (!(isChangingVelocity || isMiddleMouseVelocity)) {
+        if (!(interactionState.isChangingVelocity || isMiddleMouseVelocity)) {
             // Make sure we're tracking the currently held mouse position
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -2010,13 +1972,12 @@ function onMouseDown(event: MouseEvent) {
         ? raycaster.intersectObject(gizmo.velocityArrow, true)
         : [];
     if (velIntersects.length > 0 && gizmo.target) {
-        isChangingVelocity = true;
         interactionState.isChangingVelocity = true;
         controls.enabled = false;
         console.log('[drag] LMB velocity start', gizmo.target?.name);
 
         // Always pause while editing velocity (store whether we should resume after)
-        interactionState.velocityEditHadRunningBeforeDrag = !isPaused && !isFreeCameraMode;
+        interactionState.velocityEditHadRunningBeforeDrag = !simulationState.isPaused && !isFreeCameraMode;
         if (interactionState.velocityEditHadRunningBeforeDrag) {
             togglePause();
         }
@@ -2110,7 +2071,7 @@ function onMouseDown(event: MouseEvent) {
             // Highlight ring while dragging
             (gizmo.tiltRing.material as THREE.MeshPhongMaterial).color.set(0xffffff);
             (gizmo.tiltRing.material as THREE.MeshPhongMaterial).emissive.set(0x666666);
-            if (!isPaused && !isFreeCameraMode) {
+            if (!simulationState.isPaused && !isFreeCameraMode) {
                 togglePause();
                 wasRunningBeforeDrag = true;
             }
@@ -2134,7 +2095,7 @@ function onMouseDown(event: MouseEvent) {
             );
             (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).color.set(0xffffff);
             (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).emissive.set(0x666666);
-            if (!isPaused && !isFreeCameraMode) {
+            if (!simulationState.isPaused && !isFreeCameraMode) {
                 togglePause();
                 wasRunningBeforeDrag = true;
             }
@@ -2160,7 +2121,7 @@ function onMouseDown(event: MouseEvent) {
         }
 
         interactionState.isRepositioning = true;
-        activeAxis = gizmoIntersects[0].object.userData.axis;
+        interactionState.activeAxis = gizmoIntersects[0].object.userData.axis;
         // Inside onMouseDown, when an arrow is clicked:
         gizmo.arrows.forEach((a) => ((a.line.material as THREE.LineBasicMaterial).opacity = 0.2)); // Dim others
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2178,9 +2139,9 @@ function onMouseDown(event: MouseEvent) {
         // - Raycast mouse onto a plane that CONTAINS the axis and is as "screen-facing" as possible.
         // - Use incremental drag (start intersection + start position) to avoid runaway.
         const axisDir =
-            activeAxis === 'x'
+            interactionState.activeAxis === 'x'
                 ? new THREE.Vector3(1, 0, 0)
-                : activeAxis === 'y'
+                : interactionState.activeAxis === 'y'
                   ? new THREE.Vector3(0, 1, 0)
                   : new THREE.Vector3(0, 0, 1);
 
@@ -2225,7 +2186,7 @@ function onMouseDown(event: MouseEvent) {
         // Show grid and indicators
         posIndicator.show('position');
 
-        if (!isPaused && !isFreeCameraMode) {
+        if (!simulationState.isPaused && !isFreeCameraMode) {
             togglePause();
             wasRunningBeforeDrag = true;
         }
@@ -2356,7 +2317,7 @@ function onMouseMove(event: MouseEvent) {
     // Handle Velocity Dragging OR middle mouse button
     // NOTE: While dragging velocity we still allow right-mouse mouse-look + zoom.
     // So we do NOT early-return here; we only return if we actually applied a drag update.
-    if ((isChangingVelocity || isMiddleMouseVelocity) && gizmo.target) {
+    if ((interactionState.isChangingVelocity || isMiddleMouseVelocity) && gizmo.target) {
         // If RMB mouse-look is held at the same time as a velocity drag, keep normal cursor coords.
         // (Pointer-lock is disabled in that case in onMouseDown.)
         const rmbDown = (event.buttons & 2) === 2;
@@ -2585,9 +2546,9 @@ function onMouseMove(event: MouseEvent) {
         if (!raycaster.ray.intersectPlane(dragPlane, intersection)) return;
 
         const axisDir =
-            activeAxis === 'x'
+            interactionState.activeAxis === 'x'
                 ? new THREE.Vector3(1, 0, 0)
-                : activeAxis === 'y'
+                : interactionState.activeAxis === 'y'
                   ? new THREE.Vector3(0, 1, 0)
                   : new THREE.Vector3(0, 0, 1);
 
@@ -2697,7 +2658,7 @@ function onMouseMove(event: MouseEvent) {
         }
 
         // If dragging velocity arrow, keep drag plane consistent with the active edit mode.
-        if (isChangingVelocity && gizmo.target) {
+        if (interactionState.isChangingVelocity && gizmo.target) {
             const origin = gizmo.target.mesh.position;
 
             if (interactionState.velocityEditMode === 'y') {
@@ -2769,7 +2730,7 @@ function onMouseUp(event: MouseEvent) {
 
         // If LMB velocity drag is still active, do NOT hide the grid/indicators/arcs.
         // This prevents "grid disappearing" when the user releases MMB while still dragging with LMB.
-        if (!isChangingVelocity) {
+        if (!interactionState.isChangingVelocity) {
             posIndicator.hide();
 
             // Hide arc helper for middle-mouse velocity drag as well
@@ -2790,16 +2751,15 @@ function onMouseUp(event: MouseEvent) {
 
     // Left mouse button releases
     if (event.button === 0) {
-        const wasVel = isChangingVelocity;
+        const wasVel = interactionState.isChangingVelocity;
         const wasTilting = isTilting;
         const wasAzimuth = isAzimuthDragging;
 
         interactionState.isRepositioning = false;
-        isChangingVelocity = false;
         interactionState.isChangingVelocity = false;
         isTilting = false;
         isAzimuthDragging = false;
-        activeAxis = null;
+        interactionState.activeAxis = null;
         gizmo.arrows.forEach((a) => ((a.line.material as THREE.LineBasicMaterial).opacity = 1.0));
 
         // Restore tilt ring color
@@ -3826,7 +3786,7 @@ function updateFlightControls(dt: number, simDt: number) {
 
     // Pause guard: while paused, do not mutate ship rotation, thrust, roll, or velocity.
     // Keep the active flight state intact so unpausing resumes from the exact same ship state.
-    if (isPaused || simulationState.timeScale === 0) {
+    if (simulationState.isPaused || simulationState.timeScale === 0) {
         flightState.thrustActive = false;
         return;
     }
@@ -4688,15 +4648,15 @@ uiManager.on('timeScaleChange', ({ value }: { value: number }) => {
     const newSpeed = value;
     const direction = newSpeed < 0 ? ' REVERSE' : '';
     const absSpeed = Math.abs(newSpeed);
-    if (isPaused) {
+    if (simulationState.isPaused) {
         // When paused, update the saved value that will be used on resume
-        savedTimeScale = newSpeed;
+        simulationState.savedTimeScale = newSpeed;
         uiManager.mainPanel.updateTimeScaleDisplay(
             '0.0x (PAUSED - next: ' + absSpeed + 'x' + direction + ')'
         );
     } else {
         // When running, immediately update the speed
-        timeScale = newSpeed;
+        simulationState.timeScale = newSpeed;
         uiManager.mainPanel.updateTimeScaleDisplay(absSpeed + 'x' + direction);
     }
 });
@@ -5252,7 +5212,7 @@ window.addEventListener('keydown', (e) => {
 
     // Toggle velocity edit mode while actively editing velocity
     // G toggles between XZ (horizontal) and Y (vertical).
-    if ((isChangingVelocity || isMiddleMouseVelocity) && key === 'g') {
+    if ((interactionState.isChangingVelocity || isMiddleMouseVelocity) && key === 'g') {
         interactionState.velocityEditMode = interactionState.velocityEditMode === 'xz' ? 'y' : 'xz';
 
         // Update the drag plane to match the active velocity edit mode.
@@ -5428,7 +5388,7 @@ window.addEventListener('keyup', (e) => {
     }
 
     if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
-        if (!isChangingVelocity && !isMiddleMouseVelocity && !interactionState.isRepositioning) {
+        if (!interactionState.isChangingVelocity && !isMiddleMouseVelocity && !interactionState.isRepositioning) {
             posIndicator.hide();
             velArc.hideAll();
         }
@@ -5456,7 +5416,7 @@ window.addEventListener(
 
         // Disable wheel zoom while dragging gizmos (position or velocity).
         // Wheel zoom during a drag causes unstable interaction / weird cursor-plane mapping.
-        if (interactionState.isRepositioning || isChangingVelocity || isMiddleMouseVelocity) {
+        if (interactionState.isRepositioning || interactionState.isChangingVelocity || isMiddleMouseVelocity) {
             return;
         }
 
@@ -5894,27 +5854,22 @@ window.addEventListener('popstate', async () => {
     proceduralModal.hide();
 });
 
-refreshBodiesTable();// ── Start the animation loop ───────────────────────────────────────────
+refreshBodiesTable();
+// ── Start the animation loop ───────────────────────────────────────────
 const animCtx: AnimationContext = {
     scene, camera, renderer, uiScene, uiCamera, controls, raycaster, mouse,
     autopilotState, cameraState, flightState, interactionState, simulationState,
     selectedBody: { value: selectedBody },
     manuallySelectedBody: { value: manuallySelectedBody },
-    isChangingVelocity: { value: isChangingVelocity },
     isMiddleMouseVelocity: { value: isMiddleMouseVelocity },
     isFreeCameraMode: { value: isFreeCameraMode },
-    activeAxis: { value: activeAxis },
     focusID: { value: focusID },
-    isPaused: { value: isPaused },
-    timeScale: { value: timeScale },
-    lastT: { value: lastT },
     NONE_FOCUS_POSITION,
     dragPlane,
     dragCameraOffset,
     supernovas: { value: supernovas },
     planetaryNebulae: { value: planetaryNebulae },
     wasRunningBeforeDrag: { value: wasRunningBeforeDrag },
-    fpsLastUpdate: { value: fpsLastUpdate },
     lensingEffect, warpEffect, shipWeapon, gizmo, velArc, orbitPrediction,
     posIndicator, gridHelperManager, flightHUD, surfaceCam,
     fpsSprite: { value: fpsSprite },
@@ -5935,4 +5890,5 @@ const animCtx: AnimationContext = {
     triggerZoomToBody,
     uiManager,
 };
+
 runAnimationLoop(animCtx);
