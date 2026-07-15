@@ -86,6 +86,7 @@ export const flightState: IFlightState = {
     altOrbitYaw: 0,
     /** Accumulated pitch offset (radians) for the ALT orbit camera, in ship-local space. */
     altOrbitPitch: 0,
+    
 };
 
 /**

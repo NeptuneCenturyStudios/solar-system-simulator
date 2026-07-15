@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Body } from './bodies/body';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { Supernova } from './effects/supernova';
@@ -11,11 +12,15 @@ import { ITidalLockOptions } from './bodies/celestial-body';
 import { EffectiveGForce } from './types';
 import { Spaceship } from './bodies/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
+import { WarpEffect } from './effects/warp-effect';
+import { ShipWeapon } from './ship-effects/ship-weapon';
+import { FlightHUD } from './drawing/flight-hud';
+import { UIManager } from './ui/ui-manager';
 
 /**
  * Options for configuring an atmosphere on a celestial body, including its radius and tint color.
  */
-export interface IAtmosphereOptions{
+export interface IAtmosphereOptions {
     radius: number;
     tint: number;
 }
@@ -23,7 +28,7 @@ export interface IAtmosphereOptions{
 /**
  * The interface for a solar system, containing an array of celestial bodies and a space texture.
  */
-export interface ISolarSystem{
+export interface ISolarSystem {
     bodies: Body[];
     /** The space texture representing the background of the solar system. Can be null if not yet generated. */
     spaceTexture: ISpaceBackground;
@@ -185,6 +190,9 @@ export interface IFlightState {
 
     /** True while any thrust key (W/S/Shift) was held this frame. */
     thrustActive: boolean;
+
+    /** Warp effect instance. */
+    warpEffect?: WarpEffect;
 
     /** Seconds space bar has been held in flight mode. */
     warpCharge: number;
@@ -359,4 +367,28 @@ export interface IProceduralGeneratorPromptResult {
 export interface IDeathOptions {
     skipImpactSound?: boolean;
     skipExplosion?: boolean;
+}
+
+export interface IFlightControlContext {
+    shipWeapon: ShipWeapon;
+    camera: THREE.PerspectiveCamera;
+    renderer: THREE.WebGLRenderer;
+    controls: OrbitControls;
+
+    // UI
+    uiManager: UIManager;
+
+    // Steering / flight UI geometry (mutable buffer / meshes created once in index.ts)
+    flightSteeringLine: THREE.Line;
+    steeringLinePositions: Float32Array;
+    steeringEndMarker: THREE.Mesh;
+    steeringOriginMarker: THREE.Mesh;
+    steeringLineGeo: THREE.BufferGeometry;
+    flightCrosshair: THREE.LineSegments;
+    flightHUD: FlightHUD;
+    speedSprite: THREE.Sprite | null;
+
+    refreshBodiesTable: () => void;
+    addEvent: (event: { message: string; notificationType: NotificationType }) => void;
+
 }

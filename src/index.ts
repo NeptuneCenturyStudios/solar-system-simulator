@@ -52,28 +52,15 @@ import {
     VEL_SCALE,
 
     // Flight thrust constants still imported for other derived logic
-    FLIGHT_THRUST_ACCEL,
-    FLIGHT_THRUST_DECEL,
-    FLIGHT_BOOST_DECEL,
     FLIGHT_BOOST_MAX_SPEED,
     FLIGHT_MAX_SPEED,
-    FLIGHT_WARP_DECEL,
     FLIGHT_WARP_SPEED,
     FLIGHT_BOOST_ACCEL,
 
     // Flight feel constants moved from index.ts
-    FLIGHT_PERP_DECAY,
     FLIGHT_MAX_POINTER_OFFSET,
     FLIGHT_MAX_TURN_RATE,
-    FLIGHT_ROLL_SPEED,
-    FLIGHT_ROLL_ACCEL,
-    FLIGHT_ROLL_FRICTION,
-    FLIGHT_STEER_SMOOTH_RATE,
-    FLIGHT_STEER_DEADZONE,
     FLIGHT_WARP_CHARGE_TIME,
-    FLIGHT_MAX_BANK_ANGLE,
-    FLIGHT_MAX_BANK_PITCH,
-    FLIGHT_BANK_LERP_SPEED,
     FLIGHT_ALT_ORBIT_SENSITIVITY,
     FLIGHT_ALT_ORBIT_PITCH_MIN,
     FLIGHT_ALT_ORBIT_PITCH_MAX,
@@ -108,9 +95,7 @@ import {
     getBodyTypeLabel,
 } from './utilities/utilities';
 import { SeededRandom } from './utilities/prng';
-import {
-    setBodyRadius,
-} from './physics/physics';
+import { setBodyRadius } from './physics/physics';
 import {
     randomStarParams,
     randomBlackHoleParams,
@@ -171,7 +156,7 @@ import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
 import { OptionsPanel } from './ui/options-panel';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
-import { IProceduralGeneratorPromptResult, IStateDependencies } from './interfaces';
+import { IFlightControlContext, IProceduralGeneratorPromptResult, IStateDependencies } from './interfaces';
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
 import { UIManager } from './ui/ui-manager';
@@ -249,6 +234,7 @@ import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { EmptySystemGenerator } from './procedural/empty-system-generator';
 import { pickMoonTextureForMoonType } from './procedural/moon-factory';
 import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
+import { exitFlightMode } from './simulation/flight-controllers';
 
 // ── URL seed parameter helpers ──────────────────────────────────────────────
 const SEED_TYPE_NORMAL = 'normal';
@@ -421,8 +407,6 @@ steeringOriginMarker.frustumCulled = false;
 steeringOriginMarker.visible = false;
 uiScene.add(steeringOriginMarker);
 
-// (Ship engine trail is owned by each Spaceship via its ShipTrail property)
-
 // --- Ship weapon (projectile particle system, lives in the main 3D scene) ---
 const shipWeapon = new ShipWeapon(scene);
 
@@ -465,7 +449,7 @@ function applyOrbitRotationDelta(dx: number, dy: number) {
     // - LookAt: orbit around focus object (or center if none)
     const rotSpeed = cameraState.rotationSpeed;
 
-    if (isFreeCameraMode) {
+    if (cameraState.isFreeCameraMode) {
         const euler = new THREE.Euler(0, 0, 0, 'YXZ');
         euler.setFromQuaternion(camera.quaternion);
         euler.y -= dx * rotSpeed;
@@ -759,7 +743,10 @@ const _retryMusic = (): void => {
 document.addEventListener('pointerdown', _retryMusic);
 document.addEventListener('touchstart', _retryMusic);
 document.addEventListener('keydown', _retryMusic);
-const warpEffect = new WarpEffect(scene);
+
+// Set the warp effect instance
+flightState.warpEffect = new WarpEffect(scene);
+
 const flightHUD = new FlightHUD(
     uiScene,
     autopilotState,
@@ -771,87 +758,15 @@ const flightHUD = new FlightHUD(
 );
 flightHUD.init();
 
-// Backward compatibility aliases
-let isMiddleMouseVelocity = false;
-let isFreeCameraMode = false;
-let isMouseLookActive = false;
-let focusID = 'camSun';
+// Backward-compatible let kept for basic module-level state
 let manuallySelectedBody = null as Body | null; // Track bodies clicked in space (without camera buttons)
 const NONE_FOCUS_POSITION = new THREE.Vector3(0, 0, 0); // Center of solar system
-
 
 let supernovas: Supernova[] = []; // Track all supernova effects
 let planetaryNebulae: PlanetaryNebula[] = []; // Track all planetary nebula effects
 
-let wasRunningBeforeDrag = false;
 let isTilting = false;
 let isAzimuthDragging = false;
-const dragCameraOffset = new THREE.Vector3();
-const dragPlane = new THREE.Plane();
-
-// Synchronize aliases with state objects
-
-Object.defineProperty(window, 'isMiddleMouseVelocity', {
-    get: () => interactionState.isMiddleMouseVelocity,
-    set: (v) => {
-        interactionState.isMiddleMouseVelocity = v;
-    },
-});
-Object.defineProperty(window, 'isFreeCameraMode', {
-    get: () => cameraState.isFreeCameraMode,
-    set: (v) => {
-        cameraState.isFreeCameraMode = v;
-    },
-});
-Object.defineProperty(window, 'isMouseLookActive', {
-    get: () => interactionState.isMouseLookActive,
-    set: (v) => {
-        interactionState.isMouseLookActive = v;
-    },
-});
-Object.defineProperty(window, 'focusID', {
-    get: () => cameraState.focusID,
-    set: (v) => {
-        cameraState.focusID = v;
-    },
-});
-Object.defineProperty(window, 'timeScale', {
-    get: () => simulationState.timeScale,
-    set: (v) => {
-        simulationState.timeScale = v;
-    },
-});
-Object.defineProperty(window, 'isPaused', {
-    get: () => simulationState.isPaused,
-    set: (v) => {
-        simulationState.isPaused = v;
-    },
-});
-Object.defineProperty(window, 'savedTimeScale', {
-    get: () => simulationState.savedTimeScale,
-    set: (v) => {
-        simulationState.savedTimeScale = v;
-    },
-});
-
-Object.defineProperty(window, 'wasRunningBeforeDrag', {
-    get: () => interactionState.wasRunningBeforeDrag,
-    set: (v) => {
-        interactionState.wasRunningBeforeDrag = v;
-    },
-});
-Object.defineProperty(window, 'dragCameraOffset', {
-    get: () => interactionState.dragCameraOffset,
-    set: (v) => {
-        interactionState.dragCameraOffset = v;
-    },
-});
-Object.defineProperty(window, 'dragPlane', {
-    get: () => interactionState.dragPlane,
-    set: (v) => {
-        interactionState.dragPlane = v;
-    },
-});
 
 const keys = cameraState.keys;
 //const cameraSpeed = cameraState.speed;
@@ -868,7 +783,7 @@ function canMoveSelectedBodyWithArrowKeys() {
         !!gizmo.target.mesh &&
         !interactionState.isRepositioning &&
         !interactionState.isChangingVelocity &&
-        !isMiddleMouseVelocity
+        !interactionState.isMiddleMouseVelocity
     );
 }
 
@@ -931,7 +846,7 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
 
     const shouldMoveCameraWithBody =
         cameraState.isLookAtMode &&
-        !isFreeCameraMode &&
+        !cameraState.isFreeCameraMode &&
         !surfaceCam.isActive &&
         !cameraState.isFreeCameraMode;
 
@@ -961,7 +876,7 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
             );
         }
         if (
-            (interactionState.isChangingVelocity || isMiddleMouseVelocity) &&
+            (interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity) &&
             posIndicator.velocityTipIndicator &&
             posIndicator.velocityTipRing
         ) {
@@ -1861,7 +1776,9 @@ function togglePause() {
         // Restore the saved speed (which may have been adjusted while paused)
         simulationState.timeScale = simulationState.savedTimeScale;
         const direction = simulationState.savedTimeScale < 0 ? ' REVERSE' : '';
-        uiManager.mainPanel.updateTimeScaleDisplay(Math.abs(simulationState.savedTimeScale) + 'x' + direction);
+        uiManager.mainPanel.updateTimeScaleDisplay(
+            Math.abs(simulationState.savedTimeScale) + 'x' + direction
+        );
         uiManager.setPauseState(false);
     }
 }
@@ -1887,12 +1804,12 @@ function onMouseDown(event: MouseEvent) {
     // Do not allow MMB velocity edit to start while already doing an LMB velocity drag.
     if (
         event.button === 1 &&
-        !(interactionState.isChangingVelocity || isMiddleMouseVelocity) &&
+        !(interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity) &&
         gizmo.group.visible &&
         gizmo.velocityArrow.visible &&
         gizmo.target
     ) {
-        isMiddleMouseVelocity = true;
+        interactionState.isMiddleMouseVelocity = true;
         interactionState.isMiddleMouseVelocity = true;
         console.log('[drag] MMB velocity start', gizmo.target?.name);
 
@@ -1908,10 +1825,13 @@ function onMouseDown(event: MouseEvent) {
             const hDir = v.lengthSq() > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
             const up = new THREE.Vector3(0, 1, 0);
             const planeNormal = new THREE.Vector3().crossVectors(hDir, up).normalize();
-            dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
+            interactionState.dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
         } else {
             // 'xz'
-            dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), origin);
+            interactionState.dragPlane.setFromNormalAndCoplanarPoint(
+                new THREE.Vector3(0, 1, 0),
+                origin
+            );
         }
 
         // Show grid and indicators
@@ -1924,19 +1844,19 @@ function onMouseDown(event: MouseEvent) {
     // Right mouse button activates mouse look
     if (event.button === 2) {
         if (surfaceCam.isActive) {
-            isMouseLookActive = true;
+            interactionState.isMouseLookActive = true;
             return;
         }
         // If we're currently dragging velocity with LMB, do NOT pointer-lock.
         // Pointer-lock steals the cursor and breaks the drag-plane mapping used by the velocity gizmo.
         // We'll still rotate the camera using normal mousemove deltas while RMB is held.
-        if (!(interactionState.isChangingVelocity || isMiddleMouseVelocity)) {
+        if (!(interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity)) {
             // Make sure we're tracking the currently held mouse position
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
 
-            if (isFreeCameraMode) {
+            if (cameraState.isFreeCameraMode) {
                 // Free camera: look at what's under the mouse
                 const allObjects = simulationState.bodies.map((b) => b.mesh);
                 const intersects = raycaster.intersectObjects(allObjects, false);
@@ -1956,7 +1876,7 @@ function onMouseDown(event: MouseEvent) {
             renderer.domElement.requestPointerLock();
         }
 
-        isMouseLookActive = true;
+        interactionState.isMouseLookActive = true;
         return;
     }
 
@@ -1977,7 +1897,8 @@ function onMouseDown(event: MouseEvent) {
         console.log('[drag] LMB velocity start', gizmo.target?.name);
 
         // Always pause while editing velocity (store whether we should resume after)
-        interactionState.velocityEditHadRunningBeforeDrag = !simulationState.isPaused && !isFreeCameraMode;
+        interactionState.velocityEditHadRunningBeforeDrag =
+            !simulationState.isPaused && !cameraState.isFreeCameraMode;
         if (interactionState.velocityEditHadRunningBeforeDrag) {
             togglePause();
         }
@@ -1999,16 +1920,19 @@ function onMouseDown(event: MouseEvent) {
             const hDir = v.lengthSq() > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
             const up = new THREE.Vector3(0, 1, 0);
             const planeNormal = new THREE.Vector3().crossVectors(hDir, up).normalize();
-            dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
+            interactionState.dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
         } else {
             // 'xz'
-            dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), origin);
+            interactionState.dragPlane.setFromNormalAndCoplanarPoint(
+                new THREE.Vector3(0, 1, 0),
+                origin
+            );
         }
 
         // Immediately update velocity once on mouse-down using current cursor intersection
         // Use the SAME mapping as the drag loop (mouse corresponds to arrow tip in world space).
         const intersection = new THREE.Vector3();
-        if (raycaster.ray.intersectPlane(dragPlane, intersection)) {
+        if (raycaster.ray.intersectPlane(interactionState.dragPlane, intersection)) {
             const origin = gizmo.target.mesh.position;
             const vNow = gizmo.target.velocity.clone();
             const tipDelta = new THREE.Vector3().subVectors(intersection, origin);
@@ -2064,16 +1988,16 @@ function onMouseDown(event: MouseEvent) {
             // The tilt ring's plane contains world-Y and the azimuth forward direction.
             // Normal = worldX rotated by azimuth around Y = (cos(az), 0, -sin(az)).
             const az = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
-            dragPlane.setFromNormalAndCoplanarPoint(
+            interactionState.dragPlane.setFromNormalAndCoplanarPoint(
                 new THREE.Vector3(Math.cos(az), 0, -Math.sin(az)),
                 gizmo.target.mesh.position
             );
             // Highlight ring while dragging
             (gizmo.tiltRing.material as THREE.MeshPhongMaterial).color.set(0xffffff);
             (gizmo.tiltRing.material as THREE.MeshPhongMaterial).emissive.set(0x666666);
-            if (!simulationState.isPaused && !isFreeCameraMode) {
+            if (!simulationState.isPaused && !cameraState.isFreeCameraMode) {
                 togglePause();
-                wasRunningBeforeDrag = true;
+                interactionState.wasRunningBeforeDrag = true;
             }
             return;
         }
@@ -2089,15 +2013,15 @@ function onMouseDown(event: MouseEvent) {
             isAzimuthDragging = true;
             controls.enabled = false;
             // Drag plane normal = Y-axis  =>  the XZ plane through the body.
-            dragPlane.setFromNormalAndCoplanarPoint(
+            interactionState.dragPlane.setFromNormalAndCoplanarPoint(
                 new THREE.Vector3(0, 1, 0),
                 gizmo.target.mesh.position
             );
             (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).color.set(0xffffff);
             (gizmo.azimuthRing.material as THREE.MeshPhongMaterial).emissive.set(0x666666);
-            if (!simulationState.isPaused && !isFreeCameraMode) {
+            if (!simulationState.isPaused && !cameraState.isFreeCameraMode) {
                 togglePause();
-                wasRunningBeforeDrag = true;
+                interactionState.wasRunningBeforeDrag = true;
             }
             return;
         }
@@ -2133,7 +2057,7 @@ function onMouseDown(event: MouseEvent) {
         // Capture initial camera offset relative to the body so we can restore perspective on mouse-up.
         // (We do NOT translate the camera during the drag, but we should "snap" back to the same
         // relative offset at the end so the user keeps their original viewpoint.)
-        dragCameraOffset.subVectors(camera.position, gizmo.target.mesh.position);
+        interactionState.dragCameraOffset.subVectors(camera.position, gizmo.target.mesh.position);
 
         // For stable 1D axis dragging:
         // - Raycast mouse onto a plane that CONTAINS the axis and is as "screen-facing" as possible.
@@ -2172,13 +2096,19 @@ function onMouseDown(event: MouseEvent) {
         }
         planeNormal.normalize();
 
-        dragPlane.setFromNormalAndCoplanarPoint(planeNormal, gizmo.target.mesh.position);
+        interactionState.dragPlane.setFromNormalAndCoplanarPoint(
+            planeNormal,
+            gizmo.target.mesh.position
+        );
 
         // Cache initial intersection + starting position so drag is incremental.
         // If the ray doesn't hit the plane (can happen if plane is edge-on), fall back to body origin.
         interactionState.dragStartIntersection = new THREE.Vector3();
         interactionState.dragStartPosition = gizmo.target.mesh.position.clone();
-        const ok = raycaster.ray.intersectPlane(dragPlane, interactionState.dragStartIntersection);
+        const ok = raycaster.ray.intersectPlane(
+            interactionState.dragPlane,
+            interactionState.dragStartIntersection
+        );
         if (!ok) {
             interactionState.dragStartIntersection.copy(gizmo.target.mesh.position);
         }
@@ -2186,9 +2116,9 @@ function onMouseDown(event: MouseEvent) {
         // Show grid and indicators
         posIndicator.show('position');
 
-        if (!simulationState.isPaused && !isFreeCameraMode) {
+        if (!simulationState.isPaused && !cameraState.isFreeCameraMode) {
             togglePause();
-            wasRunningBeforeDrag = true;
+            interactionState.wasRunningBeforeDrag = true;
         }
         return;
     }
@@ -2284,7 +2214,8 @@ function onMouseMove(event: MouseEvent) {
                 const frac = flightState.altOrbitPitch / FLIGHT_ALT_ORBIT_PITCH_MAX;
                 pitchDelta *= Math.max(0, 1 - frac * frac);
             } else if (pitchDelta < 0 && flightState.altOrbitPitch < 0) {
-                const frac = Math.abs(flightState.altOrbitPitch) / Math.abs(FLIGHT_ALT_ORBIT_PITCH_MIN);
+                const frac =
+                    Math.abs(flightState.altOrbitPitch) / Math.abs(FLIGHT_ALT_ORBIT_PITCH_MIN);
                 pitchDelta *= Math.max(0, 1 - frac * frac);
             }
 
@@ -2317,7 +2248,10 @@ function onMouseMove(event: MouseEvent) {
     // Handle Velocity Dragging OR middle mouse button
     // NOTE: While dragging velocity we still allow right-mouse mouse-look + zoom.
     // So we do NOT early-return here; we only return if we actually applied a drag update.
-    if ((interactionState.isChangingVelocity || isMiddleMouseVelocity) && gizmo.target) {
+    if (
+        (interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity) &&
+        gizmo.target
+    ) {
         // If RMB mouse-look is held at the same time as a velocity drag, keep normal cursor coords.
         // (Pointer-lock is disabled in that case in onMouseDown.)
         const rmbDown = (event.buttons & 2) === 2;
@@ -2350,7 +2284,7 @@ function onMouseMove(event: MouseEvent) {
         } else {
             // Use drag plane intersection, then constrain by current edit mode
             const intersection = new THREE.Vector3();
-            if (raycaster.ray.intersectPlane(dragPlane, intersection)) {
+            if (raycaster.ray.intersectPlane(interactionState.dragPlane, intersection)) {
                 const origin = gizmo.target.mesh.position;
                 const vNow = gizmo.target.velocity.clone();
 
@@ -2482,7 +2416,7 @@ function onMouseMove(event: MouseEvent) {
                 gizmo.target.rings.quaternion.copy(gizmo.target.mesh.quaternion);
             }
         }
-        if (!isFreeCameraMode) return;
+        if (!cameraState.isFreeCameraMode) return;
     }
 
     // Handle azimuth ring drag — same 3D analytic tangent projection.
@@ -2531,19 +2465,19 @@ function onMouseMove(event: MouseEvent) {
                 gizmo.target.rings.quaternion.copy(gizmo.target.mesh.quaternion);
             }
         }
-        if (!isFreeCameraMode) return;
+        if (!cameraState.isFreeCameraMode) return;
     }
 
     // Handle position gizmo dragging
     if (interactionState.isRepositioning && gizmo.target) {
-        // Intersect the cached dragPlane, and move ONLY along the chosen axis by the
+        // Intersect the cached interactionState.dragPlane, and move ONLY along the chosen axis by the
         // amount the intersection moved since drag start (incremental, stable).
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
 
         const intersection = new THREE.Vector3();
-        if (!raycaster.ray.intersectPlane(dragPlane, intersection)) return;
+        if (!raycaster.ray.intersectPlane(interactionState.dragPlane, intersection)) return;
 
         const axisDir =
             interactionState.activeAxis === 'x'
@@ -2569,18 +2503,18 @@ function onMouseMove(event: MouseEvent) {
             gizmo.target.rings.position.copy(gizmo.target.mesh.position);
         }
         // Don't return here - let mouse look still work if in free camera mode
-        if (!isFreeCameraMode) return;
+        if (!cameraState.isFreeCameraMode) return;
     }
 
     // Mouse look: rotate camera when mouse look is active
-    if (isMouseLookActive) {
+    if (interactionState.isMouseLookActive) {
         // Ensure velocity dragging doesn't block mouse-look updates
         // (mousemove can fire with button states that don't include event.movement if not pointer-locked)
         // Movement deltas still come through; we just want to guarantee the look block runs.
         const movementX = event.movementX || 0;
         const movementY = event.movementY || 0;
 
-        if (isFreeCameraMode) {
+        if (cameraState.isFreeCameraMode) {
             // Free camera mode: rotate camera in place
             const euler = new THREE.Euler(0, 0, 0, 'YXZ');
             euler.setFromQuaternion(camera.quaternion);
@@ -2667,15 +2601,18 @@ function onMouseMove(event: MouseEvent) {
                 const hDir = v.lengthSq() > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
                 const up = new THREE.Vector3(0, 1, 0);
                 const planeNormal = new THREE.Vector3().crossVectors(hDir, up).normalize();
-                dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
+                interactionState.dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
             } else {
-                dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), origin);
+                interactionState.dragPlane.setFromNormalAndCoplanarPoint(
+                    new THREE.Vector3(0, 1, 0),
+                    origin
+                );
             }
 
             // Recalculate velocity (same constrained mapping as onMouseMove)
             raycaster.setFromCamera(mouse, camera);
             const intersection = new THREE.Vector3();
-            if (raycaster.ray.intersectPlane(dragPlane, intersection)) {
+            if (raycaster.ray.intersectPlane(interactionState.dragPlane, intersection)) {
                 const vNow = gizmo.target.velocity.clone();
                 const tipDelta = new THREE.Vector3().subVectors(intersection, origin);
                 if (tipDelta.lengthSq() < 1e-10) {
@@ -2725,7 +2662,7 @@ function onMouseUp(event: MouseEvent) {
 
     // Middle mouse button release
     if (event.button === 1) {
-        isMiddleMouseVelocity = false;
+        interactionState.isMiddleMouseVelocity = false;
         interactionState.isMiddleMouseVelocity = false;
 
         // If LMB velocity drag is still active, do NOT hide the grid/indicators/arcs.
@@ -2742,7 +2679,7 @@ function onMouseUp(event: MouseEvent) {
 
     // Deactivate mouse look on right mouse button release
     if (event.button === 2) {
-        isMouseLookActive = false;
+        interactionState.isMouseLookActive = false;
         // Exit pointer lock
         if (document.pointerLockElement === renderer.domElement) {
             document.exitPointerLock();
@@ -2776,7 +2713,7 @@ function onMouseUp(event: MouseEvent) {
                 .setRGB(0, 0.8, 1)
                 .multiplyScalar(0.2);
         }
-        controls.enabled = !isFreeCameraMode;
+        controls.enabled = !cameraState.isFreeCameraMode;
         posIndicator.hide();
 
         velArc.hideAll();
@@ -2796,26 +2733,26 @@ function onMouseUp(event: MouseEvent) {
             interactionState.velocityEditHadRunningBeforeDrag = false;
         }
 
-        if (wasRunningBeforeDrag) {
+        if (interactionState.wasRunningBeforeDrag) {
             togglePause();
-            wasRunningBeforeDrag = false;
+            interactionState.wasRunningBeforeDrag = false;
         }
 
         // If we were repositioning with the coordinate gizmo, restore the camera to its
         // original offset relative to the body (preserves the user's perspective).
         //
-        // IMPORTANT: Only do this if we actually started an axis drag (dragCameraOffset captured),
+        // IMPORTANT: Only do this if we actually started an axis drag (interactionState.dragCameraOffset captured),
         // otherwise a normal click selection could incorrectly "snap" the camera into/near the body.
         if (
             !wasVel &&
-            !isFreeCameraMode &&
+            !cameraState.isFreeCameraMode &&
             gizmo?.target &&
             !gizmo.target._isDisposed &&
             gizmo.target.mesh &&
             interactionState.dragStartPosition &&
             interactionState.dragStartIntersection
         ) {
-            camera.position.copy(gizmo.target.mesh.position).add(dragCameraOffset);
+            camera.position.copy(gizmo.target.mesh.position).add(interactionState.dragCameraOffset);
 
             // If Look At is enabled, keep controls target consistent with the focus.
             // Otherwise keep orbit anchored at center.
@@ -2898,7 +2835,6 @@ function setFocusBody(bodyOrNull: Body | null, { zoom = false } = {}) {
     refreshBodiesTable();
 }
 
-
 function getFocusObject() {
     // Canonical follow target is cameraState.focusBody when Look At is enabled.
     // IMPORTANT: If Look At is ON but no body is selected, behave like Look At is OFF.
@@ -2942,7 +2878,7 @@ function refreshBodiesTable() {
 function setF(id: string) {
     // Legacy helper kept for compatibility with existing call sites,
     // but camera behavior should no longer depend on id.
-    focusID = id;
+    cameraState.focusID = id;
 }
 
 // --- UI PANEL INITIALIZATION ---
@@ -3090,7 +3026,7 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
     const newDist = THREE.MathUtils.clamp(currentDist * factor, zoomInLimit, zoomOutLimit);
     camera.position.copy(targetPos).add(dir.multiplyScalar(newDist));
 
-    if (!isFreeCameraMode) {
+    if (!cameraState.isFreeCameraMode) {
         // When Look At is OFF, keep orbit controls anchored to the center.
         controls.target.copy(targetPos);
     }
@@ -3125,11 +3061,29 @@ const surfaceCam = new SurfaceCameraManager(
     () => selectedBody,
     () => manuallySelectedBody,
     () => {
-        isFreeCameraMode = false;
+        cameraState.isFreeCameraMode = false;
     }
 );
 
 // ── Flight mode functions ────────────────────────────────────────────────────
+
+const flightCtx: IFlightControlContext = {
+    shipWeapon,
+    camera,
+    renderer,
+    controls,
+    uiManager,
+    flightSteeringLine,
+    steeringLinePositions,
+    steeringEndMarker,
+    steeringOriginMarker,
+    steeringLineGeo,
+    flightCrosshair,
+    flightHUD,
+    speedSprite,
+    refreshBodiesTable,
+    addEvent
+};
 
 /**
  * Build a quaternion that orients the ship with its +Y (top) toward the target body
@@ -3169,11 +3123,7 @@ function computeTopTowardBodyQuat(
     // the radial.  The steady-state TIDAL_LOCK phase uses orbital velocity
     // as fwdDir, which is always perpendicular to radial in a circulat
     // orbit, so the lock is perfectly stable.
-    const m = new THREE.Matrix4().lookAt(
-        shipPos.clone().add(fwdNorm),
-        shipPos,
-        radial
-    );
+    const m = new THREE.Matrix4().lookAt(shipPos.clone().add(fwdNorm), shipPos, radial);
 
     return new THREE.Quaternion().setFromRotationMatrix(m);
 }
@@ -3241,7 +3191,7 @@ function updateAutopilot(dt: number) {
         // Transition to APPROACH once close enough for boost/normal to finish the journey.
         if (distance <= AUTOPILOT_WARP_THRESHOLD) {
             autopilotState.isWarpActive = false;
-            warpEffect.stop();
+            flightState.warpEffect?.stop();
             autopilotState.phase = 'APPROACH';
         }
     }
@@ -3320,7 +3270,7 @@ function updateAutopilot(dt: number) {
             autopilotState.isWarpActive = true;
             autopilotState.phase = 'WARP';
             flightHUD.hideWarpSprite();
-            warpEffect.start();
+            flightState.warpEffect?.start();
             triggerScreenFlash(200, 0.01, 2.5);
             addEvent({
                 message: '⚡ Autopilot warp engaged.',
@@ -3595,7 +3545,7 @@ function cancelAutopilot(message?: string) {
     if (!autopilotState.isActive) return;
     if (autopilotState.isWarpActive) {
         autopilotState.isWarpActive = false;
-        warpEffect.stop();
+        flightState.warpEffect?.stop();
         // If the player cancelled mid-warp while not in the cockpit, trigger
         // background deceleration so the ship slows down normally instead of
         // continuing at warp speed indefinitely.
@@ -3658,7 +3608,7 @@ function engageAutopilot(target: Body) {
     // Clean up any prior autopilot warp when switching targets.
     if (autopilotState.isWarpActive) {
         autopilotState.isWarpActive = false;
-        warpEffect.stop();
+        flightState.warpEffect?.stop();
     }
 
     // Choose initial phase based on distance.
@@ -3773,416 +3723,7 @@ function updateAutopilotUI() {
     refreshBodiesTable();
 }
 
-/**
- * Applies per-frame flight controls to the active spaceship.
- * Called from animate() when flightState.isActive.
- */
-function updateFlightControls(dt: number, simDt: number) {
-    const ship = flightState.activeShip;
-    if (!ship || ship._isDisposed || !ship.mesh) {
-        exitFlightMode();
-        return;
-    }
 
-    // Pause guard: while paused, do not mutate ship rotation, thrust, roll, or velocity.
-    // Keep the active flight state intact so unpausing resumes from the exact same ship state.
-    if (simulationState.isPaused || simulationState.timeScale === 0) {
-        flightState.thrustActive = false;
-        return;
-    }
-
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
-
-    // ── Warp deceleration ────────────────────────────────────────────────────
-    // After warp ends, decelerate in two phases:
-    //   Phase 1: shed speed from warp → FLIGHT_BOOST_MAX_SPEED using FLIGHT_WARP_DECEL.
-    //   Phase 2 (no shift): hand off to boost decel so FLIGHT_BOOST_DECEL carries the
-    //             ship the rest of the way down to FLIGHT_MAX_SPEED.
-    //   Phase 2 (shift held): end warp decel at boost speed and let the normal boost
-    //             logic maintain boost speed until Shift is released.
-    if (flightState.warpDecelerating) {
-        const fwdSpd = ship.velocity.dot(forward);
-        const unclampedWarpSpd = fwdSpd - FLIGHT_WARP_DECEL * simDt;
-        if (unclampedWarpSpd > FLIGHT_BOOST_MAX_SPEED) {
-            // Phase 1: decel from warp speed to boost max using warp decel rate.
-            ship.velocity.copy(forward).multiplyScalar(unclampedWarpSpd);
-            flightState.currentSpeed = unclampedWarpSpd;
-        } else {
-            // Reached boost speed — end the warp decel phase.
-            flightState.warpDecelerating = false;
-            warpEffect.stop();
-            // Restore steering HUD now that warp deceleration is complete.
-            flightSteeringLine.visible = true;
-            steeringOriginMarker.visible = true;
-            if (keys.shift) {
-                // Case 2: shift held — sit at boost speed; normal boost logic takes over.
-                flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_BOOST_MAX_SPEED);
-            } else {
-                // Case 1: no shift — transition to boost decel toward normal max speed.
-                flightState.boostDecelerating = true;
-                flightState.currentSpeed = fwdSpd;
-            }
-        }
-        flightState.thrustActive = false;
-        flightHUD.hideWarpSprite();
-        // Fall through to steering/roll below (no early return)
-    }
-
-    // ── Boost deceleration ───────────────────────────────────────────────────
-    // When Shift is released above FLIGHT_MAX_SPEED, rapidly decelerate back down.
-    if (flightState.boostDecelerating) {
-        const fwdSpd = ship.velocity.dot(forward);
-        const unclampedBoostSpd = fwdSpd - FLIGHT_BOOST_DECEL * simDt;
-        if (unclampedBoostSpd > FLIGHT_MAX_SPEED) {
-            // Still above max after this decel step — continue decelerating.
-            ship.velocity.copy(forward).multiplyScalar(unclampedBoostSpd);
-            flightState.currentSpeed = unclampedBoostSpd;
-        } else {
-            // This decel step reaches or overshoots FLIGHT_MAX_SPEED — exit.
-            // Using the unclamped value (rather than a fixed tolerance) makes this
-            // immune to strong gravity re-adding speed above the floor each frame,
-            // which caused perpetual braking mode when gravity > tolerance.
-            flightState.boostDecelerating = false;
-            flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_MAX_SPEED);
-        }
-        flightState.thrustActive = false;
-        // Fall through to steering/roll below
-    }
-
-    // ── Warp active ──────────────────────────────────────────────────────────
-    if (flightState.warpActive) {
-        // Drive ship forward at FLIGHT_WARP_SPEED; all other controls locked.
-        const warpVel = forward.clone().multiplyScalar(FLIGHT_WARP_SPEED);
-        ship.velocity.copy(warpVel);
-        flightState.currentSpeed = FLIGHT_WARP_SPEED;
-        flightState.thrustActive = true;
-        // (warpEffect.update is called centrally in the animate loop each frame)
-        // Hide steering HUD during warp (no manual steering available).
-        flightSteeringLine.visible = false;
-        flightCrosshair.visible = false;
-        steeringEndMarker.visible = false;
-        steeringOriginMarker.visible = false;
-        // Pulsing warp-active text (update every call is cheap since canvas is small)
-        const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
-        flightHUD.setWarpActive(pulse);
-        return; // Skip all flight controls below
-    }
-
-    // ── Warp charging ────────────────────────────────────────────────────────
-    if (flightState.warpCharging && !flightState.warpDecelerating && !autopilotState.isWarpActive) {
-        flightState.warpCharge = Math.min(flightState.warpCharge + dt, FLIGHT_WARP_CHARGE_TIME);
-        const fill = flightState.warpCharge / FLIGHT_WARP_CHARGE_TIME;
-        flightHUD.setWarpCharge(fill);
-        if (flightState.warpCharge >= FLIGHT_WARP_CHARGE_TIME) {
-            // Engage warp!
-            flightState.warpActive = true;
-            flightState.warpCharging = false;
-            flightState.warpCharge = 0;
-            warpEffect.start();
-            triggerScreenFlash(200, 0.01, 2.5);
-            addEvent({
-                message: '⚡ Warp engaged! Press Space to disengage.',
-                notificationType: NotificationType.Success,
-            });
-        }
-        // Allow normal flight controls while charging (just can't turn on warp mid-turn)
-    }
-
-    // ── Thrust ─────────────────────────────────────────────────────────────────────────────
-    // Manual controls (WASD / mouse steering) are completely ignored while autopilot is active.
-    const manualInput = !autopilotState.isActive;
-    const fwdSpeed = ship.velocity.dot(forward);
-    // W only counts as active thrust once the ship has decelerated to normal max speed.
-    // This prevents W from snapping the ship from boost speed (500) down to normal max (100)
-    // in one frame when pressed mid-deceleration.
-    const thrustActive = manualInput && (keys.shift || keys.w || keys.s);
-    if (manualInput) flightState.thrustActive = thrustActive;
-
-    // Trigger boost decel when Shift is *released* while still above normal max speed.
-    // This must only fire on a Shift-release transition (prevShiftHeld was true, now false),
-    // not when the ship is simply coasting and gravity accelerated past FLIGHT_MAX_SPEED.
-    const shiftJustReleased = flightState.prevShiftHeld && !keys.shift;
-    if (
-        manualInput &&
-        shiftJustReleased &&
-        !flightState.boostDecelerating &&
-        !flightState.warpActive &&
-        !flightState.warpDecelerating
-    ) {
-        if (fwdSpeed > FLIGHT_MAX_SPEED) {
-            flightState.boostDecelerating = true;
-        }
-    }
-    // Re-engaging boost cancels the decel — but only when we're already at or below boost max
-    // speed.  Above that threshold the ship is still shedding warp speed and boost should be
-    // ignored so it doesn't snap the ship's speed down to FLIGHT_BOOST_MAX_SPEED.
-    if (manualInput && keys.shift && fwdSpeed <= FLIGHT_BOOST_MAX_SPEED) {
-        flightState.boostDecelerating = false;
-    }
-
-    // Skip normal thrust while boost- or warp-decelerating (velocity is managed above).
-    // This prevents the thrust block fighting the decel and avoids the S-key else-branch
-    // firing incorrectly when Shift is held at warp speeds above FLIGHT_BOOST_MAX_SPEED.
-    if (flightState.boostDecelerating || flightState.warpDecelerating) {
-        // steering/roll still processed below
-    } else if (manualInput && !flightState.isAdvancedMode) {
-        // ── Simple mode ──────────────────────────────────────────────────────────
-        // While a thrust key is held: forward thrust is ADDED to velocity (like
-        // advanced mode) so gravity accumulates freely and is never overwritten.
-        // The key difference from advanced mode: perpendicular drift is always decayed
-        // while a thrust key is held, giving direct arcade-style feel.
-        // When no key is held the ship coasts freely and gravity accumulates.
-        if (thrustActive) {
-            // Use the real forward speed (includes gravity) for effectiveness checks.
-            const shiftEffective = keys.shift && fwdSpeed < FLIGHT_BOOST_MAX_SPEED;
-            const wEffective = keys.w && fwdSpeed < FLIGHT_MAX_SPEED;
-
-            if (shiftEffective) {
-                // Boost: add forward thrust toward boost max.
-                const delta = Math.min(FLIGHT_BOOST_ACCEL * simDt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            } else if (wEffective && !keys.shift) {
-                // Normal thrust: add forward thrust toward normal max.
-                const delta = Math.min(FLIGHT_THRUST_ACCEL * simDt, FLIGHT_MAX_SPEED - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            } else if (keys.s) {
-                // Decelerate.
-                const ceiling = fwdSpeed > 0 ? -FLIGHT_MAX_SPEED : 0;
-                const decelRate = fwdSpeed > FLIGHT_MAX_SPEED
-                    ? FLIGHT_BOOST_DECEL
-                    : FLIGHT_THRUST_DECEL;
-                const delta = Math.max(-decelRate * simDt, ceiling - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            }
-            // else: shift held above boost max, or no effective thrust key → coast.
-            // Gravity accumulates naturally since we never overwrite velocity.
-
-            // Decay perpendicular drift when any thrust key is held (even if not effective),
-            // giving the direct nose-points-where-you-go feel of simple mode.
-            const newFwdSpd = ship.velocity.dot(forward);
-            const perpVel = ship.velocity.clone().addScaledVector(forward, -newFwdSpd);
-            const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * simDt);
-            perpVel.multiplyScalar(decay);
-            ship.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
-
-            // Sync display value from real velocity.
-            flightState.currentSpeed = ship.velocity.dot(forward);
-        } else {
-            // Coasting: sync display value from real forward velocity.
-            flightState.currentSpeed = fwdSpeed;
-        }
-    } else if (manualInput) {
-        // ── Advanced mode ────────────────────────────────────────────────────────
-        // Thrust adds to velocity without removing gravity-accumulated perpendicular
-        // components, so orbital mechanics work at all times.
-        if (keys.shift) {
-            if (fwdSpeed < FLIGHT_BOOST_MAX_SPEED) {
-                const delta = Math.min(FLIGHT_BOOST_ACCEL * simDt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            }
-        } else if (keys.w) {
-            if (fwdSpeed < FLIGHT_MAX_SPEED) {
-                const delta = Math.min(FLIGHT_THRUST_ACCEL * simDt, FLIGHT_MAX_SPEED - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            }
-        } else if (keys.s) {
-            if (fwdSpeed > -FLIGHT_MAX_SPEED) {
-                const delta = Math.max(-FLIGHT_THRUST_DECEL * simDt, -FLIGHT_MAX_SPEED - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            }
-        }
-        // No thrust: ship coasts freely
-        flightState.currentSpeed = ship.velocity.dot(forward);
-    } else if (!manualInput) {
-        // Autopilot: show speed relative to the target body so the HUD reflects what the
-        // autopilot is actually controlling.  Absolute forward speed includes the target's
-        // orbital velocity, which inflates the reading by however much of that velocity
-        // projects onto the approach direction (e.g. ~0.3 u/s for Earth at FLIGHT_MAX_SPEED).
-        // ship.velocity already includes gravity, so gravity-driven speed is still shown.
-        const apTarget = autopilotState.targetBody;
-        if (apTarget?.mesh && !apTarget._isDisposed) {
-            const relVel = new THREE.Vector3().subVectors(ship.velocity, apTarget.velocity);
-            flightState.currentSpeed = relVel.dot(forward);
-        } else {
-            flightState.currentSpeed = fwdSpeed;
-        }
-    }
-
-    // ── Roll with inertia (A/D) ───────────────────────────────────────────────
-    // Accelerate rollVelocity toward ±FLIGHT_ROLL_SPEED when key held,
-    // then apply friction to bring it back to 0 when released.
-    const rollTarget = flightState.rollLeft
-        ? -FLIGHT_ROLL_SPEED
-        : flightState.rollRight
-          ? FLIGHT_ROLL_SPEED
-          : 0;
-    if (manualInput && !flightState.altOrbitActive && (flightState.rollLeft || flightState.rollRight)) {
-        // Ramp up toward target
-        const dir = rollTarget > 0 ? 1 : -1;
-        flightState.rollVelocity += dir * FLIGHT_ROLL_ACCEL * dt;
-        flightState.rollVelocity = THREE.MathUtils.clamp(
-            flightState.rollVelocity,
-            -FLIGHT_ROLL_SPEED,
-            FLIGHT_ROLL_SPEED
-        );
-    } else {
-        // No key — apply friction toward zero
-        if (Math.abs(flightState.rollVelocity) < FLIGHT_ROLL_FRICTION * dt) {
-            flightState.rollVelocity = 0;
-        } else {
-            flightState.rollVelocity -=
-                Math.sign(flightState.rollVelocity) * FLIGHT_ROLL_FRICTION * dt;
-        }
-    }
-    if (flightState.rollVelocity !== 0) {
-        // Rotate the camera frame around its local forward (Z) axis so the
-        // camera rolls with the ship when A/D is held.
-        const dqRoll = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 0, 1),
-            flightState.rollVelocity * dt
-        );
-        flightState.flightCameraQuat.multiply(dqRoll);
-    }
-
-    // ── Steering with smoothing + dead zone (mouse) ───────────────────────────
-    // Raw normalised pointer input
-    const rawXFull = THREE.MathUtils.clamp(
-        flightState.pointerOffsetX / FLIGHT_MAX_POINTER_OFFSET,
-        -1,
-        1
-    );
-    const rawYFull = THREE.MathUtils.clamp(
-        flightState.pointerOffsetY / FLIGHT_MAX_POINTER_OFFSET,
-        -1,
-        1
-    );
-    // Apply dead zone: values within ±DEADZONE snap to 0, outside rescale to 0-1
-    function applyDeadzone(v: number) {
-        const d = FLIGHT_STEER_DEADZONE;
-        if (Math.abs(v) < d) return 0;
-        return (Math.sign(v) * (Math.abs(v) - d)) / (1 - d);
-    }
-    const rawX = applyDeadzone(rawXFull);
-    const rawY = applyDeadzone(rawYFull);
-    // Exponential smoothing — frame-rate independent; same feel at any fps.
-    // steerAlpha and bankAlpha derived from per-second rates: alpha = 1 - exp(-rate * dt)
-    if (manualInput && !flightState.altOrbitActive) {
-        const steerAlpha = 1 - Math.exp(-FLIGHT_STEER_SMOOTH_RATE * dt);
-        flightState.steerX += (rawX - flightState.steerX) * steerAlpha;
-        flightState.steerY += (rawY - flightState.steerY) * steerAlpha;
-
-        // Yaw: rotate around camera's own local Y axis so left/right steering always
-        // matches the screen regardless of orientation (including upside-down flight).
-        // Using multiply (local space) rather than premultiply (world space) ensures
-        // the yaw direction flips with the camera when rolled, keeping it screen-consistent.
-        const yawQuat = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 1, 0),
-            -flightState.steerX * FLIGHT_MAX_TURN_RATE * dt
-        );
-        flightState.flightCameraQuat.multiply(yawQuat);
-
-        // Pitch: rotate around camera's own right (X) axis so up/down always matches screen.
-        const pitchQuat = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(1, 0, 0),
-            flightState.steerY * FLIGHT_MAX_TURN_RATE * dt
-        );
-        flightState.flightCameraQuat.multiply(pitchQuat);
-
-        // Animate visual banking of ship mesh relative to camera frame.
-        const bankAlpha = 1 - Math.exp(-FLIGHT_BANK_LERP_SPEED * dt);
-        flightState.shipBankRoll +=
-            (flightState.steerX * FLIGHT_MAX_BANK_ANGLE - flightState.shipBankRoll) * bankAlpha;
-        flightState.shipBankPitch +=
-            (flightState.steerY * FLIGHT_MAX_BANK_PITCH - flightState.shipBankPitch) * bankAlpha;
-
-        // Apply banking offset to ship mesh: camera frame * cosmetic bank/pitch rotation.
-        const bankQuat = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(flightState.shipBankPitch, 0, flightState.shipBankRoll, 'XYZ')
-        );
-        ship.mesh.quaternion.copy(flightState.flightCameraQuat).multiply(bankQuat);
-        flightState.flightCameraQuat.normalize();
-    } else {
-        // Autopilot is flying — sync camera frame to the ship's actual orientation
-        // so there is no lurch when the player retakes manual control.
-        flightState.flightCameraQuat.copy(ship.mesh.quaternion);
-        flightState.shipBankRoll = 0;
-        flightState.shipBankPitch = 0;
-        flightState.steerX = 0;
-        flightState.steerY = 0;
-    }
-
-    // (currentSpeed is updated in the thrust block above; velocity is
-    //  modified in-place there — no override needed here)
-
-    // ── Steering line (uiScene screen-space) ─────────────────────────────────
-    // Project a point far ahead in the ship's forward direction onto the screen.
-    // This gives the screen-space position of where the ship is AIMING, which sits
-    // above screen-centre in 3rd-person view because the camera is elevated behind
-    // the ship and looks at its body-centre, not its nose.
-    const noseNDC = ship.mesh.position.clone().addScaledVector(forward, 8).project(camera);
-    const noseScreenX = noseNDC.x * (window.innerWidth * 0.5);
-    const noseScreenY = noseNDC.y * (window.innerHeight * 0.5);
-
-    // Circularly clamp the pointer offset for display so the indicator line
-    // has equal maximum length in all directions (not square-capped).
-    const rawMag = Math.sqrt(flightState.pointerOffsetX ** 2 + flightState.pointerOffsetY ** 2);
-    const circleScale = rawMag > FLIGHT_MAX_POINTER_OFFSET ? FLIGHT_MAX_POINTER_OFFSET / rawMag : 1;
-    const displayOffX = flightState.pointerOffsetX * circleScale;
-    const displayOffY = flightState.pointerOffsetY * circleScale;
-
-    steeringLinePositions[0] = noseScreenX;
-    steeringLinePositions[1] = noseScreenY;
-    steeringLinePositions[2] = TEXT_SPRITE_Z;
-    steeringLinePositions[3] = noseScreenX + displayOffX;
-    steeringLinePositions[4] = noseScreenY - displayOffY;
-    steeringLinePositions[5] = TEXT_SPRITE_Z;
-    steeringLineGeo.attributes.position.needsUpdate = true;
-
-    // Move origin ring and aim reticle to their screen positions.
-    steeringOriginMarker.position.set(noseScreenX, noseScreenY, 0);
-    steeringEndMarker.position.set(noseScreenX + displayOffX, noseScreenY - displayOffY, 0);
-    steeringEndMarker.visible = true;
-
-    // Hide the steering HUD while ALT orbit mode is active (or camera is returning).
-    // Restore it once the orbit angles have fully zeroed out (and warp is not decelerating).
-    if (flightState.altOrbitActive || flightState.altOrbitYaw !== 0 || flightState.altOrbitPitch !== 0) {
-        flightSteeringLine.visible = false;
-        steeringOriginMarker.visible = false;
-        steeringEndMarker.visible = false;
-    } else if (!flightState.warpDecelerating) {
-        flightSteeringLine.visible = true;
-        steeringOriginMarker.visible = true;
-        // steeringEndMarker is already set visible above
-    }
-
-    // ── Weapon firing ────────────────────────────────────────────────────────
-    if (flightState.isFiring && !autopilotState.isActive) {
-        // Build world-space aim direction from the aim reticle screen position.
-        // Avoid unproject() — with near=0.00001 and far~8.2e9, any mid-NDC z value
-        // maps to a point essentially at the camera, causing floating-point errors.
-        // Instead, derive the ray directly from perspective FOV math:
-        //   view-space dir = (ndcX * tan(hFOV/2), ndcY * tan(vFOV/2), -1), normalised
-        // then rotate to world space via the camera world matrix.
-        const aimNdcX = (noseScreenX + displayOffX) / (window.innerWidth * 0.5);
-        const aimNdcY = (noseScreenY - displayOffY) / (window.innerHeight * 0.5);
-        const halfFovY = THREE.MathUtils.degToRad(camera.fov * 0.5);
-        const tanHalfFovY = Math.tan(halfFovY);
-        const tanHalfFovX = tanHalfFovY * camera.aspect;
-        const viewSpaceDir = new THREE.Vector3(
-            aimNdcX * tanHalfFovX,
-            aimNdcY * tanHalfFovY,
-            -1 // camera local -Z is forward in OpenGL/Three.js convention
-        ).normalize();
-        const aimDir = viewSpaceDir.transformDirection(camera.matrixWorld);
-
-        // Muzzle: slightly ahead of the ship so projectiles clear the hull.
-        const muzzlePos = ship.mesh.position.clone().addScaledVector(forward, ship.radius * 4);
-        shipWeapon.tryFire(dt, muzzlePos, aimDir, ship.velocity);
-    }
-
-    // ── Track prevShiftHeld for next frame's Shift-release detection ──────
-    flightState.prevShiftHeld = keys.shift;
-}
 
 /** Spawn a spaceship in front of the camera and enter flight mode.
  *  If a previously spawned ship is still alive in the scene, re-enters it instead. */
@@ -4320,139 +3861,7 @@ function spawnShip() {
     });
 }
 
-/** Exit flight mode and restore normal camera controls. */
-function exitFlightMode() {
-    // Preserve the ship reference so the user can re-enter later.
-    // Only keep it if the ship is still alive.
-    if (
-        flightState.activeShip &&
-        !flightState.activeShip._isDisposed &&
-        simulationState.bodies.includes(flightState.activeShip)
-    ) {
-        flightState.knownShip = flightState.activeShip;
-    } else {
-        // Ship was destroyed — clear the known reference too.
-        // Also kill warp state so the background updater doesn't force the
-        // respawned ship to warp speed, and hide the frozen tunnel immediately.
-        flightState.knownShip = null;
-        flightState.warpActive = false;
-        warpEffect.forceHide();
-    }
 
-    // Zero all steering state FIRST, before clearing isActive,
-    // so that if any deferred event (pointer-lock release mousemove, etc.) sneaks
-    // through, it won't find non-zero values to apply.
-    flightState.pointerOffsetX = 0;
-    flightState.pointerOffsetY = 0;
-    flightState.rollLeft = false;
-    flightState.rollRight = false;
-    flightState.rollVelocity = 0;
-    flightState.steerX = 0;
-    flightState.steerY = 0;
-    flightState.isFiring = false;
-    flightState.altOrbitActive = false;
-    flightState.altOrbitYaw = 0;
-    flightState.altOrbitPitch = 0;
-    shipWeapon.reset();
-
-    // Clear deceleration and warp flags so on re-entry the ship isn't
-    // artificially clamped back to FLIGHT_MAX_SPEED.
-    flightState.boostDecelerating = false;
-    flightState.warpDecelerating = false;
-    flightState.warpCharging = false;
-    flightState.warpCharge = 0;
-    flightState.prevShiftHeld = false;
-
-    flightState.isActive = false;
-    flightState.activeShip = null;
-    flightState.currentSpeed = 0;
-
-    // Reset mouse-look so camera doesn't spin after re-enabling controls
-    isMouseLookActive = false;
-
-    if (document.pointerLockElement === renderer.domElement) {
-        document.exitPointerLock();
-    }
-
-    // Restore camera up so OrbitControls rotation doesn't break (it was set to ship's local up).
-    camera.up.copy(flightState.prevCameraUp);
-
-    // Re-enable controls before moving camera so the orbit anchor is valid.
-    controls.enabled = !isFreeCameraMode;
-
-    // If the ship is still alive, orbit around it so the player can see where they left off.
-    // Otherwise fall back to the pre-flight camera snapshot.
-    if (
-        flightState.knownShip &&
-        !flightState.knownShip._isDisposed &&
-        simulationState.bodies.includes(flightState.knownShip)
-    ) {
-        const shipPos = flightState.knownShip.mesh.position.clone();
-        // Use the current in-flight camera-to-ship distance so the view doesn't
-        // jump to the pre-flight zoom level after exit.
-        const currentCamDist = camera.position.distanceTo(shipPos);
-        const prevDir = new THREE.Vector3()
-            .subVectors(flightState.prevCameraPos, flightState.prevControlsTarget)
-            .normalize();
-        const dist =
-            currentCamDist > 0
-                ? currentCamDist
-                : flightState.prevCameraPos.distanceTo(flightState.prevControlsTarget);
-        camera.position.copy(shipPos).addScaledVector(prevDir, dist);
-        controls.target.copy(shipPos);
-    } else {
-        camera.position.copy(flightState.prevCameraPos);
-        camera.quaternion.copy(flightState.prevCameraQuat);
-        controls.target.copy(flightState.prevControlsTarget);
-    }
-    controls.update();
-
-    flightSteeringLine.visible = false;
-    flightCrosshair.visible = false;
-    steeringEndMarker.visible = false;
-    steeringOriginMarker.visible = false;
-    flightHUD.hideWarpSprite();
-    flightState.warpCharge = 0;
-    flightState.warpCharging = false;
-    flightState.warpDecelerating = false;
-    if (!flightState.warpActive) {
-        // Not warping — clean up fully.
-        warpEffect.stop();
-    }
-    // If warpActive is true, the ship continues warping autonomously and the
-    // background updater (in the animate loop) maintains its velocity and the
-    // tunnel animation.  Do NOT zero warpActive or stop the effect here.
-    if (flightState.knownShip && !flightState.knownShip._isDisposed) {
-        flightState.knownShip.trail.hide();
-    }
-    if (speedSprite) speedSprite.visible = false;
-    flightControlsPanel.setFlightActive(false);
-    // Keep autopilot button enabled as long as the known ship still exists
-    const _exitShip = flightState.knownShip;
-    const _exitShipAlive = !!(
-        _exitShip &&
-        !_exitShip._isDisposed &&
-        simulationState.bodies.includes(_exitShip)
-    );
-    flightControlsPanel.setAutopilotState(autopilotState.isActive, _exitShipAlive);
-    refreshBodiesTable();
-    // updateFlightSpawnBtnLabel is defined after this function; call via a timeout
-    // to avoid forward-reference issues in the module execution order.
-    setTimeout(() => {
-        try {
-            uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
-                flightState.knownShip,
-                simulationState.bodies
-            );
-        } catch {
-            // Empty
-        }
-    }, 0);
-    addEvent({
-        message: 'Flight mode exited.',
-        notificationType: NotificationType.Info,
-    });
-}
 
 window.addEventListener('mousemove', surfaceCam.onMouseMove, { passive: true });
 
@@ -4486,9 +3895,8 @@ uiManager.mainPanel.on('freeCameraToggle', () => {
         surfaceCam.exit();
     }
 
-    isFreeCameraMode = !isFreeCameraMode;
-    cameraState.isFreeCameraMode = isFreeCameraMode;
-    uiManager.mainPanel.setFreeCameraState(isFreeCameraMode);
+    cameraState.isFreeCameraMode = !cameraState.isFreeCameraMode;
+    uiManager.mainPanel.setFreeCameraState(cameraState.isFreeCameraMode);
 
     // Preserve selection and gizmo visibility when toggling free camera:
     // - Selection should NEVER be cleared here.
@@ -4503,7 +3911,7 @@ uiManager.mainPanel.on('freeCameraToggle', () => {
             ? manuallySelectedBody
             : null);
 
-    if (isFreeCameraMode) {
+    if (cameraState.isFreeCameraMode) {
         // Turning on Free Camera disables Look At (mutually exclusive)
         cameraState.isLookAtMode = false;
         uiManager.mainPanel.setLookAtState(false);
@@ -4516,7 +3924,7 @@ uiManager.mainPanel.on('freeCameraToggle', () => {
         uiManager.mainPanel.setLookAtState(false);
 
         controls.enabled = true;
-        focusID = 'camNone';
+        cameraState.focusID = 'camNone';
         controls.target.copy(NONE_FOCUS_POSITION);
         camera.lookAt(NONE_FOCUS_POSITION);
     }
@@ -4695,7 +4103,7 @@ uiManager.mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
 
     // Manual selection should NOT automatically enable Look At.
     // However, if Look At is already enabled, selecting a body should immediately look at it.
-    if (isFreeCameraMode) {
+    if (cameraState.isFreeCameraMode) {
         // If we are in Free Camera mode and the user clicks a body in the list,
         // we KEEP Free Camera mode on (the user can still use Look At / Target buttons explicitly).
         // Just ensure the button highlight stays accurate.
@@ -4763,8 +4171,7 @@ uiManager.mainPanel.on('lookAtToggle', () => {
 
     // If we are turning Look At ON while Free Camera is ON, we implicitly disable Free Camera.
     // That transition must also refresh the hint (Free Camera hint -> Look At/selection hint).
-    if (turningOn && isFreeCameraMode) {
-        isFreeCameraMode = false;
+    if (turningOn && cameraState.isFreeCameraMode) {
         cameraState.isFreeCameraMode = false;
         uiManager.mainPanel.setFreeCameraState(false);
         controls.enabled = true;
@@ -4784,8 +4191,8 @@ uiManager.mainPanel.on('lookAtToggle', () => {
                   : null;
 
         // Look-at mode requires OrbitControls, so exit free camera mode if active
-        if (isFreeCameraMode) {
-            isFreeCameraMode = false;
+        if (cameraState.isFreeCameraMode) {
+            cameraState.isFreeCameraMode = false;
             uiManager.mainPanel.setFreeCameraState(false);
             controls.enabled = true;
         }
@@ -4823,7 +4230,7 @@ uiManager.mainPanel.on('lookAtToggle', () => {
 
         // Behave like "None": orbit/zoom around center (but keep selection)
         controls.enabled = true;
-        focusID = 'camNone';
+        cameraState.focusID = 'camNone';
         controls.target.copy(NONE_FOCUS_POSITION);
         controls.update();
         camera.lookAt(NONE_FOCUS_POSITION);
@@ -4915,7 +4322,7 @@ function keepCameraDistanceOnBodyScaleChange(body: Body, oldRadius: number, newR
     if (!oldRadius || !newRadius || oldRadius <= 0 || newRadius <= 0) return;
 
     // If we're in free cam mode, do nothing (controls are disabled and we shouldn't move the camera)
-    if (isFreeCameraMode) return;
+    if (cameraState.isFreeCameraMode) return;
 
     // Only adjust camera if this body is currently the focus object
     const focusObj = getFocusObject();
@@ -5128,7 +4535,7 @@ function deleteSelectedBody() {
     const bodyToDelete = selectedBody;
 
     // Check if this body is the camera's current focus (legacy id check kept)
-    const wasCameraTarget = bodyToDelete.id === focusID;
+    const wasCameraTarget = bodyToDelete.id === cameraState.focusID;
 
     // For stars: delete immediately with NO supernova / black hole.
     // (Natural star death still triggers those effects via the fuel system.)
@@ -5212,7 +4619,10 @@ window.addEventListener('keydown', (e) => {
 
     // Toggle velocity edit mode while actively editing velocity
     // G toggles between XZ (horizontal) and Y (vertical).
-    if ((interactionState.isChangingVelocity || isMiddleMouseVelocity) && key === 'g') {
+    if (
+        (interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity) &&
+        key === 'g'
+    ) {
         interactionState.velocityEditMode = interactionState.velocityEditMode === 'xz' ? 'y' : 'xz';
 
         // Update the drag plane to match the active velocity edit mode.
@@ -5229,10 +4639,13 @@ window.addEventListener('keydown', (e) => {
                 const up = new THREE.Vector3(0, 1, 0);
 
                 const planeNormal = new THREE.Vector3().crossVectors(hDir, up).normalize();
-                dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
+                interactionState.dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
             } else {
                 // XZ mode: use horizontal plane (not a camera-facing plane)
-                dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), origin);
+                interactionState.dragPlane.setFromNormalAndCoplanarPoint(
+                    new THREE.Vector3(0, 1, 0),
+                    origin
+                );
             }
         }
 
@@ -5297,7 +4710,7 @@ window.addEventListener('keydown', (e) => {
                 flightState.warpCharging = false;
                 flightState.warpCharge = 0;
                 flightState.warpDecelerating = true;
-                warpEffect.stop();
+                flightState.warpEffect?.stop();
                 // Restore steering HUD immediately on disengage (decel still active,
                 // but steering is restored so the player can redirect during slowdown).
                 flightSteeringLine.visible = true;
@@ -5327,7 +4740,7 @@ window.addEventListener('keydown', (e) => {
 
     // Escape exits flight mode
     if (key === 'escape' && flightState.isActive) {
-        exitFlightMode();
+        exitFlightMode(flightCtx);
         e.preventDefault();
         return;
     }
@@ -5388,7 +4801,11 @@ window.addEventListener('keyup', (e) => {
     }
 
     if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
-        if (!interactionState.isChangingVelocity && !isMiddleMouseVelocity && !interactionState.isRepositioning) {
+        if (
+            !interactionState.isChangingVelocity &&
+            !interactionState.isMiddleMouseVelocity &&
+            !interactionState.isRepositioning
+        ) {
             posIndicator.hide();
             velArc.hideAll();
         }
@@ -5416,7 +4833,11 @@ window.addEventListener(
 
         // Disable wheel zoom while dragging gizmos (position or velocity).
         // Wheel zoom during a drag causes unstable interaction / weird cursor-plane mapping.
-        if (interactionState.isRepositioning || interactionState.isChangingVelocity || isMiddleMouseVelocity) {
+        if (
+            interactionState.isRepositioning ||
+            interactionState.isChangingVelocity ||
+            interactionState.isMiddleMouseVelocity
+        ) {
             return;
         }
 
@@ -5532,13 +4953,13 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
             console.error('Error dispatching body:removed event after deleting body:', e);
         }
 
-        controls.enabled = !isFreeCameraMode;
+        controls.enabled = !cameraState.isFreeCameraMode;
         controls.target.copy(NONE_FOCUS_POSITION);
         controls.update();
         camera.lookAt(NONE_FOCUS_POSITION);
 
         // Legacy alias kept in sync for any older call sites
-        focusID = 'camNone';
+        cameraState.focusID = 'camNone';
     }
 
     // Clear edit panel selection if it is showing this body
@@ -5646,7 +5067,7 @@ function applyDefaultCameraTogglesAfterSpawn() {
     manuallySelectedBody = null;
 
     // With Look At ON but no focus body, keep orbit anchor at center.
-    controls.enabled = !isFreeCameraMode;
+    controls.enabled = !cameraState.isFreeCameraMode;
     controls.target.copy(NONE_FOCUS_POSITION);
     controls.update();
     camera.lookAt(NONE_FOCUS_POSITION);
@@ -5762,7 +5183,7 @@ window.addEventListener('mouseup', onMouseUpWrapped);
 // exit flight mode so the ship doesn't keep spinning with stale pointer offsets.
 document.addEventListener('pointerlockchange', () => {
     if (flightState.isActive && document.pointerLockElement !== renderer.domElement) {
-        exitFlightMode();
+        exitFlightMode(flightCtx);
     }
 });
 
@@ -5857,21 +5278,33 @@ window.addEventListener('popstate', async () => {
 refreshBodiesTable();
 // ── Start the animation loop ───────────────────────────────────────────
 const animCtx: AnimationContext = {
-    scene, camera, renderer, uiScene, uiCamera, controls, raycaster, mouse,
-    autopilotState, cameraState, flightState, interactionState, simulationState,
+    scene,
+    camera,
+    renderer,
+    uiScene,
+    uiCamera,
+    controls,
+    raycaster,
+    mouse,
+    autopilotState,
+    cameraState,
+    flightState,
+    interactionState,
+    simulationState,
     selectedBody: { value: selectedBody },
     manuallySelectedBody: { value: manuallySelectedBody },
-    isMiddleMouseVelocity: { value: isMiddleMouseVelocity },
-    isFreeCameraMode: { value: isFreeCameraMode },
-    focusID: { value: focusID },
     NONE_FOCUS_POSITION,
-    dragPlane,
-    dragCameraOffset,
     supernovas: { value: supernovas },
     planetaryNebulae: { value: planetaryNebulae },
-    wasRunningBeforeDrag: { value: wasRunningBeforeDrag },
-    lensingEffect, warpEffect, shipWeapon, gizmo, velArc, orbitPrediction,
-    posIndicator, gridHelperManager, flightHUD, surfaceCam,
+    lensingEffect,
+    shipWeapon,
+    gizmo,
+    velArc,
+    orbitPrediction,
+    posIndicator,
+    gridHelperManager,
+    flightHUD,
+    surfaceCam,
     fpsSprite: { value: fpsSprite },
     statsSprite: { value: statsSprite },
     speedSprite: { value: speedSprite },
@@ -5882,13 +5315,13 @@ const animCtx: AnimationContext = {
     steeringOriginMarker,
     getFocusObject,
     setFocusBody,
-    updateFlightControls,
-    updateAutopilotStep: (subDt: number) => { updateAutopilot(subDt); },
-    exitFlightMode,
+    updateAutopilotStep: (subDt: number) => {
+        updateAutopilot(subDt);
+    },
     cancelAutopilot,
     setF,
     triggerZoomToBody,
     uiManager,
 };
 
-runAnimationLoop(animCtx);
+runAnimationLoop(animCtx, flightCtx);
