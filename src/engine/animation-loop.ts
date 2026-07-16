@@ -13,6 +13,7 @@ import { OrbitPredictionManager } from '../drawing/orbit-prediction';
 import { PositionIndicatorManager } from '../gizmos/position-indicator';
 import { GridHelperManager } from '../gizmos/grid-helper';
 import { FlightHUD } from '../drawing/flight-hud';
+import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
 import { Star } from '../bodies/star';
@@ -108,6 +109,7 @@ export interface AnimationContext {
     posIndicator: PositionIndicatorManager;
     gridHelperManager: GridHelperManager;
     flightHUD: FlightHUD;
+    targetIndicator: AutopilotTargetIndicator;
     surfaceCam: SurfaceCameraManager;
 
     // Sprites
@@ -849,6 +851,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
 
             ctx.flightHUD.updateAutopilotHUD((now - lastT) / 1000);
+            ctx.targetIndicator.update(ctx.camera);
             fpsLastUpdate = now;
         }
 

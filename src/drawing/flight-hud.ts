@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
-import { AUTOPILOT_ORBIT_NOTIFY_DURATION, TEXT_SPRITE_Z } from '../utilities/consts';
+import { AUTOPILOT_ORBIT_ALTITUDE_FACTOR, AUTOPILOT_ORBIT_NOTIFY_DURATION, TEXT_SPRITE_Z } from '../utilities/consts';
 import { IAutopilotState } from '../interfaces';
 
 export type AutopilotHudState =
@@ -173,7 +173,7 @@ function createAutopilotPhaseTexture(
     ctx.fillText(text, W / 2, 34);
 
     // Distance sub-label
-    if (distanceLabel) {
+    if (distanceLabel && state !== 'TIDAL_LOCK' && state !== 'ORBIT') {
         ctx.font = '24px monospace';
         ctx.shadowBlur = 6;
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
@@ -402,12 +402,13 @@ export class FlightHUD {
             } else if (this.autopilotState.isActive && this.autopilotState.targetBody?.mesh) {
                 const ship = this.flightState.knownShip;
                 if (ship?.mesh) {
-                    const dist = ship.mesh.position.distanceTo(
+                    const rawDist = ship.mesh.position.distanceTo(
                         this.autopilotState.targetBody.mesh.position
                     );
-                    // Format: show as integer with thousands separator, strip tiny noise.
-                    const distRounded = Math.max(0, Math.round(dist));
-                    distLabel = `Distance to target: ${distRounded.toLocaleString()} u`;
+                    const orbitRadius =
+                        this.autopilotState.targetBody.radius * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
+                    const distToOrbit = Math.max(0, rawDist - orbitRadius);
+                    distLabel = `Distance to target: ${Math.round(distToOrbit).toLocaleString()} u`;
                 }
             }
 
