@@ -235,61 +235,7 @@ import { EmptySystemGenerator } from './procedural/empty-system-generator';
 import { pickMoonTextureForMoonType } from './procedural/moon-factory';
 import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
 import { exitFlightMode } from './simulation/flight-controllers';
-
-// ── URL seed parameter helpers ──────────────────────────────────────────────
-const SEED_TYPE_NORMAL = 'normal';
-const SEED_TYPE_BLACKHOLE = 'blackhole';
-
-/** Current seed value (with type prefix) that was last pushed to the URL. */
-let _lastPushedSeedValue: string | null = null;
-
-interface ParsedSeed {
-    type: 'normal' | 'blackhole';
-    seed: string;
-}
-
-function parseSeedFromURL(): ParsedSeed | null {
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get('seed');
-    if (!raw) return null;
-
-    const underscoreIdx = raw.indexOf('_');
-    if (underscoreIdx <= 0) return null;
-
-    const type = raw.substring(0, underscoreIdx);
-    const seed = raw.substring(underscoreIdx + 1);
-    if (!seed) return null;
-
-    if (type === SEED_TYPE_NORMAL) {
-        return { type: 'normal', seed };
-    }
-    if (type === SEED_TYPE_BLACKHOLE) {
-        return { type: 'blackhole', seed };
-    }
-    return null;
-}
-
-function buildSeedValue(type: 'normal' | 'blackhole', seed: string): string {
-    return `${type}_${seed}`;
-}
-
-function updateURLWithSeed(type: 'normal' | 'blackhole', seed: string): void {
-    const value = buildSeedValue(type, seed);
-    if (value === _lastPushedSeedValue) return;
-    _lastPushedSeedValue = value;
-    const url = new URL(window.location.href);
-    url.searchParams.set('seed', value);
-    window.history.pushState({ seed: value }, '', url.toString());
-}
-
-function clearURLSeed(): void {
-    _lastPushedSeedValue = null;
-    const url = new URL(window.location.href);
-    if (url.searchParams.has('seed')) {
-        url.searchParams.delete('seed');
-        window.history.replaceState({ seed: null }, '', url.toString());
-    }
-}
+import { parseSeedFromURL, buildSeedValue, updateURLWithSeed, clearURLSeed, SEED_TYPE_NORMAL, SEED_TYPE_BLACKHOLE, getLastPushedSeed, setLastPushedSeed, resetLastPushedSeed } from './utilities/url-seed';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: {
@@ -5238,8 +5184,8 @@ window.addEventListener('popstate', async () => {
     // If there's no seed in the URL now (e.g. navigated back to a page without one)
     if (!currentSeed) {
         // Only reload if we were previously showing a seeded system
-        if (_lastPushedSeedValue !== null) {
-            _lastPushedSeedValue = null;
+        if (getLastPushedSeed() !== null) {
+            resetLastPushedSeed();
             applyStartupGMultiplier();
             uiManager.managementPanel.hide();
             startupModal.hide();
@@ -5255,8 +5201,8 @@ window.addEventListener('popstate', async () => {
 
     // Avoid re-generating the same system
     const fullValue = buildSeedValue(currentSeed.type, currentSeed.seed);
-    if (fullValue === _lastPushedSeedValue) return;
-    _lastPushedSeedValue = fullValue;
+    if (fullValue === getLastPushedSeed()) return;
+    setLastPushedSeed(fullValue);
 
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
