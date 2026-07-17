@@ -3189,7 +3189,8 @@ function updateAutopilot(dt: number) {
 
     if (autopilotState.phase === 'ALIGN') {
         // Rotate toward the target without applying any thrust.  Once the ship's forward axis
-        // is within ~3° of the target direction the warp-charge sequence begins.
+        // is within ~3° of the target direction, transition to the appropriate next phase
+        // based on distance (same thresholds used in engageAutopilot).
         flightState.thrustActive = false;
         const alignQuat = new THREE.Quaternion().setFromRotationMatrix(
             new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
@@ -3198,8 +3199,16 @@ function updateAutopilot(dt: number) {
 
         const shipForward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
         if (shipForward.dot(toTargetDir) >= Math.cos(THREE.MathUtils.degToRad(3))) {
-            autopilotState.phase = 'WARP_CHARGING';
-            autopilotState.warpVoicePlayed = false;
+            if (distance > AUTOPILOT_WARP_THRESHOLD) {
+                autopilotState.phase = 'WARP_CHARGING';
+                autopilotState.warpVoicePlayed = false;
+            } else if (distance <= orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE) {
+                // Too close for approach — skip straight to BRAKE.
+                // brakeEntryDistance was pre‑recorded in engageAutopilot.
+                autopilotState.phase = 'BRAKE';
+            } else {
+                autopilotState.phase = 'APPROACH';
+            }
         }
     } else if (autopilotState.phase === 'WARP_CHARGING') {
         // Reuse the same charge progress bar shown during manual warp.
@@ -3642,14 +3651,12 @@ function engageAutopilot(target: Body) {
     autopilotState.isWarpActive = false;
     autopilotState.warpChargeTimer = 0;
     playSoundEffect(SoundEffect.AutopilotEngaged);
-    if (startWithWarp) {
-        autopilotState.phase = 'ALIGN';
-    } else if (startInBrake) {
-        autopilotState.phase = 'BRAKE';
-        autopilotState.brakeEntryDistance = dist0;
-    } else {
-        autopilotState.phase = 'APPROACH';
-    }
+    // Always start with ALIGN — rotate toward the target before applying any thrust.
+    // The ALIGN phase will transition to WARP_CHARGING, APPROACH, or BRAKE once the
+    // ship is facing the target, using the same distance thresholds.
+    autopilotState.phase = 'ALIGN';
+    // Pre‑compute the brake‑entry distance in case ALIGN hands off to BRAKE.
+    autopilotState.brakeEntryDistance = dist0;
     flightState.thrustActive = false;
 
     if (startWithWarp) {
