@@ -4,7 +4,7 @@ import { FLIGHT_BANK_LERP_SPEED, FLIGHT_BOOST_ACCEL, FLIGHT_BOOST_DECEL, FLIGHT_
 import { autopilotState, cameraState, flightState, interactionState, simulationState } from "./simulation";
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { IFlightControlContext } from '../interfaces';
-import { playVoiceWarpDriveActive } from '../utilities/audio';
+import { playSoundEffect, SoundEffect } from '../utilities/audio';
 
 /** Exit flight mode and restore normal camera controls. */
 export function exitFlightMode(ctx: IFlightControlContext) {
@@ -244,7 +244,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         ctx.flightHUD.setWarpCharge(fill);
         if (fill >= 0.99 && !flightState.warpVoicePlayed) {
             flightState.warpVoicePlayed = true;
-            playVoiceWarpDriveActive();
+            playSoundEffect(SoundEffect.WarpDriveActive);
         }
         if (flightState.warpCharge >= FLIGHT_WARP_CHARGE_TIME) {
             // Engage warp!

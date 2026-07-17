@@ -117,7 +117,7 @@ import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { WarpEffect } from './effects/warp-effect';
-import { playWeaponImpact, playVoiceAutopilotEngaged, playVoiceWarpDriveActive } from './utilities/audio.js';
+import { playWeaponImpact, playSoundEffect, SoundEffect} from './utilities/audio.js';
 import { AmbientSoundManager } from './utilities/ambient-sound';
 import { triggerScreenFlash } from './effects/screen-flash';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
@@ -3211,7 +3211,7 @@ function updateAutopilot(dt: number) {
         flightHUD.setWarpCharge(fill);
         if (fill >= 0.99 && !autopilotState.warpVoicePlayed) {
             autopilotState.warpVoicePlayed = true;
-            playVoiceWarpDriveActive();
+            playSoundEffect(SoundEffect.WarpDriveActive);
         }
         // Point toward target while charging.
         const chargeQuat = new THREE.Quaternion().setFromRotationMatrix(
@@ -3498,6 +3498,9 @@ function updateAutopilot(dt: number) {
 /** Cancel the autopilot with an optional log message. */
 function cancelAutopilot(message?: string) {
     if (!autopilotState.isActive) return;
+
+    playSoundEffect(SoundEffect.AutopilotDisengaged);
+
     if (autopilotState.isWarpActive) {
         autopilotState.isWarpActive = false;
         flightState.warpEffect?.stop();
@@ -3638,7 +3641,7 @@ function engageAutopilot(target: Body) {
     autopilotState.targetBody = target;
     autopilotState.isWarpActive = false;
     autopilotState.warpChargeTimer = 0;
-    playVoiceAutopilotEngaged();
+    playSoundEffect(SoundEffect.AutopilotEngaged);
     if (startWithWarp) {
         autopilotState.phase = 'ALIGN';
     } else if (startInBrake) {

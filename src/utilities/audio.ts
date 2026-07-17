@@ -8,8 +8,22 @@
  * When sfxVolume is 0, no sounds play.
  */
 
-import { settingsStore } from "../settings/settings-store";
+import { settingsStore } from '../settings/settings-store';
 
+export enum SoundEffect {
+    WarpDriveActive,
+    AutopilotEngaged,
+    AutopilotDisengaged,
+}
+
+type SoundEffectBank = string[];
+
+interface ISoundEffectState {
+    soundEffectBank: SoundEffectBank;
+    buffer: AudioBuffer | null;
+    loadStarted: boolean;
+    pendingPlay: boolean;
+}
 
 let ctx: AudioContext | null = null;
 let blasterBuffer: AudioBuffer | null = null;
@@ -225,61 +239,63 @@ export function playWarpLoop(): WarpSoundController | null {
     }
 }
 
-// ── Voice prompts ────────────────────────────────────────────────────────────
+/**
+ * Contains the states for all sound effects, including their audio buffers, load status, and pending play status.
+ */
+const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
+    // Voice prompts
+    [SoundEffect.WarpDriveActive]: {
+        buffer: null,
+        loadStarted: false,
+        pendingPlay: false,
+        soundEffectBank: [new URL('../assets/sounds/voice/warp-drive-active.mp3', import.meta.url).href],
+    },
+    [SoundEffect.AutopilotEngaged]: {
+        buffer: null,
+        loadStarted: false,
+        pendingPlay: false,
+        soundEffectBank: [new URL('../assets/sounds/voice/autopilot-engaged.mp3', import.meta.url).href],
+    },
+    [SoundEffect.AutopilotDisengaged]: {
+        buffer: null,
+        loadStarted: false,
+        pendingPlay: false,
+        soundEffectBank: [new URL('../assets/sounds/voice/autopilot-disengaged.mp3', import.meta.url).href],
+    },
+    // Other sound effects
+    // TODO: Move other sound effects here
+};
 
-let warpDriveBuffer: AudioBuffer | null = null;
-let warpDriveLoadStarted = false;
-let warpDrivePendingPlay = false;
-let autopilotEngagedBuffer: AudioBuffer | null = null;
-let autopilotEngagedLoadStarted = false;
-let autopilotEngagedPendingPlay = false;
-
-/** Play the "warp drive active" voice prompt once. */
-export function playVoiceWarpDriveActive(): void {
+/**
+ * Play a sound effect once.
+ */
+export function playSoundEffect(effect: SoundEffect): void {
     try {
         const ac = getCtx();
-        if (!warpDriveLoadStarted) {
-            warpDriveLoadStarted = true;
-            const url = new URL('../assets/sounds/voice/warp-drive-active.mp3', import.meta.url).href;
+        // Get the sound effect state
+        const state = soundEffectStates[effect];
+
+        if (!state.loadStarted) {
+            state.loadStarted = true;
+            // For now, there is only one sound effect per bank, so we just use the first one.
+            // TODO: If there are more than 1 in the bank, we might want to select one randomly or based on some criteria.
+            const url = state.soundEffectBank[0];
+
+            // Load the selected sound effect URL into the audio context and play when it is ready.
             loadAndCache(ac, url, (buf) => {
-                warpDriveBuffer = buf;
-                if (warpDrivePendingPlay) {
-                    warpDrivePendingPlay = false;
+                state.buffer = buf;
+                if (state.pendingPlay) {
+                    state.pendingPlay = false;
                     playBuffer(ac, buf, 1.0);
                 }
             });
         }
-        if (warpDriveBuffer) {
-            playBuffer(ac, warpDriveBuffer, 1.0);
+        if (state.buffer) {
+            playBuffer(ac, state.buffer, 1.0);
         } else {
-            warpDrivePendingPlay = true;
+            state.pendingPlay = true;
         }
     } catch {
-        console.error('Error playing warp drive voice prompt');
-    }
-}
-
-/** Play the "autopilot engaged" voice prompt once. */
-export function playVoiceAutopilotEngaged(): void {
-    try {
-        const ac = getCtx();
-        if (!autopilotEngagedLoadStarted) {
-            autopilotEngagedLoadStarted = true;
-            const url = new URL('../assets/sounds/voice/autopilot-engaged.mp3', import.meta.url).href;
-            loadAndCache(ac, url, (buf) => {
-                autopilotEngagedBuffer = buf;
-                if (autopilotEngagedPendingPlay) {
-                    autopilotEngagedPendingPlay = false;
-                    playBuffer(ac, buf, 1.0);
-                }
-            });
-        }
-        if (autopilotEngagedBuffer) {
-            playBuffer(ac, autopilotEngagedBuffer, 1.0);
-        } else {
-            autopilotEngagedPendingPlay = true;
-        }
-    } catch {
-        console.error('Error playing autopilot engaged voice prompt');
+        console.error(`Error playing sound effect: ${effect}`);
     }
 }
