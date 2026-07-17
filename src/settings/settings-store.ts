@@ -19,7 +19,7 @@ const defaultSettings: SpaceSimSettings = {
     particleEffectsEnabled: true,
     substeps: 64,
     sfxVolume: 1.0,
-    musicVolume: 1.0
+    musicVolume: 0.5
 };
 
 class SettingsStore {

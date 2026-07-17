@@ -117,7 +117,7 @@ import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { WarpEffect } from './effects/warp-effect';
-import { playWeaponImpact } from './utilities/audio.js';
+import { playWeaponImpact, playVoiceAutopilotEngaged, playVoiceWarpDriveActive } from './utilities/audio.js';
 import { AmbientSoundManager } from './utilities/ambient-sound';
 import { triggerScreenFlash } from './effects/screen-flash';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
@@ -3199,6 +3199,7 @@ function updateAutopilot(dt: number) {
         const shipForward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
         if (shipForward.dot(toTargetDir) >= Math.cos(THREE.MathUtils.degToRad(3))) {
             autopilotState.phase = 'WARP_CHARGING';
+            autopilotState.warpVoicePlayed = false;
         }
     } else if (autopilotState.phase === 'WARP_CHARGING') {
         // Reuse the same charge progress bar shown during manual warp.
@@ -3208,6 +3209,10 @@ function updateAutopilot(dt: number) {
         );
         const fill = autopilotState.warpChargeTimer / FLIGHT_WARP_CHARGE_TIME;
         flightHUD.setWarpCharge(fill);
+        if (fill >= 0.99 && !autopilotState.warpVoicePlayed) {
+            autopilotState.warpVoicePlayed = true;
+            playVoiceWarpDriveActive();
+        }
         // Point toward target while charging.
         const chargeQuat = new THREE.Quaternion().setFromRotationMatrix(
             new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
@@ -3633,6 +3638,7 @@ function engageAutopilot(target: Body) {
     autopilotState.targetBody = target;
     autopilotState.isWarpActive = false;
     autopilotState.warpChargeTimer = 0;
+    playVoiceAutopilotEngaged();
     if (startWithWarp) {
         autopilotState.phase = 'ALIGN';
     } else if (startInBrake) {
@@ -4672,6 +4678,7 @@ window.addEventListener('keydown', (e) => {
                 // Only start charging when not already decelerating from a previous warp,
                 // and not under autopilot control.
                 flightState.warpCharging = true;
+                flightState.warpVoicePlayed = false;
             }
             return;
         }

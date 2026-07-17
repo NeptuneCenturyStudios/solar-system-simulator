@@ -224,3 +224,62 @@ export function playWarpLoop(): WarpSoundController | null {
         return null;
     }
 }
+
+// ── Voice prompts ────────────────────────────────────────────────────────────
+
+let warpDriveBuffer: AudioBuffer | null = null;
+let warpDriveLoadStarted = false;
+let warpDrivePendingPlay = false;
+let autopilotEngagedBuffer: AudioBuffer | null = null;
+let autopilotEngagedLoadStarted = false;
+let autopilotEngagedPendingPlay = false;
+
+/** Play the "warp drive active" voice prompt once. */
+export function playVoiceWarpDriveActive(): void {
+    try {
+        const ac = getCtx();
+        if (!warpDriveLoadStarted) {
+            warpDriveLoadStarted = true;
+            const url = new URL('../assets/sounds/voice/warp-drive-active.mp3', import.meta.url).href;
+            loadAndCache(ac, url, (buf) => {
+                warpDriveBuffer = buf;
+                if (warpDrivePendingPlay) {
+                    warpDrivePendingPlay = false;
+                    playBuffer(ac, buf, 1.0);
+                }
+            });
+        }
+        if (warpDriveBuffer) {
+            playBuffer(ac, warpDriveBuffer, 1.0);
+        } else {
+            warpDrivePendingPlay = true;
+        }
+    } catch {
+        console.error('Error playing warp drive voice prompt');
+    }
+}
+
+/** Play the "autopilot engaged" voice prompt once. */
+export function playVoiceAutopilotEngaged(): void {
+    try {
+        const ac = getCtx();
+        if (!autopilotEngagedLoadStarted) {
+            autopilotEngagedLoadStarted = true;
+            const url = new URL('../assets/sounds/voice/autopilot-engaged.mp3', import.meta.url).href;
+            loadAndCache(ac, url, (buf) => {
+                autopilotEngagedBuffer = buf;
+                if (autopilotEngagedPendingPlay) {
+                    autopilotEngagedPendingPlay = false;
+                    playBuffer(ac, buf, 1.0);
+                }
+            });
+        }
+        if (autopilotEngagedBuffer) {
+            playBuffer(ac, autopilotEngagedBuffer, 1.0);
+        } else {
+            autopilotEngagedPendingPlay = true;
+        }
+    } catch {
+        console.error('Error playing autopilot engaged voice prompt');
+    }
+}

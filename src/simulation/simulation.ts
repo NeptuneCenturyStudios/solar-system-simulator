@@ -86,7 +86,8 @@ export const flightState: IFlightState = {
     altOrbitYaw: 0,
     /** Accumulated pitch offset (radians) for the ALT orbit camera, in ship-local space. */
     altOrbitPitch: 0,
-    
+    /** True once the warp-drive-active voice prompt has played for the current charge cycle. */
+    warpVoicePlayed: false,
 };
 
 /**
@@ -164,4 +165,6 @@ export const autopilotState: IAutopilotState = {
      *  0→1 blend factor that rotates the desired velocity from 'stop' to
      *  'orbital velocity' as the ship closes on the orbit radius. */
     brakeEntryDistance: 0,
+    /** True once the warp-drive-active voice prompt has played for the current autopilot warp charge cycle. */
+    warpVoicePlayed: false,
 };

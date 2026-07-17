@@ -105,7 +105,7 @@ export class OptionsPanel extends Panel {
 
         if (this.musicVolumeResetBtn) {
             this.musicVolumeResetBtn.onclick = () => {
-                if (this.musicVolumeSlider) this.musicVolumeSlider.value = '100';
+                if (this.musicVolumeSlider) this.musicVolumeSlider.value = '50';
                 this.applyMusicVolume();
             };
         }

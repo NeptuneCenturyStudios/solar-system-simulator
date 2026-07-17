@@ -227,7 +227,11 @@ export interface IFlightState {
     /** True while ALT is held — camera orbits the ship instead of steering it. */
     altOrbitActive: boolean;
 
+    /** True once the warp-drive-active voice prompt has played for the current charge cycle. */
+    warpVoicePlayed: boolean;
+
     /** Accumulated yaw offset (radians) for the ALT orbit camera, in ship-local space. */
+
     altOrbitYaw: number;
 
     /** Accumulated pitch offset (radians) for the ALT orbit camera, in ship-local space. */
@@ -344,6 +348,8 @@ export interface IAutopilotState {
      *  0→1 blend factor that rotates the desired velocity from 'stop' to
      *  'orbital velocity' as the ship closes on the orbit radius. */
     brakeEntryDistance: number;
+    /** True once the warp-drive-active voice prompt has played for the current autopilot warp charge cycle. */
+    warpVoicePlayed: boolean;
 }
 
 /**
