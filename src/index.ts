@@ -3115,8 +3115,9 @@ function updateAutopilot(dt: number) {
     const relVel = new THREE.Vector3().subVectors(ship.velocity, target.velocity);
     const approachSpeed = relVel.length();
 
-    // ── Phase transitions ────────────────────────────────────────────────────
+        // ── Phase transitions ────────────────────────────────────────────────────
     const toTargetDir = toTarget.clone().normalize();
+
     // Three-phase stopping distance: shed warp→boost at AUTOPILOT_WARP_DECEL, then
     // boost→normal at AUTOPILOT_BOOST_DECEL, then normal→stop at AUTOPILOT_DECEL.
     // Using only AUTOPILOT_BOOST_DECEL at warp speed would give a brake trigger
@@ -3270,6 +3271,7 @@ function updateAutopilot(dt: number) {
         // from boost and then crawl the remaining ~0.5×boostDecelDist at FLIGHT_MAX_SPEED.
         const effectiveBoostThreshold =
             orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE + boostDecelDist;
+            
         const useBoost = distance > effectiveBoostThreshold;
         autopilotState.isBoostActive = useBoost;
         const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : AUTOPILOT_APPROACH_SPEED;
