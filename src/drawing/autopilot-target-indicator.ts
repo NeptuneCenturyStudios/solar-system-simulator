@@ -18,6 +18,46 @@ const infoCtx = infoCanvas.getContext('2d')!;
 function drawInfoPanel(name: string, distLabel: string, etaLabel: string) {
     infoCtx.clearRect(0, 0, W, H);
 
+    // Background panel
+    const pad = 8;
+    infoCtx.fillStyle = 'rgba(0, 8, 16, 0.70)';
+    infoCtx.fillRect(pad, pad, W - pad * 2, H - pad * 2);
+
+    // // Outer border (dim cyan)
+    infoCtx.strokeStyle = 'rgba(0, 255, 204, 0.35)';
+    infoCtx.lineWidth = 1.5;
+    infoCtx.strokeRect(pad, pad, W - pad * 2, H - pad * 2);
+
+    // Corner accent brackets
+    const accentLen = 14;
+    infoCtx.strokeStyle = '#00ffcc';
+    infoCtx.lineWidth = 2;
+    // top-left
+    infoCtx.beginPath();
+    infoCtx.moveTo(pad, pad + accentLen);
+    infoCtx.lineTo(pad, pad);
+    infoCtx.lineTo(pad + accentLen, pad);
+    infoCtx.stroke();
+    // top-right
+    infoCtx.beginPath();
+    infoCtx.moveTo(W - pad - accentLen, pad);
+    infoCtx.lineTo(W - pad, pad);
+    infoCtx.lineTo(W - pad, pad + accentLen);
+    infoCtx.stroke();
+    // bottom-left
+    infoCtx.beginPath();
+    infoCtx.moveTo(pad, H - pad - accentLen);
+    infoCtx.lineTo(pad, H - pad);
+    infoCtx.lineTo(pad + accentLen, H - pad);
+    infoCtx.stroke();
+    // bottom-right
+    infoCtx.beginPath();
+    infoCtx.moveTo(W - pad - accentLen, H - pad);
+    infoCtx.lineTo(W - pad, H - pad);
+    infoCtx.lineTo(W - pad, H - pad - accentLen);
+    infoCtx.stroke();
+
+
     infoCtx.textAlign = 'center';
     infoCtx.textBaseline = 'middle';
 
