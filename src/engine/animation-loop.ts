@@ -851,11 +851,15 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
 
             ctx.flightHUD.updateAutopilotHUD((now - lastT) / 1000);
-            ctx.targetIndicator.update(ctx.camera);
+            
             fpsLastUpdate = now;
         }
 
+        // Updates done per frame (for certain indicators that track objects or for other reasons)
+        ctx.targetIndicator.update(ctx.camera);
+
         lastT = now;
+
     }
 
     animate();

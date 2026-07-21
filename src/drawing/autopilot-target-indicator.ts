@@ -4,81 +4,151 @@ import { IAutopilotState } from '../interfaces';
 import { AUTOPILOT_ORBIT_ALTITUDE_FACTOR, TEXT_SPRITE_Z } from '../utilities/consts';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Canvas + context reused forever
+// Canvas + context reused forever (resized dynamically)
 // ─────────────────────────────────────────────────────────────────────────────
-const W = 512;
-const H = 160;
+let infoCanvas: HTMLCanvasElement | null = null;
+let infoCtx: CanvasRenderingContext2D | null = null;
+let currentCanvasW = 0;
+let currentCanvasH = 0;
 
-const infoCanvas = document.createElement('canvas');
-infoCanvas.width = W;
-infoCanvas.height = H;
-const infoCtx = infoCanvas.getContext('2d')!;
+// Layout constants
+const PAD = 15;
+const ACCENT_LEN = 14;
+// Text Y positions measured from top of padded area (like original layout)
+const NAME_Y = 52;
+const DIST_Y = 100;
+const ETA_Y = 135;
+// Total bottom padding after ETA (matching original ~25px bottom margin)
+const BOTTOM_PAD = 25;
 
-// Pre‑set static drawing styles (only dynamic text changes)
-function drawInfoPanel(name: string, distLabel: string, etaLabel: string) {
-    infoCtx.clearRect(0, 0, W, H);
+/**
+ * Ensures the canvas is sized to w×h.
+ * Clears the old canvas area BEFORE resizing so no ghost pixels remain.
+ * Returns true if the dimensions actually changed.
+ */
+function ensureCanvas(w: number, h: number): boolean {
+    if (!infoCanvas || !infoCtx) {
+        infoCanvas = document.createElement('canvas');
+        infoCtx = infoCanvas.getContext('2d')!;
+        infoCanvas.width = w;
+        infoCanvas.height = h;
+        currentCanvasW = w;
+        currentCanvasH = h;
+        return true;
+    }
 
-    // Background panel
-    const pad = 8;
-    infoCtx.fillStyle = 'rgba(0, 8, 16, 0.70)';
-    infoCtx.fillRect(pad, pad, W - pad * 2, H - pad * 2);
+    if (w === currentCanvasW && h === currentCanvasH) {
+        return false; // no resize needed
+    }
 
-    // // Outer border (dim cyan)
-    infoCtx.strokeStyle = 'rgba(0, 255, 204, 0.35)';
-    infoCtx.lineWidth = 1.5;
-    infoCtx.strokeRect(pad, pad, W - pad * 2, H - pad * 2);
+    // Clear the entire old canvas area before resizing
+    infoCtx.clearRect(0, 0, currentCanvasW, currentCanvasH);
 
-    // Corner accent brackets
-    const accentLen = 14;
-    infoCtx.strokeStyle = '#00ffcc';
-    infoCtx.lineWidth = 2;
+    // Set new dimensions (this also clears the canvas per spec, but the
+    // explicit clearRect above handles edge cases)
+    infoCanvas.width = w;
+    infoCanvas.height = h;
+    currentCanvasW = w;
+    currentCanvasH = h;
+    return true;
+}
+
+function drawInfoPanel(name: string, distLabel: string, etaLabel: string): boolean {
+    // ── 1. Measure all text ──────────────────────────────────────────────
+    const measureCtx = infoCtx || document.createElement('canvas').getContext('2d')!;
+
+    measureCtx.font = 'bold 38px monospace';
+    const nameW = measureCtx.measureText(name).width;
+
+    measureCtx.font = '25px monospace';
+    const distW = measureCtx.measureText(distLabel).width;
+
+    measureCtx.font = '23px monospace';
+    const etaW = measureCtx.measureText(etaLabel).width;
+
+    const maxTextW = Math.max(nameW, distW, etaW);
+
+    // ── 2. Compute canvas dimensions ─────────────────────────────────────
+    // Content area: text centred, with PAD on each side
+    const contentW = Math.max(maxTextW, 100); // floor is 100px wide
+    const innerW = contentW + PAD * 2;
+    // Full canvas width: inner area + accent bracket width on both sides
+    const fullW = innerW + ACCENT_LEN * 2 + 4; // +4 for outer border linewidth room
+
+    // Height: fixed Y positions + bottom pad
+    const fullH = ETA_Y + 23 + BOTTOM_PAD; // 23 = half font height approx, matches original 160
+
+    const resized = ensureCanvas(fullW, fullH);
+
+    const ctx = infoCtx!;
+
+    // Always clear the full current canvas (needed even without resize since
+    // we reuse the canvas)
+    ctx.clearRect(0, 0, currentCanvasW, currentCanvasH);
+
+    // ── 3. Background panel ──────────────────────────────────────────────
+    ctx.fillStyle = 'rgba(0, 8, 16, 0.50)';
+    ctx.fillRect(PAD, PAD, fullW - PAD * 2, fullH - PAD * 2);
+
+    // Outer border (dim cyan)
+    ctx.strokeStyle = 'rgba(0, 255, 204, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(PAD, PAD, fullW - PAD * 2, fullH - PAD * 2);
+
+    // ── 4. Corner accent brackets ────────────────────────────────────────
+    ctx.strokeStyle = '#00ffcc';
+    ctx.lineWidth = 2;
     // top-left
-    infoCtx.beginPath();
-    infoCtx.moveTo(pad, pad + accentLen);
-    infoCtx.lineTo(pad, pad);
-    infoCtx.lineTo(pad + accentLen, pad);
-    infoCtx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(PAD, PAD + ACCENT_LEN);
+    ctx.lineTo(PAD, PAD);
+    ctx.lineTo(PAD + ACCENT_LEN, PAD);
+    ctx.stroke();
     // top-right
-    infoCtx.beginPath();
-    infoCtx.moveTo(W - pad - accentLen, pad);
-    infoCtx.lineTo(W - pad, pad);
-    infoCtx.lineTo(W - pad, pad + accentLen);
-    infoCtx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(fullW - PAD - ACCENT_LEN, PAD);
+    ctx.lineTo(fullW - PAD, PAD);
+    ctx.lineTo(fullW - PAD, PAD + ACCENT_LEN);
+    ctx.stroke();
     // bottom-left
-    infoCtx.beginPath();
-    infoCtx.moveTo(pad, H - pad - accentLen);
-    infoCtx.lineTo(pad, H - pad);
-    infoCtx.lineTo(pad + accentLen, H - pad);
-    infoCtx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(PAD, fullH - PAD - ACCENT_LEN);
+    ctx.lineTo(PAD, fullH - PAD);
+    ctx.lineTo(PAD + ACCENT_LEN, fullH - PAD);
+    ctx.stroke();
     // bottom-right
-    infoCtx.beginPath();
-    infoCtx.moveTo(W - pad - accentLen, H - pad);
-    infoCtx.lineTo(W - pad, H - pad);
-    infoCtx.lineTo(W - pad, H - pad - accentLen);
-    infoCtx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(fullW - PAD - ACCENT_LEN, fullH - PAD);
+    ctx.lineTo(fullW - PAD, fullH - PAD);
+    ctx.lineTo(fullW - PAD, fullH - PAD - ACCENT_LEN);
+    ctx.stroke();
 
+    // ── 5. Text ──────────────────────────────────────────────────────────
+    const cx = fullW / 2;
 
-    infoCtx.textAlign = 'center';
-    infoCtx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
     // Name
-    infoCtx.font = 'bold 38px monospace';
-    infoCtx.shadowBlur = 14;
-    infoCtx.shadowColor = 'rgba(0, 255, 204, 0.9)';
-    infoCtx.fillStyle = '#00ffcc';
-    infoCtx.fillText(name, W / 2, 52);
+    ctx.font = 'bold 38px monospace';
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = 'rgba(0, 255, 204, 0.9)';
+    ctx.fillStyle = '#00ffcc';
+    ctx.fillText(name, cx, NAME_Y);
 
     // Distance
-    infoCtx.font = '25px monospace';
-    infoCtx.shadowBlur = 5;
-    infoCtx.shadowColor = 'rgba(0,0,0,0.6)';
-    infoCtx.fillStyle = 'rgba(255, 255, 255, 0.90)';
-    infoCtx.fillText(distLabel, W / 2, 100);
+    ctx.font = '25px monospace';
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.90)';
+    ctx.fillText(distLabel, cx, DIST_Y);
 
     // ETA
-    infoCtx.font = '23px monospace';
-    infoCtx.fillStyle = 'rgba(130, 255, 210, 0.85)';
-    infoCtx.fillText(etaLabel, W / 2, 135);
+    ctx.font = '23px monospace';
+    ctx.fillStyle = 'rgba(130, 255, 210, 0.85)';
+    ctx.fillText(etaLabel, cx, ETA_Y);
+
+    return resized;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -149,6 +219,13 @@ export class AutopilotTargetIndicator {
     private infoTexture: THREE.CanvasTexture | null = null;
     private chevronTexture: THREE.CanvasTexture | null = null;
 
+    // Reference sprite scale from the original fixed canvas (512×160 → 360×112)
+    // Used as a baseline so dynamic sizing matches the same pixel density.
+    private static readonly REF_CANVAS_W = 512;
+    private static readonly REF_SPRITE_W = 360;
+    private static readonly REF_CANVAS_H = 160;
+    private static readonly REF_SPRITE_H = 112;
+
     private scratch = new THREE.Vector3();
 
     constructor(
@@ -162,8 +239,8 @@ export class AutopilotTargetIndicator {
     }
 
     init(): void {
-        // Info sprite
-        this.infoTexture = new THREE.CanvasTexture(infoCanvas);
+        // Info sprite (initialised once; texture is replaced on resize)
+        this.infoTexture = new THREE.CanvasTexture(document.createElement('canvas'));
         this.infoTexture.needsUpdate = true;
 
         const infoMat = new THREE.SpriteMaterial({
@@ -174,7 +251,6 @@ export class AutopilotTargetIndicator {
         });
 
         this.infoSprite = new THREE.Sprite(infoMat);
-        this.infoSprite.scale.set(360, 112, 1);
         this.infoSprite.visible = false;
         this.uiScene.add(this.infoSprite);
 
@@ -227,42 +303,58 @@ export class AutopilotTargetIndicator {
     }
 
     private showOnScreen(
-    nx: number,
-    ny: number,
-    target: Body,
-    ship: Body | null
-): void {
-    if (!this.infoSprite || !this.infoTexture) return;
+        nx: number,
+        ny: number,
+        target: Body,
+        ship: Body | null
+    ): void {
+        if (!this.infoSprite || !this.infoTexture) return;
 
-    const uiX = nx * (window.innerWidth / 2);
-    const uiY = ny * (window.innerHeight / 2);
+        const uiX = nx * (window.innerWidth / 2);
+        const uiY = ny * (window.innerHeight / 2);
 
-    // Always update because animate loop is already throttled
-    let distLabel = '';
-    let etaLabel = 'ETA: ∞';
+        let distLabel = '';
+        let etaLabel = 'ETA: ∞';
 
-    if (ship?.mesh) {
-        const rawDist = ship.mesh.position.distanceTo(target.mesh.position);
-        const orbitRadius = target.radius * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
-        const distToOrbit = Math.max(0, rawDist - orbitRadius);
+        if (ship?.mesh) {
+            const rawDist = ship.mesh.position.distanceTo(target.mesh.position);
+            const orbitRadius = target.radius * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
+            const distToOrbit = Math.max(0, rawDist - orbitRadius);
 
-        distLabel = `${Math.round(distToOrbit).toLocaleString()} u`;
+            distLabel = `${Math.round(distToOrbit).toLocaleString()} u`;
 
-        const closingSpeed = computeClosingSpeed(ship, target);
-        etaLabel =
-            closingSpeed > 0
-                ? formatETA(distToOrbit / closingSpeed)
-                : 'ETA: ∞';
+            const closingSpeed = computeClosingSpeed(ship, target);
+            etaLabel =
+                closingSpeed > 0
+                    ? formatETA(distToOrbit / closingSpeed)
+                    : 'ETA: ∞';
+        }
+
+        const canvasResized = drawInfoPanel(target.name, distLabel, etaLabel);
+
+        // When the canvas is resized, the old Three.js texture may cache stale
+        // backing-store data. Recreate the texture to guarantee clean output.
+        if (canvasResized) {
+            if (this.infoTexture) this.infoTexture.dispose();
+            this.infoTexture = new THREE.CanvasTexture(infoCanvas!);
+            this.infoTexture.needsUpdate = true;
+            (this.infoSprite.material as THREE.SpriteMaterial).map = this.infoTexture;
+        } else {
+            this.infoTexture.image = infoCanvas!;
+            this.infoTexture.needsUpdate = true;
+        }
+
+        // Scale sprite to maintain the same visual pixel density as the hardcoded version
+        const spriteW = (currentCanvasW / AutopilotTargetIndicator.REF_CANVAS_W) *
+            AutopilotTargetIndicator.REF_SPRITE_W;
+        const spriteH = (currentCanvasH / AutopilotTargetIndicator.REF_CANVAS_H) *
+            AutopilotTargetIndicator.REF_SPRITE_H;
+        this.infoSprite.scale.set(spriteW, spriteH, 1);
+
+        this.infoSprite.position.set(uiX, uiY + 70, TEXT_SPRITE_Z);
+        this.infoSprite.visible = true;
+        this.edgeSprite!.visible = false;
     }
-
-    drawInfoPanel(target.name, distLabel, etaLabel);
-    this.infoTexture.needsUpdate = true;
-
-    this.infoSprite.position.set(uiX, uiY + 70, TEXT_SPRITE_Z);
-    this.infoSprite.visible = true;
-    this.edgeSprite!.visible = false;
-}
-
 
     private showOffScreen(nx: number, ny: number, nz: number): void {
         if (!this.edgeSprite) return;
