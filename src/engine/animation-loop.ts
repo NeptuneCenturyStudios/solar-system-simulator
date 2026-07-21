@@ -36,6 +36,7 @@ import {
     TIME_SCALE,
     TEXT_SPRITE_Z,
     FLIGHT_WARP_SPEED,
+    FLIGHT_WARP_ACCEL,
     FLIGHT_BOOST_MAX_SPEED,
     FLIGHT_BOOST_DECEL,
     FLIGHT_WARP_DECEL,
@@ -207,7 +208,13 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             const bgShip = ctx.flightState.knownShip;
             if (bgShip && !bgShip._isDisposed && bgShip.mesh) {
                 const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
-                bgShip.velocity.copy(bgFwd).multiplyScalar(FLIGHT_WARP_SPEED);
+                const fwdSpd = bgShip.velocity.dot(bgFwd);
+                if (fwdSpd < FLIGHT_WARP_SPEED) {
+                    const delta = Math.min(FLIGHT_WARP_ACCEL * dtTotal, FLIGHT_WARP_SPEED - fwdSpd);
+                    bgShip.velocity.addScaledVector(bgFwd, delta);
+                } else {
+                    bgShip.velocity.copy(bgFwd).multiplyScalar(FLIGHT_WARP_SPEED);
+                }
             } else {
                 ctx.flightState.warpActive = false;
             }

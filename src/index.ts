@@ -78,6 +78,7 @@ import {
     AUTOPILOT_BRAKE_DONE_SPEED,
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
     AUTOPILOT_BLOCKED_NOTIFY_DURATION,
+    AUTOPILOT_WARP_ACCEL,
     AUTOPILOT_WARP_DECEL,
     AUTOPILOT_APPROACH_MIN_DISTANCE,
     AUTOPILOT_BRAKE_ARC_DIST,
@@ -3243,9 +3244,19 @@ function updateAutopilot(dt: number) {
             });
         }
     } else if (autopilotState.phase === 'WARP') {
-        // Lock ship velocity to warp speed toward the target, in the target's frame.
-        ship.velocity.copy(target.velocity).addScaledVector(toTargetDir, FLIGHT_WARP_SPEED);
-        flightState.currentSpeed = FLIGHT_WARP_SPEED;
+        // Accelerate toward FLIGHT_WARP_SPEED in the target's frame, rather than
+        // snapping instantly.  This gives a smooth ramp-up that pairs naturally
+        // with the existing deceleration ramps (AUTOPILOT_WARP_DECEL, etc.).
+        const relVel = new THREE.Vector3().subVectors(ship.velocity, target.velocity);
+        const curSpeed = relVel.dot(toTargetDir);
+        let newSpeed: number;
+        if (curSpeed < FLIGHT_WARP_SPEED) {
+            newSpeed = Math.min(curSpeed + AUTOPILOT_WARP_ACCEL * dt, FLIGHT_WARP_SPEED);
+        } else {
+            newSpeed = FLIGHT_WARP_SPEED;
+        }
+        ship.velocity.copy(target.velocity).addScaledVector(toTargetDir, newSpeed);
+        flightState.currentSpeed = newSpeed;
         flightState.thrustActive = true;
         // (warpEffect.update is called centrally in the animate loop each frame)
 

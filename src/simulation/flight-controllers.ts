@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { NotificationType } from "../event-log/event-log";
-import { FLIGHT_BANK_LERP_SPEED, FLIGHT_BOOST_ACCEL, FLIGHT_BOOST_DECEL, FLIGHT_BOOST_MAX_SPEED, FLIGHT_MAX_BANK_ANGLE, FLIGHT_MAX_BANK_PITCH, FLIGHT_MAX_POINTER_OFFSET, FLIGHT_MAX_SPEED, FLIGHT_MAX_TURN_RATE, FLIGHT_PERP_DECAY, FLIGHT_ROLL_ACCEL, FLIGHT_ROLL_FRICTION, FLIGHT_ROLL_SPEED, FLIGHT_STEER_DEADZONE, FLIGHT_STEER_SMOOTH_RATE, FLIGHT_THRUST_ACCEL, FLIGHT_THRUST_DECEL, FLIGHT_WARP_CHARGE_TIME, FLIGHT_WARP_DECEL, FLIGHT_WARP_SPEED, TEXT_SPRITE_Z } from "../utilities/consts";
+import { FLIGHT_BANK_LERP_SPEED, FLIGHT_BOOST_ACCEL, FLIGHT_BOOST_DECEL, FLIGHT_BOOST_MAX_SPEED, FLIGHT_MAX_BANK_ANGLE, FLIGHT_MAX_BANK_PITCH, FLIGHT_MAX_POINTER_OFFSET, FLIGHT_MAX_SPEED, FLIGHT_MAX_TURN_RATE, FLIGHT_PERP_DECAY, FLIGHT_ROLL_ACCEL, FLIGHT_ROLL_FRICTION, FLIGHT_ROLL_SPEED, FLIGHT_STEER_DEADZONE, FLIGHT_STEER_SMOOTH_RATE, FLIGHT_THRUST_ACCEL, FLIGHT_THRUST_DECEL, FLIGHT_WARP_ACCEL, FLIGHT_WARP_CHARGE_TIME, FLIGHT_WARP_DECEL, FLIGHT_WARP_SPEED, TEXT_SPRITE_Z } from "../utilities/consts";
 import { autopilotState, cameraState, flightState, interactionState, simulationState } from "./simulation";
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { IFlightControlContext } from '../interfaces';
@@ -220,10 +220,16 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
 
     // ── Warp active ──────────────────────────────────────────────────────────
     if (flightState.warpActive) {
-        // Drive ship forward at FLIGHT_WARP_SPEED; all other controls locked.
-        const warpVel = forward.clone().multiplyScalar(FLIGHT_WARP_SPEED);
-        ship.velocity.copy(warpVel);
-        flightState.currentSpeed = FLIGHT_WARP_SPEED;
+        // Accelerate toward FLIGHT_WARP_SPEED rather than snapping instantly.
+        const fwdSpd = ship.velocity.dot(forward);
+        if (fwdSpd < FLIGHT_WARP_SPEED) {
+            const delta = Math.min(FLIGHT_WARP_ACCEL * simDt, FLIGHT_WARP_SPEED - fwdSpd);
+            ship.velocity.addScaledVector(forward, delta);
+        } else {
+            // Clamp to warp max just in case gravity accelerates beyond it.
+            ship.velocity.copy(forward).multiplyScalar(FLIGHT_WARP_SPEED);
+        }
+        flightState.currentSpeed = ship.velocity.dot(forward);
         flightState.thrustActive = true;
         // (warpEffect.update is called centrally in the animate loop each frame)
         // Hide steering HUD during warp (no manual steering available).

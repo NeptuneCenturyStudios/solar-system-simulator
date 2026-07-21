@@ -88,7 +88,7 @@ function createWarpActiveTexture(pulse: number): THREE.CanvasTexture {
     ctx.shadowBlur = 20 + 20 * pulse;
     ctx.shadowColor = `rgba(255,120,0,${alpha})`;
     ctx.fillStyle = `rgba(255,${Math.round(180 + 75 * pulse)},0,${alpha})`;
-    ctx.fillText('⚡ WARP ACTIVE ⚡', W / 2, H / 2);
+    ctx.fillText('WARP ACTIVE', W / 2, H / 2);
 
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
@@ -115,42 +115,42 @@ function createAutopilotPhaseTexture(
     let glow: string;
     switch (state) {
         case 'ALIGN':
-            text = '◎  AUTOPILOT: ALIGNING TO TARGET';
+            text = '◎ AUTOPILOT: ALIGNING TO TARGET';
             color = '#88ddff';
             glow = 'rgba(136,221,255,0.85)';
             break;
         case 'APPROACH_WARP':
-            text = '⚡  AUTOPILOT: WARPING';
+            text = '▶▶▶ AUTOPILOT: WARPING';
             color = '#ff4488';
             glow = 'rgba(255,68,136,0.9)';
             break;
         case 'APPROACH_BOOST':
-            text = '▶▶  AUTOPILOT: APPROACHING TARGET (BOOST)';
+            text = '▶▶ AUTOPILOT: APPROACHING TARGET (BOOST)';
             color = '#ff9944';
             glow = 'rgba(255,153,68,0.85)';
             break;
         case 'APPROACH':
-            text = '▶  AUTOPILOT: APPROACHING TARGET';
+            text = '▶ AUTOPILOT: APPROACHING TARGET';
             color = '#00ffcc';
             glow = 'rgba(0,255,204,0.85)';
             break;
         case 'BRAKE':
-            text = '◼  AUTOPILOT: ESTABLISHING ORBIT TRAJECTORY';
+            text = '◼ AUTOPILOT: ESTABLISHING ORBIT TRAJECTORY';
             color = '#00ffcc';
             glow = 'rgba(0,255,204,0.85)';
             break;
         case 'CIRCULARIZE':
-            text = '↻  AUTOPILOT: ENTERING ORBIT';
+            text = '↻ AUTOPILOT: ENTERING ORBIT';
             color = '#00ffcc';
             glow = 'rgba(0,255,204,0.85)';
             break;
         case 'TIDAL_LOCK':
-            text = '☰  AUTOPILOT: ORBIT LOCK ACTIVE';
+            text = '☰ AUTOPILOT: ORBIT LOCK ACTIVE';
             color = '#7ef0ff';
             glow = 'rgba(100,220,255,0.9)';
             break;
         case 'ORBIT':
-            text = '✓  STABLE ORBIT ESTABLISHED';
+            text = '✓ STABLE ORBIT ESTABLISHED';
             color = '#7ef0ff';
             glow = 'rgba(100,220,255,0.9)';
             break;
