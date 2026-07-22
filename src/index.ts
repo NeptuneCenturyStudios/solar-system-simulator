@@ -3293,19 +3293,25 @@ function updateAutopilot(dt: number) {
             .addScaledVector(toTargetDir, targetSpeed);
 
         const velDelta = new THREE.Vector3().subVectors(desiredVel, ship.velocity);
-
-        // // Guard: don't add forward thrust if relative speed toward target already meets targetSpeed.
-        // // Gravity may have accelerated the ship past the limit — that's fine (physics preserving).
-        // // But the autopilot should not add thrust that pushes speed further beyond the target.
-        // const relFwd = relVel.dot(toTargetDir);
-        // if (relFwd >= targetSpeed) {
-        //     velDelta.addScaledVector(toTargetDir, -velDelta.dot(toTargetDir));
-        // }
-
         const deltaLen = velDelta.length();
 
         if (deltaLen > 1e-6) {
             const accelDir = velDelta.clone().normalize();
+
+            // Guard: if the ship's relative forward speed already meets or exceeds
+            // targetSpeed, remove the forward component from the thrust direction so
+            // autopilot only steers (perpendicular correction) without adding more
+            // forward speed.  Deceleration (negative fwd component) is NOT blocked,
+            // and gravity's forward pull is untouched.
+            const relFwd = relVel.dot(toTargetDir);
+            if (relFwd >= targetSpeed) {
+                const fwdComp = accelDir.dot(toTargetDir);
+                if (fwdComp > 0) {
+                    accelDir.addScaledVector(toTargetDir, -fwdComp);
+                    const len = accelDir.length();
+                    if (len > 1e-6) accelDir.divideScalar(len);
+                }
+            }
             const needsDecel = approachSpeed > targetSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
             // When current speed exceeds the target speed we need to decelerate, which
             // requires the full AUTOPILOT_DECEL rate (80 u/s²).  Using only AUTOPILOT_ACCEL
@@ -5280,8 +5286,14 @@ const animCtx: AnimationContext = {
     flightState,
     interactionState,
     simulationState,
-    selectedBody: { value: selectedBody },
-    manuallySelectedBody: { value: manuallySelectedBody },
+    selectedBody: {
+        get value() { return selectedBody; },
+        set value(v: Body | null) { selectedBody = v; },
+    },
+    manuallySelectedBody: {
+        get value() { return manuallySelectedBody; },
+        set value(v: Body | null) { manuallySelectedBody = v; },
+    },
     NONE_FOCUS_POSITION,
     supernovas: { value: supernovas },
     planetaryNebulae: { value: planetaryNebulae },
