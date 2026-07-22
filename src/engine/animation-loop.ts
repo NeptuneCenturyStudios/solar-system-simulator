@@ -66,7 +66,7 @@ import {
     cameraState,
     flightState,
 } from '../simulation/simulation';
-import { exitFlightMode, updateFlightControls } from '../simulation/flight-controllers';
+import { applyFlightThrustSubstep, exitFlightMode, updateFlightControls } from '../simulation/flight-controllers';
 
 // ── Context interface ───────────────────────────────────────────────────────
 
@@ -372,6 +372,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         const oldPos = _animOldPos;
 
         // ── Physics ──────────────────────────────────────────────────────
+        // Manual thrust (WASD) is applied per substep via applyFlightThrustSubstep
+        // so it interleaves correctly with gravity at any time scale.
         // flightState param kept for signature compatibility with updateSimulation
         const _dummyFlightState = ctx.flightState;
         updateSimulation(
@@ -380,8 +382,17 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             _dummyFlightState,
             steps,
             dt,
-            ctx.updateAutopilotStep
+            ctx.updateAutopilotStep,
+            isFlightModeActive ? applyFlightThrustSubstep : undefined
         );
+
+        // Sync currentSpeed from the ship's real velocity after the physics loop
+        // so HUD/labels reflect the true combined result of thrust + gravity.
+        if (isFlightModeActive) {
+            const _ship = ctx.flightState.activeShip;
+            const _forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ctx.flightState.flightCameraQuat);
+            ctx.flightState.currentSpeed = _ship?.velocity.dot(_forward) ?? 0;
+        }
 
         // ── Collision & post-physics updates ─────────────────────────────
         if (!ctx.interactionState.isRepositioning) {
@@ -805,7 +816,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     (ctx.flightState.boostDecelerating ||
                         ctx.flightState.warpDecelerating ||
                         ctx.autopilotState.phase === 'BRAKE' ||
-                        (ctx.keys.s && ctx.flightState.currentSpeed > 0));
+                        ctx.keys.s);
                 const thrustRate: number = (() => {
                     if (ctx.flightState.warpDecelerating) return FLIGHT_WARP_DECEL;
                     if (ctx.flightState.boostDecelerating) return FLIGHT_BOOST_DECEL;

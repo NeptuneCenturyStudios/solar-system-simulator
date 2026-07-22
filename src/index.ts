@@ -3293,6 +3293,15 @@ function updateAutopilot(dt: number) {
             .addScaledVector(toTargetDir, targetSpeed);
 
         const velDelta = new THREE.Vector3().subVectors(desiredVel, ship.velocity);
+
+        // // Guard: don't add forward thrust if relative speed toward target already meets targetSpeed.
+        // // Gravity may have accelerated the ship past the limit — that's fine (physics preserving).
+        // // But the autopilot should not add thrust that pushes speed further beyond the target.
+        // const relFwd = relVel.dot(toTargetDir);
+        // if (relFwd >= targetSpeed) {
+        //     velDelta.addScaledVector(toTargetDir, -velDelta.dot(toTargetDir));
+        // }
+
         const deltaLen = velDelta.length();
 
         if (deltaLen > 1e-6) {

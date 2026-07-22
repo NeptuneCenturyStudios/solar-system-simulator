@@ -142,8 +142,88 @@ export function exitFlightMode(ctx: IFlightControlContext) {
 }
 
 /**
+ * Apply manual thrust for one physics substep.
+ * Called from inside the physics substep loop so thrust and gravity interleave
+ * correctly at any time scale.
+ */
+export function applyFlightThrustSubstep(dt: number): void {
+    const ship = flightState.activeShip;
+    if (!ship || ship._isDisposed || !ship.mesh) return;
+    if (simulationState.isPaused || simulationState.timeScale === 0) return;
+
+    // Autopilot handles its own thrust — stay out of its way.
+    if (autopilotState.isActive) return;
+    // Warp/boost deceleration is handled frame-level; do not add thrust during those.
+    if (flightState.warpActive || flightState.warpDecelerating || flightState.boostDecelerating) return;
+
+    const keys = cameraState.keys;
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
+    const fwdSpeed = ship.velocity.dot(forward);
+
+    if (!flightState.isAdvancedMode) {
+        // ── Simple mode ──────────────────────────────────────────────────
+        // While a thrust key is held: forward thrust is ADDED to velocity so
+        // gravity accumulates freely and is never overwritten.
+        // Perpendicular drift is always decayed while any thrust key is held.
+        const thrustActive = keys.shift || keys.w || keys.s;
+        if (thrustActive) {
+            const shiftEffective = keys.shift && fwdSpeed < FLIGHT_BOOST_MAX_SPEED;
+            const wEffective = keys.w && fwdSpeed < FLIGHT_MAX_SPEED;
+
+            if (shiftEffective) {
+                const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            } else if (wEffective && !keys.shift) {
+                const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            } else if (keys.s) {
+                // Decelerate — continuously applied even at fwdSpeed == 0 so
+                // gravity cannot cause flickering brake on/off cycles.
+                const ceiling = -FLIGHT_MAX_SPEED;
+                const decelRate = fwdSpeed > FLIGHT_MAX_SPEED ? FLIGHT_BOOST_DECEL : FLIGHT_THRUST_DECEL;
+                const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            }
+
+            // Decay perpendicular drift when any thrust key is held.
+            const newFwdSpd = ship.velocity.dot(forward);
+            const perpVel = ship.velocity.clone().addScaledVector(forward, -newFwdSpd);
+            const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * dt);
+            perpVel.multiplyScalar(decay);
+            ship.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
+        }
+    } else {
+        // ── Advanced mode ────────────────────────────────────────────────
+        // Thrust adds to velocity without removing gravity-accumulated
+        // perpendicular components, so orbital mechanics work at all times.
+        if (keys.shift) {
+            if (fwdSpeed < FLIGHT_BOOST_MAX_SPEED) {
+                const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            }
+        } else if (keys.w) {
+            if (fwdSpeed < FLIGHT_MAX_SPEED) {
+                const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            }
+        } else if (keys.s) {
+            if (fwdSpeed > -FLIGHT_MAX_SPEED) {
+                const delta = Math.max(-FLIGHT_THRUST_DECEL * dt, -FLIGHT_MAX_SPEED - fwdSpeed);
+                ship.velocity.addScaledVector(forward, delta);
+            }
+        }
+    }
+}
+
+/**
  * Applies per-frame flight controls to the active spaceship.
  * Called from animate() when flightState.isActive.
+ *
+ * NOTE: Velocity mutation (thrust) happens per physics substep inside
+ * updateSimulation() via applyFlightThrustSubstep().  This function handles
+ * frame-level state transitions, steering, roll, and HUD only.
+ * currentSpeed is synced from the ship's actual velocity after the physics
+ * loop completes (in animation-loop.ts).
  */
 export function updateFlightControls(ctx: IFlightControlContext, dt: number, simDt: number) {
     const ship = flightState.activeShip;
@@ -208,9 +288,6 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
             flightState.currentSpeed = unclampedBoostSpd;
         } else {
             // This decel step reaches or overshoots FLIGHT_MAX_SPEED — exit.
-            // Using the unclamped value (rather than a fixed tolerance) makes this
-            // immune to strong gravity re-adding speed above the floor each frame,
-            // which caused perpetual braking mode when gravity > tolerance.
             flightState.boostDecelerating = false;
             flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_MAX_SPEED);
         }
@@ -268,19 +345,15 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         // Allow normal flight controls while charging (just can't turn on warp mid-turn)
     }
 
-    // ── Thrust ─────────────────────────────────────────────────────────────────────────────
-    // Manual controls (WASD / mouse steering) are completely ignored while autopilot is active.
+    // ── Thrust state transitions (velocity mutation is in applyFlightThrustSubstep) ──
     const manualInput = !autopilotState.isActive;
     const fwdSpeed = ship.velocity.dot(forward);
-    // W only counts as active thrust once the ship has decelerated to normal max speed.
-    // This prevents W from snapping the ship from boost speed (500) down to normal max (100)
-    // in one frame when pressed mid-deceleration.
+
+    // Sync thrustActive flag for trail / HUD (key state, not physics).
     const thrustActive = manualInput && (keys.shift || keys.w || keys.s);
     if (manualInput) flightState.thrustActive = thrustActive;
 
     // Trigger boost decel when Shift is *released* while still above normal max speed.
-    // This must only fire on a Shift-release transition (prevShiftHeld was true, now false),
-    // not when the ship is simply coasting and gravity accelerated past FLIGHT_MAX_SPEED.
     const shiftJustReleased = flightState.prevShiftHeld && !keys.shift;
     if (
         manualInput &&
@@ -293,100 +366,13 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
             flightState.boostDecelerating = true;
         }
     }
-    // Re-engaging boost cancels the decel — but only when we're already at or below boost max
-    // speed.  Above that threshold the ship is still shedding warp speed and boost should be
-    // ignored so it doesn't snap the ship's speed down to FLIGHT_BOOST_MAX_SPEED.
+    // Re-engaging boost cancels the decel — but only when we're already at or below boost max speed.
     if (manualInput && keys.shift && fwdSpeed <= FLIGHT_BOOST_MAX_SPEED) {
         flightState.boostDecelerating = false;
     }
 
-    // Skip normal thrust while boost- or warp-decelerating (velocity is managed above).
-    // This prevents the thrust block fighting the decel and avoids the S-key else-branch
-    // firing incorrectly when Shift is held at warp speeds above FLIGHT_BOOST_MAX_SPEED.
-    if (flightState.boostDecelerating || flightState.warpDecelerating) {
-        // steering/roll still processed below
-    } else if (manualInput && !flightState.isAdvancedMode) {
-        // ── Simple mode ──────────────────────────────────────────────────────────
-        // While a thrust key is held: forward thrust is ADDED to velocity (like
-        // advanced mode) so gravity accumulates freely and is never overwritten.
-        // The key difference from advanced mode: perpendicular drift is always decayed
-        // while a thrust key is held, giving direct arcade-style feel.
-        // When no key is held the ship coasts freely and gravity accumulates.
-        if (thrustActive) {
-            // Use the real forward speed (includes gravity) for effectiveness checks.
-            const shiftEffective = keys.shift && fwdSpeed < FLIGHT_BOOST_MAX_SPEED;
-            const wEffective = keys.w && fwdSpeed < FLIGHT_MAX_SPEED;
-
-            if (shiftEffective) {
-                // Boost: add forward thrust toward boost max.
-                const delta = Math.min(
-                    FLIGHT_BOOST_ACCEL * simDt,
-                    FLIGHT_BOOST_MAX_SPEED - fwdSpeed
-                );
-                ship.velocity.addScaledVector(forward, delta);
-            } else if (wEffective && !keys.shift) {
-                // Normal thrust: add forward thrust toward normal max.
-                const delta = Math.min(FLIGHT_THRUST_ACCEL * simDt, FLIGHT_MAX_SPEED - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            } else if (keys.s) {
-                // Decelerate.
-                // ceiling is always -FLIGHT_MAX_SPEED so decel thrust is applied
-                // continuously even when fwdSpeed is 0, preventing flicker when
-                // gravity re-accelerates the ship past zero each frame.
-                const ceiling = -FLIGHT_MAX_SPEED;
-                const decelRate =
-                    fwdSpeed > FLIGHT_MAX_SPEED ? FLIGHT_BOOST_DECEL : FLIGHT_THRUST_DECEL;
-                const delta = Math.max(-decelRate * simDt, ceiling - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            }
-            // else: shift held above boost max, or no effective thrust key → coast.
-            // Gravity accumulates naturally since we never overwrite velocity.
-
-            // Decay perpendicular drift when any thrust key is held (even if not effective),
-            // giving the direct nose-points-where-you-go feel of simple mode.
-            const newFwdSpd = ship.velocity.dot(forward);
-            const perpVel = ship.velocity.clone().addScaledVector(forward, -newFwdSpd);
-            const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * simDt);
-            perpVel.multiplyScalar(decay);
-            ship.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
-
-            // Sync display value from real velocity.
-            flightState.currentSpeed = ship.velocity.dot(forward);
-        } else {
-            // Coasting: sync display value from real forward velocity.
-            flightState.currentSpeed = fwdSpeed;
-        }
-    } else if (manualInput) {
-        // ── Advanced mode ────────────────────────────────────────────────────────
-        // Thrust adds to velocity without removing gravity-accumulated perpendicular
-        // components, so orbital mechanics work at all times.
-        if (keys.shift) {
-            if (fwdSpeed < FLIGHT_BOOST_MAX_SPEED) {
-                const delta = Math.min(
-                    FLIGHT_BOOST_ACCEL * simDt,
-                    FLIGHT_BOOST_MAX_SPEED - fwdSpeed
-                );
-                ship.velocity.addScaledVector(forward, delta);
-            }
-        } else if (keys.w) {
-            if (fwdSpeed < FLIGHT_MAX_SPEED) {
-                const delta = Math.min(FLIGHT_THRUST_ACCEL * simDt, FLIGHT_MAX_SPEED - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            }
-        } else if (keys.s) {
-            if (fwdSpeed > -FLIGHT_MAX_SPEED) {
-                const delta = Math.max(-FLIGHT_THRUST_DECEL * simDt, -FLIGHT_MAX_SPEED - fwdSpeed);
-                ship.velocity.addScaledVector(forward, delta);
-            }
-        }
-        // No thrust: ship coasts freely
-        flightState.currentSpeed = ship.velocity.dot(forward);
-    } else if (!manualInput) {
-        // Autopilot: show speed relative to the target body so the HUD reflects what the
-        // autopilot is actually controlling.  Absolute forward speed includes the target's
-        // orbital velocity, which inflates the reading by however much of that velocity
-        // projects onto the approach direction (e.g. ~0.3 u/s for Earth at FLIGHT_MAX_SPEED).
-        // ship.velocity already includes gravity, so gravity-driven speed is still shown.
+    // Autopilot speed display (velocity is managed by the autopilot subsystem).
+    if (!manualInput) {
         const apTarget = autopilotState.targetBody;
         if (apTarget?.mesh && !apTarget._isDisposed) {
             const relVel = new THREE.Vector3().subVectors(ship.velocity, apTarget.velocity);
@@ -397,8 +383,6 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
 
     // ── Roll with inertia (A/D) ───────────────────────────────────────────────
-    // Accelerate rollVelocity toward ±FLIGHT_ROLL_SPEED when key held,
-    // then apply friction to bring it back to 0 when released.
     const rollTarget = flightState.rollLeft
         ? -FLIGHT_ROLL_SPEED
         : flightState.rollRight
@@ -409,7 +393,6 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         !flightState.altOrbitActive &&
         (flightState.rollLeft || flightState.rollRight)
     ) {
-        // Ramp up toward target
         const dir = rollTarget > 0 ? 1 : -1;
         flightState.rollVelocity += dir * FLIGHT_ROLL_ACCEL * dt;
         flightState.rollVelocity = THREE.MathUtils.clamp(
@@ -418,7 +401,6 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
             FLIGHT_ROLL_SPEED
         );
     } else {
-        // No key — apply friction toward zero
         if (Math.abs(flightState.rollVelocity) < FLIGHT_ROLL_FRICTION * dt) {
             flightState.rollVelocity = 0;
         } else {
@@ -427,8 +409,6 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         }
     }
     if (flightState.rollVelocity !== 0) {
-        // Rotate the camera frame around its local forward (Z) axis so the
-        // camera rolls with the ship when A/D is held.
         const dqRoll = new THREE.Quaternion().setFromAxisAngle(
             new THREE.Vector3(0, 0, 1),
             flightState.rollVelocity * dt
@@ -437,7 +417,6 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
 
     // ── Steering with smoothing + dead zone (mouse) ───────────────────────────
-    // Raw normalised pointer input
     const rawXFull = THREE.MathUtils.clamp(
         flightState.pointerOffsetX / FLIGHT_MAX_POINTER_OFFSET,
         -1,
@@ -448,7 +427,6 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         -1,
         1
     );
-    // Apply dead zone: values within ±DEADZONE snap to 0, outside rescale to 0-1
     function applyDeadzone(v: number) {
         const d = FLIGHT_STEER_DEADZONE;
         if (Math.abs(v) < d) return 0;
@@ -456,46 +434,36 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
     const rawX = applyDeadzone(rawXFull);
     const rawY = applyDeadzone(rawYFull);
-    // Exponential smoothing — frame-rate independent; same feel at any fps.
-    // steerAlpha and bankAlpha derived from per-second rates: alpha = 1 - exp(-rate * dt)
+
     if (manualInput && !flightState.altOrbitActive) {
         const steerAlpha = 1 - Math.exp(-FLIGHT_STEER_SMOOTH_RATE * dt);
         flightState.steerX += (rawX - flightState.steerX) * steerAlpha;
         flightState.steerY += (rawY - flightState.steerY) * steerAlpha;
 
-        // Yaw: rotate around camera's own local Y axis so left/right steering always
-        // matches the screen regardless of orientation (including upside-down flight).
-        // Using multiply (local space) rather than premultiply (world space) ensures
-        // the yaw direction flips with the camera when rolled, keeping it screen-consistent.
         const yawQuat = new THREE.Quaternion().setFromAxisAngle(
             new THREE.Vector3(0, 1, 0),
             -flightState.steerX * FLIGHT_MAX_TURN_RATE * dt
         );
         flightState.flightCameraQuat.multiply(yawQuat);
 
-        // Pitch: rotate around camera's own right (X) axis so up/down always matches screen.
         const pitchQuat = new THREE.Quaternion().setFromAxisAngle(
             new THREE.Vector3(1, 0, 0),
             flightState.steerY * FLIGHT_MAX_TURN_RATE * dt
         );
         flightState.flightCameraQuat.multiply(pitchQuat);
 
-        // Animate visual banking of ship mesh relative to camera frame.
         const bankAlpha = 1 - Math.exp(-FLIGHT_BANK_LERP_SPEED * dt);
         flightState.shipBankRoll +=
             (flightState.steerX * FLIGHT_MAX_BANK_ANGLE - flightState.shipBankRoll) * bankAlpha;
         flightState.shipBankPitch +=
             (flightState.steerY * FLIGHT_MAX_BANK_PITCH - flightState.shipBankPitch) * bankAlpha;
 
-        // Apply banking offset to ship mesh: camera frame * cosmetic bank/pitch rotation.
         const bankQuat = new THREE.Quaternion().setFromEuler(
             new THREE.Euler(flightState.shipBankPitch, 0, flightState.shipBankRoll, 'XYZ')
         );
         ship.mesh.quaternion.copy(flightState.flightCameraQuat).multiply(bankQuat);
         flightState.flightCameraQuat.normalize();
     } else {
-        // Autopilot is flying — sync camera frame to the ship's actual orientation
-        // so there is no lurch when the player retakes manual control.
         flightState.flightCameraQuat.copy(ship.mesh.quaternion);
         flightState.shipBankRoll = 0;
         flightState.shipBankPitch = 0;
@@ -503,20 +471,11 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         flightState.steerY = 0;
     }
 
-    // (currentSpeed is updated in the thrust block above; velocity is
-    //  modified in-place there — no override needed here)
-
     // ── Steering line (uiScene screen-space) ─────────────────────────────────
-    // Project a point far ahead in the ship's forward direction onto the screen.
-    // This gives the screen-space position of where the ship is AIMING, which sits
-    // above screen-centre in 3rd-person view because the camera is elevated behind
-    // the ship and looks at its body-centre, not its nose.
     const noseNDC = ship.mesh.position.clone().addScaledVector(forward, 8).project(ctx.camera);
     const noseScreenX = noseNDC.x * (window.innerWidth * 0.5);
     const noseScreenY = noseNDC.y * (window.innerHeight * 0.5);
 
-    // Circularly clamp the pointer offset for display so the indicator line
-    // has equal maximum length in all directions (not square-capped).
     const rawMag = Math.sqrt(flightState.pointerOffsetX ** 2 + flightState.pointerOffsetY ** 2);
     const circleScale = rawMag > FLIGHT_MAX_POINTER_OFFSET ? FLIGHT_MAX_POINTER_OFFSET / rawMag : 1;
     const displayOffX = flightState.pointerOffsetX * circleScale;
@@ -530,13 +489,10 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     ctx.steeringLinePositions[5] = TEXT_SPRITE_Z;
     ctx.steeringLineGeo.attributes.position.needsUpdate = true;
 
-    // Move origin ring and aim reticle to their screen positions.
     ctx.steeringOriginMarker.position.set(noseScreenX, noseScreenY, 0);
     ctx.steeringEndMarker.position.set(noseScreenX + displayOffX, noseScreenY - displayOffY, 0);
     ctx.steeringEndMarker.visible = true;
 
-    // Hide the steering HUD while ALT orbit mode is active (or camera is returning).
-    // Restore it once the orbit angles have fully zeroed out (and warp is not decelerating).
     if (
         flightState.altOrbitActive ||
         flightState.altOrbitYaw !== 0 ||
@@ -548,17 +504,10 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     } else if (!flightState.warpDecelerating) {
         ctx.flightSteeringLine.visible = true;
         ctx.steeringOriginMarker.visible = true;
-        // ctx.steeringEndMarker is already set visible above
     }
 
     // ── Weapon firing ────────────────────────────────────────────────────────
     if (flightState.isFiring && !autopilotState.isActive) {
-        // Build world-space aim direction from the aim reticle screen position.
-        // Avoid unproject() — with near=0.00001 and far~8.2e9, any mid-NDC z value
-        // maps to a point essentially at the camera, causing floating-point errors.
-        // Instead, derive the ray directly from perspective FOV math:
-        //   view-space dir = (ndcX * tan(hFOV/2), ndcY * tan(vFOV/2), -1), normalised
-        // then rotate to world space via the camera world matrix.
         const aimNdcX = (noseScreenX + displayOffX) / (window.innerWidth * 0.5);
         const aimNdcY = (noseScreenY - displayOffY) / (window.innerHeight * 0.5);
         const halfFovY = THREE.MathUtils.degToRad(ctx.camera.fov * 0.5);
@@ -567,11 +516,9 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         const viewSpaceDir = new THREE.Vector3(
             aimNdcX * tanHalfFovX,
             aimNdcY * tanHalfFovY,
-            -1 // camera local -Z is forward in OpenGL/Three.js convention
+            -1
         ).normalize();
         const aimDir = viewSpaceDir.transformDirection(ctx.camera.matrixWorld);
-
-        // Muzzle: slightly ahead of the ship so projectiles clear the hull.
         const muzzlePos = ship.mesh.position.clone().addScaledVector(forward, ship.radius * 4);
         ctx.shipWeapon.tryFire(dt, muzzlePos, aimDir, ship.velocity);
     }

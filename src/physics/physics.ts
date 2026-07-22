@@ -80,10 +80,16 @@ export function updateSimulation(
     _flightState: IFlightState,
     steps: number,
     dt: number,
-    updateAutopilot: (dt: number) => void
+    updateAutopilot: (dt: number) => void,
+    manualThrustSubstep?: (subDt: number) => void
 ) {
     // Physics integration loop
     for (let i = 0; i < steps; i++) {
+        // Apply manual thrust per substep so it interleaves with gravity
+        // integration, giving correct balance between thrust and gravity at
+        // any time scale.
+        manualThrustSubstep?.(dt);
+
         // Apply physics to bodies
         updatePhysics(simulationState);
 
