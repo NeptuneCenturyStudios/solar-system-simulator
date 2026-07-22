@@ -330,7 +330,10 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
                 ship.velocity.addScaledVector(forward, delta);
             } else if (keys.s) {
                 // Decelerate.
-                const ceiling = fwdSpeed > 0 ? -FLIGHT_MAX_SPEED : 0;
+                // ceiling is always -FLIGHT_MAX_SPEED so decel thrust is applied
+                // continuously even when fwdSpeed is 0, preventing flicker when
+                // gravity re-accelerates the ship past zero each frame.
+                const ceiling = -FLIGHT_MAX_SPEED;
                 const decelRate =
                     fwdSpeed > FLIGHT_MAX_SPEED ? FLIGHT_BOOST_DECEL : FLIGHT_THRUST_DECEL;
                 const delta = Math.max(-decelRate * simDt, ceiling - fwdSpeed);
