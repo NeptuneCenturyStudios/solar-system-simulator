@@ -135,7 +135,7 @@ function createAutopilotPhaseTexture(
             glow = 'rgba(0,255,204,0.85)';
             break;
         case 'BRAKE':
-            text = '◼ AUTOPILOT: ESTABLISHING ORBIT TRAJECTORY';
+            text = '↻ AUTOPILOT: ESTABLISHING ORBIT TRAJECTORY';
             color = '#00ffcc';
             glow = 'rgba(0,255,204,0.85)';
             break;
@@ -145,7 +145,7 @@ function createAutopilotPhaseTexture(
             glow = 'rgba(0,255,204,0.85)';
             break;
         case 'TIDAL_LOCK':
-            text = '☰ AUTOPILOT: ORBIT LOCK ACTIVE';
+            text = '↻ AUTOPILOT: ORBIT LOCK ACTIVE';
             color = '#7ef0ff';
             glow = 'rgba(100,220,255,0.9)';
             break;

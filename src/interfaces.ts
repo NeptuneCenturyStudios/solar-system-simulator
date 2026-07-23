@@ -6,7 +6,7 @@ import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { IPipelineFeedEffect } from './effects/effect-base';
-import { NotificationType } from './event-log/event-log';
+import { LogMethods, NotificationType } from './event-log/event-log';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
 import { ITidalLockOptions } from './bodies/celestial-body';
 import { EffectiveGForce } from './types';
@@ -397,4 +397,11 @@ export interface IFlightControlContext {
     refreshBodiesTable: () => void;
     addEvent: (event: { message: string; notificationType: NotificationType }) => void;
 
+}
+
+export interface IAutopilotContext {
+    flightHUD: FlightHUD;
+    addEvent: (event: { message: string; notificationType: NotificationType; logMethod?: LogMethods }) => void;
+    refreshBodiesTable: () => void;
+    setAutopilotState: (active: boolean, canEngage: boolean) => void;
 }
