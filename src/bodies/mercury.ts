@@ -33,7 +33,8 @@ export class Mercury extends Planet {
         const rotSpeed = ((2 * Math.PI) / (1407.5 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, MERCURY_DIST, SUN_MASS, angleRad);
 
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/mercury.jpg');
+        const TEXTURE_PATH = './assets/textures/bodies/2k/mercury.jpg';
+        const texture = loadSrgbTexture(TEXTURE_PATH);
         const geometry = new THREE.SphereGeometry(MERCURY_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
@@ -62,5 +63,8 @@ export class Mercury extends Planet {
             bodySubtype: PlanetTypeEnum.Terrestrial,
             mesh: mesh,
         });
+
+        // Register texture path for quality-based reloading
+        this.setTexturePath('map', TEXTURE_PATH);
     }
 }

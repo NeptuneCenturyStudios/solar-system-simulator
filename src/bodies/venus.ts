@@ -32,7 +32,9 @@ export class Venus extends Planet {
             VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, gEff, SUN_MASS);
         const rotSpeed = ((-2 * Math.PI) / (5832.5 * 3600)) * timeScale; // retrograde
         const trajectory = calculateTrajectory(gEff, VENUS_DIST, SUN_MASS, angleRad);
-        const venusTexture = loadSrgbTexture('./assets/textures/bodies/2k/venus.jpg');
+        const VENUS_SURFACE_PATH = './assets/textures/bodies/2k/venus.jpg';
+        const VENUS_ATMOSPHERE_PATH = './assets/textures/bodies/2k/venus_atmosphere.jpg';
+        const venusTexture = loadSrgbTexture(VENUS_SURFACE_PATH);
         const geometry = new THREE.SphereGeometry(VENUS_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: venusTexture,
@@ -63,9 +65,11 @@ export class Venus extends Planet {
             },
         });
 
-        const venusAtmosphereTexture = loadSrgbTexture(
-            './assets/textures/bodies/2k/venus_atmosphere.jpg'
-        );
+        // Register texture paths for quality-based reloading
+        this.setTexturePath('map', VENUS_SURFACE_PATH);
+        this.setTexturePath('cloudMap', VENUS_ATMOSPHERE_PATH);
+
+        const venusAtmosphereTexture = loadSrgbTexture(VENUS_ATMOSPHERE_PATH);
         const cloudsMat = new THREE.MeshStandardMaterial({
             map: venusAtmosphereTexture,
             color: 0xffffff,

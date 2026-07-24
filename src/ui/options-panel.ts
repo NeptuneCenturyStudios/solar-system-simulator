@@ -11,6 +11,11 @@ export class OptionsPanel extends Panel {
     substepsResetBtn: HTMLButtonElement | null = null;
     btnClose: HTMLButtonElement | null;
 
+    // Texture quality slider
+    textureQualitySlider: HTMLInputElement | null = null;
+    textureQualityDisplay: HTMLElement | null = null;
+    textureQualityResetBtn: HTMLButtonElement | null = null;
+
     // Volume sliders
     sfxVolumeSlider: HTMLInputElement | null = null;
     sfxVolumeDisplay: HTMLElement | null = null;
@@ -63,6 +68,28 @@ export class OptionsPanel extends Panel {
                 if (this.substepsSlider) this.substepsSlider.value = '64';
                 if (this.substepsDisplay) this.substepsDisplay.textContent = '64';
                 this.applySubsteps();
+            };
+        }
+
+        // ── Texture Quality ───────────────────────────────────────────────────
+        this.textureQualitySlider = document.getElementById(
+            'textureQualitySlider'
+        ) as HTMLInputElement | null;
+        this.textureQualityDisplay = document.getElementById('texture-quality-val');
+        this.textureQualityResetBtn = document.getElementById(
+            'textureQualityResetBtn'
+        ) as HTMLButtonElement | null;
+
+        if (this.textureQualitySlider) {
+            this.textureQualitySlider.oninput = () => {
+                this.applyTextureQuality();
+            };
+        }
+
+        if (this.textureQualityResetBtn) {
+            this.textureQualityResetBtn.onclick = () => {
+                if (this.textureQualitySlider) this.textureQualitySlider.value = '0';
+                this.applyTextureQuality();
             };
         }
 
@@ -123,6 +150,11 @@ export class OptionsPanel extends Panel {
             this.applySubsteps();
         }
 
+        if (this.textureQualitySlider) {
+            this.textureQualitySlider.value = s.textureQuality ? '1' : '0';
+            this.applyTextureQuality();
+        }
+
         if (this.sfxVolumeSlider) {
             const v = Math.round(s.sfxVolume * 100);
             this.sfxVolumeSlider.value = v.toString();
@@ -153,6 +185,18 @@ export class OptionsPanel extends Panel {
         settingsStore.update(SettingKey.Substeps, value);
         if (this.substepsDisplay) this.substepsDisplay.textContent = `${value}`;
         this.emit('substepsChange', { value });
+    }
+
+    /**
+     * Apply the current texture quality from the slider to the settings store and emit an event.
+     */
+    private applyTextureQuality(): void {
+        const value = this.textureQualitySlider!.value === '1';
+        settingsStore.update(SettingKey.TextureQuality, value);
+        if (this.textureQualityDisplay) {
+            this.textureQualityDisplay.textContent = value ? 'High (8k)' : 'Low (2k)';
+        }
+        this.emit('textureQualityChange', { value });
     }
 
     /**

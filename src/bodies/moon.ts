@@ -37,5 +37,16 @@ export class Moon extends CelestialBody {
         );
 
         this.moonType = options.moonType;
+
+        // Auto-register texture path from mesh material's map
+        if (options.mesh) {
+            const mat = options.mesh.material as THREE.MeshStandardMaterial | undefined;
+            if (mat?.map) {
+                const url = (mat.map as THREE.Texture).userData.sourceUrl as string | undefined;
+                if (url) {
+                    this.setTexturePath('map', url);
+                }
+            }
+        }
     }
 }

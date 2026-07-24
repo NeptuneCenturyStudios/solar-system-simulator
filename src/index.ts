@@ -3306,6 +3306,14 @@ optionsPanel.on('sfxVolumeChange', () => {
     // sfxVolume is read live by audio.ts playBuffer() and playWarpLoop() each call
 });
 
+optionsPanel.on('textureQualityChange', ({ value: use8k }: { value: boolean }) => {
+    for (const body of simulationState.bodies) {
+        if (body instanceof CelestialBody && !body._isDisposed) {
+            body.reloadTextures(use8k);
+        }
+    }
+});
+
 optionsPanel.on('musicVolumeChange', ({ value }: { value: number }) => {
     ambientMusic.setVolume(value);
 });

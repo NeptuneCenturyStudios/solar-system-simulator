@@ -36,7 +36,8 @@ export class Saturn extends Planet {
             SATURN_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(SATURN_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (10.656 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, SATURN_DIST, SUN_MASS, angleRad);
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/saturn.jpg');
+        const TEXTURE_PATH = './assets/textures/bodies/2k/saturn.jpg';
+        const texture = loadSrgbTexture(TEXTURE_PATH);
         const geometry = new THREE.SphereGeometry(SATURN_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
@@ -66,5 +67,8 @@ export class Saturn extends Planet {
                 tint: 0xffeebb,
             },
         });
+
+        // Register texture path for quality-based reloading
+        this.setTexturePath('map', TEXTURE_PATH);
     }
 }

@@ -37,5 +37,16 @@ export class Planet extends CelestialBody {
         );
 
         this.planetType = options.bodySubtype;
+
+        // Auto-register texture path from mesh material's map (for procedural bodies)
+        if (options.mesh) {
+            const mat = options.mesh.material as THREE.MeshStandardMaterial | undefined;
+            if (mat?.map) {
+                const url = (mat.map as THREE.Texture).userData.sourceUrl as string | undefined;
+                if (url) {
+                    this.setTexturePath('map', url);
+                }
+            }
+        }
     }
 }

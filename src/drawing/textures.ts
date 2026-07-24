@@ -15,6 +15,7 @@ export function loadSrgbTexture(url: string): THREE.Texture {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.userData.sourceUrl = url;
     return tex;
 }
 
@@ -56,13 +57,26 @@ export const temperateTextures = getTemperateTextures();
  * Generates an array of THREE.Texture objects representing the available volcanic planet textures for procedural generation.
  * @returns An array of THREE.Texture objects.
  */
+function getVolcanicTextureUrls(): string[] {
+    const urls: string[] = [];
+    for (let i = 1; i <= PROCEDURAL_VOLCANIC_TEXTURES; i++) {
+        urls.push(`./assets/textures/bodies/2k/procedural/volcanic-${i}.jpg`);
+    }
+    return urls;
+}
+
 function getVolcanicTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
-    for (let i = 1; i <= PROCEDURAL_VOLCANIC_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/volcanic-${i}.jpg`));
+    for (const url of volcanicTextureUrls) {
+        textures.push(loadSrgbTexture(url));
     }
     return textures;
 }
+
+/**
+ * URLs for each volcanic texture in the same order as volcanicTextures.
+ */
+export const volcanicTextureUrls = getVolcanicTextureUrls();
 
 /**
  * An array of THREE.Texture objects representing the available volcanic planet textures for procedural generation.

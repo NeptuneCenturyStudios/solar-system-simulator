@@ -13,14 +13,18 @@ import {
 import { createUniqueId, isBodyType } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
+import { CelestialBody } from './celestial-body.js';
 import { Planet } from './planet.js';
 import { BodyTypeEnum, PlanetTypeEnum } from './body-enums.js';
 
 // Maximum number of stars supported by the day/night shader.
 const MAX_STARS = 8;
 
-const earthDayTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_day.jpg');
-const earthNightTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_night.jpg');
+const EARTH_DAY_PATH = './assets/textures/bodies/2k/earth_day.jpg';
+const EARTH_NIGHT_PATH = './assets/textures/bodies/2k/earth_night.jpg';
+const EARTH_CLOUDS_PATH = './assets/textures/bodies/2k/earth_clouds.jpg';
+const earthDayTexture = loadSrgbTexture(EARTH_DAY_PATH);
+const earthNightTexture = loadSrgbTexture(EARTH_NIGHT_PATH);
 
 type EarthUniforms = {
     nightTexture: { value: THREE.Texture };
@@ -175,9 +179,14 @@ export class Earth extends Planet {
             },
         });
 
+        // Register texture paths for quality-based reloading
+        this.setTexturePath('map', EARTH_DAY_PATH);
+        this.setTexturePath('nightMap', EARTH_NIGHT_PATH);
+        this.setTexturePath('cloudMap', EARTH_CLOUDS_PATH);
+
         this.customUniforms = customUniforms;
 
-        const earthCloudsTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_clouds.jpg');
+        const earthCloudsTexture = loadSrgbTexture(EARTH_CLOUDS_PATH);
         earthCloudsTexture.wrapS = THREE.ClampToEdgeWrapping;
         earthCloudsTexture.wrapT = THREE.ClampToEdgeWrapping;
 
@@ -209,6 +218,21 @@ export class Earth extends Planet {
 
         // Clouds rotate slightly faster than Earth to simulate moving atmosphere.
         this.cloudRotationSpeed = rotSpeed * 1.3;
+    }
+
+    override reloadTextures(use8k: boolean): void {
+        // Reload the day texture and cloud layer via the base implementation
+        super.reloadTextures(use8k);
+
+        // Also reload the night texture (used as a custom uniform in the shader)
+        const nightPath = this._texturePaths['nightMap'];
+        if (nightPath) {
+            const resolveUrl = use8k
+                ? (CelestialBody.to8kUrl(nightPath) ?? nightPath)
+                : nightPath;
+            const newNightTex = loadSrgbTexture(resolveUrl);
+            this.customUniforms.nightTexture.value = newNightTex;
+        }
     }
 
     update(acc: THREE.Vector3, dt: number) {

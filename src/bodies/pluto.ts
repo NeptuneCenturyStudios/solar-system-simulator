@@ -36,7 +36,8 @@ export class Pluto extends DwarfPlanet {
             PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, gEff, SUN_MASS);
         const rotSpeed = ((-2 * Math.PI) / (153.3 * 3600)) * timeScale; // retrograde
         const trajectory = calculateTrajectory(gEff, PLUTO_DIST, SUN_MASS, angleRad);
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/pluto.jpg');
+        const TEXTURE_PATH = './assets/textures/bodies/2k/pluto.jpg';
+        const texture = loadSrgbTexture(TEXTURE_PATH);
         const geometry = new THREE.SphereGeometry(PLUTO_RADIUS, 32, 32);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
@@ -62,5 +63,8 @@ export class Pluto extends DwarfPlanet {
             rotation: { tilt: PLUTO_AXIS, speed: rotSpeed, azimuth: PLUTO_AZIMUTH },
             mesh: mesh,
         });
+
+        // Register texture path for quality-based reloading
+        this.setTexturePath('map', TEXTURE_PATH);
     }
 }

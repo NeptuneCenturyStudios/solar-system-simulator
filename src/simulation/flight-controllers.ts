@@ -177,9 +177,8 @@ export function applyFlightThrustSubstep(dt: number): void {
                 const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
                 ship.velocity.addScaledVector(forward, delta);
             } else if (keys.s) {
-                // Decelerate — continuously applied even at fwdSpeed == 0 so
-                // gravity cannot cause flickering brake on/off cycles.
-                const ceiling = -FLIGHT_MAX_SPEED;
+                // Decelerate
+                const ceiling = fwdSpeed > 0 ? -FLIGHT_MAX_SPEED : 0;
                 const decelRate = fwdSpeed > FLIGHT_MAX_SPEED ? FLIGHT_BOOST_DECEL : FLIGHT_THRUST_DECEL;
                 const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
                 ship.velocity.addScaledVector(forward, delta);

@@ -417,6 +417,31 @@
 
                         <div class="control-group">
                             <label
+                                >Texture Quality
+                                <span id="texture-quality-val" class="val-display">Low (2k)</span></label
+                            >
+                            <div class="slider-row">
+                                <input
+                                    type="range"
+                                    id="textureQualitySlider"
+                                    min="0"
+                                    max="1"
+                                    step="1"
+                                    value="0"
+                                    title="Low (2k) — uses smaller textures. High (8k) — uses ultra-resolution textures when available."
+                                />
+                                <button
+                                    class="old-ui btn-slider-reset"
+                                    id="textureQualityResetBtn"
+                                    title="Reset to Low (2k)"
+                                >
+                                    <span class="material-symbols-outlined">replay</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label
                                 >Sound Effects Volume
                                 <span id="sfx-volume-val" class="val-display">100%</span></label
                             >

@@ -10,6 +10,7 @@ import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { BodyTypeEnum } from './body-enums';
 import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/atmosphere-shell';
+import { loadSrgbTexture } from '../drawing/textures';
 
 // Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
 const _Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -553,6 +554,89 @@ export class CelestialBody extends Body {
             this.label.material.map = labelTexture;
             this.label.material.needsUpdate = true;
         }
+    }
+
+    /**
+     * Converts a 2k texture URL to its 8k equivalent by replacing "2k/" with "8k/".
+     * Returns null if the path doesn't contain "2k/".
+     */
+    static to8kUrl(url: string): string | null {
+        if (url.includes('2k/')) {
+            return url.replace('2k/', '8k/');
+        }
+        return null;
+    }
+
+    /**
+     * Texture path slots for quality-based reloading.
+     * Each slot maps to a material property on the mesh.
+     */
+    protected _texturePaths: Partial<Record<'map' | 'emissiveMap' | 'nightMap' | 'cloudMap', string>> = {};
+
+    /**
+     * Register a 2k texture path for a given slot. The path is used to derive
+     * the 8k URL when the user switches to high-quality mode.
+     */
+    setTexturePath(slot: keyof typeof CelestialBody.prototype._texturePaths, path2k: string): void {
+        this._texturePaths[slot] = path2k;
+    }
+
+    /**
+     * Reload all registered textures at the specified quality level.
+     * If a body has no 8k asset for a slot, the 2k texture is kept (silent fallback).
+     * @param use8k Whether to attempt loading 8k textures.
+     */
+    reloadTextures(use8k: boolean): void {
+        if (this._isDisposed) return;
+        if (!this.mesh) return;
+
+        const mat = this.mesh.material as THREE.MeshStandardMaterial | THREE.MeshPhongMaterial;
+        if (!mat) return;
+
+        const resolve = (slot: keyof typeof this._texturePaths): string | undefined => {
+            const path2k = this._texturePaths[slot];
+            if (!path2k) return undefined;
+            if (use8k) {
+                const url8k = CelestialBody.to8kUrl(path2k);
+                // Only use 8k if a replacement was actually possible
+                if (url8k) return url8k;
+            }
+            return path2k;
+        };
+
+        // Reload main diffuse map
+        const mapUrl = resolve('map');
+        if (mapUrl) {
+            const newMap = loadSrgbTexture(mapUrl);
+            if (mat.map) {
+                mat.map.dispose();
+            }
+            mat.map = newMap;
+        }
+
+        // Reload emissive map
+        const emissiveUrl = resolve('emissiveMap');
+        if (emissiveUrl) {
+            const newMap = loadSrgbTexture(emissiveUrl);
+            if (mat.emissiveMap) {
+                mat.emissiveMap.dispose();
+            }
+            mat.emissiveMap = newMap;
+        }
+
+        // Reload cloud texture if we have a separate cloud mesh
+        const cloudUrl = resolve('cloudMap');
+        if (cloudUrl && this.clouds) {
+            const cloudMat = this.clouds.material as THREE.MeshStandardMaterial;
+            if (cloudMat) {
+                const newCloudMap = loadSrgbTexture(cloudUrl);
+                if (cloudMat.map) cloudMat.map.dispose();
+                cloudMat.map = newCloudMap;
+                cloudMat.needsUpdate = true;
+            }
+        }
+
+        mat.needsUpdate = true;
     }
 
     temperatureToColor(temp: number) {

@@ -36,7 +36,8 @@ export class Jupiter extends Planet {
             JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (9.925 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, JUPITER_DIST, SUN_MASS, angleRad);
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/jupiter.jpg');
+        const TEXTURE_PATH = './assets/textures/bodies/2k/jupiter.jpg';
+        const texture = loadSrgbTexture(TEXTURE_PATH);
         const geometry = new THREE.SphereGeometry(JUPITER_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
@@ -66,5 +67,8 @@ export class Jupiter extends Planet {
                 tint: 0xffcc88,
             },
         });
+
+        // Register texture path for quality-based reloading
+        this.setTexturePath('map', TEXTURE_PATH);
     }
 }

@@ -36,7 +36,8 @@ export class Neptune extends Planet {
             NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (16.11 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, NEPTUNE_DIST, SUN_MASS, angleRad);
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/neptune.jpg');
+        const TEXTURE_PATH = './assets/textures/bodies/2k/neptune.jpg';
+        const texture = loadSrgbTexture(TEXTURE_PATH);
         const geometry = new THREE.SphereGeometry(NEPTUNE_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
@@ -66,5 +67,8 @@ export class Neptune extends Planet {
                 tint: 0x4488ff,
             },
         });
+
+        // Register texture path for quality-based reloading
+        this.setTexturePath('map', TEXTURE_PATH);
     }
 }

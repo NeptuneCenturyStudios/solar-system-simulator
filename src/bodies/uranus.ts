@@ -36,7 +36,8 @@ export class Uranus extends Planet {
             URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, gEff, SUN_MASS);
         const rotSpeed = ((-2 * Math.PI) / (17.24 * 3600)) * timeScale; // retrograde
         const trajectory = calculateTrajectory(gEff, URANUS_DIST, SUN_MASS, angleRad);
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/uranus.jpg');
+        const TEXTURE_PATH = './assets/textures/bodies/2k/uranus.jpg';
+        const texture = loadSrgbTexture(TEXTURE_PATH);
         const geometry = new THREE.SphereGeometry(URANUS_RADIUS, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
@@ -66,5 +67,8 @@ export class Uranus extends Planet {
                 tint: 0x88ddff,
             },
         });
+
+        // Register texture path for quality-based reloading
+        this.setTexturePath('map', TEXTURE_PATH);
     }
 }
