@@ -11,6 +11,18 @@ import { CelestialBody } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from './body-enums';
+import { loadSrgbTexture } from '../drawing/textures';
+
+// Paths for star texture bins, used for quality-based reloading.
+const STAR_TEXTURE_PATHS = {
+    sun: './assets/textures/bodies/2k/sun.jpg',
+    red: './assets/textures/bodies/2k/red-star.jpg',
+    orange: './assets/textures/bodies/2k/orange_star.jpg',
+    white: './assets/textures/bodies/2k/white_star.jpg',
+    blue: './assets/textures/bodies/2k/blue-star.jpg',
+    whiteDwarf: './assets/textures/bodies/2k/white_dwarf.jpg',
+    brownDwarf: './assets/textures/bodies/2k/brown_dwarf.jpg',
+} as const;
 
 /**
  * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.
@@ -147,7 +159,59 @@ export class Star extends CelestialBody {
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
         scene.add(this.ambientLight);
 
+        // Register the current sun texture path for base reloadTextures
+        this.setTexturePath('map', STAR_TEXTURE_PATHS.sun);
+
+        // Store star-specific texture paths for reloading all temperature bins
+        this._starTexturePaths = {
+            sun: STAR_TEXTURE_PATHS.sun,
+            red: STAR_TEXTURE_PATHS.red,
+            orange: STAR_TEXTURE_PATHS.orange,
+            white: STAR_TEXTURE_PATHS.white,
+            blue: STAR_TEXTURE_PATHS.blue,
+            whiteDwarf: STAR_TEXTURE_PATHS.whiteDwarf,
+            brownDwarf: STAR_TEXTURE_PATHS.brownDwarf,
+        };
+
         this.setTemperature(options.temperature);
+    }
+
+    /** Stored 2k paths for each star texture bin. */
+    protected _starTexturePaths: Record<string, string> = {};
+
+    override reloadTextures(use8k: boolean): void {
+        // Reload the base map texture (currently active bin)
+        super.reloadTextures(use8k);
+
+        // Reload ALL star texture bins at the requested quality
+        const resolve = (path2k: string): string => {
+            if (use8k) {
+                const url8k = CelestialBody.to8kUrl(path2k);
+                if (url8k) return url8k;
+            }
+            return path2k;
+        };
+
+        const newTextures = {
+            sunTexture: loadSrgbTexture(resolve(this._starTexturePaths.sun)),
+            redStarTexture: loadSrgbTexture(resolve(this._starTexturePaths.red)),
+            orangeStarTexture: loadSrgbTexture(resolve(this._starTexturePaths.orange)),
+            whiteStarTexture: loadSrgbTexture(resolve(this._starTexturePaths.white)),
+            blueStarTexture: loadSrgbTexture(resolve(this._starTexturePaths.blue)),
+            whiteDwarfTexture: loadSrgbTexture(resolve(this._starTexturePaths.whiteDwarf)),
+            brownDwarfTexture: loadSrgbTexture(resolve(this._starTexturePaths.brownDwarf)),
+        };
+
+        // Dispose old textures
+        for (const key of Object.keys(this.textures) as Array<keyof typeof this.textures>) {
+            const old = this.textures[key];
+            if (old) old.dispose();
+        }
+
+        this.textures = newTextures;
+
+        // Re-apply current temperature to pick the right bin from the newly loaded textures
+        this.setTemperature(this.temperature);
     }
 
     /** Computes the expected radius for a star of the given mass using a mass-radius power law (R ∝ M^0.8). */
