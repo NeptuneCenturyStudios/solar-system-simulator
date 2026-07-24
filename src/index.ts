@@ -62,7 +62,6 @@ import {
     FLIGHT_ALT_ORBIT_YAW_MAX,
     SUN_RADIUS,
     DIST_SCALE,
-    WEAPON_DAMAGE,
     TEXT_SPRITE_Z,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
@@ -93,9 +92,7 @@ import {
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
-import { ImpactShockwave } from './effects/impact-shockwave';
 import { WarpEffect } from './effects/warp-effect';
-import { playWeaponImpact} from './utilities/audio.js';
 import { AmbientSoundManager } from './utilities/ambient-sound';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
 import { GridHelperManager } from './gizmos/grid-helper';
@@ -140,6 +137,7 @@ import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
 import { UIManager } from './ui/ui-manager';
 import { runAnimationLoop, AnimationContext } from './engine/animation-loop';
+import { registerCustomEventListeners } from './events/custom-event-listeners';
 
 // State singletons
 import {
@@ -4274,75 +4272,23 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
     }
 }
 
-// Event-driven bodies table + selection cleanup updates (avoid constant refresh/flicker)
-window.addEventListener('body:added', refreshBodiesTable);
-
-// Physics → UI logging: body absorption events become Noty notifications via addEvent()
-window.addEventListener('body:absorbed', (e) => {
-    if (!e?.detail) return;
-    const { message, notificationType } = e.detail;
-    addEvent({ message, notificationType });
-});
-
-window.addEventListener('body:removed', (e: WindowEventMap['body:removed']) => {
-    const removedBody = e.detail.body;
-    // If the deleted body was the player's known ship, clear the reference
-    // so the button reverts to "SPAWN SPACESHIP" rather than "ENTER SHIP".
-    if (removedBody && removedBody === flightState.knownShip) {
-        flightState.knownShip = null;
-        setTimeout(() => {
-            try {
-                uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
-                    flightState.knownShip,
-                    simulationState.bodies
-                );
-            } catch {
-                // Empty
-            }
-        }, 0);
-    }
-    handleBodyBecameInvalid(removedBody);
-    refreshBodiesTable();
-});
-
-window.addEventListener('weapon:hit', (e: WindowEventMap['weapon:hit']) => {
-    const { body, position } = e.detail;
-    if (body._isDisposed || !body.mesh) return;
-
-    playWeaponImpact();
-
-    // Spawn impact flash: pass body centre so ImpactShockwave can snap to surface
-    simulationState.impacts.push(
-        new ImpactShockwave(dependencies, scene, position, body.mesh.position, body.radius)
-    );
-
-    body.healthPoints -= WEAPON_DAMAGE;
-    if (body.healthPoints <= 0) {
-        body.die();
-    }
-});
-
-window.addEventListener('body:dead', (e: WindowEventMap['body:dead']) => {
-    const body = e.detail.body;
-    if (body) {
-        // Ensure truly-dead bodies are removed from the simulation array.
-        // Collision deaths already remove immediately, but other death paths (e.g. star fuel death)
-        // can emit `body:dead` without being spliced out here.
-        simulationState.bodies = (simulationState.bodies || []).filter((b) => b !== body);
-    }
-
-    handleBodyBecameInvalid(body);
-    refreshBodiesTable();
-});
-
-window.addEventListener('bodies:reset', () => {
-    // Everything is rebuilt; clear selection-related pointers so UI/camera doesn't reference stale bodies.
-    selectedBody = null;
-    manuallySelectedBody = null;
-    cameraState.focusBody = null;
-    gizmo.attach(null);
-    uiManager.managementPanel.setSelectedBody(null);
-    refreshBodiesTable();
+// Event-driven custom event listeners (body:added, body:removed, weapon:hit, etc.)
+registerCustomEventListeners({
+    selectedBody: {
+        get value() { return selectedBody; },
+        set value(v: Body | null) { selectedBody = v; },
+    },
+    manuallySelectedBody: {
+        get value() { return manuallySelectedBody; },
+        set value(v: Body | null) { manuallySelectedBody = v; },
+    },
+    gizmo,
+    uiManager,
+    scene,
+    dependencies,
+    refreshBodiesTable,
+    addEvent,
+    handleBodyBecameInvalid,
 });
 
 // --- Startup modal wiring ---
