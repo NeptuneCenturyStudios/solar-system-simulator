@@ -87,8 +87,14 @@ export class Body {
         return this.labelHeight || 10;
     }
 
-    protected createLabel(name: string) {
-        const labelTexture = createTextTexture(name);
+    protected createLabel(_name: string) {
+        // Old text labels are replaced by PlanetNameIndicator (autopilot-style panels).
+        // Create a placeholder sprite that is always invisible so the body still has a
+        // `label` reference for `updateLabel()` (used by the management panel).
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const labelTexture = new THREE.CanvasTexture(canvas);
         const labelMaterial = new THREE.SpriteMaterial({
             map: labelTexture,
             transparent: true,
@@ -97,25 +103,25 @@ export class Body {
         });
 
         const label = new THREE.Sprite(labelMaterial);
-        label.scale.set(10, 4, 1);
+        label.scale.set(1, 1, 1);
         label.position.set(0, this.getLabelHeight(), 0);
         label.visible = false;
 
+        // Keep labelLine as a stub too.
         const lineGeometry = new THREE.BufferGeometry();
         lineGeometry.setAttribute(
             'position',
             new THREE.BufferAttribute(
-                new Float32Array([0, this.getLabelHeight(), 0, 0, this.getLabelHeight(), 0]),
+                new Float32Array([0, 0, 0, 0, 0, 0]),
                 3
             )
         );
-
         this.labelLine = new THREE.Line(
             lineGeometry,
             new THREE.LineBasicMaterial({
                 color: 0x00ffcc,
                 transparent: true,
-                opacity: 0.4,
+                opacity: 0,
                 depthTest: false,
             })
         );

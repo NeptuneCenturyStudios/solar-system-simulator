@@ -14,6 +14,7 @@ import { PositionIndicatorManager } from '../gizmos/position-indicator';
 import { GridHelperManager } from '../gizmos/grid-helper';
 import { FlightHUD } from '../drawing/flight-hud';
 import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator';
+import { PlanetNameIndicator } from '../drawing/planet-name-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
 import { Star } from '../bodies/star';
@@ -111,6 +112,7 @@ export interface AnimationContext {
     gridHelperManager: GridHelperManager;
     flightHUD: FlightHUD;
     targetIndicator: AutopilotTargetIndicator;
+    planetNameIndicator: PlanetNameIndicator;
     surfaceCam: SurfaceCameraManager;
 
     // Sprites
@@ -156,6 +158,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
     const _animCamRight = new THREE.Vector3();
     const _animCamMovement = new THREE.Vector3();
     const _animOldPos = new THREE.Vector3();
+    const _prevCamPos = new THREE.Vector3();
+    const _cameraVel = new THREE.Vector3();
 
     let fpsLastUpdate = 0;
     let lastT = performance.now();
@@ -165,6 +169,18 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         const wallDt = Math.min((now - _lastFrameTime.value) / 1000, 0.1);
         _lastFrameTime.value = now;
         requestAnimationFrame(animate);
+
+        // ── Camera velocity (frame-to-frame delta for labels / ETA) ────
+        _cameraVel.subVectors(ctx.camera.position, _prevCamPos);
+        // On the very first frame _prevCamPos is (0,0,0) which produces a huge
+        // false velocity spike.  Guard against that by zeroing when length > 10×
+        // the simulation scale would reasonably allow (|v| >> 1e6 is a bootstrap spike).
+        if (_cameraVel.length() > 1_000_000) {
+            _cameraVel.set(0, 0, 0);
+        } else if (wallDt > 1e-8) {
+            _cameraVel.divideScalar(wallDt);
+        }
+        _prevCamPos.copy(ctx.camera.position);
 
         const tScale = simulationState.timeScale;
         const steps = settingsStore.settings.substeps;
@@ -562,21 +578,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 pi.updateIndicator(pi.yAxisIndicator, pi.yAxisRing, ctx.gizmo.target.mesh.position);
         }
 
-        // ── Label scaling ──────────────────────────────────────────────────
-        const showNames = ctx.simulationState.showNames;
-        for (const body of ctx.simulationState.bodies) {
-            if (!body || body._isDisposed || !body.mesh || !body.label) continue;
-            const isActiveShip = ctx.flightState.isActive && body === ctx.flightState.activeShip;
-            body.label.visible = showNames && !isActiveShip;
-            if (body.labelLine) body.labelLine.visible = showNames && !isActiveShip;
-            if (showNames) {
-                const dist = ctx.camera.position.distanceTo(body.mesh.position);
-                const scale = Math.max(dist * 0.033, 33);
-                const ms = body.mesh.scale.x;
-                const cs = scale / ms;
-                body.label.scale.set(cs * 6, cs * 2.4, 1);
-            }
-        }
+        // ── Planet name indicators (replaces old text labels) ───────────
+        ctx.planetNameIndicator.update(ctx.camera, _cameraVel, false, ctx.autopilotState);
 
         // ── Flight camera ──────────────────────────────────────────────────
         if (isFlightModeActive) {
