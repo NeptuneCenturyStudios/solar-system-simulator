@@ -14,7 +14,7 @@ import { PositionIndicatorManager } from '../gizmos/position-indicator';
 import { GridHelperManager } from '../gizmos/grid-helper';
 import { FlightHUD } from '../drawing/flight-hud';
 import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator';
-import { PlanetNameIndicator } from '../drawing/planet-name-indicator';
+import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet-name-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
 import { Star } from '../bodies/star';
@@ -55,6 +55,7 @@ import {
     FREE_CAM_BOOST_SPEED,
     AUTOPILOT_ACCEL,
     AUTOPILOT_DECEL,
+    FLIGHT_AUTOPILOT_CHARGE_TIME,
 } from '../utilities/consts';
 import {
     createFPSTexture,
@@ -128,6 +129,7 @@ export interface AnimationContext {
         d: boolean;
         space: boolean;
         c: boolean;
+        e: boolean;
         shift: boolean;
     };
 
@@ -142,6 +144,7 @@ export interface AnimationContext {
     setFocusBody: (bodyOrNull: Body | null, opts?: { zoom?: boolean }) => void;
     updateAutopilotStep: (dt: number) => void;
     cancelAutopilot: (message?: string) => void;
+    engageAutopilot: (target: Body) => void;
     setF: (id: string) => void;
     triggerZoomToBody: (body: Body | null) => void;
     uiManager: UIManager;
@@ -579,7 +582,40 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         // ── Planet name indicators (replaces old text labels) ───────────
-        ctx.planetNameIndicator.update(ctx.camera, _cameraVel, false, ctx.autopilotState);
+        const _flightHoverCtx: IPlanetNameFlightContext | undefined = isFlightModeActive
+            ? {
+                  isActive: true,
+                  steeringLineVisible: ctx.flightSteeringLine.visible,
+                  steeringTipX: ctx.steeringLinePositions[3],
+                  steeringTipY: ctx.steeringLinePositions[4],
+                  autopilotCharge: ctx.flightState.autopilotCharge,
+                  chargeTime: FLIGHT_AUTOPILOT_CHARGE_TIME,
+                  activeShip: ctx.flightState.activeShip,
+              }
+            : undefined;
+        ctx.planetNameIndicator.update(ctx.camera, _cameraVel, false, ctx.autopilotState, _flightHoverCtx);
+
+        // ── E-key autopilot charge accumulation ──────────────────────────
+        if (isFlightModeActive) {
+            const _hovered = ctx.planetNameIndicator.steeringHoveredBody;
+            const _eHeld = ctx.keys.e;
+            const _alreadyTarget =
+                ctx.autopilotState.isActive &&
+                ctx.autopilotState.targetBody === _hovered &&
+                ctx.autopilotState.phase !== 'TIDAL_LOCK';
+            if (_hovered && _eHeld && !_alreadyTarget) {
+                ctx.flightState.autopilotCharge = Math.min(
+                    ctx.flightState.autopilotCharge + wallDt,
+                    FLIGHT_AUTOPILOT_CHARGE_TIME
+                );
+                if (ctx.flightState.autopilotCharge >= FLIGHT_AUTOPILOT_CHARGE_TIME) {
+                    ctx.engageAutopilot(_hovered);
+                    ctx.flightState.autopilotCharge = 0;
+                }
+            } else {
+                ctx.flightState.autopilotCharge = 0;
+            }
+        }
 
         // ── Flight camera ──────────────────────────────────────────────────
         if (isFlightModeActive) {

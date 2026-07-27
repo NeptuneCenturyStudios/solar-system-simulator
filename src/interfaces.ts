@@ -236,6 +236,12 @@ export interface IFlightState {
 
     /** Accumulated pitch offset (radians) for the ALT orbit camera, in ship-local space. */
     altOrbitPitch: number;
+
+    /** The body currently under the steering line tip in flight mode. Set by PlanetNameIndicator each frame. */
+    steeringHoveredBody: Body | null;
+
+    /** Seconds the E key has been held over the current hovered body (0 → FLIGHT_AUTOPILOT_CHARGE_TIME). */
+    autopilotCharge: number;
 }
 
 /**
@@ -303,6 +309,7 @@ export interface ICameraState {
         s: boolean;
         d: boolean;
         c: boolean;
+        e: boolean;
         space: boolean;
         shift: boolean;
     };

@@ -59,6 +59,30 @@ function formatETA(seconds: number): string {
     return `${s}s`;
 }
 
+// ── Flight hover context ─────────────────────────────────────────────────────
+
+/**
+ * Context passed to PlanetNameIndicator.update() during flight mode.
+ * Provides the steering line tip position and autopilot charge state
+ * needed to render the E-key autopilot prompt below body panels.
+ */
+export interface IPlanetNameFlightContext {
+    /** True when flight mode is active (panel will perform hover detection). */
+    isActive: boolean;
+    /** True when the steering line is currently visible (not during warp / alt-orbit). */
+    steeringLineVisible: boolean;
+    /** Steering-line tip X in UI screen-space coordinates (pixels from screen centre). */
+    steeringTipX: number;
+    /** Steering-line tip Y in UI screen-space coordinates (pixels from screen centre). */
+    steeringTipY: number;
+    /** Seconds the E key has been held on the current hovered body (0–chargeTime). */
+    autopilotCharge: number;
+    /** Total seconds required to fully charge (matches FLIGHT_AUTOPILOT_CHARGE_TIME). */
+    chargeTime: number;
+    /** The player's active ship — its name label is suppressed in flight mode. */
+    activeShip: Body | null;
+}
+
 // ── PlanetNameIndicator ──────────────────────────────────────────────────────
 
 export class PlanetNameIndicator {
@@ -68,8 +92,17 @@ export class PlanetNameIndicator {
     /** Active sprites — grown/shrunk each frame. */
     private spritePool: PoolEntry[] = [];
 
+    /** Dedicated sprite for the flight-hover panel when showNames is OFF. */
+    private _hoverEntry: PoolEntry | null = null;
+
     /** Scratch vector to avoid per-frame allocation. */
     private _scratch = new THREE.Vector3();
+
+    /**
+     * Set each frame by update(). The body whose projected position is nearest
+     * the steering-line tip (within its apparent screen radius). Null when none.
+     */
+    public steeringHoveredBody: Body | null = null;
 
     constructor(uiScene: THREE.Scene, simulationState: ISimulationState) {
         this.uiScene = uiScene;
@@ -80,78 +113,111 @@ export class PlanetNameIndicator {
      * Called every animation frame.
      *
      * @param camera  The main perspective camera (used for NDC projection).
-     * @param cameraVelocity  The camera's current velocity (world u/s), computed
-     *                        from the per-frame position delta.
-     * @param showEta  When true, the panel will also render the ETA line.
-     *                 (Currently reserved for flight mode – defaults false.)
-     * @param autopilotState  Optional autopilot state. When provided and the
-     *                        autopilot is actively showing a target indicator
-     *                        (i.e. active and not in TIDAL_LOCK), the target
-     *                        body's normal name label is suppressed to avoid
-     *                        duplicate indicators on the same body.
+     * @param cameraVelocity  The camera's current velocity (world u/s).
+     * @param showEta  Reserved for future use; defaults false.
+     * @param autopilotState  Suppresses the name label for the current autopilot
+     *                        target to avoid duplication with the target indicator.
+     * @param flightContext  When provided and active, enables hover detection
+     *                       (steering tip vs. body screen position) and renders
+     *                       the E-key autopilot prompt section on the hovered body.
+     *                       Runs regardless of the showNames setting.
      */
     update(
         camera: THREE.PerspectiveCamera,
         cameraVelocity: THREE.Vector3,
         showEta = false,
-        autopilotState?: IAutopilotState
+        autopilotState?: IAutopilotState,
+        flightContext?: IPlanetNameFlightContext
     ): void {
         const bodies = this.simulationState.bodies;
         const showNames = this.simulationState.showNames;
-        if (!showNames || bodies.length === 0) {
-            this.hideAll();
-            return;
-        }
 
-        // Determine whether the autopilot indicator is currently covering its target.
-        // We skip the target body in PlanetNameIndicator so it doesn't double-up.
+        // ── Hover detection (always runs in flight mode, independent of showNames) ──
+        let hoveredBody: Body | null = null;
+        const isFlightHoverActive = !!(flightContext?.isActive && flightContext.steeringLineVisible);
+
+        if (isFlightHoverActive && bodies.length > 0) {
+            const tipX = flightContext!.steeringTipX;
+            const tipY = flightContext!.steeringTipY;
+            const halfW = window.innerWidth / 2;
+            const halfH = window.innerHeight / 2;
+            const tanHalfFovY = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+
+            let bestScreenDist = Infinity;
+            for (const body of bodies) {
+                if (!body || body._isDisposed || !body.mesh) continue;
+                if (body === flightContext!.activeShip) continue; // skip own ship
+                body.mesh.getWorldPosition(this._scratch);
+                this._scratch.project(camera);
+                if (this._scratch.z >= 1) continue; // behind camera
+                const uiX = this._scratch.x * halfW;
+                const uiY = this._scratch.y * halfH;
+                const camDist = camera.position.distanceTo(body.mesh.position);
+                // Apparent screen radius — at least 50 px so small distant bodies are still selectable
+                const apparentR = Math.max(50, (body.radius / camDist) * (halfH / tanHalfFovY));
+                const screenDist = Math.hypot(uiX - tipX, uiY - tipY);
+                if (screenDist < apparentR && screenDist < bestScreenDist) {
+                    bestScreenDist = screenDist;
+                    hoveredBody = body;
+                }
+            }
+        }
+        this.steeringHoveredBody = hoveredBody;
+
+        // Whether the autopilot target indicator is already covering its target
         const apTargetHidden =
             autopilotState?.isActive &&
             autopilotState.targetBody != null &&
             autopilotState.phase !== 'TIDAL_LOCK';
 
-        // Determine which bodies get indicators
-        const visible: { body: Body; nx: number; ny: number; dist: number }[] = [];
-
-        for (let i = 0; i < bodies.length; i++) {
-            const body = bodies[i];
-            if (!body || body._isDisposed || !body.mesh) continue;
-            if (!body.name) continue;
-
-            // Skip the autopilot target — the autopilot indicator panel already
-            // shows name + distance for it.
-            if (apTargetHidden && body === autopilotState!.targetBody) continue;
-
-            // Project body world position to NDC
-            body.mesh.getWorldPosition(this._scratch);
-            this._scratch.project(camera);
-            const nx = this._scratch.x;
-            const ny = this._scratch.y;
-            const nz = this._scratch.z;
-
-            // Off-screen or behind camera
-            if (nz >= 1 || Math.abs(nx) > 1 || Math.abs(ny) > 1) continue;
-
-            const dist = camera.position.distanceTo(body.mesh.position);
-            visible.push({ body, nx, ny, dist });
+        // Ring fill for the hovered body (–1 = no ring section shown)
+        let computedRingFill = -1;
+        if (isFlightHoverActive && hoveredBody) {
+            const isAlreadyTarget = apTargetHidden && hoveredBody === autopilotState!.targetBody;
+            if (!isAlreadyTarget) {
+                computedRingFill = Math.min(
+                    1,
+                    flightContext!.autopilotCharge / flightContext!.chargeTime
+                );
+            }
         }
 
-        // Synchronise the sprite pool to match the visible count
+        // ── Regular names pass (gated by showNames) ───────────────────────
+        const visible: { body: Body; nx: number; ny: number; dist: number }[] = [];
+
+        if (showNames && bodies.length > 0) {
+            for (let i = 0; i < bodies.length; i++) {
+                const body = bodies[i];
+                if (!body || body._isDisposed || !body.mesh) continue;
+                if (!body.name) continue;
+                // Skip the autopilot target — target indicator already shows name+dist
+                if (apTargetHidden && body === autopilotState!.targetBody) continue;
+                // In flight mode, suppress the player ship's own label
+                if (isFlightHoverActive && body === flightContext!.activeShip) continue;
+
+                body.mesh.getWorldPosition(this._scratch);
+                this._scratch.project(camera);
+                const nx = this._scratch.x;
+                const ny = this._scratch.y;
+                const nz = this._scratch.z;
+
+                if (nz >= 1 || Math.abs(nx) > 1 || Math.abs(ny) > 1) continue;
+
+                const dist = camera.position.distanceTo(body.mesh.position);
+                visible.push({ body, nx, ny, dist });
+            }
+        }
+
         this.syncPool(visible.length);
 
-        // Update each sprite — always redraw and recreate texture each frame
-        // (same proven pattern as AutopilotTargetIndicator)
         for (let i = 0; i < visible.length; i++) {
             const v = visible[i];
             const entry = this.spritePool[i];
 
             const uiX = v.nx * (window.innerWidth / 2);
             const uiY = v.ny * (window.innerHeight / 2);
-
-            // Build distance label
             const distLabel = `${Math.round(v.dist).toLocaleString()} u`;
 
-            // ETA computed infra reserved for future flight-mode use
             if (showEta) {
                 const closingSpeed = computeClosingSpeed(
                     camera.position,
@@ -162,24 +228,38 @@ export class PlanetNameIndicator {
                 void (closingSpeed > 0.001 ? formatETA(v.dist / closingSpeed) : '∞');
             }
 
-            // Draw onto this sprite's own canvas
-            const canvasResized = this.drawPanel(entry, v.body.name, distLabel);
-
-            // Autopilot indicator pattern: recreate texture on resize, otherwise
-            // reassign .image and flag dirty. This guarantees Three.js re-reads
-            // the canvas content even after a resize.
-            if (canvasResized) {
-                entry.texture.dispose();
-                entry.texture = new THREE.CanvasTexture(entry.canvas);
-                entry.texture.needsUpdate = true;
-                entry.material.map = entry.texture;
-                entry.material.needsUpdate = true;
-            } else {
-                entry.texture.image = entry.canvas;
-                entry.texture.needsUpdate = true;
-            }
-
+            // Pass ring fill only for the hovered body
+            const ringFill = isFlightHoverActive && v.body === hoveredBody ? computedRingFill : -1;
+            const canvasResized = this.drawPanel(entry, v.body.name, distLabel, ringFill);
+            this._applyTexture(entry, canvasResized);
             this.updateSprite(entry, uiX, uiY);
+        }
+
+        // ── Hover-only sprite (showNames OFF + body hovered in flight mode) ─
+        if (isFlightHoverActive && hoveredBody && !showNames) {
+            // Suppress when the autopilot target indicator already covers this body
+            const suppressPanel = apTargetHidden && hoveredBody === autopilotState!.targetBody;
+            if (!suppressPanel) {
+                if (!this._hoverEntry) this._hoverEntry = this.createPoolEntry();
+                hoveredBody.mesh.getWorldPosition(this._scratch);
+                this._scratch.project(camera);
+                const uiX = this._scratch.x * (window.innerWidth / 2);
+                const uiY = this._scratch.y * (window.innerHeight / 2);
+                const dist = camera.position.distanceTo(hoveredBody.mesh.position);
+                const distLabel = `${Math.round(dist).toLocaleString()} u`;
+                const canvasResized = this.drawPanel(
+                    this._hoverEntry,
+                    hoveredBody.name,
+                    distLabel,
+                    computedRingFill
+                );
+                this._applyTexture(this._hoverEntry, canvasResized);
+                this.updateSprite(this._hoverEntry, uiX, uiY);
+            } else if (this._hoverEntry) {
+                this._hoverEntry.sprite.visible = false;
+            }
+        } else if (this._hoverEntry) {
+            this._hoverEntry.sprite.visible = false;
         }
     }
 
@@ -191,6 +271,12 @@ export class PlanetNameIndicator {
             this.uiScene.remove(entry.sprite);
         }
         this.spritePool = [];
+        if (this._hoverEntry) {
+            this._hoverEntry.texture.dispose();
+            this._hoverEntry.material.dispose();
+            this.uiScene.remove(this._hoverEntry.sprite);
+            this._hoverEntry = null;
+        }
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
@@ -198,6 +284,20 @@ export class PlanetNameIndicator {
     private hideAll(): void {
         for (const entry of this.spritePool) {
             entry.sprite.visible = false;
+        }
+    }
+
+    /** Apply updated canvas to a pool entry's texture, recreating it if the canvas was resized. */
+    private _applyTexture(entry: PoolEntry, canvasResized: boolean): void {
+        if (canvasResized) {
+            entry.texture.dispose();
+            entry.texture = new THREE.CanvasTexture(entry.canvas);
+            entry.texture.needsUpdate = true;
+            entry.material.map = entry.texture;
+            entry.material.needsUpdate = true;
+        } else {
+            entry.texture.image = entry.canvas;
+            entry.texture.needsUpdate = true;
         }
     }
 
@@ -240,10 +340,13 @@ export class PlanetNameIndicator {
 
     /**
      * Draw the name+distance panel onto the sprite's canvas.
+     * @param ringFill  -1 = no ring section; 0–1 = ring visible with that fill progress.
      * Returns true if the canvas was resized (texture must be recreated).
      */
-    private drawPanel(entry: PoolEntry, name: string, distLabel: string): boolean {
+    private drawPanel(entry: PoolEntry, name: string, distLabel: string, ringFill = -1): boolean {
         const ctx = entry.ctx;
+        const RING_SECTION_H = 60;
+        const hasRing = ringFill >= 0;
 
         // Measure text
         ctx.font = 'bold 32px monospace';
@@ -252,33 +355,42 @@ export class PlanetNameIndicator {
         ctx.font = '22px monospace';
         const distW = ctx.measureText(distLabel).width;
 
-        const maxTextW = Math.max(nameW, distW);
+        // Ensure canvas is wide enough for the ring label when active
+        let minContentW = MIN_CONTENT_W;
+        if (hasRing) {
+            ctx.font = '20px monospace';
+            const ringLabelW = ctx.measureText('Autopilot here').width;
+            // circleLeftMargin(30) + diameter(40) + gap(8) + labelW + rightPad
+            minContentW = Math.max(minContentW, 30 + 40 + 8 + ringLabelW + PAD);
+        }
 
-        // Compute canvas dimensions
-        const contentW = Math.max(maxTextW, MIN_CONTENT_W);
+        const maxTextW = Math.max(nameW, distW);
+        const contentW = Math.max(maxTextW, minContentW);
         const innerW = contentW + PAD * 2;
         const fullW = innerW + ACCENT_LEN * 2 + 4;
-        const fullH = DIST_Y + 20 + BOTTOM_PAD;
 
-        const resized = entry.canvasW !== fullW || entry.canvasH !== fullH;
+        const baseH = DIST_Y + 20 + BOTTOM_PAD;          // normal panel height
+        const totalH = hasRing ? baseH + RING_SECTION_H : baseH;
+
+        const resized = entry.canvasW !== fullW || entry.canvasH !== totalH;
 
         if (resized) {
             ctx.clearRect(0, 0, entry.canvasW, entry.canvasH);
             entry.canvas.width = fullW;
-            entry.canvas.height = fullH;
+            entry.canvas.height = totalH;
             entry.canvasW = fullW;
-            entry.canvasH = fullH;
+            entry.canvasH = totalH;
         } else {
-            ctx.clearRect(0, 0, fullW, fullH);
+            ctx.clearRect(0, 0, fullW, totalH);
         }
 
         // ── Background panel ──────────────────────────────────────────────
         ctx.fillStyle = 'rgba(0, 8, 16, 0.50)';
-        ctx.fillRect(PAD, PAD, fullW - PAD * 2, fullH - PAD * 2);
+        ctx.fillRect(PAD, PAD, fullW - PAD * 2, totalH - PAD * 2);
 
         ctx.strokeStyle = 'rgba(0, 255, 204, 0.35)';
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(PAD, PAD, fullW - PAD * 2, fullH - PAD * 2);
+        ctx.strokeRect(PAD, PAD, fullW - PAD * 2, totalH - PAD * 2);
 
         // ── Corner accent brackets ────────────────────────────────────────
         ctx.strokeStyle = '#00ffcc';
@@ -297,15 +409,15 @@ export class PlanetNameIndicator {
         ctx.stroke();
         // bottom-left
         ctx.beginPath();
-        ctx.moveTo(PAD, fullH - PAD - ACCENT_LEN);
-        ctx.lineTo(PAD, fullH - PAD);
-        ctx.lineTo(PAD + ACCENT_LEN, fullH - PAD);
+        ctx.moveTo(PAD, totalH - PAD - ACCENT_LEN);
+        ctx.lineTo(PAD, totalH - PAD);
+        ctx.lineTo(PAD + ACCENT_LEN, totalH - PAD);
         ctx.stroke();
         // bottom-right
         ctx.beginPath();
-        ctx.moveTo(fullW - PAD - ACCENT_LEN, fullH - PAD);
-        ctx.lineTo(fullW - PAD, fullH - PAD);
-        ctx.lineTo(fullW - PAD, fullH - PAD - ACCENT_LEN);
+        ctx.moveTo(fullW - PAD - ACCENT_LEN, totalH - PAD);
+        ctx.lineTo(fullW - PAD, totalH - PAD);
+        ctx.lineTo(fullW - PAD, totalH - PAD - ACCENT_LEN);
         ctx.stroke();
 
         // ── Name — bold, cyan glow ────────────────────────────────────────
@@ -324,6 +436,67 @@ export class PlanetNameIndicator {
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
         ctx.fillText(distLabel, cx, DIST_Y);
+
+        // ── Ring / E-key prompt section ───────────────────────────────────
+        if (hasRing) {
+            // Separator line between the name/dist area and the ring row
+            const sepY = baseH - BOTTOM_PAD / 2;
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(0, 255, 204, 0.25)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(PAD + 6, sepY);
+            ctx.lineTo(fullW - PAD - 6, sepY);
+            ctx.stroke();
+
+            // Circle geometry
+            const ringCY = baseH + RING_SECTION_H / 2; // vertical centre of ring row
+            const circR = 20;                           // circle radius
+            const circCX = PAD + ACCENT_LEN + 4 + circR + 4; // left-anchored
+
+            // Subtle background fill inside the circle
+            ctx.fillStyle = 'rgba(0, 255, 204, 0.07)';
+            ctx.beginPath();
+            ctx.arc(circCX, ringCY, circR, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 4 px thick outer ring border
+            ctx.strokeStyle = 'rgba(0, 255, 204, 0.55)';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(circCX, ringCY, circR, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Clockwise fill arc drawn on top — white with glow
+            if (ringFill > 0) {
+                const startAngle = -Math.PI / 2;
+                const endAngle = startAngle + ringFill * Math.PI * 2;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 4;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(255, 255, 255, 0.85)';
+                ctx.beginPath();
+                ctx.arc(circCX, ringCY, circR, startAngle, endAngle);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // "E" letter centred inside the circle
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 22px monospace';
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = ringFill > 0 ? '#ffffff' : 'rgba(255,255,255,0.80)';
+            ctx.fillText('E', circCX, ringCY);
+
+            // "Autopilot here" label to the right of the circle
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.font = '20px monospace';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.70)';
+            ctx.fillText('Autopilot here', circCX + circR + 10, ringCY);
+        }
 
         return resized;
     }

@@ -88,6 +88,10 @@ export const flightState: IFlightState = {
     altOrbitPitch: 0,
     /** True once the warp-drive-active voice prompt has played for the current charge cycle. */
     warpVoicePlayed: false,
+    /** The body currently under the steering line tip in flight mode. Set by PlanetNameIndicator. */
+    steeringHoveredBody: null as Body | null,
+    /** Seconds the E key has been held over the current hovered body (0 → FLIGHT_AUTOPILOT_CHARGE_TIME). */
+    autopilotCharge: 0,
 };
 
 /**
@@ -141,7 +145,7 @@ export const cameraState: ICameraState = {
     lastPlanetAngle: 0,
     speed: 10,
     rotationSpeed: 0.002,
-    keys: { w: false, a: false, s: false, d: false, c: false, space: false, shift: false },
+    keys: { w: false, a: false, s: false, d: false, c: false, e: false, space: false, shift: false },
     arrowKeys: { left: false, right: false, up: false, down: false },
     pendingCollisionFocusBody: null as Body | null,
 };

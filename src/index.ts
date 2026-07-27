@@ -3996,6 +3996,11 @@ window.addEventListener('keydown', (e) => {
         }
         keys.c = true;
     }
+    if (key === 'e' && flightState.isActive) {
+        keys.e = true;
+        e.preventDefault();
+        return;
+    }
     if (key === ' ') {
         if (flightState.isActive) {
             e.preventDefault();
@@ -4077,6 +4082,10 @@ window.addEventListener('keyup', (e) => {
         if (flightState.isActive) flightState.rollRight = false;
     }
     if (key === 'c') keys.c = false;
+    if (key === 'e') {
+        keys.e = false;
+        if (flightState.isActive) flightState.autopilotCharge = 0;
+    }
     if (key === ' ') {
         keys.space = false;
         if (flightState.isActive) {
@@ -4572,6 +4581,7 @@ const animCtx: AnimationContext = {
         updateAutopilot(autopilotCtx, subDt);
     },
     cancelAutopilot: (message?: string) => cancelAutopilot(autopilotCtx, message),
+    engageAutopilot: (target: Body) => engageAutopilot(autopilotCtx, target),
     setF,
     triggerZoomToBody,
     uiManager,
