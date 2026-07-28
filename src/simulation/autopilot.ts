@@ -151,8 +151,15 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
     // Choose initial phase based on distance.
     const dist0 =
         ship.mesh && target.mesh ? ship.mesh.position.distanceTo(target.mesh.position) : Infinity;
-    const startWithWarp = dist0 > AUTOPILOT_WARP_THRESHOLD;
     const orbitRadius0 = (target.radius ?? 10) * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
+    // Dynamic warp threshold: the static AUTOPILOT_WARP_THRESHOLD is the stopping
+    // distance from full warp speed to zero, but it doesn't account for the target
+    // body's orbit radius.  For large bodies (e.g. radius ~80k), the braking runway
+    // shrinks below zero, causing the autopilot to enter BRAKE already inside the
+    // body's surface.  Adding orbitRadius ensures the ship stops *at* the orbit
+    // radius, not at the target centre.
+    const dynamicWarpThreshold0 = AUTOPILOT_WARP_THRESHOLD + orbitRadius0;
+    const startWithWarp = dist0 > dynamicWarpThreshold0;
 
     // ── Autopilot obstruction gate (compute once at engagement) ─────────────
     // If something lies between the ship and the destination, block autopilot.
@@ -309,9 +316,14 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
               : Math.max(approachSpeed, AUTOPILOT_APPROACH_SPEED) ** 2 / (2 * AUTOPILOT_DECEL);
     const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
+    // Dynamic warp threshold: adds orbitRadius so the ship stops at the
+    // desired orbit altitude, not at the target centre.  Without this,
+    // large bodies (radius ~80k) leave no room for the BRAKE smoothstep.
+    const dynamicWarpThreshold = AUTOPILOT_WARP_THRESHOLD + orbitRadius;
+
     if (autopilotState.phase === 'WARP') {
         // Transition to APPROACH once close enough for boost/normal to finish the journey.
-        if (distance <= AUTOPILOT_WARP_THRESHOLD) {
+        if (distance <= dynamicWarpThreshold) {
             autopilotState.isWarpActive = false;
             flightState.warpEffect?.stop();
             autopilotState.phase = 'APPROACH';
@@ -349,7 +361,7 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
 
         const shipForward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
         if (shipForward.dot(toTargetDir) >= Math.cos(THREE.MathUtils.degToRad(3))) {
-            if (distance > AUTOPILOT_WARP_THRESHOLD) {
+            if (distance > dynamicWarpThreshold) {
                 autopilotState.phase = 'WARP_CHARGING';
                 autopilotState.warpVoicePlayed = false;
             } else if (distance <= orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE) {
