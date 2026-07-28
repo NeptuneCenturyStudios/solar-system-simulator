@@ -242,7 +242,15 @@ export class FlightHUD {
     };
     private cameraState: { isFreeCameraMode: boolean; isTargetMode: boolean };
     private simulationState: { bodies: Body[] };
-    private flightState: { knownShip: Body | null };
+    private flightState: {
+        knownShip: Body | null;
+        isActive: boolean;
+        warpActive: boolean;
+        warpCharging: boolean;
+        isCockpitView: boolean;
+        steeringHoveredBody: Body | null;
+        altOrbitActive: boolean;
+    };
     private getSelectedBody: () => Body | null;
 
     constructor(
@@ -255,7 +263,15 @@ export class FlightHUD {
         },
         cameraState: { isFreeCameraMode: boolean; isTargetMode: boolean },
         simulationState: { bodies: Body[] },
-        flightState: { knownShip: Body | null },
+        flightState: {
+            knownShip: Body | null;
+            isActive: boolean;
+            warpActive: boolean;
+            warpCharging: boolean;
+            isCockpitView: boolean;
+            steeringHoveredBody: Body | null;
+            altOrbitActive: boolean;
+        },
         getSelectedBody: () => Body | null
     ) {
         this.uiScene = uiScene;
@@ -499,6 +515,57 @@ export class FlightHUD {
                 visible: true,
                 lines: [
                     `Dragging velocity — press G to switch modes (XZ ↔ Y) | Mode: ${mode.toUpperCase()}`,
+                ],
+            };
+        }
+
+        // Flight mode hints (active spaceship steering)
+        if (this.flightState.isActive) {
+            if (this.flightState.warpActive) {
+                return {
+                    visible: true,
+                    lines: ['WARP ACTIVE — Press [Space] to disengage'],
+                };
+            }
+
+            if (this.autopilotState.isActive) {
+                return {
+                    visible: true,
+                    lines: [
+                        'AUTOPILOT ENGAGED — Press [E] to cancel',
+                        'Hold ALT to orbit camera around ship',
+                    ],
+                };
+            }
+
+            if (this.flightState.altOrbitActive) {
+                return {
+                    visible: true,
+                    lines: [
+                        'ALT orbit camera — Mouse rotates around ship',
+                        'Release ALT to return to steering controls',
+                    ],
+                };
+            }
+
+            // Check if there's a hovered body (potential autopilot target)
+            const hovered = this.flightState.steeringHoveredBody;
+            if (hovered && !hovered._isDisposed) {
+                return {
+                    visible: true,
+                    lines: [
+                        `W Thrust | S Brake | A/D Roll | Shift Boost | [Space] Warp`,
+                        `Hold [E] → ${hovered.name} | [C] View | [Esc] Exit | LMB Fire`,
+                    ],
+                };
+            }
+
+            // Default flight controls hint
+            return {
+                visible: true,
+                lines: [
+                    'W Thrust | S Brake | A/D Roll | Shift Boost | [Space] Warp',
+                    `[C] View (${this.flightState.isCockpitView ? 'cockpit' : '3rd person'}) | [E] Autopilot target | [Esc] Exit | LMB Fire`,
                 ],
             };
         }
