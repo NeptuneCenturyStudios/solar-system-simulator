@@ -257,7 +257,7 @@ export const FLIGHT_ROLL_FRICTION = 1.06; // how fast roll decays when key relea
 export const FLIGHT_STEER_SMOOTH_RATE = 0.66; // exponential-decay rate (per second) — use: 1 - exp(-rate * dt)
 export const FLIGHT_STEER_DEADZONE = 0.05; // normalised dead zone (0–1)
 export const FLIGHT_WARP_CHARGE_TIME = 2.0; // seconds to hold Space before warp engages
-export const FLIGHT_AUTOPILOT_CHARGE_TIME = 2.0; // seconds to hold E over a body before autopilot engages
+export const FLIGHT_AUTOPILOT_CHARGE_TIME = 1.0; // seconds to hold E over a body before autopilot engages
 
 export const FLIGHT_MAX_BANK_ANGLE = 0.35; // max visual roll angle (rad)
 export const FLIGHT_MAX_BANK_PITCH = 0.2; // max visual pitch angle (rad)

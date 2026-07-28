@@ -68,7 +68,11 @@ import {
     cameraState,
     flightState,
 } from '../simulation/simulation';
-import { applyFlightThrustSubstep, exitFlightMode, updateFlightControls } from '../simulation/flight-controllers';
+import {
+    applyFlightThrustSubstep,
+    exitFlightMode,
+    updateFlightControls,
+} from '../simulation/flight-controllers';
 
 // ── Context interface ───────────────────────────────────────────────────────
 
@@ -166,6 +170,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
     let fpsLastUpdate = 0;
     let lastT = performance.now();
+    // Prevents an E-hold that triggered autopilot engagement from immediately cancelling it.
+    let _eBlockedForCancel = false;
 
     function animate(): void {
         const now = performance.now();
@@ -409,7 +415,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // so HUD/labels reflect the true combined result of thrust + gravity.
         if (isFlightModeActive) {
             const _ship = ctx.flightState.activeShip;
-            const _forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ctx.flightState.flightCameraQuat);
+            const _forward = new THREE.Vector3(0, 0, 1).applyQuaternion(
+                ctx.flightState.flightCameraQuat
+            );
             ctx.flightState.currentSpeed = _ship?.velocity.dot(_forward) ?? 0;
         }
 
@@ -593,17 +601,27 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                   activeShip: ctx.flightState.activeShip,
               }
             : undefined;
-        ctx.planetNameIndicator.update(ctx.camera, _cameraVel, false, ctx.autopilotState, _flightHoverCtx);
+        ctx.planetNameIndicator.update(
+            ctx.camera,
+            _cameraVel,
+            false,
+            ctx.autopilotState,
+            _flightHoverCtx
+        );
 
         // ── E-key autopilot charge accumulation ──────────────────────────
         if (isFlightModeActive) {
             const _hovered = ctx.planetNameIndicator.steeringHoveredBody;
             const _eHeld = ctx.keys.e;
-            const _alreadyTarget =
-                ctx.autopilotState.isActive &&
-                ctx.autopilotState.targetBody === _hovered &&
-                ctx.autopilotState.phase !== 'TIDAL_LOCK';
-            if (_hovered && _eHeld && !_alreadyTarget) {
+            const _autopilotCanCancel = ctx.autopilotState.isActive;
+
+            // Clear the block as soon as E is released
+            if (!_eHeld) _eBlockedForCancel = false;
+
+            if (_eHeld && _autopilotCanCancel && !_eBlockedForCancel) {
+                // Cancel autopilot on any E press — no hover or charge required
+                ctx.cancelAutopilot('Autopilot disengaged.');
+            } else if (_hovered && _eHeld && !_autopilotCanCancel) {
                 ctx.flightState.autopilotCharge = Math.min(
                     ctx.flightState.autopilotCharge + wallDt,
                     FLIGHT_AUTOPILOT_CHARGE_TIME
@@ -611,6 +629,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 if (ctx.flightState.autopilotCharge >= FLIGHT_AUTOPILOT_CHARGE_TIME) {
                     ctx.engageAutopilot(_hovered);
                     ctx.flightState.autopilotCharge = 0;
+                    // Prevent cancelling immediately if E is still held after engagement
+                    _eBlockedForCancel = true;
                 }
             } else {
                 ctx.flightState.autopilotCharge = 0;
@@ -908,7 +928,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
 
             ctx.flightHUD.updateAutopilotHUD((now - lastT) / 1000);
-            
+
             fpsLastUpdate = now;
         }
 
@@ -916,7 +936,6 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.targetIndicator.update(ctx.camera);
 
         lastT = now;
-
     }
 
     animate();

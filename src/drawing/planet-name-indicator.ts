@@ -95,6 +95,16 @@ export class PlanetNameIndicator {
     /** Dedicated sprite for the flight-hover panel when showNames is OFF. */
     private _hoverEntry: PoolEntry | null = null;
 
+    /** Dedicated sprite for the cancel-autopilot ring shown when hovering over the active autopilot target. */
+    private _cancelEntry: PoolEntry | null = null;
+
+    /**
+     * While the user is holding E to charge autopilot, this is locked to the body
+     * that was hovered when charging began.  Prevents the hover display from
+     * vanishing if the mouse drifts slightly off the body mid-charge.
+     */
+    private _chargeLockedBody: Body | null = null;
+
     /** Scratch vector to avoid per-frame allocation. */
     private _scratch = new THREE.Vector3();
 
@@ -135,32 +145,69 @@ export class PlanetNameIndicator {
         // ── Hover detection (always runs in flight mode, independent of showNames) ──
         let hoveredBody: Body | null = null;
         const isFlightHoverActive = !!(flightContext?.isActive && flightContext.steeringLineVisible);
+        const isCharging = !!(flightContext && flightContext.autopilotCharge > 0);
 
-        if (isFlightHoverActive && bodies.length > 0) {
-            const tipX = flightContext!.steeringTipX;
-            const tipY = flightContext!.steeringTipY;
-            const halfW = window.innerWidth / 2;
-            const halfH = window.innerHeight / 2;
-            const tanHalfFovY = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+        if (!isCharging) {
+            // No active charge — normal hover detection and clear any stale lock
+            this._chargeLockedBody = null;
+            if (isFlightHoverActive && bodies.length > 0) {
+                const tipX = flightContext!.steeringTipX;
+                const tipY = flightContext!.steeringTipY;
+                const halfW = window.innerWidth / 2;
+                const halfH = window.innerHeight / 2;
+                const tanHalfFovY = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
 
-            let bestScreenDist = Infinity;
-            for (const body of bodies) {
-                if (!body || body._isDisposed || !body.mesh) continue;
-                if (body === flightContext!.activeShip) continue; // skip own ship
-                body.mesh.getWorldPosition(this._scratch);
-                this._scratch.project(camera);
-                if (this._scratch.z >= 1) continue; // behind camera
-                const uiX = this._scratch.x * halfW;
-                const uiY = this._scratch.y * halfH;
-                const camDist = camera.position.distanceTo(body.mesh.position);
-                // Apparent screen radius — at least 50 px so small distant bodies are still selectable
-                const apparentR = Math.max(50, (body.radius / camDist) * (halfH / tanHalfFovY));
-                const screenDist = Math.hypot(uiX - tipX, uiY - tipY);
-                if (screenDist < apparentR && screenDist < bestScreenDist) {
-                    bestScreenDist = screenDist;
-                    hoveredBody = body;
+                let bestScreenDist = Infinity;
+                for (const body of bodies) {
+                    if (!body || body._isDisposed || !body.mesh) continue;
+                    if (body === flightContext!.activeShip) continue; // skip own ship
+                    body.mesh.getWorldPosition(this._scratch);
+                    this._scratch.project(camera);
+                    if (this._scratch.z >= 1) continue; // behind camera
+                    const uiX = this._scratch.x * halfW;
+                    const uiY = this._scratch.y * halfH;
+                    const camDist = camera.position.distanceTo(body.mesh.position);
+                    // Apparent screen radius — at least 50 px so small distant bodies are still selectable
+                    const apparentR = Math.max(50, (body.radius / camDist) * (halfH / tanHalfFovY));
+                    const screenDist = Math.hypot(uiX - tipX, uiY - tipY);
+                    if (screenDist < apparentR && screenDist < bestScreenDist) {
+                        bestScreenDist = screenDist;
+                        hoveredBody = body;
+                    }
                 }
             }
+        } else if (this._chargeLockedBody && !this._chargeLockedBody._isDisposed) {
+            // Charging is active and a lock exists — hold hover on the locked body
+            // regardless of where the steering tip currently is.
+            hoveredBody = this._chargeLockedBody;
+        } else {
+            // Charging just started (no lock set yet) — run detection once to establish the lock
+            if (isFlightHoverActive && bodies.length > 0) {
+                const tipX = flightContext!.steeringTipX;
+                const tipY = flightContext!.steeringTipY;
+                const halfW = window.innerWidth / 2;
+                const halfH = window.innerHeight / 2;
+                const tanHalfFovY = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+
+                let bestScreenDist = Infinity;
+                for (const body of bodies) {
+                    if (!body || body._isDisposed || !body.mesh) continue;
+                    if (body === flightContext!.activeShip) continue;
+                    body.mesh.getWorldPosition(this._scratch);
+                    this._scratch.project(camera);
+                    if (this._scratch.z >= 1) continue;
+                    const uiX = this._scratch.x * halfW;
+                    const uiY = this._scratch.y * halfH;
+                    const camDist = camera.position.distanceTo(body.mesh.position);
+                    const apparentR = Math.max(50, (body.radius / camDist) * (halfH / tanHalfFovY));
+                    const screenDist = Math.hypot(uiX - tipX, uiY - tipY);
+                    if (screenDist < apparentR && screenDist < bestScreenDist) {
+                        bestScreenDist = screenDist;
+                        hoveredBody = body;
+                    }
+                }
+            }
+            if (hoveredBody) this._chargeLockedBody = hoveredBody;
         }
         this.steeringHoveredBody = hoveredBody;
 
@@ -171,15 +218,13 @@ export class PlanetNameIndicator {
             autopilotState.phase !== 'TIDAL_LOCK';
 
         // Ring fill for the hovered body (–1 = no ring section shown)
+        // Suppressed entirely while autopilot is active to avoid cluttering the view.
         let computedRingFill = -1;
-        if (isFlightHoverActive && hoveredBody) {
-            const isAlreadyTarget = apTargetHidden && hoveredBody === autopilotState!.targetBody;
-            if (!isAlreadyTarget) {
-                computedRingFill = Math.min(
-                    1,
-                    flightContext!.autopilotCharge / flightContext!.chargeTime
-                );
-            }
+        if (isFlightHoverActive && hoveredBody && !apTargetHidden) {
+            computedRingFill = Math.min(
+                1,
+                flightContext!.autopilotCharge / flightContext!.chargeTime
+            );
         }
 
         // ── Regular names pass (gated by showNames) ───────────────────────
@@ -237,8 +282,9 @@ export class PlanetNameIndicator {
 
         // ── Hover-only sprite (showNames OFF + body hovered in flight mode) ─
         if (isFlightHoverActive && hoveredBody && !showNames) {
-            // Suppress when the autopilot target indicator already covers this body
-            const suppressPanel = apTargetHidden && hoveredBody === autopilotState!.targetBody;
+            // Suppress the hover panel while autopilot is active — the target indicator
+            // and cancel-ring entry already provide all the needed context.
+            const suppressPanel = apTargetHidden;
             if (!suppressPanel) {
                 if (!this._hoverEntry) this._hoverEntry = this.createPoolEntry();
                 hoveredBody.mesh.getWorldPosition(this._scratch);
@@ -261,6 +307,38 @@ export class PlanetNameIndicator {
         } else if (this._hoverEntry) {
             this._hoverEntry.sprite.visible = false;
         }
+
+        // ── Cancel-autopilot ring (visible whenever autopilot target is on screen) ─
+        if (flightContext?.isActive && apTargetHidden) {
+            const targetBody = autopilotState!.targetBody!;
+            if (!targetBody._isDisposed && targetBody.mesh) {
+                targetBody.mesh.getWorldPosition(this._scratch);
+                this._scratch.project(camera);
+                const nz = this._scratch.z;
+                const nx = this._scratch.x;
+                const ny = this._scratch.y;
+                // Show as long as the target is in front of the camera
+                if (nz < 1 && Math.abs(nx) <= 1.1 && Math.abs(ny) <= 1.1) {
+                    if (!this._cancelEntry) this._cancelEntry = this.createPoolEntry();
+                    const uiX = nx * (window.innerWidth / 2);
+                    const uiY = ny * (window.innerHeight / 2);
+                    const canvasResized = this.drawCancelRingOnly(this._cancelEntry);
+                    this._applyTexture(this._cancelEntry, canvasResized);
+                    // Position below the body (target indicator sits above it)
+                    const spriteW = (this._cancelEntry.canvasW / REF_CANVAS_W) * REF_SPRITE_W;
+                    const spriteH = (this._cancelEntry.canvasH / REF_CANVAS_H) * REF_SPRITE_H;
+                    this._cancelEntry.sprite.scale.set(spriteW, spriteH, 1);
+                    this._cancelEntry.sprite.position.set(uiX, uiY - spriteH / 2 - 10, TEXT_SPRITE_Z);
+                    this._cancelEntry.sprite.visible = true;
+                } else if (this._cancelEntry) {
+                    this._cancelEntry.sprite.visible = false;
+                }
+            } else if (this._cancelEntry) {
+                this._cancelEntry.sprite.visible = false;
+            }
+        } else if (this._cancelEntry) {
+            this._cancelEntry.sprite.visible = false;
+        }
     }
 
     /** Free all GPU resources. */
@@ -276,6 +354,12 @@ export class PlanetNameIndicator {
             this._hoverEntry.material.dispose();
             this.uiScene.remove(this._hoverEntry.sprite);
             this._hoverEntry = null;
+        }
+        if (this._cancelEntry) {
+            this._cancelEntry.texture.dispose();
+            this._cancelEntry.material.dispose();
+            this.uiScene.remove(this._cancelEntry.sprite);
+            this._cancelEntry = null;
         }
     }
 
@@ -497,6 +581,76 @@ export class PlanetNameIndicator {
             ctx.fillStyle = 'rgba(255, 255, 255, 0.70)';
             ctx.fillText('Autopilot here', circCX + circR + 10, ringCY);
         }
+
+        return resized;
+    }
+
+    /**
+     * Draw a compact cancel-autopilot ring widget (no name/distance header).
+     * Shows a red-orange "E" ring with "Cancel autopilot" label.
+     * Returns true if the canvas was resized.
+     */
+    private drawCancelRingOnly(entry: PoolEntry): boolean {
+        const ctx = entry.ctx;
+        const H = 56;
+        const circR = 20;
+        const circCX = PAD + ACCENT_LEN + 4 + circR + 4;
+        const ringCY = H / 2;
+
+        ctx.font = '20px monospace';
+        const labelW = ctx.measureText('Cancel autopilot').width;
+        const W = Math.ceil(circCX + circR + 10 + labelW + PAD);
+
+        const resized = entry.canvasW !== W || entry.canvasH !== H;
+        if (resized) {
+            ctx.clearRect(0, 0, entry.canvasW, entry.canvasH);
+            entry.canvas.width = W;
+            entry.canvas.height = H;
+            entry.canvasW = W;
+            entry.canvasH = H;
+        } else {
+            ctx.clearRect(0, 0, W, H);
+        }
+
+        // Background
+        ctx.fillStyle = 'rgba(0, 8, 16, 0.50)';
+        ctx.fillRect(PAD, PAD, W - PAD * 2, H - PAD * 2);
+        ctx.strokeStyle = 'rgba(255, 80, 60, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(PAD, PAD, W - PAD * 2, H - PAD * 2);
+
+        // Corner accent brackets
+        ctx.strokeStyle = 'rgba(255, 80, 60, 0.75)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(PAD, PAD + ACCENT_LEN); ctx.lineTo(PAD, PAD); ctx.lineTo(PAD + ACCENT_LEN, PAD); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(W - PAD - ACCENT_LEN, PAD); ctx.lineTo(W - PAD, PAD); ctx.lineTo(W - PAD, PAD + ACCENT_LEN); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(PAD, H - PAD - ACCENT_LEN); ctx.lineTo(PAD, H - PAD); ctx.lineTo(PAD + ACCENT_LEN, H - PAD); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(W - PAD - ACCENT_LEN, H - PAD); ctx.lineTo(W - PAD, H - PAD); ctx.lineTo(W - PAD, H - PAD - ACCENT_LEN); ctx.stroke();
+
+        // Circle background
+        ctx.fillStyle = 'rgba(255, 80, 60, 0.07)';
+        ctx.beginPath(); ctx.arc(circCX, ringCY, circR, 0, Math.PI * 2); ctx.fill();
+
+        // Circle border
+        ctx.strokeStyle = 'rgba(255, 80, 60, 0.65)';
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(circCX, ringCY, circR, 0, Math.PI * 2); ctx.stroke();
+
+        // "E" letter (the key to press)
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 22px monospace';
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('E', circCX, ringCY);
+
+        // Label
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.font = '20px monospace';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.70)';
+        ctx.fillText('Cancel autopilot', circCX + circR + 10, ringCY);
 
         return resized;
     }
