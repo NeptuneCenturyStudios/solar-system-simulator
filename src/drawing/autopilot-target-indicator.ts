@@ -325,7 +325,7 @@ export class AutopilotTargetIndicator {
 
             const closingSpeed = computeClosingSpeed(ship, target);
             etaLabel =
-                closingSpeed > 0
+                closingSpeed > 0.001
                     ? formatETA(distToOrbit / closingSpeed)
                     : 'ETA: ∞';
         }
