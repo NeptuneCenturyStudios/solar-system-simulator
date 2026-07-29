@@ -8,7 +8,9 @@ import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
 import { WarpSoundController, playWarpLoop } from '../utilities/audio.js';
 import { IDeathOptions } from '../interfaces';
-//import { ShipFlame } from '../ship-effects/ship-flame.js';
+import { FLIGHT_BOOST_ACCEL, FLIGHT_BOOST_DECEL, FLIGHT_BOOST_MAX_SPEED, FLIGHT_MAX_SPEED, FLIGHT_PERP_DECAY, FLIGHT_THRUST_ACCEL, FLIGHT_THRUST_DECEL, } from "../utilities/consts";
+import { autopilotState, cameraState, flightState, simulationState } from '../simulation/simulation';
+
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
 
@@ -175,6 +177,81 @@ export class Spaceship extends Body {
         this.thirdPersonOffset.set(0, SPACESHIP_RADIUS * 0.35, -SPACESHIP_RADIUS * 1.8);
 
         this._loadModel(modelName);
+    }
+
+    // Flight Controllers
+    /**
+     * Apply manual thrust for one physics substep.
+     * Called from inside the physics substep loop so thrust and gravity interleave
+     * correctly at any time scale.
+     */
+    applyFlightThrustSubstep(dt: number): void {
+        const ship = flightState.activeShip;
+        if (!ship || ship._isDisposed || !ship.mesh) return;
+        if (simulationState.isPaused || simulationState.timeScale === 0) return;
+    
+        // Autopilot handles its own thrust — stay out of its way.
+        if (autopilotState.isActive) return;
+        // Warp/boost deceleration is handled frame-level; do not add thrust during those.
+        if (flightState.warpActive || flightState.warpDecelerating || flightState.boostDecelerating) return;
+    
+        const keys = cameraState.keys;
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
+        const fwdSpeed = ship.velocity.dot(forward);
+    
+        if (!flightState.isAdvancedMode) {
+            // ── Simple mode ──────────────────────────────────────────────────
+            // While a thrust key is held: forward thrust is ADDED to velocity so
+            // gravity accumulates freely and is never overwritten.
+            // Perpendicular drift is always decayed while any thrust key is held.
+            const thrustActive = keys.shift || keys.w || keys.s;
+            if (thrustActive) {
+                const shiftEffective = keys.shift && fwdSpeed < FLIGHT_BOOST_MAX_SPEED;
+                const wEffective = keys.w && fwdSpeed < FLIGHT_MAX_SPEED;
+    
+                if (shiftEffective) {
+                    const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
+                    ship.velocity.addScaledVector(forward, delta);
+                } else if (wEffective && !keys.shift) {
+                    const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
+                    ship.velocity.addScaledVector(forward, delta);
+                } else if (keys.s) {
+                    // Decelerate — continuously applied even at fwdSpeed == 0 so
+                    // gravity cannot cause flickering brake on/off cycles.
+                    const ceiling = -FLIGHT_MAX_SPEED;
+                    const decelRate = fwdSpeed > FLIGHT_MAX_SPEED ? FLIGHT_BOOST_DECEL : FLIGHT_THRUST_DECEL;
+                    const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
+                    ship.velocity.addScaledVector(forward, delta);
+                }
+    
+                // Decay perpendicular drift when any thrust key is held.
+                const newFwdSpd = ship.velocity.dot(forward);
+                const perpVel = ship.velocity.clone().addScaledVector(forward, -newFwdSpd);
+                const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * dt);
+                perpVel.multiplyScalar(decay);
+                ship.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
+            }
+        } else {
+            // ── Advanced mode ────────────────────────────────────────────────
+            // Thrust adds to velocity without removing gravity-accumulated
+            // perpendicular components, so orbital mechanics work at all times.
+            if (keys.shift) {
+                if (fwdSpeed < FLIGHT_BOOST_MAX_SPEED) {
+                    const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
+                    ship.velocity.addScaledVector(forward, delta);
+                }
+            } else if (keys.w) {
+                if (fwdSpeed < FLIGHT_MAX_SPEED) {
+                    const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
+                    ship.velocity.addScaledVector(forward, delta);
+                }
+            } else if (keys.s) {
+                if (fwdSpeed > -FLIGHT_MAX_SPEED) {
+                    const delta = Math.max(-FLIGHT_THRUST_DECEL * dt, -FLIGHT_MAX_SPEED - fwdSpeed);
+                    ship.velocity.addScaledVector(forward, delta);
+                }
+            }
+        }
     }
 
     /**

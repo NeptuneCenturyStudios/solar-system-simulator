@@ -68,11 +68,7 @@ import {
     cameraState,
     flightState,
 } from '../simulation/simulation';
-import {
-    applyFlightThrustSubstep,
-    exitFlightMode,
-    updateFlightControls,
-} from '../simulation/flight-controllers';
+import { exitFlightMode, updateFlightControls } from '../simulation/flight-controllers';
 
 // ── Context interface ───────────────────────────────────────────────────────
 
@@ -408,7 +404,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             steps,
             dt,
             ctx.updateAutopilotStep,
-            isFlightModeActive ? applyFlightThrustSubstep : undefined
+            isFlightModeActive ? ctx.flightState.activeShip?.applyFlightThrustSubstep : undefined
         );
 
         // Sync currentSpeed from the ship's real velocity after the physics loop
