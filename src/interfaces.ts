@@ -169,13 +169,6 @@ export interface IFlightState {
     rollLeft: boolean;
     rollRight: boolean;
 
-    /** Current angular roll velocity (rad/s). Decays when key released. */
-    rollVelocity: number;
-
-    /** Smoothed steering values in [-1, 1]. Lerp toward raw target each frame. */
-    steerX: number;
-    steerY: number;
-
     /** Whether advanced (additive) flight physics are active. */
     isAdvancedMode: boolean;
 
@@ -212,17 +205,8 @@ export interface IFlightState {
     /** Camera reference frame quaternion, independent of ship mesh banking. */
     flightCameraQuat: THREE.Quaternion;
 
-    /** Visual roll offset of ship mesh relative to camera frame (radians). */
-    shipBankRoll: number;
-
-    /** Visual pitch offset of ship mesh relative to camera frame (radians). */
-    shipBankPitch: number;
-
     /** True while LMB is held during flight — fires weapon particles each frame. */
     isFiring: boolean;
-
-    /** Whether Shift was held on the previous frame. */
-    prevShiftHeld: boolean;
 
     /** True while ALT is held — camera orbits the ship instead of steering it. */
     altOrbitActive: boolean;
@@ -417,19 +401,48 @@ export interface IAutopilotContext {
 }
 
 /**
- * Interface representing the handling characteristics of a spaceship, including its flight performance parameters.
+ * Interface representing the handling characteristics of a spaceship, including its flight performance and steering feel parameters.
+ *
+ * All ships share the same set of tunable values.  A Starfighter handles differently
+ * from a Freighter by choosing different numbers, not different mechanics.
  */
 export interface ISpaceshipHandling {
+    // ── Thrust / speed ────────────────────────────────────────────────
     flightMaxSpeed: number;
     flightThrustAccel: number;
     flightThrustDecel: number;
     flightThrustDecelTolerance: number;
+
+    // ── Boost ─────────────────────────────────────────────────────────
     flightBoostMaxSpeed: number;
     flightBoostAccel: number;
     flightBoostDecel: number;
+
+    // ── Warp ──────────────────────────────────────────────────────────
     flightWarpSpeed: number;
     flightWarpAccel: number;
     flightWarpDecel: number;
     flightWarpDecelTolerance: number;
+
+    // ── Perpendicular drift decay (simple mode) ───────────────────────
     flightPerpDecay: number;
+
+    // ── Steering feel ─────────────────────────────────────────────────
+    flightMaxPointerOffset: number;  // pixels before reaching full turn rate
+    flightMaxTurnRate: number;       // radians/s at full pointer deflection
+    flightSteerSmoothRate: number;   // exponential-decay rate (per second)
+    flightSteerDeadzone: number;     // normalised dead zone (0–1)
+
+    // ── Roll ──────────────────────────────────────────────────────────
+    flightRollSpeed: number;   // max roll angular velocity (rad/s)
+    flightRollAccel: number;   // how fast roll ramps up (rad/s²)
+    flightRollFriction: number; // how fast roll decays when key released (rad/s²)
+
+    // ── Visual banking ────────────────────────────────────────────────
+    flightBankLerpSpeed: number; // exponential-decay rate for banking animation (per second)
+    flightMaxBankAngle: number;  // max visual roll angle (rad)
+    flightMaxBankPitch: number;  // max visual pitch angle (rad)
+
+    // ── Misc ──────────────────────────────────────────────────────────
+    flightWarpChargeTime: number; // seconds to hold Space before warp engages
 }

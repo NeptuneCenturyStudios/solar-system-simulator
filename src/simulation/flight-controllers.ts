@@ -1,23 +1,9 @@
 import * as THREE from 'three';
 import { NotificationType } from '../event-log/event-log';
 import {
-    FLIGHT_BANK_LERP_SPEED,
-    FLIGHT_BOOST_DECEL,
     FLIGHT_BOOST_MAX_SPEED,
-    FLIGHT_MAX_BANK_ANGLE,
-    FLIGHT_MAX_BANK_PITCH,
-    FLIGHT_MAX_POINTER_OFFSET,
     FLIGHT_MAX_SPEED,
-    FLIGHT_MAX_TURN_RATE,
-    FLIGHT_ROLL_ACCEL,
-    FLIGHT_ROLL_FRICTION,
-    FLIGHT_ROLL_SPEED,
-    FLIGHT_STEER_DEADZONE,
-    FLIGHT_STEER_SMOOTH_RATE,
-    FLIGHT_WARP_ACCEL,
     FLIGHT_WARP_CHARGE_TIME,
-    FLIGHT_WARP_DECEL,
-    FLIGHT_WARP_SPEED,
     TEXT_SPRITE_Z,
 } from '../utilities/consts';
 import {
@@ -50,16 +36,17 @@ export function exitFlightMode(ctx: IFlightControlContext) {
         flightState.warpEffect?.forceHide();
     }
 
-    // Zero all steering state FIRST, before clearing isActive,
-    // so that if any deferred event (pointer-lock release mousemove, etc.) sneaks
-    // through, it won't find non-zero values to apply.
+    // Reset ship-local flight control state (roll vel, steer, banking, prevShift).
+    const ship = flightState.activeShip ?? flightState.knownShip;
+    if (ship && !ship._isDisposed) {
+        ship.resetFlightControlState();
+    }
+
+    // Zero pointer/camera-level steering state.
     flightState.pointerOffsetX = 0;
     flightState.pointerOffsetY = 0;
     flightState.rollLeft = false;
     flightState.rollRight = false;
-    flightState.rollVelocity = 0;
-    flightState.steerX = 0;
-    flightState.steerY = 0;
     flightState.isFiring = false;
     flightState.altOrbitActive = false;
     flightState.altOrbitYaw = 0;
@@ -72,7 +59,6 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     flightState.warpDecelerating = false;
     flightState.warpCharging = false;
     flightState.warpCharge = 0;
-    flightState.prevShiftHeld = false;
 
     flightState.isActive = false;
     flightState.activeShip = null;
@@ -166,88 +152,15 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     });
 }
 
-// NOTE: applyFlightThrustSubstep has been moved to Spaceship class. This is no longer needed.
-// /**
-//  * Apply manual thrust for one physics substep.
-//  * Called from inside the physics substep loop so thrust and gravity interleave
-//  * correctly at any time scale.
-//  */
-// export function applyFlightThrustSubstep(dt: number): void {
-//     const ship = flightState.activeShip;
-//     if (!ship || ship._isDisposed || !ship.mesh) return;
-//     if (simulationState.isPaused || simulationState.timeScale === 0) return;
-
-//     // Autopilot handles its own thrust — stay out of its way.
-//     if (autopilotState.isActive) return;
-//     // Warp/boost deceleration is handled frame-level; do not add thrust during those.
-//     if (flightState.warpActive || flightState.warpDecelerating || flightState.boostDecelerating) return;
-
-//     const keys = cameraState.keys;
-//     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
-//     const fwdSpeed = ship.velocity.dot(forward);
-
-//     if (!flightState.isAdvancedMode) {
-//         // ── Simple mode ──────────────────────────────────────────────────
-//         // While a thrust key is held: forward thrust is ADDED to velocity so
-//         // gravity accumulates freely and is never overwritten.
-//         // Perpendicular drift is always decayed while any thrust key is held.
-//         const thrustActive = keys.shift || keys.w || keys.s;
-//         if (thrustActive) {
-//             const shiftEffective = keys.shift && fwdSpeed < FLIGHT_BOOST_MAX_SPEED;
-//             const wEffective = keys.w && fwdSpeed < FLIGHT_MAX_SPEED;
-
-//             if (shiftEffective) {
-//                 const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
-//                 ship.velocity.addScaledVector(forward, delta);
-//             } else if (wEffective && !keys.shift) {
-//                 const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
-//                 ship.velocity.addScaledVector(forward, delta);
-//             } else if (keys.s) {
-//                 // Decelerate — continuously applied even at fwdSpeed == 0 so
-//                 // gravity cannot cause flickering brake on/off cycles.
-//                 const ceiling = -FLIGHT_MAX_SPEED;
-//                 const decelRate = fwdSpeed > FLIGHT_MAX_SPEED ? FLIGHT_BOOST_DECEL : FLIGHT_THRUST_DECEL;
-//                 const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
-//                 ship.velocity.addScaledVector(forward, delta);
-//             }
-
-//             // Decay perpendicular drift when any thrust key is held.
-//             const newFwdSpd = ship.velocity.dot(forward);
-//             const perpVel = ship.velocity.clone().addScaledVector(forward, -newFwdSpd);
-//             const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * dt);
-//             perpVel.multiplyScalar(decay);
-//             ship.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
-//         }
-//     } else {
-//         // ── Advanced mode ────────────────────────────────────────────────
-//         // Thrust adds to velocity without removing gravity-accumulated
-//         // perpendicular components, so orbital mechanics work at all times.
-//         if (keys.shift) {
-//             if (fwdSpeed < FLIGHT_BOOST_MAX_SPEED) {
-//                 const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
-//                 ship.velocity.addScaledVector(forward, delta);
-//             }
-//         } else if (keys.w) {
-//             if (fwdSpeed < FLIGHT_MAX_SPEED) {
-//                 const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
-//                 ship.velocity.addScaledVector(forward, delta);
-//             }
-//         } else if (keys.s) {
-//             if (fwdSpeed > -FLIGHT_MAX_SPEED) {
-//                 const delta = Math.max(-FLIGHT_THRUST_DECEL * dt, -FLIGHT_MAX_SPEED - fwdSpeed);
-//                 ship.velocity.addScaledVector(forward, delta);
-//             }
-//         }
-//     }
-// }
-
 /**
  * Applies per-frame flight controls to the active spaceship.
  * Called from animate() when flightState.isActive.
  *
  * NOTE: Velocity mutation (thrust) happens per physics substep inside
- * updateSimulation() via applyFlightThrustSubstep().  This function handles
+ * updateSimulation() via ship.applyFlightThrustSubstep().  This function handles
  * frame-level state transitions, steering, roll, and HUD only.
+ * Warp/boost deceleration and warp acceleration are also handled here
+ * (frame-level velocity steps applied via ship methods).
  * currentSpeed is synced from the ship's actual velocity after the physics
  * loop completes (in animation-loop.ts).
  */
@@ -270,19 +183,13 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
 
     // ── Warp deceleration ────────────────────────────────────────────────────
     // After warp ends, decelerate in two phases:
-    //   Phase 1: shed speed from warp → FLIGHT_BOOST_MAX_SPEED using FLIGHT_WARP_DECEL.
-    //   Phase 2 (no shift): hand off to boost decel so FLIGHT_BOOST_DECEL carries the
-    //             ship the rest of the way down to FLIGHT_MAX_SPEED.
-    //   Phase 2 (shift held): end warp decel at boost speed and let the normal boost
-    //             logic maintain boost speed until Shift is released.
+    //   Phase 1: shed speed from warp → FLIGHT_BOOST_MAX_SPEED using warp decel.
+    //   Phase 2 (no shift): hand off to boost decel until normal max speed.
+    //   Phase 2 (shift held): end warp decel at boost speed.
     if (flightState.warpDecelerating) {
-        const fwdSpd = ship.velocity.dot(forward);
-        const unclampedWarpSpd = fwdSpd - FLIGHT_WARP_DECEL * simDt;
-        if (unclampedWarpSpd > FLIGHT_BOOST_MAX_SPEED) {
-            // Phase 1: decel from warp speed to boost max using warp decel rate.
-            ship.velocity.copy(forward).multiplyScalar(unclampedWarpSpd);
-            flightState.currentSpeed = unclampedWarpSpd;
-        } else {
+        const stillDecel = ship.applyWarpDecelerationStep(simDt, forward);
+        flightState.currentSpeed = ship.velocity.dot(forward);
+        if (!stillDecel) {
             // Reached boost speed — end the warp decel phase.
             flightState.warpDecelerating = false;
             flightState.warpEffect?.stop();
@@ -291,11 +198,10 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
             ctx.steeringOriginMarker.visible = true;
             if (keys.shift) {
                 // Case 2: shift held — sit at boost speed; normal boost logic takes over.
-                flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_BOOST_MAX_SPEED);
+                flightState.currentSpeed = Math.min(flightState.currentSpeed, FLIGHT_BOOST_MAX_SPEED);
             } else {
                 // Case 1: no shift — transition to boost decel toward normal max speed.
                 flightState.boostDecelerating = true;
-                flightState.currentSpeed = fwdSpd;
             }
         }
         flightState.thrustActive = false;
@@ -306,16 +212,11 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // ── Boost deceleration ───────────────────────────────────────────────────
     // When Shift is released above FLIGHT_MAX_SPEED, rapidly decelerate back down.
     if (flightState.boostDecelerating) {
-        const fwdSpd = ship.velocity.dot(forward);
-        const unclampedBoostSpd = fwdSpd - FLIGHT_BOOST_DECEL * simDt;
-        if (unclampedBoostSpd > FLIGHT_MAX_SPEED) {
-            // Still above max after this decel step — continue decelerating.
-            ship.velocity.copy(forward).multiplyScalar(unclampedBoostSpd);
-            flightState.currentSpeed = unclampedBoostSpd;
-        } else {
-            // This decel step reaches or overshoots FLIGHT_MAX_SPEED — exit.
+        const stillDecel = ship.applyBoostDecelerationStep(simDt, forward);
+        flightState.currentSpeed = ship.velocity.dot(forward);
+        if (!stillDecel) {
             flightState.boostDecelerating = false;
-            flightState.currentSpeed = Math.min(fwdSpd, FLIGHT_MAX_SPEED);
+            // Clamp to max speed (currentSpeed already clamped by the ship method)
         }
         flightState.thrustActive = false;
         // Fall through to steering/roll below
@@ -323,15 +224,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
 
     // ── Warp active ──────────────────────────────────────────────────────────
     if (flightState.warpActive) {
-        // Accelerate toward FLIGHT_WARP_SPEED rather than snapping instantly.
-        const fwdSpd = ship.velocity.dot(forward);
-        if (fwdSpd < FLIGHT_WARP_SPEED) {
-            const delta = Math.min(FLIGHT_WARP_ACCEL * simDt, FLIGHT_WARP_SPEED - fwdSpd);
-            ship.velocity.addScaledVector(forward, delta);
-        } else {
-            // Clamp to warp max just in case gravity accelerates beyond it.
-            ship.velocity.copy(forward).multiplyScalar(FLIGHT_WARP_SPEED);
-        }
+        ship.applyWarpAccelerationStep(simDt, forward);
         flightState.currentSpeed = ship.velocity.dot(forward);
         flightState.thrustActive = true;
         // (warpEffect.update is called centrally in the animate loop each frame)
@@ -380,7 +273,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     if (manualInput) flightState.thrustActive = thrustActive;
 
     // Trigger boost decel when Shift is *released* while still above normal max speed.
-    const shiftJustReleased = flightState.prevShiftHeld && !keys.shift;
+    const shiftJustReleased = ship.prevShiftHeld && !keys.shift;
     if (
         manualInput &&
         shiftJustReleased &&
@@ -408,53 +301,36 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         }
     }
 
-    // ── Roll with inertia (A/D) ───────────────────────────────────────────────
-    const rollTarget = flightState.rollLeft
-        ? -FLIGHT_ROLL_SPEED
-        : flightState.rollRight
-          ? FLIGHT_ROLL_SPEED
-          : 0;
+    // ── Roll with inertia (A/D) — delegated to ship ──────────────────────────
     if (
         manualInput &&
-        !flightState.altOrbitActive &&
-        (flightState.rollLeft || flightState.rollRight)
+        !flightState.altOrbitActive
     ) {
-        const dir = rollTarget > 0 ? 1 : -1;
-        flightState.rollVelocity += dir * FLIGHT_ROLL_ACCEL * dt;
-        flightState.rollVelocity = THREE.MathUtils.clamp(
-            flightState.rollVelocity,
-            -FLIGHT_ROLL_SPEED,
-            FLIGHT_ROLL_SPEED
-        );
-    } else {
-        if (Math.abs(flightState.rollVelocity) < FLIGHT_ROLL_FRICTION * dt) {
-            flightState.rollVelocity = 0;
-        } else {
-            flightState.rollVelocity -=
-                Math.sign(flightState.rollVelocity) * FLIGHT_ROLL_FRICTION * dt;
+        const rollDelta = ship.applyRoll(dt, flightState.rollLeft, flightState.rollRight);
+        // Apply the roll delta (from key input OR friction decay) to the camera quaternion.
+        if (rollDelta !== 0) {
+            const dqRoll = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 0, 1),
+                rollDelta
+            );
+            flightState.flightCameraQuat.multiply(dqRoll);
         }
-    }
-    if (flightState.rollVelocity !== 0) {
-        const dqRoll = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 0, 1),
-            flightState.rollVelocity * dt
-        );
-        flightState.flightCameraQuat.multiply(dqRoll);
     }
 
     // ── Steering with smoothing + dead zone (mouse) ───────────────────────────
+    const h = ship.handling;
     const rawXFull = THREE.MathUtils.clamp(
-        flightState.pointerOffsetX / FLIGHT_MAX_POINTER_OFFSET,
+        flightState.pointerOffsetX / h.flightMaxPointerOffset,
         -1,
         1
     );
     const rawYFull = THREE.MathUtils.clamp(
-        flightState.pointerOffsetY / FLIGHT_MAX_POINTER_OFFSET,
+        flightState.pointerOffsetY / h.flightMaxPointerOffset,
         -1,
         1
     );
     function applyDeadzone(v: number) {
-        const d = FLIGHT_STEER_DEADZONE;
+        const d = h.flightSteerDeadzone;
         if (Math.abs(v) < d) return 0;
         return (Math.sign(v) * (Math.abs(v) - d)) / (1 - d);
     }
@@ -462,39 +338,31 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     const rawY = applyDeadzone(rawYFull);
 
     if (manualInput && !flightState.altOrbitActive) {
-        const steerAlpha = 1 - Math.exp(-FLIGHT_STEER_SMOOTH_RATE * dt);
-        flightState.steerX += (rawX - flightState.steerX) * steerAlpha;
-        flightState.steerY += (rawY - flightState.steerY) * steerAlpha;
+        const { yawDelta, pitchDelta, bankQuat } = ship.applySteering(dt, rawX, rawY);
 
-        const yawQuat = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 1, 0),
-            -flightState.steerX * FLIGHT_MAX_TURN_RATE * dt
-        );
-        flightState.flightCameraQuat.multiply(yawQuat);
+        if (yawDelta !== 0) {
+            const yawQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                yawDelta
+            );
+            flightState.flightCameraQuat.multiply(yawQuat);
+        }
+        if (pitchDelta !== 0) {
+            const pitchQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(1, 0, 0),
+                pitchDelta
+            );
+            flightState.flightCameraQuat.multiply(pitchQuat);
+        }
 
-        const pitchQuat = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(1, 0, 0),
-            flightState.steerY * FLIGHT_MAX_TURN_RATE * dt
-        );
-        flightState.flightCameraQuat.multiply(pitchQuat);
-
-        const bankAlpha = 1 - Math.exp(-FLIGHT_BANK_LERP_SPEED * dt);
-        flightState.shipBankRoll +=
-            (flightState.steerX * FLIGHT_MAX_BANK_ANGLE - flightState.shipBankRoll) * bankAlpha;
-        flightState.shipBankPitch +=
-            (flightState.steerY * FLIGHT_MAX_BANK_PITCH - flightState.shipBankPitch) * bankAlpha;
-
-        const bankQuat = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(flightState.shipBankPitch, 0, flightState.shipBankRoll, 'XYZ')
-        );
         ship.mesh.quaternion.copy(flightState.flightCameraQuat).multiply(bankQuat);
         flightState.flightCameraQuat.normalize();
     } else {
         flightState.flightCameraQuat.copy(ship.mesh.quaternion);
-        flightState.shipBankRoll = 0;
-        flightState.shipBankPitch = 0;
-        flightState.steerX = 0;
-        flightState.steerY = 0;
+        ship.shipBankRoll = 0;
+        ship.shipBankPitch = 0;
+        ship.steerX = 0;
+        ship.steerY = 0;
     }
 
     // ── Steering line (uiScene screen-space) ─────────────────────────────────
@@ -503,7 +371,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     const noseScreenY = noseNDC.y * (window.innerHeight * 0.5);
 
     const rawMag = Math.sqrt(flightState.pointerOffsetX ** 2 + flightState.pointerOffsetY ** 2);
-    const circleScale = rawMag > FLIGHT_MAX_POINTER_OFFSET ? FLIGHT_MAX_POINTER_OFFSET / rawMag : 1;
+    const circleScale = rawMag > h.flightMaxPointerOffset ? h.flightMaxPointerOffset / rawMag : 1;
     const displayOffX = flightState.pointerOffsetX * circleScale;
     const displayOffY = flightState.pointerOffsetY * circleScale;
 
@@ -550,5 +418,5 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
 
     // ── Track prevShiftHeld for next frame's Shift-release detection ──────
-    flightState.prevShiftHeld = keys.shift;
+    ship.prevShiftHeld = keys.shift;
 }

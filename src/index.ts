@@ -3103,16 +3103,13 @@ function spawnShip() {
     flightState.pointerOffsetY = 0;
     flightState.rollLeft = false;
     flightState.rollRight = false;
-    flightState.rollVelocity = 0;
-    flightState.steerX = 0;
-    flightState.steerY = 0;
     flightState.warpCharge = 0;
     flightState.warpCharging = false;
     // warpActive and warpDecelerating are intentionally NOT zeroed here —
     // they are preserved from the background-warp state set before re-entry.
+    // Reset ship-local flight control state (roll vel, steer, banking, prevShift).
+    ship.resetFlightControlState();
     flightState.flightCameraQuat.copy(ship.mesh.quaternion);
-    flightState.shipBankRoll = 0;
-    flightState.shipBankPitch = 0;
 
     // Deselect any currently selected body so the gizmo doesn't appear on entry
     if (selectedBody) {

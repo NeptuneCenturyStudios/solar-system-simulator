@@ -37,12 +37,9 @@ import {
     TIME_SCALE,
     TEXT_SPRITE_Z,
     FLIGHT_WARP_SPEED,
-    FLIGHT_WARP_ACCEL,
     FLIGHT_BOOST_MAX_SPEED,
     FLIGHT_BOOST_DECEL,
     FLIGHT_WARP_DECEL,
-    FLIGHT_THRUST_DECEL_TOLERANCE,
-    FLIGHT_WARP_DECEL_TOLERANCE,
     FLIGHT_MAX_SPEED,
     FLIGHT_THRUST_DECEL,
     FLIGHT_BOOST_ACCEL,
@@ -222,24 +219,18 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             updateFlightControls(flightCtx, wallDt, dtTotal);
         }
 
-        // ── Background warp ──────────────────────────────────────────────
+        // ── Background warp (delegated to ship) ─────────────────────────
         if (!isFlightModeActive && ctx.flightState.warpActive) {
             const bgShip = ctx.flightState.knownShip;
             if (bgShip && !bgShip._isDisposed && bgShip.mesh) {
                 const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
-                const fwdSpd = bgShip.velocity.dot(bgFwd);
-                if (fwdSpd < FLIGHT_WARP_SPEED) {
-                    const delta = Math.min(FLIGHT_WARP_ACCEL * dtTotal, FLIGHT_WARP_SPEED - fwdSpd);
-                    bgShip.velocity.addScaledVector(bgFwd, delta);
-                } else {
-                    bgShip.velocity.copy(bgFwd).multiplyScalar(FLIGHT_WARP_SPEED);
-                }
+                bgShip.applyWarpAccelerationStep(dtTotal, bgFwd);
             } else {
                 ctx.flightState.warpActive = false;
             }
         }
 
-        // ── Background deceleration ──────────────────────────────────────
+        // ── Background deceleration (delegated to ship) ──────────────────
         if (
             !isFlightModeActive &&
             (ctx.flightState.warpDecelerating || ctx.flightState.boostDecelerating)
@@ -247,32 +238,19 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             const _bgShip = ctx.flightState.knownShip;
             if (_bgShip && !_bgShip._isDisposed && _bgShip.mesh) {
                 const _bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(_bgShip.mesh.quaternion);
-                const _bgFwdSpd = _bgShip.velocity.dot(_bgFwd);
                 if (ctx.flightState.warpDecelerating) {
-                    if (_bgFwdSpd > FLIGHT_BOOST_MAX_SPEED + FLIGHT_WARP_DECEL_TOLERANCE) {
-                        const ns = Math.max(
-                            FLIGHT_BOOST_MAX_SPEED,
-                            _bgFwdSpd - FLIGHT_WARP_DECEL * dtTotal
-                        );
-                        _bgShip.velocity.copy(_bgFwd).multiplyScalar(ns);
-                        ctx.flightState.currentSpeed = ns;
-                    } else {
+                    const stillDecel = _bgShip.applyWarpDecelerationStep(dtTotal, _bgFwd);
+                    ctx.flightState.currentSpeed = _bgShip.velocity.dot(_bgFwd);
+                    if (!stillDecel) {
                         ctx.flightState.warpDecelerating = false;
                         ctx.flightState.boostDecelerating = true;
-                        ctx.flightState.currentSpeed = _bgFwdSpd;
                         flightState.warpEffect?.stop();
                     }
                 } else if (ctx.flightState.boostDecelerating) {
-                    if (_bgFwdSpd > FLIGHT_MAX_SPEED + FLIGHT_THRUST_DECEL_TOLERANCE) {
-                        const ns = Math.max(
-                            FLIGHT_MAX_SPEED,
-                            _bgFwdSpd - FLIGHT_BOOST_DECEL * dtTotal
-                        );
-                        _bgShip.velocity.copy(_bgFwd).multiplyScalar(ns);
-                        ctx.flightState.currentSpeed = ns;
-                    } else {
+                    const stillDecel = _bgShip.applyBoostDecelerationStep(dtTotal, _bgFwd);
+                    ctx.flightState.currentSpeed = _bgShip.velocity.dot(_bgFwd);
+                    if (!stillDecel) {
                         ctx.flightState.boostDecelerating = false;
-                        ctx.flightState.currentSpeed = Math.min(_bgFwdSpd, FLIGHT_MAX_SPEED);
                         flightState.warpEffect?.stop();
                     }
                 }

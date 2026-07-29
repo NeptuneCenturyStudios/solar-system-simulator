@@ -40,11 +40,6 @@ export const flightState: IFlightState = {
     pointerOffsetY: 0,
     rollLeft: false,
     rollRight: false,
-    /** Current angular roll velocity (rad/s). Decays when key released. */
-    rollVelocity: 0,
-    /** Smoothed steering values in [-1, 1]. Lerp toward raw target each frame. */
-    steerX: 0,
-    steerY: 0,
     /** Whether advanced (additive) flight physics are active. Default = false (simple mode). */
     isAdvancedMode: false,
     // Pre-flight camera snapshot so we can restore exactly on exit
@@ -70,16 +65,8 @@ export const flightState: IFlightState = {
      *  Rotated by mouse steering (world-yaw + local-pitch) and A/D roll.
      *  In 3rd-person view the camera follows this, not ship.mesh.quaternion. */
     flightCameraQuat: new THREE.Quaternion(),
-    /** Visual roll offset of ship mesh relative to camera frame (radians).
-     *  Animated toward -steerX * FLIGHT_MAX_BANK_ANGLE when steering laterally. */
-    shipBankRoll: 0,
-    /** Visual pitch offset of ship mesh relative to camera frame (radians).
-     *  Animated toward steerY * FLIGHT_MAX_BANK_PITCH when steering vertically. */
-    shipBankPitch: 0,
     /** True while LMB is held during flight — fires weapon particles each frame. */
     isFiring: false,
-    /** Whether Shift was held on the previous frame — used to detect Shift-release transitions. */
-    prevShiftHeld: false,
     /** True while ALT is held — camera orbits the ship instead of steering it. */
     altOrbitActive: false,
     /** Accumulated yaw offset (radians) for the ALT orbit camera, in ship-local space. */

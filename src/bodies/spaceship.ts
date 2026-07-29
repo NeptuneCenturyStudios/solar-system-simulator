@@ -18,6 +18,11 @@ const SF = SCALE_FACTOR / SCALE_FACTOR;
  * Ship local axes: +Z = forward, +Y = up, +X = right.
  * Geometry is assembled from merged primitives scaled by SCALE_FACTOR.
  * Extends Body so gravity applies automatically when added to simulationState.bodies.
+ *
+ * Owns its flight-control logic via applyFlightThrustSubstep and the new ship-level
+ * methods for roll, steering, warp/boost deceleration, and visual banking.  Frame-level
+ * state transitions (warp charging, button combos) and camera management stay in
+ * flight-controllers.ts / animation-loop.ts.
  */
 export class Spaceship extends Body {
     /** Local-space offset for 1st-person cockpit camera. */
@@ -30,6 +35,18 @@ export class Spaceship extends Body {
     trail: IShipEffect;
     /** Handling characteristics of the spaceship. */
     handling: ISpaceshipHandling;
+
+    /** Current angular roll velocity (rad/s). Decays when key released. */
+    rollVelocity: number = 0;
+    /** Smoothed steering values in [-1, 1]. Lerp toward raw target each frame. */
+    steerX: number = 0;
+    steerY: number = 0;
+    /** Visual roll offset relative to camera frame (radians). */
+    shipBankRoll: number = 0;
+    /** Visual pitch offset relative to camera frame (radians). */
+    shipBankPitch: number = 0;
+    /** Whether Shift was held on the previous frame. */
+    prevShiftHeld: boolean = false;
 
     /** Active warp loop sound controller, or null if not currently playing. */
     private _warpSound: WarpSoundController | null = null;
@@ -185,7 +202,10 @@ export class Spaceship extends Body {
         this._loadModel(modelName);
     }
 
-    // Flight Controllers
+    // ─────────────────────────────────────────────────────────────────────────────
+    //  Flight Control Methods (owned by the ship)
+    // ─────────────────────────────────────────────────────────────────────────────
+
     /**
      * Apply manual thrust for one physics substep.
      * Called from inside the physics substep loop so thrust and gravity interleave
@@ -194,16 +214,16 @@ export class Spaceship extends Body {
     applyFlightThrustSubstep(dt: number): void {
         if (this._isDisposed || !this.mesh) return;
         if (simulationState.isPaused || simulationState.timeScale === 0) return;
-    
+
         // Autopilot handles its own thrust — stay out of its way.
         if (autopilotState.isActive) return;
         // Warp/boost deceleration is handled frame-level; do not add thrust during those.
         if (flightState.warpActive || flightState.warpDecelerating || flightState.boostDecelerating) return;
-    
+
         const keys = cameraState.keys;
         const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
         const fwdSpeed = this.velocity.dot(forward);
-    
+
         if (!flightState.isAdvancedMode) {
             // ── Simple mode ──────────────────────────────────────────────────
             // While a thrust key is held: forward thrust is ADDED to velocity so
@@ -213,7 +233,7 @@ export class Spaceship extends Body {
             if (thrustActive) {
                 const shiftEffective = keys.shift && fwdSpeed < this.handling.flightBoostMaxSpeed;
                 const wEffective = keys.w && fwdSpeed < this.handling.flightMaxSpeed;
-    
+
                 if (shiftEffective) {
                     const delta = Math.min(this.handling.flightBoostAccel * dt, this.handling.flightBoostMaxSpeed - fwdSpeed);
                     this.velocity.addScaledVector(forward, delta);
@@ -228,7 +248,7 @@ export class Spaceship extends Body {
                     const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
                     this.velocity.addScaledVector(forward, delta);
                 }
-    
+
                 // Decay perpendicular drift when any thrust key is held.
                 const newFwdSpd = this.velocity.dot(forward);
                 const perpVel = this.velocity.clone().addScaledVector(forward, -newFwdSpd);
@@ -258,6 +278,142 @@ export class Spaceship extends Body {
             }
         }
     }
+
+    /**
+     * Apply warp deceleration for one frame step.
+     * Phase 1: shed speed from FLIGHT_WARP_SPEED down to FLIGHT_BOOST_MAX_SPEED
+     *          using the warp deceleration rate.
+     * Returns true while still in phase 1, false when boost speed has been reached
+     * (caller should then flip flightState.boostDecelerating).
+     */
+    applyWarpDecelerationStep(simDt: number, forward: THREE.Vector3): boolean {
+        const fwdSpd = this.velocity.dot(forward);
+        const unclamped = fwdSpd - this.handling.flightWarpDecel * simDt;
+        if (unclamped > this.handling.flightBoostMaxSpeed) {
+            this.velocity.copy(forward).multiplyScalar(unclamped);
+            return true; // still in warp decel
+        }
+        // Reached boost speed — snap and signal done.
+        this.velocity.copy(forward).multiplyScalar(this.handling.flightBoostMaxSpeed);
+        return false;
+    }
+
+    /**
+     * Apply boost deceleration for one frame step.
+     * Phase 2: shed speed from FLIGHT_BOOST_MAX_SPEED down to FLIGHT_MAX_SPEED
+     *          using the boost deceleration rate.
+     * Returns true while still decelerating, false when normal max speed has been reached.
+     */
+    applyBoostDecelerationStep(simDt: number, forward: THREE.Vector3): boolean {
+        const fwdSpd = this.velocity.dot(forward);
+        const unclamped = fwdSpd - this.handling.flightBoostDecel * simDt;
+        if (unclamped > this.handling.flightMaxSpeed) {
+            this.velocity.copy(forward).multiplyScalar(unclamped);
+            return true; // still in boost decel
+        }
+        // Reached normal max — snap and signal done.
+        this.velocity.copy(forward).multiplyScalar(this.handling.flightMaxSpeed);
+        return false;
+    }
+
+    /**
+     * Accelerate toward warp speed for one frame step.
+     */
+    applyWarpAccelerationStep(simDt: number, forward: THREE.Vector3): void {
+        const fwdSpd = this.velocity.dot(forward);
+        if (fwdSpd < this.handling.flightWarpSpeed) {
+            const delta = Math.min(this.handling.flightWarpAccel * simDt, this.handling.flightWarpSpeed - fwdSpd);
+            this.velocity.addScaledVector(forward, delta);
+        } else {
+            // Clamp to warp max just in case gravity accelerates beyond it.
+            this.velocity.copy(forward).multiplyScalar(this.handling.flightWarpSpeed);
+        }
+    }
+
+    /**
+     * Apply roll with inertia for one frame.
+     * @param dt  Wall-clock seconds (non-physics-scaled).
+     * @param rollLeft  True if A (left roll) is held.
+     * @param rollRight True if D (right roll) is held.
+     * @returns The angular delta (radians) to apply to the camera quaternion.
+     */
+    applyRoll(dt: number, rollLeft: boolean, rollRight: boolean): number {
+        const h = this.handling;
+        const rollTarget = rollLeft
+            ? -h.flightRollSpeed
+            : rollRight
+              ? h.flightRollSpeed
+              : 0;
+
+        if (rollLeft || rollRight) {
+            const dir = rollTarget > 0 ? 1 : -1;
+            this.rollVelocity += dir * h.flightRollAccel * dt;
+            this.rollVelocity = THREE.MathUtils.clamp(
+                this.rollVelocity,
+                -h.flightRollSpeed,
+                h.flightRollSpeed
+            );
+        } else {
+            if (Math.abs(this.rollVelocity) < h.flightRollFriction * dt) {
+                this.rollVelocity = 0;
+            } else {
+                this.rollVelocity -=
+                    Math.sign(this.rollVelocity) * h.flightRollFriction * dt;
+            }
+        }
+
+        return this.rollVelocity * dt;
+    }
+
+    /**
+     * Apply steering smoothing and compute yaw/pitch deltas for one frame.
+     * @param dt  Wall-clock seconds.
+     * @param rawX  Normalised horizontal pointer position after deadzone [-1..1].
+     * @param rawY  Normalised vertical pointer position after deadzone [-1..1].
+     * @returns yawDelta, pitchDelta, and a banking quaternion for the ship mesh.
+     */
+    applySteering(
+        dt: number,
+        rawX: number,
+        rawY: number
+    ): { yawDelta: number; pitchDelta: number; bankQuat: THREE.Quaternion } {
+        const h = this.handling;
+        const steerAlpha = 1 - Math.exp(-h.flightSteerSmoothRate * dt);
+
+        this.steerX += (rawX - this.steerX) * steerAlpha;
+        this.steerY += (rawY - this.steerY) * steerAlpha;
+
+        const yawDelta = -this.steerX * h.flightMaxTurnRate * dt;
+        const pitchDelta = this.steerY * h.flightMaxTurnRate * dt;
+
+        // Visual banking
+        const bankAlpha = 1 - Math.exp(-h.flightBankLerpSpeed * dt);
+        this.shipBankRoll +=
+            (this.steerX * h.flightMaxBankAngle - this.shipBankRoll) * bankAlpha;
+        this.shipBankPitch +=
+            (this.steerY * h.flightMaxBankPitch - this.shipBankPitch) * bankAlpha;
+
+        const bankQuat = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(this.shipBankPitch, 0, this.shipBankRoll, 'XYZ')
+        );
+
+        return { yawDelta, pitchDelta, bankQuat };
+    }
+
+    /**
+     * Zero all ship-local flight control state (roll, steer, banking, prevShift).
+     * Call on flight-mode exit and re-entry so the ship doesn't retain stale inputs.
+     */
+    resetFlightControlState(): void {
+        this.rollVelocity = 0;
+        this.steerX = 0;
+        this.steerY = 0;
+        this.shipBankRoll = 0;
+        this.shipBankPitch = 0;
+        this.prevShiftHeld = false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
 
     /**
      * Call once per frame to manage the warp loop sound effect.
