@@ -7,8 +7,7 @@ import { IShipEffect } from '../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
 import { WarpSoundController, playWarpLoop } from '../utilities/audio.js';
-import { IDeathOptions } from '../interfaces';
-import { FLIGHT_BOOST_ACCEL, FLIGHT_BOOST_DECEL, FLIGHT_BOOST_MAX_SPEED, FLIGHT_MAX_SPEED, FLIGHT_PERP_DECAY, FLIGHT_THRUST_ACCEL, FLIGHT_THRUST_DECEL, } from "../utilities/consts";
+import { IDeathOptions, ISpaceshipHandling } from '../interfaces';
 import { autopilotState, cameraState, flightState, simulationState } from '../simulation/simulation';
 
 
@@ -29,6 +28,8 @@ export class Spaceship extends Body {
     thrusterOffset: THREE.Vector3;
     /** Glowing engine exhaust trail rendered as a connected line in world space. */
     trail: IShipEffect;
+    /** Handling characteristics of the spaceship. */
+    handling: ISpaceshipHandling;
 
     /** Active warp loop sound controller, or null if not currently playing. */
     private _warpSound: WarpSoundController | null = null;
@@ -41,6 +42,7 @@ export class Spaceship extends Body {
      * @param velocity The initial velocity of the spaceship.
      * @param id Unique identifier for the spaceship.
      * @param modelName Base filename (without extension) of the OBJ/MTL model to load.
+     * @param handling The handling characteristics of the spaceship.
      */
     constructor(
         dependencies: object,
@@ -48,7 +50,8 @@ export class Spaceship extends Body {
         position: THREE.Vector3,
         velocity: THREE.Vector3,
         id: string,
-        modelName: string = 'Lo_poly_Spaceship_01_by_Liz_Reddington'
+        modelName: string = 'Lo_poly_Spaceship_01_by_Liz_Reddington',
+        handling: ISpaceshipHandling
     ) {
         // Invisible placeholder mesh — replaced by the loaded OBJ group once ready.
         const placeholderGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
@@ -68,6 +71,9 @@ export class Spaceship extends Body {
             'Spaceship',
             BodyTypeEnum.SpaceShip
         );
+
+        // Store the handling characteristics for use in flight control calculations.
+        this.handling = handling;
 
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
@@ -186,8 +192,7 @@ export class Spaceship extends Body {
      * correctly at any time scale.
      */
     applyFlightThrustSubstep(dt: number): void {
-        const ship = flightState.activeShip;
-        if (!ship || ship._isDisposed || !ship.mesh) return;
+        if (this._isDisposed || !this.mesh) return;
         if (simulationState.isPaused || simulationState.timeScale === 0) return;
     
         // Autopilot handles its own thrust — stay out of its way.
@@ -197,7 +202,7 @@ export class Spaceship extends Body {
     
         const keys = cameraState.keys;
         const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
-        const fwdSpeed = ship.velocity.dot(forward);
+        const fwdSpeed = this.velocity.dot(forward);
     
         if (!flightState.isAdvancedMode) {
             // ── Simple mode ──────────────────────────────────────────────────
@@ -206,49 +211,49 @@ export class Spaceship extends Body {
             // Perpendicular drift is always decayed while any thrust key is held.
             const thrustActive = keys.shift || keys.w || keys.s;
             if (thrustActive) {
-                const shiftEffective = keys.shift && fwdSpeed < FLIGHT_BOOST_MAX_SPEED;
-                const wEffective = keys.w && fwdSpeed < FLIGHT_MAX_SPEED;
+                const shiftEffective = keys.shift && fwdSpeed < this.handling.flightBoostMaxSpeed;
+                const wEffective = keys.w && fwdSpeed < this.handling.flightMaxSpeed;
     
                 if (shiftEffective) {
-                    const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
-                    ship.velocity.addScaledVector(forward, delta);
+                    const delta = Math.min(this.handling.flightBoostAccel * dt, this.handling.flightBoostMaxSpeed - fwdSpeed);
+                    this.velocity.addScaledVector(forward, delta);
                 } else if (wEffective && !keys.shift) {
-                    const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
-                    ship.velocity.addScaledVector(forward, delta);
+                    const delta = Math.min(this.handling.flightThrustAccel * dt, this.handling.flightMaxSpeed - fwdSpeed);
+                    this.velocity.addScaledVector(forward, delta);
                 } else if (keys.s) {
                     // Decelerate — continuously applied even at fwdSpeed == 0 so
                     // gravity cannot cause flickering brake on/off cycles.
-                    const ceiling = -FLIGHT_MAX_SPEED;
-                    const decelRate = fwdSpeed > FLIGHT_MAX_SPEED ? FLIGHT_BOOST_DECEL : FLIGHT_THRUST_DECEL;
+                    const ceiling = -this.handling.flightMaxSpeed;
+                    const decelRate = fwdSpeed > this.handling.flightMaxSpeed ? this.handling.flightBoostDecel : this.handling.flightThrustDecel;
                     const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
-                    ship.velocity.addScaledVector(forward, delta);
+                    this.velocity.addScaledVector(forward, delta);
                 }
     
                 // Decay perpendicular drift when any thrust key is held.
-                const newFwdSpd = ship.velocity.dot(forward);
-                const perpVel = ship.velocity.clone().addScaledVector(forward, -newFwdSpd);
-                const decay = Math.max(0, 1 - FLIGHT_PERP_DECAY * dt);
+                const newFwdSpd = this.velocity.dot(forward);
+                const perpVel = this.velocity.clone().addScaledVector(forward, -newFwdSpd);
+                const decay = Math.max(0, 1 - this.handling.flightPerpDecay * dt);
                 perpVel.multiplyScalar(decay);
-                ship.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
+                this.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
             }
         } else {
             // ── Advanced mode ────────────────────────────────────────────────
             // Thrust adds to velocity without removing gravity-accumulated
             // perpendicular components, so orbital mechanics work at all times.
             if (keys.shift) {
-                if (fwdSpeed < FLIGHT_BOOST_MAX_SPEED) {
-                    const delta = Math.min(FLIGHT_BOOST_ACCEL * dt, FLIGHT_BOOST_MAX_SPEED - fwdSpeed);
-                    ship.velocity.addScaledVector(forward, delta);
+                if (fwdSpeed < this.handling.flightBoostMaxSpeed) {
+                    const delta = Math.min(this.handling.flightBoostAccel * dt, this.handling.flightBoostMaxSpeed - fwdSpeed);
+                    this.velocity.addScaledVector(forward, delta);
                 }
             } else if (keys.w) {
-                if (fwdSpeed < FLIGHT_MAX_SPEED) {
-                    const delta = Math.min(FLIGHT_THRUST_ACCEL * dt, FLIGHT_MAX_SPEED - fwdSpeed);
-                    ship.velocity.addScaledVector(forward, delta);
+                if (fwdSpeed < this.handling.flightMaxSpeed) {
+                    const delta = Math.min(this.handling.flightThrustAccel * dt, this.handling.flightMaxSpeed - fwdSpeed);
+                    this.velocity.addScaledVector(forward, delta);
                 }
             } else if (keys.s) {
-                if (fwdSpeed > -FLIGHT_MAX_SPEED) {
-                    const delta = Math.max(-FLIGHT_THRUST_DECEL * dt, -FLIGHT_MAX_SPEED - fwdSpeed);
-                    ship.velocity.addScaledVector(forward, delta);
+                if (fwdSpeed > -this.handling.flightMaxSpeed) {
+                    const delta = Math.max(-this.handling.flightThrustDecel * dt, -this.handling.flightMaxSpeed - fwdSpeed);
+                    this.velocity.addScaledVector(forward, delta);
                 }
             }
         }

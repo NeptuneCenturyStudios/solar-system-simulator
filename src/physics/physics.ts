@@ -8,6 +8,7 @@ import { Spaceship } from '../bodies/spaceship';
 import { NotificationType } from '../event-log/event-log';
 import { EffectiveGForce } from '../types';
 import { IFlightState, ISimulationState, IAutopilotState } from '../interfaces';
+import { flightState } from '../simulation/simulation';
 
 // ── Scratch vectors for allocation-free physics ──────────────────────────────
 // Reused by getAcc() and updatePhysics() to eliminate GC churn in the hot path.
@@ -80,15 +81,14 @@ export function updateSimulation(
     _flightState: IFlightState,
     steps: number,
     dt: number,
-    updateAutopilot: (dt: number) => void,
-    manualThrustSubstep?: (subDt: number) => void
+    updateAutopilot: (dt: number) => void
 ) {
     // Physics integration loop
     for (let i = 0; i < steps; i++) {
         // Apply manual thrust per substep so it interleaves with gravity
         // integration, giving correct balance between thrust and gravity at
         // any time scale.
-        manualThrustSubstep?.(dt);
+        flightState.activeShip?.applyFlightThrustSubstep?.(dt);
 
         // Apply physics to bodies
         updatePhysics(simulationState);

@@ -403,8 +403,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             _dummyFlightState,
             steps,
             dt,
-            ctx.updateAutopilotStep,
-            isFlightModeActive ? ctx.flightState.activeShip?.applyFlightThrustSubstep : undefined
+            ctx.updateAutopilotStep
         );
 
         // Sync currentSpeed from the ship's real velocity after the physics loop

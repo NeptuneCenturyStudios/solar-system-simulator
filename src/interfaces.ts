@@ -403,12 +403,33 @@ export interface IFlightControlContext {
 
     refreshBodiesTable: () => void;
     addEvent: (event: { message: string; notificationType: NotificationType }) => void;
-
 }
 
 export interface IAutopilotContext {
     flightHUD: FlightHUD;
-    addEvent: (event: { message: string; notificationType: NotificationType; logMethod?: LogMethods }) => void;
+    addEvent: (event: {
+        message: string;
+        notificationType: NotificationType;
+        logMethod?: LogMethods;
+    }) => void;
     refreshBodiesTable: () => void;
     setAutopilotState: (active: boolean, canEngage: boolean) => void;
+}
+
+/**
+ * Interface representing the handling characteristics of a spaceship, including its flight performance parameters.
+ */
+export interface ISpaceshipHandling {
+    flightMaxSpeed: number;
+    flightThrustAccel: number;
+    flightThrustDecel: number;
+    flightThrustDecelTolerance: number;
+    flightBoostMaxSpeed: number;
+    flightBoostAccel: number;
+    flightBoostDecel: number;
+    flightWarpSpeed: number;
+    flightWarpAccel: number;
+    flightWarpDecel: number;
+    flightWarpDecelTolerance: number;
+    flightPerpDecay: number;
 }

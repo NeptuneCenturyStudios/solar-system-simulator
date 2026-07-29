@@ -214,6 +214,7 @@ import { pickMoonTextureForMoonType } from './procedural/moon-factory';
 import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
 import { exitFlightMode } from './simulation/flight-controllers';
 import { parseSeedFromURL, buildSeedValue, updateURLWithSeed, clearURLSeed, SEED_TYPE_NORMAL, SEED_TYPE_BLACKHOLE, getLastPushedSeed, setLastPushedSeed, resetLastPushedSeed } from './utilities/url-seed';
+import { Fighter } from './bodies/fighter';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: {
@@ -3035,7 +3036,7 @@ function spawnShip() {
         camera.getWorldDirection(cameraDir);
         const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
 
-        const ship = new Spaceship(
+        const ship = new Fighter(
             dependencies,
             scene,
             spawnPos,
