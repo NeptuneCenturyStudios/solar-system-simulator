@@ -46,15 +46,13 @@ import {
     FLIGHT_MAX_SPEED,
     FLIGHT_THRUST_DECEL,
     FLIGHT_BOOST_ACCEL,
-    FLIGHT_THRUST_ACCEL,
     WARP_FADE_DIST,
     WARP_FULL_VIS_DIST,
     WARP_SHAKE_MAG,
     FLIGHT_ALT_ORBIT_RETURN_SPEED,
     FREE_CAM_NORMAL_SPEED,
     FREE_CAM_BOOST_SPEED,
-    AUTOPILOT_ACCEL,
-    AUTOPILOT_DECEL,
+    FLIGHT_THRUST_ACCEL,
     FLIGHT_AUTOPILOT_CHARGE_TIME,
 } from '../utilities/consts';
 import {
@@ -882,14 +880,14 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                             : FLIGHT_THRUST_DECEL;
                     if (!ctx.autopilotState.isActive && ctx.keys.w) return FLIGHT_THRUST_ACCEL;
                     if (ctx.autopilotState.isActive && ctx.autopilotState.phase === 'BRAKE')
-                        return AUTOPILOT_DECEL;
+                        return FLIGHT_THRUST_DECEL;
                     if (
                         ctx.autopilotState.isActive &&
                         (ctx.autopilotState.phase === 'APPROACH' ||
                             ctx.autopilotState.phase === 'CIRCULARIZE' ||
                             ctx.autopilotState.phase === 'TIDAL_LOCK')
                     )
-                        return AUTOPILOT_ACCEL;
+                        return FLIGHT_THRUST_ACCEL;
                     return 0;
                 })();
                 const gRate = ship?.tempAcc?.length() ?? 0;

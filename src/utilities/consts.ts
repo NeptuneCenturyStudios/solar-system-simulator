@@ -275,16 +275,8 @@ export const FLIGHT_ALT_ORBIT_YAW_MAX = 90 * (Math.PI / 180); // 90° left or ri
 
 // === Autopilot tuning constants (derived from flight tuning) ===
 // u/s
-export const AUTOPILOT_APPROACH_SPEED = FLIGHT_MAX_SPEED;
 
-/** Thrust acceleration used by autopilot during approach (u/s²). */
-export const AUTOPILOT_ACCEL = FLIGHT_THRUST_ACCEL;
-/** Braking deceleration — moderate so the stop feels gradual rather than jarring. */
-export const AUTOPILOT_DECEL = FLIGHT_THRUST_DECEL;
-/** High deceleration rate used to scrub boost speed quickly during approach. */
-export const AUTOPILOT_BOOST_DECEL = FLIGHT_BOOST_DECEL;
-
-/** Orbit-insertion rate — gentler than AUTOPILOT_DECEL so the turn into orbit is smooth. */
+/** Orbit-insertion rate — gentler than FLIGHT_THRUST_DECEL so the turn into orbit is smooth. */
 export const AUTOPILOT_CIRCULARIZE_RATE = 1.1 * SCALE_FACTOR;
 /** Gravity-derived floor multiplier for circularize velocity rotation rate. */
 export const AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN = 4 * SCALE_FACTOR;
@@ -306,9 +298,9 @@ export const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
 export const AUTOPILOT_BOOST_THRESHOLD =
     1.5 *
     ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
-        AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
-        (2 * AUTOPILOT_BOOST_DECEL) +
-        (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL));
+        FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+        (2 * FLIGHT_BOOST_DECEL) +
+        (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * FLIGHT_THRUST_DECEL));
 
 /** Acceleration rate used to engage warp during autopilot approach. */
 export const AUTOPILOT_WARP_ACCEL = FLIGHT_WARP_ACCEL;        
@@ -318,12 +310,12 @@ export const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
 /** Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop. */
 export const AUTOPILOT_APPROACH_MIN_DISTANCE =
     AUTOPILOT_BRAKE_PAD *
-    (((AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) *
-        (AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED)) /
-        (2 * AUTOPILOT_DECEL));
+    (((FLIGHT_MAX_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) *
+        (FLIGHT_MAX_SPEED + AUTOPILOT_BRAKE_DONE_SPEED)) /
+        (2 * FLIGHT_THRUST_DECEL));
 
 /** Target arc length (u) for the BRAKE blend. */
-export const AUTOPILOT_BRAKE_ARC_DIST = AUTOPILOT_APPROACH_SPEED * 10;
+export const AUTOPILOT_BRAKE_ARC_DIST = FLIGHT_MAX_SPEED * 10;
 
 /** Distance (u) above which autopilot engages warp for fast transit. */
 export const AUTOPILOT_WARP_THRESHOLD =

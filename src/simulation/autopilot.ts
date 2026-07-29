@@ -9,17 +9,16 @@ import {
     FLIGHT_WARP_SPEED,
     G,
     SCALE_FACTOR,
-    AUTOPILOT_ACCEL,
+    FLIGHT_THRUST_ACCEL,
     AUTOPILOT_APPROACH_MIN_DISTANCE,
-    AUTOPILOT_APPROACH_SPEED,
     AUTOPILOT_BLOCKED_NOTIFY_DURATION,
-    AUTOPILOT_BOOST_DECEL,
+    FLIGHT_BOOST_DECEL,
     AUTOPILOT_BRAKE_ARC_DIST,
     AUTOPILOT_BRAKE_DONE_SPEED,
     AUTOPILOT_BRAKE_PAD,
     AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN,
     AUTOPILOT_CIRCULARIZE_RATE,
-    AUTOPILOT_DECEL,
+    FLIGHT_THRUST_DECEL,
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
     AUTOPILOT_WARP_ACCEL,
@@ -299,21 +298,21 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
     const toTargetDir = toTarget.clone().normalize();
 
     // Three-phase stopping distance: shed warp→boost at AUTOPILOT_WARP_DECEL, then
-    // boost→normal at AUTOPILOT_BOOST_DECEL, then normal→stop at AUTOPILOT_DECEL.
+    // boost→normal at FLIGHT_BOOST_DECEL, then normal→stop at FLIGHT_THRUST_DECEL.
     const effectiveStopDist =
         approachSpeed > FLIGHT_BOOST_MAX_SPEED
             ? (approachSpeed * approachSpeed - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
                   (2 * AUTOPILOT_WARP_DECEL) +
               (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
-                  AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
-                  (2 * AUTOPILOT_BOOST_DECEL) +
-              (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL)
-            : approachSpeed > AUTOPILOT_APPROACH_SPEED
+                  FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+                  (2 * FLIGHT_BOOST_DECEL) +
+              (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * FLIGHT_THRUST_DECEL)
+            : approachSpeed > FLIGHT_MAX_SPEED
               ? (approachSpeed * approachSpeed -
-                    AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) /
-                    (2 * AUTOPILOT_BOOST_DECEL) +
-                (AUTOPILOT_APPROACH_SPEED * AUTOPILOT_APPROACH_SPEED) / (2 * AUTOPILOT_DECEL)
-              : Math.max(approachSpeed, AUTOPILOT_APPROACH_SPEED) ** 2 / (2 * AUTOPILOT_DECEL);
+                    FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
+                    (2 * FLIGHT_BOOST_DECEL) +
+                (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * FLIGHT_THRUST_DECEL)
+              : Math.max(approachSpeed, FLIGHT_MAX_SPEED) ** 2 / (2 * FLIGHT_THRUST_DECEL);
     const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
     // Dynamic warp threshold: adds orbitRadius so the ship stops at the
@@ -332,7 +331,7 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
 
     if (autopilotState.phase === 'APPROACH') {
         const nearApproachSpeed =
-            approachSpeed <= AUTOPILOT_APPROACH_SPEED + AUTOPILOT_BRAKE_DONE_SPEED;
+            approachSpeed <= FLIGHT_MAX_SPEED + AUTOPILOT_BRAKE_DONE_SPEED;
         const brakeEntryTrigger = orbitRadius + Math.max(brakeDistance, AUTOPILOT_BRAKE_ARC_DIST);
         if (nearApproachSpeed && distance <= brakeEntryTrigger) {
             autopilotState.phase = 'BRAKE';
@@ -424,13 +423,13 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
         const boostDecelDist =
             (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
                 FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
-            (2 * AUTOPILOT_BOOST_DECEL);
+            (2 * FLIGHT_BOOST_DECEL);
         const effectiveBoostThreshold =
             orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE + boostDecelDist;
 
         const useBoost = distance > effectiveBoostThreshold;
         autopilotState.isBoostActive = useBoost;
-        const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : AUTOPILOT_APPROACH_SPEED;
+        const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
 
         const desiredVel = new THREE.Vector3()
             .copy(target.velocity)
@@ -455,12 +454,12 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
             const rate = needsDecel
                 ? approachSpeed > FLIGHT_BOOST_MAX_SPEED
                     ? AUTOPILOT_WARP_DECEL
-                    : approachSpeed > AUTOPILOT_APPROACH_SPEED
-                      ? AUTOPILOT_BOOST_DECEL
-                      : AUTOPILOT_DECEL
+                    : approachSpeed > FLIGHT_MAX_SPEED
+                      ? FLIGHT_BOOST_DECEL
+                      : FLIGHT_THRUST_DECEL
                 : useBoost
                   ? FLIGHT_BOOST_ACCEL
-                  : AUTOPILOT_ACCEL;
+                  : FLIGHT_THRUST_ACCEL;
             const accelMag = Math.min(rate * dt, deltaLen);
             ship.velocity.addScaledVector(accelDir, accelMag);
         }
@@ -494,8 +493,8 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
             brakeApproachSpeed > FLIGHT_BOOST_MAX_SPEED
                 ? AUTOPILOT_WARP_DECEL
                 : brakeApproachSpeed > FLIGHT_MAX_SPEED
-                  ? AUTOPILOT_BOOST_DECEL
-                  : AUTOPILOT_DECEL;
+                  ? FLIGHT_BOOST_DECEL
+                  : FLIGHT_THRUST_DECEL;
         const maxInwardForSpan = Math.sqrt(2 * brakeDecel * brakeSpan);
         const inwardSpeed = Math.min(FLIGHT_MAX_SPEED, maxInwardForSpan) * (1 - alpha);
         const desiredVel = new THREE.Vector3()

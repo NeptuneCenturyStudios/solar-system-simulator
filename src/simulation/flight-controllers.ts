@@ -166,6 +166,7 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     });
 }
 
+// NOTE: applyFlightThrustSubstep has been moved to Spaceship class. This is no longer needed.
 // /**
 //  * Apply manual thrust for one physics substep.
 //  * Called from inside the physics substep loop so thrust and gravity interleave
