@@ -5,8 +5,6 @@ import {
     FLIGHT_BOOST_MAX_SPEED,
     FLIGHT_MAX_SPEED,
     FLIGHT_MAX_TURN_RATE,
-    FLIGHT_WARP_CHARGE_TIME,
-    FLIGHT_WARP_SPEED,
     G,
     SCALE_FACTOR,
     FLIGHT_THRUST_ACCEL,
@@ -21,7 +19,6 @@ import {
     FLIGHT_THRUST_DECEL,
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
-    AUTOPILOT_WARP_ACCEL,
     AUTOPILOT_WARP_DECEL,
     AUTOPILOT_WARP_THRESHOLD,
 } from '../utilities/consts';
@@ -79,20 +76,15 @@ export function cancelAutopilot(ctx: IAutopilotContext, message?: string): void 
 
     playSoundEffect(SoundEffect.AutopilotDisengaged);
 
-    if (autopilotState.isWarpActive) {
-        autopilotState.isWarpActive = false;
-        flightState.warpEffect?.stop();
-        // If the player cancelled mid-warp while not in the cockpit, trigger
-        // background deceleration so the ship slows down normally instead of
-        // continuing at warp speed indefinitely.
-        if (!flightState.isActive) {
-            flightState.warpDecelerating = true;
-        }
+    const ship = flightState.knownShip;
+    if (ship?.warpActive) {
+        // If cancelled mid-warp while not in the cockpit, start background decel.
+        ship.beginWarpDecel();
     }
-    // Hide the charge bar if it was showing.
+    // Clear any in-progress warp charge.
     if (autopilotState.phase === 'WARP_CHARGING') {
         ctx.flightHUD.hideWarpSprite();
-        autopilotState.warpChargeTimer = 0;
+        ship?.cancelWarpCharge();
     }
     autopilotState.isActive = false;
     autopilotState.isBoostActive = false;
@@ -128,10 +120,9 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
 
     // Guard: refuse to engage while manual warp is live.
     if (
-        autopilotState.isWarpActive ||
-        flightState.warpActive ||
-        flightState.warpDecelerating ||
-        flightState.warpCharging
+        ship.warpActive ||
+        ship.warpDecelerating ||
+        ship.warpCharging
     ) {
         ctx.addEvent({
             message: 'Autopilot: disengage warp before engaging autopilot.',
@@ -142,9 +133,8 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
     }
 
     // Clean up any prior autopilot warp when switching targets.
-    if (autopilotState.isWarpActive) {
-        autopilotState.isWarpActive = false;
-        flightState.warpEffect?.stop();
+    if (ship.warpActive) {
+        ship.warpActive = false;
     }
 
     // Choose initial phase based on distance.
@@ -224,8 +214,7 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
 
     autopilotState.isActive = true;
     autopilotState.targetBody = target;
-    autopilotState.isWarpActive = false;
-    autopilotState.warpChargeTimer = 0;
+    ship.warpActive = false;
     playSoundEffect(SoundEffect.AutopilotEngaged);
     // Always start with ALIGN — rotate toward the target before applying any thrust.
     // The ALIGN phase will transition to WARP_CHARGING, APPROACH, or BRAKE once the
@@ -323,9 +312,9 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
     if (autopilotState.phase === 'WARP') {
         // Transition to APPROACH once close enough for boost/normal to finish the journey.
         if (distance <= dynamicWarpThreshold) {
-            autopilotState.isWarpActive = false;
-            flightState.warpEffect?.stop();
+            ship.warpActive = false;
             autopilotState.phase = 'APPROACH';
+            ctx.flightHUD.hideWarpSprite();
         }
     }
 
@@ -362,7 +351,7 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
         if (shipForward.dot(toTargetDir) >= Math.cos(THREE.MathUtils.degToRad(3))) {
             if (distance > dynamicWarpThreshold) {
                 autopilotState.phase = 'WARP_CHARGING';
-                autopilotState.warpVoicePlayed = false;
+                ship.startWarpCharge();
             } else if (distance <= orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE) {
                 autopilotState.phase = 'BRAKE';
             } else {
@@ -371,14 +360,10 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
         }
     } else if (autopilotState.phase === 'WARP_CHARGING') {
         // Reuse the same charge progress bar shown during manual warp.
-        autopilotState.warpChargeTimer = Math.min(
-            autopilotState.warpChargeTimer + dt,
-            FLIGHT_WARP_CHARGE_TIME
-        );
-        const fill = autopilotState.warpChargeTimer / FLIGHT_WARP_CHARGE_TIME;
+        const fill = ship.updateWarpCharge(dt);
         ctx.flightHUD.setWarpCharge(fill);
-        if (fill >= 0.99 && !autopilotState.warpVoicePlayed) {
-            autopilotState.warpVoicePlayed = true;
+        if (fill >= 0.99 && !ship.warpVoicePlayed) {
+            ship.warpVoicePlayed = true;
             playSoundEffect(SoundEffect.WarpDriveActive);
         }
         // Point toward target while charging.
@@ -388,12 +373,10 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
         ship.mesh.quaternion.rotateTowards(chargeQuat, FLIGHT_MAX_TURN_RATE * dt);
         flightState.thrustActive = false;
 
-        if (autopilotState.warpChargeTimer >= FLIGHT_WARP_CHARGE_TIME) {
-            autopilotState.warpChargeTimer = 0;
-            autopilotState.isWarpActive = true;
+        if (fill >= 1) {
+            ship.engageWarp();
             autopilotState.phase = 'WARP';
             ctx.flightHUD.hideWarpSprite();
-            flightState.warpEffect?.start();
             triggerScreenFlash(200, 0.01, 2.5);
             ctx.addEvent({
                 message: '⚡ Autopilot warp engaged.',
@@ -401,17 +384,10 @@ export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
             });
         }
     } else if (autopilotState.phase === 'WARP') {
-        // Accelerate toward FLIGHT_WARP_SPEED in the target's frame.
-        const relVel = new THREE.Vector3().subVectors(ship.velocity, target.velocity);
-        const curSpeed = relVel.dot(toTargetDir);
-        let newSpeed: number;
-        if (curSpeed < FLIGHT_WARP_SPEED) {
-            newSpeed = Math.min(curSpeed + AUTOPILOT_WARP_ACCEL * dt, FLIGHT_WARP_SPEED);
-        } else {
-            newSpeed = FLIGHT_WARP_SPEED;
-        }
-        ship.velocity.copy(target.velocity).addScaledVector(toTargetDir, newSpeed);
-        flightState.currentSpeed = newSpeed;
+        // Accelerate toward FLIGHT_WARP_SPEED along current toTargetDir (world-space).
+        // toTargetDir is recomputed each substep, so the path continuously homes on the target.
+        ship.applyWarpAccelerationStep(dt, toTargetDir);
+        flightState.currentSpeed = ship.velocity.length();
         flightState.thrustActive = true;
 
         // Keep ship visually pointed toward the target.

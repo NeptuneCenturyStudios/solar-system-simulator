@@ -7,6 +7,8 @@ import { IShipEffect } from '../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
 import { WarpSoundController, playWarpLoop } from '../utilities/audio.js';
+import { WarpEffect } from '../effects/warp-effect.js';
+import { FLIGHT_WARP_CHARGE_TIME } from '../utilities/consts.js';
 import { IDeathOptions, ISpaceshipHandling } from '../interfaces';
 import { autopilotState, cameraState, flightState, simulationState } from '../simulation/simulation';
 
@@ -47,6 +49,22 @@ export class Spaceship extends Body {
     shipBankPitch: number = 0;
     /** Whether Shift was held on the previous frame. */
     prevShiftHeld: boolean = false;
+
+    // ── Warp drive state ─────────────────────────────────────────────────────
+    /** Accumulated charge time (seconds) during the warp charging phase (0 → FLIGHT_WARP_CHARGE_TIME). */
+    warpChargeTimer: number = 0;
+    /** True while warp is being charged (space bar held / autopilot WARP_CHARGING). */
+    warpCharging: boolean = false;
+    /** True when warp speed is active (manual or autopilot WARP phase). */
+    warpActive: boolean = false;
+    /** True during phase-1 decel: shedding speed from warp → boost max. */
+    warpDecelerating: boolean = false;
+    /** True during phase-2 decel: shedding speed from boost max → normal max. */
+    boostDecelerating: boolean = false;
+    /** Debounce flag — true once the warp-drive-active voice prompt has played for the current charge cycle. */
+    warpVoicePlayed: boolean = false;
+    /** Visual warp tunnel effect. Owned by the ship; created in constructor. */
+    warpEffect: WarpEffect;
 
     /** Active warp loop sound controller, or null if not currently playing. */
     private _warpSound: WarpSoundController | null = null;
@@ -103,6 +121,9 @@ export class Spaceship extends Body {
 
         // Engine exhaust trail (Line-based, no gaps at any speed)
         this.trail = new ShipFlame(scene);
+
+        // Warp tunnel effect — visibility is speed-driven (no explicit start/stop needed)
+        this.warpEffect = new WarpEffect(scene);
 
         // Keep default label (shows in bodies table) but hide it during flight
         if (this.label) this.label.visible = false;
@@ -218,7 +239,7 @@ export class Spaceship extends Body {
         // Autopilot handles its own thrust — stay out of its way.
         if (autopilotState.isActive) return;
         // Warp/boost deceleration is handled frame-level; do not add thrust during those.
-        if (flightState.warpActive || flightState.warpDecelerating || flightState.boostDecelerating) return;
+        if (this.warpActive || this.warpDecelerating || this.boostDecelerating) return;
 
         const keys = cameraState.keys;
         const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
@@ -284,7 +305,7 @@ export class Spaceship extends Body {
      * Phase 1: shed speed from FLIGHT_WARP_SPEED down to FLIGHT_BOOST_MAX_SPEED
      *          using the warp deceleration rate.
      * Returns true while still in phase 1, false when boost speed has been reached
-     * (caller should then flip flightState.boostDecelerating).
+     * (caller should then set ship.boostDecelerating = true).
      */
     applyWarpDecelerationStep(simDt: number, forward: THREE.Vector3): boolean {
         const fwdSpd = this.velocity.dot(forward);
@@ -437,14 +458,95 @@ export class Spaceship extends Body {
         }
     }
 
+    // ── Warp charging API ────────────────────────────────────────────────────
+
     /**
-     * Override die() to clean up the warp sound controller.
+     * Begin a warp charge cycle.  Resets the timer and clears the voice-played debounce.
+     */
+    startWarpCharge(): void {
+        this.warpCharging = true;
+        this.warpChargeTimer = 0;
+        this.warpVoicePlayed = false;
+    }
+
+    /**
+     * Advance the warp charge timer by `dt` seconds.
+     * @returns Fill ratio in [0, 1].  Returns 1.0 when fully charged.
+     */
+    updateWarpCharge(dt: number): number {
+        this.warpChargeTimer = Math.min(this.warpChargeTimer + dt, FLIGHT_WARP_CHARGE_TIME);
+        return this.warpChargeTimer / FLIGHT_WARP_CHARGE_TIME;
+    }
+
+    /**
+     * Abort an in-progress warp charge without engaging warp.
+     */
+    cancelWarpCharge(): void {
+        this.warpCharging = false;
+        this.warpChargeTimer = 0;
+        this.warpVoicePlayed = false;
+    }
+
+    // ── Warp state transitions ────────────────────────────────────────────────
+
+    /**
+     * Transition from WARP_CHARGING → WARP active.  Caller is responsible for
+     * triggering flash, sound, and HUD updates.
+     */
+    engageWarp(): void {
+        this.warpActive = true;
+        this.warpCharging = false;
+        this.warpChargeTimer = 0;
+    }
+
+    /**
+     * Transition from WARP active → phase-1 deceleration (warp → boost speed).
+     */
+    beginWarpDecel(): void {
+        this.warpActive = false;
+        this.warpDecelerating = true;
+    }
+
+    /**
+     * Clear all warp flags and timers.  Use on ship destruction or hard reset.
+     */
+    resetWarpState(): void {
+        this.warpChargeTimer = 0;
+        this.warpCharging = false;
+        this.warpActive = false;
+        this.warpDecelerating = false;
+        this.boostDecelerating = false;
+        this.warpVoicePlayed = false;
+    }
+
+    // ── Warp effect helpers ───────────────────────────────────────────────────
+
+    /**
+     * Update the warp tunnel visual.  Call once per frame while the ship exists.
+     * @param dt        Delta time in seconds.
+     * @param maxSpeed  Speed at which the effect reaches full opacity (pass FLIGHT_WARP_SPEED).
+     */
+    updateWarpEffect(dt: number, maxSpeed: number): void {
+        this.warpEffect.update(dt, this.mesh.position, this.velocity, maxSpeed);
+    }
+
+    /**
+     * Apply a distance-based fade to the warp tunnel (0 = hidden, 1 = fully visible).
+     */
+    setWarpEffectOpacity(fade: number): void {
+        this.warpEffect.setOpacity(fade);
+    }
+
+    /**
+     * Override die() to clean up the warp sound controller and warp effect.
      */
     die(deathOptions?: IDeathOptions): void {
         if (this._warpSound) {
             this._warpSound.dispose();
             this._warpSound = null;
         }
+        this.warpEffect.forceHide();
+        this.warpEffect.dispose();
         super.die(deathOptions);
     }
 }

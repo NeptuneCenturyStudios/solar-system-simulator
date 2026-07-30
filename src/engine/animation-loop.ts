@@ -61,7 +61,6 @@ import {
     interactionState,
     simulationState,
     cameraState,
-    flightState,
 } from '../simulation/simulation';
 import { exitFlightMode, updateFlightControls } from '../simulation/flight-controllers';
 
@@ -220,55 +219,48 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         // ── Background warp (delegated to ship) ─────────────────────────
-        if (!isFlightModeActive && ctx.flightState.warpActive) {
-            const bgShip = ctx.flightState.knownShip;
+        const bgShip = ctx.flightState.knownShip;
+        if (!isFlightModeActive && bgShip?.warpActive) {
             if (bgShip && !bgShip._isDisposed && bgShip.mesh) {
                 const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
                 bgShip.applyWarpAccelerationStep(dtTotal, bgFwd);
             } else {
-                ctx.flightState.warpActive = false;
+                bgShip.warpActive = false;
             }
         }
 
         // ── Background deceleration (delegated to ship) ──────────────────
         if (
             !isFlightModeActive &&
-            (ctx.flightState.warpDecelerating || ctx.flightState.boostDecelerating)
+            bgShip && (bgShip.warpDecelerating || bgShip.boostDecelerating)
         ) {
-            const _bgShip = ctx.flightState.knownShip;
+            const _bgShip = bgShip;
             if (_bgShip && !_bgShip._isDisposed && _bgShip.mesh) {
                 const _bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(_bgShip.mesh.quaternion);
-                if (ctx.flightState.warpDecelerating) {
+                if (_bgShip.warpDecelerating) {
                     const stillDecel = _bgShip.applyWarpDecelerationStep(dtTotal, _bgFwd);
                     ctx.flightState.currentSpeed = _bgShip.velocity.dot(_bgFwd);
                     if (!stillDecel) {
-                        ctx.flightState.warpDecelerating = false;
-                        ctx.flightState.boostDecelerating = true;
-                        flightState.warpEffect?.stop();
+                        _bgShip.warpDecelerating = false;
+                        _bgShip.boostDecelerating = true;
                     }
-                } else if (ctx.flightState.boostDecelerating) {
+                } else if (_bgShip.boostDecelerating) {
                     const stillDecel = _bgShip.applyBoostDecelerationStep(dtTotal, _bgFwd);
                     ctx.flightState.currentSpeed = _bgShip.velocity.dot(_bgFwd);
                     if (!stillDecel) {
-                        ctx.flightState.boostDecelerating = false;
-                        flightState.warpEffect?.stop();
+                        _bgShip.boostDecelerating = false;
                     }
                 }
-            } else {
-                ctx.flightState.warpDecelerating = false;
-                ctx.flightState.boostDecelerating = false;
+            } else if (_bgShip) {
+                _bgShip.warpDecelerating = false;
+                _bgShip.boostDecelerating = false;
             }
         }
 
         // ── Warp effect ──────────────────────────────────────────────────
         const _warpShip = ctx.flightState.activeShip ?? ctx.flightState.knownShip;
         if (_warpShip && !_warpShip._isDisposed && _warpShip.mesh) {
-            flightState.warpEffect?.update(
-                dtTotal,
-                _warpShip.mesh.position,
-                _warpShip.velocity,
-                FLIGHT_WARP_SPEED
-            );
+            _warpShip.updateWarpEffect(dtTotal, FLIGHT_WARP_SPEED);
         }
 
         // ── WASD camera movement ─────────────────────────────────────────
@@ -679,11 +671,12 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         // ── Warp shake ─────────────────────────────────────────────────────
+        const _shakeShip = ctx.flightState.activeShip ?? ctx.flightState.knownShip;
         if (
             !simulationState.isPaused &&
-            (ctx.flightState.warpActive || ctx.autopilotState.isWarpActive)
+            _shakeShip?.warpActive
         ) {
-            if (isFlightModeActive || flightState.warpEffect?.lines.visible) {
+            if (isFlightModeActive || _shakeShip.warpEffect.lines.visible) {
                 const cf = new THREE.Vector3();
                 ctx.camera.getWorldDirection(cf);
                 const cr = new THREE.Vector3().crossVectors(cf, ctx.camera.up).normalize();
@@ -696,7 +689,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         // ── Ship trail ──────────────────────────────────────────────────────
-        const trailShip = !(ctx.flightState.warpActive || ctx.autopilotState.isWarpActive)
+        const trailShip = !_shakeShip?.warpActive
             ? (ctx.flightState.activeShip ?? ctx.flightState.knownShip)
             : null;
         if (trailShip && trailShip.mesh) {
@@ -708,10 +701,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             const trailSpd = isFlightModeActive
                 ? ctx.flightState.currentSpeed
                 : trailShip.velocity.length();
-            const trailMax = ctx.autopilotState.isWarpActive
-                ? FLIGHT_WARP_SPEED
-                : ctx.keys.shift ||
-                    ctx.flightState.boostDecelerating ||
+            const trailMax =
+                ctx.keys.shift ||
+                    trailShip.boostDecelerating ||
                     ctx.autopilotState.isBoostActive
                   ? FLIGHT_BOOST_MAX_SPEED
                   : FLIGHT_MAX_SPEED;
@@ -764,7 +756,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         if (visShip && !visShip._isDisposed && visShip.mesh) {
             if (isFlightModeActive) {
                 wdf = 1;
-                flightState.warpEffect?.setOpacity(1);
+                visShip.setWarpEffectOpacity(1);
             } else {
                 const isLook =
                     ctx.cameraState.isLookAtMode && ctx.cameraState.focusBody === visShip;
@@ -772,23 +764,23 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     const d = ctx.camera.position.distanceTo(visShip.mesh.position);
                     if (d >= WARP_FADE_DIST) {
                         wdf = 0;
-                        flightState.warpEffect?.setOpacity(0);
+                        visShip.setWarpEffectOpacity(0);
                     } else {
                         const t = Math.max(
                             0,
                             (d - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST)
                         );
                         wdf = 1 - t;
-                        flightState.warpEffect?.setOpacity(1 - t);
+                        visShip.setWarpEffectOpacity(1 - t);
                     }
                 } else {
                     wdf = 0;
-                    flightState.warpEffect?.setOpacity(0);
+                    visShip.setWarpEffectOpacity(0);
                 }
             }
         } else {
             wdf = 0;
-            flightState.warpEffect?.setOpacity(0);
+            visShip?.setWarpEffectOpacity(0);
         }
 
         if (visShip && !visShip._isDisposed && visShip.mesh) {
@@ -829,8 +821,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             if (spd && spd.visible && ctx.flightState.isActive) {
                 const ship = ctx.flightState.activeShip;
                 const hWarp =
-                    ctx.flightState.warpActive ||
-                    ctx.flightState.warpDecelerating ||
+                    ship?.warpActive ||
+                    ship?.warpDecelerating ||
                     ctx.autopilotState.phase === 'WARP' ||
                     ctx.autopilotState.phase === 'WARP_CHARGING';
                 const hBoost =
@@ -843,13 +835,13 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                                 FLIGHT_MAX_SPEED));
                 const hBrake =
                     !hWarp &&
-                    (ctx.flightState.boostDecelerating ||
-                        ctx.flightState.warpDecelerating ||
+                    (ship?.boostDecelerating ||
+                        ship?.warpDecelerating ||
                         ctx.autopilotState.phase === 'BRAKE' ||
                         ctx.keys.s);
                 const thrustRate: number = (() => {
-                    if (ctx.flightState.warpDecelerating) return FLIGHT_WARP_DECEL;
-                    if (ctx.flightState.boostDecelerating) return FLIGHT_BOOST_DECEL;
+                    if (ship?.warpDecelerating) return FLIGHT_WARP_DECEL;
+                    if (ship?.boostDecelerating) return FLIGHT_BOOST_DECEL;
                     if (hWarp) return 0;
                     if (hBoost) return FLIGHT_BOOST_ACCEL;
                     if (hBrake)

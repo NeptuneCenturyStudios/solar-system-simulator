@@ -51,16 +51,6 @@ export const flightState: IFlightState = {
     knownShip: null as Spaceship | null,
     /** True while any thrust key (W/S/Shift) was held this frame. Used by trail. */
     thrustActive: false,
-    /** Seconds space bar has been held in flight mode (0 – FLIGHT_WARP_CHARGE_TIME). */
-    warpCharge: 0,
-    /** True while space bar is being held down to charge warp. */
-    warpCharging: false,
-    /** True when warp speed is active. */
-    warpActive: false,
-    /** True while decelerating back from warp speed. */
-    warpDecelerating: false,
-    /** True while rapidly decelerating from boost speed back to normal max. */
-    boostDecelerating: false,
     /** Camera reference frame quaternion, independent of ship mesh visual banking.
      *  Rotated by mouse steering (world-yaw + local-pitch) and A/D roll.
      *  In 3rd-person view the camera follows this, not ship.mesh.quaternion. */
@@ -73,8 +63,6 @@ export const flightState: IFlightState = {
     altOrbitYaw: 0,
     /** Accumulated pitch offset (radians) for the ALT orbit camera, in ship-local space. */
     altOrbitPitch: 0,
-    /** True once the warp-drive-active voice prompt has played for the current charge cycle. */
-    warpVoicePlayed: false,
     /** The body currently under the steering line tip in flight mode. Set by PlanetNameIndicator. */
     steeringHoveredBody: null as Body | null,
     /** Seconds the E key has been held over the current hovered body (0 → FLIGHT_AUTOPILOT_CHARGE_TIME). */
@@ -146,16 +134,10 @@ export const autopilotState: IAutopilotState = {
     phase: null,
     /** Stable-orbit notification timer (seconds remaining to display). */
     orbitNotifyTimer: 0,
-    /** True while the autopilot WARP phase is active (post-charge). */
-    isWarpActive: false,
-    /** Accumulated charge time (seconds) during the WARP_CHARGING phase. */
-    warpChargeTimer: 0,
     /** True while the approach phase is using boost speed. */
     isBoostActive: false,
     /** Distance from target when BRAKE phase started — used to compute the
      *  0→1 blend factor that rotates the desired velocity from 'stop' to
      *  'orbital velocity' as the ship closes on the orbit radius. */
     brakeEntryDistance: 0,
-    /** True once the warp-drive-active voice prompt has played for the current autopilot warp charge cycle. */
-    warpVoicePlayed: false,
 };

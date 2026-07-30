@@ -12,7 +12,6 @@ import { ITidalLockOptions } from './bodies/celestial-body';
 import { EffectiveGForce } from './types';
 import { Spaceship } from './bodies/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
-import { WarpEffect } from './effects/warp-effect';
 import { ShipWeapon } from './ship-effects/ship-weapon';
 import { FlightHUD } from './drawing/flight-hud';
 import { UIManager } from './ui/ui-manager';
@@ -184,24 +183,6 @@ export interface IFlightState {
     /** True while any thrust key (W/S/Shift) was held this frame. */
     thrustActive: boolean;
 
-    /** Warp effect instance. */
-    warpEffect?: WarpEffect;
-
-    /** Seconds space bar has been held in flight mode. */
-    warpCharge: number;
-
-    /** True while space bar is being held down to charge warp. */
-    warpCharging: boolean;
-
-    /** True when warp speed is active. */
-    warpActive: boolean;
-
-    /** True while decelerating back from warp speed. */
-    warpDecelerating: boolean;
-
-    /** True while rapidly decelerating from boost speed back to normal max. */
-    boostDecelerating: boolean;
-
     /** Camera reference frame quaternion, independent of ship mesh banking. */
     flightCameraQuat: THREE.Quaternion;
 
@@ -210,9 +191,6 @@ export interface IFlightState {
 
     /** True while ALT is held — camera orbits the ship instead of steering it. */
     altOrbitActive: boolean;
-
-    /** True once the warp-drive-active voice prompt has played for the current charge cycle. */
-    warpVoicePlayed: boolean;
 
     /** Accumulated yaw offset (radians) for the ALT orbit camera, in ship-local space. */
 
@@ -329,18 +307,12 @@ export interface IAutopilotState {
     phase: AutopilotPhase | null;
     /** Stable-orbit notification timer (seconds remaining to display). */
     orbitNotifyTimer: number;
-    /** True while the autopilot WARP phase is active (post-charge). */
-    isWarpActive: boolean;
-    /** Accumulated charge time (seconds) during the WARP_CHARGING phase. */
-    warpChargeTimer: number;
     /** True while the approach phase is using boost speed. */
     isBoostActive: boolean;
     /** Distance from target when BRAKE phase started — used to compute the
      *  0→1 blend factor that rotates the desired velocity from 'stop' to
      *  'orbital velocity' as the ship closes on the orbit radius. */
     brakeEntryDistance: number;
-    /** True once the warp-drive-active voice prompt has played for the current autopilot warp charge cycle. */
-    warpVoicePlayed: boolean;
 }
 
 /**

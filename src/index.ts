@@ -92,7 +92,6 @@ import {
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
-import { WarpEffect } from './effects/warp-effect';
 import { AmbientSoundManager } from './utilities/ambient-sound';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
 import { GridHelperManager } from './gizmos/grid-helper';
@@ -669,8 +668,7 @@ document.addEventListener('pointerdown', _retryMusic);
 document.addEventListener('touchstart', _retryMusic);
 document.addEventListener('keydown', _retryMusic);
 
-// Set the warp effect instance
-flightState.warpEffect = new WarpEffect(scene);
+// (warp effect is now created per-ship inside the Spaceship constructor)
 
 const flightHUD = new FlightHUD(
     uiScene,
@@ -3098,13 +3096,12 @@ function spawnShip() {
     flightState.isActive = true;
     // Preserve warp state: if the ship was warping autonomously while the player
     // was outside, keep warpActive so flight resumes at warp speed immediately.
-    flightState.currentSpeed = flightState.warpActive ? FLIGHT_WARP_SPEED : 0;
+    flightState.currentSpeed = ship.warpActive ? FLIGHT_WARP_SPEED : 0;
     flightState.pointerOffsetX = 0;
     flightState.pointerOffsetY = 0;
     flightState.rollLeft = false;
     flightState.rollRight = false;
-    flightState.warpCharge = 0;
-    flightState.warpCharging = false;
+    ship.cancelWarpCharge();
     // warpActive and warpDecelerating are intentionally NOT zeroed here —
     // they are preserved from the background-warp state set before re-entry.
     // Reset ship-local flight control state (roll vel, steer, banking, prevShift).
@@ -4003,25 +4000,20 @@ window.addEventListener('keydown', (e) => {
         if (flightState.isActive) {
             e.preventDefault();
             if (e.repeat) return; // ignore key-repeat; only act on the initial press
-            if (flightState.warpActive) {
-                // Disengage warp
-                flightState.warpActive = false;
-                flightState.warpCharging = false;
-                flightState.warpCharge = 0;
-                flightState.warpDecelerating = true;
-                flightState.warpEffect?.stop();
-                // Restore steering HUD immediately on disengage (decel still active,
-                // but steering is restored so the player can redirect during slowdown).
+            const ship = flightState.activeShip;
+            if (ship?.warpActive && !autopilotState.isActive) {
+                // Disengage warp (manual only — autopilot manages its own warp lifecycle)
+                ship.beginWarpDecel();
+                ship.cancelWarpCharge();
                 flightSteeringLine.visible = true;
                 addEvent({
                     message: 'Warp disengaged. Decelerating...',
                     notificationType: NotificationType.Info,
                 });
-            } else if (!flightState.warpDecelerating && !autopilotState.isActive) {
+            } else if (ship && !ship.warpDecelerating && !autopilotState.isActive) {
                 // Only start charging when not already decelerating from a previous warp,
                 // and not under autopilot control.
-                flightState.warpCharging = true;
-                flightState.warpVoicePlayed = false;
+                ship.startWarpCharge();
             }
             return;
         }
@@ -4088,9 +4080,9 @@ window.addEventListener('keyup', (e) => {
         keys.space = false;
         if (flightState.isActive) {
             // Cancel warp charge if space released before full charge
-            if (flightState.warpCharging) {
-                flightState.warpCharging = false;
-                flightState.warpCharge = 0;
+            const _spaceShip = flightState.activeShip;
+            if (_spaceShip?.warpCharging) {
+                _spaceShip.cancelWarpCharge();
                 flightHUD.hideWarpSprite();
             }
         }

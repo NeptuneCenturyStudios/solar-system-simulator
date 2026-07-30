@@ -243,10 +243,8 @@ export class FlightHUD {
     private cameraState: { isFreeCameraMode: boolean; isTargetMode: boolean };
     private simulationState: { bodies: Body[] };
     private flightState: {
-        knownShip: Body | null;
+        knownShip: (Body & { warpActive?: boolean }) | null;
         isActive: boolean;
-        warpActive: boolean;
-        warpCharging: boolean;
         isCockpitView: boolean;
         steeringHoveredBody: Body | null;
         altOrbitActive: boolean;
@@ -264,10 +262,8 @@ export class FlightHUD {
         cameraState: { isFreeCameraMode: boolean; isTargetMode: boolean },
         simulationState: { bodies: Body[] },
         flightState: {
-            knownShip: Body | null;
+            knownShip: (Body & { warpActive?: boolean }) | null;
             isActive: boolean;
-            warpActive: boolean;
-            warpCharging: boolean;
             isCockpitView: boolean;
             steeringHoveredBody: Body | null;
             altOrbitActive: boolean;
@@ -521,7 +517,7 @@ export class FlightHUD {
 
         // Flight mode hints (active spaceship steering)
         if (this.flightState.isActive) {
-            if (this.flightState.warpActive) {
+            if (this.flightState.knownShip?.warpActive) {
                 return {
                     visible: true,
                     lines: ['WARP ACTIVE — Press [Space] to disengage'],

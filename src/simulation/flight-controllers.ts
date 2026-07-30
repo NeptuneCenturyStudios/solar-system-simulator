@@ -3,7 +3,6 @@ import { NotificationType } from '../event-log/event-log';
 import {
     FLIGHT_BOOST_MAX_SPEED,
     FLIGHT_MAX_SPEED,
-    FLIGHT_WARP_CHARGE_TIME,
     TEXT_SPRITE_Z,
 } from '../utilities/consts';
 import {
@@ -32,8 +31,8 @@ export function exitFlightMode(ctx: IFlightControlContext) {
         // Also kill warp state so the background updater doesn't force the
         // respawned ship to warp speed, and hide the frozen tunnel immediately.
         flightState.knownShip = null;
-        flightState.warpActive = false;
-        flightState.warpEffect?.forceHide();
+        flightState.activeShip?.resetWarpState();
+        flightState.activeShip?.warpEffect.forceHide();
     }
 
     // Reset ship-local flight control state (roll vel, steer, banking, prevShift).
@@ -55,10 +54,11 @@ export function exitFlightMode(ctx: IFlightControlContext) {
 
     // Clear deceleration and warp flags so on re-entry the ship isn't
     // artificially clamped back to FLIGHT_MAX_SPEED.
-    flightState.boostDecelerating = false;
-    flightState.warpDecelerating = false;
-    flightState.warpCharging = false;
-    flightState.warpCharge = 0;
+    if (ship) {
+        ship.boostDecelerating = false;
+        ship.warpDecelerating = false;
+        ship.cancelWarpCharge();
+    }
 
     flightState.isActive = false;
     flightState.activeShip = null;
@@ -109,16 +109,9 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     ctx.steeringEndMarker.visible = false;
     ctx.steeringOriginMarker.visible = false;
     ctx.flightHUD.hideWarpSprite();
-    flightState.warpCharge = 0;
-    flightState.warpCharging = false;
-    flightState.warpDecelerating = false;
-    if (!flightState.warpActive) {
-        // Not warping — clean up fully.
-        flightState.warpEffect?.stop();
-    }
-    // If warpActive is true, the ship continues warping autonomously and the
-    // background updater (in the animate loop) maintains its velocity and the
-    // tunnel animation.  Do NOT zero warpActive or stop the effect here.
+    ship?.cancelWarpCharge();
+    // warpActive is intentionally NOT cleared here — if the ship is still warping,
+    // the background updater continues its velocity and the tunnel animation.
     if (flightState.knownShip && !flightState.knownShip._isDisposed) {
         flightState.knownShip.trail.hide();
     }
@@ -186,13 +179,12 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     //   Phase 1: shed speed from warp → FLIGHT_BOOST_MAX_SPEED using warp decel.
     //   Phase 2 (no shift): hand off to boost decel until normal max speed.
     //   Phase 2 (shift held): end warp decel at boost speed.
-    if (flightState.warpDecelerating) {
+    if (ship.warpDecelerating) {
         const stillDecel = ship.applyWarpDecelerationStep(simDt, forward);
         flightState.currentSpeed = ship.velocity.dot(forward);
         if (!stillDecel) {
             // Reached boost speed — end the warp decel phase.
-            flightState.warpDecelerating = false;
-            flightState.warpEffect?.stop();
+            ship.warpDecelerating = false;
             // Restore steering HUD now that warp deceleration is complete.
             ctx.flightSteeringLine.visible = true;
             ctx.steeringOriginMarker.visible = true;
@@ -201,7 +193,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
                 flightState.currentSpeed = Math.min(flightState.currentSpeed, FLIGHT_BOOST_MAX_SPEED);
             } else {
                 // Case 1: no shift — transition to boost decel toward normal max speed.
-                flightState.boostDecelerating = true;
+                ship.boostDecelerating = true;
             }
         }
         flightState.thrustActive = false;
@@ -211,11 +203,11 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
 
     // ── Boost deceleration ───────────────────────────────────────────────────
     // When Shift is released above FLIGHT_MAX_SPEED, rapidly decelerate back down.
-    if (flightState.boostDecelerating) {
+    if (ship.boostDecelerating) {
         const stillDecel = ship.applyBoostDecelerationStep(simDt, forward);
         flightState.currentSpeed = ship.velocity.dot(forward);
         if (!stillDecel) {
-            flightState.boostDecelerating = false;
+            ship.boostDecelerating = false;
             // Clamp to max speed (currentSpeed already clamped by the ship method)
         }
         flightState.thrustActive = false;
@@ -223,7 +215,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
 
     // ── Warp active ──────────────────────────────────────────────────────────
-    if (flightState.warpActive) {
+    if (ship.warpActive) {
         ship.applyWarpAccelerationStep(simDt, forward);
         flightState.currentSpeed = ship.velocity.dot(forward);
         flightState.thrustActive = true;
@@ -240,20 +232,18 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
 
     // ── Warp charging ────────────────────────────────────────────────────────
-    if (flightState.warpCharging && !flightState.warpDecelerating && !autopilotState.isWarpActive) {
-        flightState.warpCharge = Math.min(flightState.warpCharge + dt, FLIGHT_WARP_CHARGE_TIME);
-        const fill = flightState.warpCharge / FLIGHT_WARP_CHARGE_TIME;
+    // Only process manual warp charging when autopilot is not active — autopilot
+    // has its own WARP_CHARGING phase that advances the same ship.warpChargeTimer.
+    if (ship.warpCharging && !ship.warpDecelerating && !ship.warpActive && !autopilotState.isActive) {
+        const fill = ship.updateWarpCharge(dt);
         ctx.flightHUD.setWarpCharge(fill);
-        if (fill >= 0.99 && !flightState.warpVoicePlayed) {
-            flightState.warpVoicePlayed = true;
+        if (fill >= 0.99 && !ship.warpVoicePlayed) {
+            ship.warpVoicePlayed = true;
             playSoundEffect(SoundEffect.WarpDriveActive);
         }
-        if (flightState.warpCharge >= FLIGHT_WARP_CHARGE_TIME) {
+        if (fill >= 1) {
             // Engage warp!
-            flightState.warpActive = true;
-            flightState.warpCharging = false;
-            flightState.warpCharge = 0;
-            flightState.warpEffect?.start();
+            ship.engageWarp();
             triggerScreenFlash(200, 0.01, 2.5);
 
             ctx.addEvent({
@@ -277,17 +267,17 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     if (
         manualInput &&
         shiftJustReleased &&
-        !flightState.boostDecelerating &&
-        !flightState.warpActive &&
-        !flightState.warpDecelerating
+        !ship.boostDecelerating &&
+        !ship.warpActive &&
+        !ship.warpDecelerating
     ) {
         if (fwdSpeed > FLIGHT_MAX_SPEED) {
-            flightState.boostDecelerating = true;
+            ship.boostDecelerating = true;
         }
     }
     // Re-engaging boost cancels the decel — but only when we're already at or below boost max speed.
     if (manualInput && keys.shift && fwdSpeed <= FLIGHT_BOOST_MAX_SPEED) {
-        flightState.boostDecelerating = false;
+        ship.boostDecelerating = false;
     }
 
     // Autopilot speed display (velocity is managed by the autopilot subsystem).
@@ -395,7 +385,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         ctx.flightSteeringLine.visible = false;
         ctx.steeringOriginMarker.visible = false;
         ctx.steeringEndMarker.visible = false;
-    } else if (!flightState.warpDecelerating) {
+    } else if (!ship.warpDecelerating) {
         ctx.flightSteeringLine.visible = true;
         ctx.steeringOriginMarker.visible = true;
     }

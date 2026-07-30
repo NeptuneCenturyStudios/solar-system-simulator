@@ -156,7 +156,7 @@ function updatePhysics(simulationState: ISimulationState) {
         // // (kept as a silent skip — no console.info on the hot path)
         // if (
         //     body === flightState.knownShip &&
-        //     (flightState.warpDecelerating || flightState.boostDecelerating)
+        //     (body.warpDecelerating || body.boostDecelerating)
         // ) {
         //     continue;
         // }
