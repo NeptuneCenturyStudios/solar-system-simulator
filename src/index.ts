@@ -99,6 +99,7 @@ import { PositionIndicatorManager } from './gizmos/position-indicator';
 import { FlightHUD } from './drawing/flight-hud';
 import { AutopilotTargetIndicator } from './drawing/autopilot-target-indicator';
 import { PlanetNameIndicator } from './drawing/planet-name-indicator';
+import { triggerScreenFlash } from './effects/screen-flash';
 import { VelocityArcManager } from './drawing/velocity-arc';
 import { OrbitPredictionManager } from './drawing/orbit-prediction';
 import { SurfaceCameraManager } from './camera/surface-camera';
@@ -132,7 +133,7 @@ import { AboutModal } from './ui/about-modal';
 import { OptionsPanel } from './ui/options-panel';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
 import { IAutopilotContext, IFlightControlContext, IProceduralGeneratorPromptResult, IStateDependencies } from './interfaces';
-import { cancelAutopilot, engageAutopilot, updateAutopilot } from './simulation/autopilot';
+import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simulation/autopilot';
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
 import { UIManager } from './ui/ui-manager';
@@ -4568,7 +4569,16 @@ const animCtx: AnimationContext = {
     getFocusObject,
     setFocusBody,
     updateAutopilotStep: (subDt: number) => {
-        updateAutopilot(autopilotCtx, subDt);
+        const _apShip = flightState.knownShip;
+        if (_apShip && _apShip.autopilotActive && !_apShip._isDisposed) {
+            _apShip.autopilotStep(subDt);
+            // Drain any one-shot events the autopilot generated this substep
+            drainAutopilotEvents(autopilotCtx);
+            // If the autopilot just engaged warp, do a screen flash
+            if (_apShip.autopilotEventMessages.some(m => m.isWarpFlash)) {
+                triggerScreenFlash(200, 0.01, 2.5);
+            }
+        }
     },
     cancelAutopilot: (message?: string) => cancelAutopilot(autopilotCtx, message),
     engageAutopilot: (target: Body) => engageAutopilot(autopilotCtx, target),

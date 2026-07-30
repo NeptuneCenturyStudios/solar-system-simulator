@@ -1,61 +1,17 @@
 import * as THREE from 'three';
 import { LogMethods, NotificationType } from '../event-log/event-log';
 import {
-    FLIGHT_BOOST_ACCEL,
-    FLIGHT_BOOST_MAX_SPEED,
-    FLIGHT_MAX_SPEED,
-    FLIGHT_MAX_TURN_RATE,
-    G,
     SCALE_FACTOR,
-    FLIGHT_THRUST_ACCEL,
+    AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
+    AUTOPILOT_WARP_THRESHOLD,
     AUTOPILOT_APPROACH_MIN_DISTANCE,
     AUTOPILOT_BLOCKED_NOTIFY_DURATION,
-    FLIGHT_BOOST_DECEL,
-    AUTOPILOT_BRAKE_ARC_DIST,
-    AUTOPILOT_BRAKE_DONE_SPEED,
-    AUTOPILOT_BRAKE_PAD,
-    AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN,
-    AUTOPILOT_CIRCULARIZE_RATE,
-    FLIGHT_THRUST_DECEL,
-    AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
-    AUTOPILOT_WARP_DECEL,
-    AUTOPILOT_WARP_THRESHOLD,
 } from '../utilities/consts';
-import { triggerScreenFlash } from '../effects/screen-flash';
 import { playSoundEffect, SoundEffect } from '../utilities/audio';
 import { IAutopilotContext } from '../interfaces';
 import { Body } from '../bodies/body';
 import { autopilotState, flightState, simulationState } from './simulation';
-
-// ── Private helper ────────────────────────────────────────────────────────────
-
-/**
- * Build a quaternion that orients the ship with its +Y (top) toward the target body
- * and its +Z (forward) in the given direction.  This provides a "tidal lock" look
- * where the ship's belly/side faces the planet instead of pointing its nose at it.
- */
-function computeTopTowardBodyQuat(
-    shipPos: THREE.Vector3,
-    targetPos: THREE.Vector3,
-    fwdDir: THREE.Vector3
-): THREE.Quaternion {
-    const radial = new THREE.Vector3().subVectors(targetPos, shipPos);
-    if (radial.lengthSq() < 1e-10) return new THREE.Quaternion();
-    radial.normalize();
-
-    const fwdLen = fwdDir.length();
-    if (fwdLen < 1e-10) return new THREE.Quaternion();
-    const fwdNorm = fwdDir.clone().normalize();
-
-    // Use Matrix4.lookAt to build the orientation:
-    //   eye    = shipPos + fwdNorm
-    //   target = shipPos
-    //   up     = radial (toward the body centre)
-    const m = new THREE.Matrix4().lookAt(shipPos.clone().add(fwdNorm), shipPos, radial);
-
-    return new THREE.Quaternion().setFromRotationMatrix(m);
-}
 
 // ── Exported functions ────────────────────────────────────────────────────────
 
@@ -72,11 +28,11 @@ export function updateAutopilotUI(ctx: IAutopilotContext): void {
 
 /** Cancel the autopilot with an optional log message. */
 export function cancelAutopilot(ctx: IAutopilotContext, message?: string): void {
-    if (!autopilotState.isActive) return;
+    const ship = flightState.knownShip;
+    if (!ship || !ship.autopilotActive) return;
 
     playSoundEffect(SoundEffect.AutopilotDisengaged);
 
-    const ship = flightState.knownShip;
     if (ship?.warpActive) {
         // If cancelled mid-warp while not in the cockpit, start background decel.
         ship.beginWarpDecel();
@@ -86,6 +42,11 @@ export function cancelAutopilot(ctx: IAutopilotContext, message?: string): void 
         ctx.flightHUD.hideWarpSprite();
         ship?.cancelWarpCharge();
     }
+
+    // Clear ship-local autopilot state
+    ship.resetAutopilotState();
+
+    // Sync global state
     autopilotState.isActive = false;
     autopilotState.isBoostActive = false;
     autopilotState.phase = null;
@@ -113,7 +74,7 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
     }
 
     // If already engaged on the same target, cancel (toggle)
-    if (autopilotState.isActive && autopilotState.targetBody === target) {
+    if (ship.autopilotActive && ship.autopilotTarget === target) {
         cancelAutopilot(ctx, 'Autopilot disengaged.');
         return;
     }
@@ -212,17 +173,24 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
     // from full normal speed — e.g. Moon → Earth (110 u) where APPROACH would need ~1,200 u.
     const startInBrake = !startWithWarp && dist0 <= orbitRadius0 + AUTOPILOT_APPROACH_MIN_DISTANCE;
 
+    // Set ship-local autopilot state
+    ship.autopilotActive = true;
+    ship.autopilotTarget = target;
+    ship.autopilotPhase = 'ALIGN';
+    ship.autopilotBoostActive = false;
+    ship.autopilotBrakeEntryDistance = dist0;
+    ship.autopilotEventMessages = [];
+    ship.warpActive = false;
+
+    // Sync global state
     autopilotState.isActive = true;
     autopilotState.targetBody = target;
-    ship.warpActive = false;
-    playSoundEffect(SoundEffect.AutopilotEngaged);
-    // Always start with ALIGN — rotate toward the target before applying any thrust.
-    // The ALIGN phase will transition to WARP_CHARGING, APPROACH, or BRAKE once the
-    // ship is facing the target, using the same distance thresholds.
     autopilotState.phase = 'ALIGN';
-    // Pre‑compute the brake‑entry distance in case ALIGN hands off to BRAKE.
     autopilotState.brakeEntryDistance = dist0;
+    autopilotState.isBoostActive = false;
     flightState.thrustActive = false;
+
+    playSoundEffect(SoundEffect.AutopilotEngaged);
 
     if (startWithWarp) {
         ctx.addEvent({
@@ -244,340 +212,31 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
 }
 
 /**
- * Autopilot: steers the ship through phases to reach a target body and enter a circular orbit.
- * Phase 1 — ALIGN:         Rotate toward the target.
- * Phase 2 — WARP_CHARGING: Charge warp drive.
- * Phase 3 — WARP:          Accelerate toward target at warp speed.
- * Phase 4 — APPROACH:      Drive toward target at boost/normal speed.
- * Phase 5 — BRAKE:         Trajectory-blend orbital insertion.
- * Phase 6 — CIRCULARIZE:   Lock into circular orbit.
- * Phase 7 — TIDAL_LOCK:    Coast in orbit with +Y toward body.
- *
- * This runs per physics substep regardless of whether flight mode is active.
+ * Drain autopilot event messages from the ship, firing one-shot effects.
+ * Called after autopilotStep() in the physics loop.
  */
-export function updateAutopilot(ctx: IAutopilotContext, dt: number): void {
-    if (!autopilotState.isActive) return;
-
-    // ── Safety guards ────────────────────────────────────────────────────────
+export function drainAutopilotEvents(ctx: IAutopilotContext): void {
     const ship = flightState.knownShip;
-    const target = autopilotState.targetBody;
+    if (!ship) return;
 
-    const shipAlive =
-        ship && !ship._isDisposed && ship.mesh && simulationState.bodies.includes(ship);
-    const targetAlive =
-        target && !target._isDisposed && target.mesh && simulationState.bodies.includes(target);
+    const messages = ship.autopilotEventMessages;
+    if (messages.length === 0) return;
 
-    if (!shipAlive || !targetAlive) {
-        cancelAutopilot(ctx, 'Autopilot disengaged: target or ship no longer exists.');
-        return;
-    }
-
-    // ── Derived values ───────────────────────────────────────────────────────
-    const shipPos = ship.mesh.position; // live reference — no clone needed for reading
-    const targetPos = target.mesh.position;
-
-    const toTarget = new THREE.Vector3().subVectors(targetPos, shipPos);
-    const distance = toTarget.length();
-
-    const orbitRadius = (target.radius ?? 10) * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
-    const relVel = new THREE.Vector3().subVectors(ship.velocity, target.velocity);
-    const approachSpeed = relVel.length();
-
-    // ── Phase transitions ────────────────────────────────────────────────────
-    const toTargetDir = toTarget.clone().normalize();
-
-    // Three-phase stopping distance: shed warp→boost at AUTOPILOT_WARP_DECEL, then
-    // boost→normal at FLIGHT_BOOST_DECEL, then normal→stop at FLIGHT_THRUST_DECEL.
-    const effectiveStopDist =
-        approachSpeed > FLIGHT_BOOST_MAX_SPEED
-            ? (approachSpeed * approachSpeed - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
-                  (2 * AUTOPILOT_WARP_DECEL) +
-              (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
-                  FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
-                  (2 * FLIGHT_BOOST_DECEL) +
-              (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * FLIGHT_THRUST_DECEL)
-            : approachSpeed > FLIGHT_MAX_SPEED
-              ? (approachSpeed * approachSpeed -
-                    FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
-                    (2 * FLIGHT_BOOST_DECEL) +
-                (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * FLIGHT_THRUST_DECEL)
-              : Math.max(approachSpeed, FLIGHT_MAX_SPEED) ** 2 / (2 * FLIGHT_THRUST_DECEL);
-    const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
-
-    // Dynamic warp threshold: adds orbitRadius so the ship stops at the
-    // desired orbit altitude, not at the target centre.  Without this,
-    // large bodies (radius ~80k) leave no room for the BRAKE smoothstep.
-    const dynamicWarpThreshold = AUTOPILOT_WARP_THRESHOLD + orbitRadius;
-
-    if (autopilotState.phase === 'WARP') {
-        // Transition to APPROACH once close enough for boost/normal to finish the journey.
-        if (distance <= dynamicWarpThreshold) {
-            ship.warpActive = false;
-            autopilotState.phase = 'APPROACH';
-            ctx.flightHUD.hideWarpSprite();
+    for (const msg of messages) {
+        if (msg.isWarpFlash) {
+            // Import is async-safe; dynamic import won't work here since it's a module-level function.
+            // Instead, the caller (animation-loop.ts) handles the screen flash.
         }
-    }
-
-    if (autopilotState.phase === 'APPROACH') {
-        const nearApproachSpeed =
-            approachSpeed <= FLIGHT_MAX_SPEED + AUTOPILOT_BRAKE_DONE_SPEED;
-        const brakeEntryTrigger = orbitRadius + Math.max(brakeDistance, AUTOPILOT_BRAKE_ARC_DIST);
-        if (nearApproachSpeed && distance <= brakeEntryTrigger) {
-            autopilotState.phase = 'BRAKE';
-            autopilotState.brakeEntryDistance = distance;
-        }
-    }
-
-    if (autopilotState.phase === 'BRAKE') {
-        const radialClosingSpeed = -relVel.dot(toTargetDir); // positive = closing on target
-        const withinOrbit = distance <= orbitRadius * 1.02;
-        const driftedToOrbit = distance <= orbitRadius * 1.1 && radialClosingSpeed < 1;
-        if (withinOrbit || driftedToOrbit) {
-            autopilotState.phase = 'CIRCULARIZE';
-        }
-    }
-
-    // ── Phase execution ──────────────────────────────────────────────────────
-
-    if (autopilotState.phase === 'ALIGN') {
-        // Rotate toward the target without applying any thrust.
-        flightState.thrustActive = false;
-        const alignQuat = new THREE.Quaternion().setFromRotationMatrix(
-            new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
-        );
-        ship.mesh.quaternion.rotateTowards(alignQuat, FLIGHT_MAX_TURN_RATE * dt);
-
-        const shipForward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
-        if (shipForward.dot(toTargetDir) >= Math.cos(THREE.MathUtils.degToRad(3))) {
-            if (distance > dynamicWarpThreshold) {
-                autopilotState.phase = 'WARP_CHARGING';
-                ship.startWarpCharge();
-            } else if (distance <= orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE) {
-                autopilotState.phase = 'BRAKE';
-            } else {
-                autopilotState.phase = 'APPROACH';
-            }
-        }
-    } else if (autopilotState.phase === 'WARP_CHARGING') {
-        // Reuse the same charge progress bar shown during manual warp.
-        const fill = ship.updateWarpCharge(dt);
-        ctx.flightHUD.setWarpCharge(fill);
-        if (fill >= 0.99 && !ship.warpVoicePlayed) {
-            ship.warpVoicePlayed = true;
-            playSoundEffect(SoundEffect.WarpDriveActive);
-        }
-        // Point toward target while charging.
-        const chargeQuat = new THREE.Quaternion().setFromRotationMatrix(
-            new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
-        );
-        ship.mesh.quaternion.rotateTowards(chargeQuat, FLIGHT_MAX_TURN_RATE * dt);
-        flightState.thrustActive = false;
-
-        if (fill >= 1) {
-            ship.engageWarp();
-            autopilotState.phase = 'WARP';
-            ctx.flightHUD.hideWarpSprite();
-            triggerScreenFlash(200, 0.01, 2.5);
-            ctx.addEvent({
-                message: '⚡ Autopilot warp engaged.',
-                notificationType: NotificationType.Success,
-            });
-        }
-    } else if (autopilotState.phase === 'WARP') {
-        // Accelerate toward FLIGHT_WARP_SPEED along current toTargetDir (world-space).
-        // toTargetDir is recomputed each substep, so the path continuously homes on the target.
-        ship.applyWarpAccelerationStep(dt, toTargetDir);
-        flightState.currentSpeed = ship.velocity.length();
-        flightState.thrustActive = true;
-
-        // Keep ship visually pointed toward the target.
-        const warpQuat = new THREE.Quaternion().setFromRotationMatrix(
-            new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
-        );
-        ship.mesh.quaternion.rotateTowards(warpQuat, FLIGHT_MAX_TURN_RATE * dt);
-    } else if (autopilotState.phase === 'APPROACH') {
-        const boostDecelDist =
-            (FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
-                FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
-            (2 * FLIGHT_BOOST_DECEL);
-        const effectiveBoostThreshold =
-            orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE + boostDecelDist;
-
-        const useBoost = distance > effectiveBoostThreshold;
-        autopilotState.isBoostActive = useBoost;
-        const targetSpeed = useBoost ? FLIGHT_BOOST_MAX_SPEED : FLIGHT_MAX_SPEED;
-
-        const desiredVel = new THREE.Vector3()
-            .copy(target.velocity)
-            .addScaledVector(toTargetDir, targetSpeed);
-
-        const velDelta = new THREE.Vector3().subVectors(desiredVel, ship.velocity);
-        const deltaLen = velDelta.length();
-
-        if (deltaLen > 1e-6) {
-            const accelDir = velDelta.clone().normalize();
-
-            const relFwd = relVel.dot(toTargetDir);
-            if (relFwd >= targetSpeed) {
-                const fwdComp = accelDir.dot(toTargetDir);
-                if (fwdComp > 0) {
-                    accelDir.addScaledVector(toTargetDir, -fwdComp);
-                    const len = accelDir.length();
-                    if (len > 1e-6) accelDir.divideScalar(len);
-                }
-            }
-            const needsDecel = approachSpeed > targetSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
-            const rate = needsDecel
-                ? approachSpeed > FLIGHT_BOOST_MAX_SPEED
-                    ? AUTOPILOT_WARP_DECEL
-                    : approachSpeed > FLIGHT_MAX_SPEED
-                      ? FLIGHT_BOOST_DECEL
-                      : FLIGHT_THRUST_DECEL
-                : useBoost
-                  ? FLIGHT_BOOST_ACCEL
-                  : FLIGHT_THRUST_ACCEL;
-            const accelMag = Math.min(rate * dt, deltaLen);
-            ship.velocity.addScaledVector(accelDir, accelMag);
-        }
-
-        const approachQuat = new THREE.Quaternion().setFromRotationMatrix(
-            new THREE.Matrix4().lookAt(targetPos, shipPos, new THREE.Vector3(0, 1, 0))
-        );
-        ship.mesh.quaternion.rotateTowards(approachQuat, FLIGHT_MAX_TURN_RATE * dt);
-        flightState.thrustActive = deltaLen > 1e-6;
-    } else if (autopilotState.phase === 'BRAKE' && G * simulationState.gMultiplier > 0) {
-        const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
-        if (radial.lengthSq() < 1e-10) return;
-        const r = radial.length();
-        radial.normalize();
-
-        const worldUp = new THREE.Vector3(0, 1, 0);
-        const tangential = new THREE.Vector3().crossVectors(radial, worldUp).normalize();
-        if (tangential.lengthSq() < 1e-10) {
-            tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
-        }
-
-        const vOrbit = Math.sqrt((G * simulationState.gMultiplier * target.mass) / r);
-
-        const brakeSpan = Math.max(autopilotState.brakeEntryDistance - orbitRadius, 1);
-        const rawT = 1 - (distance - orbitRadius) / brakeSpan;
-        const t = Math.max(0, Math.min(1, rawT));
-        const alpha = t * t * (3 - 2 * t); // smoothstep
-
-        const brakeApproachSpeed = relVel.length();
-        const brakeDecel =
-            brakeApproachSpeed > FLIGHT_BOOST_MAX_SPEED
-                ? AUTOPILOT_WARP_DECEL
-                : brakeApproachSpeed > FLIGHT_MAX_SPEED
-                  ? FLIGHT_BOOST_DECEL
-                  : FLIGHT_THRUST_DECEL;
-        const maxInwardForSpan = Math.sqrt(2 * brakeDecel * brakeSpan);
-        const inwardSpeed = Math.min(FLIGHT_MAX_SPEED, maxInwardForSpan) * (1 - alpha);
-        const desiredVel = new THREE.Vector3()
-            .copy(target.velocity)
-            .addScaledVector(tangential, vOrbit * alpha)
-            .addScaledVector(toTargetDir, inwardSpeed);
-
-        // Explicit gravity compensation.
-        const gravAccel = (G * simulationState.gMultiplier * target.mass) / (r * r);
-        const tangentialSpeed = relVel.dot(tangential);
-        const speedRatio = Math.max(0, Math.min(1, tangentialSpeed / vOrbit));
-        const gravCompFraction = 1 - speedRatio * speedRatio;
-        ship.velocity.addScaledVector(radial, gravAccel * gravCompFraction * dt);
-
-        const velDelta = new THREE.Vector3().subVectors(desiredVel, ship.velocity);
-        const deltaLen = velDelta.length();
-
-        if (deltaLen > 1e-6) {
-            const thrustDir = velDelta.clone().normalize();
-            const brakeMag = Math.min(brakeDecel * dt, deltaLen);
-            ship.velocity.addScaledVector(thrustDir, brakeMag);
-
-            const targetQuat = computeTopTowardBodyQuat(shipPos, targetPos, thrustDir);
-            ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
-            flightState.thrustActive = deltaLen > 1;
-        } else {
-            flightState.thrustActive = false;
-        }
-    } else if (autopilotState.phase === 'CIRCULARIZE' && G * simulationState.gMultiplier > 0) {
-        const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
-        if (radial.lengthSq() < 1e-10) {
-            ship.mesh.position.addScaledVector(new THREE.Vector3(1, 0, 0), orbitRadius);
-            return;
-        }
-
-        const r = radial.length();
-        radial.normalize();
-
-        const worldUp = new THREE.Vector3(0, 1, 0);
-        const tangential = new THREE.Vector3().crossVectors(radial, worldUp).normalize();
-        if (tangential.lengthSq() < 1e-10) {
-            tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
-        }
-
-        const vOrbit = Math.sqrt((G * simulationState.gMultiplier * target.mass) / r);
-
-        const bodyRadius = target.radius ?? 10;
-        const altitude = Math.max(r - bodyRadius, 1);
-        const gravAccel = (G * simulationState.gMultiplier * target.mass) / (r * r);
-        const safeRate =
-            AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN * vOrbit * Math.sqrt(gravAccel / altitude);
-        const effectiveRate = Math.max(AUTOPILOT_CIRCULARIZE_RATE, safeRate);
-
-        const tangentialSpeed = relVel.dot(tangential);
-        const speedRatio = Math.max(0, Math.min(1, tangentialSpeed / vOrbit));
-        const gravCompFraction = 1 - speedRatio * speedRatio;
-        ship.velocity.addScaledVector(radial, gravAccel * gravCompFraction * dt);
-
-        const desiredVel = new THREE.Vector3()
-            .copy(target.velocity)
-            .addScaledVector(tangential, vOrbit);
-
-        const velDelta = new THREE.Vector3().subVectors(desiredVel, ship.velocity);
-        const deltaLen = velDelta.length();
-
-        if (deltaLen < AUTOPILOT_BRAKE_DONE_SPEED) {
-            // Close enough — snap the residual and complete.
-            ship.velocity.copy(desiredVel);
-            flightState.thrustActive = false;
-
-            const targetName = target.name || 'the body';
-            ctx.addEvent({
-                message: `✓ Autopilot: Stable orbit around ${targetName} achieved. Tidal lock engaged.`,
-                notificationType: NotificationType.Success,
-            });
+        if (msg.isOrbitNotify) {
             autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
             ctx.flightHUD.showOrbitNotify();
-
-            autopilotState.phase = 'TIDAL_LOCK';
-            setTimeout(() => updateAutopilotUI(ctx), 0);
-        } else {
-            const thrustDir = velDelta.clone().normalize();
-            const mag = Math.min(effectiveRate * dt, deltaLen);
-            ship.velocity.addScaledVector(thrustDir, mag);
-
-            const targetQuat = computeTopTowardBodyQuat(shipPos, targetPos, thrustDir);
-            ship.mesh.quaternion.rotateTowards(targetQuat, FLIGHT_MAX_TURN_RATE * dt);
-            flightState.thrustActive = true;
         }
-    } else if (autopilotState.phase === 'TIDAL_LOCK' && G * simulationState.gMultiplier > 0) {
-        const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
-        if (radial.lengthSq() < 1e-10) return;
-        radial.normalize();
-
-        const worldUp = new THREE.Vector3(0, 1, 0);
-        const tangential = new THREE.Vector3().crossVectors(radial, worldUp).normalize();
-        if (tangential.lengthSq() < 1e-10) {
-            tangential.crossVectors(radial, new THREE.Vector3(0, 0, 1)).normalize();
-        }
-
-        // Use the relative velocity direction as forward, falling back to the
-        // tangential orbit direction if the ship's velocity is negligible.
-        const relVel = new THREE.Vector3().subVectors(ship.velocity, target.velocity);
-        const fwdDir = relVel.lengthSq() > 1e-6 ? relVel.clone().normalize() : tangential;
-
-        const lockQuat = computeTopTowardBodyQuat(shipPos, targetPos, fwdDir);
-        ship.mesh.quaternion.rotateTowards(lockQuat, FLIGHT_MAX_TURN_RATE * dt);
-        flightState.thrustActive = false;
+        ctx.addEvent({
+            message: msg.message,
+            notificationType: msg.isOrbitNotify ? NotificationType.Success : NotificationType.Success,
+        });
     }
+
+    ship.autopilotEventMessages = [];
+    setTimeout(() => updateAutopilotUI(ctx), 0);
 }
