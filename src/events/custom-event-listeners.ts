@@ -4,9 +4,9 @@ import { Body } from '../bodies/body';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { ImpactShockwave } from '../effects/impact-shockwave';
 import { playWeaponImpact } from '../utilities/audio.js';
-import { WEAPON_DAMAGE } from '../utilities/consts';
 import { IStateDependencies } from '../interfaces';
 import {
+    autopilotState,
     cameraState,
     flightState,
     simulationState,
@@ -62,12 +62,20 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         // so the button reverts to "SPAWN SPACESHIP" rather than "ENTER SHIP".
         if (removedBody && removedBody === flightState.knownShip) {
             flightState.knownShip = null;
+            // Disengage autopilot globally if this ship was the autopilot actor.
+            if (autopilotState.isActive) {
+                autopilotState.isActive = false;
+                autopilotState.targetBody = null;
+                autopilotState.phase = null;
+                autopilotState.isBoostActive = false;
+            }
             setTimeout(() => {
                 try {
                     uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
                         flightState.knownShip,
                         simulationState.bodies
                     );
+                    uiManager.flightControlsPanel.setAutopilotState(false, false);
                 } catch {
                     // Empty
                 }
@@ -89,7 +97,7 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
             new ImpactShockwave(dependencies, scene, position, body.mesh.position, body.radius)
         );
 
-        body.healthPoints -= WEAPON_DAMAGE;
+        body.healthPoints -= e.detail.damage;
         if (body.healthPoints <= 0) {
             body.die();
         }
@@ -99,6 +107,26 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
     window.addEventListener('body:dead', (e: WindowEventMap['body:dead']) => {
         const body = e.detail.body;
         if (body) {
+            // If the dead body was the player's ship, disengage autopilot globally.
+            // Do NOT clear flightState.activeShip or flightState.knownShip here —
+            // the animation loop's guard detects _isDisposed and calls exitFlightMode(),
+            // which handles those references properly (including warp cleanup).
+            const isShip =
+                body === flightState.knownShip || body === flightState.activeShip;
+            if (isShip && autopilotState.isActive) {
+                autopilotState.isActive = false;
+                autopilotState.targetBody = null;
+                autopilotState.phase = null;
+                autopilotState.isBoostActive = false;
+                setTimeout(() => {
+                    try {
+                        uiManager.flightControlsPanel.setAutopilotState(false, false);
+                    } catch {
+                        // Empty
+                    }
+                }, 0);
+            }
+
             // Ensure truly-dead bodies are removed from the simulation array.
             // Collision deaths already remove immediately, but other death paths (e.g. star fuel death)
             // can emit `body:dead` without being spliced out here.

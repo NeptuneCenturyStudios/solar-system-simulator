@@ -219,10 +219,6 @@ export function drainAutopilotEvents(ctx: IAutopilotContext): void {
     if (messages.length === 0) return;
 
     for (const msg of messages) {
-        if (msg.isWarpFlash) {
-            // Import is async-safe; dynamic import won't work here since it's a module-level function.
-            // Instead, the caller (animation-loop.ts) handles the screen flash.
-        }
         if (msg.isOrbitNotify) {
             autopilotState.orbitNotifyTimer = AUTOPILOT_ORBIT_NOTIFY_DURATION;
             ctx.flightHUD.showOrbitNotify();

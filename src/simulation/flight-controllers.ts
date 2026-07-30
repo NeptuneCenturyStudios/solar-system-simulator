@@ -10,7 +10,6 @@ import {
     interactionState,
     simulationState,
 } from './simulation';
-import { triggerScreenFlash } from '../effects/screen-flash';
 import { IFlightControlContext } from '../interfaces';
 import { playSoundEffect, SoundEffect } from '../utilities/audio';
 
@@ -48,7 +47,7 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     flightState.altOrbitActive = false;
     flightState.altOrbitYaw = 0;
     flightState.altOrbitPitch = 0;
-    ctx.shipWeapon.reset();
+    flightState.activeShip?.weapon?.reset();
 
     // Clear deceleration and warp flags so on re-entry the ship isn't
     // artificially clamped back to FLIGHT_MAX_SPEED.
@@ -230,24 +229,31 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
 
     // ── Warp charging ────────────────────────────────────────────────────────
-    // Only process manual warp charging when autopilot is not active — autopilot
-    // has its own WARP_CHARGING phase that advances the same ship.warpChargeTimer.
-    if (ship.warpCharging && !ship.warpDecelerating && !ship.warpActive && !autopilotState.isActive) {
-        const fill = ship.updateWarpCharge(dt);
-        ctx.flightHUD.setWarpCharge(fill);
-        if (fill >= 0.99 && !ship.warpVoicePlayed) {
-            ship.warpVoicePlayed = true;
-            playSoundEffect(SoundEffect.WarpDriveActive);
-        }
-        if (fill >= 1) {
-            // Engage warp!
-            ship.engageWarp();
-            triggerScreenFlash(200, 0.01, 2.5);
-
-            ctx.addEvent({
-                message: '⚡ Warp engaged! Press Space to disengage.',
-                notificationType: NotificationType.Success,
-            });
+    // Autopilot has its own WARP_CHARGING phase that advances ship.warpChargeTimer
+    // inside autopilotStep().  We still need to show the charge bar in both cases.
+    if (ship.warpCharging && !ship.warpDecelerating && !ship.warpActive) {
+        if (!autopilotState.isActive) {
+            // Manual warp charging — advance the timer here.
+            const fill = ship.updateWarpCharge(dt);
+            ctx.flightHUD.setWarpCharge(fill);
+            if (fill >= 0.99 && !ship.warpVoicePlayed) {
+                ship.warpVoicePlayed = true;
+                playSoundEffect(SoundEffect.WarpDriveActive);
+            }
+            if (fill >= 1) {
+                // Engage warp!
+                ship.engageWarp();
+                
+                ctx.addEvent({
+                    message: '⚡ Warp engaged! Press Space to disengage.',
+                    notificationType: NotificationType.Success,
+                });
+            }
+        } else {
+            // Autopilot warp charging — timer is advanced by autopilotStep();
+            // just display the current progress.
+            const fill = ship.warpChargeTimer / ship.handling.flightWarpChargeTime;
+            ctx.flightHUD.setWarpCharge(fill);
         }
         // Allow normal flight controls while charging (just can't turn on warp mid-turn)
     }
@@ -402,7 +408,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         ).normalize();
         const aimDir = viewSpaceDir.transformDirection(ctx.camera.matrixWorld);
         const muzzlePos = ship.mesh.position.clone().addScaledVector(forward, ship.radius * 4);
-        ctx.shipWeapon.tryFire(dt, muzzlePos, aimDir, ship.velocity);
+        ship.fireWeapon(dt, muzzlePos, aimDir);
     }
 
     // ── Warp sprite catch-all ──────────────────────────────────────────────

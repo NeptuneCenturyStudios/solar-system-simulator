@@ -6,7 +6,6 @@ import { CelestialBody } from '../bodies/celestial-body';
 import { Supernova } from '../effects/supernova';
 import { PlanetaryNebula } from '../effects/planetary-nebula';
 import { GravitationalLensingEffect } from '../effects/gravitational-lensing';
-import { ShipWeapon } from '../ship-effects/ship-weapon';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { VelocityArcManager } from '../drawing/velocity-arc';
 import { OrbitPredictionManager } from '../drawing/orbit-prediction';
@@ -91,7 +90,6 @@ export interface AnimationContext {
 
     // Managers & effects
     lensingEffect: GravitationalLensingEffect;
-    shipWeapon: ShipWeapon;
     gizmo: CoordinateGizmo;
     velArc: VelocityArcManager;
     orbitPrediction: OrbitPredictionManager;
@@ -246,6 +244,19 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             } else if (_bgShip) {
                 _bgShip.warpDecelerating = false;
                 _bgShip.boostDecelerating = false;
+            }
+        }
+
+        // ── Background warp HUD (charge & active, non-flight) ─────────────
+        if (!isFlightModeActive && bgShip && !bgShip._isDisposed && bgShip.mesh) {
+            if (bgShip.warpCharging) {
+                const fill = bgShip.warpChargeTimer / bgShip.handling.flightWarpChargeTime;
+                ctx.flightHUD.setWarpCharge(fill);
+            } else if (bgShip.warpActive) {
+                const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
+                ctx.flightHUD.setWarpActive(pulse);
+            } else {
+                ctx.flightHUD.hideWarpSprite();
             }
         }
 
@@ -485,7 +496,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
         // ── Weapon bolts ──────────────────────────────────────────────────
         if (ctx.flightState.isActive && ctx.flightState.activeShip) {
-            ctx.shipWeapon.update(
+            ctx.flightState.activeShip.weapon?.update(
                 wallDt,
                 dtTotal,
                 ctx.simulationState.bodies,

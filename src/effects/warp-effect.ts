@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import {
     DIST_SCALE,
-    FLIGHT_MAX_SPEED,
     SCALE_FACTOR,
 } from '../utilities/consts.js';
 import { settingsStore } from '../settings/settings-store.js';
@@ -233,12 +232,6 @@ export class WarpEffect {
 
         // Get the current speed of the ship.
         const speed = shipVelocity.length();
-
-        // If ship speed is below FLIGHT_MAX_SPEED, then return. We don't need to display the warp effect
-        if (speed <= FLIGHT_MAX_SPEED) {
-            this.lines.visible = false;
-            return;
-        }
 
         this.lines.visible = true;
 

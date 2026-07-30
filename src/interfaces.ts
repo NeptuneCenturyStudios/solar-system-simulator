@@ -12,7 +12,6 @@ import { ITidalLockOptions } from './bodies/celestial-body';
 import { EffectiveGForce } from './types';
 import { Spaceship } from './bodies/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
-import { ShipWeapon } from './ship-effects/ship-weapon';
 import { FlightHUD } from './drawing/flight-hud';
 import { UIManager } from './ui/ui-manager';
 
@@ -339,7 +338,6 @@ export interface IDeathOptions {
 }
 
 export interface IFlightControlContext {
-    shipWeapon: ShipWeapon;
     camera: THREE.PerspectiveCamera;
     renderer: THREE.WebGLRenderer;
     controls: OrbitControls;
@@ -417,4 +415,32 @@ export interface ISpaceshipHandling {
 
     // ── Misc ──────────────────────────────────────────────────────────
     flightWarpChargeTime: number; // seconds to hold Space before warp engages
+}
+/** Per-ship weapon tuning — passed to ShipWeapon constructor. */
+export interface IWeaponConfig {
+    // ── Projectile physics ────────────────────────────────────────────
+    /** Speed added on top of ship velocity (units/s). */
+    baseSpeed: number;
+    /** Seconds before a bolt fizzles. */
+    particleLifetime: number;
+
+    // ── Visuals ───────────────────────────────────────────────────────
+    /** World-space length of each bolt line segment. */
+    boltLength: number;
+    /** Hex colour for bolts and the glow point. */
+    boltColor: number;
+    /** World-space size of the glowing head sprite (perspective-correct). */
+    boltHeadSize: number;
+
+    // ── Rate & damage ─────────────────────────────────────────────────
+    /** Maximum bolts fired per second. */
+    fireRate: number;
+    /** HP damage dealt on impact. */
+    damage: number;
+
+    // ── Optional overrides ────────────────────────────────────────────
+    /** Maximum simultaneous in-flight bolts (default 800). */
+    maxProjectiles?: number;
+    /** Called once per bolt fired; defaults to playWeaponFire() if omitted. */
+    fireSound?: () => void;
 }

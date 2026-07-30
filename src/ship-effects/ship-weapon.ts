@@ -1,14 +1,7 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { playWeaponFire } from '../utilities/audio.js';
-import {
-    WEAPON_BASE_SPEED,
-    WEAPON_PARTICLE_LIFETIME,
-    WEAPON_BOLT_LENGTH,
-    WEAPON_PARTICLE_COLOR,
-    WEAPON_BOLT_HEAD_SIZE,
-    WEAPON_FIRE_RATE,
-} from '../utilities/consts';
+import { IWeaponConfig } from '../interfaces';
 
 /**
  * One active weapon projectile.
@@ -46,6 +39,7 @@ interface Projectile {
  */
 export class ShipWeapon {
     private scene: THREE.Scene;
+    private readonly config: IWeaponConfig;
     private projectiles: Projectile[] = [];
     private readonly maxProjectiles: number;
     /** Flat float32 buffer: 2 vertices × 3 coords per projectile [tail, head]. */
@@ -60,18 +54,19 @@ export class ShipWeapon {
     private headPoints: THREE.Points;
     private fireCooldown = 0;
 
-    constructor(scene: THREE.Scene, maxProjectiles = 800) {
+    constructor(scene: THREE.Scene, config: IWeaponConfig) {
         this.scene = scene;
-        this.maxProjectiles = maxProjectiles;
+        this.config = config;
+        this.maxProjectiles = config.maxProjectiles ?? 800;
 
         // 2 vertices per bolt (tail + head), 3 floats each.
-        this.positions = new Float32Array(maxProjectiles * 2 * 3).fill(0);
+        this.positions = new Float32Array(this.maxProjectiles * 2 * 3).fill(0);
         this.geometry = new THREE.BufferGeometry();
         this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
         this.geometry.setDrawRange(0, 0);
 
         this.material = new THREE.LineBasicMaterial({
-            color: WEAPON_PARTICLE_COLOR,
+            color: this.config.boltColor,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -85,7 +80,7 @@ export class ShipWeapon {
         scene.add(this.lines);
 
         // ── Glowing head points ───────────────────────────────────────────────
-        this.headPositions = new Float32Array(maxProjectiles * 3).fill(0);
+        this.headPositions = new Float32Array(this.maxProjectiles * 3).fill(0);
         this.headGeometry = new THREE.BufferGeometry();
         this.headGeometry.setAttribute(
             'position',
@@ -94,8 +89,8 @@ export class ShipWeapon {
         this.headGeometry.setDrawRange(0, 0);
 
         this.headMaterial = new THREE.PointsMaterial({
-            color: WEAPON_PARTICLE_COLOR,
-            size: WEAPON_BOLT_HEAD_SIZE,
+            color: this.config.boltColor,
+            size: this.config.boltHeadSize,
             sizeAttenuation: true, // world-unit size — shrinks naturally with distance
             transparent: true,
             opacity: 1.0,
@@ -147,19 +142,19 @@ export class ShipWeapon {
     ): void {
         this.fireCooldown -= dt;
         if (this.fireCooldown > 0) return;
-        this.fireCooldown = 1.0 / WEAPON_FIRE_RATE;
+        this.fireCooldown = 1.0 / this.config.fireRate;
 
         if (this.projectiles.length >= this.maxProjectiles) return;
 
         // Speed is base + ship speed (Galilean relativity)
-        const velocity = direction.clone().multiplyScalar(WEAPON_BASE_SPEED).add(shipVelocity);
+        const velocity = direction.clone().multiplyScalar(this.config.baseSpeed).add(shipVelocity);
 
-        playWeaponFire();
+        (this.config.fireSound ?? playWeaponFire)();
         this.projectiles.push({
             position: origin.clone(),
             velocity,
             velDir: velocity.clone().normalize(),
-            timeRemaining: WEAPON_PARTICLE_LIFETIME,
+            timeRemaining: this.config.particleLifetime,
         });
     }
 
@@ -203,7 +198,7 @@ export class ShipWeapon {
                 if (p.position.distanceTo(body.mesh.position) <= body.radius) {
                     window.dispatchEvent(
                         new CustomEvent('weapon:hit', {
-                            detail: { body, position: p.position.clone() },
+                            detail: { body, position: p.position.clone(), damage: this.config.damage },
                         })
                     );
                     toRemove.add(i);
@@ -231,10 +226,10 @@ export class ShipWeapon {
         for (let i = 0; i < count; i++) {
             const p = this.projectiles[i];
 
-            // Fixed-length bolt: tail always sits exactly WEAPON_BOLT_LENGTH behind the head.
-            const tailX = p.position.x - p.velDir.x * WEAPON_BOLT_LENGTH;
-            const tailY = p.position.y - p.velDir.y * WEAPON_BOLT_LENGTH;
-            const tailZ = p.position.z - p.velDir.z * WEAPON_BOLT_LENGTH;
+            // Fixed-length bolt: tail always sits exactly boltLength behind the head.
+            const tailX = p.position.x - p.velDir.x * this.config.boltLength;
+            const tailY = p.position.y - p.velDir.y * this.config.boltLength;
+            const tailZ = p.position.z - p.velDir.z * this.config.boltLength;
 
             const base = i * 6;
             // Tail vertex (relative to camera)

@@ -11,8 +11,8 @@ declare global {
         'body:absorbed': CustomEvent<{ message: string; notificationType: NotificationType }>;
         'body:selected': CustomEvent<{ body: Body; id: string; name: string }>;
         'body:deselected': CustomEvent<{ body: Body; id: string; name: string }>;
-        /** Fired when a weapon projectile strikes a body. Future damage systems listen here. */
-        'weapon:hit': CustomEvent<{ body: Body; position: THREE.Vector3 }>;
+        /** Fired when a weapon projectile strikes a body. */
+        'weapon:hit': CustomEvent<{ body: Body; position: THREE.Vector3; damage: number }>;
         'camera:focusChanged': CustomEvent<{
             body: Body | null;
             id: string | null;
@@ -96,7 +96,6 @@ import { PositionIndicatorManager } from './gizmos/position-indicator';
 import { FlightHUD } from './drawing/flight-hud';
 import { AutopilotTargetIndicator } from './drawing/autopilot-target-indicator';
 import { PlanetNameIndicator } from './drawing/planet-name-indicator';
-import { triggerScreenFlash } from './effects/screen-flash';
 import { VelocityArcManager } from './drawing/velocity-arc';
 import { OrbitPredictionManager } from './drawing/orbit-prediction';
 import { SurfaceCameraManager } from './camera/surface-camera';
@@ -123,7 +122,6 @@ import { upgradeProceduralTexture } from './procedural/texture-upgrader';
 import { Asteroid } from './bodies/asteroid';
 
 import { Spaceship } from './bodies/spaceship';
-import { ShipWeapon } from './ship-effects/ship-weapon';
 import { StartupModal } from './ui/startup-modal';
 import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
@@ -328,9 +326,6 @@ const steeringOriginMarker = new THREE.Mesh(
 steeringOriginMarker.frustumCulled = false;
 steeringOriginMarker.visible = false;
 uiScene.add(steeringOriginMarker);
-
-// --- Ship weapon (projectile particle system, lives in the main 3D scene) ---
-const shipWeapon = new ShipWeapon(scene);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 camera.position.set(INITIAL_CAMERA_DISTANCE, 12018 * SCALE_FACTOR, INITIAL_CAMERA_DISTANCE); // Scaled for new world size
@@ -2994,7 +2989,6 @@ const surfaceCam = new SurfaceCameraManager(
 // ── Flight mode functions ────────────────────────────────────────────────────
 
 const flightCtx: IFlightControlContext = {
-    shipWeapon,
     camera,
     renderer,
     controls,
@@ -4545,7 +4539,6 @@ const animCtx: AnimationContext = {
     supernovas: { value: supernovas },
     planetaryNebulae: { value: planetaryNebulae },
     lensingEffect,
-    shipWeapon,
     gizmo,
     velArc,
     orbitPrediction,
@@ -4571,10 +4564,7 @@ const animCtx: AnimationContext = {
             _apShip.autopilotStep(subDt);
             // Drain any one-shot events the autopilot generated this substep
             drainAutopilotEvents(autopilotCtx);
-            // If the autopilot just engaged warp, do a screen flash
-            if (_apShip.autopilotEventMessages.some(m => m.isWarpFlash)) {
-                triggerScreenFlash(200, 0.01, 2.5);
-            }
+            
         }
     },
     cancelAutopilot: (message?: string) => cancelAutopilot(autopilotCtx, message),

@@ -8,8 +8,8 @@ import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
 import { WarpSoundController, playWarpLoop } from '../utilities/audio.js';
 import { WarpEffect } from '../effects/warp-effect.js';
-import { FLIGHT_WARP_CHARGE_TIME } from '../utilities/consts.js';
-import { IDeathOptions, ISpaceshipHandling, AutopilotPhase } from '../interfaces';
+import { IDeathOptions, ISpaceshipHandling, IWeaponConfig, AutopilotPhase } from '../interfaces';
+import { ShipWeapon } from '../ship-effects/ship-weapon';
 import { autopilotState, cameraState, flightState, simulationState } from '../simulation/simulation';
 import { G } from '../utilities/consts';
 import {
@@ -19,6 +19,7 @@ import {
     AUTOPILOT_CIRCULARIZE_RATE,
     AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN,
 } from '../utilities/consts';
+import { triggerScreenFlash } from '../effects/screen-flash';
 
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
@@ -50,6 +51,8 @@ export class Spaceship extends Body {
     trail: IShipEffect;
     /** Handling characteristics of the spaceship. */
     handling: ISpaceshipHandling;
+    /** Weapon system; null for unarmed ships. Subclasses arm themselves by passing a config. */
+    weapon: ShipWeapon | null = null;
 
     /** Current angular roll velocity (rad/s). Decays when key released. */
     rollVelocity: number = 0;
@@ -91,7 +94,7 @@ export class Spaceship extends Body {
     /** Distance to target when BRAKE phase started — used for the velocity blend smoothstep. */
     autopilotBrakeEntryDistance: number = 0;
     /** Holds pending phase-change messages for the caller to drain after autopilotStep returns. */
-    autopilotEventMessages: { message: string; isOrbitNotify: boolean; isWarpFlash: boolean }[] = [];
+    autopilotEventMessages: { message: string; isOrbitNotify: boolean; }[] = [];
 
     /** Active warp loop sound controller, or null if not currently playing. */
     private _warpSound: WarpSoundController | null = null;
@@ -174,7 +177,8 @@ export class Spaceship extends Body {
         velocity: THREE.Vector3,
         id: string,
         modelName: string = 'Lo_poly_Spaceship_01_by_Liz_Reddington',
-        handling: ISpaceshipHandling
+        handling: ISpaceshipHandling,
+        weaponConfig?: IWeaponConfig
     ) {
         // Invisible placeholder mesh — replaced by the loaded OBJ group once ready.
         const placeholderGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
@@ -198,6 +202,8 @@ export class Spaceship extends Body {
         // Store the handling characteristics for use in flight control calculations.
         this.handling = handling;
 
+        if (weaponConfig) this.weapon = new ShipWeapon(scene, weaponConfig);
+
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
         this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF, -0.9 * SF);
@@ -219,6 +225,11 @@ export class Spaceship extends Body {
 
         // ── Async OBJ + MTL load ──────────────────────────────────────────────
         this._loadModel(modelName);
+    }
+
+    /** Fire the ship's weapon toward `aimDir`. No-op if this ship is unarmed. */
+    fireWeapon(dt: number, muzzlePos: THREE.Vector3, aimDir: THREE.Vector3): void {
+        this.weapon?.tryFire(dt, muzzlePos, aimDir, this.velocity);
     }
 
     /**
@@ -694,13 +705,12 @@ export class Spaceship extends Body {
             this.steerToward(toTargetDir, dt);
             flightState.thrustActive = false;
 
-            if (this.warpChargeTimer >= FLIGHT_WARP_CHARGE_TIME) {
+            if (this.warpChargeTimer >= this.handling.flightWarpChargeTime) {
                 this.engageWarp();
                 this.autopilotPhase = 'WARP';
                 this.autopilotEventMessages.push({
                     message: '⚡ Autopilot warp engaged.',
-                    isOrbitNotify: false,
-                    isWarpFlash: true,
+                    isOrbitNotify: false
                 });
             }
         } else if (this.autopilotPhase === 'WARP') {
@@ -846,8 +856,7 @@ export class Spaceship extends Body {
                 this.autopilotPhase = 'TIDAL_LOCK';
                 this.autopilotEventMessages.push({
                     message: `✓ Autopilot: Stable orbit around ${target.name || 'the body'} achieved. Tidal lock engaged.`,
-                    isOrbitNotify: true,
-                    isWarpFlash: false,
+                    isOrbitNotify: true
                 });
             } else {
                 const thrustDir = velDelta.clone().normalize();
@@ -924,8 +933,8 @@ export class Spaceship extends Body {
      * @returns Fill ratio in [0, 1].  Returns 1.0 when fully charged.
      */
     updateWarpCharge(dt: number): number {
-        this.warpChargeTimer = Math.min(this.warpChargeTimer + dt, FLIGHT_WARP_CHARGE_TIME);
-        return this.warpChargeTimer / FLIGHT_WARP_CHARGE_TIME;
+        this.warpChargeTimer = Math.min(this.warpChargeTimer + dt, this.handling.flightWarpChargeTime);
+        return this.warpChargeTimer / this.handling.flightWarpChargeTime;
     }
 
     /**
@@ -947,6 +956,8 @@ export class Spaceship extends Body {
         this.warpActive = true;
         this.warpCharging = false;
         this.warpChargeTimer = 0;
+
+        triggerScreenFlash(200, 0.01, 2.5);
     }
 
     /**
@@ -1010,6 +1021,8 @@ export class Spaceship extends Body {
         }
         this.warpEffect.forceHide();
         this.warpEffect.dispose();
+        this.weapon?.dispose();
+        this.weapon = null;
         this.resetAutopilotState();
         super.die(deathOptions);
     }
