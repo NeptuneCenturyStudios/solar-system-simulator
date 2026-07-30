@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { NotificationType } from '../event-log/event-log';
 import {
-    FLIGHT_BOOST_MAX_SPEED,
-    FLIGHT_MAX_SPEED,
     TEXT_SPRITE_Z,
 } from '../utilities/consts';
 import {
@@ -190,7 +188,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
             ctx.steeringOriginMarker.visible = true;
             if (keys.shift) {
                 // Case 2: shift held — sit at boost speed; normal boost logic takes over.
-                flightState.currentSpeed = Math.min(flightState.currentSpeed, FLIGHT_BOOST_MAX_SPEED);
+                flightState.currentSpeed = Math.min(flightState.currentSpeed, ship.handling.flightBoostMaxSpeed);
             } else {
                 // Case 1: no shift — transition to boost decel toward normal max speed.
                 ship.boostDecelerating = true;
@@ -271,12 +269,12 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         !ship.warpActive &&
         !ship.warpDecelerating
     ) {
-        if (fwdSpeed > FLIGHT_MAX_SPEED) {
+        if (fwdSpeed > ship.handling.flightMaxSpeed) {
             ship.boostDecelerating = true;
         }
     }
     // Re-engaging boost cancels the decel — but only when we're already at or below boost max speed.
-    if (manualInput && keys.shift && fwdSpeed <= FLIGHT_BOOST_MAX_SPEED) {
+    if (manualInput && keys.shift && fwdSpeed <= ship.handling.flightBoostMaxSpeed) {
         ship.boostDecelerating = false;
     }
 

@@ -3,8 +3,6 @@ import { LogMethods, NotificationType } from '../event-log/event-log';
 import {
     SCALE_FACTOR,
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
-    AUTOPILOT_WARP_THRESHOLD,
-    AUTOPILOT_APPROACH_MIN_DISTANCE,
     AUTOPILOT_BLOCKED_NOTIFY_DURATION,
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
 } from '../utilities/consts';
@@ -102,13 +100,11 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
     const dist0 =
         ship.mesh && target.mesh ? ship.mesh.position.distanceTo(target.mesh.position) : Infinity;
     const orbitRadius0 = (target.radius ?? 10) * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
-    // Dynamic warp threshold: the static AUTOPILOT_WARP_THRESHOLD is the stopping
-    // distance from full warp speed to zero, but it doesn't account for the target
-    // body's orbit radius.  For large bodies (e.g. radius ~80k), the braking runway
-    // shrinks below zero, causing the autopilot to enter BRAKE already inside the
-    // body's surface.  Adding orbitRadius ensures the ship stops *at* the orbit
-    // radius, not at the target centre.
-    const dynamicWarpThreshold0 = AUTOPILOT_WARP_THRESHOLD + orbitRadius0;
+    // Dynamic warp threshold: the ship's autopilotWarpThreshold is the stopping
+    // distance from full warp speed to zero, derived from the ship's own handling.
+    // It doesn't account for the target body's orbit radius, so adding orbitRadius
+    // ensures the ship stops *at* the orbit radius, not at the target centre.
+    const dynamicWarpThreshold0 = ship.autopilotWarpThreshold + orbitRadius0;
     const startWithWarp = dist0 > dynamicWarpThreshold0;
 
     // ── Autopilot obstruction gate (compute once at engagement) ─────────────
@@ -171,7 +167,7 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
     }
     // Skip APPROACH when the available braking room is shorter than the stopping distance
     // from full normal speed — e.g. Moon → Earth (110 u) where APPROACH would need ~1,200 u.
-    const startInBrake = !startWithWarp && dist0 <= orbitRadius0 + AUTOPILOT_APPROACH_MIN_DISTANCE;
+    const startInBrake = !startWithWarp && dist0 <= orbitRadius0 + ship.autopilotApproachMinDistance;
 
     // Set ship-local autopilot state
     ship.autopilotActive = true;

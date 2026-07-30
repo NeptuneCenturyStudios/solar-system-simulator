@@ -16,9 +16,6 @@ import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_BRAKE_PAD,
     AUTOPILOT_BRAKE_DONE_SPEED,
-    AUTOPILOT_BRAKE_ARC_DIST,
-    AUTOPILOT_WARP_THRESHOLD,
-    AUTOPILOT_APPROACH_MIN_DISTANCE,
     AUTOPILOT_CIRCULARIZE_RATE,
     AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN,
 } from '../utilities/consts';
@@ -98,6 +95,67 @@ export class Spaceship extends Body {
 
     /** Active warp loop sound controller, or null if not currently playing. */
     private _warpSound: WarpSoundController | null = null;
+
+    // ── Autopilot threshold computation (derived from handling at runtime) ──────
+
+    /**
+     * Threshold distance for switching from boost to normal approach decel.
+     * Computed from the ship's own handling object, not global constants.
+     */
+    get autopilotBoostThreshold(): number {
+        const h = this.handling;
+        return (
+            1.5 *
+            ((h.flightBoostMaxSpeed * h.flightBoostMaxSpeed -
+                h.flightMaxSpeed * h.flightMaxSpeed) /
+                (2 * h.flightBoostDecel) +
+                (h.flightMaxSpeed * h.flightMaxSpeed) / (2 * h.flightThrustDecel))
+        );
+    }
+
+    /**
+     * Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop.
+     */
+    get autopilotApproachMinDistance(): number {
+        const h = this.handling;
+        return (
+            AUTOPILOT_BRAKE_PAD *
+            (((h.flightMaxSpeed + AUTOPILOT_BRAKE_DONE_SPEED) *
+                (h.flightMaxSpeed + AUTOPILOT_BRAKE_DONE_SPEED)) /
+                (2 * h.flightThrustDecel))
+        );
+    }
+
+    /**
+     * Target arc length (u) for the BRAKE blend.
+     */
+    get autopilotBrakeArcDist(): number {
+        return this.handling.flightMaxSpeed * 10;
+    }
+
+    /**
+     * Distance (u) above which autopilot engages warp for fast transit.
+     */
+    get autopilotWarpThreshold(): number {
+        const h = this.handling;
+        return (
+            1.5 *
+                ((h.flightWarpSpeed * h.flightWarpSpeed -
+                    h.flightBoostMaxSpeed * h.flightBoostMaxSpeed) /
+                    (2 * h.flightWarpDecel)) +
+            this.autopilotBoostThreshold
+        );
+    }
+
+    /** Acceleration rate used to engage warp during autopilot approach (same as handling). */
+    get autopilotWarpAccel(): number {
+        return this.handling.flightWarpAccel;
+    }
+
+    /** Deceleration rate used to scrub warp speed during autopilot approach (same as handling). */
+    get autopilotWarpDecel(): number {
+        return this.handling.flightWarpDecel;
+    }
 
     /**
      * Constructs a new Spaceship object with camera offsets and placeholder geometry.
@@ -574,7 +632,7 @@ export class Spaceship extends Body {
 
         // Dynamic warp threshold — adds orbitRadius so the ship stops at the
         // desired orbit altitude, not at the target centre.
-        const dynamicWarpThreshold = AUTOPILOT_WARP_THRESHOLD + orbitRadius;
+        const dynamicWarpThreshold = this.autopilotWarpThreshold + orbitRadius;
 
         if (this.autopilotPhase === 'WARP') {
             if (distance <= dynamicWarpThreshold) {
@@ -585,7 +643,7 @@ export class Spaceship extends Body {
 
         if (this.autopilotPhase === 'APPROACH') {
             const nearApproachSpeed = approachSpeed <= h.flightMaxSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
-            const brakeEntryTrigger = orbitRadius + Math.max(brakeDistance, AUTOPILOT_BRAKE_ARC_DIST);
+            const brakeEntryTrigger = orbitRadius + Math.max(brakeDistance, this.autopilotBrakeArcDist);
             if (nearApproachSpeed && distance <= brakeEntryTrigger) {
                 this.autopilotPhase = 'BRAKE';
                 this.autopilotBrakeEntryDistance = distance;
@@ -614,7 +672,7 @@ export class Spaceship extends Body {
                 if (distance > dynamicWarpThreshold) {
                     this.autopilotPhase = 'WARP_CHARGING';
                     this.startWarpCharge();
-                } else if (distance <= orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE) {
+                } else if (distance <= orbitRadius + this.autopilotApproachMinDistance) {
                     this.autopilotPhase = 'BRAKE';
                     this.autopilotBrakeEntryDistance = distance;
                 } else {
@@ -649,7 +707,7 @@ export class Spaceship extends Body {
                 (h.flightBoostMaxSpeed * h.flightBoostMaxSpeed -
                     h.flightMaxSpeed * h.flightMaxSpeed) /
                 (2 * h.flightBoostDecel);
-            const effectiveBoostThreshold = orbitRadius + AUTOPILOT_APPROACH_MIN_DISTANCE + boostDecelDist;
+            const effectiveBoostThreshold = orbitRadius + this.autopilotApproachMinDistance + boostDecelDist;
 
             const useBoost = distance > effectiveBoostThreshold;
             this.autopilotBoostActive = useBoost;

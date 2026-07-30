@@ -51,9 +51,6 @@ import {
     CROSSHAIR_SIZE,
     VEL_SCALE,
 
-    // Flight thrust constants still imported for other derived logic
-    FLIGHT_WARP_SPEED,
-
     // Flight feel constants moved from index.ts
     FLIGHT_MAX_POINTER_OFFSET,
     FLIGHT_ALT_ORBIT_SENSITIVITY,
@@ -3097,7 +3094,7 @@ function spawnShip() {
     flightState.isActive = true;
     // Preserve warp state: if the ship was warping autonomously while the player
     // was outside, keep warpActive so flight resumes at warp speed immediately.
-    flightState.currentSpeed = ship.warpActive ? FLIGHT_WARP_SPEED : 0;
+    flightState.currentSpeed = ship.warpActive ? ship.handling.flightWarpSpeed : 0;
     flightState.pointerOffsetX = 0;
     flightState.pointerOffsetY = 0;
     flightState.rollLeft = false;

@@ -36,20 +36,12 @@ import {
     GIZMO_TUNING,
     TIME_SCALE,
     TEXT_SPRITE_Z,
-    FLIGHT_WARP_SPEED,
-    FLIGHT_BOOST_MAX_SPEED,
-    FLIGHT_BOOST_DECEL,
-    FLIGHT_WARP_DECEL,
-    FLIGHT_MAX_SPEED,
-    FLIGHT_THRUST_DECEL,
-    FLIGHT_BOOST_ACCEL,
     WARP_FADE_DIST,
     WARP_FULL_VIS_DIST,
     WARP_SHAKE_MAG,
     FLIGHT_ALT_ORBIT_RETURN_SPEED,
     FREE_CAM_NORMAL_SPEED,
     FREE_CAM_BOOST_SPEED,
-    FLIGHT_THRUST_ACCEL,
     FLIGHT_AUTOPILOT_CHARGE_TIME,
 } from '../utilities/consts';
 import {
@@ -260,7 +252,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // ── Warp effect ──────────────────────────────────────────────────
         const _warpShip = ctx.flightState.activeShip ?? ctx.flightState.knownShip;
         if (_warpShip && !_warpShip._isDisposed && _warpShip.mesh) {
-            _warpShip.updateWarpEffect(dtTotal, FLIGHT_WARP_SPEED);
+            _warpShip.updateWarpEffect(dtTotal, _warpShip.handling.flightWarpSpeed);
         }
 
         // ── WASD camera movement ─────────────────────────────────────────
@@ -705,8 +697,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 ctx.keys.shift ||
                     trailShip.boostDecelerating ||
                     ctx.autopilotState.isBoostActive
-                  ? FLIGHT_BOOST_MAX_SPEED
-                  : FLIGHT_MAX_SPEED;
+                  ? trailShip.handling.flightBoostMaxSpeed
+                  : trailShip.handling.flightMaxSpeed;
             trailShip.trail.update(
                 nozzle,
                 trailSpd,
@@ -784,7 +776,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         if (visShip && !visShip._isDisposed && visShip.mesh) {
-            const vol = Math.min(visShip.velocity.length() / (FLIGHT_WARP_SPEED / 33.33), 1);
+            const vol = Math.min(visShip.velocity.length() / (visShip.handling.flightWarpSpeed / 33.33), 1);
             visShip.updateWarpSound(vol, wdf);
         }
 
@@ -820,19 +812,20 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             const spd = ctx.speedSprite.value;
             if (spd && spd.visible && ctx.flightState.isActive) {
                 const ship = ctx.flightState.activeShip;
+                const h = ship?.handling;
                 const hWarp =
                     ship?.warpActive ||
                     ship?.warpDecelerating ||
                     ctx.autopilotState.phase === 'WARP' ||
                     ctx.autopilotState.phase === 'WARP_CHARGING';
                 const hBoost =
-                    !hWarp &&
+                    !!h && !hWarp &&
                     ((!ctx.autopilotState.isActive && ctx.keys.shift) ||
                         (ctx.autopilotState.phase === 'APPROACH' &&
                             ctx.autopilotState.isBoostActive) ||
                         (ctx.autopilotState.phase === 'BRAKE' &&
                             (ctx.flightState.activeShip?.velocity?.length() ?? 0) >
-                                FLIGHT_MAX_SPEED));
+                                h.flightMaxSpeed));
                 const hBrake =
                     !hWarp &&
                     (ship?.boostDecelerating ||
@@ -840,24 +833,25 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         ctx.autopilotState.phase === 'BRAKE' ||
                         ctx.keys.s);
                 const thrustRate: number = (() => {
-                    if (ship?.warpDecelerating) return FLIGHT_WARP_DECEL;
-                    if (ship?.boostDecelerating) return FLIGHT_BOOST_DECEL;
+                    if (!h) return 0;
+                    if (ship?.warpDecelerating) return h.flightWarpDecel;
+                    if (ship?.boostDecelerating) return h.flightBoostDecel;
                     if (hWarp) return 0;
-                    if (hBoost) return FLIGHT_BOOST_ACCEL;
+                    if (hBoost) return h.flightBoostAccel;
                     if (hBrake)
-                        return ctx.flightState.currentSpeed > FLIGHT_MAX_SPEED
-                            ? FLIGHT_BOOST_DECEL
-                            : FLIGHT_THRUST_DECEL;
-                    if (!ctx.autopilotState.isActive && ctx.keys.w) return FLIGHT_THRUST_ACCEL;
+                        return ctx.flightState.currentSpeed > h.flightMaxSpeed
+                            ? h.flightBoostDecel
+                            : h.flightThrustDecel;
+                    if (!ctx.autopilotState.isActive && ctx.keys.w) return h.flightThrustAccel;
                     if (ctx.autopilotState.isActive && ctx.autopilotState.phase === 'BRAKE')
-                        return FLIGHT_THRUST_DECEL;
+                        return h.flightThrustDecel;
                     if (
                         ctx.autopilotState.isActive &&
                         (ctx.autopilotState.phase === 'APPROACH' ||
                             ctx.autopilotState.phase === 'CIRCULARIZE' ||
                             ctx.autopilotState.phase === 'TIDAL_LOCK')
                     )
-                        return FLIGHT_THRUST_ACCEL;
+                        return h.flightThrustAccel;
                     return 0;
                 })();
                 const gRate = ship?.tempAcc?.length() ?? 0;

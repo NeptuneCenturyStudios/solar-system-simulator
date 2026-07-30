@@ -294,35 +294,9 @@ export const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
 /** Duration (seconds) to show the "Autopilot blocked" HUD notification. */
 export const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
 
-/** Threshold distance for switching from boost to normal approach decel. */
-export const AUTOPILOT_BOOST_THRESHOLD =
-    1.5 *
-    ((FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED -
-        FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) /
-        (2 * FLIGHT_BOOST_DECEL) +
-        (FLIGHT_MAX_SPEED * FLIGHT_MAX_SPEED) / (2 * FLIGHT_THRUST_DECEL));
-
-/** Acceleration rate used to engage warp during autopilot approach. */
-export const AUTOPILOT_WARP_ACCEL = FLIGHT_WARP_ACCEL;        
-/** Deceleration rate used to scrub warp speed during autopilot approach. */
-export const AUTOPILOT_WARP_DECEL = FLIGHT_WARP_DECEL;
-
-/** Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop. */
-export const AUTOPILOT_APPROACH_MIN_DISTANCE =
-    AUTOPILOT_BRAKE_PAD *
-    (((FLIGHT_MAX_SPEED + AUTOPILOT_BRAKE_DONE_SPEED) *
-        (FLIGHT_MAX_SPEED + AUTOPILOT_BRAKE_DONE_SPEED)) /
-        (2 * FLIGHT_THRUST_DECEL));
-
-/** Target arc length (u) for the BRAKE blend. */
-export const AUTOPILOT_BRAKE_ARC_DIST = FLIGHT_MAX_SPEED * 10;
-
-/** Distance (u) above which autopilot engages warp for fast transit. */
-export const AUTOPILOT_WARP_THRESHOLD =
-    1.5 *
-        ((FLIGHT_WARP_SPEED * FLIGHT_WARP_SPEED - FLIGHT_BOOST_MAX_SPEED * FLIGHT_BOOST_MAX_SPEED) /
-            (2 * AUTOPILOT_WARP_DECEL)) +
-    AUTOPILOT_BOOST_THRESHOLD;
+// (AUTOPILOT_BOOST_THRESHOLD, AUTOPILOT_APPROACH_MIN_DISTANCE, AUTOPILOT_BRAKE_ARC_DIST,
+//  AUTOPILOT_WARP_THRESHOLD, AUTOPILOT_WARP_ACCEL, and AUTOPILOT_WARP_DECEL are now computed
+//  at runtime from the ship's handling object via Spaceship getters.)
 
 // === Ship weapon tuning ===
 /**
