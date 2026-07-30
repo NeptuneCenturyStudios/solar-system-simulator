@@ -405,6 +405,14 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         ctx.shipWeapon.tryFire(dt, muzzlePos, aimDir, ship.velocity);
     }
 
+    // ── Warp sprite catch-all ──────────────────────────────────────────────
+    // When the ship exits warp (e.g. autopilot transitions WARP → APPROACH)
+    // without going through warpDecelerating, the warp sprite stays visible.
+    // Hide it whenever no warp state is active.
+    if (!ship.warpActive && !ship.warpDecelerating && !ship.warpCharging) {
+        ctx.flightHUD.hideWarpSprite();
+    }
+
     // ── Track prevShiftHeld for next frame's Shift-release detection ──────
     ship.prevShiftHeld = keys.shift;
 }

@@ -630,12 +630,19 @@ export class Spaceship extends Body {
                   : Math.max(approachSpeed, h.flightMaxSpeed) ** 2 / (2 * h.flightThrustDecel);
         const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
-        // Dynamic warp threshold — adds orbitRadius so the ship stops at the
-        // desired orbit altitude, not at the target centre.
+        // Max-warp braking threshold — only used by ALIGN to decide whether to
+        // bother entering warp at all.  Not used for the WARP → APPROACH
+        // transition (see below), which uses the current-speed brakeDistance.
         const dynamicWarpThreshold = this.autopilotWarpThreshold + orbitRadius;
 
         if (this.autopilotPhase === 'WARP') {
-            if (distance <= dynamicWarpThreshold) {
+            // Compute the stopping distance from the ship's current approach
+            // speed, then add the same 1.5× safety margin the original
+            // dynamicWarpThreshold used.  This way a ship that hasn't reached
+            // full warp speed uses a proportionally smaller threshold and
+            // stays in warp closer to the target.
+            const warpStopDist = effectiveStopDist * 1.5 + orbitRadius;
+            if (distance <= warpStopDist) {
                 this.warpActive = false;
                 this.autopilotPhase = 'APPROACH';
             }
