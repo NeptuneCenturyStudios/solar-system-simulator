@@ -208,56 +208,27 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             updateFlightControls(flightCtx, wallDt, dtTotal);
         }
 
-        // ── Background warp (delegated to ship) ─────────────────────────
+        // ── Background warp/boost speed (unified) ────────────────────────
         const bgShip = ctx.flightState.knownShip;
-        if (!isFlightModeActive && bgShip?.warpActive) {
-            if (bgShip && !bgShip._isDisposed && bgShip.mesh) {
-                const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
-                bgShip.applyWarpAccelerationStep(dtTotal, bgFwd);
-            } else {
-                bgShip.warpActive = false;
-            }
-        }
-
-        // ── Background deceleration (delegated to ship) ──────────────────
-        if (
-            !isFlightModeActive &&
-            bgShip && (bgShip.warpDecelerating || bgShip.boostDecelerating)
-        ) {
-            const _bgShip = bgShip;
-            if (_bgShip && !_bgShip._isDisposed && _bgShip.mesh) {
-                const _bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(_bgShip.mesh.quaternion);
-                if (_bgShip.warpDecelerating) {
-                    const stillDecel = _bgShip.applyWarpDecelerationStep(dtTotal, _bgFwd);
-                    ctx.flightState.currentSpeed = _bgShip.velocity.dot(_bgFwd);
-                    if (!stillDecel) {
-                        _bgShip.warpDecelerating = false;
-                        _bgShip.boostDecelerating = true;
-                    }
-                } else if (_bgShip.boostDecelerating) {
-                    const stillDecel = _bgShip.applyBoostDecelerationStep(dtTotal, _bgFwd);
-                    ctx.flightState.currentSpeed = _bgShip.velocity.dot(_bgFwd);
-                    if (!stillDecel) {
-                        _bgShip.boostDecelerating = false;
-                    }
-                }
-            } else if (_bgShip) {
-                _bgShip.warpDecelerating = false;
-                _bgShip.boostDecelerating = false;
-            }
-        }
-
-        // ── Background warp HUD (charge & active, non-flight) ─────────────
         if (!isFlightModeActive && bgShip && !bgShip._isDisposed && bgShip.mesh) {
-            if (bgShip.warpCharging) {
-                const fill = bgShip.warpChargeTimer / bgShip.handling.flightWarpChargeTime;
-                ctx.flightHUD.setWarpCharge(fill);
-            } else if (bgShip.warpActive) {
-                const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
-                ctx.flightHUD.setWarpActive(pulse);
-            } else {
-                ctx.flightHUD.hideWarpSprite();
+            const bgWarpActive = bgShip.warpActive;
+            const bgWarpDecel = bgShip.warpDecelerating;
+            const bgBoostDecel = bgShip.boostDecelerating;
+
+            if (bgWarpActive || bgWarpDecel || bgBoostDecel) {
+                const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
+                bgShip.advanceWarpSpeed(dtTotal, bgFwd);
+                ctx.flightState.currentSpeed = bgShip.velocity.dot(bgFwd);
             }
+
+            // Background warp HUD — use the unified method for all three states.
+            ctx.flightHUD.updateWarpHUD(
+                bgShip.warpCharging,
+                bgShip.warpActive,
+                bgShip.warpCharging
+                    ? bgShip.warpChargeTimer / bgShip.handling.flightWarpChargeTime
+                    : 0
+            );
         }
 
         // ── Warp effect ──────────────────────────────────────────────────

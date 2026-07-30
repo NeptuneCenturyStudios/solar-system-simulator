@@ -8,7 +8,7 @@ import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
 import { WarpSoundController, playWarpLoop } from '../utilities/audio.js';
 import { WarpEffect } from '../effects/warp-effect.js';
-import { IDeathOptions, ISpaceshipHandling, IWeaponConfig, AutopilotPhase } from '../interfaces';
+import { IDeathOptions, ISpaceshipHandling, IWeaponConfig, AutopilotPhase, IWarpStepResult } from '../interfaces';
 import { ShipWeapon } from '../ship-effects/ship-weapon';
 import { autopilotState, cameraState, flightState, simulationState } from '../simulation/simulation';
 import { G } from '../utilities/consts';
@@ -500,6 +500,57 @@ export class Spaceship extends Body {
             // Clamp to warp max just in case gravity accelerates beyond it.
             this.velocity.copy(forward).multiplyScalar(this.handling.flightWarpSpeed);
         }
+    }
+
+    /**
+     * Unified warp/boost speed step for one physics tick.
+     * Handles all three phases (warp-active acceleration, warp decel → boost,
+     * boost decel → idle) and returns a result object the caller uses to
+     * update HUD and state.
+     *
+     * Call this from flight-controllers.ts (manual cockpit) and animation-loop.ts
+     * (background non-flight) instead of duplicating the per-phase logic.
+     *
+     * Does NOT handle warp charging; the caller/ship's autopilotStep manages
+     * charging independently.
+     *
+     * @param simDt  Physics-scaled delta time for this step.
+     * @param forward  Direction of forward thrust (camera-quat or ship-quat +Z).
+     * @returns IWarpStepResult describing the post-step phase and speed.
+     */
+    advanceWarpSpeed(simDt: number, forward: THREE.Vector3): IWarpStepResult {
+        if (this.warpActive) {
+            this.applyWarpAccelerationStep(simDt, forward);
+            const fwdSpd = this.velocity.dot(forward);
+            return { phase: 'warp_active', forwardSpeed: fwdSpd, decelDone: false };
+        }
+
+        if (this.warpDecelerating) {
+            const stillDecel = this.applyWarpDecelerationStep(simDt, forward);
+            const fwdSpd = this.velocity.dot(forward);
+            if (!stillDecel) {
+                // Phase 1 complete: reached boost speed.
+                this.warpDecelerating = false;
+                // Auto-start boost decel for the caller; they may override.
+                this.boostDecelerating = true;
+                return { phase: 'boost_decel', forwardSpeed: fwdSpd, decelDone: true };
+            }
+            return { phase: 'warp_decel', forwardSpeed: fwdSpd, decelDone: false };
+        }
+
+        if (this.boostDecelerating) {
+            const stillDecel = this.applyBoostDecelerationStep(simDt, forward);
+            const fwdSpd = this.velocity.dot(forward);
+            if (!stillDecel) {
+                this.boostDecelerating = false;
+                return { phase: 'idle', forwardSpeed: fwdSpd, decelDone: true };
+            }
+            return { phase: 'boost_decel', forwardSpeed: fwdSpd, decelDone: false };
+        }
+
+        // Idle — no warp/boost state.
+        const fwdSpd = this.velocity.dot(forward);
+        return { phase: 'idle', forwardSpeed: fwdSpd, decelDone: false };
     }
 
     /**

@@ -171,91 +171,84 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     const keys = cameraState.keys;
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
 
-    // ── Warp deceleration ────────────────────────────────────────────────────
-    // After warp ends, decelerate in two phases:
-    //   Phase 1: shed speed from warp → FLIGHT_BOOST_MAX_SPEED using warp decel.
-    //   Phase 2 (no shift): hand off to boost decel until normal max speed.
-    //   Phase 2 (shift held): end warp decel at boost speed.
-    if (ship.warpDecelerating) {
-        const stillDecel = ship.applyWarpDecelerationStep(simDt, forward);
-        flightState.currentSpeed = ship.velocity.dot(forward);
-        if (!stillDecel) {
-            // Reached boost speed — end the warp decel phase.
-            ship.warpDecelerating = false;
-            // Restore steering HUD now that warp deceleration is complete.
-            ctx.flightSteeringLine.visible = true;
-            ctx.steeringOriginMarker.visible = true;
-            if (keys.shift) {
-                // Case 2: shift held — sit at boost speed; normal boost logic takes over.
-                flightState.currentSpeed = Math.min(flightState.currentSpeed, ship.handling.flightBoostMaxSpeed);
-            } else {
-                // Case 1: no shift — transition to boost decel toward normal max speed.
-                ship.boostDecelerating = true;
-            }
+    // ── Warp/boost speed management (unified) ──────────────────────────────
+    // Handles warp-active acceleration, warp decel → boost, and boost decel → idle
+    // via the single ship.advanceWarpSpeed() method, replacing three separate
+    // duplicated blocks that existed for flight mode and background mode.
+    if (ship.warpActive || ship.warpDecelerating || ship.boostDecelerating) {
+        const result = ship.advanceWarpSpeed(simDt, forward);
+        flightState.currentSpeed = result.forwardSpeed;
+
+        if (result.phase === 'warp_active') {
+            // Warp active: accelerate, hide steering HUD, show warp-active overlay.
+            flightState.thrustActive = true;
+            ctx.flightSteeringLine.visible = false;
+            ctx.flightCrosshair.visible = false;
+            ctx.steeringEndMarker.visible = false;
+            ctx.steeringOriginMarker.visible = false;
+            ctx.flightHUD.updateWarpHUD(false, true, 0);
+            return; // Skip all flight controls below
         }
+
+        // Warp deceleration or boost deceleration
         flightState.thrustActive = false;
         ctx.flightHUD.hideWarpSprite();
+
+        if (result.phase === 'warp_decel') {
+            // Still shedding warp speed — keep steering hidden.
+            ctx.flightSteeringLine.visible = false;
+            ctx.steeringOriginMarker.visible = false;
+        }
+
+        if (result.decelDone) {
+            // A deceleration phase just completed.
+            if (result.phase === 'boost_decel') {
+                // Warp decel finished (auto-started boost decel internally).
+                ctx.flightSteeringLine.visible = true;
+                ctx.steeringOriginMarker.visible = true;
+                if (keys.shift) {
+                    // Shift held: abort the auto boost decel, sit at boost speed.
+                    flightState.currentSpeed = Math.min(
+                        flightState.currentSpeed,
+                        ship.handling.flightBoostMaxSpeed
+                    );
+                    ship.boostDecelerating = false;
+                }
+            }
+            // If result.phase === 'idle', boost decel finished — nothing extra needed.
+        }
+
         // Fall through to steering/roll below (no early return)
-    }
-
-    // ── Boost deceleration ───────────────────────────────────────────────────
-    // When Shift is released above FLIGHT_MAX_SPEED, rapidly decelerate back down.
-    if (ship.boostDecelerating) {
-        const stillDecel = ship.applyBoostDecelerationStep(simDt, forward);
-        flightState.currentSpeed = ship.velocity.dot(forward);
-        if (!stillDecel) {
-            ship.boostDecelerating = false;
-            // Clamp to max speed (currentSpeed already clamped by the ship method)
-        }
-        flightState.thrustActive = false;
-        // Fall through to steering/roll below
-    }
-
-    // ── Warp active ──────────────────────────────────────────────────────────
-    if (ship.warpActive) {
-        ship.applyWarpAccelerationStep(simDt, forward);
-        flightState.currentSpeed = ship.velocity.dot(forward);
-        flightState.thrustActive = true;
-        // (warpEffect.update is called centrally in the animate loop each frame)
-        // Hide steering HUD during warp (no manual steering available).
-        ctx.flightSteeringLine.visible = false;
-        ctx.flightCrosshair.visible = false;
-        ctx.steeringEndMarker.visible = false;
-        ctx.steeringOriginMarker.visible = false;
-        // Pulsing warp-active text (update every call is cheap since canvas is small)
-        const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
-        ctx.flightHUD.setWarpActive(pulse);
-        return; // Skip all flight controls below
-    }
-
-    // ── Warp charging ────────────────────────────────────────────────────────
-    // Autopilot has its own WARP_CHARGING phase that advances ship.warpChargeTimer
-    // inside autopilotStep().  We still need to show the charge bar in both cases.
-    if (ship.warpCharging && !ship.warpDecelerating && !ship.warpActive) {
-        if (!autopilotState.isActive) {
-            // Manual warp charging — advance the timer here.
-            const fill = ship.updateWarpCharge(dt);
-            ctx.flightHUD.setWarpCharge(fill);
-            if (fill >= 0.99 && !ship.warpVoicePlayed) {
-                ship.warpVoicePlayed = true;
-                playSoundEffect(SoundEffect.WarpDriveActive);
+    } else {
+        // ── Warp charging ──────────────────────────────────────────────────
+        // Autopilot has its own WARP_CHARGING phase that advances ship.warpChargeTimer
+        // inside autopilotStep().  We still need to show the charge bar in both cases.
+        if (ship.warpCharging) {
+            if (!autopilotState.isActive) {
+                // Manual warp charging — advance the timer here.
+                const fill = ship.updateWarpCharge(dt);
+                ctx.flightHUD.updateWarpHUD(true, false, fill);
+                if (fill >= 0.99 && !ship.warpVoicePlayed) {
+                    ship.warpVoicePlayed = true;
+                    playSoundEffect(SoundEffect.WarpDriveActive);
+                }
+                if (fill >= 1) {
+                    // Engage warp!
+                    ship.engageWarp();
+                    
+                    ctx.addEvent({
+                        message: '⚡ Warp engaged! Press Space to disengage.',
+                        notificationType: NotificationType.Success,
+                    });
+                }
+            } else {
+                // Autopilot warp charging — timer is advanced by autopilotStep();
+                // just display the current progress.
+                const fill = ship.warpChargeTimer / ship.handling.flightWarpChargeTime;
+                ctx.flightHUD.updateWarpHUD(true, false, fill);
             }
-            if (fill >= 1) {
-                // Engage warp!
-                ship.engageWarp();
-                
-                ctx.addEvent({
-                    message: '⚡ Warp engaged! Press Space to disengage.',
-                    notificationType: NotificationType.Success,
-                });
-            }
-        } else {
-            // Autopilot warp charging — timer is advanced by autopilotStep();
-            // just display the current progress.
-            const fill = ship.warpChargeTimer / ship.handling.flightWarpChargeTime;
-            ctx.flightHUD.setWarpCharge(fill);
+            // Allow normal flight controls while charging (just can't turn on warp mid-turn)
         }
-        // Allow normal flight controls while charging (just can't turn on warp mid-turn)
     }
 
     // ── Thrust state transitions (velocity mutation is in applyFlightThrustSubstep) ──

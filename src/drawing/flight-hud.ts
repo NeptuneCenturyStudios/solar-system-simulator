@@ -366,6 +366,29 @@ export class FlightHUD {
     }
 
     /**
+     * Unified warp-sprite update for both flight-mode and background.
+     * Call once per frame instead of duplicating charge/active/hide logic.
+     *
+     * @param ship  The spaceship (or null if disposed).
+     * @param chargeFill  Current charge fill in [0, 1]. Passed in so caller can
+     *                    compute it once (avoids duplicating the fill calculation).
+     */
+    updateWarpHUD(
+        warpCharging: boolean,
+        warpActive: boolean,
+        chargeFill: number
+    ): void {
+        if (warpCharging) {
+            this.setWarpCharge(chargeFill);
+        } else if (warpActive) {
+            const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
+            this.setWarpActive(pulse);
+        } else {
+            this.hideWarpSprite();
+        }
+    }
+
+    /**
      * Update the autopilot phase HUD sprite. Call once per animate frame.
      * @param dt Elapsed seconds since last frame.
      */
