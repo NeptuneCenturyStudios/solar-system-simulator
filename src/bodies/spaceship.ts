@@ -860,7 +860,7 @@ export class Spaceship extends Body {
                 const thrustDir = velDelta.clone().normalize();
                 const brakeMag = Math.min(brakeDecel * dt, deltaLen);
                 this.applyThrust(thrustDir, brakeMag);
-                this.orientTopToward(targetPos, thrustDir, dt);
+                this.steerToward(toTargetDir, dt);
                 flightState.thrustActive = deltaLen > 1;
             } else {
                 flightState.thrustActive = false;
@@ -913,7 +913,7 @@ export class Spaceship extends Body {
                 const thrustDir = velDelta.clone().normalize();
                 const mag = Math.min(effectiveRate * dt, deltaLen);
                 this.applyThrust(thrustDir, mag);
-                this.orientTopToward(targetPos, thrustDir, dt);
+                this.steerToward(toTargetDir, dt);
                 flightState.thrustActive = true;
             }
         } else if (this.autopilotPhase === 'TIDAL_LOCK' && gEff > 0) {
