@@ -20,7 +20,7 @@ import { SolarFlare, SolarFlareType } from '../effects/solar-flare';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { Corona } from '../effects/corona';
 import { StarGlow } from '../effects/star-glow';
-import { StarShine } from '../effects/star-shine';
+import { StarLensflare } from '../effects/star-lensflare';
 import { BodyTypeEnum } from './body-enums';
 import { settingsStore } from '../settings/settings-store';
 
@@ -475,9 +475,9 @@ export class MainSequenceStar extends Star {
             this.sunGlow = null;
         }
 
-        if (this.starShine) {
-            this.starShine.dispose();
-            this.starShine = null;
+        if (this.lensflare) {
+            this.lensflare.dispose();
+            this.lensflare = null;
         }
 
         if (this.sunLight) {
@@ -526,15 +526,9 @@ export class MainSequenceStar extends Star {
             );
         }
 
-        // Restore shine.
-        if (!this.starShine) {
-            this.starShine = new StarShine(
-                this.dependencies,
-                this.scene,
-                this.radius,
-                this.baseColor.getHex(),
-                this.mesh.position
-            );
+        // Restore lens flare.
+        if (!this.lensflare && this.sunLight) {
+            this.lensflare = new StarLensflare(this.sunLight, this.radius);
         }
 
         // Restore light intensity.

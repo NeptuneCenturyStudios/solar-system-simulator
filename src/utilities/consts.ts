@@ -222,6 +222,23 @@ export const STAR_SHINE_PULSE_OPACITY_AMPLITUDE = 0.08;
 /** Breathing pulse rate (rad/s) — slow shimmer, same feel as the star-glow pulse. */
 export const STAR_SHINE_PULSE_RATE = 0.0015 * 60;
 
+// ─── Star Shine spike parameters ──────────────────────────────────────────
+export const STAR_SHINE_CARDINAL_SPIKE_LENGTH = 0.46;
+export const STAR_SHINE_CARDINAL_SPIKE_WIDTH = 0.012;
+export const STAR_SHINE_CARDINAL_SPIKE_ALPHA = 0.95;
+export const STAR_SHINE_DIAGONAL_SPIKE_LENGTH = 0.3;
+export const STAR_SHINE_DIAGONAL_SPIKE_WIDTH = 0.014;
+export const STAR_SHINE_DIAGONAL_SPIKE_ALPHA = 0.4;
+
+// ─── Lens Flare element sizes ──────────────────────────────────────────────
+export const LENSFLARE_STARBURST_SIZE = 128;
+export const LENSFLARE_CORE_SIZE = 75;
+export const LENSFLARE_HALO_SIZE = 500;
+export const LENSFLARE_CARDINAL_SPIKE_LENGTH = 0.46;
+export const LENSFLARE_CARDINAL_SPIKE_WIDTH = 0.020;
+export const LENSFLARE_DIAGONAL_SPIKE_LENGTH = 0.32;
+export const LENSFLARE_DIAGONAL_SPIKE_WIDTH = 0.015;
+
 export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;
 export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4;
 export const MAX_NEUTRON_STAR_MASS = SUN_MASS * 3;

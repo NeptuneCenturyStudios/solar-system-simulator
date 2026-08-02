@@ -5,7 +5,8 @@ export const enum SettingKey {
     ParticleEffectsEnabled = 'particleEffectsEnabled',
     Substeps = 'substeps',
     SfxVolume = 'sfxVolume',
-    MusicVolume = 'musicVolume'
+    MusicVolume = 'musicVolume',
+    LensflareEnabled = 'lensflareEnabled'
 }
 
 export interface SpaceSimSettings {
@@ -13,13 +14,15 @@ export interface SpaceSimSettings {
     substeps: number;
     sfxVolume: number;
     musicVolume: number;
+    lensflareEnabled: boolean;
 }
 
 const defaultSettings: SpaceSimSettings = {
     particleEffectsEnabled: true,
     substeps: 64,
     sfxVolume: 1.0,
-    musicVolume: 0.5
+    musicVolume: 0.5,
+    lensflareEnabled: true
 };
 
 class SettingsStore {

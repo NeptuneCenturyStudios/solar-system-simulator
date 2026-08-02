@@ -6,6 +6,7 @@ import { SettingKey, settingsStore } from '../settings/settings-store';
  */
 export class OptionsPanel extends Panel {
     enableParticleEffectsCheckbox: HTMLInputElement | null;
+    enableLensflareCheckbox: HTMLInputElement | null = null;
     substepsSlider: HTMLInputElement | null = null;
     substepsDisplay: HTMLElement | null = null;
     substepsResetBtn: HTMLButtonElement | null = null;
@@ -44,6 +45,16 @@ export class OptionsPanel extends Panel {
         if (this.enableParticleEffectsCheckbox) {
             this.enableParticleEffectsCheckbox.onchange = () => {
                 this.applyEnableParticleEffects();
+            };
+        }
+
+        this.enableLensflareCheckbox = document.getElementById(
+            'enableLensflare'
+        ) as HTMLInputElement | null;
+
+        if (this.enableLensflareCheckbox) {
+            this.enableLensflareCheckbox.onchange = () => {
+                this.applyEnableLensflare();
             };
         }
 
@@ -118,6 +129,11 @@ export class OptionsPanel extends Panel {
             this.applyEnableParticleEffects();
         }
 
+        if (this.enableLensflareCheckbox) {
+            this.enableLensflareCheckbox.checked = s.lensflareEnabled;
+            this.applyEnableLensflare();
+        }
+
         if (this.substepsSlider) {
             this.substepsSlider.value = s.substeps.toString();
             this.applySubsteps();
@@ -143,6 +159,14 @@ export class OptionsPanel extends Panel {
         const checked = this.enableParticleEffectsCheckbox!.checked;
         settingsStore.update(SettingKey.ParticleEffectsEnabled, checked);
         this.emit('particleEffectsChange', { value: checked });
+    }
+
+    /**
+     * Apply the current state of the "Lens Flares" checkbox to the settings store.
+     */
+    private applyEnableLensflare(): void {
+        const checked = this.enableLensflareCheckbox!.checked;
+        settingsStore.update(SettingKey.LensflareEnabled, checked);
     }
 
     /**
