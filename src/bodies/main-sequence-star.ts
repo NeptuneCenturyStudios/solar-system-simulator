@@ -20,6 +20,7 @@ import { SolarFlare, SolarFlareType } from '../effects/solar-flare';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { Corona } from '../effects/corona';
 import { StarGlow } from '../effects/star-glow';
+import { StarShine } from '../effects/star-shine';
 import { BodyTypeEnum } from './body-enums';
 import { settingsStore } from '../settings/settings-store';
 
@@ -474,6 +475,11 @@ export class MainSequenceStar extends Star {
             this.sunGlow = null;
         }
 
+        if (this.starShine) {
+            this.starShine.dispose();
+            this.starShine = null;
+        }
+
         if (this.sunLight) {
             this.sunLight.intensity = 0.002;
             this.sunLight.color.setHex(0xff6020);
@@ -512,6 +518,17 @@ export class MainSequenceStar extends Star {
         // Restore glow.
         if (!this.sunGlow) {
             this.sunGlow = new StarGlow(
+                this.dependencies,
+                this.scene,
+                this.radius,
+                this.baseColor.getHex(),
+                this.mesh.position
+            );
+        }
+
+        // Restore shine.
+        if (!this.starShine) {
+            this.starShine = new StarShine(
                 this.dependencies,
                 this.scene,
                 this.radius,

@@ -9,6 +9,7 @@ import {
 import { isBodyType } from '../utilities/utilities';
 import { CelestialBody } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
+import { StarShine } from '../effects/star-shine';
 import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from './body-enums';
 
@@ -52,6 +53,9 @@ export class Star extends CelestialBody {
     lightIntensity: number;
     ambientLight: THREE.AmbientLight | null;
     sunLight: THREE.PointLight | null;
+
+    /** Diffraction-cross effect that makes the star visible from great distances. Null for brown dwarfs. */
+    starShine: StarShine | null;
 
     /**
      * @param {object} dependencies - same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
@@ -148,6 +152,21 @@ export class Star extends CelestialBody {
         scene.add(this.ambientLight);
 
         this.setTemperature(options.temperature);
+
+        // Diffraction-cross shine. Brown dwarfs are excluded at transition time
+        // (see MainSequenceStar.transitionToBrownDwarf), so skip it here too for
+        // stars constructed directly with the BrownDwarf flag set.
+        if (!(this.bodyType & BodyTypeEnum.BrownDwarf)) {
+            this.starShine = new StarShine(
+                dependencies,
+                scene,
+                options.radius,
+                this.baseColor.getHex(),
+                this.mesh.position
+            );
+        } else {
+            this.starShine = null;
+        }
     }
 
     /** Computes the expected radius for a star of the given mass using a mass-radius power law (R ∝ M^0.8). */
@@ -276,6 +295,25 @@ export class Star extends CelestialBody {
         }
     }
 
+    /**
+     * Per-rendered-frame visual update. Drives the diffraction-cross shine so it
+     * follows the star and fades out as the camera approaches. Brown dwarfs never
+     * show the effect.
+     */
+    override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
+        super.updateVisuals(dtTotal, cameraPos);
+
+        if (this._isDisposed || !this.starShine) return;
+
+        if (this.bodyType & BodyTypeEnum.BrownDwarf) {
+            this.starShine.setVisible(false);
+            return;
+        }
+
+        this.starShine.setPosition(this.mesh.position);
+        this.starShine.update(dtTotal, cameraPos);
+    }
+
     setLightIntensity(intensity: number) {
         const clamped = Math.max(
             STAR_LIGHT_INTENSITY_MIN,
@@ -320,10 +358,16 @@ export class Star extends CelestialBody {
         if (this.sunLight) {
             this.sunLight.color.setHex(glowHex);
         }
+
+        // Keep the diffraction-cross tint in sync with the temperature-derived color.
+        this.starShine?.setColor(glowHex);
     }
 
     setRadius(newRadius: number) {
         super.setRadius(newRadius);
+
+        // Keep the diffraction-cross span in sync with the star's radius.
+        this.starShine?.setRadius(newRadius);
     }
 
     // setLightDistance(distance: number) {
@@ -388,6 +432,15 @@ export class Star extends CelestialBody {
                 this.ambientLight.visible = false;
                 this.scene.remove(this.ambientLight);
                 this.ambientLight = null;
+            }
+        } catch {
+            // ignore
+        }
+
+        try {
+            if (this.starShine) {
+                this.starShine.dispose();
+                this.starShine = null;
             }
         } catch {
             // ignore
