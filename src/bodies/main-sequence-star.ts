@@ -527,6 +527,10 @@ export class MainSequenceStar extends Star {
         // Restore lens flare.
         if (!this.lensflare && this.sunLight) {
             this.lensflare = new StarLensflare(this.sunLight, this.radius);
+            // Base setTemperature() above doesn't reach here; tint the
+            // recreated flare so resurrection isn't left white until the
+            // caller happens to call setTemperature again.
+            this.lensflare.setColor(this.baseColor.getHex());
         }
 
         // Restore light intensity.

@@ -21,6 +21,12 @@ export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
     temperature: number;
     lightIntensity: number;
     lightDistance: number;
+    /**
+     * When true (default), setTemperature() drives the surface emissive
+     * (color + intensity) from temperature. Compact remnants (white dwarfs)
+     * opt out so they keep their own surface material.
+     */
+    emissiveDrivenByTemperature?: boolean;
 }
 
 /**
@@ -49,6 +55,13 @@ export class Star extends CelestialBody {
     };
 
     temperature: number;
+
+    /**
+     * Whether setTemperature() should drive the surface emissive from
+     * temperature. Compact remnants (white dwarfs) set this to false to keep
+     * their own surface material.
+     */
+    emissiveDrivenByTemperature: boolean;
 
     // Lighting effects
     lightIntensity: number;
@@ -145,7 +158,12 @@ export class Star extends CelestialBody {
 
         this.temperature = options.temperature;
 
-        if (this.mesh.material instanceof THREE.MeshPhongMaterial) {
+        this.emissiveDrivenByTemperature = options.emissiveDrivenByTemperature ?? true;
+
+        if (
+            this.emissiveDrivenByTemperature &&
+            this.mesh.material instanceof THREE.MeshPhongMaterial
+        ) {
             this.mesh.material.emissive.setHex(0xffffff);
             this.mesh.material.emissiveIntensity = 1.0;
         }
@@ -163,6 +181,10 @@ export class Star extends CelestialBody {
         // star-only effects.
         if (!(this.bodyType & BodyTypeEnum.BrownDwarf) && this.sunLight) {
             this.lensflare = new StarLensflare(this.sunLight, options.radius);
+            // setTemperature() above ran before the lensflare existed, so its
+            // setColor() call was a no-op. Apply the star's color now so a
+            // newly created star isn't stuck with the white default flare.
+            this.lensflare.setColor(this.baseColor.getHex());
         } else {
             this.lensflare = null;
         }
@@ -346,10 +368,12 @@ export class Star extends CelestialBody {
         else if (temp < 40000) glowHex = 0xaaccff;
         else glowHex = 0xd6f0ff;
 
-        const material = this.mesh.material as THREE.MeshPhongMaterial;
-        material.emissive.setHex(0xffffff);
-        material.emissiveIntensity = Star.temperatureToEmissiveIntensity(temp);
-        material.needsUpdate = true;
+        if (this.emissiveDrivenByTemperature) {
+            const material = this.mesh.material as THREE.MeshPhongMaterial;
+            material.emissive.setHex(0xffffff);
+            material.emissiveIntensity = Star.temperatureToEmissiveIntensity(temp);
+            material.needsUpdate = true;
+        }
 
         this.baseColor.setHex(glowHex);
 

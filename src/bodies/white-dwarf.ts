@@ -35,7 +35,7 @@ export class WhiteDwarf extends Star {
         name: string,
         rotation: IRotation
     ) {
-        const whiteDwarfTexture = loadSrgbTexture('./assets/textures/white_dwarf.jpg');
+        const whiteDwarfTexture = loadSrgbTexture('./assets/textures/bodies/2k/white_dwarf.jpg');
 
         // Mass to radius relationship for white dwarfs (no clamping)
         const radius = massToWhiteDwarfRadius(mass);
@@ -44,8 +44,9 @@ export class WhiteDwarf extends Star {
         const material = new THREE.MeshStandardMaterial({
             map: whiteDwarfTexture,
             color: 0xffffff,
-            emissive: 0x000000,
-            emissiveIntensity: 0,
+            emissive: 0xffffff,
+            emissiveMap: whiteDwarfTexture,
+            emissiveIntensity: 0.4,
             roughness: 0.7,
             metalness: 0.95,
         });
@@ -74,6 +75,10 @@ export class WhiteDwarf extends Star {
                 temperature: WHITE_DWARF_TEMPERATURE,
                 lightIntensity: WHITE_DWARF_LIGHT_INTENSITY,
                 lightDistance: WHITE_DWARF_LIGHT_DISTANCE,
+                // Keep the surface material under the white dwarf's control:
+                // the base Star class would otherwise force a full-white emissive
+                // that washes out the texture entirely.
+                emissiveDrivenByTemperature: false,
                 rotation,
                 mesh: mesh,
             },
@@ -81,5 +86,14 @@ export class WhiteDwarf extends Star {
         );
 
         this.bodyType = BodyTypeEnum.WhiteDwarf | BodyTypeEnum.Star;
+
+        // Star clamps lightIntensity to [STAR_LIGHT_INTENSITY_MIN, MAX], which
+        // would force this "much dimmer than the Sun" remnant up to 1000× its
+        // intended brightness. Override the clamp directly (same pattern the
+        // brown dwarf transition uses).
+        this.lightIntensity = WHITE_DWARF_LIGHT_INTENSITY;
+        if (this.sunLight) {
+            this.sunLight.intensity = WHITE_DWARF_LIGHT_INTENSITY;
+        }
     }
 }

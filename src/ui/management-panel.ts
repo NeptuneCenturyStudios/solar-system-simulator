@@ -520,8 +520,8 @@ export class ManagementPanel extends Panel {
         };
 
         const formatLightIntensityForDisplay = (value: number): string => {
-            if (!isFinite(value) || value <= 0) return '0M';
-            return `${formatNumberForDisplay(value / 1000000)}M`;
+            if (!isFinite(value) || value <= 0) return '0';
+            return `${formatNumberForDisplay(value)}`;
         };
 
         this.formatLightIntensityForDisplay = formatLightIntensityForDisplay;
