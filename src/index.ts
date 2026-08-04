@@ -683,8 +683,8 @@ const planetNameIndicator = new PlanetNameIndicator(uiScene, simulationState);
 let manuallySelectedBody = null as Body | null; // Track bodies clicked in space (without camera buttons)
 const NONE_FOCUS_POSITION = new THREE.Vector3(0, 0, 0); // Center of solar system
 
-let supernovas: Supernova[] = []; // Track all supernova effects
-let planetaryNebulae: PlanetaryNebula[] = []; // Track all planetary nebula effects
+const supernovas: Supernova[] = []; // Track all supernova effects
+const planetaryNebulae: PlanetaryNebula[] = []; // Track all planetary nebula effects
 
 let isTilting = false;
 let isAzimuthDragging = false;
