@@ -52,8 +52,8 @@ import {
     interactionState,
     simulationState,
     cameraState,
-} from '../simulation/simulation';
-import { exitFlightMode, updateFlightControls } from '../simulation/flight-controllers';
+} from './simulation';
+import { exitFlightMode, updateFlightControls } from './flight-controllers';
 
 // ── Context interface ───────────────────────────────────────────────────────
 

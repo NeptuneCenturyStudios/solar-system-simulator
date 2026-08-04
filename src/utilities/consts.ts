@@ -243,6 +243,7 @@ export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;
 export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4;
 export const MAX_NEUTRON_STAR_MASS = SUN_MASS * 3;
 export const MIN_BLACK_HOLE_MASS = SUN_MASS * 3;
+export const BLACK_HOLE_RADIUS_PER_SOL = (2.95 / RADIUS_SCALE) * SCALE_FACTOR; // Base radius for a black hole of mass MIN_BLACK_HOLE_MASS
 export const GIZMO_TUNING = Object.freeze({ VELOCITY_ARROW_SCALE: 50 });
 export const GRAV_ARROW_SCALE = 15000;
 

@@ -1,12 +1,11 @@
 import * as THREE from 'three';
 import type { StarParams } from '../utilities/body-params';
 import { EARTH_DIST, SUN_MASS } from '../utilities/consts';
-import { calculateTrajectory } from '../physics/physics';
+import { calculateTrajectory, blackHoleMassToEventHorizonRadius } from '../physics/physics';
 import { generateProceduralBodyName } from './body-naming';
 import type { ProceduralBlackHoleCreation } from './black-hole-factory';
 import type { IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from '../bodies/body-enums';
-import { blackHoleMassToEventHorizonRadius } from '../engine/core';
 import { rngFor } from './seed-utils';
 
 export function generateProceduralBlackHoles(params: {

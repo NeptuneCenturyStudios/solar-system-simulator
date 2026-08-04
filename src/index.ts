@@ -132,7 +132,7 @@ import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simula
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
 import { UIManager } from './ui/ui-manager';
-import { runAnimationLoop, AnimationContext } from './engine/animation-loop';
+import { runAnimationLoop, AnimationContext } from './simulation/animation-loop';
 import { registerCustomEventListeners } from './events/custom-event-listeners';
 
 // State singletons

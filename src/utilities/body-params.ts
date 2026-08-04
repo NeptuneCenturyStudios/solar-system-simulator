@@ -6,7 +6,7 @@
  * Shared between the `createNewBody` interactive flow and the preset spawn modes.
  */
 import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
-import { blackHoleMassToEventHorizonRadius } from '../engine/core';
+import { blackHoleMassToEventHorizonRadius } from '../physics/physics';
 import {
     SCALE_FACTOR,
     SUN_MASS,

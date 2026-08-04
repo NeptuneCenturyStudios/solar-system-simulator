@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
-import { G, PLUTO_DIST } from '../utilities/consts';
+import { BLACK_HOLE_RADIUS_PER_SOL, G, PLUTO_DIST } from '../utilities/consts';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { BlackHole } from '../bodies/black-hole';
 import { CelestialBody } from '../bodies/celestial-body';
@@ -298,4 +298,15 @@ export function absorbBody(winner: Body, victim: Body) {
             },
         })
     );
+}
+
+/**
+ * Calculates the event horizon radius for a black hole of a given mass.
+ * @param mass The mass of the black hole.
+ * @returns The event horizon radius.
+ */
+export function blackHoleMassToEventHorizonRadius(mass: number): number {
+    const safeMass = Math.max(0, mass);
+
+    return BLACK_HOLE_RADIUS_PER_SOL * safeMass;
 }
