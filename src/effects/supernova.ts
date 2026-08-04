@@ -21,11 +21,8 @@ export class Supernova implements IEffect {
     baseColors: { r: number; g: number; b: number }[];
     sizes: Float32Array;
     velocities: THREE.Vector3[];
-    // maxDistances: number[]; // No longer needed
     expandTime: number;
     origin: THREE.Vector3;
-    shouldCollapse: boolean;
-    collapseStartTime: number | null;
     flashSphere: THREE.Mesh | null;
     flashOpacity: number;
 
@@ -33,8 +30,7 @@ export class Supernova implements IEffect {
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         pos: THREE.Vector3,
-        radius: number,
-        shouldCollapse = false
+        radius: number
     ) {
         this.dependencies = dependencies;
         this.count = 20000; // Even more particles for maximum density
@@ -44,13 +40,10 @@ export class Supernova implements IEffect {
         this.baseColors = []; // Store original colors for fading
         this.sizes = new Float32Array(this.count);
         this.velocities = [];
-        // this.maxDistances = []; // No longer needed
         this.active = true;
         this.scene = scene;
         this.expandTime = 0;
         this.origin = pos.clone(); // Store origin for distance calculation
-        this.shouldCollapse = shouldCollapse; // If true, reverse animation (black hole formation)
-        this.collapseStartTime = shouldCollapse ? 3.0 : null; // Wait 3 seconds before starting collapse
 
         // Nebula color palette - vibrant cosmic colors
         const nebulaColors = [
@@ -67,8 +60,6 @@ export class Supernova implements IEffect {
 
         // Split particles: 5000 inner white-hot core, 15000 outer nebula
         const innerCount = 5000;
-        // Expand to halfway to Kuiper Belt (Neptune distance / 2)
-        // const maxExpansion = 328000; // No longer used
 
         for (let i = 0; i < this.count; i++) {
             // Start at supernova center
@@ -169,25 +160,19 @@ export class Supernova implements IEffect {
         this.points.frustumCulled = false; // Prevent disappearing at certain angles
         scene.add(this.points);
 
-        // Massive initial flash - but skip for black hole collapse (too brief)
-        if (!shouldCollapse) {
-            // Normal supernova gets full-size flash sphere
-            const flashGeo = new THREE.SphereGeometry(radius * 6, 32, 32);
-            const flashMat = new THREE.MeshBasicMaterial({
-                color: 0xffffaa,
-                transparent: true,
-                opacity: 1.0,
-                blending: THREE.AdditiveBlending,
-            });
-            this.flashSphere = new THREE.Mesh(flashGeo, flashMat);
-            this.flashSphere.position.copy(pos);
-            scene.add(this.flashSphere);
-            this.flashOpacity = 1.0;
-        } else {
-            // No flash sphere for black hole collapse
-            this.flashSphere = null;
-            this.flashOpacity = 0;
-        }
+        // Massive initial flash sphere. Fades with simulation time in update()
+        // and is removed + disposed once its opacity reaches zero.
+        const flashGeo = new THREE.SphereGeometry(radius * 6, 32, 32);
+        const flashMat = new THREE.MeshBasicMaterial({
+            color: 0xffffaa,
+            transparent: true,
+            opacity: 1.0,
+            blending: THREE.AdditiveBlending,
+        });
+        this.flashSphere = new THREE.Mesh(flashGeo, flashMat);
+        this.flashSphere.position.copy(pos);
+        scene.add(this.flashSphere);
+        this.flashOpacity = 1.0;
     }
 
     update(dt: number) {
@@ -197,84 +182,42 @@ export class Supernova implements IEffect {
         const p = this.geometry.attributes.position.array;
         const colorAttr = this.geometry.attributes.color.array;
 
-        // Check if we should start collapsing (black hole formation)
-        const isCollapsing =
-            this.shouldCollapse &&
-            this.collapseStartTime !== null &&
-            this.expandTime >= this.collapseStartTime;
-
-        // Flash fades quickly - remove immediately if collapsing
+        // Flash fades quickly with simulation time (pauses when sim is paused).
         if (this.flashSphere) {
-            // If the sphere was already removed from the scene somehow, still allow cleanup by opacity.
-            const hasParent = !!this.flashSphere.parent;
+            this.flashOpacity -= 0.02 * (absDt * 60);
 
-            if (isCollapsing) {
-                // Force remove flash sphere when collapse starts
-                if (hasParent) this.scene.remove(this.flashSphere);
+            if (this.flashSphere.material) {
+                (this.flashSphere.material as THREE.MeshBasicMaterial).opacity = Math.max(
+                    0,
+                    this.flashOpacity
+                );
+            }
+            this.flashSphere.scale.setScalar(1 + (1 - this.flashOpacity) * 8);
+
+            if (this.flashOpacity <= 0) {
+                // Fade complete — remove from the scene and release GPU resources.
+                if (this.flashSphere.parent) this.scene.remove(this.flashSphere);
                 this.flashSphere.geometry?.dispose?.();
                 (this.flashSphere.material as THREE.MeshBasicMaterial)?.dispose?.();
                 this.flashSphere = null;
-                this.flashOpacity = 0;
-            } else if (this.flashOpacity > 0) {
-                this.flashOpacity -= 0.02 * (absDt * 60);
-                if (this.flashSphere.material) {
-                    (this.flashSphere.material as THREE.MeshBasicMaterial).opacity = Math.max(
-                        0,
-                        this.flashOpacity
-                    );
-                }
-                this.flashSphere.scale.setScalar(1 + (1 - this.flashOpacity) * 8);
-
-                if (this.flashOpacity <= 0) {
-                    if (hasParent) this.scene.remove(this.flashSphere);
-                    this.flashSphere.geometry?.dispose?.();
-                    (this.flashSphere.material as THREE.MeshBasicMaterial)?.dispose?.();
-                    this.flashSphere = null;
-                }
             }
         }
 
         // Particles expand and gradually slow down
         let allFaded = true;
         for (let i = 0; i < this.count; i++) {
-            if (isCollapsing) {
-                // REVERSE: Pull particles back toward origin (collapse logic unchanged)
-                const dx = p[i * 3] - this.origin.x;
-                const dy = p[i * 3 + 1] - this.origin.y;
-                const dz = p[i * 3 + 2] - this.origin.z;
-                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                // Use a default maxDist for collapse speed scaling
-                const maxDist = 100000; // Arbitrary large value
-                const dirToOrigin = new THREE.Vector3(
-                    this.origin.x - p[i * 3],
-                    this.origin.y - p[i * 3 + 1],
-                    this.origin.z - p[i * 3 + 2]
-                ).normalize();
-                const collapseSpeed = 300 + (1 - dist / maxDist) * 500;
-                p[i * 3] += dirToOrigin.x * collapseSpeed * (absDt * 60);
-                p[i * 3 + 1] += dirToOrigin.y * collapseSpeed * (absDt * 60);
-                p[i * 3 + 2] += dirToOrigin.z * collapseSpeed * (absDt * 60);
-                // Fade out based on collapse progress
-                const collapseProgress =
-                    this.collapseStartTime !== null
-                        ? (this.expandTime - this.collapseStartTime) / 3.0
-                        : 0;
-                const baseFade = Math.max(0, 1 - collapseProgress * 0.5);
-                colorAttr[i * 4 + 3] = baseFade;
+            // Normal expansion - particles slow down gradually
+            p[i * 3] += this.velocities[i].x * (absDt * 60);
+            p[i * 3 + 1] += this.velocities[i].y * (absDt * 60);
+            p[i * 3 + 2] += this.velocities[i].z * (absDt * 60);
+            // Apply gradual slowdown (tweak factor for desired effect)
+            this.velocities[i].multiplyScalar(Supernova.SPEED_LOSS); // Tweakable slowdown factor
+            // Gradually fade out each particle
+            colorAttr[i * 4 + 3] *= Supernova.COOLDOWN_FADE;
+            if (colorAttr[i * 4 + 3] < 0.01) {
+                colorAttr[i * 4 + 3] = 0;
             } else {
-                // Normal expansion - particles slow down gradually
-                p[i * 3] += this.velocities[i].x * (absDt * 60);
-                p[i * 3 + 1] += this.velocities[i].y * (absDt * 60);
-                p[i * 3 + 2] += this.velocities[i].z * (absDt * 60);
-                // Apply gradual slowdown (tweak factor for desired effect)
-                this.velocities[i].multiplyScalar(Supernova.SPEED_LOSS); // Tweakable slowdown factor
-                // Gradually fade out each particle
-                colorAttr[i * 4 + 3] *= Supernova.COOLDOWN_FADE;
-                if (colorAttr[i * 4 + 3] < 0.01) {
-                    colorAttr[i * 4 + 3] = 0;
-                } else {
-                    allFaded = false;
-                }
+                allFaded = false;
             }
         }
 
@@ -282,27 +225,8 @@ export class Supernova implements IEffect {
         this.geometry.attributes.color.needsUpdate = true;
 
         // If all particles are faded, mark for cleanup
-        if (!isCollapsing && allFaded) {
+        if (allFaded) {
             this.active = false;
-        }
-
-        // Check if collapse is complete (all particles absorbed)
-        if (isCollapsing) {
-            let allAbsorbed = true;
-            for (let i = 0; i < this.count; i++) {
-                const dx = p[i * 3] - this.origin.x;
-                const dy = p[i * 3 + 1] - this.origin.y;
-                const dz = p[i * 3 + 2] - this.origin.z;
-                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                if (dist > 500) {
-                    // Much smaller threshold - cleanup faster
-                    allAbsorbed = false;
-                    break;
-                }
-            }
-            if (allAbsorbed) {
-                this.active = false; // Mark for cleanup
-            }
         }
     }
 

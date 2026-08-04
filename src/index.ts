@@ -1601,13 +1601,16 @@ function cleanUpSolarSystem() {
     for (const supernova of supernovas) {
         supernova.dispose();
     }
-    supernovas = [];
+    // Mutate in place (NOT `supernovas = []`) — animCtx captured the array
+    // reference via `{ value: supernovas }`, so rebinding would orphan every
+    // future supernova from the animation loop. Use the same for nebulae.
+    supernovas.length = 0;
 
     // Clean up all planetary nebula effects
     for (const nebula of planetaryNebulae) {
         nebula.dispose();
     }
-    planetaryNebulae = [];
+    planetaryNebulae.length = 0;
 
     // Reset bodies array depending on mode
     simulationState.bodies = [];

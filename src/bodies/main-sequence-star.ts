@@ -42,7 +42,6 @@ export class MainSequenceStar extends Star {
     initialColor: THREE.Color;
     isBecomingWhiteDwarf: boolean;
     targetWhiteDwarfRadius: number;
-    _pendingBlackHoleFormation: boolean;
     activeSolarFlares: SolarFlare[];
     _solarFlareTimer: number;
     _nextFlareInterval: number;
@@ -83,7 +82,6 @@ export class MainSequenceStar extends Star {
 
         this.isBecomingWhiteDwarf = false;
         this.targetWhiteDwarfRadius = 8;
-        this._pendingBlackHoleFormation = false;
 
         this.activeSolarFlares = [];
         this._solarFlareTimer = 0;
@@ -335,8 +333,8 @@ export class MainSequenceStar extends Star {
         }
     }
 
-    createSupernova(pos: THREE.Vector3, radius: number, shouldCollapse: boolean) {
-        const supernova = new Supernova(this.dependencies, this.scene, pos, radius, shouldCollapse);
+    createSupernova(pos: THREE.Vector3, radius: number) {
+        const supernova = new Supernova(this.dependencies, this.scene, pos, radius);
         this.dependencies.addSupernova(supernova);
         return supernova;
     }
@@ -344,7 +342,7 @@ export class MainSequenceStar extends Star {
     triggerStarDeath() {
         if (this.initialMass > MIN_NEUTRON_STAR_MASS) {
             try {
-                this.createSupernova(this.mesh.position.clone(), this.radius, false);
+                this.createSupernova(this.mesh.position.clone(), this.radius);
             } catch (e) {
                 console.error('Error creating supernova:', e);
             }
