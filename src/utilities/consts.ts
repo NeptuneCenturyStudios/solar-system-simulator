@@ -204,36 +204,10 @@ export const STAR_LIGHT_INTENSITY_MAX = 15_000;
 export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
 export const STAR_LIGHT_DECAY = 0.45; // Tuned for model
 
-// === Star Shine (diffraction-cross) Effect ===
-/** Camera distance (u) at which a star's shine cross reaches full visibility. Beyond this the cross stays at max opacity. */
-export const STAR_SHINE_FULL_VIS_DIST = (500_000 / DIST_SCALE) * SCALE_FACTOR;
-/** Multiplier on star radius defining the close-range distance below which the shine cross has fully faded out. */
-export const STAR_SHINE_FADE_RADIUS_MULT = 12;
-/**
- * Constant apparent size of the shine cross in radians. The sprite is scaled
- * proportional to camera distance each frame, so the cross keeps the same size
- * on screen no matter how far the camera is.
- */
-export const STAR_SHINE_ANGULAR_SIZE = 0.14;
-/** Breathing pulse amplitude for the shine cross: ±fraction of its base scale. */
-export const STAR_SHINE_PULSE_AMPLITUDE = 0.12;
-/** Breathing pulse amplitude for the shine cross: ±fraction of its base opacity (subtler than scale). */
-export const STAR_SHINE_PULSE_OPACITY_AMPLITUDE = 0.08;
-/** Breathing pulse rate (rad/s) — slow shimmer, same feel as the star-glow pulse. */
-export const STAR_SHINE_PULSE_RATE = 0.0015 * 60;
-
-// ─── Star Shine spike parameters ──────────────────────────────────────────
-export const STAR_SHINE_CARDINAL_SPIKE_LENGTH = 0.46;
-export const STAR_SHINE_CARDINAL_SPIKE_WIDTH = 0.012;
-export const STAR_SHINE_CARDINAL_SPIKE_ALPHA = 0.95;
-export const STAR_SHINE_DIAGONAL_SPIKE_LENGTH = 0.3;
-export const STAR_SHINE_DIAGONAL_SPIKE_WIDTH = 0.014;
-export const STAR_SHINE_DIAGONAL_SPIKE_ALPHA = 0.4;
-
 // ─── Lens Flare element sizes ──────────────────────────────────────────────
 export const LENSFLARE_STARBURST_SIZE = 128;
 export const LENSFLARE_CORE_SIZE = 75;
-export const LENSFLARE_HALO_SIZE = 500;
+export const LENSFLARE_HALO_SIZE = 250;
 export const LENSFLARE_CARDINAL_SPIKE_LENGTH = 0.46;
 export const LENSFLARE_CARDINAL_SPIKE_WIDTH = 0.020;
 export const LENSFLARE_DIAGONAL_SPIKE_LENGTH = 0.32;

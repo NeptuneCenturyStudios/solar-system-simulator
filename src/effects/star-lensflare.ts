@@ -230,9 +230,9 @@ function drawWarmHalo(ctx: CanvasRenderingContext2D): void {
     const r = TEXTURE_SIZE * 0.5;
     const grad = ctx.createRadialGradient(c, c, 0, c, c, r);
     grad.addColorStop(0,    'rgba(255, 255, 255, 0.35)');
-    grad.addColorStop(0.30, 'rgba(255, 255, 255, 0.30)');
-    grad.addColorStop(0.60, 'rgba(255, 255, 255, 0.20)');
-    grad.addColorStop(0.85, 'rgba(255, 255, 255, 0.10)');
+    grad.addColorStop(0.30, 'rgba(255, 255, 255, 0.25)');
+    grad.addColorStop(0.50, 'rgba(255, 255, 255, 0.15)');
+    grad.addColorStop(0.75, 'rgba(255, 255, 255, 0.05)');
     grad.addColorStop(1,    'rgba(  0,   0,  0,  0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
