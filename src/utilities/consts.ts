@@ -239,6 +239,14 @@ export const LENSFLARE_CARDINAL_SPIKE_WIDTH = 0.020;
 export const LENSFLARE_DIAGONAL_SPIKE_LENGTH = 0.32;
 export const LENSFLARE_DIAGONAL_SPIKE_WIDTH = 0.015;
 
+// ─── Lens Flare starburst flicker ──────────────────────────────────────────
+/** Peak size perturbation of the starburst as a fraction of its base size (±4%). */
+export const LENSFLARE_STARBURST_FLICKER_AMPLITUDE = 0.04;
+/** Primary flicker rate (rad/s) — slow shimmer dominant term. */
+export const LENSFLARE_STARBURST_FLICKER_FREQ_A = 3.0;
+/** Secondary flicker rate (rad/s) — incommensurate with A so the shimmer never repeats. */
+export const LENSFLARE_STARBURST_FLICKER_FREQ_B = 7.3;
+
 export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;
 export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4;
 export const MAX_NEUTRON_STAR_MASS = SUN_MASS * 3;

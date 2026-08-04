@@ -8,6 +8,9 @@ import {
     LENSFLARE_DIAGONAL_SPIKE_WIDTH,
     LENSFLARE_HALO_SIZE,
     LENSFLARE_STARBURST_SIZE,
+    LENSFLARE_STARBURST_FLICKER_AMPLITUDE,
+    LENSFLARE_STARBURST_FLICKER_FREQ_A,
+    LENSFLARE_STARBURST_FLICKER_FREQ_B,
 } from '../utilities/consts';
 
 /**
@@ -22,6 +25,8 @@ export class StarLensflare {
     private _starburstElement: LensflareElement | null = null;
     private _coreElement: LensflareElement | null = null;
     private _haloElement: LensflareElement | null = null;
+    /** Accumulated simulation time (s) driving the starburst flicker. */
+    private _visualTime = 0;
     private readonly _starburstBaseColor = new THREE.Color(0xffffff);
     private readonly _coreBaseColor = new THREE.Color(0xffffff);
     private readonly _haloBaseColor = new THREE.Color(0xffffff);
@@ -86,6 +91,26 @@ export class StarLensflare {
         for (const flare of this._flares) {
             flare.visible = visible;
         }
+    }
+
+    /**
+     * Per-frame starburst flicker. Advances an internal clock by `dt` (real
+     * simulation time, so the shimmer freezes while paused) and perturbs the
+     * starburst element's `size` with two incommensurate sines — a subtle
+     * ±LENSFLARE_STARBURST_FLICKER_AMPLITUDE shimmer that never repeats.
+     */
+    update(dt: number): void {
+        if (!this._starburstElement) return;
+
+        this._visualTime += dt;
+
+        const shimmer =
+            Math.sin(this._visualTime * LENSFLARE_STARBURST_FLICKER_FREQ_A) * 0.6 +
+            Math.sin(this._visualTime * LENSFLARE_STARBURST_FLICKER_FREQ_B) * 0.4;
+
+        this._starburstElement.size =
+            LENSFLARE_STARBURST_SIZE *
+            (1 + LENSFLARE_STARBURST_FLICKER_AMPLITUDE * shimmer);
     }
 
     dispose(): void {

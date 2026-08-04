@@ -332,6 +332,7 @@ export class Star extends CelestialBody {
         }
 
         this.lensflare?.setVisible(settingsStore.settings.lensflareEnabled);
+        this.lensflare?.update(dtTotal);
     }
 
     setLightIntensity(intensity: number) {
