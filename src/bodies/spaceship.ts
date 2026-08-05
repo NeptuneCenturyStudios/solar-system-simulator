@@ -8,7 +8,7 @@ import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
 import { SoundEffect, WarpSoundController, playSoundEffect, playWarpLoop } from '../utilities/audio.js';
 import { WarpEffect } from '../effects/warp-effect.js';
-import { IDeathOptions, ISpaceshipHandling, IWeaponConfig, AutopilotPhase, IWarpStepResult } from '../interfaces';
+import { IDeathOptions, ISpaceshipHandling, AutopilotPhase, IWarpStepResult, IWeaponConfig } from '../interfaces';
 import { ShipWeapon } from '../ship-effects/ship-weapon';
 import { autopilotState, cameraState, flightState, simulationState } from '../simulation/simulation';
 import { G } from '../utilities/consts';

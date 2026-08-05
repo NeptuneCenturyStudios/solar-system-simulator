@@ -399,24 +399,25 @@ export interface ISpaceshipHandling {
     flightPerpDecay: number;
 
     // ── Steering feel ─────────────────────────────────────────────────
-    flightMaxPointerOffset: number;  // pixels before reaching full turn rate
-    flightMaxTurnRate: number;       // radians/s at full pointer deflection
-    flightSteerSmoothRate: number;   // exponential-decay rate (per second)
-    flightSteerDeadzone: number;     // normalised dead zone (0–1)
+    flightMaxPointerOffset: number; // pixels before reaching full turn rate
+    flightMaxTurnRate: number; // radians/s at full pointer deflection
+    flightSteerSmoothRate: number; // exponential-decay rate (per second)
+    flightSteerDeadzone: number; // normalised dead zone (0–1)
 
     // ── Roll ──────────────────────────────────────────────────────────
-    flightRollSpeed: number;   // max roll angular velocity (rad/s)
-    flightRollAccel: number;   // how fast roll ramps up (rad/s²)
+    flightRollSpeed: number; // max roll angular velocity (rad/s)
+    flightRollAccel: number; // how fast roll ramps up (rad/s²)
     flightRollFriction: number; // how fast roll decays when key released (rad/s²)
 
     // ── Visual banking ────────────────────────────────────────────────
     flightBankLerpSpeed: number; // exponential-decay rate for banking animation (per second)
-    flightMaxBankAngle: number;  // max visual roll angle (rad)
-    flightMaxBankPitch: number;  // max visual pitch angle (rad)
+    flightMaxBankAngle: number; // max visual roll angle (rad)
+    flightMaxBankPitch: number; // max visual pitch angle (rad)
 
     // ── Misc ──────────────────────────────────────────────────────────
     flightWarpChargeTime: number; // seconds to hold Space before warp engages
 }
+
 /** Per-ship weapon tuning — passed to ShipWeapon constructor. */
 export interface IWeaponConfig {
     // ── Projectile physics ────────────────────────────────────────────
@@ -436,12 +437,12 @@ export interface IWeaponConfig {
     // ── Rate & damage ─────────────────────────────────────────────────
     /** Maximum bolts fired per second. */
     fireRate: number;
-    /** HP damage dealt on impact. */
-    damage: number;
 
     // ── Optional overrides ────────────────────────────────────────────
     /** Maximum simultaneous in-flight bolts (default 800). */
     maxProjectiles?: number;
+    /** HP damage dealt on impact. */
+    damage: number;
     /** Called once per bolt fired; defaults to playWeaponFire() if omitted. */
     fireSound?: () => void;
 }
