@@ -4,7 +4,7 @@ import { IAtmosphereOptions, IDeathOptions, IRotation } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
 import { triggerScreenFlash } from '../effects/screen-flash';
-import { C, DIST_SCALE } from '../utilities/consts';
+import { DIST_SCALE } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
@@ -392,10 +392,14 @@ export class CelestialBody extends Body {
         }
     }
 
+    /**
+     * Clamps the body's velocity to be below the speed of light.
+     */
     private clampToLightSpeed(): void {
         const speed = this.velocity.length();
-        if (speed >= C) {
-            this.velocity.multiplyScalar((C * 0.9999) / speed);
+        const lightSpeed = this.dependencies.getC();
+        if (speed >= lightSpeed) {
+            this.velocity.multiplyScalar((lightSpeed * 0.9999) / speed);
         }
     }
 

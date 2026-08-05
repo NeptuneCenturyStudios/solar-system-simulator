@@ -11,7 +11,6 @@ import {
     simulationState,
 } from './simulation';
 import { IFlightControlContext } from '../interfaces';
-import { playSoundEffect, SoundEffect } from '../utilities/audio';
 
 /** Exit flight mode and restore normal camera controls. */
 export function exitFlightMode(ctx: IFlightControlContext) {
@@ -228,10 +227,6 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
                 // Manual warp charging — advance the timer here.
                 const fill = ship.updateWarpCharge(dt);
                 ctx.flightHUD.updateWarpHUD(true, false, fill);
-                if (fill >= 0.99 && !ship.warpVoicePlayed) {
-                    ship.warpVoicePlayed = true;
-                    playSoundEffect(SoundEffect.WarpDriveActive);
-                }
                 if (fill >= 1) {
                     // Engage warp!
                     ship.engageWarp();

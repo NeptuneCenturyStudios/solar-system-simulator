@@ -60,6 +60,7 @@ import {
     SUN_RADIUS,
     DIST_SCALE,
     TEXT_SPRITE_Z,
+    C,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -202,7 +203,7 @@ import { ProceduralGenerator } from './procedural/procedural-generator';
 import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
 import { BlackHoleSystemGenerator } from './procedural/black-hole-system-generator';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
-import { EffectiveGForce } from './types';
+import { EffectiveCSpeed, EffectiveGForce } from './types';
 import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { EmptySystemGenerator } from './procedural/empty-system-generator';
 import { pickMoonTextureForMoonType } from './procedural/moon-factory';
@@ -554,6 +555,7 @@ const dependencies: IStateDependencies = {
     },
     getBodies: () => simulationState.bodies,
     getG: () => (G * simulationState.gMultiplier) as EffectiveGForce,
+    getC: () => (C * Math.sqrt(simulationState.gMultiplier)) as EffectiveCSpeed,
 };
 
 // --- Velocity editing arc helpers ---

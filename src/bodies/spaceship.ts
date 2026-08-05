@@ -6,7 +6,7 @@ import { SCALE_FACTOR, SPACESHIP_MASS, SPACESHIP_RADIUS } from '../utilities/con
 import { IShipEffect } from '../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
-import { WarpSoundController, playWarpLoop } from '../utilities/audio.js';
+import { SoundEffect, WarpSoundController, playSoundEffect, playWarpLoop } from '../utilities/audio.js';
 import { WarpEffect } from '../effects/warp-effect.js';
 import { IDeathOptions, ISpaceshipHandling, IWeaponConfig, AutopilotPhase, IWarpStepResult } from '../interfaces';
 import { ShipWeapon } from '../ship-effects/ship-weapon';
@@ -77,8 +77,6 @@ export class Spaceship extends Body {
     warpDecelerating: boolean = false;
     /** True during phase-2 decel: shedding speed from boost max → normal max. */
     boostDecelerating: boolean = false;
-    /** Debounce flag — true once the warp-drive-active voice prompt has played for the current charge cycle. */
-    warpVoicePlayed: boolean = false;
     /** Visual warp tunnel effect. Owned by the ship; created in constructor. */
     warpEffect: WarpEffect;
 
@@ -976,7 +974,6 @@ export class Spaceship extends Body {
     startWarpCharge(): void {
         this.warpCharging = true;
         this.warpChargeTimer = 0;
-        this.warpVoicePlayed = false;
     }
 
     /**
@@ -994,7 +991,6 @@ export class Spaceship extends Body {
     cancelWarpCharge(): void {
         this.warpCharging = false;
         this.warpChargeTimer = 0;
-        this.warpVoicePlayed = false;
     }
 
     // ── Warp state transitions ────────────────────────────────────────────────
@@ -1009,6 +1005,7 @@ export class Spaceship extends Body {
         this.warpChargeTimer = 0;
 
         triggerScreenFlash(200, 0.01, 2.5);
+        playSoundEffect(SoundEffect.WarpDriveActive);
     }
 
     /**
@@ -1028,7 +1025,6 @@ export class Spaceship extends Body {
         this.warpActive = false;
         this.warpDecelerating = false;
         this.boostDecelerating = false;
-        this.warpVoicePlayed = false;
     }
 
     // ── Autopilot state reset ────────────────────────────────────────────────

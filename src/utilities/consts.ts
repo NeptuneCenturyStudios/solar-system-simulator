@@ -20,8 +20,8 @@ export const DIST_SCALE = 100;
 // === Free Camera Movement Speeds ===
 // WASD normal speed and shift-boost speed, scaled proportionally to DIST_SCALE
 // so camera feel remains consistent if the world scale changes.
-export const FREE_CAM_NORMAL_SPEED = 10 / DIST_SCALE; // 100 u/s at default DIST_SCALE=100
-export const FREE_CAM_BOOST_SPEED = 100 / DIST_SCALE; // 1000 u/s at default DIST_SCALE=100
+export const FREE_CAM_NORMAL_SPEED = 10 / DIST_SCALE; // 10 u/s at default DIST_SCALE=100
+export const FREE_CAM_BOOST_SPEED = 10000 / DIST_SCALE; // 10000 u/s at default DIST_SCALE=100
 
 // 1. Keep the physically-derived base time scale
 export const BASE_TIME_SCALE = Math.sqrt(DIST_SCALE ** 3 / MASS_SCALE);

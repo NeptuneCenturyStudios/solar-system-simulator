@@ -9,7 +9,7 @@ import { IPipelineFeedEffect } from './effects/effect-base';
 import { LogMethods, NotificationType } from './event-log/event-log';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
 import { ITidalLockOptions } from './bodies/celestial-body';
-import { EffectiveGForce } from './types';
+import { EffectiveCSpeed, EffectiveGForce } from './types';
 import { Spaceship } from './bodies/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { FlightHUD } from './drawing/flight-hud';
@@ -103,6 +103,7 @@ export interface IStateDependencies {
     gizmo: CoordinateGizmo;
     getBodies: () => Body[];
     getG: () => EffectiveGForce;
+    getC: () => EffectiveCSpeed;
 }
 
 /**
