@@ -31,7 +31,7 @@ export interface IBoltWeaponConfig {
 
 /** Class-level defaults — a ship wanting different behaviour passes a partial IBoltWeaponConfig. */
 const DEFAULT_BOLT_CONFIG: IBoltWeaponConfig = {
-    baseSpeed: 50,//C * 0.2, // fast bolts relative to top speeds
+    baseSpeed: 100,//C * 0.2, // fast bolts relative to top speeds
     particleLifetime: 4.0,
     boltLength: SPACESHIP_RADIUS * 40,
     boltColor: 0x00eeff,

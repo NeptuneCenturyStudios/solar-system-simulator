@@ -1,5 +1,5 @@
 import { Body } from '../bodies/body';
-import { Spaceship } from '../bodies/spaceship';
+import { Spaceship } from '../bodies/ships/spaceship';
 import { Panel } from './panel';
 
 /**

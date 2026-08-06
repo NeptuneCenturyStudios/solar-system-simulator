@@ -9,7 +9,7 @@ import {
     IInteractionState,
     ISimulationState,
 } from '../interfaces';
-import { Spaceship } from '../bodies/spaceship';
+import { Spaceship } from '../bodies/ships/spaceship';
 
 /**
  * The central state object for the solar system simulation, tracking time, bodies, and visual effects.

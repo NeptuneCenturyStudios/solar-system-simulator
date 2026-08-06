@@ -122,7 +122,7 @@ import { createPlanetBodyFromProceduralCreation } from './procedural/planet-fact
 import { upgradeProceduralTexture } from './procedural/texture-upgrader';
 import { Asteroid } from './bodies/asteroid';
 
-import { Spaceship } from './bodies/spaceship';
+import { Spaceship } from './bodies/ships/spaceship';
 import { StartupModal } from './ui/startup-modal';
 import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
@@ -210,7 +210,7 @@ import { pickMoonTextureForMoonType } from './procedural/moon-factory';
 import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
 import { exitFlightMode } from './simulation/flight-controllers';
 import { parseSeedFromURL, buildSeedValue, updateURLWithSeed, clearURLSeed, SEED_TYPE_NORMAL, SEED_TYPE_BLACKHOLE, getLastPushedSeed, setLastPushedSeed, resetLastPushedSeed } from './utilities/url-seed';
-import { Fighter } from './bodies/fighter';
+import { Zenith } from './bodies/ships/zenith';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: {
@@ -3031,13 +3031,14 @@ function spawnShip() {
         camera.getWorldDirection(cameraDir);
         const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
 
-        const ship = new Fighter(
+        // TODO: Based on ship type selected, create the appropriate ship class (Zenith, etc). For now, Zenith is the only option.
+        const ship = new Zenith(
             dependencies,
             scene,
             spawnPos,
             new THREE.Vector3(),
             createUniqueId('spaceship'),
-            flightControlsPanel.getSelectedModel()
+            // flightControlsPanel.getSelectedModel() TODO: No longer needed. Replaceing model selection with ship type selection
         );
 
         // Orient the ship to the same direction the camera is facing

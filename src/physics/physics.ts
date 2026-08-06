@@ -4,7 +4,7 @@ import { BLACK_HOLE_RADIUS_PER_SOL, G, PLUTO_DIST } from '../utilities/consts';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { BlackHole } from '../bodies/black-hole';
 import { CelestialBody } from '../bodies/celestial-body';
-import { Spaceship } from '../bodies/spaceship';
+import { Spaceship } from '../bodies/ships/spaceship';
 import { NotificationType } from '../event-log/event-log';
 import { EffectiveGForce } from '../types';
 import { IFlightState, ISimulationState, IAutopilotState } from '../interfaces';

@@ -1,25 +1,25 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
-import { Body } from './body';
-import { SCALE_FACTOR, SPACESHIP_MASS, SPACESHIP_RADIUS } from '../utilities/consts.js';
-import { IShipEffect } from '../ship-effects/ship-effect-base.js';
-import { ShipFlame } from '../ship-effects/ship-flame.js';
-import { BodyTypeEnum } from './body-enums';
-import { SoundEffect, WarpSoundController, playSoundEffect, playWarpLoop } from '../utilities/audio.js';
-import { WarpEffect } from '../effects/warp-effect.js';
-import { IDeathOptions, ISpaceshipHandling, AutopilotPhase, IWarpStepResult } from '../interfaces';
-import { Weapon, WeaponConstructor } from '../ship-effects/weapons/weapon';
-import { autopilotState, cameraState, flightState, simulationState } from '../simulation/simulation';
-import { G } from '../utilities/consts';
+import { Body } from '../body';
+import { SCALE_FACTOR, SPACESHIP_MASS, SPACESHIP_RADIUS } from '../../utilities/consts.js';
+import { IShipEffect } from '../../ship-effects/ship-effect-base.js';
+import { ShipFlame } from '../../ship-effects/ship-flame.js';
+import { BodyTypeEnum } from '../body-enums';
+import { SoundEffect, WarpSoundController, playSoundEffect, playWarpLoop } from '../../utilities/audio.js';
+import { WarpEffect } from '../../effects/warp-effect.js';
+import { IDeathOptions, ISpaceshipHandling, AutopilotPhase, IWarpStepResult } from '../../interfaces';
+import { Weapon, WeaponConstructor } from '../../ship-effects/weapons/weapon';
+import { autopilotState, cameraState, flightState, simulationState } from '../../simulation/simulation';
+import { G } from '../../utilities/consts';
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_BRAKE_PAD,
     AUTOPILOT_BRAKE_DONE_SPEED,
     AUTOPILOT_CIRCULARIZE_RATE,
     AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN,
-} from '../utilities/consts';
-import { triggerScreenFlash } from '../effects/screen-flash';
+} from '../../utilities/consts';
+import { triggerScreenFlash } from '../../effects/screen-flash';
 
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
