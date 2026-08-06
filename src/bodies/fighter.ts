@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Spaceship } from "./spaceship";
 import { ISpaceshipHandling } from '../interfaces';
 import { C } from '../utilities/consts';
-import { LaserWeapon } from '../ship-effects/weapons/laser-weapon';
+import { BoltWeapon } from '../ship-effects/weapons/bolt-weapon';
 
 // Flight tuning constants
 const FLIGHT_MAX_SPEED = C * 0.005;
@@ -78,7 +78,7 @@ const fighterHandling: ISpaceshipHandling = {
  * different weapons on the Fighter (e.g. [LaserWeapon] for pure laser,
  * [BoltWeapon, LaserWeapon] for both).
  */
-const fighterWeaponLoadout = [LaserWeapon];
+const fighterWeaponLoadout = [BoltWeapon];
 
 export class Fighter extends Spaceship {
     constructor(
