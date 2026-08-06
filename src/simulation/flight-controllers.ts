@@ -399,7 +399,12 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
                 -1
             ).normalize();
             const aimDir = viewSpaceDir.transformDirection(ctx.camera.matrixWorld);
-            const muzzlePos = ship.mesh.position.clone().addScaledVector(forward, ship.radius * 4);
+            // Anchor the muzzle to the loaded model's nose (ship-local +Z), so the
+            // beam/bolts emerge from the hull instead of floating ahead of it.
+            const muzzlePos = ship.muzzleOffset
+                .clone()
+                .applyQuaternion(ship.mesh.quaternion)
+                .add(ship.mesh.position);
             ship.fireWeapon(dt, muzzlePos, aimDir);
         } else {
             ship.stopFire();

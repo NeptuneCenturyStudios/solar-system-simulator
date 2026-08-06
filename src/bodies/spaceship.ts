@@ -47,6 +47,8 @@ export class Spaceship extends Body {
     thirdPersonOffset: THREE.Vector3;
     /** Local-space offset to the engine nozzle (used for the trail origin). */
     thrusterOffset: THREE.Vector3;
+    /** Local-space offset to the weapon muzzle (nose). Weapon origins are anchored here. */
+    muzzleOffset: THREE.Vector3;
     /** Glowing engine exhaust trail rendered as a connected line in world space. */
     trail: IShipEffect;
     /** Handling characteristics of the spaceship. */
@@ -210,6 +212,8 @@ export class Spaceship extends Body {
             SPACESHIP_RADIUS * 0.35,
             -SPACESHIP_RADIUS * 1.8
         );
+        // Initial muzzle off the nose (approximate; updated precisely after OBJ loads).
+        this.muzzleOffset = new THREE.Vector3(0, 0, SPACESHIP_RADIUS);
 
         // Engine exhaust trail (Line-based, no gaps at any speed)
         this.trail = new ShipFlame(scene);
@@ -241,7 +245,7 @@ export class Spaceship extends Body {
 
     /**
      * Loads an OBJ/MTL model, scales it to fit SPACESHIP_RADIUS, centres it on this.mesh,
-     * and updates cockpit/thruster offsets from the resulting bounding box.
+     * and updates cockpit/thruster/muzzle offsets from the resulting bounding box.
      * Safe to call from the constructor and from loadModel().
      */
     private _loadModel(modelName: string): void {
@@ -287,6 +291,8 @@ export class Spaceship extends Body {
                 // Update camera/thruster offsets from the local bbox.
                 this.cockpitOffset.set(0, localBbox.max.y * 0.5, localBbox.max.z * 0.75);
                 this.thrusterOffset.set(0, localBbox.min.y * 0.3, localBbox.min.z);
+                // Muzzle sits at the forward-most point of the hull (+Z = nose).
+                this.muzzleOffset.set(0, localBbox.max.y * 0.25, localBbox.max.z);
             })
             .catch((e) => {
                 console.warn('Spaceship OBJ/MTL load failed — using placeholder mesh', e);
@@ -325,6 +331,7 @@ export class Spaceship extends Body {
         this.cockpitOffset.set(0, 0.3 * SF, 0.52 * SF);
         this.thrusterOffset.set(0, -0.1 * SF, -0.9 * SF);
         this.thirdPersonOffset.set(0, SPACESHIP_RADIUS * 0.35, -SPACESHIP_RADIUS * 1.8);
+        this.muzzleOffset.set(0, 0, SPACESHIP_RADIUS);
 
         this._loadModel(modelName);
     }

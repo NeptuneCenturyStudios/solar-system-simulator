@@ -27,7 +27,7 @@ export interface ILaserWeaponConfig {
 const DEFAULT_LASER_CONFIG: ILaserWeaponConfig = {
     maxRange: C * 1.0,
     beamColor: 0xff2244,
-    beamWidth: SPACESHIP_RADIUS * 8,
+    beamWidth: SPACESHIP_RADIUS * .5,
     damage: 1000,
     damageInterval: 0.2,
     fireSound: playWeaponFire,
@@ -47,8 +47,14 @@ export class LaserWeapon extends Weapon {
     private active = false;
     /** True if the beam was active on the previous update (edge detection). */
     private prevBeamVisible = false;
-    /** World-space muzzle position for the current frame. */
+    /** World-space muzzle position captured at the last tryFire() (pre-physics). */
     private origin = new THREE.Vector3();
+    /**
+     * Current-frame world-space muzzle position (origin shifted by
+     * shipVelocity * simDt so the beam stays glued to the nose after the
+     * physics step moves the ship).
+     */
+    private curOrigin = new THREE.Vector3();
     /** Normalised world-space aim direction for the current frame. */
     private direction = new THREE.Vector3(0, 0, 1);
     /** Ship velocity — the beam trail drifts with the ship (Galilean feel). */
@@ -183,7 +189,7 @@ export class LaserWeapon extends Weapon {
      */
     update(
         wallDt: number,
-        _simDt: number,
+        simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
         excludeBody?: Body
@@ -199,6 +205,14 @@ export class LaserWeapon extends Weapon {
             return;
         }
 
+        // The captured origin is pre-physics.  Physics moves the ship (and its
+        // muzzle) by shipVelocity * simDt before this update runs, so shift the
+        // origin forward by the same amount — this keeps the beam rooted on the
+        // nose while the ship is moving.
+        this.curOrigin
+            .copy(this.origin)
+            .addScaledVector(this.shipVelocity, simDt);
+
         // ── Ray-sphere hit test along the beam ───────────────────────────
         const maxT = this.config.maxRange;
         let hitT = maxT;
@@ -208,9 +222,9 @@ export class LaserWeapon extends Weapon {
             if (body === excludeBody) continue;
             if (!body.mesh || body._isDisposed) continue;
 
-            const ocX = body.mesh.position.x - this.origin.x;
-            const ocY = body.mesh.position.y - this.origin.y;
-            const ocZ = body.mesh.position.z - this.origin.z;
+            const ocX = body.mesh.position.x - this.curOrigin.x;
+            const ocY = body.mesh.position.y - this.curOrigin.y;
+            const ocZ = body.mesh.position.z - this.curOrigin.z;
             const tca = ocX * this.direction.x + ocY * this.direction.y + ocZ * this.direction.z;
             if (tca < 0 || tca > hitT) continue;
 
@@ -227,9 +241,8 @@ export class LaserWeapon extends Weapon {
 
         // ── Beam tip in world space (drifts with the ship between frames) ──
         this.tip
-            .copy(this.origin)
-            .addScaledVector(this.direction, hitT)
-            .addScaledVector(this.shipVelocity, _simDt);
+            .copy(this.curOrigin)
+            .addScaledVector(this.direction, hitT);
 
         if (hitBody && this.hitCooldown <= 0) {
             this.hitCooldown = this.config.damageInterval;
@@ -250,9 +263,9 @@ export class LaserWeapon extends Weapon {
         const cpz = cameraPosition.z;
 
         // Muzzle (relative to camera)
-        this.corePositions[0] = this.origin.x - cpx;
-        this.corePositions[1] = this.origin.y - cpy;
-        this.corePositions[2] = this.origin.z - cpz;
+        this.corePositions[0] = this.curOrigin.x - cpx;
+        this.corePositions[1] = this.curOrigin.y - cpy;
+        this.corePositions[2] = this.curOrigin.z - cpz;
         // Tip (relative to camera)
         this.corePositions[3] = this.tip.x - cpx;
         this.corePositions[4] = this.tip.y - cpy;
@@ -262,7 +275,7 @@ export class LaserWeapon extends Weapon {
 
         // Glow lines: offset the beam along a screen-perpendicular axis so the
         // beam has apparent width in world units at any camera angle.
-        const camDir = new THREE.Vector3().subVectors(this.origin, cameraPosition);
+        const camDir = new THREE.Vector3().subVectors(this.curOrigin, cameraPosition);
         const offsetAxis = new THREE.Vector3().crossVectors(this.direction, camDir);
         const axisLen = offsetAxis.length();
         if (axisLen < 1e-10) {
@@ -276,9 +289,9 @@ export class LaserWeapon extends Weapon {
         const oy = offsetAxis.y * w;
         const oz = offsetAxis.z * w;
 
-        const m0x = this.origin.x - cpx;
-        const m0y = this.origin.y - cpy;
-        const m0z = this.origin.z - cpz;
+        const m0x = this.curOrigin.x - cpx;
+        const m0y = this.curOrigin.y - cpy;
+        const m0z = this.curOrigin.z - cpz;
         const t0x = this.tip.x - cpx;
         const t0y = this.tip.y - cpy;
         const t0z = this.tip.z - cpz;

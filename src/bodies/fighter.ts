@@ -79,7 +79,7 @@ const fighterHandling: ISpaceshipHandling = {
  * different weapons on the Fighter (e.g. [LaserWeapon] for pure laser,
  * [BoltWeapon, LaserWeapon] for both).
  */
-const fighterWeaponLoadout = [BoltWeapon, LaserWeapon];
+const fighterWeaponLoadout = [LaserWeapon];
 
 export class Fighter extends Spaceship {
     constructor(
