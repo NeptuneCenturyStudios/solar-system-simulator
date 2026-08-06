@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { Spaceship } from "./spaceship";
-import { ISpaceshipHandling, IWeaponConfig } from '../interfaces';
-import { C, SPACESHIP_RADIUS } from '../utilities/consts';
-import { playWeaponFire } from '../utilities/audio';
+import { ISpaceshipHandling } from '../interfaces';
+import { C } from '../utilities/consts';
+import { BoltWeapon } from '../ship-effects/weapons/bolt-weapon';
+import { LaserWeapon } from '../ship-effects/weapons/laser-weapon';
 
 // Flight tuning constants
 const FLIGHT_MAX_SPEED = C * 0.005;
@@ -70,22 +71,16 @@ const fighterHandling: ISpaceshipHandling = {
     flightWarpChargeTime: FLIGHT_WARP_CHARGE_TIME,
 };
 
-// Weapon tuning for the Fighter
-const fighterWeaponConfig: IWeaponConfig = {
-    baseSpeed: C * 0.2,          // fast bolts relative to top speeds
-    particleLifetime: 4.0,
-    boltLength: SPACESHIP_RADIUS * 40,
-    boltColor: 0x00eeff,
-    boltHeadSize: SPACESHIP_RADIUS * 2400,
-    fireRate: 10.56,
-    damage: 1,
-    fireSound: playWeaponFire,
-};
-
 /**
  * Fighter class extends Spaceship with handling characteristics specific to
  * a nimble starfighter.
+ *
+ * Weapon loadout is configured here — swap the classes in this array to try
+ * different weapons on the Fighter (e.g. [LaserWeapon] for pure laser,
+ * [BoltWeapon, LaserWeapon] for both).
  */
+const fighterWeaponLoadout = [BoltWeapon, LaserWeapon];
+
 export class Fighter extends Spaceship {
     constructor(
         dependencies: object,
@@ -103,7 +98,7 @@ export class Fighter extends Spaceship {
             id,
             modelName,
             fighterHandling,
-            fighterWeaponConfig
+            fighterWeaponLoadout
         );
     }
 }

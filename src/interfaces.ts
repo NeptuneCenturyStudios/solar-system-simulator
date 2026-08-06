@@ -418,35 +418,6 @@ export interface ISpaceshipHandling {
     flightWarpChargeTime: number; // seconds to hold Space before warp engages
 }
 
-/** Per-ship weapon tuning — passed to ShipWeapon constructor. */
-export interface IWeaponConfig {
-    // ── Projectile physics ────────────────────────────────────────────
-    /** Speed added on top of ship velocity (units/s). */
-    baseSpeed: number;
-    /** Seconds before a bolt fizzles. */
-    particleLifetime: number;
-
-    // ── Visuals ───────────────────────────────────────────────────────
-    /** World-space length of each bolt line segment. */
-    boltLength: number;
-    /** Hex colour for bolts and the glow point. */
-    boltColor: number;
-    /** World-space size of the glowing head sprite (perspective-correct). */
-    boltHeadSize: number;
-
-    // ── Rate & damage ─────────────────────────────────────────────────
-    /** Maximum bolts fired per second. */
-    fireRate: number;
-
-    // ── Optional overrides ────────────────────────────────────────────
-    /** Maximum simultaneous in-flight bolts (default 800). */
-    maxProjectiles?: number;
-    /** HP damage dealt on impact. */
-    damage: number;
-    /** Called once per bolt fired; defaults to playWeaponFire() if omitted. */
-    fireSound?: () => void;
-}
-
 /**
  * Result returned by Spaceship.advanceWarpSpeed() after each physics step.
  * The caller uses this to update UI/HUD without duplicating the phase-transition logic.

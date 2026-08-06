@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { Spaceship } from './spaceship';
-import { ISpaceshipHandling, IWeaponConfig } from '../interfaces';
-import { C, SPACESHIP_RADIUS } from '../utilities/consts';
-import { playWeaponFire } from '../utilities/audio';
+import { ISpaceshipHandling } from '../interfaces';
+import { C } from '../utilities/consts';
+import { BoltWeapon } from '../ship-effects/weapons/bolt-weapon';
 
 // Flight tuning constants
 const FLIGHT_MAX_SPEED = C * 0.005;
@@ -82,19 +82,6 @@ export class StarDestroyer extends Spaceship {
         id: string,
         modelName: string = 'star_destroyer'
     ) {
-
-        // Weapon tuning for the Star Destroyer
-        const starDestroyerWeaponConfig: IWeaponConfig = {
-            baseSpeed: C * 0.2, // fast bolts relative to top speeds
-            particleLifetime: 4.0,
-            boltLength: SPACESHIP_RADIUS * 40,
-            boltColor: 0x00eeff,
-            boltHeadSize: SPACESHIP_RADIUS * 2400,
-            fireRate: 10.56,
-            damage: 1,
-            fireSound: playWeaponFire,
-        };
-
         super(
             dependencies,
             scene,
@@ -103,7 +90,7 @@ export class StarDestroyer extends Spaceship {
             id,
             modelName,
             fighterHandling,
-            starDestroyerWeaponConfig
+            [BoltWeapon]
         );
     }
 }

@@ -1,10 +1,49 @@
 import * as THREE from 'three';
-import { Body } from '../bodies/body';
-import { playWeaponFire } from '../utilities/audio.js';
-import { IWeaponConfig } from '../interfaces';
+import { Body } from '../../bodies/body';
+import { playWeaponFire } from '../../utilities/audio.js';
+import { C, SPACESHIP_RADIUS } from '../../utilities/consts.js';
+import { Weapon } from './weapon';
 
 /**
- * One active weapon projectile.
+ * Per-instance tuning for BoltWeapon.  Ships may pass a partial config to
+ * override the class defaults; any omitted field keeps the class default.
+ */
+export interface IBoltWeaponConfig {
+    /** Speed added on top of ship velocity (units/s). */
+    baseSpeed: number;
+    /** Seconds before a bolt fizzles. */
+    particleLifetime: number;
+    /** World-space length of each bolt line segment. */
+    boltLength: number;
+    /** Hex colour for bolts and the glow point. */
+    boltColor: number;
+    /** World-space size of the glowing head sprite (perspective-correct). */
+    boltHeadSize: number;
+    /** Maximum bolts fired per second. */
+    fireRate: number;
+    /** Maximum simultaneous in-flight bolts. */
+    maxProjectiles: number;
+    /** HP damage dealt on impact. */
+    damage: number;
+    /** Called once per bolt fired. Defaults to playWeaponFire(). */
+    fireSound?: () => void;
+}
+
+/** Class-level defaults — a ship wanting different behaviour passes a partial IBoltWeaponConfig. */
+const DEFAULT_BOLT_CONFIG: IBoltWeaponConfig = {
+    baseSpeed: 10,//C * 0.2, // fast bolts relative to top speeds
+    particleLifetime: 4.0,
+    boltLength: SPACESHIP_RADIUS * 40,
+    boltColor: 0x00eeff,
+    boltHeadSize: SPACESHIP_RADIUS * 2400,
+    fireRate: 10.56,
+    maxProjectiles: 800,
+    damage: 1,
+    fireSound: playWeaponFire,
+};
+
+/**
+ * One active bolt projectile.
  * All positions are stored as JS float64 THREE.Vector3 to avoid precision loss
  * at extreme simulation distances.  Camera-relative float32 values are computed
  * in update() only at render time.
@@ -16,7 +55,7 @@ interface Projectile {
     velocity: THREE.Vector3;
     /**
      * Normalised velocity direction — pre-computed once so we can cheaply
-     * place the bolt tail exactly WEAPON_BOLT_LENGTH behind the head.
+     * place the bolt tail exactly boltLength behind the head.
      */
     velDir: THREE.Vector3;
     /** Seconds until fizzle. */
@@ -24,7 +63,8 @@ interface Projectile {
 }
 
 /**
- * Manages ship weapon bolts rendered as camera-relative line segments.
+ * Bolt weapon system — rapid-fire energy bolts rendered as camera-relative
+ * line segments with a glowing head point.
  *
  * Each bolt is a short line: tail (behind) → head (front).
  * The tail is clamped to the muzzle position for the first few frames so the
@@ -35,11 +75,10 @@ interface Projectile {
  * technique used by ShipFlame.
  *
  * On body impact, dispatches `window` CustomEvent `'weapon:hit'` with:
- *   { body: Body, position: THREE.Vector3 }
+ *   { body: Body, position: THREE.Vector3, damage: number }
  */
-export class ShipWeapon {
-    private scene: THREE.Scene;
-    private readonly config: IWeaponConfig;
+export class BoltWeapon extends Weapon {
+    private readonly config: IBoltWeaponConfig;
     private projectiles: Projectile[] = [];
     private readonly maxProjectiles: number;
     /** Flat float32 buffer: 2 vertices × 3 coords per projectile [tail, head]. */
@@ -54,10 +93,10 @@ export class ShipWeapon {
     private headPoints: THREE.Points;
     private fireCooldown = 0;
 
-    constructor(scene: THREE.Scene, config: IWeaponConfig) {
-        this.scene = scene;
-        this.config = config;
-        this.maxProjectiles = config.maxProjectiles ?? 800;
+    constructor(scene: THREE.Scene, config: Partial<IBoltWeaponConfig> = {}) {
+        super(scene);
+        this.config = { ...DEFAULT_BOLT_CONFIG, ...config };
+        this.maxProjectiles = this.config.maxProjectiles;
 
         // 2 vertices per bolt (tail + head), 3 floats each.
         this.positions = new Float32Array(this.maxProjectiles * 2 * 3).fill(0);
@@ -147,7 +186,10 @@ export class ShipWeapon {
         if (this.projectiles.length >= this.maxProjectiles) return;
 
         // Speed is base + ship speed (Galilean relativity)
-        const velocity = direction.clone().multiplyScalar(this.config.baseSpeed).add(shipVelocity);
+        const velocity = direction
+            .clone()
+            .multiplyScalar(this.config.baseSpeed)
+            .add(shipVelocity);
 
         (this.config.fireSound ?? playWeaponFire)();
         this.projectiles.push({
@@ -198,7 +240,11 @@ export class ShipWeapon {
                 if (p.position.distanceTo(body.mesh.position) <= body.radius) {
                     window.dispatchEvent(
                         new CustomEvent('weapon:hit', {
-                            detail: { body, position: p.position.clone(), damage: this.config.damage },
+                            detail: {
+                                body,
+                                position: p.position.clone(),
+                                damage: this.config.damage,
+                            },
                         })
                     );
                     toRemove.add(i);

@@ -46,7 +46,8 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     flightState.altOrbitActive = false;
     flightState.altOrbitYaw = 0;
     flightState.altOrbitPitch = 0;
-    flightState.activeShip?.weapon?.reset();
+    flightState.activeShip?.stopFire();
+    flightState.activeShip?.weapons.forEach((w) => w.reset());
 
     // Clear deceleration and warp flags so on re-entry the ship isn't
     // artificially clamped back to FLIGHT_MAX_SPEED.
@@ -383,20 +384,26 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
 
     // ── Weapon firing ────────────────────────────────────────────────────────
-    if (flightState.isFiring && !autopilotState.isActive) {
-        const aimNdcX = (noseScreenX + displayOffX) / (window.innerWidth * 0.5);
-        const aimNdcY = (noseScreenY - displayOffY) / (window.innerHeight * 0.5);
-        const halfFovY = THREE.MathUtils.degToRad(ctx.camera.fov * 0.5);
-        const tanHalfFovY = Math.tan(halfFovY);
-        const tanHalfFovX = tanHalfFovY * ctx.camera.aspect;
-        const viewSpaceDir = new THREE.Vector3(
-            aimNdcX * tanHalfFovX,
-            aimNdcY * tanHalfFovY,
-            -1
-        ).normalize();
-        const aimDir = viewSpaceDir.transformDirection(ctx.camera.matrixWorld);
-        const muzzlePos = ship.mesh.position.clone().addScaledVector(forward, ship.radius * 4);
-        ship.fireWeapon(dt, muzzlePos, aimDir);
+    // While the trigger is held (and the ship is controllable) refresh aim on all
+    // mounted weapons; on release, continuous weapons (e.g. laser) cut their beams.
+    if (!autopilotState.isActive && ship.weapons.length > 0) {
+        if (flightState.isFiring) {
+            const aimNdcX = (noseScreenX + displayOffX) / (window.innerWidth * 0.5);
+            const aimNdcY = (noseScreenY - displayOffY) / (window.innerHeight * 0.5);
+            const halfFovY = THREE.MathUtils.degToRad(ctx.camera.fov * 0.5);
+            const tanHalfFovY = Math.tan(halfFovY);
+            const tanHalfFovX = tanHalfFovY * ctx.camera.aspect;
+            const viewSpaceDir = new THREE.Vector3(
+                aimNdcX * tanHalfFovX,
+                aimNdcY * tanHalfFovY,
+                -1
+            ).normalize();
+            const aimDir = viewSpaceDir.transformDirection(ctx.camera.matrixWorld);
+            const muzzlePos = ship.mesh.position.clone().addScaledVector(forward, ship.radius * 4);
+            ship.fireWeapon(dt, muzzlePos, aimDir);
+        } else {
+            ship.stopFire();
+        }
     }
 
     // ── Warp sprite catch-all ──────────────────────────────────────────────

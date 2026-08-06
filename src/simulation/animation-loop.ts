@@ -465,15 +465,20 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             ctx.steeringOriginMarker.visible = false;
         }
 
-        // ── Weapon bolts ──────────────────────────────────────────────────
+        // ── Weapon systems ─────────────────────────────────────────────────
+        // Advance every mounted weapon (bolts fly, laser beams cast) while in
+        // flight mode.  Weapons also self-hide when not firing.
         if (ctx.flightState.isActive && ctx.flightState.activeShip) {
-            ctx.flightState.activeShip.weapon?.update(
-                wallDt,
-                dtTotal,
-                ctx.simulationState.bodies,
-                ctx.camera.position,
-                ctx.flightState.activeShip
-            );
+            const ship = ctx.flightState.activeShip;
+            for (const weapon of ship.weapons) {
+                weapon.update(
+                    wallDt,
+                    dtTotal,
+                    ctx.simulationState.bodies,
+                    ctx.camera.position,
+                    ship
+                );
+            }
         }
 
         // ── Explosions / impacts / supernovas / nebulae ──────────────────

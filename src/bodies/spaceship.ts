@@ -8,8 +8,8 @@ import { ShipFlame } from '../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from './body-enums';
 import { SoundEffect, WarpSoundController, playSoundEffect, playWarpLoop } from '../utilities/audio.js';
 import { WarpEffect } from '../effects/warp-effect.js';
-import { IDeathOptions, ISpaceshipHandling, AutopilotPhase, IWarpStepResult, IWeaponConfig } from '../interfaces';
-import { ShipWeapon } from '../ship-effects/ship-weapon';
+import { IDeathOptions, ISpaceshipHandling, AutopilotPhase, IWarpStepResult } from '../interfaces';
+import { Weapon, WeaponConstructor } from '../ship-effects/weapons/weapon';
 import { autopilotState, cameraState, flightState, simulationState } from '../simulation/simulation';
 import { G } from '../utilities/consts';
 import {
@@ -51,8 +51,8 @@ export class Spaceship extends Body {
     trail: IShipEffect;
     /** Handling characteristics of the spaceship. */
     handling: ISpaceshipHandling;
-    /** Weapon system; null for unarmed ships. Subclasses arm themselves by passing a config. */
-    weapon: ShipWeapon | null = null;
+    /** Weapon systems mounted on this ship. Empty for unarmed ships. Subclasses mount a loadout of Weapon classes. */
+    weapons: Weapon[] = [];
 
     /** Current angular roll velocity (rad/s). Decays when key released. */
     rollVelocity: number = 0;
@@ -176,7 +176,7 @@ export class Spaceship extends Body {
         id: string,
         modelName: string = 'Lo_poly_Spaceship_01_by_Liz_Reddington',
         handling: ISpaceshipHandling,
-        weaponConfig?: IWeaponConfig
+        weaponClasses: WeaponConstructor[] = []
     ) {
         // Invisible placeholder mesh — replaced by the loaded OBJ group once ready.
         const placeholderGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
@@ -200,7 +200,7 @@ export class Spaceship extends Body {
         // Store the handling characteristics for use in flight control calculations.
         this.handling = handling;
 
-        if (weaponConfig) this.weapon = new ShipWeapon(scene, weaponConfig);
+        this.weapons = weaponClasses.map((Ctor) => new Ctor(scene));
 
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
@@ -225,9 +225,18 @@ export class Spaceship extends Body {
         this._loadModel(modelName);
     }
 
-    /** Fire the ship's weapon toward `aimDir`. No-op if this ship is unarmed. */
+    /** Fire all mounted weapons toward `aimDir`. No-op if this ship is unarmed. */
     fireWeapon(dt: number, muzzlePos: THREE.Vector3, aimDir: THREE.Vector3): void {
-        this.weapon?.tryFire(dt, muzzlePos, aimDir, this.velocity);
+        for (const weapon of this.weapons) {
+            weapon.tryFire(dt, muzzlePos, aimDir, this.velocity);
+        }
+    }
+
+    /** Release the trigger on all mounted weapons (stops continuous beams). */
+    stopFire(): void {
+        for (const weapon of this.weapons) {
+            weapon.stopFire();
+        }
     }
 
     /**
@@ -1068,8 +1077,8 @@ export class Spaceship extends Body {
         }
         this.warpEffect.forceHide();
         this.warpEffect.dispose();
-        this.weapon?.dispose();
-        this.weapon = null;
+        for (const weapon of this.weapons) weapon.dispose();
+        this.weapons = [];
         this.resetAutopilotState();
         super.die(deathOptions);
     }
