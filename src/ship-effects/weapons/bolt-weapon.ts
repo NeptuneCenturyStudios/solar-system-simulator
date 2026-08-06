@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Body } from '../../bodies/body';
 import { playWeaponFire } from '../../utilities/audio.js';
 import { SPACESHIP_RADIUS } from '../../utilities/consts.js';
-import { Weapon } from './weapon';
+import { IWeaponOwner, Weapon } from './weapon';
 
 /**
  * Per-instance tuning for BoltWeapon.  Ships may pass a partial config to
@@ -211,14 +211,14 @@ export class BoltWeapon extends Weapon {
      *                       movement (dtTotal = BASE_FRAME_DT × TIME_SCALE × tScale).
      * @param bodies         All active simulation bodies for collision testing.
      * @param cameraPosition World-space camera position for camera-relative rendering.
-     * @param excludeBody    Body to skip in collision checks (player's ship).
+     * @param owner          Ship firing this weapon — skipped in collision checks.
      */
     update(
         wallDt: number,
         simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
-        excludeBody?: Body
+        owner: IWeaponOwner
     ): void {
         const toRemove = new Set<number>();
 
@@ -235,7 +235,7 @@ export class BoltWeapon extends Weapon {
 
             // Sphere–sphere hit test.
             for (const body of bodies) {
-                if (body === excludeBody) continue;
+                if (body === owner) continue;
                 if (!body.mesh || body._isDisposed) continue;
                 if (p.position.distanceTo(body.mesh.position) <= body.radius) {
                     window.dispatchEvent(

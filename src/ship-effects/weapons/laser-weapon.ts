@@ -5,7 +5,7 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Body } from '../../bodies/body';
 import { playWeaponFire } from '../../utilities/audio.js';
 import { C, SPACESHIP_RADIUS } from '../../utilities/consts.js';
-import { Weapon } from './weapon';
+import { IWeaponOwner, Weapon } from './weapon';
 
 /**
  * Per-instance tuning for LaserWeapon.  Ships may pass a partial config to
@@ -55,18 +55,14 @@ export class LaserWeapon extends Weapon {
     private active = false;
     /** True if the beam was active on the previous update (edge detection). */
     private prevBeamVisible = false;
-    /** World-space muzzle position captured at the last tryFire() (pre-physics). */
-    private origin = new THREE.Vector3();
     /**
-     * Current-frame world-space muzzle position (origin shifted by
-     * shipVelocity * simDt so the beam stays glued to the nose after the
-     * physics step moves the ship).
+     * Current-frame world-space muzzle position.  Re-read from the owner's
+     * live transform every update() so the beam stays glued to the nose
+     * regardless of thrust, boost, or steering.
      */
     private curOrigin = new THREE.Vector3();
     /** Normalised world-space aim direction for the current frame. */
     private direction = new THREE.Vector3(0, 0, 1);
-    /** Ship velocity — the beam trail drifts with the ship (Galilean feel). */
-    private shipVelocity = new THREE.Vector3();
     /** Seconds until the next permitted damage tick. */
     private hitCooldown = 0;
     /** World-space beam tip (impact point or max-range end). */
@@ -192,15 +188,13 @@ export class LaserWeapon extends Weapon {
      */
     tryFire(
         _dt: number,
-        origin: THREE.Vector3,
+        _origin: THREE.Vector3,
         direction: THREE.Vector3,
-        shipVelocity: THREE.Vector3
+        _shipVelocity: THREE.Vector3
     ): void {
         const wasActive = this.active;
         this.active = true;
-        this.origin.copy(origin);
         this.direction.copy(direction).normalize();
-        this.shipVelocity.copy(shipVelocity);
 
         if (!wasActive) {
             (this.config.fireSound ?? playWeaponFire)();
@@ -221,7 +215,7 @@ export class LaserWeapon extends Weapon {
         simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
-        excludeBody?: Body
+        owner: IWeaponOwner
     ): void {
         this.hitCooldown -= wallDt;
 
@@ -234,13 +228,14 @@ export class LaserWeapon extends Weapon {
             return;
         }
 
-        // The captured origin is pre-physics.  Physics moves the ship (and its
-        // muzzle) by shipVelocity * simDt before this update runs, so shift the
-        // origin forward by the same amount — this keeps the beam rooted on the
-        // nose while the ship is moving.
+        // This update runs AFTER the physics step, so the owner's transform is
+        // already the post-physics one — read the muzzle straight off the live
+        // mesh.  No extrapolation, so the beam stays pinned to the nose under
+        // thrust/boost and while steering.
         this.curOrigin
-            .copy(this.origin)
-            .addScaledVector(this.shipVelocity, simDt);
+            .copy(owner.muzzleOffset)
+            .applyQuaternion(owner.mesh.quaternion)
+            .add(owner.mesh.position);
 
         // ── Ray-sphere hit test along the beam ───────────────────────────
         const maxT = this.config.maxRange;
@@ -248,7 +243,7 @@ export class LaserWeapon extends Weapon {
         let hitBody: Body | null = null;
 
         for (const body of bodies) {
-            if (body === excludeBody) continue;
+            if (body === owner) continue;
             if (!body.mesh || body._isDisposed) continue;
 
             const ocX = body.mesh.position.x - this.curOrigin.x;

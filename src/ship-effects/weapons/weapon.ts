@@ -2,6 +2,15 @@ import * as THREE from 'three';
 import { Body } from '../../bodies/body';
 
 /**
+ * Structural owner contract for weapons.  Satisfied by Spaceship (and any
+ * future armed body) without an import cycle: Body does not import weapon.ts.
+ */
+export interface IWeaponOwner extends Body {
+    /** Local-space offset to the weapon muzzle (nose). */
+    muzzleOffset: THREE.Vector3;
+}
+
+/**
  * Base class for all ship weapon systems.
  *
  * Each weapon owns its own configuration (constants live inside the class file),
@@ -15,8 +24,8 @@ import { Body } from '../../bodies/body';
  *     refresh their aim/origin each call.
  *   - stopFire() — called when the trigger is released.  No-op for burst weapons,
  *     terminates beams for continuous weapons.
- *   - update(wallDt, simDt, bodies, cameraPosition, excludeBody) — called once per
- *     frame while the owning ship is in flight mode.
+     *   - update(wallDt, simDt, bodies, cameraPosition, owner) — called once per
+     *     frame while the owning ship is in flight mode.
  *   - reset() — clear all active state on flight exit.
  *   - dispose() — release GPU resources on ship destruction.
  */
@@ -39,7 +48,7 @@ export abstract class Weapon {
         simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
-        excludeBody?: Body
+        owner: IWeaponOwner
     ): void;
 
     /** Clear active projectiles/beams and reset timers. Called on flight exit. */
