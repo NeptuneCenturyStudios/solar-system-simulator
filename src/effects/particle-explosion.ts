@@ -74,7 +74,7 @@ export class ParticleExplosion implements IEffect {
             blending: THREE.AdditiveBlending,
             opacity: 1.5,
             depthWrite: false,
-            depthTest: false,
+            depthTest: true,
         });
         // Round glowing sprite — same shader pattern as weapon bolts
         this.material.onBeforeCompile = (shader) => {
@@ -105,7 +105,7 @@ export class ParticleExplosion implements IEffect {
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            depthTest: false,
+            depthTest: true,
         });
         this.flashSphere = new THREE.Mesh(flashGeo, flashMat);
         this.flashSphere.renderOrder = 1;
@@ -130,7 +130,7 @@ export class ParticleExplosion implements IEffect {
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            depthTest: false,
+            depthTest: true,
             side: THREE.DoubleSide,
             uniforms: {
                 uBaseColor: { value: brightColor.clone() },
