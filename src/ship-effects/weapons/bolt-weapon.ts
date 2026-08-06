@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Body } from '../../bodies/body';
 import { playWeaponFire } from '../../utilities/audio.js';
-import { C, SPACESHIP_RADIUS } from '../../utilities/consts.js';
+import { SPACESHIP_RADIUS } from '../../utilities/consts.js';
 import { Weapon } from './weapon';
 
 /**

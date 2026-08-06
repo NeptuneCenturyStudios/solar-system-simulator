@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { Spaceship } from "./spaceship";
 import { ISpaceshipHandling } from '../interfaces';
 import { C } from '../utilities/consts';
-import { BoltWeapon } from '../ship-effects/weapons/bolt-weapon';
 import { LaserWeapon } from '../ship-effects/weapons/laser-weapon';
 
 // Flight tuning constants

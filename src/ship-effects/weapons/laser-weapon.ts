@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Body } from '../../bodies/body';
 import { playWeaponFire } from '../../utilities/audio.js';
 import { C, SPACESHIP_RADIUS } from '../../utilities/consts.js';
@@ -13,8 +16,10 @@ export interface ILaserWeaponConfig {
     maxRange: number;
     /** Beam colour (outer glow). */
     beamColor: number;
-    /** World-space half-width of the beam glow. */
-    beamWidth: number;
+    /** Screen-pixel width of the white-hot core line. */
+    coreWidth: number;
+    /** Screen-pixel width of the coloured halo line. */
+    haloWidth: number;
     /** HP damage dealt per damage tick while the beam touches a body. */
     damage: number;
     /** Minimum seconds between damage ticks on the same body. */
@@ -27,18 +32,21 @@ export interface ILaserWeaponConfig {
 const DEFAULT_LASER_CONFIG: ILaserWeaponConfig = {
     maxRange: C * 1.0,
     beamColor: 0xff2244,
-    beamWidth: SPACESHIP_RADIUS * .5,
+    coreWidth: 2,
+    haloWidth: 8,
     damage: 1000,
     damageInterval: 0.2,
     fireSound: playWeaponFire,
 };
 
+
 /**
  * Continuous laser weapon.  While the trigger is held, `tryFire` refreshes the
- * beam origin/direction every frame; `stopFire` cuts the beam.  The beam is
- * rendered camera-relative (origin clamped to the muzzle) and ray-sphere tests
- * against bodies each frame, dispatching `'weapon:hit'` on a throttled tick so
- * the existing impact-sound / shockwave / damage pipeline is reused.
+ * beam origin/direction every frame; `stopFire` cuts the beam.
+ *
+ * Rendered as two camera-relative `Line2` objects (thick screen-pixel-width
+ * lines): a narrow white core + a wider coloured halo.  Camera-relative
+ * positioning avoids float32 precision collapse at interplanetary distances.
  */
 export class LaserWeapon extends Weapon {
     private readonly config: ILaserWeaponConfig;
@@ -63,19 +71,21 @@ export class LaserWeapon extends Weapon {
     private hitCooldown = 0;
     /** World-space beam tip (impact point or max-range end). */
     private tip = new THREE.Vector3();
+    // ── Rendering ────────────────────────────────────────────────────────────
+    private readonly coreLineGeo: LineGeometry;
+    private readonly coreLineMat: LineMaterial;
+    private readonly coreBeamLine: Line2;
+    private readonly haloLineGeo: LineGeometry;
+    private readonly haloLineMat: LineMaterial;
+    private readonly haloBeamLine: Line2;
 
-    // ── Rendering (all positioned at the camera; vertices are camera-relative) ──
-    private corePositions: Float32Array; // 2 vertices [muzzle, tip]
-    private coreGeometry: THREE.BufferGeometry;
-    private coreMaterial: THREE.LineBasicMaterial;
-    private coreLine: THREE.Line;
+    // Glow points at the muzzle and the beam tip.
+    private muzzlePositions = new Float32Array(3).fill(0);
+    private muzzleGeometry: THREE.BufferGeometry;
+    private muzzleMaterial: THREE.PointsMaterial;
+    private muzzlePoint: THREE.Points;
 
-    private glowPositions: Float32Array; // 4 vertices: two offset lines [±width]
-    private glowGeometry: THREE.BufferGeometry;
-    private glowMaterial: THREE.LineBasicMaterial;
-    private glowLines: THREE.LineSegments;
-
-    private tipPositions: Float32Array; // 1 point at beam tip
+    private tipPositions = new Float32Array(3).fill(0);
     private tipGeometry: THREE.BufferGeometry;
     private tipMaterial: THREE.PointsMaterial;
     private tipPoint: THREE.Points;
@@ -84,60 +94,81 @@ export class LaserWeapon extends Weapon {
         super(scene);
         this.config = { ...DEFAULT_LASER_CONFIG, ...config };
 
-        // ── Core line (bright centre of the beam) ───────────────────────────
-        this.corePositions = new Float32Array(6).fill(0);
-        this.coreGeometry = new THREE.BufferGeometry();
-        this.coreGeometry.setAttribute('position', new THREE.BufferAttribute(this.corePositions, 3));
-        this.coreGeometry.setDrawRange(0, 0);
-        this.coreMaterial = new THREE.LineBasicMaterial({
+        // ── Core beam: narrow white-hot Line2 ─────────────────────────────
+        this.coreLineGeo = new LineGeometry();
+        this.coreLineGeo.setPositions([0, 0, 0, 0, 0, 1]);
+        this.coreLineMat = new LineMaterial({
             color: 0xffffff,
+            linewidth: this.config.coreWidth,
             transparent: true,
-            opacity: 0.9,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
         });
-        this.coreLine = new THREE.Line(this.coreGeometry, this.coreMaterial);
-        this.coreLine.frustumCulled = false;
-        this.coreLine.renderOrder = 2;
-        this.coreLine.visible = false;
-        scene.add(this.coreLine);
+        this.coreLineMat.resolution.set(window.innerWidth, window.innerHeight);
+        this.coreBeamLine = new Line2(this.coreLineGeo, this.coreLineMat);
+        this.coreBeamLine.frustumCulled = false;
+        this.coreBeamLine.renderOrder = 2;
+        this.coreBeamLine.visible = false;
+        scene.add(this.coreBeamLine);
 
-        // ── Glow lines (two offset lines giving the beam apparent width) ────
-        this.glowPositions = new Float32Array(12).fill(0); // 2 lines × 2 vertices × 3
-        this.glowGeometry = new THREE.BufferGeometry();
-        this.glowGeometry.setAttribute(
+        // ── Halo beam: wide coloured glow around the core ──────────────────
+        this.haloLineGeo = new LineGeometry();
+        this.haloLineGeo.setPositions([0, 0, 0, 0, 0, 1]);
+        this.haloLineMat = new LineMaterial({
+            color: this.config.beamColor,
+            linewidth: this.config.haloWidth,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+        });
+        this.haloLineMat.resolution.set(window.innerWidth, window.innerHeight);
+        this.haloBeamLine = new Line2(this.haloLineGeo, this.haloLineMat);
+        this.haloBeamLine.frustumCulled = false;
+        this.haloBeamLine.renderOrder = 2;
+        this.haloBeamLine.visible = false;
+        scene.add(this.haloBeamLine);
+
+        // ── Muzzle glow point (beam seems to emerge from the hull) ────────
+        this.muzzleGeometry = new THREE.BufferGeometry();
+        this.muzzleGeometry.setAttribute(
             'position',
-            new THREE.BufferAttribute(this.glowPositions, 3)
+            new THREE.BufferAttribute(this.muzzlePositions, 3)
         );
-        this.glowGeometry.setDrawRange(0, 0);
-        this.glowMaterial = new THREE.LineBasicMaterial({
-            color: this.config.beamColor,
-            transparent: true,
-            opacity: 0.55,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-        });
-        this.glowLines = new THREE.LineSegments(this.glowGeometry, this.glowMaterial);
-        this.glowLines.frustumCulled = false;
-        this.glowLines.renderOrder = 2;
-        this.glowLines.visible = false;
-        scene.add(this.glowLines);
+        this.muzzleGeometry.setDrawRange(0, 0);
+        this.muzzleMaterial = this.createGlowPointMaterial(SPACESHIP_RADIUS * 1100, 0.95);
+        this.muzzlePoint = new THREE.Points(this.muzzleGeometry, this.muzzleMaterial);
+        this.muzzlePoint.frustumCulled = false;
+        this.muzzlePoint.renderOrder = 2;
+        this.muzzlePoint.visible = false;
+        scene.add(this.muzzlePoint);
 
-        // ── Tip glow point ──────────────────────────────────────────────────
-        this.tipPositions = new Float32Array(3).fill(0);
+        // ── Tip glow point (impact flash at the far end of the beam) ──────
         this.tipGeometry = new THREE.BufferGeometry();
-        this.tipGeometry.setAttribute('position', new THREE.BufferAttribute(this.tipPositions, 3));
+        this.tipGeometry.setAttribute(
+            'position',
+            new THREE.BufferAttribute(this.tipPositions, 3)
+        );
         this.tipGeometry.setDrawRange(0, 0);
-        this.tipMaterial = new THREE.PointsMaterial({
+        this.tipMaterial = this.createGlowPointMaterial(SPACESHIP_RADIUS * 1800, 0.9);
+        this.tipPoint = new THREE.Points(this.tipGeometry, this.tipMaterial);
+        this.tipPoint.frustumCulled = false;
+        this.tipPoint.renderOrder = 2;
+        this.tipPoint.visible = false;
+        scene.add(this.tipPoint);
+    }
+
+    /** Build a round, soft-edged glow sprite that falls off radially. */
+    private createGlowPointMaterial(size: number, opacity: number): THREE.PointsMaterial {
+        const material = new THREE.PointsMaterial({
             color: this.config.beamColor,
-            size: SPACESHIP_RADIUS * 1800,
+            size,
             sizeAttenuation: true,
             transparent: true,
-            opacity: 0.9,
+            opacity,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
         });
-        this.tipMaterial.onBeforeCompile = (shader) => {
+        material.onBeforeCompile = (shader) => {
             shader.fragmentShader = shader.fragmentShader.replace(
                 'outgoingLight = diffuseColor.rgb;',
                 `outgoingLight = diffuseColor.rgb;
@@ -150,12 +181,10 @@ export class LaserWeapon extends Weapon {
                 diffuseColor.a *= _glow;`
             );
         };
-        this.tipPoint = new THREE.Points(this.tipGeometry, this.tipMaterial);
-        this.tipPoint.frustumCulled = false;
-        this.tipPoint.renderOrder = 2;
-        this.tipPoint.visible = false;
-        scene.add(this.tipPoint);
+        return material;
     }
+
+    // ── Firing ───────────────────────────────────────────────────────────────
 
     /**
      * Refresh the beam aim while the trigger is held.  Plays the fire sound on
@@ -257,73 +286,38 @@ export class LaserWeapon extends Weapon {
             );
         }
 
-        // ── Camera-relative GPU upload ────────────────────────────────────
+        // ── Beam lines (camera-relative Line2 — avoids float32 collapse at scale) ────
         const cpx = cameraPosition.x;
         const cpy = cameraPosition.y;
         const cpz = cameraPosition.z;
+        const mRelX = this.curOrigin.x - cpx;
+        const mRelY = this.curOrigin.y - cpy;
+        const mRelZ = this.curOrigin.z - cpz;
+        const tRelX = this.tip.x - cpx;
+        const tRelY = this.tip.y - cpy;
+        const tRelZ = this.tip.z - cpz;
+        this.coreLineGeo.setPositions([mRelX, mRelY, mRelZ, tRelX, tRelY, tRelZ]);
+        this.haloLineGeo.setPositions([mRelX, mRelY, mRelZ, tRelX, tRelY, tRelZ]);
+        this.coreBeamLine.position.set(cpx, cpy, cpz);
+        this.haloBeamLine.position.set(cpx, cpy, cpz);
+        this.coreLineMat.resolution.set(window.innerWidth, window.innerHeight);
+        this.haloLineMat.resolution.set(window.innerWidth, window.innerHeight);
 
-        // Muzzle (relative to camera)
-        this.corePositions[0] = this.curOrigin.x - cpx;
-        this.corePositions[1] = this.curOrigin.y - cpy;
-        this.corePositions[2] = this.curOrigin.z - cpz;
-        // Tip (relative to camera)
-        this.corePositions[3] = this.tip.x - cpx;
-        this.corePositions[4] = this.tip.y - cpy;
-        this.corePositions[5] = this.tip.z - cpz;
-        this.coreGeometry.attributes.position.needsUpdate = true;
-        this.coreGeometry.setDrawRange(0, 2);
+        // ── Muzzle glow point ──────────────────────────────────────────────────────────────────
+        this.muzzlePositions[0] = this.curOrigin.x - cpx;
+        this.muzzlePositions[1] = this.curOrigin.y - cpy;
+        this.muzzlePositions[2] = this.curOrigin.z - cpz;
+        this.muzzleGeometry.attributes.position.needsUpdate = true;
+        this.muzzleGeometry.setDrawRange(0, 1);
+        this.muzzlePoint.position.set(cpx, cpy, cpz);
 
-        // Glow lines: offset the beam along a screen-perpendicular axis so the
-        // beam has apparent width in world units at any camera angle.
-        const camDir = new THREE.Vector3().subVectors(this.curOrigin, cameraPosition);
-        const offsetAxis = new THREE.Vector3().crossVectors(this.direction, camDir);
-        const axisLen = offsetAxis.length();
-        if (axisLen < 1e-10) {
-            offsetAxis.set(0, 1, 0).cross(this.direction);
-        } else {
-            offsetAxis.divideScalar(axisLen);
-        }
-        const w = this.config.beamWidth;
-
-        const ox = offsetAxis.x * w;
-        const oy = offsetAxis.y * w;
-        const oz = offsetAxis.z * w;
-
-        const m0x = this.curOrigin.x - cpx;
-        const m0y = this.curOrigin.y - cpy;
-        const m0z = this.curOrigin.z - cpz;
-        const t0x = this.tip.x - cpx;
-        const t0y = this.tip.y - cpy;
-        const t0z = this.tip.z - cpz;
-
-        // Line 1: muzzle−offset → tip−offset
-        this.glowPositions[0] = m0x + ox;
-        this.glowPositions[1] = m0y + oy;
-        this.glowPositions[2] = m0z + oz;
-        this.glowPositions[3] = t0x + ox;
-        this.glowPositions[4] = t0y + oy;
-        this.glowPositions[5] = t0z + oz;
-        // Line 2: muzzle+offset → tip+offset
-        this.glowPositions[6] = m0x - ox;
-        this.glowPositions[7] = m0y - oy;
-        this.glowPositions[8] = m0z - oz;
-        this.glowPositions[9] = t0x - ox;
-        this.glowPositions[10] = t0y - oy;
-        this.glowPositions[11] = t0z - oz;
-        this.glowGeometry.attributes.position.needsUpdate = true;
-        this.glowGeometry.setDrawRange(0, 4);
-
-        // Tip glow point
-        this.tipPositions[0] = t0x;
-        this.tipPositions[1] = t0y;
-        this.tipPositions[2] = t0z;
+        // ── Tip glow point ────────────────────────────────────────────────
+        this.tipPositions[0] = this.tip.x - cpx;
+        this.tipPositions[1] = this.tip.y - cpy;
+        this.tipPositions[2] = this.tip.z - cpz;
         this.tipGeometry.attributes.position.needsUpdate = true;
         this.tipGeometry.setDrawRange(0, 1);
-
-        // Place all objects at the camera so the relative positions render correctly.
-        this.coreLine.position.copy(cameraPosition);
-        this.glowLines.position.copy(cameraPosition);
-        this.tipPoint.position.copy(cameraPosition);
+        this.tipPoint.position.set(cpx, cpy, cpz);
 
         if (!this.prevBeamVisible) {
             this.setBeamVisible(true);
@@ -332,8 +326,9 @@ export class LaserWeapon extends Weapon {
     }
 
     private setBeamVisible(visible: boolean): void {
-        this.coreLine.visible = visible;
-        this.glowLines.visible = visible;
+        this.coreBeamLine.visible = visible;
+        this.haloBeamLine.visible = visible;
+        this.muzzlePoint.visible = visible;
         this.tipPoint.visible = visible;
     }
 
@@ -346,13 +341,16 @@ export class LaserWeapon extends Weapon {
     }
 
     dispose(): void {
-        this.scene.remove(this.coreLine);
-        this.scene.remove(this.glowLines);
+        this.scene.remove(this.coreBeamLine);
+        this.scene.remove(this.haloBeamLine);
+        this.scene.remove(this.muzzlePoint);
         this.scene.remove(this.tipPoint);
-        this.coreGeometry.dispose();
-        this.coreMaterial.dispose();
-        this.glowGeometry.dispose();
-        this.glowMaterial.dispose();
+        this.coreLineGeo.dispose();
+        this.coreLineMat.dispose();
+        this.haloLineGeo.dispose();
+        this.haloLineMat.dispose();
+        this.muzzleGeometry.dispose();
+        this.muzzleMaterial.dispose();
         this.tipGeometry.dispose();
         this.tipMaterial.dispose();
     }
