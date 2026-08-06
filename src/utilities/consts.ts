@@ -260,7 +260,7 @@ export const FLIGHT_AUTOPILOT_CHARGE_TIME = 1.0; // seconds to hold E over a bod
 /** Mouse sensitivity for ALT-key orbit camera mode (radians per pixel). */
 export const FLIGHT_ALT_ORBIT_SENSITIVITY = 0.005;
 /** Return speed (rad/s) at which ALT orbit yaw/pitch lerp back to zero on release. */
-export const FLIGHT_ALT_ORBIT_RETURN_SPEED = 24.0;
+export const FLIGHT_ALT_ORBIT_RETURN_SPEED = 6.0;
 /** Pitch clamp limits (radians) for ALT orbit — keeps camera in upper hemisphere (half-sphere). */
 export const FLIGHT_ALT_ORBIT_PITCH_MIN = -60 * (Math.PI / 180); // 60° below ship equator
 export const FLIGHT_ALT_ORBIT_PITCH_MAX = 80 * (Math.PI / 180); // 80° above ship equator

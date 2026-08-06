@@ -584,7 +584,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             const ship = ctx.flightState.activeShip;
             if (ship && !ship._isDisposed && ship.mesh) {
                 if (!ctx.flightState.altOrbitActive) {
-                    const step = FLIGHT_ALT_ORBIT_RETURN_SPEED * dt;
+                    const step = FLIGHT_ALT_ORBIT_RETURN_SPEED * wallDt;
                     if (Math.abs(ctx.flightState.altOrbitYaw) < step) {
                         ctx.flightState.altOrbitYaw = 0;
                     } else {
