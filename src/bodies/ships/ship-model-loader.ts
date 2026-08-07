@@ -20,13 +20,22 @@ export function createShipContainerMesh(): THREE.Mesh {
  * ship subclasses feed that into Spaceship.applyModelOffsets() to place the
  * cockpit/thruster/muzzle anchors.
  *
- * @param container  The placeholder mesh the model group is attached to.
- * @param modelName  Base filename (without extension) of the OBJ/MTL model.
+ * Ships are authored nose-first along +Z.  Models that don't follow that
+ * convention pass a modelRotation (e.g. yaw) that is applied BEFORE scaling
+ * and centring, so the returned bounding box — and therefore the
+ * cockpit/thruster/muzzle anchors derived from it — reflects the corrected
+ * orientation.
+ *
+ * @param container       The placeholder mesh the model group is attached to.
+ * @param modelName       Base filename (without extension) of the OBJ/MTL model.
+ * @param radius          The ship radius the model's longest dimension is scaled to fit.
+ * @param modelRotation   Optional Euler correction for models not authored +Z-forward.
  */
 export async function loadShipModelInto(
     container: THREE.Mesh,
     modelName: string,
-    radius: number
+    radius: number,
+    modelRotation: THREE.Euler = new THREE.Euler()
 ): Promise<THREE.Box3> {
     const mtlLoader = new MTLLoader();
     mtlLoader.setPath('./assets/models/');
@@ -36,6 +45,10 @@ export async function loadShipModelInto(
     const objLoader = new OBJLoader();
     objLoader.setMaterials(materials);
     const group = await objLoader.loadAsync(`./assets/models/${modelName}.obj`);
+
+    // Apply any authored orientation correction before measuring/scaling so the
+    // bbox stays aligned to the game's local axes (+Z = forward, +Y = up).
+    group.rotation.copy(modelRotation);
 
     // Compute bounding box of the unscaled model (group at world origin, no parent).
     const bbox = new THREE.Box3().setFromObject(group);
