@@ -1,15 +1,13 @@
 import * as THREE from 'three';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { Body } from '../body';
-import { SCALE_FACTOR, SPACESHIP_MASS, SPACESHIP_RADIUS } from '../../utilities/consts.js';
+import { SCALE_FACTOR } from '../../utilities/consts.js';
 import { IShipEffect } from '../../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from '../body-enums';
 import { SoundEffect, WarpSoundController, playSoundEffect, playWarpLoop } from '../../utilities/audio.js';
 import { WarpEffect } from '../../effects/warp-effect.js';
-import { IDeathOptions, ISpaceshipHandling, AutopilotPhase, IWarpStepResult } from '../../interfaces';
-import { Weapon, WeaponConstructor } from '../../ship-effects/weapons/weapon';
+import { IDeathOptions, ISpaceshipHandling, AutopilotPhase, IWarpStepResult, ISpaceshipCreationOptions } from '../../interfaces';
+import { Weapon } from '../../ship-effects/weapons/weapon';
 import { autopilotState, cameraState, flightState, simulationState } from '../../simulation/simulation';
 import { G } from '../../utilities/consts';
 import {
@@ -162,61 +160,55 @@ export class Spaceship extends Body {
 
     /**
      * Constructs a new Spaceship object with camera offsets and placeholder geometry.
+     * The concrete ship subclass builds and loads its own visual model onto the
+     * supplied container mesh (see ship-model-loader.ts); the base class only
+     * passes the mesh through to Body.
      * @param dependencies External dependencies for the spaceship.
      * @param scene The THREE.Scene to which the spaceship belongs.
      * @param position The initial position of the spaceship.
      * @param velocity The initial velocity of the spaceship.
      * @param id Unique identifier for the spaceship.
-     * @param modelName Base filename (without extension) of the OBJ/MTL model to load.
+     * @param mesh The mesh (visual container) to attach to the body.
      * @param handling The handling characteristics of the spaceship.
      */
     constructor(
         dependencies: object,
         scene: THREE.Scene,
-        position: THREE.Vector3,
-        velocity: THREE.Vector3,
-        id: string,
-        modelName: string = 'Lo_poly_Spaceship_01_by_Liz_Reddington',
-        handling: ISpaceshipHandling,
-        weaponClasses: WeaponConstructor[] = []
+        options: ISpaceshipCreationOptions
     ) {
-        // Invisible placeholder mesh — replaced by the loaded OBJ group once ready.
-        const placeholderGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.001);
-        const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
-        const placeholderMesh = new THREE.Mesh(placeholderGeometry, placeholderMaterial);
-
         // ── Base class ────────────────────────────────────────────────────────
         super(
             dependencies,
             scene,
-            SPACESHIP_MASS,
-            SPACESHIP_RADIUS,
-            position,
-            velocity,
-            placeholderMesh,
-            id,
+            options.mass,
+            options.radius,
+            options.position,
+            options.velocity,
+            options.mesh,
+            options.id,
             'Spaceship',
             BodyTypeEnum.SpaceShip
         );
 
         // Store the handling characteristics for use in flight control calculations.
-        this.handling = handling;
+        this.handling = options.handling;
 
-        this.weapons = weaponClasses.map((Ctor) => new Ctor(scene));
+        this.weapons = options.weapons;
 
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
         this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF, -0.9 * SF);
         this.thirdPersonOffset = new THREE.Vector3(
             0,
-            SPACESHIP_RADIUS * 0.35,
-            -SPACESHIP_RADIUS * 1.8
+            options.radius * 0.35,
+            -options.radius * 1.8
         );
+
         // Initial muzzle off the nose (approximate; updated precisely after OBJ loads).
-        this.muzzleOffset = new THREE.Vector3(0, 0, SPACESHIP_RADIUS);
+        this.muzzleOffset = new THREE.Vector3(0, 0, options.radius);
 
         // Engine exhaust trail (Line-based, no gaps at any speed)
-        this.trail = new ShipFlame(scene);
+        this.trail = new ShipFlame(scene, this.radius);
 
         // Warp tunnel effect — visibility is speed-driven (no explicit start/stop needed)
         this.warpEffect = new WarpEffect(scene);
@@ -224,9 +216,6 @@ export class Spaceship extends Body {
         // Keep default label (shows in bodies table) but hide it during flight
         if (this.label) this.label.visible = false;
         if (this.labelLine) this.labelLine.visible = false;
-
-        // ── Async OBJ + MTL load ──────────────────────────────────────────────
-        this._loadModel(modelName);
     }
 
     /** Fire all mounted weapons toward `aimDir`. No-op if this ship is unarmed. */
@@ -244,70 +233,25 @@ export class Spaceship extends Body {
     }
 
     /**
-     * Loads an OBJ/MTL model, scales it to fit SPACESHIP_RADIUS, centres it on this.mesh,
-     * and updates cockpit/thruster/muzzle offsets from the resulting bounding box.
-     * Safe to call from the constructor and from loadModel().
+     * Positions the cockpit/thruster/muzzle anchors from the loaded model's
+     * bounding box (in ship-local space).  Concrete ship subclasses call this
+     * after loadShipModelInto() resolves, since the base class no longer owns
+     * model loading.
+     * @param localBbox Bounding box of the loaded model in mesh-local coordinates.
      */
-    private _loadModel(modelName: string): void {
-        const mtlLoader = new MTLLoader();
-        mtlLoader.setPath('./assets/models/');
-        mtlLoader
-            .loadAsync(`${modelName}.mtl`)
-            .then((materials) => {
-                materials.preload();
-                const objLoader = new OBJLoader();
-                objLoader.setMaterials(materials);
-                return objLoader.loadAsync(`./assets/models/${modelName}.obj`);
-            })
-            .then((group) => {
-                // Compute bounding box of the unscaled model (group at world origin, no parent).
-                const bbox = new THREE.Box3().setFromObject(group);
-                const size = new THREE.Vector3();
-                bbox.getSize(size);
-                const longestDim = Math.max(size.x, size.y, size.z);
-                const scale = SPACESHIP_RADIUS / longestDim;
-                group.scale.setScalar(scale);
-
-                // Re-compute bbox after scaling to find the center.
-                group.updateMatrixWorld(true);
-                const scaledBbox = new THREE.Box3().setFromObject(group);
-                const center = new THREE.Vector3();
-                scaledBbox.getCenter(center);
-                group.position.sub(center);
-
-                // Compute LOCAL bbox now — before adding to this.mesh — so world space
-                // equals mesh-local space and the values are valid as local offsets.
-                group.updateMatrixWorld(true);
-                const localBbox = new THREE.Box3().setFromObject(group);
-
-                group.traverse((child) => {
-                    if ((child as THREE.Mesh).isMesh) {
-                        child.renderOrder = 2; // draw after effects (renderOrder 1)
-                    }
-                });
-
-                this.mesh.add(group);
-
-                // Update camera/thruster offsets from the local bbox.
-                this.cockpitOffset.set(0, localBbox.max.y * 0.5, localBbox.max.z * 0.75);
-                this.thrusterOffset.set(0, localBbox.min.y * 0.3, localBbox.min.z);
-                // Muzzle sits at the forward-most point of the hull (+Z = nose).
-                this.muzzleOffset.set(0, localBbox.max.y * 0.25, localBbox.max.z);
-            })
-            .catch((e) => {
-                console.warn('Spaceship OBJ/MTL load failed — using placeholder mesh', e);
-            });
+    protected applyModelOffsets(localBbox: THREE.Box3): void {
+        // Update camera/thruster offsets from the local bbox.
+        this.cockpitOffset.set(0, localBbox.max.y * 0.5, localBbox.max.z * 0.75);
+        this.thrusterOffset.set(0, localBbox.min.y * 0.3, localBbox.min.z);
+        // Muzzle sits at the forward-most point of the hull (+Z = nose).
+        this.muzzleOffset.set(0, localBbox.max.y * 0.25, localBbox.max.z);
     }
 
     /**
-     * Swaps the visual model without affecting physics state.
-     * Disposes any previously loaded OBJ group children attached to this.mesh,
-     * resets camera/thruster offsets to constructor defaults, then asynchronously
-     * loads and attaches the new model.
-     * @param modelName Base filename (without extension) of the OBJ/MTL model to load.
+     * Disposes all loaded OBJ group children attached to this.mesh.
+     * Called from die(); also usable by subclasses that replace their model.
      */
-    loadModel(modelName: string): void {
-        // Remove and dispose any Group children (the previously loaded OBJ models).
+    protected disposeModelChildren(): void {
         const groupsToRemove = this.mesh.children.filter(
             (c) => c instanceof THREE.Group
         ) as THREE.Group[];
@@ -326,14 +270,6 @@ export class Spaceship extends Body {
             });
             this.mesh.remove(group);
         }
-
-        // Reset offsets to initial defaults (will be overwritten once the new model loads).
-        this.cockpitOffset.set(0, 0.3 * SF, 0.52 * SF);
-        this.thrusterOffset.set(0, -0.1 * SF, -0.9 * SF);
-        this.thirdPersonOffset.set(0, SPACESHIP_RADIUS * 0.35, -SPACESHIP_RADIUS * 1.8);
-        this.muzzleOffset.set(0, 0, SPACESHIP_RADIUS);
-
-        this._loadModel(modelName);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -1084,6 +1020,7 @@ export class Spaceship extends Body {
         }
         this.warpEffect.forceHide();
         this.warpEffect.dispose();
+        this.disposeModelChildren();
         for (const weapon of this.weapons) weapon.dispose();
         this.weapons = [];
         this.resetAutopilotState();

@@ -1,19 +1,23 @@
 import * as THREE from 'three';
-import { ISpaceshipHandling } from "../../interfaces";
-import { C } from "../../utilities/consts";
-import { Spaceship } from "./spaceship";
+import { ISpaceshipHandling } from '../../interfaces';
+import { C, MASS_SCALE, RADIUS_SCALE, SCALE_FACTOR } from '../../utilities/consts';
+import { Spaceship } from './spaceship';
 import { BoltWeapon } from '../../ship-effects/weapons/bolt-weapon';
+import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
 
 export class Zenith extends Spaceship {
     constructor(
-            dependencies: object,
-            scene: THREE.Scene,
-            position: THREE.Vector3,
-            velocity: THREE.Vector3,
-            id: string
-        ) {
+        dependencies: object,
+        scene: THREE.Scene,
+        position: THREE.Vector3,
+        velocity: THREE.Vector3,
+        id: string
+    ) {
+        // Ship radius
+        const SPACESHIP_MASS = (75000 / MASS_SCALE) * SCALE_FACTOR;
+        const SPACESHIP_RADIUS = (0.037 / RADIUS_SCALE) * SCALE_FACTOR;
 
-            // Flight tuning constants
+        // Flight tuning constants
         const FLIGHT_MAX_SPEED = C * 0.005;
         const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.1;
         const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.75;
@@ -78,16 +82,37 @@ export class Zenith extends Spaceship {
             // Misc
             flightWarpChargeTime: FLIGHT_WARP_CHARGE_TIME,
         };
-        
-            super(
-                dependencies,
-                scene,
-                position,
-                velocity,
-                id,
-                'Lo_poly_Spaceship_01_by_Liz_Reddington',
-                fighterHandling,
-                [BoltWeapon],            
-            );
-        }
+
+        const containerMesh = createShipContainerMesh();
+        const MODEL_NAME = 'Lo_poly_Spaceship_01_by_Liz_Reddington';
+
+        super(
+            dependencies,
+            scene,
+            {
+                position: position,
+                velocity: velocity,
+                mass: SPACESHIP_MASS,
+                radius: SPACESHIP_RADIUS,
+                mesh: containerMesh,
+                id: id,
+                name: 'Zenith',
+                handling: fighterHandling,
+                weapons: [new BoltWeapon(scene, SPACESHIP_RADIUS)],
+            }
+        );
+            
+
+        // Kick off the async model load; offsets are applied once the bbox is known.
+        loadShipModelInto(containerMesh, MODEL_NAME, SPACESHIP_RADIUS)
+            .then((localBbox) => {
+                this.applyModelOffsets(localBbox);
+            })
+            .catch((e) => {
+                console.warn(
+                    `Zenith OBJ/MTL load failed for ${MODEL_NAME} — using placeholder mesh`,
+                    e
+                );
+            });
+    }
 }

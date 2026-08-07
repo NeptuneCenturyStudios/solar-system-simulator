@@ -134,12 +134,6 @@ export function calcSimOrbitalPeriod(r_sim: number, G: number, M_sun: number): n
     return 2 * Math.PI * Math.sqrt(Math.pow(r_sim, 3) / (G * M_sun));
 }
 
-// === Spaceship: Mass ===
-export const SPACESHIP_MASS = (75000 / MASS_SCALE) * SCALE_FACTOR;
-
-// === Spaceship: Radius ===
-export const SPACESHIP_RADIUS = (0.037 / RADIUS_SCALE) * SCALE_FACTOR;
-
 // === Satellites: Mass ===
 export const ISS_MASS = (419725 / MASS_SCALE) * SCALE_FACTOR;
 
@@ -188,7 +182,7 @@ export const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
 /** Camera distance (u) at which the warp tunnel has fully faded out. */
 export const WARP_FADE_DIST = 200 * SCALE_FACTOR;
 /** Peak camera shake displacement (u) applied each frame during warp. */
-export const WARP_SHAKE_MAG = 0.002 * SPACESHIP_RADIUS; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
+export const WARP_SHAKE_MAG = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
 
 // === Miscellaneous & Simulation Parameters ===
 export const ASTEROID_SPAWN_MIN_DIST = 50000 * SCALE_FACTOR;

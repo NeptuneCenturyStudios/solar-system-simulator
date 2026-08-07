@@ -210,7 +210,7 @@ import { pickMoonTextureForMoonType } from './procedural/moon-factory';
 import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
 import { exitFlightMode } from './simulation/flight-controllers';
 import { parseSeedFromURL, buildSeedValue, updateURLWithSeed, clearURLSeed, SEED_TYPE_NORMAL, SEED_TYPE_BLACKHOLE, getLastPushedSeed, setLastPushedSeed, resetLastPushedSeed } from './utilities/url-seed';
-import { Zenith } from './bodies/ships/zenith';
+import { getShipTypeById } from './bodies/ships/ship-registry';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: {
@@ -2846,12 +2846,6 @@ if (performanceOptionsBtn) {
     });
 }
 flightControlsPanel.on('spawnShip', () => spawnShip());
-flightControlsPanel.on('modelChanged', ({ modelName }: { modelName: string }) => {
-    const ship = flightState.knownShip;
-    if (ship && !ship._isDisposed && simulationState.bodies.includes(ship)) {
-        ship.loadModel(modelName);
-    }
-});
 flightControlsPanel.on('toggleView', () => {
     flightState.isCockpitView = !flightState.isCockpitView;
 });
@@ -3031,14 +3025,14 @@ function spawnShip() {
         camera.getWorldDirection(cameraDir);
         const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
 
-        // TODO: Based on ship type selected, create the appropriate ship class (Zenith, etc). For now, Zenith is the only option.
-        const ship = new Zenith(
+        // Create the selected ship type from the registry (falls back to the first type).
+        const shipType = getShipTypeById(flightControlsPanel.getSelectedShipTypeId());
+        const ship = shipType.create(
             dependencies,
             scene,
             spawnPos,
             new THREE.Vector3(),
-            createUniqueId('spaceship'),
-            // flightControlsPanel.getSelectedModel() TODO: No longer needed. Replaceing model selection with ship type selection
+            createUniqueId('spaceship')
         );
 
         // Orient the ship to the same direction the camera is facing

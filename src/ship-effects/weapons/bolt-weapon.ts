@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { Body } from '../../bodies/body';
 import { playWeaponFire } from '../../utilities/audio.js';
-import { SPACESHIP_RADIUS } from '../../utilities/consts.js';
 import { IWeaponOwner, Weapon } from './weapon';
 
 /**
@@ -28,19 +27,6 @@ export interface IBoltWeaponConfig {
     /** Called once per bolt fired. Defaults to playWeaponFire(). */
     fireSound?: () => void;
 }
-
-/** Class-level defaults — a ship wanting different behaviour passes a partial IBoltWeaponConfig. */
-const DEFAULT_BOLT_CONFIG: IBoltWeaponConfig = {
-    baseSpeed: 100,//C * 0.2, // fast bolts relative to top speeds
-    particleLifetime: 4.0,
-    boltLength: SPACESHIP_RADIUS * 40,
-    boltColor: 0x00eeff,
-    boltHeadSize: SPACESHIP_RADIUS * 2400,
-    fireRate: 10.56,
-    maxProjectiles: 800,
-    damage: 1,
-    fireSound: playWeaponFire,
-};
 
 /**
  * One active bolt projectile.
@@ -93,8 +79,22 @@ export class BoltWeapon extends Weapon {
     private headPoints: THREE.Points;
     private fireCooldown = 0;
 
-    constructor(scene: THREE.Scene, config: Partial<IBoltWeaponConfig> = {}) {
+    constructor(scene: THREE.Scene, shipRadius: number, config: Partial<IBoltWeaponConfig> = {}) {
         super(scene);
+
+        /** Class-level defaults — a ship wanting different behaviour passes a partial IBoltWeaponConfig. */
+        const DEFAULT_BOLT_CONFIG: IBoltWeaponConfig = {
+            baseSpeed: 100, //C * 0.2, // fast bolts relative to top speeds
+            particleLifetime: 4.0,
+            boltLength: shipRadius * 40,
+            boltColor: 0x00eeff,
+            boltHeadSize: shipRadius * 2400,
+            fireRate: 10.56,
+            maxProjectiles: 800,
+            damage: 1,
+            fireSound: playWeaponFire,
+        };
+        
         this.config = { ...DEFAULT_BOLT_CONFIG, ...config };
         this.maxProjectiles = this.config.maxProjectiles;
 
@@ -186,10 +186,7 @@ export class BoltWeapon extends Weapon {
         if (this.projectiles.length >= this.maxProjectiles) return;
 
         // Speed is base + ship speed (Galilean relativity)
-        const velocity = direction
-            .clone()
-            .multiplyScalar(this.config.baseSpeed)
-            .add(shipVelocity);
+        const velocity = direction.clone().multiplyScalar(this.config.baseSpeed).add(shipVelocity);
 
         (this.config.fireSound ?? playWeaponFire)();
         this.projectiles.push({

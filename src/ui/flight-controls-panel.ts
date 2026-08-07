@@ -1,5 +1,6 @@
 import { Body } from '../bodies/body';
 import { Spaceship } from '../bodies/ships/spaceship';
+import { SHIP_TYPES } from '../bodies/ships/ship-registry';
 import { Panel } from './panel';
 
 /**
@@ -8,7 +9,7 @@ import { Panel } from './panel';
  */
 export class FlightControlsPanel extends Panel {
     spawnBtn: HTMLButtonElement | null;
-    shipModelSelect: HTMLSelectElement | null;
+    shipTypeSelect: HTMLSelectElement | null;
 
     autopilotBtn: HTMLButtonElement | null;
     btnClose: HTMLButtonElement | null;
@@ -16,7 +17,7 @@ export class FlightControlsPanel extends Panel {
     constructor(elementId: string) {
         super(elementId);
         this.spawnBtn = null;
-        this.shipModelSelect = null;
+        this.shipTypeSelect = null;
 
         this.autopilotBtn = null;
         this.btnClose = null;
@@ -35,8 +36,8 @@ export class FlightControlsPanel extends Panel {
         }
 
         this.spawnBtn = document.getElementById('flightSpawnBtn') as HTMLButtonElement | null;
-        this.shipModelSelect = document.getElementById(
-            'flightShipModelSelect'
+        this.shipTypeSelect = document.getElementById(
+            'flightShipTypeSelect'
         ) as HTMLSelectElement | null;
 
         this.autopilotBtn = document.getElementById(
@@ -47,9 +48,16 @@ export class FlightControlsPanel extends Panel {
             this.spawnBtn.onclick = () => this.emit('spawnShip');
         }
 
-        if (this.shipModelSelect) {
-            this.shipModelSelect.onchange = () =>
-                this.emit('modelChanged', { modelName: this.getSelectedModel() });
+        // Populate the ship-type dropdown from the registry so new ship classes
+        // appear automatically without touching the panel or the HTML.
+        if (this.shipTypeSelect) {
+            this.shipTypeSelect.innerHTML = '';
+            for (const shipType of SHIP_TYPES) {
+                const option = document.createElement('option');
+                option.value = shipType.id;
+                option.textContent = shipType.label;
+                this.shipTypeSelect.appendChild(option);
+            }
         }
 
         if (this.autopilotBtn) {
@@ -97,8 +105,8 @@ export class FlightControlsPanel extends Panel {
             );
     }
 
-    /** Returns the currently selected ship model base name (without extension). */
-    getSelectedModel(): string {
-        return this.shipModelSelect?.value ?? 'Lo_poly_Spaceship_01_by_Liz_Reddington';
+    /** Returns the currently selected ship type id (registry id from the dropdown). */
+    getSelectedShipTypeId(): string {
+        return this.shipTypeSelect?.value ?? SHIP_TYPES[0].id;
     }
 }

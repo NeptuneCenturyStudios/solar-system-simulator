@@ -4,7 +4,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Body } from '../../bodies/body';
 import { playWeaponFire } from '../../utilities/audio.js';
-import { C, SPACESHIP_RADIUS } from '../../utilities/consts.js';
+import { C } from '../../utilities/consts.js';
 import { IWeaponOwner, Weapon } from './weapon';
 
 /**
@@ -27,17 +27,6 @@ export interface ILaserWeaponConfig {
     /** Called when the beam is first activated. Defaults to playWeaponFire(). */
     fireSound?: () => void;
 }
-
-/** Class-level defaults — a ship wanting different behaviour passes a partial ILaserWeaponConfig. */
-const DEFAULT_LASER_CONFIG: ILaserWeaponConfig = {
-    maxRange: C * 1.0,
-    beamColor: 0xff2244,
-    coreWidth: 2,
-    haloWidth: 8,
-    damage: 1000,
-    damageInterval: 0.2,
-    fireSound: playWeaponFire,
-};
 
 
 /**
@@ -86,8 +75,20 @@ export class LaserWeapon extends Weapon {
     private tipMaterial: THREE.PointsMaterial;
     private tipPoint: THREE.Points;
 
-    constructor(scene: THREE.Scene, config: Partial<ILaserWeaponConfig> = {}) {
+    constructor(scene: THREE.Scene, shipRadius:number, config: Partial<ILaserWeaponConfig> = {}) {
         super(scene);
+
+        /** Class-level defaults — a ship wanting different behaviour passes a partial ILaserWeaponConfig. */
+        const DEFAULT_LASER_CONFIG: ILaserWeaponConfig = {
+            maxRange: C * 1.0,
+            beamColor: 0xff2244,
+            coreWidth: 2,
+            haloWidth: 8,
+            damage: 1000,
+            damageInterval: 0.2,
+            fireSound: playWeaponFire,
+        };
+
         this.config = { ...DEFAULT_LASER_CONFIG, ...config };
 
         // ── Core beam: narrow white-hot Line2 ─────────────────────────────
@@ -131,7 +132,7 @@ export class LaserWeapon extends Weapon {
             new THREE.BufferAttribute(this.muzzlePositions, 3)
         );
         this.muzzleGeometry.setDrawRange(0, 0);
-        this.muzzleMaterial = this.createGlowPointMaterial(SPACESHIP_RADIUS * 1100, 0.95);
+        this.muzzleMaterial = this.createGlowPointMaterial(shipRadius * 1100, 0.95);
         this.muzzlePoint = new THREE.Points(this.muzzleGeometry, this.muzzleMaterial);
         this.muzzlePoint.frustumCulled = false;
         this.muzzlePoint.renderOrder = 2;
@@ -140,12 +141,9 @@ export class LaserWeapon extends Weapon {
 
         // ── Tip glow point (impact flash at the far end of the beam) ──────
         this.tipGeometry = new THREE.BufferGeometry();
-        this.tipGeometry.setAttribute(
-            'position',
-            new THREE.BufferAttribute(this.tipPositions, 3)
-        );
+        this.tipGeometry.setAttribute('position', new THREE.BufferAttribute(this.tipPositions, 3));
         this.tipGeometry.setDrawRange(0, 0);
-        this.tipMaterial = this.createGlowPointMaterial(SPACESHIP_RADIUS * 1800, 0.9);
+        this.tipMaterial = this.createGlowPointMaterial(shipRadius * 1800, 0.9);
         this.tipPoint = new THREE.Points(this.tipGeometry, this.tipMaterial);
         this.tipPoint.frustumCulled = false;
         this.tipPoint.renderOrder = 2;
@@ -264,9 +262,7 @@ export class LaserWeapon extends Weapon {
         }
 
         // ── Beam tip in world space (drifts with the ship between frames) ──
-        this.tip
-            .copy(this.curOrigin)
-            .addScaledVector(this.direction, hitT);
+        this.tip.copy(this.curOrigin).addScaledVector(this.direction, hitT);
 
         if (hitBody && this.hitCooldown <= 0) {
             this.hitCooldown = this.config.damageInterval;

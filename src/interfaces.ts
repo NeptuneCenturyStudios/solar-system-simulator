@@ -14,6 +14,7 @@ import { Spaceship } from './bodies/ships/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { FlightHUD } from './drawing/flight-hud';
 import { UIManager } from './ui/ui-manager';
+import { Weapon } from './ship-effects/weapons/weapon';
 
 /**
  * Options for configuring an atmosphere on a celestial body, including its radius and tint color.
@@ -92,6 +93,20 @@ export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {
     hasRings?: boolean;
     bodySubtype: PlanetTypeEnum;
     atmosphere?: IAtmosphereOptions;
+}
+
+/**
+ * Options for creating a spaceship, including its physical properties, position, velocity, and handling characteristics.
+ */
+export interface ISpaceshipCreationOptions extends IBodyCreationOptions {
+    radius: number;
+    mass: number;
+    position: THREE.Vector3;
+    velocity: THREE.Vector3;
+    id: string;
+    mesh: THREE.Mesh;
+    handling: ISpaceshipHandling;
+    weapons: Weapon[];
 }
 
 export interface IStateDependencies {

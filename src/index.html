@@ -490,24 +490,9 @@
                             <input type="checkbox" id="flightAdvancedMode" /> Advanced Flight Mode
                         </label>
                         <div class="control-group" style="margin-bottom: 8px">
-                            <label for="flightShipModelSelect">Ship Model</label>
-                            <select id="flightShipModelSelect">
-                                <option value="Lo_poly_Spaceship_01_by_Liz_Reddington" selected>
-                                    Spaceship 1
-                                </option>
-                                <option value="Lo_poly_Spaceship_02_by_Liz_Reddington">
-                                    Spaceship 2
-                                </option>
-                                <option value="Lo_poly_Spaceship_03_by_Liz_Reddington">
-                                    Spaceship 3
-                                </option>
-                                <option value="Lo_poly_Spaceship_04_by_Liz_Reddington">
-                                    Spaceship 4
-                                </option>
-                                <option value="Lo_poly_Spaceship_05_by_Liz_Reddington">
-                                    Spaceship 5
-                                </option>
-                            </select>
+                            <label for="flightShipTypeSelect">Ship Type</label>
+                            <!-- Populated at runtime from SHIP_TYPES in flight-controls-panel.ts -->
+                            <select id="flightShipTypeSelect"></select>
                         </div>
                         <button id="flightSpawnBtn" class="old-ui btn-with-icon mb-3">
                             <span class="material-symbols-outlined">rocket_launch</span>
