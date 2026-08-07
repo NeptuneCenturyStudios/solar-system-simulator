@@ -17,7 +17,7 @@ export class StarDestroyer extends Spaceship {
         id: string
     ) {
         const SPACESHIP_MASS = (40_000_000 / MASS_SCALE) * SCALE_FACTOR;
-        const SPACESHIP_RADIUS = (1.6 / RADIUS_SCALE) * SCALE_FACTOR;
+        const SPACESHIP_RADIUS = (0.8 / RADIUS_SCALE) * SCALE_FACTOR;
 
         // Flight tuning constants
         const FLIGHT_MAX_SPEED = C * 0.005;
