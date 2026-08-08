@@ -17,7 +17,7 @@ export class StarDestroyer extends Spaceship {
         id: string
     ) {
         const SPACESHIP_MASS = (40_000_000 / MASS_SCALE) * SCALE_FACTOR;
-        const SPACESHIP_RADIUS = (0.8 / RADIUS_SCALE) * SCALE_FACTOR;
+        const SPACESHIP_RADIUS = (600 / RADIUS_SCALE) * SCALE_FACTOR;
 
         // Flight tuning constants
         const FLIGHT_MAX_SPEED = C * 0.005;
@@ -86,18 +86,18 @@ export class StarDestroyer extends Spaceship {
         };
 
         const containerMesh = createShipContainerMesh();
-        const MODEL_NAME = 'star-destroyer';
+        const MODEL_NAME = 'star-destroyer/star-destroyer-3';
         // The OBJ is authored with its length axis ~39° off +Z (prow near
         // (2.9, 3.8), stern midpoint near (-2.2, -2.5)) and its bridge already
         // at +Y.  Yawing about Y points the prow along +Z (forward), matching
         // the game's ship-axis convention.  -41.4° is the exact angle at which
         // the hull's port/starboard bbox halves are equal (x:[-3.53, 3.53]);
         // -39° left the nose ~2.2° off the flight axis.  No pitch/roll needed.
-        const MODEL_ROTATION = new THREE.Euler(
-            0,
-            THREE.MathUtils.degToRad(-41.4),
-            0
-        );
+        // const MODEL_ROTATION = new THREE.Euler(
+        //     THREE.MathUtils.degToRad(20),
+        //     THREE.MathUtils.degToRad(40),
+        //     THREE.MathUtils.degToRad(20),
+        // );
 
         super(dependencies, scene, {
             position: position,
@@ -112,7 +112,7 @@ export class StarDestroyer extends Spaceship {
         });
 
         // Kick off the async model load; offsets are applied once the bbox is known.
-        loadShipModelInto(containerMesh, MODEL_NAME, SPACESHIP_RADIUS, MODEL_ROTATION)
+        loadShipModelInto(containerMesh, MODEL_NAME, SPACESHIP_RADIUS)
             .then((localBbox) => {
                 this.applyModelOffsets(localBbox);
             })
