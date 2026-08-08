@@ -54,6 +54,8 @@ export class LaserWeapon extends Weapon {
     private direction = new THREE.Vector3(0, 0, 1);
     /** Seconds until the next permitted damage tick. */
     private hitCooldown = 0;
+    /** Grows from 0 to maxRange at C per sim-second; resets to 0 on each trigger pull. */
+    private beamFront = 0;
     /** World-space beam tip (impact point or max-range end). */
     private tip = new THREE.Vector3();
     // ── Rendering ────────────────────────────────────────────────────────────
@@ -80,7 +82,7 @@ export class LaserWeapon extends Weapon {
 
         /** Class-level defaults — a ship wanting different behaviour passes a partial ILaserWeaponConfig. */
         const DEFAULT_LASER_CONFIG: ILaserWeaponConfig = {
-            maxRange: C * 1.0,
+            maxRange: C * 10.0,
             beamColor: 0xff2244,
             coreWidth: 2,
             haloWidth: 8,
@@ -202,6 +204,7 @@ export class LaserWeapon extends Weapon {
     /** Release the trigger — cuts the beam. */
     stopFire(): void {
         this.active = false;
+        this.beamFront = 0;
     }
 
     /**
@@ -225,6 +228,8 @@ export class LaserWeapon extends Weapon {
             }
             return;
         }
+
+        this.beamFront = Math.min(this.beamFront + C * simDt, this.config.maxRange);
 
         // This update runs AFTER the physics step, so the owner's transform is
         // already the post-physics one — read the muzzle straight off the live
@@ -262,9 +267,10 @@ export class LaserWeapon extends Weapon {
         }
 
         // ── Beam tip in world space (drifts with the ship between frames) ──
-        this.tip.copy(this.curOrigin).addScaledVector(this.direction, hitT);
+        const renderLength = Math.min(this.beamFront, hitT);
+        this.tip.copy(this.curOrigin).addScaledVector(this.direction, renderLength);
 
-        if (hitBody && this.hitCooldown <= 0) {
+        if (hitBody && this.beamFront >= hitT && this.hitCooldown <= 0) {
             this.hitCooldown = this.config.damageInterval;
             window.dispatchEvent(
                 new CustomEvent('weapon:hit', {
@@ -328,6 +334,7 @@ export class LaserWeapon extends Weapon {
         this.active = false;
         this.prevBeamVisible = false;
         this.hitCooldown = 0;
+        this.beamFront = 0;
         this.setBeamVisible(false);
     }
 

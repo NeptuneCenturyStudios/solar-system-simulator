@@ -27,32 +27,32 @@ export class StarDestroyer extends Spaceship {
             -SPACESHIP_RADIUS * 1
         );
 
-        // Flight tuning constants
-        const FLIGHT_MAX_SPEED = C * 0.005;
-        const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.1;
-        const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.75;
+        // Flight tuning constants — deliberately much heavier/sluggish than the Zenith fighter
+        const FLIGHT_MAX_SPEED = C * 0.003;
+        const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.025;
+        const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.35;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
-        const FLIGHT_BOOST_MAX_SPEED = C * 0.5;
-        const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.5;
-        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED * 0.5;
+        const FLIGHT_BOOST_MAX_SPEED = C * 0.4;
+        const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.2;
+        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED * 0.25;
         const FLIGHT_WARP_SPEED = C * 100;
-        const FLIGHT_WARP_ACCEL = FLIGHT_WARP_SPEED * 0.1;
-        const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 0.99;
+        const FLIGHT_WARP_ACCEL = FLIGHT_WARP_SPEED * 0.04;
+        const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 0.9;
         const FLIGHT_WARP_DECEL_TOLERANCE = FLIGHT_WARP_SPEED * 0.01;
-        const FLIGHT_PERP_DECAY = 1.32;
-        const FLIGHT_MAX_POINTER_OFFSET = 260;
-        const FLIGHT_MAX_TURN_RATE = 1.58;
-        const FLIGHT_STEER_SMOOTH_RATE = 0.66;
-        const FLIGHT_STEER_DEADZONE = 0.05;
-        const FLIGHT_ROLL_SPEED = 5.28;
-        const FLIGHT_ROLL_ACCEL = 1.06;
-        const FLIGHT_ROLL_FRICTION = 1.06;
-        const FLIGHT_BANK_LERP_SPEED = 13.76;
-        const FLIGHT_MAX_BANK_ANGLE = 0.35;
-        const FLIGHT_MAX_BANK_PITCH = 0.2;
-        const FLIGHT_WARP_CHARGE_TIME = 2.0;
+        const FLIGHT_PERP_DECAY = 0.5;
+        const FLIGHT_MAX_POINTER_OFFSET = 340;
+        const FLIGHT_MAX_TURN_RATE = 0.55;
+        const FLIGHT_STEER_SMOOTH_RATE = 0.28;
+        const FLIGHT_STEER_DEADZONE = 0.08;
+        const FLIGHT_ROLL_SPEED = 1.6;
+        const FLIGHT_ROLL_ACCEL = 0.32;
+        const FLIGHT_ROLL_FRICTION = 0.5;
+        const FLIGHT_BANK_LERP_SPEED = 4.5;
+        const FLIGHT_MAX_BANK_ANGLE = 0.12;
+        const FLIGHT_MAX_BANK_PITCH = 0.07;
+        const FLIGHT_WARP_CHARGE_TIME = 5.0;
 
-        const fighterHandling: ISpaceshipHandling = {
+        const destroyerHandling: ISpaceshipHandling = {
             // Thrust / speed
             flightMaxSpeed: FLIGHT_MAX_SPEED,
             flightThrustAccel: FLIGHT_THRUST_ACCEL,
@@ -107,10 +107,11 @@ export class StarDestroyer extends Spaceship {
         //     THREE.MathUtils.degToRad(20),
         // );
 
-        const laserWeaponConfig: ILaserWeaponConfig = {
-             beamColor: 0x00ff00,
-             damage: 100000,
-
+        const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
+            beamColor: 0x00ff00,
+            damage: 100000,
+            coreWidth: 5,
+            haloWidth: 15,
         };
 
         super(dependencies, scene, {
@@ -121,7 +122,7 @@ export class StarDestroyer extends Spaceship {
             mesh: containerMesh,
             id: id,
             name: 'StarDestroyer',
-            handling: fighterHandling,
+            handling: destroyerHandling,
             weapons: [new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)],
             thirdPersonOffset: THIRD_PERSON_OFFSET,
         });
