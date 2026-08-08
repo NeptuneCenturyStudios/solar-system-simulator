@@ -107,6 +107,13 @@ export interface ISpaceshipCreationOptions extends IBodyCreationOptions {
     mesh: THREE.Mesh;
     handling: ISpaceshipHandling;
     weapons: Weapon[];
+
+    /** Local-space offset for the 1st-person cockpit camera. When omitted, the
+     *  offset is derived from the loaded model's bounding box after it loads. */
+    cockpitOffset?: THREE.Vector3;
+    /** Local-space offset for the 3rd-person chase camera. When omitted, a
+     *  radius-scaled default is used. */
+    thirdPersonOffset?: THREE.Vector3;
 }
 
 export interface IStateDependencies {

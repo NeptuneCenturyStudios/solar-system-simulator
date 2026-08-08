@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Spaceship } from './spaceship';
 import { ISpaceshipHandling } from '../../interfaces';
 import { C, MASS_SCALE, RADIUS_SCALE, SCALE_FACTOR } from '../../utilities/consts';
-import { LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
+import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
 import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
 
 /**
@@ -17,7 +17,15 @@ export class StarDestroyer extends Spaceship {
         id: string
     ) {
         const SPACESHIP_MASS = (40_000_000 / MASS_SCALE) * SCALE_FACTOR;
-        const SPACESHIP_RADIUS = (600 / RADIUS_SCALE) * SCALE_FACTOR;
+        const SPACESHIP_RADIUS = (2 / RADIUS_SCALE) * SCALE_FACTOR;
+
+        // Camera placement (ship-local space; +Z = forward, +Y = up). Tune these to
+        // adjust how the chase cam frames the destroyer.
+        const THIRD_PERSON_OFFSET = new THREE.Vector3(
+            0,
+            SPACESHIP_RADIUS * 0.35,
+            -SPACESHIP_RADIUS * 1
+        );
 
         // Flight tuning constants
         const FLIGHT_MAX_SPEED = C * 0.005;
@@ -99,6 +107,12 @@ export class StarDestroyer extends Spaceship {
         //     THREE.MathUtils.degToRad(20),
         // );
 
+        const laserWeaponConfig: ILaserWeaponConfig = {
+             beamColor: 0x00ff00,
+             damage: 100000,
+
+        };
+
         super(dependencies, scene, {
             position: position,
             velocity: velocity,
@@ -108,7 +122,8 @@ export class StarDestroyer extends Spaceship {
             id: id,
             name: 'StarDestroyer',
             handling: fighterHandling,
-            weapons: [new LaserWeapon(scene, SPACESHIP_RADIUS)],
+            weapons: [new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)],
+            thirdPersonOffset: THIRD_PERSON_OFFSET,
         });
 
         // Kick off the async model load; offsets are applied once the bbox is known.

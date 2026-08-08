@@ -54,6 +54,10 @@ export class Spaceship extends Body {
     /** Weapon systems mounted on this ship. Empty for unarmed ships. Subclasses mount a loadout of Weapon classes. */
     weapons: Weapon[] = [];
 
+    /** True when the subclass supplied an explicit cockpitOffset; the bbox-derived
+     *  value is then skipped in applyModelOffsets(). */
+    private _cockpitCameraExplicit: boolean = false;
+
     /** Current angular roll velocity (rad/s). Decays when key released. */
     rollVelocity: number = 0;
     /** Smoothed steering values in [-1, 1]. Lerp toward raw target each frame. */
@@ -198,11 +202,17 @@ export class Spaceship extends Body {
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
         this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF, -0.9 * SF);
-        this.thirdPersonOffset = new THREE.Vector3(
-            0,
-            options.radius * 0.35,
-            -options.radius * 1.8
-        );
+
+        // Subclasses may supply explicit camera offsets. The chase-cam offset is
+        // used as-is; an explicit cockpit offset is kept and skipped by
+        // applyModelOffsets(), otherwise a bbox-derived value is used.
+        this.thirdPersonOffset = options.thirdPersonOffset
+            ? options.thirdPersonOffset.clone()
+            : new THREE.Vector3(0, options.radius * 0.35, -options.radius * 1.8);
+        if (options.cockpitOffset) {
+            this.cockpitOffset.copy(options.cockpitOffset);
+            this._cockpitCameraExplicit = true;
+        }
 
         // Initial muzzle off the nose (approximate; updated precisely after OBJ loads).
         this.muzzleOffset = new THREE.Vector3(0, 0, options.radius);
@@ -240,8 +250,11 @@ export class Spaceship extends Body {
      * @param localBbox Bounding box of the loaded model in mesh-local coordinates.
      */
     protected applyModelOffsets(localBbox: THREE.Box3): void {
-        // Update camera/thruster offsets from the local bbox.
-        this.cockpitOffset.set(0, localBbox.max.y * 0.5, localBbox.max.z * 0.75);
+        // A subclass-provided cockpit offset is authoritative; only derive the
+        // cockpit from the bbox when none was supplied explicitly.
+        if (!this._cockpitCameraExplicit) {
+            this.cockpitOffset.set(0, localBbox.max.y * 0.5, localBbox.max.z * 0.75);
+        }
         this.thrusterOffset.set(0, localBbox.min.y * 0.3, localBbox.min.z);
         // Muzzle sits at the forward-most point of the hull (+Z = nose).
         this.muzzleOffset.set(0, localBbox.max.y * 0.25, localBbox.max.z);

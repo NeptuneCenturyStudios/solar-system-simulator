@@ -17,6 +17,14 @@ export class Zenith extends Spaceship {
         const SPACESHIP_MASS = (75000 / MASS_SCALE) * SCALE_FACTOR;
         const SPACESHIP_RADIUS = (0.037 / RADIUS_SCALE) * SCALE_FACTOR;
 
+        // Camera placement (ship-local space; +Z = forward, +Y = up). Tune these to
+        // adjust how the chase cam frames the fighter.
+        const THIRD_PERSON_OFFSET = new THREE.Vector3(
+            0,
+            SPACESHIP_RADIUS * 0.35,
+            -SPACESHIP_RADIUS * 1.8
+        );
+
         // Flight tuning constants
         const FLIGHT_MAX_SPEED = C * 0.005;
         const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.1;
@@ -99,6 +107,7 @@ export class Zenith extends Spaceship {
                 name: 'Zenith',
                 handling: fighterHandling,
                 weapons: [new BoltWeapon(scene, SPACESHIP_RADIUS)],
+                thirdPersonOffset: THIRD_PERSON_OFFSET,
             }
         );
             

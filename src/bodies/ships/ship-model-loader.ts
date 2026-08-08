@@ -39,7 +39,7 @@ export async function loadShipModelInto(
 ): Promise<THREE.Box3> {
     const mtlLoader = new MTLLoader();
     mtlLoader.setPath('./assets/models/');
-    const materials = await mtlLoader.loadAsync(`${modelName}.mtl`);
+    const materials = await mtlLoader.loadAsync(`./assets/models/${modelName}.mtl`);
     materials.preload();
 
     const objLoader = new OBJLoader();
