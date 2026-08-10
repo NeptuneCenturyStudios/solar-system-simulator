@@ -26,7 +26,7 @@ export interface ILaserWeaponConfig {
     damageInterval: number;
     /**
      * Starts the continuous beam sound when the trigger is pulled.
-     * Defaults to playLaserBeamLoop() (laser-beam.mp3).  The returned
+     * Defaults to playLaserBeamLoop() (laser-beam.wav).  The returned
      * controller is stopped automatically on trigger release / reset / dispose.
      */
     loopSound?: () => LoopSoundController | null;

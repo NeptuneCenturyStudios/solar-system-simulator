@@ -39,8 +39,8 @@ const IMPACT_FILES = [
 ] as const;
 
 /** Resolved URLs for loop-capable sound assets. */
-const WARP_LOOP_URL = new URL('../assets/sounds/warp-loop-1.mp3', import.meta.url).href;
-const LASER_BEAM_URL = new URL('../assets/sounds/laser-beam.mp3', import.meta.url).href;
+const WARP_LOOP_URL = new URL('../assets/sounds/warp-loop.wav', import.meta.url).href;
+const LASER_BEAM_URL = new URL('../assets/sounds/laser-beam.wav', import.meta.url).href;
 
 /** Decoded-buffer cache for loop-capable sounds, keyed by asset URL. */
 interface ILoopBufferCacheEntry {

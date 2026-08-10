@@ -107,6 +107,7 @@ export class Zenith extends Spaceship {
                 name: 'Zenith',
                 handling: fighterHandling,
                 weapons: [new BoltWeapon(scene, SPACESHIP_RADIUS)],
+                shipTypeId: 'zenith',
                 thirdPersonOffset: THIRD_PERSON_OFFSET,
             }
         );

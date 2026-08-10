@@ -124,6 +124,7 @@ export class StarDestroyer extends Spaceship {
             name: 'StarDestroyer',
             handling: destroyerHandling,
             weapons: [new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)],
+            shipTypeId: 'star_destroyer',
             thirdPersonOffset: THIRD_PERSON_OFFSET,
         });
 

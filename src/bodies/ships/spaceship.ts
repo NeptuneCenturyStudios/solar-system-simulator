@@ -58,6 +58,11 @@ export class Spaceship extends Body {
      *  value is then skipped in applyModelOffsets(). */
     private _cockpitCameraExplicit: boolean = false;
 
+    /** Registry id of this ship type (matches IShipType.id in ship-registry.ts).
+     *  Used to detect when the user selects a different ship class than the one
+     *  currently spawned, so the old ship can be destroyed and replaced. */
+    readonly shipTypeId: string;
+
     /** Current angular roll velocity (rad/s). Decays when key released. */
     rollVelocity: number = 0;
     /** Smoothed steering values in [-1, 1]. Lerp toward raw target each frame. */
@@ -198,6 +203,9 @@ export class Spaceship extends Body {
         this.handling = options.handling;
 
         this.weapons = options.weapons;
+
+        // Registry id of this ship type (used for spawn/re-enter type matching).
+        this.shipTypeId = options.shipTypeId;
 
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);

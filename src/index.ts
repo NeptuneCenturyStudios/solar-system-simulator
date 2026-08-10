@@ -3012,14 +3012,80 @@ const autopilotCtx: IAutopilotContext = {
 };
 
 /** Spawn a spaceship in front of the camera and enter flight mode.
- *  If a previously spawned ship is still alive in the scene, re-enters it instead. */
-function spawnShip() {
-    // Re-enter an existing ship when possible
-    const existing = flightState.knownShip;
-    const canReenter =
-        existing && !existing._isDisposed && simulationState.bodies.includes(existing);
+ *  If a previously spawned ship of the same type is still alive in the scene,
+ *  re-enters it instead.  When a different ship type is selected while a ship
+ *  is already spawned, the old ship is destroyed and the new one spawns in its
+ *  place.  Pass an explicit `targetShip` (bodies-table "Enter Ship" button) to
+ *  re-enter that exact ship regardless of the dropdown selection. */
+function spawnShip(targetShip?: Spaceship) {
+    // A targeted ship (bodies-table "Enter Ship") is always re-entered as-is.
+    // Otherwise re-enter only when the dropdown selection matches the live ship.
+    const existing = targetShip ?? flightState.knownShip;
+    const live =
+        !!(existing && !existing._isDisposed && simulationState.bodies.includes(existing));
+    const selectedTypeId = flightControlsPanel.getSelectedShipTypeId();
+    const typeMatched = !!(existing && existing.shipTypeId === selectedTypeId);
+    const canReenter = live && (!!targetShip || typeMatched);
 
     if (!canReenter) {
+        // --- Different ship selected with a live ship present: destroy and replace it ---
+        if (live && existing) {
+            // Snapshot the old ship's state so the replacement spawns in its place.
+            const oldPos = existing.mesh.position.clone();
+            const oldVel = existing.velocity.clone();
+            const oldQuat = existing.mesh.quaternion.clone();
+
+            // Disengage autopilot (if any) before the old ship is destroyed.
+            if (autopilotState.isActive) {
+                cancelAutopilot(autopilotCtx);
+            }
+
+            // Destroy the old ship.  die() disposes the model, trail, warp
+            // effect, weapons, and warp sound; the body:dead listener removes it
+            // from simulationState.bodies and clears selection/focus references.
+            existing.die({ skipImpactSound: true });
+
+            // Spawn the newly selected ship type in the old ship's place.
+            const shipType = getShipTypeById(selectedTypeId);
+            const ship = shipType.create(
+                dependencies,
+                scene,
+                oldPos,
+                oldVel,
+                createUniqueId('spaceship')
+            );
+            // Inherit the old ship's orientation.
+            ship.mesh.quaternion.copy(oldQuat);
+
+            simulationState.bodies.push(ship);
+            try {
+                window.dispatchEvent(
+                    new CustomEvent('body:added', {
+                        detail: { body: ship, id: ship.id, name: ship.name },
+                    })
+                );
+            } catch {
+                // Empty
+            }
+
+            // Remember the new ship so "ENTER SHIP" works on the next click.
+            flightState.knownShip = ship;
+
+            // Select the ship as the look-at target (same as clicking it in the bodies list).
+            cameraState.isLookAtMode = true;
+            uiManager.mainPanel.setLookAtState(true);
+            setFocusBody(ship, { zoom: true });
+            uiManager.managementPanel.setSelectedBody(ship);
+
+            uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(ship, simulationState.bodies);
+
+            addEvent({
+                message: 'Spaceship spawned.',
+                notificationType: NotificationType.Info,
+            });
+            return;
+        }
+
         // --- Fresh spawn: create the ship and focus the camera on it without entering flight mode ---
         const cameraDir = new THREE.Vector3();
         camera.getWorldDirection(cameraDir);
@@ -3373,7 +3439,7 @@ uiManager.mainPanel.on('enterShip', ({ body }: { body: Body }) => {
     if (!body || body._isDisposed) return;
     if (flightState.isActive) return;
     flightState.knownShip = body as Spaceship;
-    spawnShip();
+    spawnShip(body as Spaceship);
 });
 
 // Manual selection from Bodies table

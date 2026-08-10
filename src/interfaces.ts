@@ -108,6 +108,11 @@ export interface ISpaceshipCreationOptions extends IBodyCreationOptions {
     handling: ISpaceshipHandling;
     weapons: Weapon[];
 
+    /** Registry id of the ship type (must match IShipType.id in ship-registry.ts).
+     *  Used to detect when the user selects a different ship class than the one
+     *  currently spawned, so the old ship can be destroyed and replaced. */
+    shipTypeId: string;
+
     /** Local-space offset for the 1st-person cockpit camera. When omitted, the
      *  offset is derived from the loaded model's bounding box after it loads. */
     cockpitOffset?: THREE.Vector3;
