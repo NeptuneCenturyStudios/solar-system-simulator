@@ -8,7 +8,7 @@ import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader'
 /**
  * A massive alien mothership.
  */
-export class OsirisMothership extends Spaceship {
+export class Dreadnaught extends Spaceship {
     constructor(
         dependencies: object,
         scene: THREE.Scene,
@@ -16,8 +16,8 @@ export class OsirisMothership extends Spaceship {
         velocity: THREE.Vector3,
         id: string
     ) {
-        const SPACESHIP_MASS = (80_000_000 / MASS_SCALE) * SCALE_FACTOR;
-        const SPACESHIP_RADIUS = (4 / RADIUS_SCALE) * SCALE_FACTOR;
+        const SPACESHIP_MASS = (40_000_000 / MASS_SCALE) * SCALE_FACTOR;
+        const SPACESHIP_RADIUS = (2 / RADIUS_SCALE) * SCALE_FACTOR;
 
         // Camera placement (ship-local space; +Z = forward, +Y = up). Tune these to
         // adjust how the chase cam frames the destroyer.
@@ -52,7 +52,7 @@ export class OsirisMothership extends Spaceship {
         const FLIGHT_MAX_BANK_PITCH = 0.07;
         const FLIGHT_WARP_CHARGE_TIME = 5.0;
 
-        const destroyerHandling: ISpaceshipHandling = {
+        const dreadnaughtHandling: ISpaceshipHandling = {
             // Thrust / speed
             flightMaxSpeed: FLIGHT_MAX_SPEED,
             flightThrustAccel: FLIGHT_THRUST_ACCEL,
@@ -94,7 +94,7 @@ export class OsirisMothership extends Spaceship {
         };
 
         const containerMesh = createShipContainerMesh();
-        const MODEL_NAME = 'osiris-mothership/osiris-mothership';
+        const MODEL_NAME = 'dreadnaught/dreadnaught';
         
         // Correct model orientation so that the rear is facing the camera and not the front
         const MODEL_ROTATION = new THREE.Euler(
@@ -103,9 +103,10 @@ export class OsirisMothership extends Spaceship {
             THREE.MathUtils.degToRad(180),
         );
 
+        // Purple beam laser
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
             beamColor: 0x800080,
-            damage: 1000,
+            damage: 100000,
             coreWidth: 5,
             haloWidth: 15,
             damageInterval: .05
@@ -118,10 +119,10 @@ export class OsirisMothership extends Spaceship {
             radius: SPACESHIP_RADIUS,
             mesh: containerMesh,
             id: id,
-            name: 'Osiris Mothership',
-            handling: destroyerHandling,
+            name: 'Dreadnaught',
+            handling: dreadnaughtHandling,
             weapons: [new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)],
-            shipTypeId: 'osiris_mothership',
+            shipTypeId: 'dreadnaught',
             thirdPersonOffset: THIRD_PERSON_OFFSET,
         });
 
@@ -132,7 +133,7 @@ export class OsirisMothership extends Spaceship {
             })
             .catch((e) => {
                 console.warn(
-                    `Osiris Mothership OBJ/MTL load failed for ${MODEL_NAME} — using placeholder mesh`,
+                    `Dreadnaught OBJ/MTL load failed for ${MODEL_NAME} — using placeholder mesh`,
                     e
                 );
             });
