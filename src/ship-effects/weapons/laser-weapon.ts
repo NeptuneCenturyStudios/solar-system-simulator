@@ -3,9 +3,9 @@ import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Body } from '../../bodies/body';
-import { playWeaponFire } from '../../utilities/audio.js';
+import { LoopSoundController, playLaserBeamLoop } from '../../utilities/audio.js';
 import { C } from '../../utilities/consts.js';
-import { IWeaponOwner, Weapon } from './weapon';
+import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
 
 /**
  * Per-instance tuning for LaserWeapon.  Ships may pass a partial config to
@@ -24,8 +24,12 @@ export interface ILaserWeaponConfig {
     damage: number;
     /** Minimum seconds between damage ticks on the same body. */
     damageInterval: number;
-    /** Called when the beam is first activated. Defaults to playWeaponFire(). */
-    fireSound?: () => void;
+    /**
+     * Starts the continuous beam sound when the trigger is pulled.
+     * Defaults to playLaserBeamLoop() (laser-beam.mp3).  The returned
+     * controller is stopped automatically on trigger release / reset / dispose.
+     */
+    loopSound?: () => LoopSoundController | null;
 }
 
 
@@ -88,10 +92,15 @@ export class LaserWeapon extends Weapon {
             haloWidth: 8,
             damage: 1000,
             damageInterval: 0.2,
-            fireSound: playWeaponFire,
+            loopSound: playLaserBeamLoop,
         };
 
         this.config = { ...DEFAULT_LASER_CONFIG, ...config };
+
+        const weaponSound: IWeaponSound = {
+            loop: this.config.loopSound ?? playLaserBeamLoop,
+        };
+        this.weaponSound = weaponSound;
 
         // ── Core beam: narrow white-hot Line2 ─────────────────────────────
         this.coreLineGeo = new LineGeometry();
@@ -183,8 +192,8 @@ export class LaserWeapon extends Weapon {
     // ── Firing ───────────────────────────────────────────────────────────────
 
     /**
-     * Refresh the beam aim while the trigger is held.  Plays the fire sound on
-     * the rising edge only.
+     * Refresh the beam aim while the trigger is held.  Starts the beam loop
+     * sound on the rising edge only.
      */
     tryFire(
         _dt: number,
@@ -197,14 +206,15 @@ export class LaserWeapon extends Weapon {
         this.direction.copy(direction).normalize();
 
         if (!wasActive) {
-            (this.config.fireSound ?? playWeaponFire)();
+            this.beginSound();
         }
     }
 
-    /** Release the trigger — cuts the beam. */
+    /** Release the trigger — cuts the beam and fades out the beam sound. */
     stopFire(): void {
         this.active = false;
         this.beamFront = 0;
+        super.stopFire();
     }
 
     /**
@@ -228,6 +238,10 @@ export class LaserWeapon extends Weapon {
             }
             return;
         }
+
+        // If the beam sound buffer hadn't finished decoding when the trigger was
+        // pulled, retry every frame while the beam stays active.
+        this.updateLoopSound();
 
         this.beamFront = Math.min(this.beamFront + C * simDt, this.config.maxRange);
 
@@ -329,16 +343,18 @@ export class LaserWeapon extends Weapon {
         this.tipPoint.visible = visible;
     }
 
-    /** Cut the beam and reset timers (called on flight exit). */
+    /** Cut the beam, stop the loop sound, and reset timers (called on flight exit). */
     reset(): void {
         this.active = false;
         this.prevBeamVisible = false;
         this.hitCooldown = 0;
         this.beamFront = 0;
         this.setBeamVisible(false);
+        super.reset();
     }
 
     dispose(): void {
+        super.dispose();
         this.scene.remove(this.coreBeamLine);
         this.scene.remove(this.haloBeamLine);
         this.scene.remove(this.muzzlePoint);

@@ -31,14 +31,23 @@ let blasterLoadStarted = false;
 /** One entry per impact file; fills in as each decodes. */
 const impactBuffers: AudioBuffer[] = [];
 let impactLoadStarted = false;
-let warpBuffer: AudioBuffer | null = null;
-let warpLoadStarted = false;
 
 const IMPACT_FILES = [
     '../assets/sounds/weapon-blast-1.mp3',
     '../assets/sounds/weapon-blast-2.mp3',
     '../assets/sounds/weapon-blast-3.mp3',
 ] as const;
+
+/** Resolved URLs for loop-capable sound assets. */
+const WARP_LOOP_URL = new URL('../assets/sounds/warp-loop-1.mp3', import.meta.url).href;
+const LASER_BEAM_URL = new URL('../assets/sounds/laser-beam.mp3', import.meta.url).href;
+
+/** Decoded-buffer cache for loop-capable sounds, keyed by asset URL. */
+interface ILoopBufferCacheEntry {
+    buffer: AudioBuffer | null;
+    loadStarted: boolean;
+}
+const loopBufferCache = new Map<string, ILoopBufferCacheEntry>();
 
 function getCtx(): AudioContext {
     if (!ctx) ctx = new AudioContext();
@@ -107,17 +116,13 @@ export function playWeaponImpact(): void {
     }
 }
 
-// ── Warp loop sound ──────────────────────────────────────────────────────────
-
-/** Base volume for the warp loop (0–1) — multiplied by settingsStore.settings.sfxVolume at play time. */
-const WARP_VOLUME = 0.6;
-/** Fade-out duration in seconds when warp ends. */
-const WARP_FADE_DURATION = 1.5;
+// ── Loopable sounds (warp drive, laser beam, ...) ────────────────────────────
 
 /**
- * Controller returned by `playWarpLoop()` for managing a looping warp sound.
+ * Controller returned by `playSoundLoop()` / `playLaserBeamLoop()` for managing
+ * a looping sound.
  */
-export interface WarpSoundController {
+export interface LoopSoundController {
     /**
      * Fade out over `duration` seconds, then stop and disconnect.
      * The loop continues to play during the fade ramps.
@@ -138,39 +143,61 @@ export interface WarpSoundController {
     dispose(): void;
 }
 
+/** Backwards-compatible name for the loop controller used by the warp drive. */
+export type WarpSoundController = LoopSoundController;
+
+/** Base volume for the warp loop (0–1) — multiplied by settingsStore.settings.sfxVolume at play time. */
+const WARP_VOLUME = 0.6;
+/** Fade-out duration in seconds when warp ends. */
+const WARP_FADE_DURATION = 1.5;
+/** Base volume for the laser beam loop (0–1) — multiplied by settingsStore.settings.sfxVolume. */
+const LASER_BEAM_VOLUME = 0.5;
+/** Fade-out duration in seconds when the beam is cut — short to avoid a click. */
+const LASER_BEAM_FADE_DURATION = 0.15;
+
 /**
- * Start playing the warp-loop sound on a continuous loop.
+ * Start playing a sound file on a continuous loop.
  * Returns a controller or `null` if loading fails.
  *
- * The first call triggers a fetch+decode; subsequent calls use the cached buffer.
- * Each call creates a new source + gain node pair so multiple ships can warp
- * simultaneously (though only one ship exists in practice).
+ * The first call for a given URL triggers a fetch+decode; subsequent calls use
+ * the cached buffer.  Each call creates a new source + gain node pair so
+ * multiple loops can play simultaneously (though only one ship exists in
+ * practice).
  *
- * The effective gain is WARP_VOLUME * settingsStore.settings.sfxVolume, multiplied
- * by the caller's speedVolume × distanceFade passed via setVolume().
+ * The effective gain is baseVolume * settingsStore.settings.sfxVolume, multiplied
+ * by the caller's volume passed via setVolume().
  */
-export function playWarpLoop(): WarpSoundController | null {
+export function playSoundLoop(
+    url: string,
+    baseVolume: number,
+    defaultFadeDuration = 0.15
+): LoopSoundController | null {
     try {
         const ac = getCtx();
 
-        // Kick off loading on first call
-        if (!warpLoadStarted) {
-            warpLoadStarted = true;
-            const url = new URL('../assets/sounds/warp-loop-1.mp3', import.meta.url).href;
+        // Kick off (or reuse) the fetch + decode for this URL.
+        let entry = loopBufferCache.get(url);
+        if (!entry) {
+            entry = { buffer: null, loadStarted: false };
+            loopBufferCache.set(url, entry);
+        }
+        if (!entry.loadStarted) {
+            entry.loadStarted = true;
             loadAndCache(ac, url, (buf) => {
-                warpBuffer = buf;
+                const cached = loopBufferCache.get(url);
+                if (cached) cached.buffer = buf;
             });
         }
 
-        // If the buffer isn't loaded yet, the caller should retry next frame
-        if (!warpBuffer) return null;
+        // If the buffer isn't loaded yet, the caller should retry next frame.
+        if (!entry.buffer) return null;
 
-        // Compute initial gain including global SFX volume
-        const initialGain = WARP_VOLUME * settingsStore.settings.sfxVolume;
+        // Compute initial gain including global SFX volume.
+        const initialGain = baseVolume * settingsStore.settings.sfxVolume;
 
         const t = ac.currentTime;
         const source = ac.createBufferSource();
-        source.buffer = warpBuffer;
+        source.buffer = entry.buffer;
         source.loop = true;
 
         const gainNode = ac.createGain();
@@ -183,21 +210,21 @@ export function playWarpLoop(): WarpSoundController | null {
         let _isFadingOut = false;
         let _disposed = false;
 
-        const controller: WarpSoundController = {
+        const controller: LoopSoundController = {
             get isFadingOut(): boolean {
                 return _isFadingOut;
             },
 
             setVolume(vol: number): void {
                 if (_disposed || _isFadingOut) return;
-                // Multiply caller's volume by the global SFX volume
+                // Multiply caller's volume by the base volume and global SFX volume.
                 gainNode.gain.setValueAtTime(
-                    vol * WARP_VOLUME * settingsStore.settings.sfxVolume,
+                    vol * baseVolume * settingsStore.settings.sfxVolume,
                     ac.currentTime
                 );
             },
 
-            stop(duration: number = WARP_FADE_DURATION): void {
+            stop(duration: number = defaultFadeDuration): void {
                 if (_disposed) return;
                 _isFadingOut = true;
                 const now = ac.currentTime;
@@ -234,9 +261,33 @@ export function playWarpLoop(): WarpSoundController | null {
 
         return controller;
     } catch {
-        console.error('Error playing warp loop sound');
+        console.error('Error playing loop sound');
         return null;
     }
+}
+
+/**
+ * Start playing the warp-loop sound on a continuous loop.
+ * Returns a controller or `null` if loading fails.
+ *
+ * The first call triggers a fetch+decode; subsequent calls use the cached buffer.
+ * Each call creates a new source + gain node pair so multiple ships can warp
+ * simultaneously (though only one ship exists in practice).
+ *
+ * The effective gain is WARP_VOLUME * settingsStore.settings.sfxVolume, multiplied
+ * by the caller's speedVolume × distanceFade passed via setVolume().
+ */
+export function playWarpLoop(): WarpSoundController | null {
+    return playSoundLoop(WARP_LOOP_URL, WARP_VOLUME, WARP_FADE_DURATION);
+}
+
+/**
+ * Start playing the laser-beam sound on a continuous loop while the beam is
+ * active.  Returns a controller or `null` if loading fails; call stop() (or
+ * dispose()) on the returned controller when the beam is cut.
+ */
+export function playLaserBeamLoop(): LoopSoundController | null {
+    return playSoundLoop(LASER_BEAM_URL, LASER_BEAM_VOLUME, LASER_BEAM_FADE_DURATION);
 }
 
 /**

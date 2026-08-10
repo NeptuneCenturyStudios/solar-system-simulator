@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Body } from '../../bodies/body';
 import { playWeaponFire } from '../../utilities/audio.js';
-import { IWeaponOwner, Weapon } from './weapon';
+import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
 
 /**
  * Per-instance tuning for BoltWeapon.  Ships may pass a partial config to
@@ -98,6 +98,11 @@ export class BoltWeapon extends Weapon {
         this.config = { ...DEFAULT_BOLT_CONFIG, ...config };
         this.maxProjectiles = this.config.maxProjectiles;
 
+        const weaponSound: IWeaponSound = {
+            fire: this.config.fireSound ?? playWeaponFire,
+        };
+        this.weaponSound = weaponSound;
+
         // 2 vertices per bolt (tail + head), 3 floats each.
         this.positions = new Float32Array(this.maxProjectiles * 2 * 3).fill(0);
         this.geometry = new THREE.BufferGeometry();
@@ -188,7 +193,7 @@ export class BoltWeapon extends Weapon {
         // Speed is base + ship speed (Galilean relativity)
         const velocity = direction.clone().multiplyScalar(this.config.baseSpeed).add(shipVelocity);
 
-        (this.config.fireSound ?? playWeaponFire)();
+        this.beginSound();
         this.projectiles.push({
             position: origin.clone(),
             velocity,
