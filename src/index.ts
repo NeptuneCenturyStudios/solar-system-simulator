@@ -3357,7 +3357,7 @@ uiManager.mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
 
 optionsPanel.on('sfxVolumeChange', () => {
     // settingsStore.settings.sfxVolume is already updated by the panel
-    // sfxVolume is read live by audio.ts playBuffer() and playWarpLoop() each call
+    // sfxVolume is read live by audio.ts playBuffer() and playSoundEffect() each call
 });
 
 optionsPanel.on('musicVolumeChange', ({ value }: { value: number }) => {

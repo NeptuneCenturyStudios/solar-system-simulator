@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createTextTexture } from '../drawing/text-texture.js';
 import { BodyTypeEnum } from './body-enums.js';
 import { HP_MASS_MULTIPLIER } from '../utilities/consts.js';
-import { playWeaponImpact } from '../utilities/audio.js';
+import { SoundEffect, playSoundEffect } from '../utilities/audio.js';
 import { IDeathOptions } from '../interfaces.js';
 
 /**
@@ -203,7 +203,7 @@ export class Body {
             this.scene.remove(this.mesh);
 
             if (!deathOptions || !deathOptions.skipImpactSound) {
-                playWeaponImpact();
+                playSoundEffect(SoundEffect.WeaponImpact);
             }
         }
 

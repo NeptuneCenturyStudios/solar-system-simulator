@@ -3,7 +3,7 @@ import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Body } from '../../bodies/body';
-import { LoopSoundController, playLaserBeamLoop } from '../../utilities/audio.js';
+import { LoopSoundController, SoundEffect, playSoundEffect } from '../../utilities/audio.js';
 import { C } from '../../utilities/consts.js';
 import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
 
@@ -26,8 +26,9 @@ export interface ILaserWeaponConfig {
     damageInterval: number;
     /**
      * Starts the continuous beam sound when the trigger is pulled.
-     * Defaults to playLaserBeamLoop() (laser-beam.wav).  The returned
-     * controller is stopped automatically on trigger release / reset / dispose.
+     * Defaults to playSoundEffect(SoundEffect.LaserBeam, true) (laser-beam.wav).
+     * The returned controller is stopped automatically on trigger release /
+     * reset / dispose.
      */
     loopSound?: () => LoopSoundController | null;
 }
@@ -92,13 +93,13 @@ export class LaserWeapon extends Weapon {
             haloWidth: 8,
             damage: 1000,
             damageInterval: 0.2,
-            loopSound: playLaserBeamLoop,
+            loopSound: () => playSoundEffect(SoundEffect.LaserBeam, true),
         };
 
         this.config = { ...DEFAULT_LASER_CONFIG, ...config };
 
         const weaponSound: IWeaponSound = {
-            loop: this.config.loopSound ?? playLaserBeamLoop,
+            loop: this.config.loopSound ?? (() => playSoundEffect(SoundEffect.LaserBeam, true)),
         };
         this.weaponSound = weaponSound;
 

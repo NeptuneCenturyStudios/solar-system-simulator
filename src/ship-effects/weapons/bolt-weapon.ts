@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Body } from '../../bodies/body';
-import { playWeaponFire } from '../../utilities/audio.js';
+import { SoundEffect, playSoundEffect } from '../../utilities/audio.js';
 import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
 
 /**
@@ -24,7 +24,7 @@ export interface IBoltWeaponConfig {
     maxProjectiles: number;
     /** HP damage dealt on impact. */
     damage: number;
-    /** Called once per bolt fired. Defaults to playWeaponFire(). */
+    /** Called once per bolt fired. Defaults to playSoundEffect(SoundEffect.WeaponFire). */
     fireSound?: () => void;
 }
 
@@ -92,14 +92,14 @@ export class BoltWeapon extends Weapon {
             fireRate: 10.56,
             maxProjectiles: 800,
             damage: 1,
-            fireSound: playWeaponFire,
+            fireSound: () => playSoundEffect(SoundEffect.WeaponFire),
         };
         
         this.config = { ...DEFAULT_BOLT_CONFIG, ...config };
         this.maxProjectiles = this.config.maxProjectiles;
 
         const weaponSound: IWeaponSound = {
-            fire: this.config.fireSound ?? playWeaponFire,
+            fire: this.config.fireSound ?? (() => playSoundEffect(SoundEffect.WeaponFire)),
         };
         this.weaponSound = weaponSound;
 

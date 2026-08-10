@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { ImpactShockwave } from '../effects/impact-shockwave';
-import { playWeaponImpact } from '../utilities/audio.js';
+import { SoundEffect, playSoundEffect } from '../utilities/audio.js';
 import { IStateDependencies } from '../interfaces';
 import {
     autopilotState,
@@ -90,7 +90,7 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         const { body, position } = e.detail;
         if (body._isDisposed || !body.mesh) return;
 
-        playWeaponImpact();
+        playSoundEffect(SoundEffect.WeaponImpact);
 
         // Spawn impact flash: pass body centre so ImpactShockwave can snap to surface
         simulationState.impacts.push(

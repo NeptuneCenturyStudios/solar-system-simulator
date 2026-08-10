@@ -4,7 +4,7 @@ import { SCALE_FACTOR } from '../../utilities/consts.js';
 import { IShipEffect } from '../../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from '../body-enums';
-import { SoundEffect, WarpSoundController, playSoundEffect, playWarpLoop } from '../../utilities/audio.js';
+import { SoundEffect, WarpSoundController, playSoundEffect } from '../../utilities/audio.js';
 import { WarpEffect } from '../../effects/warp-effect.js';
 import { IDeathOptions, ISpaceshipHandling, AutopilotPhase, IWarpStepResult, ISpaceshipCreationOptions } from '../../interfaces';
 import { Weapon } from '../../ship-effects/weapons/weapon';
@@ -927,7 +927,7 @@ export class Spaceship extends Body {
     updateWarpSound(speedVolume: number, distanceFade: number): void {
         // Start the sound on first call (or retry each frame if buffer wasn't loaded yet)
         if (!this._warpSound) {
-            const ctrl = playWarpLoop();
+            const ctrl = playSoundEffect(SoundEffect.WarpLoop, true);
             if (ctrl) {
                 this._warpSound = ctrl;
             }
