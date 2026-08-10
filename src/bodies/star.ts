@@ -170,7 +170,7 @@ export class Star extends CelestialBody {
 
         this.sunLight = this.createLight(options.pos, clampedLightIntensity, options.lightDistance);
 
-        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 1);
         scene.add(this.ambientLight);
 
         this.setTemperature(options.temperature);

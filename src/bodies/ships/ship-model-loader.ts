@@ -37,14 +37,23 @@ export async function loadShipModelInto(
     radius: number,
     modelRotation: THREE.Euler = new THREE.Euler()
 ): Promise<THREE.Box3> {
+    // Models nested in a subfolder (e.g. "osiris-mothership/mother ship") need the MTL/OBJ
+    // loaders pointed at that subfolder, otherwise bare texture filenames in the .mtl
+    // resolve against the models root and 404.
+    const slashIndex = modelName.lastIndexOf('/');
+    const modelDir = slashIndex >= 0 ? modelName.slice(0, slashIndex + 1) : '';
+    const fileBase = slashIndex >= 0 ? modelName.slice(slashIndex + 1) : modelName;
+    const modelPath = `./assets/models/${modelDir}`;
+
     const mtlLoader = new MTLLoader();
-    mtlLoader.setPath('./assets/models/');
-    const materials = await mtlLoader.loadAsync(`./assets/models/${modelName}.mtl`);
+    mtlLoader.setPath(modelPath);
+    mtlLoader.setResourcePath(modelPath);
+    const materials = await mtlLoader.loadAsync(`${fileBase}.mtl`);
     materials.preload();
 
     const objLoader = new OBJLoader();
     objLoader.setMaterials(materials);
-    const group = await objLoader.loadAsync(`./assets/models/${modelName}.obj`);
+    const group = await objLoader.loadAsync(`${modelPath}${fileBase}.obj`);
 
     // Apply any authored orientation correction before measuring/scaling so the
     // bbox stays aligned to the game's local axes (+Z = forward, +Y = up).
