@@ -7,6 +7,11 @@ import { LoopSoundController, SoundEffect, playSoundEffect } from '../../utiliti
 import { C } from '../../utilities/consts.js';
 import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
 
+const LASER_FLICKER_FREQ_A      = 9.1;  // rad/s — incommensurate with B for non-repeating shimmer
+const LASER_FLICKER_FREQ_B      = 17.3;
+const LASER_FLICKER_OPACITY_AMP = 0.20; // ±20 % brightness swing
+const LASER_FLICKER_WIDTH_AMP   = 0.15; // ±15 % linewidth swing
+
 /**
  * Per-instance tuning for LaserWeapon.  Ships may pass a partial config to
  * override the class defaults; any omitted field keeps the class default.
@@ -61,6 +66,8 @@ export class LaserWeapon extends Weapon {
     private hitCooldown = 0;
     /** Grows from 0 to maxRange at C per sim-second; resets to 0 on each trigger pull. */
     private beamFront = 0;
+    /** Accumulates simDt while beam is active; drives dual-sine brightness/width shimmer. */
+    private _flickerTime = 0;
     /** World-space beam tip (impact point or max-range end). */
     private tip = new THREE.Vector3();
     // ── Rendering ────────────────────────────────────────────────────────────
@@ -246,6 +253,12 @@ export class LaserWeapon extends Weapon {
 
         this.beamFront = Math.min(this.beamFront + C * simDt, this.config.maxRange);
 
+        this._flickerTime += simDt;
+        const _shimmer     = Math.sin(this._flickerTime * LASER_FLICKER_FREQ_A) * 0.6
+                           + Math.sin(this._flickerTime * LASER_FLICKER_FREQ_B) * 0.4;
+        const _opacityMult = 1 + _shimmer * LASER_FLICKER_OPACITY_AMP;
+        const _widthMult   = 1 + _shimmer * LASER_FLICKER_WIDTH_AMP;
+
         // This update runs AFTER the physics step, so the owner's transform is
         // already the post-physics one — read the muzzle straight off the live
         // mesh.  No extrapolation, so the beam stays pinned to the nose under
@@ -314,6 +327,12 @@ export class LaserWeapon extends Weapon {
         this.haloBeamLine.position.set(cpx, cpy, cpz);
         this.coreLineMat.resolution.set(window.innerWidth, window.innerHeight);
         this.haloLineMat.resolution.set(window.innerWidth, window.innerHeight);
+        this.coreLineMat.opacity    = Math.max(0, Math.min(1, _opacityMult));
+        this.haloLineMat.opacity    = Math.max(0, Math.min(1, _opacityMult));
+        this.coreLineMat.linewidth  = this.config.coreWidth * Math.max(0.1, _widthMult);
+        this.haloLineMat.linewidth  = this.config.haloWidth * Math.max(0.1, _widthMult);
+        this.muzzleMaterial.opacity = Math.max(0, 0.95 * _opacityMult);
+        this.tipMaterial.opacity    = Math.max(0, 0.9  * _opacityMult);
 
         // ── Muzzle glow point ──────────────────────────────────────────────────────────────────
         this.muzzlePositions[0] = this.curOrigin.x - cpx;
@@ -350,6 +369,7 @@ export class LaserWeapon extends Weapon {
         this.prevBeamVisible = false;
         this.hitCooldown = 0;
         this.beamFront = 0;
+        this._flickerTime = 0;
         this.setBeamVisible(false);
         super.reset();
     }
