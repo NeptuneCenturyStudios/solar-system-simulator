@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Spaceship } from './spaceship';
 import { Zenith } from './zenith';
 import { StarDestroyer } from './star-destroyer';
-
+import { OsirisMothership } from './osirus-mothership';
 /**
  * Describes a selectable ship type for the Flight Controls ship dropdown.
  * All ships share the same constructor signature, so the registry can
@@ -39,6 +39,12 @@ export const SHIP_TYPES: IShipType[] = [
         label: 'Star Destroyer',
         create: (dependencies, scene, position, velocity, id) =>
             new StarDestroyer(dependencies, scene, position, velocity, id),
+    },
+    {
+        id: 'osiris_mothership',
+        label: 'Osiris Mothership',
+        create: (dependencies, scene, position, velocity, id) =>
+            new OsirisMothership(dependencies, scene, position, velocity, id),
     },
 ];
 
