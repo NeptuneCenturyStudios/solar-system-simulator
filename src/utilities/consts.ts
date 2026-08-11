@@ -182,7 +182,7 @@ export const WARP_FULL_VIS_DIST = 50 * SCALE_FACTOR;
 /** Camera distance (u) at which the warp tunnel has fully faded out. */
 export const WARP_FADE_DIST = 200 * SCALE_FACTOR;
 /** Peak camera shake displacement (u) applied each frame during warp. */
-export const WARP_SHAKE_MAG = 0.002 * .00037; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
+export const WARP_SHAKE_MAG = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
 
 // === Miscellaneous & Simulation Parameters ===
 export const ASTEROID_SPAWN_MIN_DIST = 50000 * SCALE_FACTOR;

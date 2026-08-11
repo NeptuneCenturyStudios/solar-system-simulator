@@ -160,7 +160,7 @@ window.addEventListener('beforeunload', (e) => {
 const scene = new THREE.Scene();
 
 // === Ambient light from stars (base level of illumination) ===
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.20);
 scene.add(ambientLight);
 
 // --- Camera and renderer setup ---

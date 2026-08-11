@@ -659,10 +659,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 const cf = new THREE.Vector3();
                 ctx.camera.getWorldDirection(cf);
                 const cr = new THREE.Vector3().crossVectors(cf, ctx.camera.up).normalize();
-                ctx.camera.position.addScaledVector(cr, (Math.random() - 0.5) * WARP_SHAKE_MAG);
+                ctx.camera.position.addScaledVector(cr, (Math.random() - 0.5) * WARP_SHAKE_MAG * _shakeShip.radius);
                 ctx.camera.position.addScaledVector(
                     ctx.camera.up,
-                    (Math.random() - 0.5) * WARP_SHAKE_MAG
+                    (Math.random() - 0.5) * WARP_SHAKE_MAG * _shakeShip.radius
                 );
             }
         }
