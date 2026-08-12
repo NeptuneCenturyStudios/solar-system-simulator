@@ -24,6 +24,10 @@ export interface IBoltWeaponConfig {
     maxProjectiles: number;
     /** HP damage dealt on impact. */
     damage: number;
+    /** Thermal load gained per second while the trigger is held (0..1 scale). */
+    heatPerSecond: number;
+    /** Thermal load lost per second while the trigger is released (0..1 scale). */
+    coolPerSecond: number;
     /** Called once per bolt fired. Defaults to playSoundEffect(SoundEffect.WeaponFire). */
     fireSound?: () => void;
 }
@@ -78,6 +82,8 @@ export class BoltWeapon extends Weapon {
     private headMaterial: THREE.PointsMaterial;
     private headPoints: THREE.Points;
     private fireCooldown = 0;
+    /** True while the trigger is held (drives thermal cooldown gating). */
+    private active = false;
 
     constructor(scene: THREE.Scene, shipRadius: number, config: Partial<IBoltWeaponConfig> = {}) {
         super(scene);
@@ -92,6 +98,8 @@ export class BoltWeapon extends Weapon {
             fireRate: 10.56,
             maxProjectiles: 800,
             damage: 1,
+            heatPerSecond: 0.2,
+            coolPerSecond: 0.8,
             fireSound: () => playSoundEffect(SoundEffect.WeaponFire),
         };
         
@@ -184,6 +192,10 @@ export class BoltWeapon extends Weapon {
         direction: THREE.Vector3,
         shipVelocity: THREE.Vector3
     ): void {
+        this.active = true;
+        if (this.overheated) return;
+        this.addHeat(this.config.heatPerSecond * dt);
+
         this.fireCooldown -= dt;
         if (this.fireCooldown > 0) return;
         this.fireCooldown = 1.0 / this.config.fireRate;
@@ -200,6 +212,12 @@ export class BoltWeapon extends Weapon {
             velDir: velocity.clone().normalize(),
             timeRemaining: this.config.particleLifetime,
         });
+    }
+
+    /** Release the trigger — stops the thermal cooldown gate. */
+    stopFire(): void {
+        this.active = false;
+        super.stopFire();
     }
 
     /**
@@ -222,6 +240,8 @@ export class BoltWeapon extends Weapon {
         cameraPosition: THREE.Vector3,
         owner: IWeaponOwner
     ): void {
+        this.updateThermal(wallDt, this.active, this.config.coolPerSecond);
+
         const toRemove = new Set<number>();
 
         for (let i = 0; i < this.projectiles.length; i++) {

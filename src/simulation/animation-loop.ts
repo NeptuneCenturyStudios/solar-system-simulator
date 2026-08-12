@@ -481,6 +481,24 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
         }
 
+        // ── Thermal load gauge ───────────────────────────────────────────────
+        // Anchored beside the gray steering-origin ring; hides together with it.
+        if (
+            ctx.flightState.isActive &&
+            ctx.flightState.activeShip &&
+            ctx.flightState.activeShip.weapons.length > 0 &&
+            ctx.steeringOriginMarker.visible
+        ) {
+            const weapon = ctx.flightState.activeShip.weapons[0];
+            ctx.flightHUD.updateThermalHUD(
+                weapon.thermalLoad,
+                weapon.isOverheated,
+                ctx.steeringOriginMarker.position
+            );
+        } else {
+            ctx.flightHUD.hideThermalSprite();
+        }
+
         // ── Explosions / impacts / supernovas / nebulae ──────────────────
         ctx.simulationState.explosions = ctx.simulationState.explosions.filter((e) => {
             e.update(dtTotal, ctx.camera.position);

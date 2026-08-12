@@ -51,7 +51,44 @@ export abstract class Weapon {
     /** Active loop controller — started by beginSound(), stopped by stopFire()/reset()/dispose(). */
     private loopSound: LoopSoundController | null = null;
 
+    /** Normalised thermal load, 0 (cold) .. 1 (overheated). */
+    protected heat = 0;
+    /** True once heat has hit 1; blocks firing until heat fully cools back to 0. */
+    protected overheated = false;
+
+    /** Current thermal load in [0, 1], for HUD display. */
+    get thermalLoad(): number {
+        return this.heat;
+    }
+
+    /** True while the weapon is locked out from firing due to overheating. */
+    get isOverheated(): boolean {
+        return this.overheated;
+    }
+
     protected constructor(protected readonly scene: THREE.Scene) {}
+
+    /** Add thermal load from firing; locks the weapon out once it reaches 1. */
+    protected addHeat(amount: number): void {
+        this.heat = Math.min(1, this.heat + amount);
+        if (this.heat >= 1) {
+            this.heat = 1;
+            this.overheated = true;
+        }
+    }
+
+    /**
+     * Cool down while not firing; clears the overheat lockout once heat fully
+     * drains to 0. No-op while `firing` is true, so an overheated weapon stays
+     * pegged at max until the trigger is released.
+     */
+    protected updateThermal(dt: number, firing: boolean, coolPerSecond: number): void {
+        if (firing) return;
+        this.heat = Math.max(0, this.heat - coolPerSecond * dt);
+        if (this.overheated && this.heat <= 0) {
+            this.overheated = false;
+        }
+    }
 
     /**
      * Play the weapon's fire sound.  Subclasses call this from tryFire() on the
@@ -120,6 +157,8 @@ export abstract class Weapon {
             this.loopSound.stop(0);
             this.loopSound = null;
         }
+        this.heat = 0;
+        this.overheated = false;
     }
 
     /** Release GPU + audio resources. Called on ship destruction. */

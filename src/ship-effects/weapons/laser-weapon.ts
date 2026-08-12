@@ -29,6 +29,10 @@ export interface ILaserWeaponConfig {
     damage: number;
     /** Minimum seconds between damage ticks on the same body. */
     damageInterval: number;
+    /** Thermal load gained per second while the trigger is held (0..1 scale). */
+    heatPerSecond: number;
+    /** Thermal load lost per second while the trigger is released (0..1 scale). */
+    coolPerSecond: number;
     /**
      * Starts the continuous beam sound when the trigger is pulled.
      * Defaults to playSoundEffect(SoundEffect.LaserBeam, true) (laser-beam.wav).
@@ -100,6 +104,8 @@ export class LaserWeapon extends Weapon {
             haloWidth: 8,
             damage: 1000,
             damageInterval: 0.2,
+            heatPerSecond: 0.25,
+            coolPerSecond: 0.75,
             loopSound: () => playSoundEffect(SoundEffect.LaserBeam, true),
         };
 
@@ -204,7 +210,7 @@ export class LaserWeapon extends Weapon {
      * sound on the rising edge only.
      */
     tryFire(
-        _dt: number,
+        dt: number,
         _origin: THREE.Vector3,
         direction: THREE.Vector3,
         _shipVelocity: THREE.Vector3
@@ -212,6 +218,9 @@ export class LaserWeapon extends Weapon {
         const wasActive = this.active;
         this.active = true;
         this.direction.copy(direction).normalize();
+
+        if (this.overheated) return;
+        this.addHeat(this.config.heatPerSecond * dt);
 
         if (!wasActive) {
             this.beginSound();
@@ -237,12 +246,14 @@ export class LaserWeapon extends Weapon {
         owner: IWeaponOwner
     ): void {
         this.hitCooldown -= wallDt;
+        this.updateThermal(wallDt, this.active, this.config.coolPerSecond);
 
-        if (!this.active) {
-            // Hide the beam immediately when the trigger is released.
+        if (!this.active || this.overheated) {
+            // Hide the beam immediately when the trigger is released or the weapon overheats.
             if (this.prevBeamVisible) {
                 this.setBeamVisible(false);
                 this.prevBeamVisible = false;
+                this.endLoopSound();
             }
             return;
         }

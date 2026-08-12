@@ -15,6 +15,9 @@ export type AutopilotHudState =
     | 'BLOCKED'
     | 'NONE';
 
+// Fixed pixel offset to the right of the gray steering-origin ring (radius ~120-124px).
+const THERMAL_GAUGE_OFFSET_X = 160;
+
 // ── Private texture-creator helpers ──────────────────────────────────────────
 
 /** Renders the charging progress bar (fill = 0..1) with label above. */
@@ -89,6 +92,69 @@ function createWarpActiveTexture(pulse: number): THREE.CanvasTexture {
     ctx.shadowColor = `rgba(255,120,0,${alpha})`;
     ctx.fillStyle = `rgba(255,${Math.round(180 + 75 * pulse)},0,${alpha})`;
     ctx.fillText('WARP ACTIVE', W / 2, H / 2);
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+}
+
+/** Renders the vertical thermal-load gauge (fill = 0..1), with an overheat flash state. */
+function createThermalGaugeTexture(fill: number, overheated: boolean): THREE.CanvasTexture {
+    const W = 90,
+        H = 170;
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const ctx = c.getContext('2d')!;
+
+    // Label
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 14px monospace';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = overheated ? '#ff3344' : '#00ffcc';
+    ctx.shadowColor = overheated ? 'rgba(255,51,68,0.9)' : 'rgba(0,255,204,0.7)';
+    ctx.fillText('HEAT', W / 2, 14);
+
+    // Bar track (vertical; fills bottom-up)
+    const barX = 20,
+        barY = 28,
+        barW = W - 40,
+        barH = H - 44;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(0,255,204,0.12)';
+    ctx.strokeStyle = 'rgba(0,255,204,0.5)';
+    ctx.lineWidth = 2;
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.strokeRect(barX, barY, barW, barH);
+
+    // Bar fill — gradient cyan (cool) → orange → red (hot), growing from the bottom
+    const clampedFill = Math.max(0, Math.min(1, fill));
+    if (clampedFill > 0) {
+        const fillH = barH * clampedFill;
+        const fillY = barY + barH - fillH;
+        const grad = ctx.createLinearGradient(0, barY + barH, 0, barY);
+        grad.addColorStop(0, 'rgba(0,200,180,0.9)');
+        grad.addColorStop(0.6, 'rgba(255,180,0,0.9)');
+        grad.addColorStop(1, 'rgba(255,60,40,1.0)');
+        ctx.fillStyle = grad;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = clampedFill > 0.85 ? 'rgba(255,60,40,0.9)' : 'rgba(0,255,204,0.6)';
+        ctx.fillRect(barX, fillY, barW, fillH);
+        ctx.shadowBlur = 0;
+    }
+
+    // Overheat flash overlay + label
+    if (overheated) {
+        const pulse = (Math.sin(Date.now() * 0.012) + 1) * 0.5; // 0..1
+        ctx.fillStyle = `rgba(255,40,40,${0.25 + 0.35 * pulse})`;
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.font = 'bold 13px monospace';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(255,51,68,0.9)';
+        ctx.fillStyle = `rgba(255,80,80,${0.7 + 0.3 * pulse})`;
+        ctx.fillText('OVERHEAT', W / 2, H - 10);
+    }
 
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
@@ -226,6 +292,7 @@ export class FlightHUD {
     warpSprite: THREE.Sprite | null = null;
     orbitNotifySprite: THREE.Sprite | null = null;
     hintSprite: THREE.Sprite | null = null;
+    thermalSprite: THREE.Sprite | null = null;
     autopilotBlockedNotifyTimer = 0;
     autopilotBlockedByName = '';
 
@@ -284,6 +351,7 @@ export class FlightHUD {
         this._initWarp();
         this._initOrbitNotify();
         this._initHint();
+        this._initThermal();
     }
 
     private _initWarp(): void {
@@ -333,6 +401,21 @@ export class FlightHUD {
         this.uiScene.add(this.hintSprite);
     }
 
+    private _initThermal(): void {
+        const texture = createThermalGaugeTexture(0, false);
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            depthTest: false,
+            depthWrite: false,
+        });
+        this.thermalSprite = new THREE.Sprite(material);
+        // 90×170 canvas → 48×90 screen pixels; positioned each frame beside the gray steering ring
+        this.thermalSprite.scale.set(48, 90, 1);
+        this.thermalSprite.visible = false;
+        this.uiScene.add(this.thermalSprite);
+    }
+
     /** Show the orbit-notify sprite and reset its timer. */
     showOrbitNotify(): void {
         if (!this.orbitNotifySprite) return;
@@ -363,6 +446,25 @@ export class FlightHUD {
     /** Hide the warp sprite. */
     hideWarpSprite(): void {
         if (this.warpSprite) this.warpSprite.visible = false;
+    }
+
+    /** Update the thermal gauge fill/overheat state and anchor it beside `anchorPos` (the gray steering ring). */
+    updateThermalHUD(heat: number, overheated: boolean, anchorPos: THREE.Vector3): void {
+        if (!this.thermalSprite) return;
+        this.thermalSprite.position.set(
+            anchorPos.x + THERMAL_GAUGE_OFFSET_X,
+            anchorPos.y,
+            TEXT_SPRITE_Z
+        );
+        this.thermalSprite.material.map?.dispose();
+        this.thermalSprite.material.map = createThermalGaugeTexture(heat, overheated);
+        this.thermalSprite.material.needsUpdate = true;
+        this.thermalSprite.visible = true;
+    }
+
+    /** Hide the thermal gauge. */
+    hideThermalSprite(): void {
+        if (this.thermalSprite) this.thermalSprite.visible = false;
     }
 
     /**
