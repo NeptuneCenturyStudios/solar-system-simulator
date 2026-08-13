@@ -20,7 +20,13 @@ import { Star } from '../bodies/star';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { settingsStore } from '../settings/settings-store';
 import { UIManager } from '../ui/ui-manager';
-import { absorbBody, chooseCollisionWinner, updateSimulation } from '../physics/physics';
+import {
+    absorbBody,
+    chooseCollisionWinner,
+    deflectBodies,
+    destroyBody,
+    updateSimulation,
+} from '../physics/physics';
 import {
     ISimulationState,
     IFlightState,
@@ -382,7 +388,15 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         continue;
 
                     if (dx * dx + dy * dy + dz * dz < maxDist * maxDist) {
-                        const { winner, victim } = chooseCollisionWinner(b1, b2);
+                        const outcome = chooseCollisionWinner(b1, b2);
+
+                        if (outcome.type === 'bounce') {
+                            // Comparable-mass bodies: deflect off each other, no destruction.
+                            deflectBodies(b1, b2);
+                            continue;
+                        }
+
+                        const { winner, victim } = outcome;
                         if (
                             ctx.cameraState?.focusBody === victim &&
                             winner &&
@@ -392,7 +406,11 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                             if (ctx.cameraState.isTargetMode) ctx.gizmo.attach(winner);
                             ctx.uiManager.managementPanel?.setSelectedBody?.(winner);
                         }
-                        absorbBody(winner, victim);
+                        if (outcome.type === 'absorb') {
+                            absorbBody(winner, victim);
+                        } else {
+                            destroyBody(winner, victim);
+                        }
                         victim.die();
                         ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
                             (b) => b !== victim

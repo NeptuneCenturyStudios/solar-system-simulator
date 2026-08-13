@@ -4,6 +4,7 @@ import { BLACK_HOLE_RADIUS_PER_SOL, G, PLUTO_DIST } from '../utilities/consts';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { BlackHole } from '../bodies/black-hole';
 import { CelestialBody } from '../bodies/celestial-body';
+import { Star } from '../bodies/star';
 import { Spaceship } from '../bodies/ships/spaceship';
 import { NotificationType } from '../event-log/event-log';
 import { EffectiveGForce } from '../types';
@@ -216,11 +217,23 @@ function collisionScoreEscapeVelocity(body: Body) {
     return m / r;
 }
 
-export function chooseCollisionWinner(b1: Body, b2: Body) {
-    // Spaceships always lose — they should never absorb anything.
-    if (b1 instanceof Spaceship) return { winner: b2, victim: b1 };
-    if (b2 instanceof Spaceship) return { winner: b1, victim: b2 };
+/** A body must outmass the other by at least this ratio to be declared a decisive winner.
+ *  Below this ratio the two bodies are considered comparable and deflect off each other
+ *  instead (conservation of momentum) rather than one absorbing/destroying the other. */
+const MASS_DOMINANCE_RATIO = 10;
 
+/**
+ * 'absorb': winner merges the victim's mass/radius (default outcome for CelestialBody/BlackHole/Star collisions).
+ * 'destroy': winner survives and the victim is removed, but no mass/radius is transferred
+ *   (spaceships can claim a kill without ever "absorbing" anything).
+ * 'bounce': neither body is destroyed — comparable-mass bodies deflect off each other instead.
+ */
+export type CollisionOutcome =
+    | { type: 'absorb'; winner: Body; victim: Body }
+    | { type: 'destroy'; winner: Body; victim: Body }
+    | { type: 'bounce' };
+
+function resolveByEscapeVelocity(b1: Body, b2: Body): { winner: Body; victim: Body } {
     const s1 = collisionScoreEscapeVelocity(b1);
     const s2 = collisionScoreEscapeVelocity(b2);
 
@@ -237,6 +250,73 @@ export function chooseCollisionWinner(b1: Body, b2: Body) {
     const n2 = String(b2?.name || '');
     if (n1 >= n2) return { winner: b1, victim: b2 };
     return { winner: b2, victim: b1 };
+}
+
+export function chooseCollisionWinner(b1: Body, b2: Body): CollisionOutcome {
+    const isBH1 = b1 instanceof BlackHole;
+    const isBH2 = b2 instanceof BlackHole;
+
+    // Black holes dominate everything except another (bigger) black hole.
+    if (isBH1 && !isBH2) return { type: 'absorb', winner: b1, victim: b2 };
+    if (isBH2 && !isBH1) return { type: 'absorb', winner: b2, victim: b1 };
+
+    const isStar1 = b1 instanceof Star;
+    const isStar2 = b2 instanceof Star;
+
+    // Two black holes or two stars: keep the original escape-velocity ordering — always absorb.
+    if ((isBH1 && isBH2) || (isStar1 && isStar2)) {
+        const { winner, victim } = resolveByEscapeVelocity(b1, b2);
+        return { type: 'absorb', winner, victim };
+    }
+
+    const m1 = Math.max(0, b1?.mass || 0);
+    const m2 = Math.max(0, b2?.mass || 0);
+    const bigger = m1 >= m2 ? b1 : b2;
+    const smaller = m1 >= m2 ? b2 : b1;
+    const mBig = Math.max(m1, m2);
+    const mSmall = Math.min(m1, m2);
+    const ratio = mSmall > 0 ? mBig / mSmall : Infinity;
+
+    // Comparable mass: no decisive winner — both bodies survive and deflect off each other.
+    if (ratio < MASS_DOMINANCE_RATIO) return { type: 'bounce' };
+
+    // One body decisively outmasses the other, so it "wins" the collision.
+    // Spaceships never absorb mass — they can only claim a kill (or be destroyed themselves).
+    if (bigger instanceof Spaceship || smaller instanceof Spaceship) {
+        return { type: 'destroy', winner: bigger, victim: smaller };
+    }
+
+    return { type: 'absorb', winner: bigger, victim: smaller };
+}
+
+/**
+ * Deflects two comparable-mass bodies off each other via a 1D elastic collision along the
+ * contact normal, conserving momentum without destroying or merging either body.
+ */
+export function deflectBodies(b1: Body, b2: Body) {
+    if (!b1 || !b2) return;
+    if (b1._isDisposed || b2._isDisposed) return;
+    if (!b1.velocity || !b2.velocity || !b1.mesh || !b2.mesh) return;
+
+    const normal = b1.mesh.position.clone().sub(b2.mesh.position);
+    if (normal.lengthSq() < 1e-12) normal.set(1, 0, 0);
+    else normal.normalize();
+
+    const relVel = b1.velocity.clone().sub(b2.velocity);
+    const closingSpeed = relVel.dot(normal);
+
+    // Only resolve while actually approaching — avoids re-triggering every frame the two
+    // bodies remain visually overlapping after they've already been pushed apart.
+    if (closingSpeed >= 0) return;
+
+    const m1 = Math.max(1e-9, b1.mass || 0);
+    const m2 = Math.max(1e-9, b2.mass || 0);
+
+    const restitution = 1; // fully elastic bounce
+    const impulse = (-(1 + restitution) * closingSpeed) / (1 / m1 + 1 / m2);
+
+    b1.velocity.addScaledVector(normal, impulse / m1);
+    b2.velocity.addScaledVector(normal, -impulse / m2);
 }
 
 export function absorbBody(winner: Body, victim: Body) {
@@ -290,6 +370,26 @@ export function absorbBody(winner: Body, victim: Body) {
     // index.ts listens and turns this into a Noty notification.
     const message = `${winner.name} absorbed ${victim.name}`;
     console.info('[body:absorbed]', message);
+    window.dispatchEvent(
+        new CustomEvent('body:absorbed', {
+            detail: {
+                message,
+                notificationType: NotificationType.Alert,
+            },
+        })
+    );
+}
+
+/**
+ * Removes a victim body from a decisive collision without transferring any mass/radius to the
+ * winner. Used for spaceships, which can claim a much smaller body as a kill but never absorb it.
+ */
+export function destroyBody(winner: Body, victim: Body) {
+    if (!winner || !victim) return;
+    if (winner._isDisposed || victim._isDisposed) return;
+
+    const message = `${winner.name} destroyed ${victim.name}`;
+    console.info('[body:destroyed]', message);
     window.dispatchEvent(
         new CustomEvent('body:absorbed', {
             detail: {
