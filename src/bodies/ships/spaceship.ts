@@ -756,6 +756,18 @@ export class Spaceship extends Body {
                 .copy(target.velocity)
                 .addScaledVector(toTargetDir, targetSpeed);
 
+            // Speed-limit guard: never command the ship beyond its current phase
+            // cap (boost max or normal max). Without this clamp, a target body
+            // moving faster than the ship can travel (e.g. a fast comet) makes
+            // desiredVel = target.velocity + targetSpeed exceed the ship's limit,
+            // and the controller thrusts the ship past max speed trying to catch
+            // up. Clamping the commanded velocity lets the existing warp→boost→
+            // normal decel sequence still shed speed while ensuring acceleration
+            // can never push the ship beyond the limit.
+            const approachCap = useBoost ? h.flightBoostMaxSpeed : h.flightMaxSpeed;
+            const desiredLen = desiredVel.length();
+            if (desiredLen > approachCap) desiredVel.multiplyScalar(approachCap / desiredLen);
+
             const velDelta = new THREE.Vector3().subVectors(desiredVel, this.velocity);
             const deltaLen = velDelta.length();
 
@@ -816,6 +828,17 @@ export class Spaceship extends Body {
                 .copy(target.velocity)
                 .addScaledVector(tangential, vOrbit * alpha)
                 .addScaledVector(toTargetDir, inwardSpeed);
+
+            // Speed-limit guard (same as APPROACH): never command the ship beyond
+            // boost max while braking. The vOrbit allowance preserves orbit
+            // insertion around bodies whose orbital velocity exceeds boost max
+            // (e.g. black holes), since matching the orbit there is necessary to
+            // avoid falling in. Chasing a target moving faster than boost max
+            // simply caps the ship at its limit — it can't exceed it.
+            const brakeCap = Math.max(h.flightBoostMaxSpeed, vOrbit);
+            const brakeDesiredLen = desiredVel.length();
+            if (brakeDesiredLen > brakeCap)
+                desiredVel.multiplyScalar(brakeCap / brakeDesiredLen);
 
             // Explicit gravity compensation.
             const gravAccel = (gEff * target.mass) / (r * r);
