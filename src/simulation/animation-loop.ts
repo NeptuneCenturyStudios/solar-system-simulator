@@ -23,7 +23,6 @@ import { UIManager } from '../ui/ui-manager';
 import {
     absorbBody,
     chooseCollisionWinner,
-    deflectBodies,
     destroyBody,
     updateSimulation,
 } from '../physics/physics';
@@ -390,13 +389,34 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     if (dx * dx + dy * dy + dz * dz < maxDist * maxDist) {
                         const outcome = chooseCollisionWinner(b1, b2);
 
-                        if (outcome.type === 'bounce') {
-                            // Comparable-mass bodies: deflect off each other, no destruction.
-                            deflectBodies(b1, b2);
-                            continue;
+                        if (outcome.type === 'destroy-both') {
+                            // Comparable-mass bodies: no winner — both are destroyed.
+                            destroyBody(null, outcome.victims);
+
+                            const primaryStar = ctx.simulationState.bodies.find(
+                                (b) => b && !b._isDisposed && b instanceof Star
+                            ) as Star | undefined;
+                            for (const victim of outcome.victims) {
+                                if (victim === primaryStar && cameraState.focusID === 'camSun') {
+                                    ctx.setF('camNone');
+                                    ctx.selectedBody.value = null;
+                                    ctx.gizmo.attach(null);
+                                    ctx.controls.enabled = true;
+                                    ctx.controls.target.set(0, 0, 0);
+                                    ctx.controls.mouseButtons.RIGHT = null;
+                                    ctx.triggerZoomToBody(null);
+                                }
+                                victim.die();
+                                ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
+                                    (b) => b !== victim
+                                );
+                            }
+                            // b1 is always destroyed here — stop colliding it against the rest.
+                            break;
                         }
 
-                        const { winner, victim } = outcome;
+                        const { winner, victims } = outcome;
+                        const victim = victims[0];
                         if (
                             ctx.cameraState?.focusBody === victim &&
                             winner &&
@@ -406,16 +426,13 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                             if (ctx.cameraState.isTargetMode) ctx.gizmo.attach(winner);
                             ctx.uiManager.managementPanel?.setSelectedBody?.(winner);
                         }
+
                         if (outcome.type === 'absorb') {
                             absorbBody(winner, victim);
                         } else {
-                            destroyBody(winner, victim);
+                            destroyBody(winner, victims);
                         }
-                        victim.die();
-                        ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
-                            (b) => b !== victim
-                        );
-
+                        
                         const primaryStar = ctx.simulationState.bodies.find(
                             (b) => b && !b._isDisposed && b instanceof Star
                         ) as Star | undefined;
@@ -428,6 +445,14 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                             ctx.controls.mouseButtons.RIGHT = null;
                             ctx.triggerZoomToBody(null);
                         }
+
+                        victim.die();
+                        ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
+                            (b) => b !== victim
+                        );
+
+                        // b1 may be the victim — stop colliding it against remaining bodies.
+                        if (b1._isDisposed) break;
                     }
                 }
             }
