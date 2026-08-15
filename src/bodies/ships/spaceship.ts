@@ -795,6 +795,9 @@ export class Spaceship extends Body {
             const withinOrbit = distance <= orbitRadius * 1.02;
             const driftedToOrbit = distance <= orbitRadius * 1.1 && radialClosingSpeed < 1;
             if (withinOrbit || driftedToOrbit) {
+                // Voice prompt: destination reached — the ship arrives at the
+                // body and begins circularizing into orbit.
+                playSoundEffect(SoundEffect.AutopilotDestinationReached);
                 this.autopilotPhase = 'CIRCULARIZE';
             }
         }

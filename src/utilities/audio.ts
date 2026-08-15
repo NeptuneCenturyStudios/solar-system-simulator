@@ -26,6 +26,7 @@ export enum SoundEffect {
     WarpDriveActive,
     AutopilotEngaged,
     AutopilotDisengaged,
+    AutopilotDestinationReached,
     // Weapon sounds
     WeaponFire,
     WeaponImpact,
@@ -82,6 +83,15 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     },
     [SoundEffect.AutopilotDisengaged]: {
         soundEffectBank: [new URL('../assets/sounds/voice/autopilot-disengaged.mp3', import.meta.url).href],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        activeLoop: null,
+    },
+    [SoundEffect.AutopilotDestinationReached]: {
+        soundEffectBank: [new URL('../assets/sounds/voice/autopilot-destination-reached.mp3', import.meta.url).href],
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
