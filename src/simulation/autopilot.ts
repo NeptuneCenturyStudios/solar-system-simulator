@@ -83,13 +83,11 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
         return;
     }
 
-    // Guard: refuse to engage while warp/stop-brake is live.
-    if (
-        ship.warpActive ||
-        ship.warpDecelerating ||
-        ship.warpCharging ||
-        ship.stopBraking
-    ) {
+    // Guard: refuse to engage while warp is live.  A warp-adjacent deceleration
+    // in progress (stop-brake from an autopilot cancel, or a boost decel from a
+    // Shift release) is interrupted — the autopilot takes over from the ship's
+    // current velocity and manages its own speed.
+    if (ship.warpActive || ship.warpDecelerating || ship.warpCharging) {
         ctx.addEvent({
             message: 'Autopilot: disengage warp before engaging autopilot.',
             notificationType: NotificationType.Warning,
@@ -97,6 +95,10 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
         });
         return;
     }
+    // Interrupt any in-progress stop-brake / boost deceleration so it can't keep
+    // fighting the autopilot's own velocity management.
+    ship.stopBraking = false;
+    ship.boostDecelerating = false;
 
     // Clean up any prior autopilot warp when switching targets.
     if (ship.warpActive) {

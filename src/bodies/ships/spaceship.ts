@@ -469,11 +469,36 @@ export class Spaceship extends Body {
     }
 
     /**
-     * Apply one stop-brake step: shed forward speed toward zero using the
-     * deceleration rate matching the ship's current speed band (warp decel above
-     * boost max, boost decel above normal max, thrust decel otherwise).
-     * Perpendicular drift is decayed as well so the ship stops in a straight
-     * line instead of drifting off course.
+     * Deceleration rate (u/s²) matching the ship's current speed band:
+     * warp decel above boost max, boost decel above normal max, thrust decel
+     * otherwise.  Shared by the autopilot APPROACH and autopilot BRAKE paths so
+     * every deceleration uses the same band selection.  The stop-brake sheds
+     * band-by-band instead (see applyStopBrakeStep).
+     */
+    decelRateForSpeed(speed: number): number {
+        const h = this.handling;
+        const absSpeed = Math.abs(speed);
+        return absSpeed > h.flightBoostMaxSpeed
+            ? h.flightWarpDecel
+            : absSpeed > h.flightMaxSpeed
+              ? h.flightBoostDecel
+              : h.flightThrustDecel;
+    }
+
+    /**
+     * Apply one stop-brake step: shed forward speed toward zero in straight-line
+     * fashion (perpendicular drift is decayed) using the decel rate matching the
+     * ship's current speed band: warp decel above boost max, boost decel above
+     * normal max, thrust decel otherwise.
+     *
+     * Sheds band-by-band (warp → boost → thrust) within a single step. Each
+     * band's shed is capped at the distance to that band's floor, so a step can
+     * never overshoot a floor and hard-stop — the original instant-stop from a
+     * single warpDecel step at full boost speed — and it always crosses INTO the
+     * next band rather than landing exactly on the boundary. Landing exactly on a
+     * floor would let gravity re-inject a hair of forward speed next frame,
+     * re-triggering the higher-band rate indefinitely: the ship pinned at max
+     * speed with stopBraking never completing.
      *
      * Returns true while still braking, false once the ship is at rest.
      */
@@ -481,21 +506,33 @@ export class Spaceship extends Body {
         const h = this.handling;
         const fwdSpd = this.velocity.dot(forward);
         const absFwdSpd = Math.abs(fwdSpd);
-        const rate =
-            absFwdSpd > h.flightBoostMaxSpeed
-                ? h.flightWarpDecel
-                : absFwdSpd > h.flightMaxSpeed
-                  ? h.flightBoostDecel
-                  : h.flightThrustDecel;
-        const unclamped = Math.sign(fwdSpd) * (absFwdSpd - rate * simDt);
+        const dir = fwdSpd < 0 ? -1 : 1;
 
-        if (Math.sign(unclamped) === Math.sign(fwdSpd) && Math.abs(unclamped) > 1e-6) {
-            this.velocity.copy(forward).multiplyScalar(unclamped);
+        // Remaining forward speed after shedding each band this step.
+        let remaining = absFwdSpd;
+
+        // Phase 1: warp speed → boost max, at the warp decel rate.
+        if (remaining > h.flightBoostMaxSpeed) {
+            const shed = Math.min(remaining - h.flightBoostMaxSpeed, h.flightWarpDecel * simDt);
+            remaining -= shed;
+        }
+        // Phase 2: boost speed → normal max, at the boost decel rate.
+        if (remaining > h.flightMaxSpeed) {
+            const shed = Math.min(remaining - h.flightMaxSpeed, h.flightBoostDecel * simDt);
+            remaining -= shed;
+        }
+        // Phase 3: normal speed → rest, at the thrust decel rate.
+        const thrustShed = Math.min(remaining, h.flightThrustDecel * simDt);
+        remaining -= thrustShed;
+
+        if (remaining > 1e-6) {
+            const nextFwd = dir * remaining;
+            this.velocity.copy(forward).multiplyScalar(nextFwd);
             // Decay perpendicular drift so the ship decelerates in a straight line.
-            const perpVel = this.velocity.clone().addScaledVector(forward, -unclamped);
+            const perpVel = this.velocity.clone().addScaledVector(forward, -nextFwd);
             const decay = Math.max(0, 1 - h.flightPerpDecay * simDt);
             perpVel.multiplyScalar(decay);
-            this.velocity.copy(forward).multiplyScalar(unclamped).add(perpVel);
+            this.velocity.copy(forward).multiplyScalar(nextFwd).add(perpVel);
             return true;
         }
         // At rest — stop completely.
@@ -847,11 +884,7 @@ export class Spaceship extends Body {
                 }
                 const needsDecel = approachSpeed > targetSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
                 const rate = needsDecel
-                    ? approachSpeed > h.flightBoostMaxSpeed
-                        ? h.flightWarpDecel
-                        : approachSpeed > h.flightMaxSpeed
-                          ? h.flightBoostDecel
-                          : h.flightThrustDecel
+                    ? this.decelRateForSpeed(approachSpeed)
                     : useBoost
                       ? h.flightBoostAccel
                       : h.flightThrustAccel;
@@ -880,11 +913,7 @@ export class Spaceship extends Body {
             const alpha = t * t * (3 - 2 * t); // smoothstep
 
             const brakeApproachSpeed = relVel.length();
-            const brakeDecel = brakeApproachSpeed > h.flightBoostMaxSpeed
-                ? h.flightWarpDecel
-                : brakeApproachSpeed > h.flightMaxSpeed
-                  ? h.flightBoostDecel
-                  : h.flightThrustDecel;
+            const brakeDecel = this.decelRateForSpeed(brakeApproachSpeed);
             const maxInwardForSpan = Math.sqrt(2 * brakeDecel * brakeSpan);
             const inwardSpeed = Math.min(h.flightMaxSpeed, maxInwardForSpan) * (1 - alpha);
             const desiredVel = new THREE.Vector3()
