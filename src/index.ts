@@ -4627,6 +4627,18 @@ const animCtx: AnimationContext = {
     updateAutopilotStep: (subDt: number) => {
         const _apShip = flightState.knownShip;
         if (_apShip && _apShip.autopilotActive && !_apShip._isDisposed) {
+            // If the autopilot's target is gone (destroyed, absorbed, or deleted),
+            // disengage immediately instead of letting the ship coast onward.
+            const _apTarget = _apShip.autopilotTarget;
+            const _apTargetAlive =
+                _apTarget &&
+                !_apTarget._isDisposed &&
+                _apTarget.mesh &&
+                simulationState.bodies.includes(_apTarget);
+            if (!_apTargetAlive) {
+                cancelAutopilot(autopilotCtx, 'Autopilot disengaged: target destroyed.');
+                return;
+            }
             _apShip.autopilotStep(subDt);
             // Drain any one-shot events the autopilot generated this substep
             drainAutopilotEvents(autopilotCtx);

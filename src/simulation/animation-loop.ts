@@ -203,9 +203,23 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         if (ctx.autopilotState.isActive) {
+            // Guard 1: the autopilot ship must still exist.
             const apShip = ctx.flightState.knownShip;
             if (!apShip || apShip._isDisposed || !ctx.simulationState.bodies.includes(apShip)) {
                 ctx.cancelAutopilot();
+            }
+            // Guard 2: the autopilot target must still exist.  This covers
+            // target deaths that happen while physics is not advancing
+            // (e.g. the sim is paused and the user deletes the target).
+            const apTarget = ctx.autopilotState.targetBody;
+            if (
+                ctx.autopilotState.isActive &&
+                (!apTarget ||
+                    apTarget._isDisposed ||
+                    !apTarget.mesh ||
+                    !ctx.simulationState.bodies.includes(apTarget))
+            ) {
+                ctx.cancelAutopilot('Autopilot disengaged: target destroyed.');
             }
         }
 

@@ -628,7 +628,10 @@ export class Spaceship extends Body {
         const target = this.autopilotTarget;
         const targetAlive = target && !target._isDisposed && target.mesh && simulationState.bodies.includes(target);
         if (!targetAlive) {
-            // Ship or target died — caller handles cancel + event
+            // The autopilot target (or this ship) is no longer alive.  The callers
+            // (index.ts updateAutopilotStep and animation-loop.ts frame guard) detect
+            // this before invoking autopilotStep and disengage the autopilot with a
+            // notification.  This remains as a defensive no-op for any future caller.
             return;
         }
 
