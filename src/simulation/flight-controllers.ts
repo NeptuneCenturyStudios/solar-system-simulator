@@ -175,7 +175,12 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // Handles warp-active acceleration, warp decel → boost, and boost decel → idle
     // via the single ship.advanceWarpSpeed() method, replacing three separate
     // duplicated blocks that existed for flight mode and background mode.
-    if (ship.warpActive || ship.warpDecelerating || ship.boostDecelerating) {
+    if (
+        ship.warpActive ||
+        ship.warpDecelerating ||
+        ship.boostDecelerating ||
+        ship.stopBraking
+    ) {
         const result = ship.advanceWarpSpeed(simDt, forward);
         flightState.currentSpeed = result.forwardSpeed;
 
@@ -261,6 +266,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         manualInput &&
         shiftJustReleased &&
         !ship.boostDecelerating &&
+        !ship.stopBraking &&
         !ship.warpActive &&
         !ship.warpDecelerating
     ) {
@@ -378,7 +384,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         ctx.flightSteeringLine.visible = false;
         ctx.steeringOriginMarker.visible = false;
         ctx.steeringEndMarker.visible = false;
-    } else if (!ship.warpDecelerating) {
+    } else if (!ship.warpDecelerating && !ship.stopBraking) {
         ctx.flightSteeringLine.visible = true;
         ctx.steeringOriginMarker.visible = true;
     }

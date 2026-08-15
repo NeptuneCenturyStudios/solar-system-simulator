@@ -86,6 +86,10 @@ export class Spaceship extends Body {
     warpDecelerating: boolean = false;
     /** True during phase-2 decel: shedding speed from boost max → normal max. */
     boostDecelerating: boolean = false;
+    /** True while braking from any speed to a complete stop (e.g. autopilot
+     *  cancel). Managed by beginStopBrake(); zeroes velocity when complete.
+     *  Runs through the same unified advanceWarpSpeed() path as warp/boost decel. */
+    stopBraking: boolean = false;
     /** Visual warp tunnel effect. Owned by the ship; created in constructor. */
     warpEffect: WarpEffect;
 
@@ -360,8 +364,14 @@ export class Spaceship extends Body {
 
         // Autopilot handles its own thrust — stay out of its way.
         if (this.autopilotActive) return;
-        // Warp/boost deceleration is handled frame-level; do not add thrust during those.
-        if (this.warpActive || this.warpDecelerating || this.boostDecelerating) return;
+        // Warp/boost/stop deceleration is handled frame-level; do not add thrust during those.
+        if (
+            this.warpActive ||
+            this.warpDecelerating ||
+            this.boostDecelerating ||
+            this.stopBraking
+        )
+            return;
 
         const keys = cameraState.keys;
         const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
@@ -460,6 +470,41 @@ export class Spaceship extends Body {
     }
 
     /**
+     * Apply one stop-brake step: shed forward speed toward zero using the
+     * deceleration rate matching the ship's current speed band (warp decel above
+     * boost max, boost decel above normal max, thrust decel otherwise).
+     * Perpendicular drift is decayed as well so the ship stops in a straight
+     * line instead of drifting off course.
+     *
+     * Returns true while still braking, false once the ship is at rest.
+     */
+    applyStopBrakeStep(simDt: number, forward: THREE.Vector3): boolean {
+        const h = this.handling;
+        const fwdSpd = this.velocity.dot(forward);
+        const absFwdSpd = Math.abs(fwdSpd);
+        const rate =
+            absFwdSpd > h.flightBoostMaxSpeed
+                ? h.flightWarpDecel
+                : absFwdSpd > h.flightMaxSpeed
+                  ? h.flightBoostDecel
+                  : h.flightThrustDecel;
+        const unclamped = Math.sign(fwdSpd) * (absFwdSpd - rate * simDt);
+
+        if (Math.sign(unclamped) === Math.sign(fwdSpd) && Math.abs(unclamped) > 1e-6) {
+            this.velocity.copy(forward).multiplyScalar(unclamped);
+            // Decay perpendicular drift so the ship decelerates in a straight line.
+            const perpVel = this.velocity.clone().addScaledVector(forward, -unclamped);
+            const decay = Math.max(0, 1 - h.flightPerpDecay * simDt);
+            perpVel.multiplyScalar(decay);
+            this.velocity.copy(forward).multiplyScalar(unclamped).add(perpVel);
+            return true;
+        }
+        // At rest — stop completely.
+        this.velocity.set(0, 0, 0);
+        return false;
+    }
+
+    /**
      * Accelerate toward warp speed for one frame step.
      */
     applyWarpAccelerationStep(simDt: number, forward: THREE.Vector3): void {
@@ -517,6 +562,22 @@ export class Spaceship extends Body {
                 return { phase: 'idle', forwardSpeed: fwdSpd, decelDone: true };
             }
             return { phase: 'boost_decel', forwardSpeed: fwdSpd, decelDone: false };
+        }
+
+        if (this.stopBraking) {
+            const stillBraking = this.applyStopBrakeStep(simDt, forward);
+            if (!stillBraking) {
+                // Reached a standstill — clear the stop-brake flag.
+                this.stopBraking = false;
+                // Defensive: drop any stale warp/boost decel flags so a later
+                // advanceWarpSpeed() call can never snap the ship back up to a
+                // clamped max speed after the ship has come to rest.
+                this.warpDecelerating = false;
+                this.boostDecelerating = false;
+                return { phase: 'idle', forwardSpeed: 0, decelDone: true };
+            }
+            const fwdSpd = this.velocity.dot(forward);
+            return { phase: 'stop_brake', forwardSpeed: fwdSpd, decelDone: false };
         }
 
         // Idle — no warp/boost state.
@@ -1016,6 +1077,19 @@ export class Spaceship extends Body {
     }
 
     /**
+     * Begin braking from the ship's current speed to a complete stop.
+     * Used by autopilot cancel so the ship decelerates to rest from any
+     * speed band (warp, boost, or normal approach) instead of coasting.
+     * Runs through advanceWarpSpeed(); clears itself when the ship stops.
+     */
+    beginStopBrake(): void {
+        this.warpActive = false;
+        this.warpDecelerating = false;
+        this.boostDecelerating = false;
+        this.stopBraking = true;
+    }
+
+    /**
      * Clear all warp flags and timers.  Use on ship destruction or hard reset.
      */
     resetWarpState(): void {
@@ -1024,6 +1098,7 @@ export class Spaceship extends Body {
         this.warpActive = false;
         this.warpDecelerating = false;
         this.boostDecelerating = false;
+        this.stopBraking = false;
     }
 
     // ── Autopilot state reset ────────────────────────────────────────────────

@@ -449,14 +449,14 @@ export interface ISpaceshipHandling {
  * Result returned by Spaceship.advanceWarpSpeed() after each physics step.
  * The caller uses this to update UI/HUD without duplicating the phase-transition logic.
  *
- * - `phase`: the active phase after this step ('warp_active', 'warp_decel', 'boost_decel', or 'idle')
+ * - `phase`: the active phase after this step ('warp_active', 'warp_decel', 'boost_decel', 'stop_brake', or 'idle')
  * - `forwardSpeed`: the ship's velocity projected onto `forward` after the step
  * - `decelDone`: true when a deceleration phase just completed and its flag was cleared.
  *   For warp_decel, the ship auto-starts boost_decel — the caller can override by
  *   setting boostDecelerating = false (e.g. when shift is held in manual flight).
  */
 export interface IWarpStepResult {
-    phase: 'warp_active' | 'warp_decel' | 'boost_decel' | 'idle';
+    phase: 'warp_active' | 'warp_decel' | 'boost_decel' | 'stop_brake' | 'idle';
     forwardSpeed: number;
     decelDone: boolean;
 }

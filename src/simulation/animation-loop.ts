@@ -233,8 +233,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             const bgWarpActive = bgShip.warpActive;
             const bgWarpDecel = bgShip.warpDecelerating;
             const bgBoostDecel = bgShip.boostDecelerating;
+            const bgStopBrake = bgShip.stopBraking;
 
-            if (bgWarpActive || bgWarpDecel || bgBoostDecel) {
+            if (bgWarpActive || bgWarpDecel || bgBoostDecel || bgStopBrake) {
                 const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
                 bgShip.advanceWarpSpeed(dtTotal, bgFwd);
                 ctx.flightState.currentSpeed = bgShip.velocity.dot(bgFwd);
@@ -892,12 +893,19 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     !hWarp &&
                     (ship?.boostDecelerating ||
                         ship?.warpDecelerating ||
+                        ship?.stopBraking ||
                         ctx.autopilotState.phase === 'BRAKE' ||
                         ctx.keys.s);
                 const thrustRate: number = (() => {
                     if (!h) return 0;
                     if (ship?.warpDecelerating) return h.flightWarpDecel;
                     if (ship?.boostDecelerating) return h.flightBoostDecel;
+                    if (ship?.stopBraking)
+                        return ctx.flightState.currentSpeed > h.flightBoostMaxSpeed
+                            ? h.flightWarpDecel
+                            : ctx.flightState.currentSpeed > h.flightMaxSpeed
+                              ? h.flightBoostDecel
+                              : h.flightThrustDecel;
                     if (hWarp) return 0;
                     if (hBoost) return h.flightBoostAccel;
                     if (hBrake)

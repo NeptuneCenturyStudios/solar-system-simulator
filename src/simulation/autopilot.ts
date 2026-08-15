@@ -31,9 +31,11 @@ export function cancelAutopilot(ctx: IAutopilotContext, message?: string): void 
 
     playSoundEffect(SoundEffect.AutopilotDisengaged);
 
-    if (ship?.warpActive) {
-        // If cancelled mid-warp while not in the cockpit, start background decel.
-        ship.beginWarpDecel();
+    if (ship) {
+        // Brake to a complete stop from whatever speed the ship is at (warp,
+        // boost, or normal approach).  Runs through advanceWarpSpeed() so the
+        // decel continues in flight mode AND in the background updater.
+        ship.beginStopBrake();
     }
     // Clear any in-progress warp charge.
     if (autopilotState.phase === 'WARP_CHARGING') {
@@ -50,6 +52,10 @@ export function cancelAutopilot(ctx: IAutopilotContext, message?: string): void 
     autopilotState.phase = null;
     autopilotState.targetBody = null;
     flightState.thrustActive = false;
+    // Zero stale steering offsets so the ship doesn't lurch once the player
+    // regains control after the stop-brake completes.
+    flightState.pointerOffsetX = 0;
+    flightState.pointerOffsetY = 0;
     if (message) {
         ctx.addEvent({ message, notificationType: NotificationType.Info });
     }
@@ -77,11 +83,12 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
         return;
     }
 
-    // Guard: refuse to engage while manual warp is live.
+    // Guard: refuse to engage while warp/stop-brake is live.
     if (
         ship.warpActive ||
         ship.warpDecelerating ||
-        ship.warpCharging
+        ship.warpCharging ||
+        ship.stopBraking
     ) {
         ctx.addEvent({
             message: 'Autopilot: disengage warp before engaging autopilot.',
