@@ -394,9 +394,8 @@ export class Spaceship extends Body {
                     const delta = Math.min(this.handling.flightThrustAccel * dt, this.handling.flightMaxSpeed - fwdSpeed);
                     this.velocity.addScaledVector(forward, delta);
                 } else if (keys.s) {
-                    // Decelerate — continuously applied even at fwdSpeed == 0 so
-                    // gravity cannot cause flickering brake on/off cycles.
-                    const ceiling = -this.handling.flightMaxSpeed;
+                    // Decel stops applying when ship reaches 0 speed
+                    const ceiling = Math.max(-this.handling.flightMaxSpeed, -fwdSpeed);
                     const decelRate = fwdSpeed > this.handling.flightMaxSpeed ? this.handling.flightBoostDecel : this.handling.flightThrustDecel;
                     const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
                     this.velocity.addScaledVector(forward, delta);
