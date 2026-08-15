@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { NotificationType } from '../event-log/event-log';
-import {
-    TEXT_SPRITE_Z,
-} from '../utilities/consts';
+import { TEXT_SPRITE_Z } from '../utilities/consts';
 import {
     autopilotState,
     cameraState,
@@ -175,12 +173,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // Handles warp-active acceleration, warp decel → boost, and boost decel → idle
     // via the single ship.advanceWarpSpeed() method, replacing three separate
     // duplicated blocks that existed for flight mode and background mode.
-    if (
-        ship.warpActive ||
-        ship.warpDecelerating ||
-        ship.boostDecelerating ||
-        ship.stopBraking
-    ) {
+    if (ship.warpActive || ship.warpDecelerating || ship.boostDecelerating || ship.stopBraking) {
         const result = ship.advanceWarpSpeed(simDt, forward);
         flightState.currentSpeed = result.forwardSpeed;
 
@@ -236,7 +229,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
                 if (fill >= 1) {
                     // Engage warp!
                     ship.engageWarp();
-                    
+
                     ctx.addEvent({
                         message: '⚡ Warp engaged! Press Space to disengage.',
                         notificationType: NotificationType.Success,
@@ -291,10 +284,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
 
     // ── Roll with inertia (A/D) — delegated to ship ──────────────────────────
-    if (
-        manualInput &&
-        !flightState.altOrbitActive
-    ) {
+    if (manualInput && !flightState.altOrbitActive) {
         const rollDelta = ship.applyRoll(dt, flightState.rollLeft, flightState.rollRight);
         // Apply the roll delta (from key input OR friction decay) to the camera quaternion.
         if (rollDelta !== 0) {

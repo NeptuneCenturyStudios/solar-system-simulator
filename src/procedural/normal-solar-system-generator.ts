@@ -54,7 +54,14 @@ import {
     HYGIEA_RADIUS,
 } from '../utilities/consts';
 import { MoonTypeEnum } from '../bodies/body-enums';
-import { callistoTexture, europaTexture, ganymedeTexture, ioTexture, moonTexture, spaceTextures } from '../drawing/textures';
+import {
+    callistoTexture,
+    europaTexture,
+    ganymedeTexture,
+    ioTexture,
+    moonTexture,
+    spaceTextures,
+} from '../drawing/textures';
 import type {
     ProceduralGenerationReporter,
     ProceduralGenerationWorkUnit,
@@ -71,7 +78,9 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         this.scene = scene;
     }
 
-    async generateSolarSystemAsync(progressReporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
+    async generateSolarSystemAsync(
+        progressReporter?: ProceduralGenerationReporter
+    ): Promise<ISolarSystem> {
         const bodies: Body[] = [];
 
         // Total bodies: Sun + 9 planets + Ceres + 3 asteroids + 5 moons + ISS + Halley = 21

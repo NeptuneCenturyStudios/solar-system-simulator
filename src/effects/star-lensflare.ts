@@ -45,15 +45,30 @@ export class StarLensflare {
 
         const main = new Lensflare();
 
-        const starburstEl = new LensflareElement(texture.starburst, LENSFLARE_STARBURST_SIZE, 0, new THREE.Color(0xffffff));
+        const starburstEl = new LensflareElement(
+            texture.starburst,
+            LENSFLARE_STARBURST_SIZE,
+            0,
+            new THREE.Color(0xffffff)
+        );
         this._starburstElement = starburstEl;
         main.addElement(starburstEl);
-        
-        const coreEl = new LensflareElement(texture.core, LENSFLARE_CORE_SIZE, 0, new THREE.Color(0xffffff));
+
+        const coreEl = new LensflareElement(
+            texture.core,
+            LENSFLARE_CORE_SIZE,
+            0,
+            new THREE.Color(0xffffff)
+        );
         this._coreElement = coreEl;
         main.addElement(coreEl);
-        
-        const haloEl = new LensflareElement(texture.warmHalo, LENSFLARE_HALO_SIZE, 0, new THREE.Color(0xffffff));
+
+        const haloEl = new LensflareElement(
+            texture.warmHalo,
+            LENSFLARE_HALO_SIZE,
+            0,
+            new THREE.Color(0xffffff)
+        );
         this._haloElement = haloEl;
         main.addElement(haloEl);
 
@@ -109,8 +124,7 @@ export class StarLensflare {
             Math.sin(this._visualTime * LENSFLARE_STARBURST_FLICKER_FREQ_B) * 0.4;
 
         this._starburstElement.size =
-            LENSFLARE_STARBURST_SIZE *
-            (1 + LENSFLARE_STARBURST_FLICKER_AMPLITUDE * shimmer);
+            LENSFLARE_STARBURST_SIZE * (1 + LENSFLARE_STARBURST_FLICKER_AMPLITUDE * shimmer);
     }
 
     dispose(): void {
@@ -180,13 +194,13 @@ function drawStarburst(ctx: CanvasRenderingContext2D): void {
 
     // [dx, dy, tipLen, halfWidth, drawSpine]
     const spikes: ReadonlyArray<readonly [number, number, number, number, boolean]> = [
-        [ 1,   0,  cardinalLen, cardinalWidth, true],
-        [-1,   0,  cardinalLen, cardinalWidth, true],
-        [ 0,   1,  cardinalLen, cardinalWidth, true],
-        [ 0,  -1,  cardinalLen, cardinalWidth, true],
-        [ S2,  S2, diagonalLen, diagonalWidth, false],
-        [-S2,  S2, diagonalLen, diagonalWidth, false],
-        [ S2, -S2, diagonalLen, diagonalWidth, false],
+        [1, 0, cardinalLen, cardinalWidth, true],
+        [-1, 0, cardinalLen, cardinalWidth, true],
+        [0, 1, cardinalLen, cardinalWidth, true],
+        [0, -1, cardinalLen, cardinalWidth, true],
+        [S2, S2, diagonalLen, diagonalWidth, false],
+        [-S2, S2, diagonalLen, diagonalWidth, false],
+        [S2, -S2, diagonalLen, diagonalWidth, false],
         [-S2, -S2, diagonalLen, diagonalWidth, false],
     ];
 
@@ -229,11 +243,11 @@ function drawWarmHalo(ctx: CanvasRenderingContext2D): void {
     const c = TEXTURE_SIZE / 2;
     const r = TEXTURE_SIZE * 0.5;
     const grad = ctx.createRadialGradient(c, c, 0, c, c, r);
-    grad.addColorStop(0,    'rgba(255, 255, 255, 0.35)');
-    grad.addColorStop(0.30, 'rgba(255, 255, 255, 0.25)');
-    grad.addColorStop(0.50, 'rgba(255, 255, 255, 0.15)');
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+    grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.25)');
+    grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.15)');
     grad.addColorStop(0.75, 'rgba(255, 255, 255, 0.05)');
-    grad.addColorStop(1,    'rgba(  0,   0,  0,  0)');
+    grad.addColorStop(1, 'rgba(  0,   0,  0,  0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 }

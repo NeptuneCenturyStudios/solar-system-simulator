@@ -302,12 +302,7 @@ export class AutopilotTargetIndicator {
         }
     }
 
-    private showOnScreen(
-        nx: number,
-        ny: number,
-        target: Body,
-        ship: Body | null
-    ): void {
+    private showOnScreen(nx: number, ny: number, target: Body, ship: Body | null): void {
         if (!this.infoSprite || !this.infoTexture) return;
 
         const uiX = nx * (window.innerWidth / 2);
@@ -324,10 +319,7 @@ export class AutopilotTargetIndicator {
             distLabel = `${Math.round(distToOrbit).toLocaleString()} u`;
 
             const closingSpeed = computeClosingSpeed(ship, target);
-            etaLabel =
-                closingSpeed > 0.001
-                    ? formatETA(distToOrbit / closingSpeed)
-                    : 'ETA: ∞';
+            etaLabel = closingSpeed > 0.001 ? formatETA(distToOrbit / closingSpeed) : 'ETA: ∞';
         }
 
         const canvasResized = drawInfoPanel(target.name, distLabel, etaLabel);
@@ -345,9 +337,11 @@ export class AutopilotTargetIndicator {
         }
 
         // Scale sprite to maintain the same visual pixel density as the hardcoded version
-        const spriteW = (currentCanvasW / AutopilotTargetIndicator.REF_CANVAS_W) *
+        const spriteW =
+            (currentCanvasW / AutopilotTargetIndicator.REF_CANVAS_W) *
             AutopilotTargetIndicator.REF_SPRITE_W;
-        const spriteH = (currentCanvasH / AutopilotTargetIndicator.REF_CANVAS_H) *
+        const spriteH =
+            (currentCanvasH / AutopilotTargetIndicator.REF_CANVAS_H) *
             AutopilotTargetIndicator.REF_SPRITE_H;
         this.infoSprite.scale.set(spriteW, spriteH, 1);
 

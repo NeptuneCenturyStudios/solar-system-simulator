@@ -95,12 +95,12 @@ export class OsirisMothership extends Spaceship {
 
         const containerMesh = createShipContainerMesh();
         const MODEL_NAME = 'osiris-mothership/osiris-mothership';
-        
+
         // Correct model orientation so that the rear is facing the camera and not the front
         const MODEL_ROTATION = new THREE.Euler(
             THREE.MathUtils.degToRad(180),
             0,
-            THREE.MathUtils.degToRad(180),
+            THREE.MathUtils.degToRad(180)
         );
 
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
@@ -108,7 +108,7 @@ export class OsirisMothership extends Spaceship {
             damage: 250,
             coreWidth: 5,
             haloWidth: 15,
-            damageInterval: .05
+            damageInterval: 0.05,
         };
 
         super(dependencies, scene, {

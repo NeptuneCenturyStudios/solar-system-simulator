@@ -28,11 +28,7 @@ export class Ceres extends DwarfPlanet {
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Ceres belongs.
      */
-    constructor(
-        dependencies: IStateDependencies,
-        scene: THREE.Scene,
-        angleRad: number = 0
-    ) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
         const gEff = dependencies.getG();
         const timeScale =
             CERES_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(CERES_DISTANCE, gEff, SUN_MASS);

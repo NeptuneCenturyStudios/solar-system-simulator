@@ -127,7 +127,9 @@ export const desertTextures = getDesertTextures();
 function getTerrestrialTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_TERRESTRIAL_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/terrestrial-${i}.jpg`));
+        textures.push(
+            loadSrgbTexture(`./assets/textures/bodies/2k/procedural/terrestrial-${i}.jpg`)
+        );
     }
     return textures;
 }
@@ -175,12 +177,12 @@ export const iceGiantTextures = getIceGiantTextures();
  * Get the list of space background textures.
  * @returns An array of ISpaceBackground objects representing the available space textures.
  */
-function getSpaceTextures() : ISpaceBackground[]{
+function getSpaceTextures(): ISpaceBackground[] {
     const textures: ISpaceBackground[] = [];
     for (let skydomeIndex = 1; skydomeIndex <= SPACE_TEXTURE_COUNT; skydomeIndex++) {
         textures.push({
             name: `Space ${skydomeIndex}`,
-            filename: `./assets/textures/skydome/space-${skydomeIndex}.jpg`
+            filename: `./assets/textures/skydome/space-${skydomeIndex}.jpg`,
         });
     }
     return textures;
@@ -208,7 +210,6 @@ function getCloudTextures(): THREE.Texture[] {
  */
 export const cloudTextures = getCloudTextures();
 
-
 // =============================================================================
 // Volcanic lava emissive map extraction
 // =============================================================================
@@ -229,7 +230,11 @@ for (let i = 1; i <= PROCEDURAL_VOLCANIC_TEXTURES; i++) {
  * Given a pixel's RGBA values (each 0-255), determines whether it's lava
  * and returns an emissive RGB color, or null for rock (black emission).
  */
-function lavaEmissiveForPixel(r: number, g: number, b: number): { er: number; eg: number; eb: number } | null {
+function lavaEmissiveForPixel(
+    r: number,
+    g: number,
+    b: number
+): { er: number; eg: number; eb: number } | null {
     // Lava = red channel is notably brighter than green/blue.
     // The volcanic JPGs have very dark rock (near-black maroon) and
     // vivid red-orange lava patches.
@@ -313,7 +318,11 @@ async function prebuildAllVolcanicEmissiveMaps(): Promise<void> {
             readCtx.drawImage(bitmap, 0, 0);
             const imgData = readCtx.getImageData(0, 0, w, h);
 
-            const emissiveTex = buildEmissiveFromPixels(imgData.data as unknown as Uint8ClampedArray, w, h);
+            const emissiveTex = buildEmissiveFromPixels(
+                imgData.data as unknown as Uint8ClampedArray,
+                w,
+                h
+            );
 
             // Does a placeholder already exist for this URL?
             const existing = emissiveMapCache.get(url);

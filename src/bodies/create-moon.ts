@@ -2,10 +2,7 @@ import * as THREE from 'three';
 import { Moon } from './moon';
 import { calculateTrajectory } from '../physics/physics';
 import { SeededRandom } from '../utilities/prng';
-import {
-    getRoughnessForMoonTexture,
-    getMetalnessForMoonTexture,
-} from '../drawing/textures';
+import { getRoughnessForMoonTexture, getMetalnessForMoonTexture } from '../drawing/textures';
 
 import type { CelestialBody } from './celestial-body';
 import { MoonTypeEnum } from './body-enums';

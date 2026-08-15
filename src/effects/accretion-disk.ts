@@ -1,11 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
-import {
-    MIN_PARTICLE_ALPHA,
-    MAX_PARTICLE_ALPHA,
-    SCALE_FACTOR,
-} from '../utilities/consts';
+import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, SCALE_FACTOR } from '../utilities/consts';
 import { settingsStore } from '../settings/settings-store';
 
 /** Color pair defining the gradient from the hot inner edge to the cool outer edge. */

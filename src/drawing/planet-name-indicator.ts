@@ -144,7 +144,9 @@ export class PlanetNameIndicator {
 
         // ── Hover detection (always runs in flight mode, independent of showNames) ──
         let hoveredBody: Body | null = null;
-        const isFlightHoverActive = !!(flightContext?.isActive && flightContext.steeringLineVisible);
+        const isFlightHoverActive = !!(
+            flightContext?.isActive && flightContext.steeringLineVisible
+        );
         const isCharging = !!(flightContext && flightContext.autopilotCharge > 0);
 
         if (!isCharging) {
@@ -328,7 +330,11 @@ export class PlanetNameIndicator {
                     const spriteW = (this._cancelEntry.canvasW / REF_CANVAS_W) * REF_SPRITE_W;
                     const spriteH = (this._cancelEntry.canvasH / REF_CANVAS_H) * REF_SPRITE_H;
                     this._cancelEntry.sprite.scale.set(spriteW, spriteH, 1);
-                    this._cancelEntry.sprite.position.set(uiX, uiY - spriteH / 2 - 10, TEXT_SPRITE_Z);
+                    this._cancelEntry.sprite.position.set(
+                        uiX,
+                        uiY - spriteH / 2 - 10,
+                        TEXT_SPRITE_Z
+                    );
                     this._cancelEntry.sprite.visible = true;
                 } else if (this._cancelEntry) {
                     this._cancelEntry.sprite.visible = false;
@@ -453,7 +459,7 @@ export class PlanetNameIndicator {
         const innerW = contentW + PAD * 2;
         const fullW = innerW + ACCENT_LEN * 2 + 4;
 
-        const baseH = DIST_Y + 20 + BOTTOM_PAD;          // normal panel height
+        const baseH = DIST_Y + 20 + BOTTOM_PAD; // normal panel height
         const totalH = hasRing ? baseH + RING_SECTION_H : baseH;
 
         const resized = entry.canvasW !== fullW || entry.canvasH !== totalH;
@@ -535,7 +541,7 @@ export class PlanetNameIndicator {
 
             // Circle geometry
             const ringCY = baseH + RING_SECTION_H / 2; // vertical centre of ring row
-            const circR = 20;                           // circle radius
+            const circR = 20; // circle radius
             const circCX = PAD + ACCENT_LEN + 4 + circR + 4; // left-anchored
 
             // Subtle background fill inside the circle
@@ -622,20 +628,40 @@ export class PlanetNameIndicator {
         // Corner accent brackets
         ctx.strokeStyle = 'rgba(255, 80, 60, 0.75)';
         ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(PAD, PAD + ACCENT_LEN); ctx.lineTo(PAD, PAD); ctx.lineTo(PAD + ACCENT_LEN, PAD); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(W - PAD - ACCENT_LEN, PAD); ctx.lineTo(W - PAD, PAD); ctx.lineTo(W - PAD, PAD + ACCENT_LEN); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(PAD, H - PAD - ACCENT_LEN); ctx.lineTo(PAD, H - PAD); ctx.lineTo(PAD + ACCENT_LEN, H - PAD); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(W - PAD - ACCENT_LEN, H - PAD); ctx.lineTo(W - PAD, H - PAD); ctx.lineTo(W - PAD, H - PAD - ACCENT_LEN); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(PAD, PAD + ACCENT_LEN);
+        ctx.lineTo(PAD, PAD);
+        ctx.lineTo(PAD + ACCENT_LEN, PAD);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(W - PAD - ACCENT_LEN, PAD);
+        ctx.lineTo(W - PAD, PAD);
+        ctx.lineTo(W - PAD, PAD + ACCENT_LEN);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(PAD, H - PAD - ACCENT_LEN);
+        ctx.lineTo(PAD, H - PAD);
+        ctx.lineTo(PAD + ACCENT_LEN, H - PAD);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(W - PAD - ACCENT_LEN, H - PAD);
+        ctx.lineTo(W - PAD, H - PAD);
+        ctx.lineTo(W - PAD, H - PAD - ACCENT_LEN);
+        ctx.stroke();
 
         // Circle background
         ctx.fillStyle = 'rgba(255, 80, 60, 0.07)';
-        ctx.beginPath(); ctx.arc(circCX, ringCY, circR, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(circCX, ringCY, circR, 0, Math.PI * 2);
+        ctx.fill();
 
         // Circle border
         ctx.strokeStyle = 'rgba(255, 80, 60, 0.65)';
         ctx.lineWidth = 4;
         ctx.shadowBlur = 0;
-        ctx.beginPath(); ctx.arc(circCX, ringCY, circR, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(circCX, ringCY, circR, 0, Math.PI * 2);
+        ctx.stroke();
 
         // "E" letter (the key to press)
         ctx.textAlign = 'center';

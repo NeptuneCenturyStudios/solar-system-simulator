@@ -23,7 +23,6 @@ export class EmptySystemGenerator extends SolarSystemGenerator {
     }
 
     async generateSolarSystemAsync(): Promise<ISolarSystem> {
-
         const bodies: Body[] = [];
 
         await this.yieldToEventLoop();

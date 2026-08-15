@@ -40,8 +40,8 @@ export interface IWeaponSound {
  *     refresh their aim/origin each call.
  *   - stopFire() — called when the trigger is released.  No-op for burst weapons,
  *     terminates beams for continuous weapons.
-     *   - update(wallDt, simDt, bodies, cameraPosition, owner) — called once per
-     *     frame while the owning ship is in flight mode.
+ *   - update(wallDt, simDt, bodies, cameraPosition, owner) — called once per
+ *     frame while the owning ship is in flight mode.
  *   - reset() — clear all active state on flight exit.
  *   - dispose() — release GPU resources on ship destruction.
  */

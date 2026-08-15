@@ -48,32 +48,30 @@ export class ShipFlame implements IShipEffect {
     readonly glowOuter: THREE.Points;
 
     /** Base particle lifetime in seconds. Actual lifetime is randomised ±30% around this. */
-        private readonly LIFETIME_BASE: number;
-        /** Speed (u/s) at which exhaust particles travel in world space.
-         *  plumeLength ≈ EXHAUST_DRIFT_SPEED × LIFETIME_BASE; keep this a few ship-lengths
-         *  (ship radius ≈ 0.6 u, so targeting ~3 u plume). */
-        private readonly EXHAUST_DRIFT_SPEED: number; // 4 u/s gives a nice plume length without needing super long lifetimes
+    private readonly LIFETIME_BASE: number;
+    /** Speed (u/s) at which exhaust particles travel in world space.
+     *  plumeLength ≈ EXHAUST_DRIFT_SPEED × LIFETIME_BASE; keep this a few ship-lengths
+     *  (ship radius ≈ 0.6 u, so targeting ~3 u plume). */
+    private readonly EXHAUST_DRIFT_SPEED: number; // 4 u/s gives a nice plume length without needing super long lifetimes
 
-     /** Maximum number of live particles in the pool. */
-        private readonly MAX_PARTICLES = 120;
-        /** Half-angle of the exhaust cone in radians. */
-        private readonly EXHAUST_SPREAD = 0.22;
-        /** Minimum particles emitted per frame while thrusting. */
-        private readonly EMIT_MIN = 8;
-        /** Maximum particles emitted per frame. */
-        private readonly EMIT_MAX = 256;
-        /** Sentinel: negative life means the slot is unused. */
-        private readonly DEAD = -1;
+    /** Maximum number of live particles in the pool. */
+    private readonly MAX_PARTICLES = 120;
+    /** Half-angle of the exhaust cone in radians. */
+    private readonly EXHAUST_SPREAD = 0.22;
+    /** Minimum particles emitted per frame while thrusting. */
+    private readonly EMIT_MIN = 8;
+    /** Maximum particles emitted per frame. */
+    private readonly EMIT_MAX = 256;
+    /** Sentinel: negative life means the slot is unused. */
+    private readonly DEAD = -1;
 
     constructor(scene: THREE.Scene, radius: number) {
-
         /** Base particle lifetime in seconds. Actual lifetime is randomised ±30% around this. */
         this.LIFETIME_BASE = 128 * radius;
         /** Speed (u/s) at which exhaust particles travel in world space.
          *  plumeLength ≈ EXHAUST_DRIFT_SPEED × LIFETIME_BASE; keep this a few ship-lengths
          *  (ship radius ≈ 0.6 u, so targeting ~3 u plume). */
         this.EXHAUST_DRIFT_SPEED = 16 * radius; // 4 u/s gives a nice plume length without needing super long lifetimes
- 
 
         this.scene = scene;
         this.radius = radius;
@@ -243,7 +241,10 @@ export class ShipFlame implements IShipEffect {
             // positions always come from the nozzle regardless of ship movement direction.
             const nEmit = Math.min(
                 this.EMIT_MAX,
-                Math.max(this.EMIT_MIN, Math.round(this.EMIT_MIN + (this.EMIT_MAX - this.EMIT_MIN) * speedFactor))
+                Math.max(
+                    this.EMIT_MIN,
+                    Math.round(this.EMIT_MIN + (this.EMIT_MAX - this.EMIT_MIN) * speedFactor)
+                )
             );
 
             // Scale particle lifetime so pool stays under 50% full at any emit rate.

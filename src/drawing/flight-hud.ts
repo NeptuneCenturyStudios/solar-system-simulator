@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
-import { AUTOPILOT_ORBIT_ALTITUDE_FACTOR, AUTOPILOT_ORBIT_NOTIFY_DURATION, TEXT_SPRITE_Z } from '../utilities/consts';
+import {
+    AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
+    AUTOPILOT_ORBIT_NOTIFY_DURATION,
+    TEXT_SPRITE_Z,
+} from '../utilities/consts';
 import { IAutopilotState } from '../interfaces';
 
 export type AutopilotHudState =
@@ -475,11 +479,7 @@ export class FlightHUD {
      * @param chargeFill  Current charge fill in [0, 1]. Passed in so caller can
      *                    compute it once (avoids duplicating the fill calculation).
      */
-    updateWarpHUD(
-        warpCharging: boolean,
-        warpActive: boolean,
-        chargeFill: number
-    ): void {
+    updateWarpHUD(warpCharging: boolean, warpActive: boolean, chargeFill: number): void {
         if (warpCharging) {
             this.setWarpCharge(chargeFill);
         } else if (warpActive) {

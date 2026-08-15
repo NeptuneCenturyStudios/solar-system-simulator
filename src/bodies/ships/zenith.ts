@@ -94,24 +94,19 @@ export class Zenith extends Spaceship {
         const containerMesh = createShipContainerMesh();
         const MODEL_NAME = 'Lo_poly_Spaceship_01_by_Liz_Reddington';
 
-        super(
-            dependencies,
-            scene,
-            {
-                position: position,
-                velocity: velocity,
-                mass: SPACESHIP_MASS,
-                radius: SPACESHIP_RADIUS,
-                mesh: containerMesh,
-                id: id,
-                name: 'Zenith',
-                handling: fighterHandling,
-                weapons: [new BoltWeapon(scene, SPACESHIP_RADIUS)],
-                shipTypeId: 'zenith',
-                thirdPersonOffset: THIRD_PERSON_OFFSET,
-            }
-        );
-            
+        super(dependencies, scene, {
+            position: position,
+            velocity: velocity,
+            mass: SPACESHIP_MASS,
+            radius: SPACESHIP_RADIUS,
+            mesh: containerMesh,
+            id: id,
+            name: 'Zenith',
+            handling: fighterHandling,
+            weapons: [new BoltWeapon(scene, SPACESHIP_RADIUS)],
+            shipTypeId: 'zenith',
+            thirdPersonOffset: THIRD_PERSON_OFFSET,
+        });
 
         // Kick off the async model load; offsets are applied once the bbox is known.
         loadShipModelInto(containerMesh, MODEL_NAME, SPACESHIP_RADIUS)

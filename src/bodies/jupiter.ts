@@ -26,11 +26,7 @@ export class Jupiter extends Planet {
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Jupiter belongs.
      */
-    constructor(
-        dependencies: IStateDependencies,
-        scene: THREE.Scene,
-        angleRad: number = 0
-    ) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
         const gEff = dependencies.getG();
         const timeScale =
             JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, gEff, SUN_MASS);

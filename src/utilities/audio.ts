@@ -64,7 +64,9 @@ const WEAPON_VOLUME = 0.8;
 const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     // Voice prompts
     [SoundEffect.WarpDriveActive]: {
-        soundEffectBank: [new URL('../assets/sounds/voice/warp-drive-active.mp3', import.meta.url).href],
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/warp-drive-active.mp3', import.meta.url).href,
+        ],
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -73,7 +75,9 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         activeLoop: null,
     },
     [SoundEffect.AutopilotEngaged]: {
-        soundEffectBank: [new URL('../assets/sounds/voice/autopilot-engaged.mp3', import.meta.url).href],
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/autopilot-engaged.mp3', import.meta.url).href,
+        ],
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -82,7 +86,9 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         activeLoop: null,
     },
     [SoundEffect.AutopilotDisengaged]: {
-        soundEffectBank: [new URL('../assets/sounds/voice/autopilot-disengaged.mp3', import.meta.url).href],
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/autopilot-disengaged.mp3', import.meta.url).href,
+        ],
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -91,7 +97,10 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         activeLoop: null,
     },
     [SoundEffect.AutopilotDestinationReached]: {
-        soundEffectBank: [new URL('../assets/sounds/voice/autopilot-destination-reached.mp3', import.meta.url).href],
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/autopilot-destination-reached.mp3', import.meta.url)
+                .href,
+        ],
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,

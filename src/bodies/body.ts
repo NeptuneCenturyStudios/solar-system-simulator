@@ -111,10 +111,7 @@ export class Body {
         const lineGeometry = new THREE.BufferGeometry();
         lineGeometry.setAttribute(
             'position',
-            new THREE.BufferAttribute(
-                new Float32Array([0, 0, 0, 0, 0, 0]),
-                3
-            )
+            new THREE.BufferAttribute(new Float32Array([0, 0, 0, 0, 0, 0]), 3)
         );
         this.labelLine = new THREE.Line(
             lineGeometry,

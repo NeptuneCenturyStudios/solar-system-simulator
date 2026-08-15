@@ -153,9 +153,10 @@ function buildMeshMaterial(creation: ProceduralPlanetCreation): THREE.MeshStanda
     // Volcanic planets get a derived emissive map so lava areas actually glow
     if (bodySubtype === PlanetTypeEnum.Volcanic && texture) {
         const texIdx = volcanicTextures.indexOf(texture);
-        const emissiveUrl = texIdx !== -1
-            ? `./assets/textures/bodies/2k/procedural/volcanic-${texIdx + 1}.jpg`
-            : null;
+        const emissiveUrl =
+            texIdx !== -1
+                ? `./assets/textures/bodies/2k/procedural/volcanic-${texIdx + 1}.jpg`
+                : null;
         if (emissiveUrl) {
             material.emissiveMap = getVolcanicEmissiveMap(emissiveUrl);
             material.emissive = new THREE.Color(0xff3300);
@@ -288,7 +289,9 @@ export function createPlanetBodyFromProceduralCreation(
     addCloudLayer(body, creation.bodySubtype, creation.textureSeed!, creation.rotationSpeed);
 
     // Add atmosphere shell for gas/ice giants and for solid planets that got a cloud layer.
-    const isGasOrIce = creation.bodySubtype === PlanetTypeEnum.GasGiant || creation.bodySubtype === PlanetTypeEnum.IceGiant;
+    const isGasOrIce =
+        creation.bodySubtype === PlanetTypeEnum.GasGiant ||
+        creation.bodySubtype === PlanetTypeEnum.IceGiant;
     if (isGasOrIce || body.clouds) {
         // Pick a tint based on the subtype — use a seeded hash so it's deterministic.
         const tintRng = new SeededRandom(`${creation.textureSeed!}|atmosphere-tint`);

@@ -1,8 +1,5 @@
 import * as THREE from 'three';
-import {
-    DIST_SCALE,
-    SCALE_FACTOR,
-} from '../utilities/consts.js';
+import { DIST_SCALE, SCALE_FACTOR } from '../utilities/consts.js';
 import { settingsStore } from '../settings/settings-store.js';
 
 // ─── Tunnel geometry constants ───────────────────────────────────────────────

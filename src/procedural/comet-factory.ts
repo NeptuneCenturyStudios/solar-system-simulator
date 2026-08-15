@@ -22,7 +22,8 @@ export function createCometBodyFromProceduralCreation(
     scene: THREE.Scene,
     creation: ProceduralCometCreation
 ): GenericComet {
-    const { id, name, pos, vel, radius, mass, rotationSpeed, rotationTilt, rotationAzimuth } = creation;
+    const { id, name, pos, vel, radius, mass, rotationSpeed, rotationTilt, rotationAzimuth } =
+        creation;
 
     return new GenericComet(dependencies, scene, {
         id,

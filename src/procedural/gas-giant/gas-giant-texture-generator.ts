@@ -55,7 +55,7 @@ export const DEFAULT_GAS_GIANT_PARAMS: GasGiantTextureParams = {
     customEquatorialColor1: '#6ab0e0',
     customEquatorialColor2: '#e0a060',
     customEquatorialColor3: '#60e090',
-    equatorialWidth: 0.30,
+    equatorialWidth: 0.3,
     colorVariation: 1.0,
 };
 
@@ -67,28 +67,28 @@ type PaletteStop = Vec3;
 
 const PALETTES: Record<Exclude<GasGiantPalette, 'custom'>, PaletteStop[]> = {
     jupiter: [
-        { x: 0.75, y: 0.55, z: 0.30 }, // warm amber
-        { x: 0.52, y: 0.30, z: 0.14 }, // dark brown
+        { x: 0.75, y: 0.55, z: 0.3 }, // warm amber
+        { x: 0.52, y: 0.3, z: 0.14 }, // dark brown
         { x: 0.88, y: 0.78, z: 0.62 }, // cream tan
-        { x: 0.62, y: 0.38, z: 0.20 }, // reddish brown
-        { x: 0.80, y: 0.65, z: 0.44 }, // warm tan
+        { x: 0.62, y: 0.38, z: 0.2 }, // reddish brown
+        { x: 0.8, y: 0.65, z: 0.44 }, // warm tan
         { x: 0.42, y: 0.26, z: 0.12 }, // deep brown
     ],
     saturn: [
-        { x: 0.92, y: 0.86, z: 0.70 }, // cream
+        { x: 0.92, y: 0.86, z: 0.7 }, // cream
         { x: 0.78, y: 0.66, z: 0.42 }, // gold
         { x: 0.85, y: 0.78, z: 0.58 }, // pale gold
-        { x: 0.70, y: 0.58, z: 0.36 }, // dark gold
-        { x: 0.95, y: 0.90, z: 0.78 }, // bright cream
-        { x: 0.60, y: 0.48, z: 0.28 }, // bronze
+        { x: 0.7, y: 0.58, z: 0.36 }, // dark gold
+        { x: 0.95, y: 0.9, z: 0.78 }, // bright cream
+        { x: 0.6, y: 0.48, z: 0.28 }, // bronze
     ],
     ice: [
         { x: 0.25, y: 0.45, z: 0.82 }, // mid blue
-        { x: 0.10, y: 0.22, z: 0.65 }, // deep blue
+        { x: 0.1, y: 0.22, z: 0.65 }, // deep blue
         { x: 0.35, y: 0.72, z: 0.88 }, // light teal
         { x: 0.12, y: 0.38, z: 0.72 }, // slate blue
         { x: 0.52, y: 0.82, z: 0.92 }, // cyan
-        { x: 0.18, y: 0.30, z: 0.78 }, // cobalt
+        { x: 0.18, y: 0.3, z: 0.78 }, // cobalt
     ],
     alien: [
         { x: 0.58, y: 0.15, z: 0.85 }, // purple
@@ -96,41 +96,41 @@ const PALETTES: Record<Exclude<GasGiantPalette, 'custom'>, PaletteStop[]> = {
         { x: 0.88, y: 0.15, z: 0.65 }, // magenta
         { x: 0.32, y: 0.55, z: 0.18 }, // olive green
         { x: 0.72, y: 0.22, z: 0.95 }, // violet
-        { x: 0.10, y: 0.85, z: 0.45 }, // emerald
+        { x: 0.1, y: 0.85, z: 0.45 }, // emerald
     ],
 };
 
 /** Equatorial palette stops — blended in near the equator for each preset. */
 const EQUATORIAL_PALETTES: Record<Exclude<GasGiantPalette, 'custom'>, PaletteStop[]> = {
     jupiter: [
-        { x: 0.62, y: 0.28, z: 0.10 }, // dark reddish-orange (equatorial belt)
-        { x: 0.88, y: 0.52, z: 0.20 }, // warm amber-orange
+        { x: 0.62, y: 0.28, z: 0.1 }, // dark reddish-orange (equatorial belt)
+        { x: 0.88, y: 0.52, z: 0.2 }, // warm amber-orange
         { x: 0.45, y: 0.18, z: 0.06 }, // deep red-brown
         { x: 0.76, y: 0.42, z: 0.14 }, // reddish-orange
         { x: 0.32, y: 0.12, z: 0.04 }, // very dark reddish
-        { x: 0.94, y: 0.70, z: 0.38 }, // light warm tan
+        { x: 0.94, y: 0.7, z: 0.38 }, // light warm tan
     ],
     saturn: [
         { x: 0.98, y: 0.92, z: 0.76 }, // bright warm cream
-        { x: 0.72, y: 0.56, z: 0.30 }, // warm amber-gold
-        { x: 0.86, y: 0.80, z: 0.58 }, // pale warm
+        { x: 0.72, y: 0.56, z: 0.3 }, // warm amber-gold
+        { x: 0.86, y: 0.8, z: 0.58 }, // pale warm
         { x: 0.62, y: 0.48, z: 0.22 }, // dark amber
         { x: 0.96, y: 0.86, z: 0.66 }, // creamy
-        { x: 0.52, y: 0.40, z: 0.18 }, // deep bronze
+        { x: 0.52, y: 0.4, z: 0.18 }, // deep bronze
     ],
     ice: [
-        { x: 0.15, y: 0.65, z: 0.80 }, // teal
+        { x: 0.15, y: 0.65, z: 0.8 }, // teal
         { x: 0.06, y: 0.38, z: 0.68 }, // deep teal-blue
         { x: 0.28, y: 0.78, z: 0.88 }, // light teal
-        { x: 0.10, y: 0.52, z: 0.75 }, // mid teal
-        { x: 0.40, y: 0.85, z: 0.92 }, // bright cyan
-        { x: 0.08, y: 0.28, z: 0.60 }, // deep blue
+        { x: 0.1, y: 0.52, z: 0.75 }, // mid teal
+        { x: 0.4, y: 0.85, z: 0.92 }, // bright cyan
+        { x: 0.08, y: 0.28, z: 0.6 }, // deep blue
     ],
     alien: [
-        { x: 0.90, y: 0.42, z: 0.08 }, // electric orange
+        { x: 0.9, y: 0.42, z: 0.08 }, // electric orange
         { x: 0.08, y: 0.88, z: 0.65 }, // bright cyan-green
         { x: 0.95, y: 0.88, z: 0.05 }, // vivid yellow
-        { x: 0.45, y: 0.06, z: 0.90 }, // bright violet
+        { x: 0.45, y: 0.06, z: 0.9 }, // bright violet
         { x: 0.05, y: 0.72, z: 0.95 }, // electric blue
         { x: 0.95, y: 0.18, z: 0.48 }, // hot pink
     ],
@@ -152,24 +152,32 @@ function buildCustomPalette(hex1: string, hex2: string, hex3: string): PaletteSt
     const c3 = hexToVec3(hex3);
     const dk = (c: Vec3): Vec3 => ({ x: c.x * 0.45, y: c.y * 0.45, z: c.z * 0.45 });
     return [
-        c1,      // bright c1
-        dk(c2),  // dark   c2
-        c3,      // bright c3
-        dk(c1),  // dark   c1
-        c2,      // bright c2
-        dk(c3),  // dark   c3
+        c1, // bright c1
+        dk(c2), // dark   c2
+        c3, // bright c3
+        dk(c1), // dark   c1
+        c2, // bright c2
+        dk(c3), // dark   c3
     ];
 }
 
 function getStops(params: GasGiantTextureParams): PaletteStop[] {
     if (params.palette === 'custom')
-        return buildCustomPalette(params.customBandColor1, params.customBandColor2, params.customBandColor3);
+        return buildCustomPalette(
+            params.customBandColor1,
+            params.customBandColor2,
+            params.customBandColor3
+        );
     return PALETTES[params.palette];
 }
 
 function getEquatorialStops(params: GasGiantTextureParams): PaletteStop[] {
     if (params.palette === 'custom')
-        return buildCustomPalette(params.customEquatorialColor1, params.customEquatorialColor2, params.customEquatorialColor3);
+        return buildCustomPalette(
+            params.customEquatorialColor1,
+            params.customEquatorialColor2,
+            params.customEquatorialColor3
+        );
     return EQUATORIAL_PALETTES[params.palette];
 }
 
@@ -178,9 +186,15 @@ function getEquatorialStops(params: GasGiantTextureParams): PaletteStop[] {
 function applyColorVariation(stops: PaletteStop[], variation: number): PaletteStop[] {
     if (variation >= 1) return stops;
     const avg: Vec3 = { x: 0, y: 0, z: 0 };
-    for (const s of stops) { avg.x += s.x; avg.y += s.y; avg.z += s.z; }
-    avg.x /= stops.length; avg.y /= stops.length; avg.z /= stops.length;
-    return stops.map(s => mix3(avg, s, variation));
+    for (const s of stops) {
+        avg.x += s.x;
+        avg.y += s.y;
+        avg.z += s.z;
+    }
+    avg.x /= stops.length;
+    avg.y /= stops.length;
+    avg.z /= stops.length;
+    return stops.map((s) => mix3(avg, s, variation));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -210,10 +224,10 @@ function applyContrast(c: Vec3, contrast: number): Vec3 {
 // ─────────────────────────────────────────────────────────────
 
 type Storm = {
-    sinLat: number;   // -1..1
-    lon: number;      // 0..2π
+    sinLat: number; // -1..1
+    lon: number; // 0..2π
     radius: number;
-    spin: number;     // +1 or -1
+    spin: number; // +1 or -1
 };
 
 function buildStorms(params: GasGiantTextureParams): Storm[] {
@@ -325,7 +339,7 @@ export async function renderGasGiantTexture(
         }
 
         const v = y / Math.max(height - 1, 1); // 0..1 top → bottom
-        const lat = (v - 0.5) * Math.PI;        // -π/2 .. +π/2
+        const lat = (v - 0.5) * Math.PI; // -π/2 .. +π/2
         const cosLat = Math.cos(lat);
         const sinLat = Math.sin(lat);
 
@@ -346,7 +360,9 @@ export async function renderGasGiantTexture(
                     pz * TURB_SCALE,
                     TURB_OCTAVES,
                     turbSeedU32
-                ) * params.turbulence * 0.35;
+                ) *
+                params.turbulence *
+                0.35;
 
             // Storm vortex warp
             let stormWarpV = 0;
@@ -375,7 +391,10 @@ export async function renderGasGiantTexture(
             // Blend primary and equatorial palettes based on band position
             const primaryColor = samplePalette(stops, bandT);
             const equatorialColor = samplePalette(equatorialStops, bandT);
-            let color = applyContrast(mix3(primaryColor, equatorialColor, equatorialBlend), params.contrast);
+            let color = applyContrast(
+                mix3(primaryColor, equatorialColor, equatorialBlend),
+                params.contrast
+            );
 
             // High-frequency detail within bands
             if (params.detailStrength > 0) {
@@ -386,7 +405,9 @@ export async function renderGasGiantTexture(
                         pz * DETAIL_SCALE,
                         DETAIL_OCTAVES,
                         detailSeedU32
-                    ) * params.detailStrength * 0.10;
+                    ) *
+                    params.detailStrength *
+                    0.1;
                 color = {
                     x: clamp01(color.x + detail),
                     y: clamp01(color.y + detail),
@@ -395,7 +416,7 @@ export async function renderGasGiantTexture(
             }
 
             const idx = (y * width + x) * 4;
-            data[idx]     = Math.round(color.x * 255);
+            data[idx] = Math.round(color.x * 255);
             data[idx + 1] = Math.round(color.y * 255);
             data[idx + 2] = Math.round(color.z * 255);
             data[idx + 3] = 255;

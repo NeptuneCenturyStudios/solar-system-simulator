@@ -387,7 +387,6 @@ export class Star extends CelestialBody {
 
     setRadius(newRadius: number) {
         super.setRadius(newRadius);
-
     }
 
     // setLightDistance(distance: number) {

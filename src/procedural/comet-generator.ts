@@ -127,7 +127,7 @@ export function generateProceduralComets(params: {
         // Seeded mass and radius (avoids the unseeded Math.random() inside randomCometParams).
         const massRng = rngFor(masterSeed, 'cometMass', i);
         const mass = 0.5 + massRng.next() * 3.5;
-        
+
         const radiusRng = rngFor(masterSeed, 'cometRadius', i);
         const radius = 1 + radiusRng.next() * 2;
 
@@ -152,7 +152,17 @@ export function generateProceduralComets(params: {
             sequenceNumber: i + 1,
         });
 
-        creations.push({ id, name, pos, vel, mass, radius, rotationSpeed, rotationTilt, rotationAzimuth });
+        creations.push({
+            id,
+            name,
+            pos,
+            vel,
+            mass,
+            radius,
+            rotationSpeed,
+            rotationTilt,
+            rotationAzimuth,
+        });
     }
 
     sanitizeOrbitCreations(creations, { minRadius: 1, minMass: 0.5 });

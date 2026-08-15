@@ -4,11 +4,7 @@ import * as THREE from 'three';
 const SIPHON_SPEED_SCALE = 8000 / DIST_SCALE;
 import { IPipelineFeedEffect } from './effect-base';
 import { IStateDependencies, ISiphonTarget, IAccretionTarget } from '../interfaces';
-import {
-    MIN_PARTICLE_ALPHA,
-    MAX_PARTICLE_ALPHA,
-    DIST_SCALE,
-} from '../utilities/consts';
+import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, DIST_SCALE } from '../utilities/consts';
 import { settingsStore } from '../settings/settings-store';
 
 /** Maximum number of simultaneously in-flight siphon particles per stream. */

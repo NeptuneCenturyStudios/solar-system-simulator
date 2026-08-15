@@ -23,7 +23,7 @@ function massToWhiteDwarfRadius(mass: number): number {
 const WHITE_DWARF_TEMPERATURE = 10000;
 const WHITE_DWARF_LIGHT_INTENSITY = SUN_LIGHT_INTENSITY * 0.0001; // White dwarfs are much dimmer than main sequence stars
 // Update the light distance to match the dimmer intensity, so that the light falls off appropriately in the simulation.
-const WHITE_DWARF_LIGHT_DISTANCE = SUN_LIGHT_INTENSITY / WHITE_DWARF_LIGHT_INTENSITY * 1000; // Scale distance based on intensity ratio
+const WHITE_DWARF_LIGHT_DISTANCE = (SUN_LIGHT_INTENSITY / WHITE_DWARF_LIGHT_INTENSITY) * 1000; // Scale distance based on intensity ratio
 
 export class WhiteDwarf extends Star {
     constructor(

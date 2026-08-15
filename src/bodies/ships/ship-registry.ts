@@ -39,7 +39,7 @@ export const SHIP_TYPES: IShipType[] = [
         label: 'Osiris Mothership',
         create: (dependencies, scene, position, velocity, id) =>
             new OsirisMothership(dependencies, scene, position, velocity, id),
-    }
+    },
 ];
 
 /** Resolve a ship type id to its registry entry, falling back to the first. */

@@ -41,5 +41,5 @@ export const PLAYLIST_FILENAMES: string[] = [
     'sergepavkinmusic-endless-space-149636.mp3',
     'sergepavkinmusic-outer-space-188045.mp3',
     'universfield-starlight-harmonies-185900.mp3',
-    'neptunecentury-lost-in-the-cosmos.mp3'
+    'neptunecentury-lost-in-the-cosmos.mp3',
 ];

@@ -128,7 +128,12 @@ import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
 import { OptionsPanel } from './ui/options-panel';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
-import { IAutopilotContext, IFlightControlContext, IProceduralGeneratorPromptResult, IStateDependencies } from './interfaces';
+import {
+    IAutopilotContext,
+    IFlightControlContext,
+    IProceduralGeneratorPromptResult,
+    IStateDependencies,
+} from './interfaces';
 import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simulation/autopilot';
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
@@ -160,7 +165,7 @@ window.addEventListener('beforeunload', (e) => {
 const scene = new THREE.Scene();
 
 // === Ambient light from stars (base level of illumination) ===
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.20);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 scene.add(ambientLight);
 
 // --- Camera and renderer setup ---
@@ -209,7 +214,17 @@ import { EmptySystemGenerator } from './procedural/empty-system-generator';
 import { pickMoonTextureForMoonType } from './procedural/moon-factory';
 import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
 import { exitFlightMode } from './simulation/flight-controllers';
-import { parseSeedFromURL, buildSeedValue, updateURLWithSeed, clearURLSeed, SEED_TYPE_NORMAL, SEED_TYPE_BLACKHOLE, getLastPushedSeed, setLastPushedSeed, resetLastPushedSeed } from './utilities/url-seed';
+import {
+    parseSeedFromURL,
+    buildSeedValue,
+    updateURLWithSeed,
+    clearURLSeed,
+    SEED_TYPE_NORMAL,
+    SEED_TYPE_BLACKHOLE,
+    getLastPushedSeed,
+    setLastPushedSeed,
+    resetLastPushedSeed,
+} from './utilities/url-seed';
 import { getShipTypeById } from './bodies/ships/ship-registry';
 
 // --- Event notifications (replaces sprite-based event log) ---
@@ -3001,14 +3016,15 @@ const flightCtx: IFlightControlContext = {
     flightHUD,
     speedSprite,
     refreshBodiesTable,
-    addEvent
+    addEvent,
 };
 
 const autopilotCtx: IAutopilotContext = {
     flightHUD,
     addEvent,
     refreshBodiesTable,
-    setAutopilotState: (active, canEngage) => flightControlsPanel.setAutopilotState(active, canEngage),
+    setAutopilotState: (active, canEngage) =>
+        flightControlsPanel.setAutopilotState(active, canEngage),
 };
 
 /** Spawn a spaceship in front of the camera and enter flight mode.
@@ -3021,8 +3037,7 @@ function spawnShip(targetShip?: Spaceship) {
     // A targeted ship (bodies-table "Enter Ship") is always re-entered as-is.
     // Otherwise re-enter only when the dropdown selection matches the live ship.
     const existing = targetShip ?? flightState.knownShip;
-    const live =
-        !!(existing && !existing._isDisposed && simulationState.bodies.includes(existing));
+    const live = !!(existing && !existing._isDisposed && simulationState.bodies.includes(existing));
     const selectedTypeId = flightControlsPanel.getSelectedShipTypeId();
     const typeMatched = !!(existing && existing.shipTypeId === selectedTypeId);
     const canReenter = live && (!!targetShip || typeMatched);
@@ -3209,8 +3224,6 @@ function spawnShip(targetShip?: Spaceship) {
         notificationType: NotificationType.Success,
     });
 }
-
-
 
 window.addEventListener('mousemove', surfaceCam.onMouseMove, { passive: true });
 
@@ -4335,12 +4348,20 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
 // Event-driven custom event listeners (body:added, body:removed, weapon:hit, etc.)
 registerCustomEventListeners({
     selectedBody: {
-        get value() { return selectedBody; },
-        set value(v: Body | null) { selectedBody = v; },
+        get value() {
+            return selectedBody;
+        },
+        set value(v: Body | null) {
+            selectedBody = v;
+        },
     },
     manuallySelectedBody: {
-        get value() { return manuallySelectedBody; },
-        set value(v: Body | null) { manuallySelectedBody = v; },
+        get value() {
+            return manuallySelectedBody;
+        },
+        set value(v: Body | null) {
+            manuallySelectedBody = v;
+        },
     },
     gizmo,
     uiManager,
@@ -4594,12 +4615,20 @@ const animCtx: AnimationContext = {
     interactionState,
     simulationState,
     selectedBody: {
-        get value() { return selectedBody; },
-        set value(v: Body | null) { selectedBody = v; },
+        get value() {
+            return selectedBody;
+        },
+        set value(v: Body | null) {
+            selectedBody = v;
+        },
     },
     manuallySelectedBody: {
-        get value() { return manuallySelectedBody; },
-        set value(v: Body | null) { manuallySelectedBody = v; },
+        get value() {
+            return manuallySelectedBody;
+        },
+        set value(v: Body | null) {
+            manuallySelectedBody = v;
+        },
     },
     NONE_FOCUS_POSITION,
     supernovas: { value: supernovas },
@@ -4642,7 +4671,6 @@ const animCtx: AnimationContext = {
             _apShip.autopilotStep(subDt);
             // Drain any one-shot events the autopilot generated this substep
             drainAutopilotEvents(autopilotCtx);
-            
         }
     },
     cancelAutopilot: (message?: string) => cancelAutopilot(autopilotCtx, message),

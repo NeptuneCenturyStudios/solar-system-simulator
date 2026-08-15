@@ -26,11 +26,7 @@ export class Pluto extends DwarfPlanet {
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Pluto belongs.
      */
-    constructor(
-        dependencies: IStateDependencies,
-        scene: THREE.Scene,
-        angleRad: number = 0
-    ) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
         const gEff = dependencies.getG();
         const timeScale =
             PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, gEff, SUN_MASS);

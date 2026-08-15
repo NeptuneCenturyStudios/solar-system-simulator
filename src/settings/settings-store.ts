@@ -6,7 +6,7 @@ export const enum SettingKey {
     Substeps = 'substeps',
     SfxVolume = 'sfxVolume',
     MusicVolume = 'musicVolume',
-    LensflareEnabled = 'lensflareEnabled'
+    LensflareEnabled = 'lensflareEnabled',
 }
 
 export interface SpaceSimSettings {
@@ -22,7 +22,7 @@ const defaultSettings: SpaceSimSettings = {
     substeps: 64,
     sfxVolume: 1.0,
     musicVolume: 0.5,
-    lensflareEnabled: true
+    lensflareEnabled: true,
 };
 
 class SettingsStore {
@@ -30,9 +30,7 @@ class SettingsStore {
 
     constructor() {
         const raw = localStorage.getItem(STORAGE_KEY);
-        this.data = raw
-            ? { ...defaultSettings, ...JSON.parse(raw) }
-            : { ...defaultSettings };
+        this.data = raw ? { ...defaultSettings, ...JSON.parse(raw) } : { ...defaultSettings };
     }
 
     get settings(): SpaceSimSettings {

@@ -38,9 +38,9 @@ export function generateSeedString(): string {
  * @returns The selected space texture as an ISpaceBackground object.
  */
 export function pickRandomSpaceTexture(masterSeed: string): ISpaceBackground {
-     const skydomeIndex = rngFor(masterSeed, 'skydome').rangeInt(1, 11);
-     const spaceTexture = spaceTextures[skydomeIndex - 1];
-     return spaceTexture;
+    const skydomeIndex = rngFor(masterSeed, 'skydome').rangeInt(1, 11);
+    const spaceTexture = spaceTextures[skydomeIndex - 1];
+    return spaceTexture;
 }
 
 /**

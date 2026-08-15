@@ -26,11 +26,7 @@ export class Neptune extends Planet {
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Neptune belongs.
      */
-    constructor(
-        dependencies: IStateDependencies,
-        scene: THREE.Scene,
-        angleRad: number = 0
-    ) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
         const gEff = dependencies.getG();
         const timeScale =
             NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, gEff, SUN_MASS);

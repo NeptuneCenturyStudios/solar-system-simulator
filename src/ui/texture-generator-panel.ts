@@ -91,9 +91,7 @@ export class TextureGeneratorPanel extends Panel {
             'textureTypeSelect'
         ) as HTMLSelectElement | null;
 
-        this.seedInput = document.getElementById(
-            'textureGenSeedInput'
-        ) as HTMLInputElement | null;
+        this.seedInput = document.getElementById('textureGenSeedInput') as HTMLInputElement | null;
 
         this.btnRandomizeSeed = document.getElementById(
             'btn-texture-gen-randomize-seed'
@@ -221,9 +219,12 @@ export class TextureGeneratorPanel extends Panel {
         if (this.customBandColor1Input) this.customBandColor1Input.oninput = scheduleOnInput;
         if (this.customBandColor2Input) this.customBandColor2Input.oninput = scheduleOnInput;
         if (this.customBandColor3Input) this.customBandColor3Input.oninput = scheduleOnInput;
-        if (this.customEquatorialColor1Input) this.customEquatorialColor1Input.oninput = scheduleOnInput;
-        if (this.customEquatorialColor2Input) this.customEquatorialColor2Input.oninput = scheduleOnInput;
-        if (this.customEquatorialColor3Input) this.customEquatorialColor3Input.oninput = scheduleOnInput;
+        if (this.customEquatorialColor1Input)
+            this.customEquatorialColor1Input.oninput = scheduleOnInput;
+        if (this.customEquatorialColor2Input)
+            this.customEquatorialColor2Input.oninput = scheduleOnInput;
+        if (this.customEquatorialColor3Input)
+            this.customEquatorialColor3Input.oninput = scheduleOnInput;
 
         for (const slider of [
             this.bandScaleSlider,
@@ -235,7 +236,11 @@ export class TextureGeneratorPanel extends Panel {
             this.equatorialWidthSlider,
             this.colorVariationSlider,
         ]) {
-            if (slider) slider.oninput = () => { this.syncDisplayValues(); scheduleOnInput(); };
+            if (slider)
+                slider.oninput = () => {
+                    this.syncDisplayValues();
+                    scheduleOnInput();
+                };
         }
 
         if (this.btnDownload) {
@@ -372,7 +377,10 @@ export class TextureGeneratorPanel extends Panel {
 
             await new Promise<void>((resolve, reject) => {
                 canvas.toBlob((blob) => {
-                    if (!blob) { reject(new Error('toBlob returned null')); return; }
+                    if (!blob) {
+                        reject(new Error('toBlob returned null'));
+                        return;
+                    }
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;

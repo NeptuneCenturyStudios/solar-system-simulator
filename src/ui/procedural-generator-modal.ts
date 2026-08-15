@@ -41,7 +41,6 @@ export class ProceduralGeneratorModal extends Panel {
         this._progressReporter = {
             setTotal: (total: number) => {
                 console.log(`Total: ${total}`);
-                
             },
             report: (progress: ProceduralGenerationProgress) => {
                 console.log(`Progress: ${progress.completed}/${progress.total}`);
@@ -127,22 +126,22 @@ export class ProceduralGeneratorModal extends Panel {
      */
     prompt(opts: { title?: string } = {}): Promise<IProceduralGeneratorPromptResult | null> {
         return new Promise((resolve) => {
-        this._promptResolve = (value) => {
-            if (value === null) {
-                resolve(null);
-                return;
-            }
+            this._promptResolve = (value) => {
+                if (value === null) {
+                    resolve(null);
+                    return;
+                }
 
-            if (opts.title && this._headerEl) {
-                this._headerEl.textContent = 'Generate Procedural System';
-            }
+                if (opts.title && this._headerEl) {
+                    this._headerEl.textContent = 'Generate Procedural System';
+                }
 
-            const returnValue: IProceduralGeneratorPromptResult = {
-                seed: value?.seed ?? '',
+                const returnValue: IProceduralGeneratorPromptResult = {
+                    seed: value?.seed ?? '',
+                };
+
+                resolve(returnValue);
             };
-
-            resolve(returnValue);
-        };
 
             // Set title
             if (opts.title) {

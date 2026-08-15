@@ -34,7 +34,6 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
     }
 
     async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
-
         const bodies: Body[] = [];
 
         const bhParams = randomBlackHoleParams();

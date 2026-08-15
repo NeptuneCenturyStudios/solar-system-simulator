@@ -53,11 +53,7 @@ import {
     createSpeedTexture,
     createStatsTexture,
 } from '../drawing/text-rendering';
-import {
-    interactionState,
-    simulationState,
-    cameraState,
-} from './simulation';
+import { interactionState, simulationState, cameraState } from './simulation';
 import { exitFlightMode, updateFlightControls } from './flight-controllers';
 
 // ── Context interface ───────────────────────────────────────────────────────
@@ -447,7 +443,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         } else {
                             destroyBody(winner, victims);
                         }
-                        
+
                         const primaryStar = ctx.simulationState.bodies.find(
                             (b) => b && !b._isDisposed && b instanceof Star
                         ) as Star | undefined;
@@ -727,15 +723,15 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
         // ── Warp shake ─────────────────────────────────────────────────────
         const _shakeShip = ctx.flightState.activeShip ?? ctx.flightState.knownShip;
-        if (
-            !simulationState.isPaused &&
-            _shakeShip?.warpActive
-        ) {
+        if (!simulationState.isPaused && _shakeShip?.warpActive) {
             if (isFlightModeActive || _shakeShip.warpEffect.lines.visible) {
                 const cf = new THREE.Vector3();
                 ctx.camera.getWorldDirection(cf);
                 const cr = new THREE.Vector3().crossVectors(cf, ctx.camera.up).normalize();
-                ctx.camera.position.addScaledVector(cr, (Math.random() - 0.5) * WARP_SHAKE_MAG * _shakeShip.radius);
+                ctx.camera.position.addScaledVector(
+                    cr,
+                    (Math.random() - 0.5) * WARP_SHAKE_MAG * _shakeShip.radius
+                );
                 ctx.camera.position.addScaledVector(
                     ctx.camera.up,
                     (Math.random() - 0.5) * WARP_SHAKE_MAG * _shakeShip.radius
@@ -757,11 +753,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 ? ctx.flightState.currentSpeed
                 : trailShip.velocity.length();
             const trailMax =
-                ctx.keys.shift ||
-                    trailShip.boostDecelerating ||
-                    ctx.autopilotState.isBoostActive
-                  ? trailShip.handling.flightBoostMaxSpeed
-                  : trailShip.handling.flightMaxSpeed;
+                ctx.keys.shift || trailShip.boostDecelerating || ctx.autopilotState.isBoostActive
+                    ? trailShip.handling.flightBoostMaxSpeed
+                    : trailShip.handling.flightMaxSpeed;
             trailShip.trail.update(
                 nozzle,
                 trailSpd,
@@ -839,7 +833,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         if (visShip && !visShip._isDisposed && visShip.mesh) {
-            const vol = Math.min(visShip.velocity.length() / (visShip.handling.flightWarpSpeed / 33.33), 1);
+            const vol = Math.min(
+                visShip.velocity.length() / (visShip.handling.flightWarpSpeed / 33.33),
+                1
+            );
             visShip.updateWarpSound(vol, wdf);
         }
 
@@ -882,7 +879,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     ctx.autopilotState.phase === 'WARP' ||
                     ctx.autopilotState.phase === 'WARP_CHARGING';
                 const hBoost =
-                    !!h && !hWarp &&
+                    !!h &&
+                    !hWarp &&
                     ((!ctx.autopilotState.isActive && ctx.keys.shift) ||
                         (ctx.autopilotState.phase === 'APPROACH' &&
                             ctx.autopilotState.isBoostActive) ||

@@ -122,9 +122,7 @@ export function generateProceduralStars(params: {
     }
 
     const sharedStarNameSeed =
-        starCount > 1
-            ? `${masterSeed}|star-name-base`
-            : `${masterSeed}|star-name-base|single`;
+        starCount > 1 ? `${masterSeed}|star-name-base` : `${masterSeed}|star-name-base|single`;
 
     return starParamsList.map((starParams, i) => {
         const placement = placements[i]!;

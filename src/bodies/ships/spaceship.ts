@@ -6,9 +6,20 @@ import { ShipFlame } from '../../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from '../body-enums';
 import { SoundEffect, WarpSoundController, playSoundEffect } from '../../utilities/audio.js';
 import { WarpEffect } from '../../effects/warp-effect.js';
-import { IDeathOptions, ISpaceshipHandling, AutopilotPhase, IWarpStepResult, ISpaceshipCreationOptions } from '../../interfaces';
+import {
+    IDeathOptions,
+    ISpaceshipHandling,
+    AutopilotPhase,
+    IWarpStepResult,
+    ISpaceshipCreationOptions,
+} from '../../interfaces';
 import { Weapon } from '../../ship-effects/weapons/weapon';
-import { autopilotState, cameraState, flightState, simulationState } from '../../simulation/simulation';
+import {
+    autopilotState,
+    cameraState,
+    flightState,
+    simulationState,
+} from '../../simulation/simulation';
 import { G } from '../../utilities/consts';
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
@@ -18,7 +29,6 @@ import {
     AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN,
 } from '../../utilities/consts';
 import { triggerScreenFlash } from '../../effects/screen-flash';
-
 
 const SF = SCALE_FACTOR / SCALE_FACTOR;
 
@@ -105,7 +115,7 @@ export class Spaceship extends Body {
     /** Distance to target when BRAKE phase started — used for the velocity blend smoothstep. */
     autopilotBrakeEntryDistance: number = 0;
     /** Holds pending phase-change messages for the caller to drain after autopilotStep returns. */
-    autopilotEventMessages: { message: string; isOrbitNotify: boolean; }[] = [];
+    autopilotEventMessages: { message: string; isOrbitNotify: boolean }[] = [];
 
     /** Active warp loop sound controller, or null if not currently playing. */
     private _warpSound: WarpSoundController | null = null;
@@ -120,8 +130,7 @@ export class Spaceship extends Body {
         const h = this.handling;
         return (
             1.5 *
-            ((h.flightBoostMaxSpeed * h.flightBoostMaxSpeed -
-                h.flightMaxSpeed * h.flightMaxSpeed) /
+            ((h.flightBoostMaxSpeed * h.flightBoostMaxSpeed - h.flightMaxSpeed * h.flightMaxSpeed) /
                 (2 * h.flightBoostDecel) +
                 (h.flightMaxSpeed * h.flightMaxSpeed) / (2 * h.flightThrustDecel))
         );
@@ -184,11 +193,7 @@ export class Spaceship extends Body {
      * @param mesh The mesh (visual container) to attach to the body.
      * @param handling The handling characteristics of the spaceship.
      */
-    constructor(
-        dependencies: object,
-        scene: THREE.Scene,
-        options: ISpaceshipCreationOptions
-    ) {
+    constructor(dependencies: object, scene: THREE.Scene, options: ISpaceshipCreationOptions) {
         // ── Base class ────────────────────────────────────────────────────────
         super(
             dependencies,
@@ -365,12 +370,7 @@ export class Spaceship extends Body {
         // Autopilot handles its own thrust — stay out of its way.
         if (this.autopilotActive) return;
         // Warp/boost/stop deceleration is handled frame-level; do not add thrust during those.
-        if (
-            this.warpActive ||
-            this.warpDecelerating ||
-            this.boostDecelerating ||
-            this.stopBraking
-        )
+        if (this.warpActive || this.warpDecelerating || this.boostDecelerating || this.stopBraking)
             return;
 
         const keys = cameraState.keys;
@@ -388,15 +388,24 @@ export class Spaceship extends Body {
                 const wEffective = keys.w && fwdSpeed < this.handling.flightMaxSpeed;
 
                 if (shiftEffective) {
-                    const delta = Math.min(this.handling.flightBoostAccel * dt, this.handling.flightBoostMaxSpeed - fwdSpeed);
+                    const delta = Math.min(
+                        this.handling.flightBoostAccel * dt,
+                        this.handling.flightBoostMaxSpeed - fwdSpeed
+                    );
                     this.velocity.addScaledVector(forward, delta);
                 } else if (wEffective && !keys.shift) {
-                    const delta = Math.min(this.handling.flightThrustAccel * dt, this.handling.flightMaxSpeed - fwdSpeed);
+                    const delta = Math.min(
+                        this.handling.flightThrustAccel * dt,
+                        this.handling.flightMaxSpeed - fwdSpeed
+                    );
                     this.velocity.addScaledVector(forward, delta);
                 } else if (keys.s) {
                     // Decel stops applying when ship reaches 0 speed
                     const ceiling = Math.max(-this.handling.flightMaxSpeed, -fwdSpeed);
-                    const decelRate = fwdSpeed > this.handling.flightMaxSpeed ? this.handling.flightBoostDecel : this.handling.flightThrustDecel;
+                    const decelRate =
+                        fwdSpeed > this.handling.flightMaxSpeed
+                            ? this.handling.flightBoostDecel
+                            : this.handling.flightThrustDecel;
                     const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
                     this.velocity.addScaledVector(forward, delta);
                 }
@@ -414,17 +423,26 @@ export class Spaceship extends Body {
             // perpendicular components, so orbital mechanics work at all times.
             if (keys.shift) {
                 if (fwdSpeed < this.handling.flightBoostMaxSpeed) {
-                    const delta = Math.min(this.handling.flightBoostAccel * dt, this.handling.flightBoostMaxSpeed - fwdSpeed);
+                    const delta = Math.min(
+                        this.handling.flightBoostAccel * dt,
+                        this.handling.flightBoostMaxSpeed - fwdSpeed
+                    );
                     this.velocity.addScaledVector(forward, delta);
                 }
             } else if (keys.w) {
                 if (fwdSpeed < this.handling.flightMaxSpeed) {
-                    const delta = Math.min(this.handling.flightThrustAccel * dt, this.handling.flightMaxSpeed - fwdSpeed);
+                    const delta = Math.min(
+                        this.handling.flightThrustAccel * dt,
+                        this.handling.flightMaxSpeed - fwdSpeed
+                    );
                     this.velocity.addScaledVector(forward, delta);
                 }
             } else if (keys.s) {
                 if (fwdSpeed > -this.handling.flightMaxSpeed) {
-                    const delta = Math.max(-this.handling.flightThrustDecel * dt, -this.handling.flightMaxSpeed - fwdSpeed);
+                    const delta = Math.max(
+                        -this.handling.flightThrustDecel * dt,
+                        -this.handling.flightMaxSpeed - fwdSpeed
+                    );
                     this.velocity.addScaledVector(forward, delta);
                 }
             }
@@ -546,7 +564,10 @@ export class Spaceship extends Body {
     applyWarpAccelerationStep(simDt: number, forward: THREE.Vector3): void {
         const fwdSpd = this.velocity.dot(forward);
         if (fwdSpd < this.handling.flightWarpSpeed) {
-            const delta = Math.min(this.handling.flightWarpAccel * simDt, this.handling.flightWarpSpeed - fwdSpd);
+            const delta = Math.min(
+                this.handling.flightWarpAccel * simDt,
+                this.handling.flightWarpSpeed - fwdSpd
+            );
             this.velocity.addScaledVector(forward, delta);
         } else {
             // Clamp to warp max just in case gravity accelerates beyond it.
@@ -630,11 +651,7 @@ export class Spaceship extends Body {
      */
     applyRoll(dt: number, rollLeft: boolean, rollRight: boolean): number {
         const h = this.handling;
-        const rollTarget = rollLeft
-            ? -h.flightRollSpeed
-            : rollRight
-              ? h.flightRollSpeed
-              : 0;
+        const rollTarget = rollLeft ? -h.flightRollSpeed : rollRight ? h.flightRollSpeed : 0;
 
         if (rollLeft || rollRight) {
             const dir = rollTarget > 0 ? 1 : -1;
@@ -648,8 +665,7 @@ export class Spaceship extends Body {
             if (Math.abs(this.rollVelocity) < h.flightRollFriction * dt) {
                 this.rollVelocity = 0;
             } else {
-                this.rollVelocity -=
-                    Math.sign(this.rollVelocity) * h.flightRollFriction * dt;
+                this.rollVelocity -= Math.sign(this.rollVelocity) * h.flightRollFriction * dt;
             }
         }
 
@@ -679,10 +695,8 @@ export class Spaceship extends Body {
 
         // Visual banking
         const bankAlpha = 1 - Math.exp(-h.flightBankLerpSpeed * dt);
-        this.shipBankRoll +=
-            (this.steerX * h.flightMaxBankAngle - this.shipBankRoll) * bankAlpha;
-        this.shipBankPitch +=
-            (this.steerY * h.flightMaxBankPitch - this.shipBankPitch) * bankAlpha;
+        this.shipBankRoll += (this.steerX * h.flightMaxBankAngle - this.shipBankRoll) * bankAlpha;
+        this.shipBankPitch += (this.steerY * h.flightMaxBankPitch - this.shipBankPitch) * bankAlpha;
 
         const bankQuat = new THREE.Quaternion().setFromEuler(
             new THREE.Euler(this.shipBankPitch, 0, this.shipBankRoll, 'XYZ')
@@ -723,7 +737,8 @@ export class Spaceship extends Body {
 
         // ── Safety guards ────────────────────────────────────────────────────
         const target = this.autopilotTarget;
-        const targetAlive = target && !target._isDisposed && target.mesh && simulationState.bodies.includes(target);
+        const targetAlive =
+            target && !target._isDisposed && target.mesh && simulationState.bodies.includes(target);
         if (!targetAlive) {
             // The autopilot target (or this ship) is no longer alive.  The callers
             // (index.ts updateAutopilotStep and animation-loop.ts frame guard) detect
@@ -782,8 +797,10 @@ export class Spaceship extends Body {
         }
 
         if (this.autopilotPhase === 'APPROACH') {
-            const nearApproachSpeed = approachSpeed <= h.flightMaxSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
-            const brakeEntryTrigger = orbitRadius + Math.max(brakeDistance, this.autopilotBrakeArcDist);
+            const nearApproachSpeed =
+                approachSpeed <= h.flightMaxSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
+            const brakeEntryTrigger =
+                orbitRadius + Math.max(brakeDistance, this.autopilotBrakeArcDist);
             if (nearApproachSpeed && distance <= brakeEntryTrigger) {
                 this.autopilotPhase = 'BRAKE';
                 this.autopilotBrakeEntryDistance = distance;
@@ -835,7 +852,7 @@ export class Spaceship extends Body {
                 this.autopilotPhase = 'WARP';
                 this.autopilotEventMessages.push({
                     message: '⚡ Autopilot warp engaged.',
-                    isOrbitNotify: false
+                    isOrbitNotify: false,
                 });
             }
         } else if (this.autopilotPhase === 'WARP') {
@@ -849,7 +866,8 @@ export class Spaceship extends Body {
                 (h.flightBoostMaxSpeed * h.flightBoostMaxSpeed -
                     h.flightMaxSpeed * h.flightMaxSpeed) /
                 (2 * h.flightBoostDecel);
-            const effectiveBoostThreshold = orbitRadius + this.autopilotApproachMinDistance + boostDecelDist;
+            const effectiveBoostThreshold =
+                orbitRadius + this.autopilotApproachMinDistance + boostDecelDist;
 
             const useBoost = distance > effectiveBoostThreshold;
             this.autopilotBoostActive = useBoost;
@@ -932,8 +950,7 @@ export class Spaceship extends Body {
             // simply caps the ship at its limit — it can't exceed it.
             const brakeCap = Math.max(h.flightBoostMaxSpeed, vOrbit);
             const brakeDesiredLen = desiredVel.length();
-            if (brakeDesiredLen > brakeCap)
-                desiredVel.multiplyScalar(brakeCap / brakeDesiredLen);
+            if (brakeDesiredLen > brakeCap) desiredVel.multiplyScalar(brakeCap / brakeDesiredLen);
 
             // Explicit gravity compensation.
             const gravAccel = (gEff * target.mass) / (r * r);
@@ -974,7 +991,8 @@ export class Spaceship extends Body {
             const bodyRadius = target.radius ?? 10;
             const altitude = Math.max(r - bodyRadius, 1);
             const gravAccel = (gEff * target.mass) / (r * r);
-            const safeRate = AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN * vOrbit * Math.sqrt(gravAccel / altitude);
+            const safeRate =
+                AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN * vOrbit * Math.sqrt(gravAccel / altitude);
             const effectiveRate = Math.max(AUTOPILOT_CIRCULARIZE_RATE, safeRate);
 
             const tangentialSpeed = relVel.dot(tangential);
@@ -996,7 +1014,7 @@ export class Spaceship extends Body {
                 this.autopilotPhase = 'TIDAL_LOCK';
                 this.autopilotEventMessages.push({
                     message: `✓ Autopilot: Stable orbit around ${target.name || 'the body'} achieved. Tidal lock engaged.`,
-                    isOrbitNotify: true
+                    isOrbitNotify: true,
                 });
             } else {
                 const thrustDir = velDelta.clone().normalize();
@@ -1072,7 +1090,10 @@ export class Spaceship extends Body {
      * @returns Fill ratio in [0, 1].  Returns 1.0 when fully charged.
      */
     updateWarpCharge(dt: number): number {
-        this.warpChargeTimer = Math.min(this.warpChargeTimer + dt, this.handling.flightWarpChargeTime);
+        this.warpChargeTimer = Math.min(
+            this.warpChargeTimer + dt,
+            this.handling.flightWarpChargeTime
+        );
         return this.warpChargeTimer / this.handling.flightWarpChargeTime;
     }
 

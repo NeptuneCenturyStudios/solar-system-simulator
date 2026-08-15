@@ -48,11 +48,11 @@ export function createAtmosphereShell(
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
     const grad = ctx.createRadialGradient(HALF, HALF, 0, HALF, HALF, HALF);
-    grad.addColorStop(0,                             'rgba(0, 0, 0, 0)');
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
     grad.addColorStop(Math.max(discEdge - 0.07, 0), 'rgba(0, 0, 0, 0)');
-    grad.addColorStop(discEdge,                      `rgba(${r}, ${g}, ${b}, 0.85)`);
+    grad.addColorStop(discEdge, `rgba(${r}, ${g}, ${b}, 0.85)`);
     grad.addColorStop(Math.min(discEdge + 0.18, 1), `rgba(${r}, ${g}, ${b}, 0.12)`);
-    grad.addColorStop(1,                             'rgba(0, 0, 0, 0)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);

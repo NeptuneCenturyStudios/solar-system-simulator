@@ -26,7 +26,8 @@ export function createAsteroidBodyFromProceduralCreation(
     scene: THREE.Scene,
     creation: ProceduralAsteroidCreation
 ): Asteroid {
-    const { id, name, pos, vel, radius, mass, rotationSpeed, rotationTilt, rotationAzimuth } = creation;
+    const { id, name, pos, vel, radius, mass, rotationSpeed, rotationTilt, rotationAzimuth } =
+        creation;
 
     return new Asteroid(dependencies, scene, {
         id,

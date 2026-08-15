@@ -72,7 +72,9 @@ export class UIManager extends Panel {
         ) as HTMLButtonElement;
         this.btnFlightControls = document.getElementById('flightControlsBtn') as HTMLButtonElement;
         this.btnPlaylist = document.getElementById('btn-playlist') as HTMLButtonElement;
-        this.btnTextureGenerator = document.getElementById('btn-texture-generator') as HTMLButtonElement;
+        this.btnTextureGenerator = document.getElementById(
+            'btn-texture-generator'
+        ) as HTMLButtonElement;
         this.btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
 
         // Block events on UI elements to prevent them from affecting the 3D scene

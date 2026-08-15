@@ -53,8 +53,6 @@ export class ProceduralGenerator extends SolarSystemGenerator {
     }
 
     async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
-        
-
         const inventory = generateSystemBodyInventory(this.prng);
 
         const starEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Star);
@@ -146,7 +144,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         // Stars
         for (let i = 0; i < starCreations.length; i++) {
             const creation = starCreations[i]!;
-            bodies.push(createStarBodyFromProceduralCreation(this.dependencies, this.scene, creation));
+            bodies.push(
+                createStarBodyFromProceduralCreation(this.dependencies, this.scene, creation)
+            );
 
             completed++;
             report({ phase: 'stars', label: `Stars: ${completed}/${totalBodies}` });

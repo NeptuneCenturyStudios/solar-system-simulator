@@ -42,13 +42,7 @@ export function createSpeedTexture(
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    const color = isWarp
-        ? '#ff4488'
-        : isBraking
-          ? '#ff6644'
-          : isBoosting
-            ? '#ff9944'
-            : '#00ffcc';
+    const color = isWarp ? '#ff4488' : isBraking ? '#ff6644' : isBoosting ? '#ff9944' : '#00ffcc';
     const glow = isWarp
         ? 'rgba(255,68,136,0.9)'
         : isBraking
@@ -88,8 +82,7 @@ export function createSpeedTexture(
         const sepStr = '  \u2014  '; // em-dash separator
         const gravStr = gravRate.toFixed(1);
 
-        const gravColor =
-            gravRate > shipThrustRate + 0.001 ? '#ff4444' : 'rgba(200,200,200,0.45)';
+        const gravColor = gravRate > shipThrustRate + 0.001 ? '#ff4444' : 'rgba(200,200,200,0.45)';
 
         // Draw right-to-left to preserve textAlign = 'right'
         ctx.fillStyle = gravColor;
@@ -262,9 +255,7 @@ export function createStatsTexture(body: Body) {
     y += lineHeight;
 
     // Planet / Moon Type (shows the "sub type" like planets already do)
-    if (
-        body instanceof Planet || body instanceof DwarfPlanet
-    ) {
+    if (body instanceof Planet || body instanceof DwarfPlanet) {
         // Map enum/string to display label
         let planetTypeLabel: string;
 

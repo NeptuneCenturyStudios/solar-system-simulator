@@ -102,7 +102,7 @@ export class BoltWeapon extends Weapon {
             coolPerSecond: 0.8,
             fireSound: () => playSoundEffect(SoundEffect.WeaponFire),
         };
-        
+
         this.config = { ...DEFAULT_BOLT_CONFIG, ...config };
         this.maxProjectiles = this.config.maxProjectiles;
 

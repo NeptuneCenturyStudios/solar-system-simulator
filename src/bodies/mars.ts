@@ -16,8 +16,6 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
 
-
-
 /**
  * Represents the planet Mars in the simulation, including its texture and orbital properties.
  * Sets up Mars's trajectory, material, and physical parameters.

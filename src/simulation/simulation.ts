@@ -120,7 +120,16 @@ export const cameraState: ICameraState = {
     lastPlanetAngle: 0,
     speed: 10,
     rotationSpeed: 0.002,
-    keys: { w: false, a: false, s: false, d: false, c: false, e: false, space: false, shift: false },
+    keys: {
+        w: false,
+        a: false,
+        s: false,
+        d: false,
+        c: false,
+        e: false,
+        space: false,
+        shift: false,
+    },
     arrowKeys: { left: false, right: false, up: false, down: false },
     pendingCollisionFocusBody: null as Body | null,
 };

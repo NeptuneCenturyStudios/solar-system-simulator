@@ -1,7 +1,14 @@
 import * as THREE from 'three';
 import { IStateDependencies } from '../interfaces';
 import { createUniqueId } from '../utilities/utilities';
-import { STAR_LIGHT_DISTANCE, SUN_AXIS, SUN_AZIMUTH, SUN_LIGHT_INTENSITY, SUN_MASS, SUN_RADIUS } from '../utilities/consts';
+import {
+    STAR_LIGHT_DISTANCE,
+    SUN_AXIS,
+    SUN_AZIMUTH,
+    SUN_LIGHT_INTENSITY,
+    SUN_MASS,
+    SUN_RADIUS,
+} from '../utilities/consts';
 import { MainSequenceStar } from './main-sequence-star';
 
 export class Sun extends MainSequenceStar {

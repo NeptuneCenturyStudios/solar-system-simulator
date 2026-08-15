@@ -6,7 +6,6 @@ import { CelestialBody } from './celestial-body';
 import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces.js';
 import { settingsStore } from '../settings/settings-store.js';
 
-
 /**
  * This class represents a comet, which is a type of celestial body with a nucleus and a tail. The tail is created using a particle system that emits particles in the opposite direction
  * of the comet's velocity. The comet's nucleus is represented as a distorted icosahedron to give it an irregular shape.

@@ -111,8 +111,7 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
             // Do NOT clear flightState.activeShip or flightState.knownShip here —
             // the animation loop's guard detects _isDisposed and calls exitFlightMode(),
             // which handles those references properly (including warp cleanup).
-            const isShip =
-                body === flightState.knownShip || body === flightState.activeShip;
+            const isShip = body === flightState.knownShip || body === flightState.activeShip;
             if (isShip && autopilotState.isActive) {
                 autopilotState.isActive = false;
                 autopilotState.targetBody = null;

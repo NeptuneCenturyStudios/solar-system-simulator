@@ -16,8 +16,8 @@
  * resumes with a new track.
  */
 
-import { settingsStore } from "../settings/settings-store";
-import { createPlaylistEntry, PLAYLIST_FILENAMES, type PlaylistEntry } from "./playlist";
+import { settingsStore } from '../settings/settings-store';
+import { createPlaylistEntry, PLAYLIST_FILENAMES, type PlaylistEntry } from './playlist';
 
 const FADE_DURATION = 1.5; // seconds
 const DELAY_MIN = 60; // seconds

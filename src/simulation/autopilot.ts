@@ -176,7 +176,8 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
     }
     // Skip APPROACH when the available braking room is shorter than the stopping distance
     // from full normal speed — e.g. Moon → Earth (110 u) where APPROACH would need ~1,200 u.
-    const startInBrake = !startWithWarp && dist0 <= orbitRadius0 + ship.autopilotApproachMinDistance;
+    const startInBrake =
+        !startWithWarp && dist0 <= orbitRadius0 + ship.autopilotApproachMinDistance;
 
     // Set ship-local autopilot state
     ship.autopilotActive = true;
@@ -234,7 +235,9 @@ export function drainAutopilotEvents(ctx: IAutopilotContext): void {
         }
         ctx.addEvent({
             message: msg.message,
-            notificationType: msg.isOrbitNotify ? NotificationType.Success : NotificationType.Success,
+            notificationType: msg.isOrbitNotify
+                ? NotificationType.Success
+                : NotificationType.Success,
         });
     }
 

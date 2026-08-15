@@ -83,7 +83,7 @@ export class CelestialBody extends Body {
         tidalLock?: ITidalLockOptions,
         seed?: string,
         atmosphere?: IAtmosphereOptions
-        ) {
+    ) {
         // Create a simple material if one isn't provided
         if (!mesh) {
             mesh = new THREE.Mesh(
@@ -111,7 +111,12 @@ export class CelestialBody extends Body {
 
         // Create the atmosphere shell if atmosphere options were provided
         if (atmosphere) {
-            this.atmosphereShell = createAtmosphereShell(scene, atmosphere.radius, atmosphere.tint, mesh);
+            this.atmosphereShell = createAtmosphereShell(
+                scene,
+                atmosphere.radius,
+                atmosphere.tint,
+                mesh
+            );
         }
 
         this.setRotation(rotation);
