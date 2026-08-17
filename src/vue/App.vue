@@ -14,16 +14,5 @@
 
 <script setup lang="ts">
 import SimControls from './components/SimControls.vue';
-import SystemExplorer from './components/SystemExplorer.vue';
 import PanelManager from './components/PanelManager.vue';
-import { vueUiState } from './ui-store';
-
-
-
 </script>
-
-<style scoped>
-.vue-ui-toolbar-slot {
-    margin-top: auto;
-}
-</style>

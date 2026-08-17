@@ -62,7 +62,7 @@
 import { computed } from 'vue';
 
 import { formatTimeScale, setTimeScale, simStore, togglePause } from '../sim-bridge';
-import { vueUiState } from '../ui-store';
+import { ActivePanel, vueUiState } from '../ui-store';
 
 // Same bounds the old bottom toolbar used (ui-manager.ts).
 const MIN_TIME_SCALE = 0.01;
@@ -100,5 +100,6 @@ function stepTimeScale(factor: number): void {
 
 function toggleExplorer(): void {
     vueUiState.explorerVisible = !vueUiState.explorerVisible;
+    vueUiState.activePanel = ActivePanel.SystemExplorer;
 }
 </script>

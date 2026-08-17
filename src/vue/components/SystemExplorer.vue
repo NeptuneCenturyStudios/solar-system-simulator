@@ -1,9 +1,13 @@
 <template>
-    <section class="vue-ui-card vue-ui-explorer">
+    <section class="vue-ui-panel vue-ui-explorer">
         <header class="vue-ui-card-header">
             <span>System Explorer</span>
             <span class="vue-ui-body-count">{{ simStore.bodies.length }}</span>
         </header>
+
+        <div>
+            Camera controls go here.
+        </div>
 
         <input
             v-model="searchQuery"
@@ -37,6 +41,10 @@
                     <span>v {{ formatNumber(body.speed) }}</span>
                 </span>
             </button>
+        </div>
+
+        <div>
+            Other controls go here like checkboxes for trails and names and other display options.
         </div>
     </section>
 </template>

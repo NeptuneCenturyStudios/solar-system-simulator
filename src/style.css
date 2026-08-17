@@ -32,6 +32,8 @@
     --new-ui-btn-care-color: #f2b6b6;
     --new-ui-btn-care-border: #bb8d8d;
     --new-ui-btn-care-shadow: 0 0 1rem rgba(242, 182, 182, 0.5);
+
+    --new-ui-gap: 0.75rem;
 }
 
 /* Utility classes */
@@ -690,7 +692,6 @@ button.btn-with-icon {
 
 .toolbar {
     display: none;
-    width: auto;
     gap: 0.5rem;
     padding: 0.5rem;
     background: var(--new-ui-bg);
@@ -785,6 +786,75 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     box-shadow: var(--new-ui-btn-care-shadow);
 }
 
+/* Vue UI shell — root layout for the new overlay UI.
+   Class names are prefixed with `vue-ui-` to avoid collisions with the
+   existing UI's `ui-*` / `panel-*` classes. Reuses the `--new-ui-*` design
+   tokens defined in src/style.css so the overlay blends with the app. */
+
+#vue-ui-root {
+    position: fixed;
+
+    top: var(--new-ui-gap);
+    left: var(--new-ui-gap);
+    bottom: var(--new-ui-gap);
+    right: var(--new-ui-gap);
+    /* inset: 0; */
+    z-index: 9500; /* above the old UI (9000), below modal overlays (10000) */
+    pointer-events: none;
+}
+
+#vue-ui-root .vue-ui-shell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    height: 100%;
+    pointer-events: none;
+}
+
+.vue-ui-toolbar-slot {
+    margin-top: auto;
+    width: 100%;
+}
+
+/* Panel manager */
+.vue-ui-panel-manager {
+    display: flex;
+    flex-direction: row;
+    flex: 1; 
+    pointer-events: auto;
+    
+    overflow: hidden;
+}
+
+.vue-ui-panel-manager.expanded {
+    align-self: stretch;
+}
+
+.vue-ui-panel-manager .vue-ui-panel-manager-toolbar {
+    
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.vue-ui-panel-manager.expanded .vue-ui-panel-manager-toolbar {
+    padding-right: var(--new-ui-gap);
+    border-right: 1px solid var(--new-ui-border);
+}
+
+.vue-ui-panel-manager .vue-ui-panel-manager-toolbar .toolbar-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--new-ui-gap);
+    margin-top: auto;
+}
+
+.vue-ui-panel-manager.expanded .vue-ui-panel-manager-panels {
+    padding: var(--new-ui-gap);
+    flex: 1;
+  
+}
+
 /* Pulses box shadow and background color */
 @keyframes active-button-pulse {
     0% {
@@ -803,6 +873,15 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 
 /* Responsive adjustments - responsive first design */
 @media (min-width: 576px) {
+    #vue-ui-root {
+        width: 25rem;
+        right: unset;
+    }
+
+    .vue-ui-toolbar-slot {
+        width: auto;
+    }
+
     .toolbar.toolbar-bottom {
         align-self: flex-start;
         min-width: 21rem;
