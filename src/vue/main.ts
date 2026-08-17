@@ -3,7 +3,8 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import { initSimBridge } from './sim-bridge';
 import './style.css';
-
+// import old styles too
+import '../style.css';
 /**
  * Mounts the Vue UI overlay. Called from index.ts after the simulation UI has
  * been initialised, so the bridge can register real sim hooks immediately.

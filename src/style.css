@@ -717,8 +717,7 @@ button.btn-with-icon {
     align-self: stretch;
     align-items: center;
     height: auto;
-    /* Only margin left, bottom, and right */
-    margin: auto 0.5rem 0.5rem 0.5rem;
+
 }
 
 button.btn.toolbar-btn {
