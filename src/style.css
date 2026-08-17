@@ -33,10 +33,16 @@
     --new-ui-btn-care-border: #bb8d8d;
     --new-ui-btn-care-shadow: 0 0 1rem rgba(242, 182, 182, 0.5);
 
-    --new-ui-gap: 0.75rem;
+    --new-ui-gap-3: 0.5rem;
+    --new-ui-gap-2: 0.25rem;
+    --new-ui-gap-1: 0.125rem;
 }
 
 /* Utility classes */
+.mt-auto {
+    margin-top: auto;
+}
+
 .ml-auto {
     margin-left: auto !important;
 }
@@ -59,6 +65,18 @@
 
 .mb-3 {
     margin-bottom: 1rem !important;
+}
+
+.gap-3 {
+    gap: var(--new-ui-gap-3) !important;
+}
+
+.p-3 {
+    padding: var(--new-ui-gap-3) !important;
+}
+
+.m-3 {
+    margin: var(--new-ui-gap-3) !important;
 }
 
 /* Reset default styles and set up base styles */
@@ -794,10 +812,10 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 #vue-ui-root {
     position: fixed;
 
-    top: var(--new-ui-gap);
-    left: var(--new-ui-gap);
-    bottom: var(--new-ui-gap);
-    right: var(--new-ui-gap);
+    top: var(--new-ui-gap-3);
+    left: var(--new-ui-gap-3);
+    bottom: var(--new-ui-gap-3);
+    right: var(--new-ui-gap-3);
     /* inset: 0; */
     z-index: 9500; /* above the old UI (9000), below modal overlays (10000) */
     pointer-events: none;
@@ -820,9 +838,9 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 .vue-ui-panel-manager {
     display: flex;
     flex-direction: row;
-    flex: 1; 
+    flex: 1;
     pointer-events: auto;
-    
+
     overflow: hidden;
 }
 
@@ -831,28 +849,253 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 }
 
 .vue-ui-panel-manager .vue-ui-panel-manager-toolbar {
-    
     display: flex;
     flex-direction: column;
     align-items: flex-start;
 }
 
 .vue-ui-panel-manager.expanded .vue-ui-panel-manager-toolbar {
-    padding-right: var(--new-ui-gap);
+    padding-right: var(--new-ui-gap-3);
     border-right: 1px solid var(--new-ui-border);
 }
 
 .vue-ui-panel-manager .vue-ui-panel-manager-toolbar .toolbar-group {
     display: flex;
     flex-direction: column;
-    gap: var(--new-ui-gap);
+    gap: var(--new-ui-gap-3);
     margin-top: auto;
 }
 
 .vue-ui-panel-manager.expanded .vue-ui-panel-manager-panels {
-    padding: var(--new-ui-gap);
+    padding: var(--new-ui-gap-3) 0 var(--new-ui-gap-3) var(--new-ui-gap-3);
     flex: 1;
-  
+}
+
+.vue-ui-card {
+    background: var(--new-ui-bg);
+    border: 1px solid var(--new-ui-border);
+    border-radius: var(--new-ui-border-radius);
+    box-shadow: var(--new-ui-shadow);
+    backdrop-filter: var(--new-ui-backdrop-filter);
+    padding: var(--new-ui-gap-3);
+    min-height: 0;
+    display: flex;
+}
+
+.vue-ui-panel {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.vue-ui-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--new-ui-border);
+    color: var(--new-ui-label-color);
+    font-family: monospace;
+    font-size: 0.85rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.vue-ui-button {
+    padding: 0.4rem 0.6rem;
+    background: var(--new-ui-button-bg);
+    color: #fff;
+    border: 1px solid var(--new-ui-border);
+    border-radius: 0.4rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.15s ease;
+}
+
+.vue-ui-button:hover {
+    background: rgba(0, 102, 204, 0.45);
+    border-color: var(--new-ui-label-color);
+    box-shadow: 0 0 0.6rem rgba(0, 255, 204, 0.3);
+}
+
+.vue-ui-button:active {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+.vue-ui-button.vue-ui-button-active {
+    background: var(--new-ui-label-color);
+    color: #000;
+    border-color: var(--new-ui-label-color);
+}
+
+.vue-ui-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.vue-ui-label {
+    color: var(--new-ui-label-color);
+    font-family: monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.vue-ui-value {
+    color: #fff;
+    font-family: monospace;
+    font-size: 0.8rem;
+    text-align: right;
+    margin-left: auto;
+}
+
+.vue-ui-range {
+    flex: 1;
+    width: auto;
+    accent-color: var(--new-ui-label-color);
+    cursor: pointer;
+}
+
+.vue-ui-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem;
+}
+
+.vue-ui-hr {
+    border: none;
+    border-top: 1px solid var(--new-ui-border);
+    margin: 0.5rem 0;
+}
+
+/* Search box */
+.vue-ui-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.4rem 0.5rem;
+    background: var(--new-ui-input-bg);
+    color: #fff;
+    border: 1px solid var(--new-ui-border);
+    border-radius: 0.4rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.vue-ui-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.vue-ui-input:focus {
+    outline: none;
+    border-color: var(--new-ui-label-color);
+    box-shadow: 0 0 0.6rem rgba(0, 255, 204, 0.35);
+}
+
+/* Body list */
+.vue-ui-body-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: var(--new-ui-gap-3);
+    gap: var(--new-ui-gap-1);
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.vue-ui-body-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.vue-ui-body-list::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 0.4rem;
+}
+
+.vue-ui-body-list::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border: 1px solid var(--scrollbar-border);
+    border-radius: 0.4rem;
+}
+
+.vue-ui-body-row {
+    display: grid;
+    text-align: start;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.25rem 0.5rem;
+    align-items: baseline;
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--new-ui-border-radius);
+    cursor: pointer;
+
+    background: rgba(0, 102, 204, 0.2);
+    border: 1px solid transparent;
+    transition: background 0.12s ease;
+    user-select: none;
+}
+
+.vue-ui-body-row:hover {
+    background-color: var(--new-ui-button-bg);
+}
+
+.vue-ui-body-row.vue-ui-body-row-selected {
+    background: rgba(0, 255, 204, 0.16);
+    border-color: rgba(0, 255, 204, 0.55);
+}
+
+.vue-ui-body-name {
+    color: #fff;
+    font-family: monospace;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vue-ui-body-type {
+    color: var(--new-ui-label-color);
+    font-family: monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.vue-ui-body-stats {
+    grid-column: 1 / -1;
+    color: rgba(255, 255, 255, 0.55);
+    font-family: monospace;
+    font-size: 0.65rem;
+    display: flex;
+    gap: var(--new-ui-gap-3);
+    flex-wrap: wrap;
+}
+
+.vue-ui-empty {
+    color: rgba(255, 255, 255, 0.45);
+    font-family: monospace;
+    font-size: 0.75rem;
+    padding: 0.75rem 0.25rem;
+    text-align: center;
 }
 
 /* Pulses box shadow and background color */
@@ -874,17 +1117,16 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 /* Responsive adjustments - responsive first design */
 @media (min-width: 576px) {
     #vue-ui-root {
-        width: 25rem;
         right: unset;
     }
 
-    .vue-ui-toolbar-slot {
-        width: auto;
+    .vue-ui-panel-manager {
+        width: 25rem;
     }
 
     .toolbar.toolbar-bottom {
         align-self: flex-start;
-        min-width: 21rem;
+        width: 25rem;
     }
 
     #ui-container {
@@ -941,7 +1183,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     flex-direction: column;
     overflow-y: auto;
     max-height: 18rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--new-ui-gap-3);
     gap: 2px;
 }
 

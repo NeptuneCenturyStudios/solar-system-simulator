@@ -26,7 +26,12 @@
                 <span class="material-symbols-outlined">edit</span>
             </button>
 
-            <button class="btn toolbar-btn" title="Flight Controls">
+            <button
+                class="btn toolbar-btn"
+                :class="{ active: activePanel === ActivePanel.FlightControls }"
+                title="Flight Controls"
+                @click="setActivePanel(ActivePanel.FlightControls)"
+            >
                 <span class="material-symbols-outlined">rocket</span>
             </button>
 
@@ -46,6 +51,7 @@
 
         <div v-show="isExpanded" class="vue-ui-panel-manager-panels" >
             <SystemExplorer v-if="activePanel === ActivePanel.SystemExplorer" />
+            <FlightControls v-if="activePanel === ActivePanel.FlightControls" />
         </div>
     </div>
 </template>
@@ -54,6 +60,7 @@
 import { computed } from 'vue';
 import { ActivePanel, vueUiState } from '../ui-store';
 import SystemExplorer from '../components/SystemExplorer.vue';
+import FlightControls from '../components/FlightControls.vue';
 
 const isExpanded = computed(() => {
     // TODO: Determine if the panel manager should be expanded based on the UI state. Currently, it is expanded if the explorer is visible.
@@ -61,4 +68,8 @@ const isExpanded = computed(() => {
 });
 
 const activePanel = computed(() => vueUiState.activePanel);
+
+function setActivePanel(panel: ActivePanel): void {
+    vueUiState.activePanel = panel;
+}
 </script>

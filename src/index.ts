@@ -146,7 +146,7 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 
 // Vue UI overlay (new UI, developed in parallel with the existing UI)
 import { mountVueUi } from './vue/main';
-import { registerVueSimHooks, setDisplayState } from './vue/sim-bridge';
+import { registerVueSimHooks, setDisplayState, simStore } from './vue/sim-bridge';
 
 // State singletons
 import {
@@ -2962,6 +2962,13 @@ if (advancedModeChk) {
     });
 }
 
+// Vue Flight Controls panel: same event paths as the old panel above, just
+// triggered from the new UI instead of DOM button clicks.
+registerVueSimHooks({
+    spawnShip: () => spawnShip(),
+    toggleAutopilot: () => flightControlsPanel.emit('autopilot', {}),
+});
+
 // Prevent UI clicks and keyboard events from interfering with scene interaction
 const uiContainer = document.getElementById('ui-container');
 if (uiContainer) {
@@ -3004,7 +3011,9 @@ if (vueUiRoot) {
 function clearCameraPresetHighlights() {
     // Clear any camera preset highlight (manual selection).
     // Do NOT clear LOOK AT / FREE / TARGET highlights, those are toggles with independent state.
-    document.querySelectorAll('.btn-row button').forEach((b) => {
+    // Scoped to the legacy panel only — the Vue System Explorer reuses the
+    // `.btn-row` class and manages its own `active` state reactively.
+    document.querySelectorAll('#system-explorer .btn-row button').forEach((b) => {
         if (b?.id === 'camLookAtBtn') return;
         if (b?.id === 'freeCameraBtn') return;
         if (b?.id === 'camTargetBtn') return;
@@ -3149,7 +3158,7 @@ function spawnShip(targetShip?: Spaceship) {
     // Otherwise re-enter only when the dropdown selection matches the live ship.
     const existing = targetShip ?? flightState.knownShip;
     const live = !!(existing && !existing._isDisposed && simulationState.bodies.includes(existing));
-    const selectedTypeId = flightControlsPanel.getSelectedShipTypeId();
+    const selectedTypeId = simStore.selectedShipTypeId;
     const typeMatched = !!(existing && existing.shipTypeId === selectedTypeId);
     const canReenter = live && (!!targetShip || typeMatched);
 
@@ -3218,7 +3227,7 @@ function spawnShip(targetShip?: Spaceship) {
         const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
 
         // Create the selected ship type from the registry (falls back to the first type).
-        const shipType = getShipTypeById(flightControlsPanel.getSelectedShipTypeId());
+        const shipType = getShipTypeById(simStore.selectedShipTypeId);
         const ship = shipType.create(
             dependencies,
             scene,

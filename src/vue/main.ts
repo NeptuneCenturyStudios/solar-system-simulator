@@ -2,9 +2,9 @@ import { createApp } from 'vue';
 
 import App from './App.vue';
 import { initSimBridge } from './sim-bridge';
-// import old styles too
 
-import './style.css';
+// Styles are currently linked through the HTML <link> tags. Once the old UI is gone, styles
+// will be imported directly into the Vue application.
 
 /**
  * Mounts the Vue UI overlay. Called from index.ts after the simulation UI has

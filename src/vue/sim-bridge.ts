@@ -2,6 +2,7 @@ import { reactive } from 'vue';
 
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { Body } from '../bodies/body';
+import { SHIP_TYPES } from '../bodies/ships/ship-registry';
 import {
     autopilotState,
     cameraState,
@@ -64,6 +65,12 @@ export interface VueSimHooks {
     enterShip?: (body: Body) => void;
     /** Surface camera enablement depends on the current selection. */
     getSurfaceCameraState?: () => SurfaceCameraSnapshot;
+
+    // ── Flight Controls (same event paths as the old panel) ────────────────
+    /** Spawn (or re-enter) a spaceship of the currently selected type. */
+    spawnShip?: () => void;
+    /** Engage autopilot toward the current selection, or cancel if already active. */
+    toggleAutopilot?: () => void;
 }
 
 const SNAPSHOT_INTERVAL_MS = 100;
@@ -102,6 +109,16 @@ export interface VueSimStore {
 
     /** Id of the autopilot target body, or null when autopilot is off. */
     autopilotTargetId: string | null;
+
+    // ── Flight Controls ─────────────────────────────────────────────────────
+    /** Registry id of the ship type currently chosen in the dropdown. */
+    selectedShipTypeId: string;
+    /** True when a spawned ship still exists in the simulation (spawn/enter/autopilot enablement). */
+    hasKnownShip: boolean;
+    /** Registry id of the known ship's type, or null if none exists. */
+    knownShipTypeId: string | null;
+    /** Whether advanced (additive) flight physics are enabled. */
+    isAdvancedMode: boolean;
 }
 
 const state = reactive<VueSimStore>({
@@ -123,6 +140,10 @@ const state = reactive<VueSimStore>({
     showTrails: true,
     showOrbitPrediction: false,
     autopilotTargetId: null as string | null,
+    selectedShipTypeId: SHIP_TYPES[0].id,
+    hasKnownShip: false,
+    knownShipTypeId: null as string | null,
+    isAdvancedMode: false,
 });
 
 /**
@@ -178,6 +199,15 @@ function refreshCameraState(): void {
     const surface = hookRegistry.getSurfaceCameraState?.();
     state.surfaceActive = surface?.isActive ?? false;
     state.surfaceEnabled = surface?.isEnabled ?? false;
+
+    const ship = flightState.knownShip;
+    state.hasKnownShip = !!(
+        ship &&
+        !ship._isDisposed &&
+        simulationState.bodies.includes(ship)
+    );
+    state.knownShipTypeId = state.hasKnownShip ? (ship?.shipTypeId ?? null) : null;
+    state.isAdvancedMode = flightState.isAdvancedMode;
 }
 
 function refreshAll(): void {
@@ -360,6 +390,28 @@ export function enterShipById(bodyId: string): void {
     const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);
     if (!body) return;
     if (hookRegistry.enterShip) hookRegistry.enterShip(body);
+}
+
+// ── Flight Controls actions ───────────────────────────────────────────────
+
+/** Update the ship type selected in the Flight Controls dropdown (pure UI state). */
+export function setSelectedShipTypeId(id: string): void {
+    state.selectedShipTypeId = id;
+}
+
+export function setAdvancedMode(checked: boolean): void {
+    flightState.isAdvancedMode = checked;
+    state.isAdvancedMode = checked;
+}
+
+/** Spawn (or re-enter) a spaceship of the currently selected type. */
+export function requestSpawnShip(): void {
+    hookRegistry.spawnShip?.();
+}
+
+/** Engage autopilot toward the current selection, or cancel if already active. */
+export function requestToggleAutopilot(): void {
+    hookRegistry.toggleAutopilot?.();
 }
 
 // ── Formatting helpers shared by components ──────────────────────────────
