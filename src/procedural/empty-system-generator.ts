@@ -8,14 +8,10 @@ import { pickRandomSpaceTexture, generateSeedString } from './seed-utils';
  * Generates an empty system with no significant celestial bodies.
  */
 export class EmptySystemGenerator extends SolarSystemGenerator {
-    private readonly dependencies: IStateDependencies;
-    private readonly scene: THREE.Scene;
     private readonly masterSeed: string;
 
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, seed?: string) {
+    constructor(_dependencies: IStateDependencies, _scene: THREE.Scene, seed?: string) {
         super();
-        this.dependencies = dependencies;
-        this.scene = scene;
         const inputSeed = (seed ?? '').trim();
         this.masterSeed = inputSeed.length > 0 ? inputSeed : generateSeedString();
         this.seed = this.masterSeed;

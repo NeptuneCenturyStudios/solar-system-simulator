@@ -17,7 +17,6 @@ import { settingsStore } from '../settings/settings-store.js';
  */
 export class ShipFlame implements IShipEffect {
     private readonly scene: THREE.Scene;
-    private readonly radius: number;
     // ── Particle pool (parallel arrays, indexed by slot) ─────────────────────
     // px/py/pz: world-space birth position.
     // vx/vy/vz: world-space velocity (u/s) — integrated each frame.
@@ -74,7 +73,6 @@ export class ShipFlame implements IShipEffect {
         this.EXHAUST_DRIFT_SPEED = 16 * radius; // 4 u/s gives a nice plume length without needing super long lifetimes
 
         this.scene = scene;
-        this.radius = radius;
 
         this.px = new Float64Array(this.MAX_PARTICLES);
         this.py = new Float64Array(this.MAX_PARTICLES);

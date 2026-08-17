@@ -44,7 +44,7 @@ export class Body {
      * @param bodyType The type of the body (enum).
      */
     constructor(
-        dependencies: object,
+        _dependencies: object,
         scene: THREE.Scene,
         mass: number,
         radius: number,
@@ -133,15 +133,6 @@ export class Body {
      */
     update(acc: THREE.Vector3, dt: number) {
         if (this._isDisposed) return;
-
-        // if (
-        //     !acc ||
-        //     typeof acc.x !== 'number' ||
-        //     typeof acc.y !== 'number' ||
-        //     typeof acc.z !== 'number'
-        // ) {
-        //     acc = new THREE.Vector3(0, 0, 0);
-        // }
 
         this.velocity.x += acc.x * dt * 0.5;
         this.velocity.y += acc.y * dt * 0.5;

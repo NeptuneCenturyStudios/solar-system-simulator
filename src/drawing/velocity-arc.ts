@@ -20,7 +20,6 @@ export class VelocityArcManager {
     arcXZ: Line2;
     arcY: Line2;
 
-    private scene: THREE.Scene;
     private gizmo: CoordinateGizmo;
     private interactionState: {
         isChangingVelocity: boolean;
@@ -37,7 +36,6 @@ export class VelocityArcManager {
             velocityEditMode: string;
         }
     ) {
-        this.scene = scene;
         this.gizmo = gizmo;
         this.interactionState = interactionState;
 

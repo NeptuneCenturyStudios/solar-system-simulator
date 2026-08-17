@@ -69,11 +69,6 @@ export class PulsarBeam implements IEffect {
 
     // ─── helpers ───────────────────────────────────────────────────────────────
 
-    private _buildPerpendicular(v: THREE.Vector3): THREE.Vector3 {
-        const perp = Math.abs(v.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-        return perp.clone().cross(v).normalize();
-    }
-
     private _currentMagAxis(): THREE.Vector3 {
         const q = new THREE.Quaternion().setFromAxisAngle(this.rotationAxis, this.spinPhase);
         return this.magneticAxisBase.clone().applyQuaternion(q);

@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import pluginVue from 'eslint-plugin-vue';
 import tseslint from 'typescript-eslint';
 import eslintConfigPrettier from 'eslint-config-prettier';
 
@@ -26,6 +27,31 @@ export default tseslint.config(
             // "no-var": "off",
             // "@typescript-eslint/no-this-alias": "off",
             // "@typescript-eslint/no-unused-expressions": "off"
+        },
+    },
+    {
+        files: ['**/*.vue'],
+        extends: [
+            js.configs.recommended,
+            ...tseslint.configs.recommended,
+            pluginVue.configs['flat/recommended'],
+            eslintConfigPrettier,
+        ],
+        languageOptions: {
+            parserOptions: {
+                parser: tseslint.parser,
+            },
+        },
+        rules: {
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                {
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_',
+                },
+            ],
+            'vue/multi-word-component-names': 'off',
         },
     }
 );

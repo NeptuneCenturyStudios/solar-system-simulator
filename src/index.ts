@@ -141,6 +141,10 @@ import { UIManager } from './ui/ui-manager';
 import { runAnimationLoop, AnimationContext } from './simulation/animation-loop';
 import { registerCustomEventListeners } from './events/custom-event-listeners';
 
+// Vue UI overlay (new UI, developed in parallel with the existing UI)
+import { mountVueUi } from './vue/main';
+import { registerVueSimHooks } from './vue/sim-bridge';
+
 // State singletons
 import {
     autopilotState,
@@ -441,6 +445,7 @@ function isTouchOverUI(e: TouchEvent) {
     // If the finger is on an actual interactive control, allow the click/tap to happen.
     return Boolean(
         el.closest('#startup-overlay, #about-overlay, .modal-overlay, .modal') ||
+        el.closest('#vue-ui-root') ||
         el.closest('.ui-panel') ||
         el.closest('button, input, select, textarea, label, a') ||
         el.closest('.toolbar-btn') ||
@@ -2842,6 +2847,25 @@ startupModal.setProceduralModal(proceduralModal);
 aboutModal.initialize();
 optionsPanel.initialize();
 
+// ── Vue UI overlay (new UI, developed in parallel with the existing UI) ──
+// Wire the Vue bridge to the same control paths the old UI uses, so both UIs
+// stay in sync. `togglePause` is a hoisted function declaration defined above.
+registerVueSimHooks({
+    togglePause: () => togglePause(),
+    setTimeScale: (value: number) => uiManager.emit('timeScaleChange', { value }),
+    setGMultiplier: (value: number) => {
+        simulationState.gMultiplier = value;
+        const mpSlider = uiManager.managementPanel.gravitationalConstantSlider;
+        const mpDisplay = uiManager.managementPanel.gravitationalConstantDisplay;
+        if (mpSlider) mpSlider.value = String(value);
+        if (mpDisplay) mpDisplay.textContent = value.toFixed(value < 10 ? 2 : 0);
+    },
+    selectBody: (body: Body) => {
+        uiManager.mainPanel.emit('manualBodySelect', { body });
+    },
+});
+mountVueUi();
+
 // Wire Flight Controls button and panel events
 
 const flightControlsPanel = uiManager.flightControlsPanel;
@@ -2911,6 +2935,24 @@ if (uiContainer) {
     uiContainer.addEventListener('keyup', (e) => {
         e.stopPropagation();
     });
+}
+
+// Block events from the Vue UI overlay so interactions never reach the 3D scene.
+// (The Vue UI sits above the old toolbar/panels, so without this, clicks on it
+// would rotate the camera / select bodies underneath.)
+const vueUiRoot = document.getElementById('vue-ui-root');
+if (vueUiRoot) {
+    // `wheel` must be blocked too: without it, scrolling the System Explorer
+    // body list bubbles up to the window-level zoom handler, which calls
+    // preventDefault() and zooms the canvas instead. `stopPropagation` here
+    // (not preventDefault) lets the list scroll normally.
+    ['mousedown', 'mouseup', 'click', 'wheel', 'keydown', 'keyup'].forEach(
+        (eventName) => {
+            vueUiRoot.addEventListener(eventName, (e) => {
+                e.stopPropagation();
+            });
+        }
+    );
 }
 
 function clearCameraPresetHighlights() {

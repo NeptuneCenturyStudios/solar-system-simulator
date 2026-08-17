@@ -371,12 +371,6 @@ export class PlanetNameIndicator {
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private hideAll(): void {
-        for (const entry of this.spritePool) {
-            entry.sprite.visible = false;
-        }
-    }
-
     /** Apply updated canvas to a pool entry's texture, recreating it if the canvas was resized. */
     private _applyTexture(entry: PoolEntry, canvasResized: boolean): void {
         if (canvasResized) {
