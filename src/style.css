@@ -717,7 +717,7 @@ button.btn-with-icon {
     align-self: stretch;
     align-items: center;
     height: auto;
-
+    pointer-events: auto;
 }
 
 button.btn.toolbar-btn {

@@ -3,6 +3,7 @@ import { reactive } from 'vue';
 import { cameraState, simulationState } from '../simulation/simulation';
 import { Body } from '../bodies/body';
 import { getBodyTypeLabel } from '../utilities/utilities';
+import type { ISimStateSnapshot } from '../interfaces';
 
 /**
  * Plain, serialisable snapshot of a simulation body. Vue reactivity cannot
@@ -44,6 +45,9 @@ export interface VueSimStore {
     bodies: BodySnapshot[];
     selectedId: string | null;
     timeScale: number;
+    /** Speed used when paused (timeScale is 0 while paused); also the base the
+     *  toolbar halve/double buttons operate on, matching the old UI. */
+    savedTimeScale: number;
     isPaused: boolean;
     gMultiplier: number;
     inFlight: boolean;
@@ -53,6 +57,7 @@ const state = reactive<VueSimStore>({
     bodies: [] as BodySnapshot[],
     selectedId: null as string | null,
     timeScale: 1,
+    savedTimeScale: 1,
     isPaused: false,
     gMultiplier: 1,
     inFlight: false,
@@ -93,6 +98,7 @@ function snapshotBodies(): void {
 
 function refreshScalarState(): void {
     state.timeScale = simulationState.timeScale;
+    state.savedTimeScale = simulationState.savedTimeScale;
     state.isPaused = simulationState.isPaused;
     state.gMultiplier = simulationState.gMultiplier;
 }
@@ -121,6 +127,17 @@ export function initSimBridge(): void {
     window.addEventListener('body:removed', refreshAll);
     window.addEventListener('body:dead', refreshAll);
     window.addEventListener('bodies:reset', refreshAll);
+    // Instant scalar sync: index.ts dispatches this on every pause / time-scale
+    // / gravity change (P key, old toolbar, auto-pause during drags), so the
+    // Vue UI mirrors the sim with zero 100ms poll lag.
+    window.addEventListener('sim:stateChange', (e: Event) => {
+        const detail = (e as CustomEvent<ISimStateSnapshot>).detail;
+        if (!detail) return;
+        state.timeScale = detail.timeScale;
+        state.savedTimeScale = detail.savedTimeScale;
+        state.isPaused = detail.isPaused;
+        state.gMultiplier = detail.gMultiplier;
+    });
 }
 
 // ── Actions (called from Vue components) ─────────────────────────────────
@@ -180,7 +197,11 @@ export function formatNumber(value: number): string {
 }
 
 export function formatTimeScale(value: number): string {
-    if (state.isPaused) return '0.0x (PAUSED)';
+    if (state.isPaused) {
+        const next = Math.abs(state.savedTimeScale).toFixed(1);
+        const direction = state.savedTimeScale < 0 ? ' REVERSE' : '';
+        return `0.0x (PAUSED - next: ${next}x${direction})`;
+    }
     if (value < 0) return `${Math.abs(value).toFixed(1)}x REVERSE`;
     return `${value.toFixed(1)}x`;
 }

@@ -46,6 +46,17 @@ export interface ISimulationState {
 }
 
 /**
+ * Plain, serialisable snapshot of the simulation's scalar controls.
+ * Consumed by the Vue UI bridge to mirror P-key / toolbar state instantly.
+ */
+export interface ISimStateSnapshot {
+    timeScale: number;
+    savedTimeScale: number;
+    isPaused: boolean;
+    gMultiplier: number;
+}
+
+/**
  * Represents the rotation of a body in 3D space
  */
 export interface IRotation {

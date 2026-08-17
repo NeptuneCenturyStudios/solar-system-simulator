@@ -65,7 +65,7 @@ function onSelect(body: BodySnapshot): void {
 
 <style scoped>
 .vue-ui-explorer {
-    flex: 1 1 auto;
+    flex: 1;
     min-height: 0;
 }
 

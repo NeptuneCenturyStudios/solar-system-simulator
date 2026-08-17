@@ -18,6 +18,8 @@ declare global {
             id: string | null;
             name: string | null;
         }>;
+        /** Fired when the sim's scalar controls (pause / time scale / gravity) change. */
+        'sim:stateChange': CustomEvent<ISimStateSnapshot>;
     }
 
     interface Event {
@@ -132,6 +134,7 @@ import {
     IAutopilotContext,
     IFlightControlContext,
     IProceduralGeneratorPromptResult,
+    ISimStateSnapshot,
     IStateDependencies,
 } from './interfaces';
 import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simulation/autopilot';
@@ -1708,6 +1711,24 @@ async function spawn(
     }
 }
 
+/**
+ * Notify the Vue UI bridge (and any other listeners) that the sim's scalar
+ * controls changed, so e.g. the P-key pause state is reflected instantly
+ * instead of waiting for the bridge's poll interval.
+ */
+function dispatchSimStateChange() {
+    window.dispatchEvent(
+        new CustomEvent<ISimStateSnapshot>('sim:stateChange', {
+            detail: {
+                timeScale: simulationState.timeScale,
+                savedTimeScale: simulationState.savedTimeScale,
+                isPaused: simulationState.isPaused,
+                gMultiplier: simulationState.gMultiplier,
+            },
+        })
+    );
+}
+
 function togglePause() {
     simulationState.isPaused = !simulationState.isPaused;
 
@@ -1727,6 +1748,8 @@ function togglePause() {
         );
         uiManager.setPauseState(false);
     }
+
+    dispatchSimStateChange();
 }
 
 function handlePauseShortcut() {
@@ -2859,6 +2882,7 @@ registerVueSimHooks({
         const mpDisplay = uiManager.managementPanel.gravitationalConstantDisplay;
         if (mpSlider) mpSlider.value = String(value);
         if (mpDisplay) mpDisplay.textContent = value.toFixed(value < 10 ? 2 : 0);
+        dispatchSimStateChange();
     },
     selectBody: (body: Body) => {
         uiManager.mainPanel.emit('manualBodySelect', { body });
@@ -3366,6 +3390,7 @@ uiManager.managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolea
 
 uiManager.managementPanel.on('gChange', ({ value }: { value: number }) => {
     simulationState.gMultiplier = value;
+    dispatchSimStateChange();
 });
 
 uiManager.managementPanel.on(
@@ -3471,6 +3496,7 @@ uiManager.on('timeScaleChange', ({ value }: { value: number }) => {
         simulationState.timeScale = newSpeed;
         uiManager.mainPanel.updateTimeScaleDisplay(absSpeed + 'x' + direction);
     }
+    dispatchSimStateChange();
 });
 
 uiManager.on('pause', () => {
@@ -4456,6 +4482,7 @@ function applyStartupGMultiplier() {
     const mpDisplay = uiManager.managementPanel.gravitationalConstantDisplay;
     if (mpSlider) mpSlider.value = String(gMult);
     if (mpDisplay) mpDisplay.textContent = gMult.toFixed(gMult < 10 ? 2 : 0);
+    dispatchSimStateChange();
 }
 
 startupModal.on('launchDefault', async () => {
