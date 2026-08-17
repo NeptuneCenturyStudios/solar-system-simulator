@@ -207,12 +207,14 @@
 
 .vue-ui-body-row {
     display: grid;
+    text-align: start;
     grid-template-columns: 1fr auto;
     gap: 0.25rem 0.5rem;
     align-items: baseline;
     padding: 0.35rem 0.5rem;
     border-radius: 0.4rem;
     cursor: pointer;
+    background-color: var(--new-ui-button-bg);
     border: 1px solid transparent;
     transition: background 0.12s ease;
     user-select: none;

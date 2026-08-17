@@ -13,13 +13,11 @@ export enum ActivePanel {
  * which parts of the Vue overlay are open.
  */
 export interface VueUiState {
-    explorerVisible: boolean;
     activePanel: ActivePanel;
 }
 
 const uiState = reactive<VueUiState>({
-    explorerVisible: true,
-    activePanel: ActivePanel.None,
+    activePanel: ActivePanel.SystemExplorer,
 });
 
 /** Reactive store consumed by Vue components for overlay visibility. */

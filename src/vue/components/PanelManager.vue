@@ -57,7 +57,7 @@ import SystemExplorer from '../components/SystemExplorer.vue';
 
 const isExpanded = computed(() => {
     // TODO: Determine if the panel manager should be expanded based on the UI state. Currently, it is expanded if the explorer is visible.
-    return vueUiState.explorerVisible;
+    return vueUiState.activePanel !== ActivePanel.None;
 });
 
 const activePanel = computed(() => vueUiState.activePanel);

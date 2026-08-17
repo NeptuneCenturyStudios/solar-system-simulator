@@ -1,8 +1,5 @@
 <template>
     <div class="vue-ui-shell gap-3">
-        <!-- <div id="vue-ui-overlay" class="vue-ui-overlay">
-            <SystemExplorer v-show="vueUiState.explorerVisible" />
-        </div> -->
 
         <PanelManager />
 

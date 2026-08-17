@@ -8,7 +8,7 @@
         <!-- Explorer -->
         <button
             class="btn toolbar-btn"
-            :class="{ active: vueUiState.explorerVisible }"
+            :class="{ active: vueUiState.activePanel === ActivePanel.SystemExplorer }"
             title="Open System Explorer"
             aria-label="Open System Explorer"
             @click="toggleExplorer"
@@ -99,7 +99,6 @@ function stepTimeScale(factor: number): void {
 }
 
 function toggleExplorer(): void {
-    vueUiState.explorerVisible = !vueUiState.explorerVisible;
     vueUiState.activePanel = ActivePanel.SystemExplorer;
 }
 </script>

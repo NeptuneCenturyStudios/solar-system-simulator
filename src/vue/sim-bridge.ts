@@ -1,7 +1,13 @@
 import { reactive } from 'vue';
 
-import { cameraState, simulationState } from '../simulation/simulation';
+import { BodyTypeEnum } from '../bodies/body-enums';
 import { Body } from '../bodies/body';
+import {
+    autopilotState,
+    cameraState,
+    flightState,
+    simulationState,
+} from '../simulation/simulation';
 import { getBodyTypeLabel } from '../utilities/utilities';
 import type { ISimStateSnapshot } from '../interfaces';
 
@@ -18,6 +24,13 @@ export interface BodySnapshot {
     mass: number;
     radius: number;
     speed: number;
+    isShip: boolean;
+}
+
+export interface SurfaceCameraSnapshot {
+    isActive: boolean;
+    /** True when the currently selected body is eligible for surface view. */
+    isEnabled: boolean;
 }
 
 export interface VueSimHooks {
@@ -29,6 +42,28 @@ export interface VueSimHooks {
     setGMultiplier?: (value: number) => void;
     /** Select & focus a body (same path as clicking a row in the old Bodies table). */
     selectBody?: (body: Body) => void;
+
+    // ── System Explorer (same event paths as the old panel) ────────────────
+    /** Toggle camera Target mode (gizmo visibility). */
+    toggleTargetMode?: () => void;
+    /** Toggle camera Look At mode (orbit around the selected body). */
+    toggleLookAtMode?: () => void;
+    /** Toggle free camera mode. */
+    toggleFreeCameraMode?: () => void;
+    /** Toggle surface camera mode; no-op when the selection is ineligible. */
+    toggleSurfaceCamera?: () => void;
+    zoomIn?: () => void;
+    zoomOut?: () => void;
+    setLockToSun?: (checked: boolean) => void;
+    setShowTrails?: (checked: boolean) => void;
+    setShowOrbitPrediction?: (checked: boolean) => void;
+    setShowNames?: (checked: boolean) => void;
+    /** Autopilot ("Fly here") to the given body; re-firing on the target cancels. */
+    flyToBody?: (body: Body) => void;
+    /** Re-enter the given spaceship. */
+    enterShip?: (body: Body) => void;
+    /** Surface camera enablement depends on the current selection. */
+    getSurfaceCameraState?: () => SurfaceCameraSnapshot;
 }
 
 const SNAPSHOT_INTERVAL_MS = 100;
@@ -51,6 +86,22 @@ export interface VueSimStore {
     isPaused: boolean;
     gMultiplier: number;
     inFlight: boolean;
+
+    // ── Camera modes (mirror cameraState) ──────────────────────────────────
+    isTargetMode: boolean;
+    isLookAtMode: boolean;
+    isFreeCameraMode: boolean;
+    lockToSun: boolean;
+    surfaceActive: boolean;
+    surfaceEnabled: boolean;
+
+    // ── Display options ────────────────────────────────────────────────────
+    showNames: boolean;
+    showTrails: boolean;
+    showOrbitPrediction: boolean;
+
+    /** Id of the autopilot target body, or null when autopilot is off. */
+    autopilotTargetId: string | null;
 }
 
 const state = reactive<VueSimStore>({
@@ -61,6 +112,17 @@ const state = reactive<VueSimStore>({
     isPaused: false,
     gMultiplier: 1,
     inFlight: false,
+    isTargetMode: false,
+    isLookAtMode: false,
+    isFreeCameraMode: false,
+    lockToSun: false,
+    surfaceActive: false,
+    surfaceEnabled: false,
+    showNames: false,
+    // Same display defaults as the old panel's HTML checkboxes.
+    showTrails: true,
+    showOrbitPrediction: false,
+    autopilotTargetId: null as string | null,
 });
 
 /**
@@ -93,6 +155,7 @@ function snapshotBodies(): void {
             mass: b.mass,
             radius: b.radius,
             speed: b.velocity ? b.velocity.length() : 0,
+            isShip: b.bodyType === BodyTypeEnum.SpaceShip,
         }));
 }
 
@@ -103,9 +166,24 @@ function refreshScalarState(): void {
     state.gMultiplier = simulationState.gMultiplier;
 }
 
+function refreshCameraState(): void {
+    state.isTargetMode = cameraState.isTargetMode;
+    state.isLookAtMode = cameraState.isLookAtMode;
+    state.isFreeCameraMode = cameraState.isFreeCameraMode;
+    state.lockToSun = cameraState.lockToSun;
+    state.showNames = simulationState.showNames;
+    state.inFlight = flightState.isActive;
+    state.autopilotTargetId = autopilotState.targetBody ? autopilotState.targetBody.id : null;
+
+    const surface = hookRegistry.getSurfaceCameraState?.();
+    state.surfaceActive = surface?.isActive ?? false;
+    state.surfaceEnabled = surface?.isEnabled ?? false;
+}
+
 function refreshAll(): void {
     refreshScalarState();
     snapshotBodies();
+    refreshCameraState();
 }
 
 let intervalId: number | null = null;
@@ -181,6 +259,107 @@ export function selectBodyById(id: string): void {
         cameraState.focusBody = body;
         snapshotBodies();
     }
+}
+
+// ── System Explorer actions ──────────────────────────────────────────────
+
+export function toggleTargetMode(): void {
+    if (hookRegistry.toggleTargetMode) {
+        hookRegistry.toggleTargetMode();
+    } else {
+        cameraState.isTargetMode = !cameraState.isTargetMode;
+        refreshCameraState();
+    }
+}
+
+export function toggleLookAtMode(): void {
+    if (hookRegistry.toggleLookAtMode) {
+        hookRegistry.toggleLookAtMode();
+    } else {
+        cameraState.isLookAtMode = !cameraState.isLookAtMode;
+        refreshCameraState();
+    }
+}
+
+export function toggleFreeCameraMode(): void {
+    if (hookRegistry.toggleFreeCameraMode) {
+        hookRegistry.toggleFreeCameraMode();
+    } else {
+        cameraState.isFreeCameraMode = !cameraState.isFreeCameraMode;
+        refreshCameraState();
+    }
+}
+
+export function toggleSurfaceCamera(): void {
+    if (!hookRegistry.toggleSurfaceCamera) return;
+    hookRegistry.toggleSurfaceCamera();
+}
+
+export function zoomCameraIn(): void {
+    if (hookRegistry.zoomIn) hookRegistry.zoomIn();
+}
+
+export function zoomCameraOut(): void {
+    if (hookRegistry.zoomOut) hookRegistry.zoomOut();
+}
+
+export function setLockToSun(checked: boolean): void {
+    if (hookRegistry.setLockToSun) {
+        hookRegistry.setLockToSun(checked);
+    } else {
+        cameraState.lockToSun = checked;
+        refreshCameraState();
+    }
+}
+
+/** Partial display-flag update pushed TO the store (used by index.ts). */
+export interface VueDisplayState {
+    showTrails?: boolean;
+    showOrbitPrediction?: boolean;
+}
+
+export function setDisplayState(partial: VueDisplayState): void {
+    if (partial.showTrails !== undefined) state.showTrails = partial.showTrails;
+    if (partial.showOrbitPrediction !== undefined) {
+        state.showOrbitPrediction = partial.showOrbitPrediction;
+    }
+}
+
+export function setShowTrails(checked: boolean): void {
+    if (hookRegistry.setShowTrails) {
+        hookRegistry.setShowTrails(checked);
+    } else {
+        setDisplayState({ showTrails: checked });
+    }
+}
+
+export function setShowOrbitPrediction(checked: boolean): void {
+    if (hookRegistry.setShowOrbitPrediction) {
+        hookRegistry.setShowOrbitPrediction(checked);
+    } else {
+        setDisplayState({ showOrbitPrediction: checked });
+    }
+}
+
+export function setShowNames(checked: boolean): void {
+    if (hookRegistry.setShowNames) {
+        hookRegistry.setShowNames(checked);
+    } else {
+        simulationState.showNames = checked;
+        refreshCameraState();
+    }
+}
+
+export function flyToBody(bodyId: string): void {
+    const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);
+    if (!body) return;
+    if (hookRegistry.flyToBody) hookRegistry.flyToBody(body);
+}
+
+export function enterShipById(bodyId: string): void {
+    const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);
+    if (!body) return;
+    if (hookRegistry.enterShip) hookRegistry.enterShip(body);
 }
 
 // ── Formatting helpers shared by components ──────────────────────────────

@@ -146,7 +146,7 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 
 // Vue UI overlay (new UI, developed in parallel with the existing UI)
 import { mountVueUi } from './vue/main';
-import { registerVueSimHooks } from './vue/sim-bridge';
+import { registerVueSimHooks, setDisplayState } from './vue/sim-bridge';
 
 // State singletons
 import {
@@ -2887,8 +2887,30 @@ registerVueSimHooks({
     selectBody: (body: Body) => {
         uiManager.mainPanel.emit('manualBodySelect', { body });
     },
+
+    // ── System Explorer: delegate to the same event paths as the old panel ──
+    toggleTargetMode: () => uiManager.mainPanel.emit('targetToggle'),
+    toggleLookAtMode: () => uiManager.mainPanel.emit('lookAtToggle'),
+    toggleFreeCameraMode: () => uiManager.mainPanel.emit('freeCameraToggle'),
+    toggleSurfaceCamera: () => uiManager.mainPanel.emit('surfaceCameraToggle'),
+    zoomIn: () => uiManager.mainPanel.emit('zoomIn'),
+    zoomOut: () => uiManager.mainPanel.emit('zoomOut'),
+    setLockToSun: (checked: boolean) =>
+        uiManager.mainPanel.emit('lockToSunChange', { checked }),
+    setShowTrails: (checked: boolean) =>
+        uiManager.mainPanel.emit('trailsChange', { checked }),
+    setShowOrbitPrediction: (checked: boolean) =>
+        uiManager.mainPanel.emit('predictionChange', { checked }),
+    setShowNames: (checked: boolean) =>
+        uiManager.mainPanel.emit('namesChange', { checked }),
+    flyToBody: (body: Body) => uiManager.mainPanel.emit('autopilot', { body }),
+    enterShip: (body: Body) => uiManager.mainPanel.emit('enterShip', { body }),
 });
 mountVueUi();
+
+// Mirror the old panel's default display-option state in the Vue store
+// (Show Orbit Trails checked, Show Orbit Prediction unchecked).
+setDisplayState({ showTrails: true, showOrbitPrediction: false });
 
 // Wire Flight Controls button and panel events
 
@@ -3065,6 +3087,29 @@ const surfaceCam = new SurfaceCameraManager(
         cameraState.isFreeCameraMode = false;
     }
 );
+
+// Surface camera enablement is selection-driven, so register the state
+// snapshot with the Vue bridge now that `surfaceCam` exists. (The bridge's
+// earlier polls simply defaulted to "disabled/inactive" until this runs.)
+registerVueSimHooks({
+    getSurfaceCameraState: () => {
+        const selected =
+            (selectedBody &&
+            simulationState.bodies.includes(selectedBody) &&
+            !selectedBody._isDisposed
+                ? selectedBody
+                : null) ||
+            (manuallySelectedBody &&
+            simulationState.bodies.includes(manuallySelectedBody) &&
+            !manuallySelectedBody._isDisposed
+                ? manuallySelectedBody
+                : null);
+        return {
+            isActive: surfaceCam.isActive,
+            isEnabled: surfaceCam.isEligibleBody(selected),
+        };
+    },
+});
 
 // ── Flight mode functions ────────────────────────────────────────────────────
 
@@ -3411,6 +3456,7 @@ if (enableSkydomeCheckbox) {
 }
 
 uiManager.mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
+    setDisplayState({ showTrails: checked });
     simulationState.bodies.forEach((body) => {
         if (body && body instanceof CelestialBody && body.trail) {
             body.trail.visible = checked;
@@ -3419,6 +3465,7 @@ uiManager.mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
 });
 
 uiManager.mainPanel.on('predictionChange', ({ checked }: { checked: boolean }) => {
+    setDisplayState({ showOrbitPrediction: checked });
     orbitPrediction.visible = checked;
 });
 
