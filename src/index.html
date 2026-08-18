@@ -13,58 +13,6 @@
     </head>
 
     <body>
-        <div id="startup-overlay" class="modal-overlay" aria-modal="true" role="dialog">
-            <div id="startup-modal" class="modal">
-                <div class="modal-header">Launch Control</div>
-                <div class="control-group startup-g-control">
-                    <label for="startupGMultiplierSlider">
-                        Gravity Multiplier (G)
-                        <span id="startupGMultiplierVal" class="val-display">Normal (1×)</span>
-                    </label>
-                    <input
-                        type="range"
-                        id="startupGMultiplierSlider"
-                        min="0"
-                        max="4"
-                        step="1"
-                        value="0"
-                    />
-                    <div class="startup-g-labels">
-                        <span title="Lower gravity is ideal for flight simulation and exploration"
-                            >Normal</span
-                        >
-                        <span title="Higher gravity is ideal for simulation and experiments"
-                            >10,000,000×</span
-                        >
-                    </div>
-                </div>
-                <button id="startupLaunchDefaultBtn" class="old-ui btn-with-icon mb-3">
-                    <span class="material-symbols-outlined">orbit</span>
-                    LAUNCH SOLAR SYSTEM
-                </button>
-                <button id="startupLaunchEmptyBtn" class="old-ui btn-with-icon mb-3">
-                    <span class="material-symbols-outlined">build</span>
-                    BUILD YOUR OWN SYSTEM
-                </button>
-                <button id="startupLaunchGenerateBtn" class="old-ui btn-with-icon mb-3">
-                    <span class="material-symbols-outlined">auto_fix_high</span>
-                    GENERATE
-                </button>
-                <button id="startupLaunchBlackHoleBtn" class="old-ui btn-dark btn-with-icon mb-3">
-                    <span class="material-symbols-outlined">brightness_1</span>
-                    BLACK HOLE
-                </button>
-                <button
-                    id="startupCancelBtn"
-                    class="old-ui btn-with-icon btn-danger mb-3"
-                    style="display: none"
-                >
-                    <span class="material-symbols-outlined">close</span>
-                    CANCEL
-                </button>
-            </div>
-        </div>
-
         <div id="procedural-overlay" class="modal-overlay" aria-modal="true" role="dialog">
             <div id="procedural-modal" class="modal">
                 <div class="modal-header">Generate Procedural System</div>

@@ -193,6 +193,9 @@ export class ProceduralGeneratorModal extends Panel {
             this.setTitle(title);
         }
 
+        // Ensure the overlay is visible even when called without a prior show()/prompt() (e.g. direct launch).
+        this.show();
+
         this._state = 'generating';
         if (this.element) this.element.style.pointerEvents = 'auto';
         if (this._seedSectionEl) this._seedSectionEl.style.display = 'none';

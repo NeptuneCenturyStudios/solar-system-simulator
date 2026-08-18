@@ -52,6 +52,7 @@ export default tseslint.config(
                 },
             ],
             'vue/multi-word-component-names': 'off',
+            'vue/attributes-order': 'error',
         },
     }
 );

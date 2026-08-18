@@ -125,7 +125,6 @@ import { upgradeProceduralTexture } from './procedural/texture-upgrader';
 import { Asteroid } from './bodies/asteroid';
 
 import { Spaceship } from './bodies/ships/spaceship';
-import { StartupModal } from './ui/startup-modal';
 import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
 import { OptionsPanel } from './ui/options-panel';
@@ -147,6 +146,13 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 // Vue UI overlay (new UI, developed in parallel with the existing UI)
 import { mountVueUi } from './vue/main';
 import { registerVueSimHooks, setDisplayState, simStore } from './vue/sim-bridge';
+import {
+    getStartupGMultiplier,
+    hideStartupModal,
+    showStartupModal,
+    startupModalAllowsCancel,
+    startupModalIsVisible,
+} from './vue/startup-modal-service';
 
 // State singletons
 import {
@@ -447,7 +453,7 @@ function isTouchOverUI(e: TouchEvent) {
 
     // If the finger is on an actual interactive control, allow the click/tap to happen.
     return Boolean(
-        el.closest('#startup-overlay, #about-overlay, .modal-overlay, .modal') ||
+        el.closest('#about-overlay, .modal-overlay, .modal, .vue-modal-overlay') ||
         el.closest('#vue-ui-root') ||
         el.closest('.ui-panel') ||
         el.closest('button, input, select, textarea, label, a') ||
@@ -2854,7 +2860,6 @@ function setF(id: string) {
 
 // Create and initialize panels
 const uiManager = new UIManager('ui-container');
-const startupModal = new StartupModal('startup-overlay');
 const proceduralModal = new ProceduralGeneratorModal();
 const aboutModal = new AboutModal('about-overlay', 'btn-about', 'aboutCloseBtn');
 const optionsPanel = new OptionsPanel('options-panel');
@@ -2864,9 +2869,7 @@ uiManager.managementPanel.registerGetFocusObject(() => {
 });
 
 uiManager.initialize();
-startupModal.initialize();
 proceduralModal.initialize();
-startupModal.setProceduralModal(proceduralModal);
 aboutModal.initialize();
 optionsPanel.initialize();
 
@@ -3562,7 +3565,7 @@ uiManager.on('pause', () => {
 uiManager.on('reset', () => {
     // Auto-close management UI and show launcher with Cancel
     uiManager.managementPanel.hide();
-    startupModal.open({ allowCancel: true });
+    void startStartupFlow({ allowCancel: true });
 });
 
 // "Fly Here" button from the bodies table
@@ -4532,7 +4535,7 @@ function applyDefaultCameraTogglesAfterSpawn() {
 }
 
 function applyStartupGMultiplier() {
-    const gMult = startupModal.getGMultiplier();
+    const gMult = getStartupGMultiplier();
     simulationState.gMultiplier = gMult;
     const mpSlider = uiManager.managementPanel.gravitationalConstantSlider;
     const mpDisplay = uiManager.managementPanel.gravitationalConstantDisplay;
@@ -4541,62 +4544,72 @@ function applyStartupGMultiplier() {
     dispatchSimStateChange();
 }
 
-startupModal.on('launchDefault', async () => {
-    ambientMusic.init();
-    applyStartupGMultiplier();
-    uiManager.managementPanel.hide();
-    startupModal.hide();
-    const progressReporter = proceduralModal.showProgressUI();
-    await spawn(SimulationStartMode.Default, undefined, progressReporter);
-    applyDefaultCameraTogglesAfterSpawn();
-    proceduralModal.hide();
-});
-
-startupModal.on('launchEmpty', async () => {
-    applyStartupGMultiplier();
-    uiManager.managementPanel.hide();
-    startupModal.hide();
-    await spawn(SimulationStartMode.Empty);
-    applyDefaultCameraTogglesAfterSpawn();
-});
-
-startupModal.on('generateBlackHole', async (result: IProceduralGeneratorPromptResult) => {
+/**
+ * Launches a system from the startup flow: applies the G multiplier, closes
+ * the management panel, shows the procedural progress overlay (where
+ * applicable), spawns the system, then hides the progress overlay.
+ */
+async function launchSystem(
+    mode: SimulationStartMode,
+    proceduralResult?: IProceduralGeneratorPromptResult
+) {
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
 
-    startupModal.hide();
-    const progressReporter = proceduralModal.showProgressUI();
-    await spawn(SimulationStartMode.BlackHole, result, progressReporter);
+    hideStartupModal();
+
+    // Every launch mode except "Build your own system" runs through a
+    // generator, so show the progress overlay while it works.
+    const progressReporter =
+        mode === SimulationStartMode.Empty ? undefined : proceduralModal.showProgressUI();
+    await spawn(mode, proceduralResult, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
-    proceduralModal.hide();
-});
+    if (progressReporter) proceduralModal.hide();
+}
 
-startupModal.on('generateProcedural', async (result: IProceduralGeneratorPromptResult) => {
-    applyStartupGMultiplier();
-    uiManager.managementPanel.hide();
+/**
+ * Shows the (Vue) startup modal and routes the user's action. GENERATE and
+ * BLACK HOLE delegate the seed prompt to the legacy procedural modal; if the
+ * user cancels that prompt, the startup modal re-opens (with Cancel visible or
+ * not, matching the current allowCancel state). The returned promise resolves
+ * once the requested system has been spawned.
+ */
+async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promise<void> {
+    const result = await showStartupModal(options);
+    if (result === null) return;
 
-    startupModal.hide();
-    const progressReporter = proceduralModal.showProgressUI();
-    await spawn(SimulationStartMode.Procedural, result, progressReporter);
-    applyDefaultCameraTogglesAfterSpawn();
-    proceduralModal.hide();
-});
-
-startupModal.on('cancel', () => {
-    startupModal.hide();
-});
-
-// // Retry: user clicked Create on the seed form after a failed generation.
-// proceduralModal.on('create', async ({ seed }: { seed: string }) => {
-//     await spawn({ mode: SimulationStartMode.Procedural, seed });
-//     applyDefaultCameraTogglesAfterSpawn();
-// });
-
-// Retry cancel: user clicked Cancel on the seed form after a failed generation.
-proceduralModal.on('cancelFromRetry', () => {
-    proceduralModal.hide();
-    startupModal.open({ allowCancel: startupModal._allowCancel });
-});
+    switch (result.action) {
+        case 'launchDefault':
+            ambientMusic.init();
+            await launchSystem(SimulationStartMode.Default);
+            break;
+        case 'launchEmpty':
+            await launchSystem(SimulationStartMode.Empty);
+            break;
+        case 'generate': {
+            hideStartupModal();
+            const seedResult = await proceduralModal.prompt();
+            if (seedResult === null) {
+                void startStartupFlow({ allowCancel: startupModalAllowsCancel() });
+                return;
+            }
+            await launchSystem(SimulationStartMode.Procedural, seedResult);
+            break;
+        }
+        case 'blackHole': {
+            hideStartupModal();
+            const seedResult = await proceduralModal.prompt({
+                title: 'Generate Black Hole System',
+            });
+            if (seedResult === null) {
+                void startStartupFlow({ allowCancel: startupModalAllowsCancel() });
+                return;
+            }
+            await launchSystem(SimulationStartMode.BlackHole, seedResult);
+            break;
+        }
+    }
+}
 
 // Block input while modal visible
 const _origOnMouseDown = onMouseDown;
@@ -4604,7 +4617,7 @@ const _origOnMouseMove = onMouseMove;
 const _origOnMouseUp = onMouseUp;
 
 function modalBlocksInput() {
-    return startupModal.isVisible() || proceduralModal.isVisible();
+    return startupModalIsVisible() || proceduralModal.isVisible();
 }
 
 function onMouseDownWrapped(e: MouseEvent) {
@@ -4675,7 +4688,7 @@ window.addEventListener(
         // Note: Build your own system doesn't have a generator yet, so it doesn't replace this texture yet.
         await loadSpaceTexture(scene, './assets/textures/skydome/space-default.jpg');
         // Display the startup modal.
-        startupModal.open({ allowCancel: false });
+        await startStartupFlow({ allowCancel: false });
     }
 })();
 
@@ -4690,7 +4703,7 @@ window.addEventListener('popstate', async () => {
             resetLastPushedSeed();
             applyStartupGMultiplier();
             uiManager.managementPanel.hide();
-            startupModal.hide();
+            hideStartupModal();
             proceduralModal.show();
             proceduralModal.setTitle('Generate Solar System');
             const progressReporter = proceduralModal.showProgressUI();
@@ -4708,7 +4721,7 @@ window.addEventListener('popstate', async () => {
 
     applyStartupGMultiplier();
     uiManager.managementPanel.hide();
-    startupModal.hide();
+    hideStartupModal();
 
     const mode =
         currentSeed.type === SEED_TYPE_BLACKHOLE

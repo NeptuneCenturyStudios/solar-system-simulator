@@ -1232,3 +1232,101 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     padding-top: 0.25rem;
     border-top: 1px solid var(--new-ui-border);
 }
+
+/* ── Vue modals ────────────────────────────────────────────────────────────
+   ModalBase.vue renders via Teleport directly under <body>, above both the
+   old modal overlays (z-index 10000) and the Vue UI root (z-index 9500).
+   Reuses the --new-ui-* tokens so the look matches the legacy modals. */
+
+.vue-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: var(--new-ui-backdrop-filter);
+    pointer-events: auto;
+}
+
+.vue-modal-card {
+    width: 360px;
+    max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    background: var(--new-ui-bg);
+    padding: 18px;
+    border-radius: var(--new-ui-border-radius);
+    border: 1px solid var(--new-ui-border);
+    box-shadow: var(--new-ui-shadow);
+    pointer-events: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.vue-modal-card:focus {
+    outline: none;
+}
+
+.vue-modal-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #00ffcc;
+    text-align: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--new-ui-border);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.vue-modal-close {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    padding: 2px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.vue-modal-close:hover {
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.12);
+}
+
+.vue-modal-body {
+    margin-bottom: 14px;
+    line-height: 1.5;
+    color: #fff;
+}
+
+.vue-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.vue-modal-fade-enter-active,
+.vue-modal-fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.vue-modal-fade-enter-from,
+.vue-modal-fade-leave-to {
+    opacity: 0;
+}
