@@ -394,7 +394,6 @@ export interface IFlightControlContext {
     flightHUD: FlightHUD;
     speedSprite: THREE.Sprite | null;
 
-    refreshBodiesTable: () => void;
     addEvent: (event: { message: string; notificationType: NotificationType }) => void;
 }
 
@@ -405,7 +404,6 @@ export interface IAutopilotContext {
         notificationType: NotificationType;
         logMethod?: LogMethods;
     }) => void;
-    refreshBodiesTable: () => void;
     setAutopilotState: (active: boolean, canEngage: boolean) => void;
 }
 

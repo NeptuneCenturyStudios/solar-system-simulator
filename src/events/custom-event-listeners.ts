@@ -23,7 +23,6 @@ export interface ICustomEventContext {
     uiManager: UIManager;
     scene: THREE.Scene;
     dependencies: IStateDependencies;
-    refreshBodiesTable: () => void;
     addEvent: (event: { message: string; notificationType: NotificationType }) => void;
     handleBodyBecameInvalid: (body: Body | null | undefined) => void;
 }
@@ -40,13 +39,9 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         uiManager,
         scene,
         dependencies,
-        refreshBodiesTable,
         addEvent,
         handleBodyBecameInvalid,
     } = ctx;
-
-    // Event-driven bodies table refresh (added)
-    window.addEventListener('body:added', refreshBodiesTable);
 
     // Physics → UI logging: body absorption events become Noty notifications via addEvent()
     window.addEventListener('body:absorbed', (e) => {
@@ -82,7 +77,6 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
             }, 0);
         }
         handleBodyBecameInvalid(removedBody);
-        refreshBodiesTable();
     });
 
     // Weapon impact handler
@@ -133,7 +127,6 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         }
 
         handleBodyBecameInvalid(body);
-        refreshBodiesTable();
     });
 
     // Full system reset
@@ -144,6 +137,5 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         cameraState.focusBody = null;
         gizmo.attach(null);
         uiManager.managementPanel.setSelectedBody(null);
-        refreshBodiesTable();
     });
 }

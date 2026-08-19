@@ -120,7 +120,6 @@ export function exitFlightMode(ctx: IFlightControlContext) {
         simulationState.bodies.includes(_exitShip)
     );
     ctx.uiManager.flightControlsPanel.setAutopilotState(autopilotState.isActive, _exitShipAlive);
-    ctx.refreshBodiesTable();
     // updateFlightSpawnBtnLabel is defined after this function; call via a timeout
     // to avoid forward-reference issues in the module execution order.
     setTimeout(() => {

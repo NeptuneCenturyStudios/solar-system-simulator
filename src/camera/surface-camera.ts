@@ -3,7 +3,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Body } from '../bodies/body';
 import { BlackHole } from '../bodies/black-hole';
 import { isBodyType } from '../utilities/utilities';
-import { UIManager } from '../ui/ui-manager';
 import { FlightHUD } from '../drawing/flight-hud';
 import { BodyTypeEnum } from '../bodies/body-enums';
 
@@ -44,11 +43,8 @@ export class SurfaceCameraManager {
     private readonly controls: OrbitControls;
     private readonly renderer: THREE.WebGLRenderer;
     private readonly simulationState: { bodies: Body[] };
-    private readonly uiManager: UIManager;
     private readonly flightHUD: FlightHUD;
     private readonly cameraState: { isFreeCameraMode: boolean; isLookAtMode: boolean };
-    private readonly getSelectedBody: () => Body | null;
-    private readonly getManuallySelectedBody: () => Body | null;
     private readonly onFreeCameraModeExit: () => void;
 
     constructor(
@@ -56,22 +52,16 @@ export class SurfaceCameraManager {
         controls: OrbitControls,
         renderer: THREE.WebGLRenderer,
         simulationState: { bodies: Body[] },
-        uiManager: UIManager,
         flightHUD: FlightHUD,
         cameraState: { isFreeCameraMode: boolean; isLookAtMode: boolean },
-        getSelectedBody: () => Body | null,
-        getManuallySelectedBody: () => Body | null,
         onFreeCameraModeExit: () => void
     ) {
         this.camera = camera;
         this.controls = controls;
         this.renderer = renderer;
         this.simulationState = simulationState;
-        this.uiManager = uiManager;
         this.flightHUD = flightHUD;
         this.cameraState = cameraState;
-        this.getSelectedBody = getSelectedBody;
-        this.getManuallySelectedBody = getManuallySelectedBody;
         this.onFreeCameraModeExit = onFreeCameraModeExit;
     }
 
@@ -84,25 +74,8 @@ export class SurfaceCameraManager {
     }
 
     updateButtonEnabled(): void {
-        const selectedBody = this.getSelectedBody();
-        const manuallySelectedBody = this.getManuallySelectedBody();
-        const selected =
-            (selectedBody &&
-            this.simulationState.bodies.includes(selectedBody) &&
-            !selectedBody._isDisposed
-                ? selectedBody
-                : null) ||
-            (manuallySelectedBody &&
-            this.simulationState.bodies.includes(manuallySelectedBody) &&
-            !manuallySelectedBody._isDisposed
-                ? manuallySelectedBody
-                : null);
-
-        const isEnabled = this.isEligibleBody(selected);
-        this.uiManager.mainPanel.setSurfaceCameraState({
-            isActive: this.state.isActive,
-            isEnabled,
-        });
+        // Button enable/disable is now handled by the Vue System Explorer
+        // which reads isEligibleBody via the sim bridge.
     }
 
     exit(): void {
@@ -115,8 +88,6 @@ export class SurfaceCameraManager {
 
         this.state.isActive = false;
         this.state.body = null;
-
-        this.uiManager.mainPanel.setSurfaceCameraState({ isActive: false, isEnabled: true });
 
         this.controls.enabled = true;
 
@@ -139,11 +110,9 @@ export class SurfaceCameraManager {
         if (this.cameraState.isFreeCameraMode) {
             this.cameraState.isFreeCameraMode = false;
             this.onFreeCameraModeExit();
-            this.uiManager.mainPanel.setFreeCameraState(false);
         }
         if (this.cameraState.isLookAtMode) {
             this.cameraState.isLookAtMode = false;
-            this.uiManager.mainPanel.setLookAtState(false);
         }
 
         this.controls.enabled = false;
@@ -163,7 +132,6 @@ export class SurfaceCameraManager {
 
         this.updateTransform();
 
-        this.uiManager.mainPanel.setSurfaceCameraState({ isActive: true, isEnabled: true });
         this.flightHUD.forceHintRefresh();
     }
 

@@ -69,7 +69,6 @@ import {
     isBodyType,
     createUniqueId,
     generateIAUName,
-    getBodyTypeLabel,
 } from './utilities/utilities';
 import { SeededRandom } from './utilities/prng';
 import { setBodyRadius } from './physics/physics';
@@ -125,7 +124,6 @@ import { upgradeProceduralTexture } from './procedural/texture-upgrader';
 import { Asteroid } from './bodies/asteroid';
 
 import { Spaceship } from './bodies/ships/spaceship';
-import { OptionsPanel } from './ui/options-panel';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
 import {
     IAutopilotContext,
@@ -138,6 +136,7 @@ import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simula
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
 import { UIManager } from './ui/ui-manager';
+import { OptionsPanel } from './ui/options-panel';
 import { runAnimationLoop, AnimationContext } from './simulation/animation-loop';
 import { registerCustomEventListeners } from './events/custom-event-listeners';
 
@@ -1077,7 +1076,6 @@ function createPresetBody(presetKey: string) {
     uiManager.managementPanel.setSelectedBody(newBody);
 
     setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
-    clearCameraPresetHighlights();
 }
 
 function createNewBody(
@@ -1585,7 +1583,6 @@ function createNewBody(
 
         // Clear any camera preset highlight (manual selection).
         // Do NOT clear LOOK AT / FREE / TARGET highlights, those are toggles with independent state.
-        clearCameraPresetHighlights();
     }
 }
 
@@ -1753,11 +1750,6 @@ function togglePause() {
     } else {
         // Restore the saved speed (which may have been adjusted while paused)
         simulationState.timeScale = simulationState.savedTimeScale;
-        const direction = simulationState.savedTimeScale < 0 ? ' REVERSE' : '';
-        uiManager.mainPanel.updateTimeScaleDisplay(
-            Math.abs(simulationState.savedTimeScale) + 'x' + direction
-        );
-        uiManager.setPauseState(false);
     }
 
     dispatchSimStateChange();
@@ -2130,7 +2122,6 @@ function onMouseDown(event: MouseEvent) {
             uiManager.managementPanel.setSelectedBody(clickedBody);
 
             // Update bodies table highlight
-            refreshBodiesTable();
 
             const isDifferentSelection = prevSelectedBody !== clickedBody;
 
@@ -2142,7 +2133,6 @@ function onMouseDown(event: MouseEvent) {
 
             // Clear any camera preset highlight (manual selection).
             // Do NOT clear LOOK AT / FREE / TARGET highlights, those are toggles with independent state.
-            clearCameraPresetHighlights();
 
             // TARGET (new behavior):
             // - If Target is ON, show gizmo for the selected body.
@@ -2167,7 +2157,6 @@ function onMouseDown(event: MouseEvent) {
         gizmo.attach(null);
         uiManager.managementPanel.setSelectedBody(null);
 
-        refreshBodiesTable();
         flightHUD.forceHintRefresh();
     }
 }
@@ -2812,7 +2801,6 @@ function setFocusBody(bodyOrNull: Body | null, { zoom = false } = {}) {
         controls.target.copy(NONE_FOCUS_POSITION);
     }
 
-    refreshBodiesTable();
 }
 
 function getFocusObject() {
@@ -2828,33 +2816,6 @@ function getFocusObject() {
         : null;
 }
 
-function refreshBodiesTable() {
-    if (!uiManager.mainPanel) return;
-
-    const ship = flightState.knownShip;
-    const hasShip = !!(ship && !ship._isDisposed && simulationState.bodies.includes(ship));
-
-    const rows = simulationState.bodies
-        .filter((b) => b && !b._isDisposed && b.mesh)
-        .map((b) => ({
-            name: b.name || 'Unnamed',
-            typeLabel: getBodyTypeLabel(b),
-            body: b,
-            isShip: b.bodyType === BodyTypeEnum.SpaceShip,
-        }))
-        .sort((a, b) => a.typeLabel.localeCompare(b.typeLabel) || a.name.localeCompare(b.name));
-
-    // Keep table highlight in sync with current selection
-    uiManager.mainPanel.setSelectedBody(selectedBody || manuallySelectedBody || null);
-    uiManager.mainPanel.renderBodiesTable(rows, hasShip, autopilotState.targetBody);
-
-    // Surface camera enablement depends on selection, so keep it in sync.
-    try {
-        surfaceCam.updateButtonEnabled();
-    } catch {
-        // Empty
-    }
-}
 function setF(id: string) {
     // Legacy helper kept for compatibility with existing call sites,
     // but camera behavior should no longer depend on id.
@@ -2865,14 +2826,12 @@ function setF(id: string) {
 
 // Create and initialize panels
 const uiManager = new UIManager('ui-container');
-const optionsPanel = new OptionsPanel('options-panel');
 uiManager.managementPanel.registerGetFocusObject(() => {
     const body = cameraState.focusBody;
     return body && !body._isDisposed && simulationState.bodies.includes(body) ? body : null;
 });
 
 uiManager.initialize();
-optionsPanel.initialize();
 
 // ── Vue UI overlay (new UI, developed in parallel with the existing UI) ──
 // Wire the Vue bridge to the same control paths the old UI uses, so both UIs
@@ -2889,35 +2848,69 @@ registerVueSimHooks({
         dispatchSimStateChange();
     },
     selectBody: (body: Body) => {
-        uiManager.mainPanel.emit('manualBodySelect', { body });
+        setFocusBody(body, { zoom: cameraState.isLookAtMode });
+        dispatchSimStateChange();
     },
 
     // ── Re-launch system (shows StartupModal with Cancel enabled) ──
     relaunch: () => uiManager.emit('reset'),
 
-    // ── System Explorer: delegate to the same event paths as the old panel ──
-    toggleTargetMode: () => uiManager.mainPanel.emit('targetToggle'),
-    toggleLookAtMode: () => uiManager.mainPanel.emit('lookAtToggle'),
-    toggleFreeCameraMode: () => uiManager.mainPanel.emit('freeCameraToggle'),
-    toggleSurfaceCamera: () => uiManager.mainPanel.emit('surfaceCameraToggle'),
-    zoomIn: () => uiManager.mainPanel.emit('zoomIn'),
-    zoomOut: () => uiManager.mainPanel.emit('zoomOut'),
-    setLockToSun: (checked: boolean) =>
-        uiManager.mainPanel.emit('lockToSunChange', { checked }),
-    setShowTrails: (checked: boolean) =>
-        uiManager.mainPanel.emit('trailsChange', { checked }),
-    setShowOrbitPrediction: (checked: boolean) =>
-        uiManager.mainPanel.emit('predictionChange', { checked }),
-    setShowNames: (checked: boolean) =>
-        uiManager.mainPanel.emit('namesChange', { checked }),
-    flyToBody: (body: Body) => uiManager.mainPanel.emit('autopilot', { body }),
-    enterShip: (body: Body) => uiManager.mainPanel.emit('enterShip', { body }),
+    // ── System Explorer: direct sim state ──
+    toggleTargetMode: () => {
+        cameraState.isTargetMode = !cameraState.isTargetMode;
+        dispatchSimStateChange();
+    },
+    toggleLookAtMode: () => {
+        cameraState.isLookAtMode = !cameraState.isLookAtMode;
+        if (cameraState.isLookAtMode) cameraState.isFreeCameraMode = false;
+        dispatchSimStateChange();
+    },
+    toggleFreeCameraMode: () => {
+        cameraState.isFreeCameraMode = !cameraState.isFreeCameraMode;
+        if (cameraState.isFreeCameraMode) cameraState.isLookAtMode = false;
+        dispatchSimStateChange();
+    },
+    toggleSurfaceCamera: () => {
+        if (surfaceCam.isActive) surfaceCam.exit();
+        else surfaceCam.enter(selectedBody || manuallySelectedBody);
+        dispatchSimStateChange();
+    },
+    zoomIn: () => { zoomRelativeToTarget(getZoomTarget(), 0.5); },
+    zoomOut: () => { zoomRelativeToTarget(getZoomTarget(), 2.0); },
+    setLockToSun: (checked: boolean) => {
+        cameraState.lockToSun = checked;
+        dispatchSimStateChange();
+    },
+    setShowTrails: (checked: boolean) => {
+        simulationState.bodies.forEach((b) => {
+            if (b instanceof CelestialBody && b.trail) b.trail.visible = checked;
+        });
+        setDisplayState({ showTrails: checked });
+    },
+    setShowOrbitPrediction: (checked: boolean) => {
+        orbitPrediction.visible = checked;
+        setDisplayState({ showOrbitPrediction: checked });
+    },
+    setShowNames: (checked: boolean) => {
+        simulationState.showNames = checked;
+        dispatchSimStateChange();
+    },
+    flyToBody: (body: Body) => {
+        engageAutopilot(autopilotCtx, body);
+    },
+    enterShip: (body: Body) => {
+        if (body instanceof Spaceship) spawnShip(body);
+    },
+    // getSurfaceCameraState is registered later, once `surfaceCam` exists (see below).
 });
 mountVueUi();
 
 // Mirror the old panel's default display-option state in the Vue store
 // (Show Orbit Trails checked, Show Orbit Prediction unchecked).
 setDisplayState({ showTrails: true, showOrbitPrediction: false });
+
+const optionsPanel = new OptionsPanel('options-panel');
+optionsPanel.initialize();
 
 // Wire Flight Controls button and panel events
 
@@ -3015,18 +3008,6 @@ if (vueUiRoot) {
     );
 }
 
-function clearCameraPresetHighlights() {
-    // Clear any camera preset highlight (manual selection).
-    // Do NOT clear LOOK AT / FREE / TARGET highlights, those are toggles with independent state.
-    // Scoped to the legacy panel only — the Vue System Explorer reuses the
-    // `.btn-row` class and manages its own `active` state reactively.
-    document.querySelectorAll('#system-explorer .btn-row button').forEach((b) => {
-        if (b?.id === 'camLookAtBtn') return;
-        if (b?.id === 'freeCameraBtn') return;
-        if (b?.id === 'camTargetBtn') return;
-        b.classList.remove('active');
-    });
-}
 
 // NOTE: Preset camera buttons were removed from the UI (replaced with toggles + bodies table).
 // The old `cameraChange` event path is intentionally removed to reduce dead code.
@@ -3080,25 +3061,14 @@ function getZoomTarget() {
     return getFocusObject();
 }
 
-function zoomIn() {
-    zoomRelativeToTarget(getZoomTarget(), 0.85);
-}
-
-function zoomOut() {
-    zoomRelativeToTarget(getZoomTarget(), 1.15);
-}
-
 // --- Surface camera / player rig ---
 const surfaceCam = new SurfaceCameraManager(
     camera,
     controls,
     renderer,
     simulationState,
-    uiManager,
     flightHUD,
     cameraState,
-    () => selectedBody,
-    () => manuallySelectedBody,
     () => {
         cameraState.isFreeCameraMode = false;
     }
@@ -3142,14 +3112,12 @@ const flightCtx: IFlightControlContext = {
     flightCrosshair,
     flightHUD,
     speedSprite,
-    refreshBodiesTable,
     addEvent,
 };
 
 const autopilotCtx: IAutopilotContext = {
     flightHUD,
     addEvent,
-    refreshBodiesTable,
     setAutopilotState: (active, canEngage) =>
         flightControlsPanel.setAutopilotState(active, canEngage),
 };
@@ -3215,7 +3183,7 @@ function spawnShip(targetShip?: Spaceship) {
 
             // Select the ship as the look-at target (same as clicking it in the bodies list).
             cameraState.isLookAtMode = true;
-            uiManager.mainPanel.setLookAtState(true);
+            cameraState.isFreeCameraMode = false;
             setFocusBody(ship, { zoom: true });
             uiManager.managementPanel.setSelectedBody(ship);
 
@@ -3265,7 +3233,7 @@ function spawnShip(targetShip?: Spaceship) {
 
         // Select the ship as the look-at target (same as clicking it in the bodies list)
         cameraState.isLookAtMode = true;
-        uiManager.mainPanel.setLookAtState(true);
+        cameraState.isFreeCameraMode = false;
         setFocusBody(ship, { zoom: true });
         uiManager.managementPanel.setSelectedBody(ship);
 
@@ -3314,7 +3282,6 @@ function spawnShip(targetShip?: Spaceship) {
         manuallySelectedBody = null;
         gizmo.attach(null);
         uiManager.managementPanel.setSelectedBody(null);
-        refreshBodiesTable();
     }
 
     // Initialize the ship's trail (but it will be hidden until warp ends, to avoid showing a long trail from spawn point to first flight location)
@@ -3339,7 +3306,6 @@ function spawnShip(targetShip?: Spaceship) {
     flightControlsPanel.setFlightActive(true);
     // Enable the autopilot button now that a ship is active
     flightControlsPanel.setAutopilotState(autopilotState.isActive, true);
-    refreshBodiesTable();
 
     ambientMusic.startPlayback();
 
@@ -3354,94 +3320,10 @@ function spawnShip(targetShip?: Spaceship) {
 
 window.addEventListener('mousemove', surfaceCam.onMouseMove, { passive: true });
 
-uiManager.mainPanel.on('surfaceCameraToggle', () => {
-    if (surfaceCam.isActive) {
-        surfaceCam.exit();
-        surfaceCam.updateButtonEnabled();
-        return;
-    }
 
-    const selected =
-        (selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
-            ? selectedBody
-            : null) ||
-        (manuallySelectedBody &&
-        simulationState.bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
-            ? manuallySelectedBody
-            : null);
 
-    if (!surfaceCam.isEligibleBody(selected)) return;
-    surfaceCam.enter(selected);
-    surfaceCam.updateButtonEnabled();
-});
 
-uiManager.mainPanel.on('freeCameraToggle', () => {
-    // If turning on free camera, surface mode must exit.
-    if (!surfaceCam.isActive) {
-        // noop
-    } else {
-        surfaceCam.exit();
-    }
 
-    cameraState.isFreeCameraMode = !cameraState.isFreeCameraMode;
-    uiManager.mainPanel.setFreeCameraState(cameraState.isFreeCameraMode);
-
-    // Preserve selection and gizmo visibility when toggling free camera:
-    // - Selection should NEVER be cleared here.
-    // - Gizmo should remain visible if Target is ON and a body is selected.
-    const selected =
-        (selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
-            ? selectedBody
-            : null) ||
-        (manuallySelectedBody &&
-        simulationState.bodies.includes(manuallySelectedBody) &&
-        !manuallySelectedBody._isDisposed
-            ? manuallySelectedBody
-            : null);
-
-    if (cameraState.isFreeCameraMode) {
-        // Turning on Free Camera disables Look At (mutually exclusive)
-        cameraState.isLookAtMode = false;
-        uiManager.mainPanel.setLookAtState(false);
-
-        controls.enabled = false;
-    } else {
-        // Turning OFF free camera behaves like Look At is OFF:
-        // orbit/zoom around the scene center (0,0,0)
-        cameraState.isLookAtMode = false;
-        uiManager.mainPanel.setLookAtState(false);
-
-        controls.enabled = true;
-        cameraState.focusID = 'camNone';
-        controls.target.copy(NONE_FOCUS_POSITION);
-        camera.lookAt(NONE_FOCUS_POSITION);
-    }
-
-    // Target toggle governs gizmo visibility in both modes.
-    if (cameraState.isTargetMode && selected) {
-        gizmo.attach(selected);
-    } else {
-        gizmo.attach(null);
-    }
-    uiManager.managementPanel.setSelectedBody(selected);
-
-    refreshBodiesTable();
-    surfaceCam.updateButtonEnabled();
-    flightHUD.forceHintRefresh();
-});
-
-uiManager.mainPanel.on('zoomIn', () => {
-    zoomIn();
-});
-
-uiManager.mainPanel.on('zoomOut', () => {
-    zoomOut();
-});
-
-uiManager.mainPanel.on('lockToSunChange', ({ checked }: { checked: boolean }) => {
-    cameraState.lockToSun = checked;
-});
 
 uiManager.managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
@@ -3471,32 +3353,8 @@ if (enableSkydomeCheckbox) {
     };
 }
 
-uiManager.mainPanel.on('trailsChange', ({ checked }: { checked: boolean }) => {
-    setDisplayState({ showTrails: checked });
-    simulationState.bodies.forEach((body) => {
-        if (body && body instanceof CelestialBody && body.trail) {
-            body.trail.visible = checked;
-        }
-    });
-});
 
-uiManager.mainPanel.on('predictionChange', ({ checked }: { checked: boolean }) => {
-    setDisplayState({ showOrbitPrediction: checked });
-    orbitPrediction.visible = checked;
-});
 
-uiManager.mainPanel.on('namesChange', ({ checked }: { checked: boolean }) => {
-    simulationState.showNames = checked;
-    simulationState.bodies.forEach((body) => {
-        if (body && body.label) {
-            const isActiveShip = flightState.isActive && body === flightState.activeShip;
-            body.label.visible = checked && !isActiveShip;
-            if (body.labelLine) {
-                body.labelLine.visible = checked && !isActiveShip;
-            }
-        }
-    });
-});
 
 optionsPanel.on('sfxVolumeChange', () => {
     // settingsStore.settings.sfxVolume is already updated by the panel
@@ -3546,18 +3404,12 @@ uiManager.playlistPanel.on('trackSelected', (index: number) => {
 
 uiManager.on('timeScaleChange', ({ value }: { value: number }) => {
     const newSpeed = value;
-    const direction = newSpeed < 0 ? ' REVERSE' : '';
-    const absSpeed = Math.abs(newSpeed);
     if (simulationState.isPaused) {
         // When paused, update the saved value that will be used on resume
         simulationState.savedTimeScale = newSpeed;
-        uiManager.mainPanel.updateTimeScaleDisplay(
-            '0.0x (PAUSED - next: ' + absSpeed + 'x' + direction + ')'
-        );
     } else {
         // When running, immediately update the speed
         simulationState.timeScale = newSpeed;
-        uiManager.mainPanel.updateTimeScaleDisplay(absSpeed + 'x' + direction);
     }
     dispatchSimStateChange();
 });
@@ -3573,177 +3425,18 @@ uiManager.on('reset', () => {
 });
 
 // "Fly Here" button from the bodies table
-uiManager.mainPanel.on('autopilot', ({ body }: { body: Body }) => {
-    if (!body || body._isDisposed) return;
-    engageAutopilot(autopilotCtx, body);
-});
 
 // "Enter Ship" button from the bodies table
-uiManager.mainPanel.on('enterShip', ({ body }: { body: Body }) => {
-    if (!body || body._isDisposed) return;
-    if (flightState.isActive) return;
-    flightState.knownShip = body as Spaceship;
-    spawnShip(body as Spaceship);
-});
 
 // Manual selection from Bodies table
-uiManager.mainPanel.on('manualBodySelect', ({ body }: { body: Body }) => {
-    if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
-
-    // Clear any camera preset highlight (manual selection).
-    // Do NOT clear LOOK AT / FREE / TARGET highlights, those are toggles with independent state.
-    clearCameraPresetHighlights();
-
-    // Manual selection should NOT automatically enable Look At.
-    // However, if Look At is already enabled, selecting a body should immediately look at it.
-    if (cameraState.isFreeCameraMode) {
-        // If we are in Free Camera mode and the user clicks a body in the list,
-        // we KEEP Free Camera mode on (the user can still use Look At / Target buttons explicitly).
-        // Just ensure the button highlight stays accurate.
-        uiManager.mainPanel.setFreeCameraState(true);
-        controls.enabled = false;
-    }
-
-    // Selecting from the table should always refresh hints (selection-driven).
-    setFocusBody(body, { zoom: cameraState.isLookAtMode });
-    flightHUD.forceHintRefresh();
-
-    // Gizmo visibility controlled by Target toggle
-    if (cameraState.isTargetMode) {
-        gizmo.attach(body);
-    } else {
-        gizmo.attach(null);
-    }
-    uiManager.managementPanel.setSelectedBody(body);
-});
 
 // TARGET button (toggle):
 // - OFF: selecting bodies does NOT show gizmo, but selection still works
 // - ON: selected body shows gizmo (and switching selection moves gizmo)
 // - Must NOT auto zoom/focus the camera
-uiManager.mainPanel.on('targetToggle', () => {
-    const turningOn = !cameraState.isTargetMode;
-    cameraState.isTargetMode = turningOn;
-    uiManager.mainPanel.setTargetState(turningOn);
-
-    const b =
-        selectedBody && simulationState.bodies.includes(selectedBody) && !selectedBody._isDisposed
-            ? selectedBody
-            : manuallySelectedBody &&
-                simulationState.bodies.includes(manuallySelectedBody) &&
-                !manuallySelectedBody._isDisposed
-              ? manuallySelectedBody
-              : null;
-
-    if (turningOn) {
-        if (b) {
-            gizmo.attach(b);
-            uiManager.managementPanel.setSelectedBody(b);
-        }
-    } else {
-        // Hide gizmo but keep selection
-        gizmo.attach(null);
-    }
-
-    // Target toggle changes the "selected body" hint line, so force a refresh.
-    flightHUD.forceHintRefresh();
-});
 
 // LOOK AT button (toggle): when enabled, orbit/zoom around selected body.
 // When disabled, behave like "None camera": orbit/zoom around the scene center.
-uiManager.mainPanel.on('lookAtToggle', () => {
-    // Turning Look At ON/OFF exits surface mode (mutually exclusive camera behaviors).
-    if (surfaceCam.isActive) {
-        surfaceCam.exit();
-        surfaceCam.updateButtonEnabled();
-    }
-    const turningOn = !cameraState.isLookAtMode;
-    // Look-at changes hint context (and camera focus behavior) so refresh.
-    // We'll also refresh again after any selection changes.
-    flightHUD.forceHintRefresh();
-
-    // If we are turning Look At ON while Free Camera is ON, we implicitly disable Free Camera.
-    // That transition must also refresh the hint (Free Camera hint -> Look At/selection hint).
-    if (turningOn && cameraState.isFreeCameraMode) {
-        cameraState.isFreeCameraMode = false;
-        uiManager.mainPanel.setFreeCameraState(false);
-        controls.enabled = true;
-        flightHUD.forceHintRefresh();
-    }
-
-    if (turningOn) {
-        const b =
-            selectedBody &&
-            simulationState.bodies.includes(selectedBody) &&
-            !selectedBody._isDisposed
-                ? selectedBody
-                : manuallySelectedBody &&
-                    simulationState.bodies.includes(manuallySelectedBody) &&
-                    !manuallySelectedBody._isDisposed
-                  ? manuallySelectedBody
-                  : null;
-
-        // Look-at mode requires OrbitControls, so exit free camera mode if active
-        if (cameraState.isFreeCameraMode) {
-            cameraState.isFreeCameraMode = false;
-            uiManager.mainPanel.setFreeCameraState(false);
-            controls.enabled = true;
-        }
-
-        cameraState.isLookAtMode = true;
-        uiManager.mainPanel.setLookAtState(true);
-
-        // If no body is selected, behave like "auto look-at": keep center orbit until selection.
-        if (!b) {
-            cameraState.focusBody = null;
-            controls.enabled = true;
-            controls.target.copy(NONE_FOCUS_POSITION);
-            controls.update();
-            camera.lookAt(NONE_FOCUS_POSITION);
-
-            // No selection => no gizmo attachment (Target still governs showing it later)
-            gizmo.attach(null);
-            uiManager.managementPanel.setSelectedBody(null);
-            refreshBodiesTable();
-            return;
-        }
-
-        // Only show gizmo if Target is ON
-        if (cameraState.isTargetMode) {
-            gizmo.attach(b);
-        } else {
-            gizmo.attach(null);
-        }
-        uiManager.managementPanel.setSelectedBody(b);
-
-        setFocusBody(b, { zoom: true });
-    } else {
-        cameraState.isLookAtMode = false;
-        uiManager.mainPanel.setLookAtState(false);
-
-        // Behave like "None": orbit/zoom around center (but keep selection)
-        controls.enabled = true;
-        cameraState.focusID = 'camNone';
-        controls.target.copy(NONE_FOCUS_POSITION);
-        controls.update();
-        camera.lookAt(NONE_FOCUS_POSITION);
-
-        // Look At OFF does not force gizmo visibility; Target still controls it.
-        if (cameraState.isTargetMode) {
-            const b =
-                selectedBody &&
-                simulationState.bodies.includes(selectedBody) &&
-                !selectedBody._isDisposed
-                    ? selectedBody
-                    : manuallySelectedBody &&
-                        simulationState.bodies.includes(manuallySelectedBody) &&
-                        !manuallySelectedBody._isDisposed
-                      ? manuallySelectedBody
-                      : null;
-            if (b) gizmo.attach(b);
-        }
-    }
-});
 
 // Subscribe to ManagementPanel events
 uiManager.managementPanel.on(
@@ -3792,7 +3485,6 @@ uiManager.managementPanel.on(
             createTilt ?? null,
             createAzimuth ?? null
         );
-        refreshBodiesTable();
     }
 );
 
@@ -3800,7 +3492,6 @@ uiManager.managementPanel.on(
 uiManager.managementPanel.on('createPresetBody', ({ presetKey }: { presetKey: string }) => {
     if (!presetKey) return;
     createPresetBody(presetKey);
-    refreshBodiesTable();
 });
 
 function refreshSelectionVisuals() {
@@ -4005,7 +3696,6 @@ uiManager.managementPanel.on(
             if (body === selectedBody) gizmo.attach(body);
         }
 
-        refreshBodiesTable();
     }
 );
 
@@ -4094,7 +3784,6 @@ function deleteSelectedBody() {
         gizmo.attach(null);
     }
 
-    refreshBodiesTable();
     return true;
 }
 
@@ -4241,13 +3930,8 @@ window.addEventListener('keydown', (e) => {
 
     // Delete key to remove selected body
     if (key === 'n') {
-        const showNamesCheckbox = uiManager.mainPanel.showNamesCheckbox as HTMLInputElement | null;
-        if (showNamesCheckbox) {
-            showNamesCheckbox.checked = !showNamesCheckbox.checked;
-            showNamesCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-            e.preventDefault();
-            return;
-        }
+        simulationState.showNames = !simulationState.showNames;
+        dispatchSimStateChange();
     }
 
     if (key === 'p') {
@@ -4414,7 +4098,6 @@ if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) kuiperBeltPoint
 if (uiManager.managementPanel.enableKuiperBeltCheckbox)
     uiManager.managementPanel.enableKuiperBeltCheckbox.checked = false;
 
-if (enableSkydomeCheckbox) enableSkydomeCheckbox.checked = true;
 
 function handleBodyBecameInvalid(body: Body | null | undefined) {
     if (!body) return;
@@ -4445,11 +4128,7 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
     // keep the new focus.
     if (cameraState.isLookAtMode && wasLookAtTarget && !focusAlreadyMoved) {
         cameraState.isLookAtMode = false;
-        try {
-            uiManager.mainPanel?.setLookAtState(false);
-        } catch (e) {
-            console.error('Error dispatching body:removed event after deleting body:', e);
-        }
+        dispatchSimStateChange();
 
         controls.enabled = !cameraState.isFreeCameraMode;
         controls.target.copy(NONE_FOCUS_POSITION);
@@ -4498,7 +4177,6 @@ registerCustomEventListeners({
     uiManager,
     scene,
     dependencies,
-    refreshBodiesTable,
     addEvent,
     handleBodyBecameInvalid,
 });
@@ -4510,10 +4188,8 @@ function applyDefaultCameraTogglesAfterSpawn() {
     // - Look At ON (button shows active), but with NO pre-selected body
     //   so camera still behaves like center-orbit until the user selects a body.
     cameraState.isTargetMode = false;
-    uiManager.mainPanel.setTargetState(false);
 
     cameraState.isLookAtMode = true;
-    uiManager.mainPanel.setLookAtState(true);
 
     // No auto-focus/selection.
     cameraState.focusBody = null;
@@ -4532,7 +4208,6 @@ function applyDefaultCameraTogglesAfterSpawn() {
     // No selection => no gizmo attachment yet.
     gizmo.attach(null);
     uiManager.managementPanel.setSelectedBody(null);
-    refreshBodiesTable();
 
     // Hint text depends on toggle state (Target/Look At).
     flightHUD.forceHintRefresh();
@@ -4736,7 +4411,6 @@ window.addEventListener('popstate', async () => {
     hideProceduralModal();
 });
 
-refreshBodiesTable();
 // ── Start the animation loop ───────────────────────────────────────────
 const animCtx: AnimationContext = {
     scene,

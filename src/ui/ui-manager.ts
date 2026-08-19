@@ -1,5 +1,4 @@
 import { FlightControlsPanel } from './flight-controls-panel';
-import { MainPanel } from './main-panel';
 import { ManagementPanel } from './management-panel';
 import { Panel } from './panel';
 import { PlaylistPanel } from './playlist-panel';
@@ -26,7 +25,6 @@ export class UIManager extends Panel {
     btnReset: HTMLButtonElement | null = null;
 
     // Panels
-    mainPanel: MainPanel;
     flightControlsPanel: FlightControlsPanel;
     managementPanel: ManagementPanel;
     playlistPanel: PlaylistPanel;
@@ -41,13 +39,11 @@ export class UIManager extends Panel {
         // Initialize control panels
         this.flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
         this.managementPanel = new ManagementPanel('management-panel');
-        this.mainPanel = new MainPanel('system-explorer');
         this.playlistPanel = new PlaylistPanel('playlist-panel');
         this.textureGeneratorPanel = new TextureGeneratorPanel('texture-generator-panel');
 
         this.flightControlsPanel.initialize();
         this.managementPanel.initialize();
-        this.mainPanel.initialize();
         this.playlistPanel.initialize();
         this.textureGeneratorPanel.initialize();
     }
@@ -118,17 +114,6 @@ export class UIManager extends Panel {
             };
         }
 
-        // Explorer button event
-        if (this.btnOpenExplorer && this.mainPanel) {
-            this.btnOpenExplorer.onclick = () => {
-                const visible = this.mainPanel.toggle();
-                if (visible) {
-                    this.btnOpenExplorer?.classList.add('active');
-                } else {
-                    this.btnOpenExplorer?.classList.remove('active');
-                }
-            };
-        }
 
         // Left toolbar button events
         if (this.btnDonate) {
@@ -181,10 +166,6 @@ export class UIManager extends Panel {
         }
 
         // Listen to panel events to update button states
-        this.mainPanel.on('closed', () => {
-            this.btnOpenExplorer?.classList.remove('active');
-        });
-
         this.managementPanel.on('closed', () => {
             this.btnEditSolarSystem?.classList.remove('active');
         });

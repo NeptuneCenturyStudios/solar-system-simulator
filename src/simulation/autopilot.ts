@@ -21,7 +21,6 @@ export function updateAutopilotUI(ctx: IAutopilotContext): void {
         autopilotState.isActive,
         (shipExists && !!autopilotState.targetBody) || autopilotState.isActive
     );
-    ctx.refreshBodiesTable();
 }
 
 /** Cancel the autopilot with an optional log message. */
