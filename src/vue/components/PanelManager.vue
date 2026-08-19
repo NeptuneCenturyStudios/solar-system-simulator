@@ -43,7 +43,7 @@
                         <span class="material-symbols-outlined">texture</span>
                     </button> -->
 
-            <button class="btn toolbar-btn btn-warning" title="Re-launch System">
+            <button class="btn toolbar-btn btn-warning" title="Re-launch System" @click="requestRelaunch()">
                 <span class="material-symbols-outlined">refresh</span>
             </button>
             </div>
@@ -59,6 +59,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ActivePanel, vueUiState } from '../ui-store';
+import { requestRelaunch } from '../sim-bridge';
 import SystemExplorer from '../components/SystemExplorer.vue';
 import FlightControls from '../components/FlightControls.vue';
 

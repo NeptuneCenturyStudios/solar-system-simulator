@@ -39,6 +39,14 @@
 }
 
 /* Utility classes */
+.d-flex {
+    display: flex !important;
+}
+
+.flex-column {
+    flex-direction: column !important;
+}
+
 .mt-auto {
     margin-top: auto;
 }
@@ -69,6 +77,15 @@
 
 .gap-3 {
     gap: var(--new-ui-gap-3) !important;
+}
+
+.gap-2 {
+    gap: var(--new-ui-gap-2) !important;
+}
+
+.gap-1
+{
+    gap: var(--new-ui-gap-1) !important;
 }
 
 .p-3 {
@@ -1256,7 +1273,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     max-height: calc(100vh - 40px);
     overflow-y: auto;
     background: var(--new-ui-bg);
-    padding: 18px;
+    padding: var(--new-ui-gap-3);
     border-radius: var(--new-ui-border-radius);
     border: 1px solid var(--new-ui-border);
     box-shadow: var(--new-ui-shadow);
@@ -1310,7 +1327,6 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 }
 
 .vue-modal-body {
-    margin-bottom: 14px;
     line-height: 1.5;
     color: #fff;
 }

@@ -71,6 +71,8 @@ export interface VueSimHooks {
     spawnShip?: () => void;
     /** Engage autopilot toward the current selection, or cancel if already active. */
     toggleAutopilot?: () => void;
+    /** Re-launch the system by showing the StartupModal with Cancel enabled. */
+    relaunch?: () => void;
 }
 
 const SNAPSHOT_INTERVAL_MS = 100;
@@ -412,6 +414,11 @@ export function requestSpawnShip(): void {
 /** Engage autopilot toward the current selection, or cancel if already active. */
 export function requestToggleAutopilot(): void {
     hookRegistry.toggleAutopilot?.();
+}
+
+/** Re-launch the system by showing the StartupModal with Cancel enabled. */
+export function requestRelaunch(): void {
+    hookRegistry.relaunch?.();
 }
 
 // ── Formatting helpers shared by components ──────────────────────────────

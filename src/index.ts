@@ -2891,6 +2891,9 @@ registerVueSimHooks({
         uiManager.mainPanel.emit('manualBodySelect', { body });
     },
 
+    // ── Re-launch system (shows StartupModal with Cancel enabled) ──
+    relaunch: () => uiManager.emit('reset'),
+
     // ── System Explorer: delegate to the same event paths as the old panel ──
     toggleTargetMode: () => uiManager.mainPanel.emit('targetToggle'),
     toggleLookAtMode: () => uiManager.mainPanel.emit('lookAtToggle'),
