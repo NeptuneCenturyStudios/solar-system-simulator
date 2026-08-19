@@ -6,6 +6,7 @@
                 class="btn toolbar-btn"
                 title="About this simulator"
                 aria-label="About this simulator"
+                @click="openAbout"
             >
                 <span class="material-symbols-outlined">info</span>
             </button>
@@ -60,6 +61,7 @@
 import { computed } from 'vue';
 import { ActivePanel, vueUiState } from '../ui-store';
 import { requestRelaunch } from '../sim-bridge';
+import { showAboutModal } from '../about-modal-service';
 import SystemExplorer from '../components/SystemExplorer.vue';
 import FlightControls from '../components/FlightControls.vue';
 
@@ -72,5 +74,9 @@ const activePanel = computed(() => vueUiState.activePanel);
 
 function setActivePanel(panel: ActivePanel): void {
     vueUiState.activePanel = panel;
+}
+
+function openAbout(): void {
+    showAboutModal();
 }
 </script>

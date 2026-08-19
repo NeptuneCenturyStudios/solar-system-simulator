@@ -29,8 +29,12 @@ npm run format:check # Prettier check (CI)
 
 ## Tooling
 
-- **ripgrep (`rg`)** is installed — use it for fast recursive code search across the project.
-  Example: `rg "class.*Body" src/bodies/` or `rg "TODO|FIXME" src/`
+- **ripgrep (`rg`)** is installed via Chocolatey at `C:\ProgramData\chocolatey\bin\rg.exe` and is on the machine PATH.
+  - If the Sixth extension's built-in `search_files` tool reports "Could not find ripgrep binary", fix it:
+    1. Open VSCode Settings (`Ctrl+,`)
+    2. Search for `ripgrep`
+    3. Set **Search: Rg Path** to: `C:\ProgramData\chocolatey\bin\rg.exe`
+  - CLI example: `rg "class.*Body" src/bodies/` or `rg "TODO|FIXME" src/`
 
 ## Architecture
 

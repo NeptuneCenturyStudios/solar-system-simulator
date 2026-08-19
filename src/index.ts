@@ -125,7 +125,6 @@ import { upgradeProceduralTexture } from './procedural/texture-upgrader';
 import { Asteroid } from './bodies/asteroid';
 
 import { Spaceship } from './bodies/ships/spaceship';
-import { AboutModal } from './ui/about-modal';
 import { OptionsPanel } from './ui/options-panel';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
 import {
@@ -158,6 +157,7 @@ import {
     hideProceduralModal,
     proceduralModalIsVisible,
 } from './vue/procedural-modal-service';
+import { aboutModalIsVisible } from './vue/about-modal-service';
 
 // State singletons
 import {
@@ -458,7 +458,7 @@ function isTouchOverUI(e: TouchEvent) {
 
     // If the finger is on an actual interactive control, allow the click/tap to happen.
     return Boolean(
-        el.closest('#about-overlay, .modal-overlay, .modal, .vue-modal-overlay') ||
+        el.closest('.vue-modal-overlay') ||
         el.closest('#vue-ui-root') ||
         el.closest('.ui-panel') ||
         el.closest('button, input, select, textarea, label, a') ||
@@ -2865,7 +2865,6 @@ function setF(id: string) {
 
 // Create and initialize panels
 const uiManager = new UIManager('ui-container');
-const aboutModal = new AboutModal('about-overlay', 'btn-about', 'aboutCloseBtn');
 const optionsPanel = new OptionsPanel('options-panel');
 uiManager.managementPanel.registerGetFocusObject(() => {
     const body = cameraState.focusBody;
@@ -2873,7 +2872,6 @@ uiManager.managementPanel.registerGetFocusObject(() => {
 });
 
 uiManager.initialize();
-aboutModal.initialize();
 optionsPanel.initialize();
 
 // ── Vue UI overlay (new UI, developed in parallel with the existing UI) ──
@@ -4623,7 +4621,7 @@ const _origOnMouseMove = onMouseMove;
 const _origOnMouseUp = onMouseUp;
 
 function modalBlocksInput() {
-    return startupModalIsVisible() || proceduralModalIsVisible();
+    return startupModalIsVisible() || proceduralModalIsVisible() || aboutModalIsVisible();
 }
 
 function onMouseDownWrapped(e: MouseEvent) {

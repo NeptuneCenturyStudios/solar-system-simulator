@@ -101,4 +101,5 @@ function stepTimeScale(factor: number): void {
 function toggleExplorer(): void {
     vueUiState.activePanel = ActivePanel.SystemExplorer;
 }
+
 </script>
