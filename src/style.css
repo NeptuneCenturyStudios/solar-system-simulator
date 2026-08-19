@@ -413,7 +413,7 @@ select option {
 }
 
 .control-group {
-    margin-bottom: 12px;
+    margin-bottom: var(--new-ui-gap-3);
 }
 
 label {

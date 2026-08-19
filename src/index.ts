@@ -125,7 +125,6 @@ import { upgradeProceduralTexture } from './procedural/texture-upgrader';
 import { Asteroid } from './bodies/asteroid';
 
 import { Spaceship } from './bodies/ships/spaceship';
-import { ProceduralGeneratorModal } from './ui/procedural-generator-modal';
 import { AboutModal } from './ui/about-modal';
 import { OptionsPanel } from './ui/options-panel';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
@@ -153,6 +152,12 @@ import {
     startupModalAllowsCancel,
     startupModalIsVisible,
 } from './vue/startup-modal-service';
+import {
+    showProceduralPrompt,
+    showProceduralProgress,
+    hideProceduralModal,
+    proceduralModalIsVisible,
+} from './vue/procedural-modal-service';
 
 // State singletons
 import {
@@ -2860,7 +2865,6 @@ function setF(id: string) {
 
 // Create and initialize panels
 const uiManager = new UIManager('ui-container');
-const proceduralModal = new ProceduralGeneratorModal();
 const aboutModal = new AboutModal('about-overlay', 'btn-about', 'aboutCloseBtn');
 const optionsPanel = new OptionsPanel('options-panel');
 uiManager.managementPanel.registerGetFocusObject(() => {
@@ -2869,7 +2873,6 @@ uiManager.managementPanel.registerGetFocusObject(() => {
 });
 
 uiManager.initialize();
-proceduralModal.initialize();
 aboutModal.initialize();
 optionsPanel.initialize();
 
@@ -4564,10 +4567,10 @@ async function launchSystem(
     // Every launch mode except "Build your own system" runs through a
     // generator, so show the progress overlay while it works.
     const progressReporter =
-        mode === SimulationStartMode.Empty ? undefined : proceduralModal.showProgressUI();
+        mode === SimulationStartMode.Empty ? undefined : showProceduralProgress();
     await spawn(mode, proceduralResult, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
-    if (progressReporter) proceduralModal.hide();
+    if (progressReporter) hideProceduralModal();
 }
 
 /**
@@ -4591,7 +4594,7 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
             break;
         case 'generate': {
             hideStartupModal();
-            const seedResult = await proceduralModal.prompt();
+            const seedResult = await showProceduralPrompt();
             if (seedResult === null) {
                 void startStartupFlow({ allowCancel: startupModalAllowsCancel() });
                 return;
@@ -4601,7 +4604,7 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
         }
         case 'blackHole': {
             hideStartupModal();
-            const seedResult = await proceduralModal.prompt({
+            const seedResult = await showProceduralPrompt({
                 title: 'Generate Black Hole System',
             });
             if (seedResult === null) {
@@ -4620,7 +4623,7 @@ const _origOnMouseMove = onMouseMove;
 const _origOnMouseUp = onMouseUp;
 
 function modalBlocksInput() {
-    return startupModalIsVisible() || proceduralModal.isVisible();
+    return startupModalIsVisible() || proceduralModalIsVisible();
 }
 
 function onMouseDownWrapped(e: MouseEvent) {
@@ -4672,8 +4675,7 @@ window.addEventListener(
                 ? SimulationStartMode.BlackHole
                 : SimulationStartMode.Procedural;
 
-        proceduralModal.show();
-        const progressReporter = proceduralModal.showProgressUI();
+        const progressReporter = showProceduralProgress();
 
         await spawn(
             mode,
@@ -4684,7 +4686,7 @@ window.addEventListener(
         );
         applyDefaultCameraTogglesAfterSpawn();
 
-        proceduralModal.hide();
+        hideProceduralModal();
     } else {
         // Load the default space texture to display while the startup modal is active before the user
         // does anything. This will get replaced once the actual space texture is loaded during the simulation setup.
@@ -4707,12 +4709,10 @@ window.addEventListener('popstate', async () => {
             applyStartupGMultiplier();
             uiManager.managementPanel.hide();
             hideStartupModal();
-            proceduralModal.show();
-            proceduralModal.setTitle('Generate Solar System');
-            const progressReporter = proceduralModal.showProgressUI();
+            const progressReporter = showProceduralProgress({ title: 'Generate Solar System' });
             await spawn(SimulationStartMode.Default, undefined, progressReporter);
             applyDefaultCameraTogglesAfterSpawn();
-            proceduralModal.hide();
+            hideProceduralModal();
         }
         return;
     }
@@ -4731,12 +4731,11 @@ window.addEventListener('popstate', async () => {
             ? SimulationStartMode.BlackHole
             : SimulationStartMode.Procedural;
 
-    proceduralModal.show();
-    const progressReporter = proceduralModal.showProgressUI();
+    const progressReporter = showProceduralProgress();
 
     await spawn(mode, { seed: currentSeed.seed }, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
-    proceduralModal.hide();
+    hideProceduralModal();
 });
 
 refreshBodiesTable();
