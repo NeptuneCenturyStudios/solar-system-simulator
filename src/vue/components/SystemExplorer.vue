@@ -90,11 +90,19 @@
             >
                 <span class="vue-ui-body-name" :title="body.name">{{ body.name }}</span>
                 <span class="vue-ui-body-type">{{ body.typeLabel }}</span>
-                <span class="vue-ui-body-stats">
-                    <span>M {{ formatNumber(body.mass) }}</span>
-                    <span>R {{ formatNumber(body.radius) }}</span>
-                    <span>v {{ formatNumber(body.speed) }}</span>
-                </span>
+                <div class="vue-ui-body-bottom-row">
+                    <span class="vue-ui-body-stats">
+                        <span>M {{ formatNumber(body.mass) }}</span>
+                        <span>R {{ formatNumber(body.radius) }}</span>
+                        <span>v {{ formatNumber(body.speed) }}</span>
+                    </span>
+                    <span class="ml-auto">
+                        <button class="btn-icon" title="Edit">
+                            <span class="material-symbols-outlined">edit</span>
+                        </button>
+                    </span>
+                </div>
+
                 <button
                     v-if="body.isShip"
                     class="old-ui table-row-btn mb-0 vue-ui-body-action"
@@ -107,7 +115,11 @@
                     v-else-if="hasShip"
                     class="old-ui table-row-btn mb-0 vue-ui-body-action"
                     :class="{ active: body.id === simStore.autopilotTargetId }"
-                    :title="body.id === simStore.autopilotTargetId ? 'Cancel autopilot' : 'Fly to this body'"
+                    :title="
+                        body.id === simStore.autopilotTargetId
+                            ? 'Cancel autopilot'
+                            : 'Fly to this body'
+                    "
                     @click.stop="flyToBody(body.id)"
                 >
                     <span class="material-symbols-outlined">{{

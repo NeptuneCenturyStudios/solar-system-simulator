@@ -677,6 +677,17 @@ button.old-ui.btn-danger:active {
     pointer-events: none;
 }
 
+button.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    width: auto;
+    border: none;
+    background: transparent;
+    color: var(--new-ui-color);
+}
+
 button.btn-icon-only {
     display: inline-flex;
     align-items: center;
@@ -1095,6 +1106,13 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     text-transform: uppercase;
     text-align: right;
     white-space: nowrap;
+}
+
+.vue-ui-body-bottom-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-end;
 }
 
 .vue-ui-body-stats {
