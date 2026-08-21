@@ -34,6 +34,88 @@ export interface SurfaceCameraSnapshot {
     isEnabled: boolean;
 }
 
+/** Rich snapshot of a body for the edit form. This crosses the sim boundary so
+ *  Vue never touches live Three.js `Body` objects directly. */
+export interface BodyEditSnapshot {
+    id: string;
+    name: string;
+    isStar: boolean;
+    isAsteroid: boolean;
+    isComet: boolean;
+    /** True when the body has a `rotation.tilt` (CelestialBody-derived). */
+    hasTilt: boolean;
+    mass: number;
+    radius: number;
+    /** Star-only surface temperature (K). */
+    temperature: number | null;
+    /** Star-only light intensity. */
+    lightIntensity: number | null;
+    /** Current speed magnitude (u/s). */
+    velocity: number;
+    /** Orbital direction angle in the XZ plane (degrees, 0–360). */
+    orbitalAngle: number;
+    /** Inclination above the XZ plane (degrees). */
+    inclination: number;
+    tilt: number;
+    azimuth: number;
+    /** Hex color string for the color picker (asteroids/comets only). */
+    colorHex: string | null;
+    /** Readable type label e.g. "Planet". */
+    typeLabel: string;
+}
+
+/** Payload for creating a custom body from the add form. Mirrors the old
+ *  management panel's `createBody` event exactly. */
+export interface CreateBodyPayload {
+    bodyType: string;
+    planetType: string;
+    orbitType: string;
+    inclination: number;
+    hasAtmosphere: boolean;
+    hasRings: boolean;
+    customMass: number | null;
+    customTemperature: number | null;
+    customLightIntensity: number | null;
+    customRadius: number | null;
+    /** Parent body id for orbit (moon parent / custom orbit parent). */
+    orbitParentId: string | null;
+    createTilt: number | null;
+    createAzimuth: number | null;
+}
+
+/** Payload for applying an edit. Mirrors the old panel's `applyEdit` event. */
+export interface ApplyBodyEditPayload {
+    name: string;
+    mass: number;
+    temperature: number | null;
+    lightIntensity: number | null;
+    radius: number | null;
+    velocity: number | null;
+    orbitalAngle: number | null;
+    inclination: number | null;
+    color: string | null;
+    /** Star-flag mirrors the old panel's isStarBody; radius cap differs for stars. */
+    isStarBody: boolean;
+    editTilt: number | null;
+    editAzimuth: number | null;
+}
+
+/** Freshly-randomized preview values for the add-custom form, keyed by `bodyType`. Mirrors the
+ *  old panel's `randomizeCreateBodyInputs()`/`randomizeCustomStarValues()` output. */
+export interface RandomizedCreateDefaults {
+    mass: number | null;
+    radius: number | null;
+    temperature: number | null;
+    lightIntensity: number | null;
+    tilt: number | null;
+    azimuth: number | null;
+    inclination: number | null;
+    hasAtmosphere: boolean;
+    hasRings: boolean;
+    planetType: string | null;
+    moonType: string | null;
+}
+
 export interface VueSimHooks {
     /** Toggle sim pause (flips the same state the P key / bottom toolbar uses). */
     togglePause?: () => void;
@@ -73,6 +155,20 @@ export interface VueSimHooks {
     toggleAutopilot?: () => void;
     /** Re-launch the system by showing the StartupModal with Cancel enabled. */
     relaunch?: () => void;
+
+    // ── Add/Edit Body (same sim paths as the old management panel) ─────────
+    /** Load a rich edit snapshot for the given body (used in edit mode). */
+    getBodyEditSnapshot?: (bodyId: string) => BodyEditSnapshot | null;
+    /** Create a custom body from the add-form payload; resolves to the new body id. */
+    createBody?: (payload: CreateBodyPayload) => string | null;
+    /** Create a preset body (presets like Sun/Mercury/Earth); resolves to the new body id. */
+    createPresetBody?: (presetKey: string) => string | null;
+    /** Apply an edit to an existing body (same behavior as the old Apply button). */
+    applyBodyEdit?: (bodyId: string, payload: ApplyBodyEditPayload) => void;
+    /** Delete a body by id (same behavior as the old Delete button). */
+    deleteBodyById?: (bodyId: string) => void;
+    /** Re-roll add-custom form preview values for the given body type (old Randomize button). */
+    getRandomizedCreateDefaults?: (bodyType: string) => RandomizedCreateDefaults;
 }
 
 const SNAPSHOT_INTERVAL_MS = 100;
@@ -153,6 +249,20 @@ const state = reactive<VueSimStore>({
  * components only read it.
  */
 export const simStore: VueSimStore = state;
+
+/** Reactive store backing the add/edit body panel. `snapshot` is loaded by the
+ *  bridge when edit mode opens; create/edit actions are forwarded to index.ts
+ *  hooks so the Vue layer never touches live `Body` objects. */
+export interface BodyEditorStore {
+    snapshot: BodyEditSnapshot | null;
+}
+
+const bodyEditorState = reactive<BodyEditorStore>({
+    snapshot: null,
+});
+
+/** Reactive store consumed by AddEditBodyPanel. */
+export const bodyEditorStore: BodyEditorStore = bodyEditorState;
 
 function snapshotBodies(): void {
     const selected = (() => {
@@ -392,6 +502,52 @@ export function enterShipById(bodyId: string): void {
     const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);
     if (!body) return;
     if (hookRegistry.enterShip) hookRegistry.enterShip(body);
+}
+
+// ── Add/Edit Body actions ────────────────────────────────────────────────
+
+/** Load the edit snapshot for `bodyId` into the store (called on edit-mode open). */
+export function loadBodyEditSnapshot(bodyId: string): void {
+    const snapshot = hookRegistry.getBodyEditSnapshot?.(bodyId) ?? null;
+    bodyEditorState.snapshot = snapshot;
+}
+
+/** Clear the edit snapshot when the editor closes. */
+export function clearBodyEditSnapshot(): void {
+    bodyEditorState.snapshot = null;
+}
+
+/** Resolve an orbit-parent id to a valid body id (or null). */
+export function resolveOrbitParentId(parentId: string | null): string | null {
+    if (!parentId) return null;
+    return simulationState.bodies.some((b) => b && b.id === parentId && !b._isDisposed)
+        ? parentId
+        : null;
+}
+
+/** Create a custom body; returns the new body's id (null on failure). */
+export function createCustomBody(payload: CreateBodyPayload): string | null {
+    return hookRegistry.createBody?.(payload) ?? null;
+}
+
+/** Create a preset body; returns the new body's id (null on failure). */
+export function createPresetBodyByKey(presetKey: string): string | null {
+    return hookRegistry.createPresetBody?.(presetKey) ?? null;
+}
+
+/** Apply an edit to an existing body. */
+export function applyBodyEdit(bodyId: string, payload: ApplyBodyEditPayload): void {
+    hookRegistry.applyBodyEdit?.(bodyId, payload);
+}
+
+/** Delete a body by id. */
+export function deleteBodyById(bodyId: string): void {
+    hookRegistry.deleteBodyById?.(bodyId);
+}
+
+/** Get freshly-randomized preview values for the add-custom form. */
+export function getRandomizedCreateDefaults(bodyType: string): RandomizedCreateDefaults | null {
+    return hookRegistry.getRandomizedCreateDefaults?.(bodyType) ?? null;
 }
 
 // ── Flight Controls actions ───────────────────────────────────────────────

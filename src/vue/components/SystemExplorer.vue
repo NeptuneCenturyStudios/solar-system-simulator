@@ -71,6 +71,11 @@
             aria-label="Search bodies"
         />
 
+        <button class="old-ui btn-with-icon mb-3" type="button" @click="openBodyEditor('add', null)">
+            <span class="material-symbols-outlined">add</span>
+            ADD BODY
+        </button>
+
         <hr class="vue-ui-hr" />
 
         <div class="vue-ui-body-list" role="listbox" aria-label="Celestial bodies">
@@ -100,7 +105,11 @@
                         <span>v {{ formatNumber(body.speed) }}</span>
                     </span>
                     <span class="ml-auto">
-                        <button class="icon-button" title="Edit">
+                        <button
+                            class="icon-button"
+                            title="Edit"
+                            @click.stop="openBodyEditor('edit', body.id)"
+                        >
                             <span class="material-symbols-outlined">edit</span>
                         </button>
                         <button
@@ -184,6 +193,7 @@ import {
     zoomCameraOut,
 } from '../sim-bridge';
 import type { BodySnapshot } from '../sim-bridge';
+import { openBodyEditor } from '../ui-store';
 
 const searchQuery = ref('');
 

@@ -53,6 +53,7 @@
         <div v-show="isExpanded" class="vue-ui-panel-manager-panels" >
             <SystemExplorer v-if="activePanel === ActivePanel.SystemExplorer" />
             <FlightControls v-if="activePanel === ActivePanel.FlightControls" />
+            <AddEditBodyPanel v-if="activePanel === ActivePanel.BodyEditor" />
         </div>
     </div>
 </template>
@@ -64,6 +65,7 @@ import { requestRelaunch } from '../sim-bridge';
 import { showAboutModal } from '../about-modal-service';
 import SystemExplorer from '../components/SystemExplorer.vue';
 import FlightControls from '../components/FlightControls.vue';
+import AddEditBodyPanel from '../components/AddEditBodyPanel.vue';
 
 const isExpanded = computed(() => {
     // TODO: Determine if the panel manager should be expanded based on the UI state. Currently, it is expanded if the explorer is visible.

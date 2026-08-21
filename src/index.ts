@@ -63,12 +63,14 @@ import {
     DIST_SCALE,
     TEXT_SPRITE_Z,
     C,
+    EARTH_RADIUS,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
     isBodyType,
     createUniqueId,
     generateIAUName,
+    getBodyTypeLabel,
 } from './utilities/utilities';
 import { SeededRandom } from './utilities/prng';
 import { setBodyRadius } from './physics/physics';
@@ -1076,6 +1078,8 @@ function createPresetBody(presetKey: string) {
     uiManager.managementPanel.setSelectedBody(newBody);
 
     setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
+
+    return newBody;
 }
 
 function createNewBody(
@@ -1584,6 +1588,8 @@ function createNewBody(
         // Clear any camera preset highlight (manual selection).
         // Do NOT clear LOOK AT / FREE / TARGET highlights, those are toggles with independent state.
     }
+
+    return (newBody && !newBody._isDisposed ? newBody : null) ?? null;
 }
 
 function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
@@ -3095,6 +3101,232 @@ registerVueSimHooks({
             isEnabled: surfaceCam.isEligibleBody(selected),
         };
     },
+
+    // ── Add/Edit Body: bridge for the Vue Add/Edit Body panel ─────────────
+    getBodyEditSnapshot: (bodyId: string) => {
+        const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);
+        if (!body) return null;
+
+        const isStarBody = isBodyType(body, BodyTypeEnum.Star);
+        const isAsteroidBody = isBodyType(body, BodyTypeEnum.Asteroid);
+        const isCometBody = isBodyType(body, BodyTypeEnum.Comet);
+
+        const vel = body.velocity;
+        const horizontalSpeed = vel ? Math.sqrt(vel.x * vel.x + vel.z * vel.z) : 0;
+        const orbitalAngle = vel
+            ? ((Math.atan2(vel.z, vel.x) * 180) / Math.PI + 360) % 360
+            : 0;
+        const inclination = vel ? (Math.atan2(vel.y, horizontalSpeed) * 180) / Math.PI : 0;
+
+        // Asteroids/comets are plain Body instances (no rotation); everything
+        // else in the sim is a CelestialBody with a `rotation` object.
+        const celestial = body as Partial<CelestialBody>;
+        const rotation = celestial.rotation;
+        const hasTilt = !!rotation && typeof rotation.tilt === 'number';
+
+        const toHexColor = (c: unknown): string | null => {
+            try {
+                if (c && typeof c === 'object' && 'r' in c && 'g' in c && 'b' in c) {
+                    const rgb = c as { r: number; g: number; b: number };
+                    const r = Math.max(0, Math.min(255, Math.round(rgb.r * 255)));
+                    const g = Math.max(0, Math.min(255, Math.round(rgb.g * 255)));
+                    const b = Math.max(0, Math.min(255, Math.round(rgb.b * 255)));
+                    return (
+                        '#' +
+                        [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('').toLowerCase()
+                    );
+                }
+                if (typeof c === 'number' && isFinite(c)) {
+                    return ('#' + (c >>> 0).toString(16).padStart(6, '0')).toLowerCase();
+                }
+            } catch {
+                // ignore
+            }
+            return '#ffffff';
+        };
+
+        const colorValue = isAsteroidBody || isCometBody
+            ? (body as Body & { baseColor?: unknown; color?: unknown }).baseColor ||
+              (body as Body & { baseColor?: unknown; color?: unknown }).color
+            : null;
+
+        return {
+            id: body.id,
+            name: body.name || 'Unnamed',
+            typeLabel: getBodyTypeLabel(body),
+            isStar: isStarBody,
+            isAsteroid: isAsteroidBody,
+            isComet: isCometBody,
+            hasTilt,
+            mass: body.mass,
+            radius: body.radius,
+            temperature: isStarBody ? ((body as Star).temperature ?? null) : null,
+            lightIntensity: isStarBody ? ((body as Star).lightIntensity ?? null) : null,
+            velocity: vel ? vel.length() : 0,
+            orbitalAngle,
+            inclination,
+            tilt: rotation?.tilt ?? 0,
+            azimuth: rotation?.azimuth ?? 0,
+            colorHex: toHexColor(colorValue),
+        };
+    },
+    createBody: (payload) => {
+        const orbitParent = payload.orbitParentId
+            ? (simulationState.bodies.find(
+                  (b) => b && b.id === payload.orbitParentId && !b._isDisposed
+              ) ?? null)
+            : null;
+
+        const body = createNewBody(
+            payload.bodyType,
+            payload.planetType,
+            payload.orbitType,
+            payload.inclination,
+            payload.hasAtmosphere,
+            payload.hasRings,
+            payload.customMass,
+            payload.customTemperature,
+            payload.customLightIntensity,
+            payload.customRadius,
+            orbitParent,
+            payload.createTilt,
+            payload.createAzimuth
+        );
+        return body && !body._isDisposed ? body.id : null;
+    },
+    createPresetBody: (presetKey) => {
+        const body = createPresetBody(presetKey);
+        return body && !body._isDisposed ? body.id : null;
+    },
+    applyBodyEdit: (bodyId, payload) => {
+        const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);
+        if (!body) return;
+        applyBodyEditToBody(body, payload);
+    },
+    deleteBodyById: (bodyId) => {
+        const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);
+        if (!body) return;
+        // deleteSelectedBody operates on `selectedBody`; point it at the target
+        // first so the shared cleanup (gizmo, selection, camera) all runs.
+        if (selectedBody !== body) {
+            selectedBody = body;
+            manuallySelectedBody = body;
+            cameraState.focusBody = body;
+            uiManager.managementPanel.setSelectedBody(body);
+        }
+        deleteSelectedBody();
+    },
+    getRandomizedCreateDefaults: (bodyType) => {
+        const PLANET_TYPES = [
+            'solid',
+            'gas_giant',
+            'ice_giant',
+            'volcanic',
+            'ocean',
+            'frozen',
+            'desert',
+            'temperate',
+        ] as const;
+        const MOON_TYPES = ['solid', 'temperate', 'volcanic', 'ocean', 'frozen', 'desert'] as const;
+        const randBool = () => Math.random() < 0.5;
+
+        if (bodyType === 'sun') {
+            const star = randomStarParams();
+            const tilt = Math.round(star.rotationTilt);
+            return {
+                mass: star.mass,
+                radius: star.radius,
+                temperature: star.temperature,
+                lightIntensity: star.lightIntensity,
+                tilt,
+                azimuth: Math.round(star.rotationAzimuth),
+                inclination: tilt,
+                hasAtmosphere: false,
+                hasRings: false,
+                planetType: null,
+                moonType: null,
+            };
+        }
+
+        // Non-star bodies randomize inclination independently of tilt (matches the old panel's
+        // `randomizeCreateBodyInputs`, which rolls this for every type except sun).
+        const inclination = Math.round(Math.random() * 90);
+
+        if (bodyType === 'black_hole') {
+            const bh = randomBlackHoleParams();
+            return {
+                mass: bh.mass,
+                radius: bh.radius,
+                temperature: null,
+                lightIntensity: null,
+                tilt: null,
+                azimuth: null,
+                inclination,
+                hasAtmosphere: false,
+                hasRings: false,
+                planetType: null,
+                moonType: null,
+            };
+        }
+
+        if (bodyType === 'planet') {
+            const planetType = PLANET_TYPES[Math.floor(Math.random() * PLANET_TYPES.length)];
+            const params = randomPlanetParams(planetType);
+            const canHaveAtmosphere =
+                planetType === 'solid' ||
+                planetType === 'volcanic' ||
+                planetType === 'ocean' ||
+                planetType === 'frozen' ||
+                planetType === 'desert';
+            return {
+                mass: params.mass,
+                radius: params.radius,
+                temperature: null,
+                lightIntensity: null,
+                tilt: Math.round(params.rotationTilt),
+                azimuth: Math.round(params.rotationAzimuth),
+                inclination,
+                hasAtmosphere: canHaveAtmosphere ? randBool() : planetType === 'temperate',
+                hasRings: randBool(),
+                planetType,
+                moonType: null,
+            };
+        }
+
+        if (bodyType === 'moon') {
+            const moonType = MOON_TYPES[Math.floor(Math.random() * MOON_TYPES.length)];
+            const params = randomMoonParams(EARTH_RADIUS);
+            return {
+                mass: params.mass,
+                radius: params.radius,
+                temperature: null,
+                lightIntensity: null,
+                tilt: Math.round(params.rotationTilt),
+                azimuth: Math.round(params.rotationAzimuth),
+                inclination,
+                hasAtmosphere: moonType === 'temperate' ? true : randBool(),
+                hasRings: false,
+                planetType: null,
+                moonType,
+            };
+        }
+
+        // Asteroid/comet: no mass/radius/tilt preview (hidden in the old UI; randomized at
+        // actual creation time by createNewBody itself).
+        return {
+            mass: null,
+            radius: null,
+            temperature: null,
+            lightIntensity: null,
+            tilt: null,
+            azimuth: null,
+            inclination,
+            hasAtmosphere: false,
+            hasRings: false,
+            planetType: null,
+            moonType: null,
+        };
+    },
 });
 
 // ── Flight mode functions ────────────────────────────────────────────────────
@@ -3527,6 +3759,158 @@ function keepCameraDistanceOnBodyScaleChange(body: Body, oldRadius: number, newR
     controls.target.copy(targetPos);
 }
 
+/** Shared "applyEdit" logic used by both the old management panel and the Vue
+ *  Add/Edit Body panel. `radius` is explicit here — the old panel reads it from
+ *  its own slider before forwarding it in. */
+interface IApplyBodyEditParams {
+    name: string;
+    mass: number;
+    temperature: number | null;
+    lightIntensity: number | null;
+    radius: number | null;
+    velocity: number | null;
+    orbitalAngle: number | null;
+    inclination: number | null;
+    color: string | null;
+    editTilt: number | null;
+    editAzimuth: number | null;
+}
+
+function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
+    if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
+
+    const { name, mass, temperature, lightIntensity, radius, velocity, orbitalAngle, inclination, color, editTilt, editAzimuth } = params;
+
+    // Update name
+    if (name !== null && name !== '') {
+        body.updateLabel(name);
+        // Update just the edit form label without repopulating the entire form
+        if (uiManager.managementPanel.editBodyName) {
+            uiManager.managementPanel.editBodyName.textContent = body.name;
+        }
+    }
+
+    // Update mass — setMass handles brown dwarf transition for stars
+    body.setMass(mass);
+
+    // Refill fuel for stars based on new mass (skipped automatically for brown dwarfs since fuel is null)
+    if (body instanceof MainSequenceStar && body.fuel !== null) {
+        body.maxFuel = mass * 100000;
+        body.fuel = body.maxFuel;
+        // Reset to initial state (in case it was in red giant phase)
+        body.initialMass = mass;
+        body.temperature = body.temperature || 5778;
+    }
+
+    // Star-only updates (temperature, light) — radius handled globally below
+    if (body instanceof MainSequenceStar) {
+        // Update temperature if provided
+        if (temperature !== null) {
+            body.setTemperature(temperature);
+        }
+
+        // Update light intensity if provided
+        if (lightIntensity !== null) {
+            body.setLightIntensity(lightIntensity);
+        }
+    }
+
+    // Apply radius change for ALL body types if radius input present
+    // Preserve special non-spherical asteroid geometry when editing low-mass asteroids.
+    try {
+        const isLowMassAsteroid =
+            isBodyType(body, BodyTypeEnum.Asteroid) &&
+            typeof body.mass === 'number' &&
+            body.mass < 1;
+
+        if (radius !== null && isFinite(radius)) {
+            const oldRadiusAll = body.radius || 1;
+            const newRadiusAll = radius;
+            if (isLowMassAsteroid) {
+                body.mass = mass;
+                if (body === selectedBody) refreshSelectionVisuals();
+            } else {
+                if (body instanceof CelestialBody) setBodyRadius(body, newRadiusAll);
+                keepCameraDistanceOnBodyScaleChange(body, oldRadiusAll, newRadiusAll);
+                if (body === selectedBody) refreshSelectionVisuals();
+            }
+        } else if (isLowMassAsteroid) {
+            body.mass = mass;
+            if (body === selectedBody) refreshSelectionVisuals();
+        }
+    } catch (e) {
+        console.error('Error applying body radius edit:', e);
+    }
+
+    // Apply new trajectory (velocity, orbital angle, and inclination) only if explicitly set.
+    // Each control is tracked independently so changing only speed doesn't alter direction
+    // and changing only angle doesn't alter speed.
+    if (velocity !== null || orbitalAngle !== null || inclination !== null) {
+        const currentVel = body.velocity.clone();
+        const currentSpeed = currentVel.length();
+        const currentAngleDeg =
+            ((Math.atan2(currentVel.z, currentVel.x) * 180) / Math.PI + 360) % 360;
+        const currentHorizSpeed = Math.sqrt(
+            currentVel.x * currentVel.x + currentVel.z * currentVel.z
+        );
+        const currentInclinationDeg =
+            (Math.atan2(currentVel.y, currentHorizSpeed) * 180) / Math.PI;
+
+        const resolvedSpeed = velocity !== null ? velocity : currentSpeed;
+        const resolvedAngleDeg = orbitalAngle !== null ? orbitalAngle : currentAngleDeg;
+        const resolvedInclinationDeg =
+            inclination !== null ? inclination : currentInclinationDeg;
+
+        const angleRad = (resolvedAngleDeg * Math.PI) / 180;
+        const inclinationRad = (resolvedInclinationDeg * Math.PI) / 180;
+
+        const horizontalSpeed = resolvedSpeed * Math.cos(inclinationRad);
+        const verticalSpeed = resolvedSpeed * Math.sin(inclinationRad);
+
+        body.velocity.x = horizontalSpeed * Math.cos(angleRad);
+        body.velocity.y = verticalSpeed;
+        body.velocity.z = horizontalSpeed * Math.sin(angleRad);
+    }
+
+    // Apply color change if provided and if body is not a star
+    if (color && !isBodyType(body, BodyTypeEnum.Star)) {
+        try {
+            // Convert hex string to THREE.Color
+            const col = new THREE.Color(color);
+            if (body.mesh && body.mesh.material) {
+                (body.mesh.material as THREE.MeshStandardMaterial).color?.set(col);
+            }
+            if (body instanceof CelestialBody) body.baseColor.set(col);
+        } catch (e) {
+            console.error('Error applying body color edit:', e);
+        }
+    }
+
+    // Apply axial tilt and azimuth if the sliders were visible and the body supports rotation
+    if ((editTilt !== null || editAzimuth !== null) && body instanceof CelestialBody) {
+        const newTilt = editTilt !== null ? editTilt : (body.rotation.tilt ?? 0);
+        const newAzimuth = editAzimuth !== null ? editAzimuth : (body.rotation.azimuth ?? 0);
+        body.rotation.tilt = newTilt;
+        body.rotation.azimuth = newAzimuth;
+        const tiltRad = THREE.MathUtils.degToRad(newTilt);
+        const azRad = THREE.MathUtils.degToRad(newAzimuth);
+        const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0),
+            tiltRad
+        );
+        const azQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(0, 1, 0),
+            azRad
+        );
+        body.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
+        if (body.rings) {
+            body.rings.position.copy(body.mesh.position);
+            body.rings.quaternion.copy(body.mesh.quaternion);
+        }
+        if (body === selectedBody) gizmo.attach(body);
+    }
+}
+
 uiManager.managementPanel.on('deleteBody', () => {
     deleteSelectedBody();
 });
@@ -3554,148 +3938,29 @@ uiManager.managementPanel.on(
         velocity: number | null;
         orbitalAngle: number | null;
         inclination: number | null;
-        color: number;
+        color: string;
         editTilt: number | null;
         editAzimuth: number | null;
     }) => {
-        if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
+        if (!body) return;
 
-        // Update name
-        if (name !== null && name !== '') {
-            body.updateLabel(name);
-            // Update just the edit form label without repopulating the entire form
-            if (uiManager.managementPanel.editBodyName) {
-                uiManager.managementPanel.editBodyName.textContent = body.name;
-            }
-        }
+        const radius = uiManager.managementPanel && uiManager.managementPanel.editRadiusSlider
+            ? parseFloat((uiManager.managementPanel.editRadiusSlider as HTMLInputElement).value)
+            : null;
 
-        // Update mass — setMass handles brown dwarf transition for stars
-        body.setMass(mass);
-
-        // Refill fuel for stars based on new mass (skipped automatically for brown dwarfs since fuel is null)
-        if (body instanceof MainSequenceStar && body.fuel !== null) {
-            body.maxFuel = mass * 100000;
-            body.fuel = body.maxFuel;
-            // Reset to initial state (in case it was in red giant phase)
-            body.initialMass = mass;
-            body.temperature = body.temperature || 5778;
-        }
-
-        // Star-only updates (temperature, light) — radius handled globally below
-        if (body instanceof MainSequenceStar) {
-            // Update temperature if provided
-            if (temperature !== null) {
-                body.setTemperature(temperature);
-            }
-
-            // Update light intensity if provided
-            if (lightIntensity !== null) {
-                body.setLightIntensity(lightIntensity);
-            }
-
-            // If this is the currently-selected body, rescale gizmo immediately after radius update
-            // (radius update happens below for all bodies)
-        }
-
-        // Apply radius change for ALL body types if radius input present
-        // Preserve special non-spherical asteroid geometry when editing low-mass asteroids.
-        try {
-            const isLowMassAsteroid =
-                isBodyType(body, BodyTypeEnum.Asteroid) &&
-                typeof body.mass === 'number' &&
-                body.mass < 1;
-
-            if (uiManager.managementPanel && uiManager.managementPanel.editRadiusSlider) {
-                const oldRadiusAll = body.radius || 1;
-                const newRadiusAll = parseFloat(
-                    (uiManager.managementPanel.editRadiusSlider as HTMLInputElement).value
-                );
-                if (!isNaN(newRadiusAll) && isFinite(newRadiusAll)) {
-                    if (isLowMassAsteroid) {
-                        body.mass = mass;
-                        if (body === selectedBody) refreshSelectionVisuals();
-                    } else {
-                        if (body instanceof CelestialBody) setBodyRadius(body, newRadiusAll);
-                        keepCameraDistanceOnBodyScaleChange(body, oldRadiusAll, newRadiusAll);
-                        if (body === selectedBody) refreshSelectionVisuals();
-                    }
-                }
-            } else if (isLowMassAsteroid) {
-                body.mass = mass;
-                if (body === selectedBody) refreshSelectionVisuals();
-            }
-        } catch (e) {
-            console.error('Error applying body radius edit:', e);
-        }
-
-        // Apply new trajectory (velocity, orbital angle, and inclination) only if explicitly set.
-        // Each control is tracked independently so changing only speed doesn't alter direction
-        // and changing only angle doesn't alter speed.
-        if (velocity !== null || orbitalAngle !== null || inclination !== null) {
-            const currentVel = body.velocity.clone();
-            const currentSpeed = currentVel.length();
-            const currentAngleDeg =
-                ((Math.atan2(currentVel.z, currentVel.x) * 180) / Math.PI + 360) % 360;
-            const currentHorizSpeed = Math.sqrt(
-                currentVel.x * currentVel.x + currentVel.z * currentVel.z
-            );
-            const currentInclinationDeg =
-                (Math.atan2(currentVel.y, currentHorizSpeed) * 180) / Math.PI;
-
-            const resolvedSpeed = velocity !== null ? velocity : currentSpeed;
-            const resolvedAngleDeg = orbitalAngle !== null ? orbitalAngle : currentAngleDeg;
-            const resolvedInclinationDeg =
-                inclination !== null ? inclination : currentInclinationDeg;
-
-            const angleRad = (resolvedAngleDeg * Math.PI) / 180;
-            const inclinationRad = (resolvedInclinationDeg * Math.PI) / 180;
-
-            const horizontalSpeed = resolvedSpeed * Math.cos(inclinationRad);
-            const verticalSpeed = resolvedSpeed * Math.sin(inclinationRad);
-
-            body.velocity.x = horizontalSpeed * Math.cos(angleRad);
-            body.velocity.y = verticalSpeed;
-            body.velocity.z = horizontalSpeed * Math.sin(angleRad);
-        }
-
-        // Apply color change if provided and if body is not a star
-        if (color && !isBodyType(body, BodyTypeEnum.Star)) {
-            try {
-                // Convert hex string to THREE.Color
-                const col = new THREE.Color(color);
-                if (body.mesh && body.mesh.material) {
-                    (body.mesh.material as THREE.MeshStandardMaterial).color?.set(col);
-                }
-                if (body instanceof CelestialBody) body.baseColor.set(col);
-            } catch (e) {
-                console.error('Error applying body color edit:', e);
-            }
-        }
-
-        // Apply axial tilt and azimuth if the sliders were visible and the body supports rotation
-        if ((editTilt !== null || editAzimuth !== null) && body instanceof CelestialBody) {
-            const newTilt = editTilt !== null ? editTilt : (body.rotation.tilt ?? 0);
-            const newAzimuth = editAzimuth !== null ? editAzimuth : (body.rotation.azimuth ?? 0);
-            body.rotation.tilt = newTilt;
-            body.rotation.azimuth = newAzimuth;
-            const tiltRad = THREE.MathUtils.degToRad(newTilt);
-            const azRad = THREE.MathUtils.degToRad(newAzimuth);
-            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(1, 0, 0),
-                tiltRad
-            );
-            const azQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(0, 1, 0),
-                azRad
-            );
-            body.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
-            if (body.rings) {
-                body.rings.position.copy(body.mesh.position);
-                body.rings.quaternion.copy(body.mesh.quaternion);
-            }
-            if (body === selectedBody) gizmo.attach(body);
-        }
-
+        applyBodyEditToBody(body, {
+            name,
+            mass,
+            temperature,
+            lightIntensity,
+            radius,
+            velocity,
+            orbitalAngle,
+            inclination,
+            color,
+            editTilt,
+            editAzimuth,
+        });
     }
 );
 
