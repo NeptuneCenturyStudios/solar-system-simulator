@@ -88,44 +88,46 @@
                 @click="onSelect(body)"
                 @keydown.enter="onSelect(body)"
             >
-                <span class="vue-ui-body-name" :title="body.name">{{ body.name }}</span>
-                <span class="vue-ui-body-type">{{ body.typeLabel }}</span>
-                <div class="vue-ui-body-bottom-row">
+                <div class="d-flex w-100">
+                    <span class="vue-ui-body-name" :title="body.name">{{ body.name }}</span>
+                    <span class="vue-ui-body-type">{{ body.typeLabel }}</span>
+                </div>
+
+                <div class="vue-ui-body-bottom-row w-100">
                     <span class="vue-ui-body-stats">
                         <span>M {{ formatNumber(body.mass) }}</span>
                         <span>R {{ formatNumber(body.radius) }}</span>
                         <span>v {{ formatNumber(body.speed) }}</span>
                     </span>
                     <span class="ml-auto">
-                        <button class="btn-icon" title="Edit">
+                        <button class="icon-button" title="Edit">
                             <span class="material-symbols-outlined">edit</span>
+                        </button>
+                        <button
+                            v-if="body.isShip"
+                            class="icon-button"
+                            title="Enter ship"
+                            @click.stop="enterShipById(body.id)"
+                        >
+                            <span class="material-symbols-outlined">login</span>
+                        </button>
+                        <button
+                            v-else-if="hasShip"
+                            class="icon-button"
+                            :class="{ active: body.id === simStore.autopilotTargetId }"
+                            :title="
+                                body.id === simStore.autopilotTargetId
+                                    ? 'Cancel autopilot'
+                                    : 'Fly to this body'
+                            "
+                            @click.stop="flyToBody(body.id)"
+                        >
+                            <span class="material-symbols-outlined">{{
+                                body.id === simStore.autopilotTargetId ? 'close' : 'flight'
+                            }}</span>
                         </button>
                     </span>
                 </div>
-
-                <button
-                    v-if="body.isShip"
-                    class="old-ui table-row-btn mb-0 vue-ui-body-action"
-                    title="Enter ship"
-                    @click.stop="enterShipById(body.id)"
-                >
-                    <span class="material-symbols-outlined">login</span>
-                </button>
-                <button
-                    v-else-if="hasShip"
-                    class="old-ui table-row-btn mb-0 vue-ui-body-action"
-                    :class="{ active: body.id === simStore.autopilotTargetId }"
-                    :title="
-                        body.id === simStore.autopilotTargetId
-                            ? 'Cancel autopilot'
-                            : 'Fly to this body'
-                    "
-                    @click.stop="flyToBody(body.id)"
-                >
-                    <span class="material-symbols-outlined">{{
-                        body.id === simStore.autopilotTargetId ? 'close' : 'flight'
-                    }}</span>
-                </button>
             </div>
         </div>
 

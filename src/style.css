@@ -32,7 +32,8 @@
     --new-ui-btn-care-color: #f2b6b6;
     --new-ui-btn-care-border: #bb8d8d;
     --new-ui-btn-care-shadow: 0 0 1rem rgba(242, 182, 182, 0.5);
-
+    --new-ui-icon-button-color: rgba(255, 255, 255, 0.25);
+    --new-ui-icon-button-hover-color: rgba(255, 255, 255, 1);
     --new-ui-gap-3: 0.5rem;
     --new-ui-gap-2: 0.25rem;
     --new-ui-gap-1: 0.125rem;
@@ -45,6 +46,10 @@
 
 .flex-column {
     flex-direction: column !important;
+}
+
+.flex-row {
+    flex-direction: row !important;
 }
 
 .mt-auto {
@@ -94,6 +99,10 @@
 
 .m-3 {
     margin: var(--new-ui-gap-3) !important;
+}
+
+.w-100 {
+    width: 100% !important;
 }
 
 /* Reset default styles and set up base styles */
@@ -677,7 +686,7 @@ button.old-ui.btn-danger:active {
     pointer-events: none;
 }
 
-button.btn-icon {
+button.icon-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -685,7 +694,14 @@ button.btn-icon {
     width: auto;
     border: none;
     background: transparent;
-    color: var(--new-ui-color);
+    color: var(--new-ui-icon-button-color);
+    transition: color 0.2s ease;
+    font-size: 0.25rem;
+    cursor: pointer;
+}
+button.icon-button:hover {
+    color: var(--new-ui-icon-button-hover-color);
+    text-shadow: 0 0 6px rgba(0, 255, 204, 0.35);
 }
 
 button.btn-icon-only {
@@ -1065,9 +1081,9 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 }
 
 .vue-ui-body-row {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     text-align: start;
-    grid-template-columns: 1fr auto auto;
     gap: 0.25rem 0.5rem;
     align-items: baseline;
     padding: 0.35rem 0.5rem;
@@ -1106,6 +1122,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     text-transform: uppercase;
     text-align: right;
     white-space: nowrap;
+    margin-left: auto;
 }
 
 .vue-ui-body-bottom-row {
