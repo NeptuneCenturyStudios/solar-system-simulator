@@ -6,7 +6,7 @@
     --scrollbar-thumb-hover: rgba(0, 255, 204, 0.75);
     --scrollbar-border: #224466;
     /* New UI theme */
-    --new-ui-bg: rgba(5, 10, 25, 0.5);
+    --new-ui-bg: rgba(7, 8, 10, 0.5);
     --new-ui-backdrop-filter: blur(10px);
     --new-ui-border: rgba(34, 68, 102, 1);
     --new-ui-border-radius: 0.5rem;

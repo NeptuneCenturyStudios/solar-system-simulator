@@ -89,6 +89,7 @@ import {
     getMetalnessForMoonTexture,
     moonTexture,
     cloudTextures,
+    spaceTextures,
 } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
@@ -145,6 +146,7 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 // Vue UI overlay (new UI, developed in parallel with the existing UI)
 import { mountVueUi } from './vue/main';
 import { registerVueSimHooks, setDisplayState, simStore } from './vue/sim-bridge';
+import { environmentState } from './simulation/environment-state';
 import {
     getStartupGMultiplier,
     hideStartupModal,
@@ -1602,6 +1604,7 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = !hideKuiper;
     }
+    environmentState.kuiperBeltVisible = !hideKuiper;
 
     // Keep UI in sync
     if (uiManager.managementPanel?.enableKuiperBeltCheckbox) {
@@ -1707,6 +1710,7 @@ async function spawn(
     simulationState.bodies = solarSystem.bodies;
     // Apply the space texture from the generated solar system
     await loadSpaceTexture(scene, solarSystem.spaceTexture.filename);
+    environmentState.spaceTextureFilename = solarSystem.spaceTexture.filename;
 
     // Sync the texture with the management panel UI
     uiManager.managementPanel.setSelectedSpaceTexture(solarSystem.spaceTexture);
@@ -2907,6 +2911,40 @@ registerVueSimHooks({
     enterShip: (body: Body) => {
         if (body instanceof Spaceship) spawnShip(body);
     },
+
+    // ── Solar System Management: environment settings ──
+    setKuiperBeltVisible: (checked: boolean) => {
+        if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
+            kuiperBeltPoints.visible = checked;
+        }
+        environmentState.kuiperBeltVisible = checked;
+        if (uiManager.managementPanel?.enableKuiperBeltCheckbox) {
+            uiManager.managementPanel.enableKuiperBeltCheckbox.checked = checked;
+        }
+    },
+    setSpaceBackgroundVisible: (checked: boolean) => {
+        showSpaceBackground(scene, checked);
+        environmentState.spaceBackgroundVisible = checked;
+        const skydomeEl = document.getElementById('enableSkydome') as HTMLInputElement | null;
+        if (skydomeEl) skydomeEl.checked = checked;
+    },
+    setSpaceTexture: async (texturePath: string) => {
+        await loadSpaceTexture(scene, texturePath);
+        environmentState.spaceTextureFilename = texturePath;
+        const match = spaceTextures.find((t) => t.filename === texturePath);
+        if (match) uiManager.managementPanel.setSelectedSpaceTexture(match);
+    },
+    setStarDeathEnabled: (checked: boolean) => {
+        environmentState.starDeathEnabled = checked;
+        const el = document.getElementById('enableStarDeath') as HTMLInputElement | null;
+        if (el) el.checked = checked;
+        // Refresh the stats display if a body is selected (parity with the old checkbox listener).
+        if (selectedBody && statsSprite && statsSprite.visible) {
+            statsSprite.material.map?.dispose();
+            statsSprite.material.map = createStatsTexture(selectedBody);
+            statsSprite.material.needsUpdate = true;
+        }
+    },
     // getSurfaceCameraState is registered later, once `surfaceCam` exists (see below).
 });
 mountVueUi();
@@ -3561,6 +3599,7 @@ uiManager.managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolea
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = checked;
     }
+    environmentState.kuiperBeltVisible = checked;
 });
 
 uiManager.managementPanel.on('gChange', ({ value }: { value: number }) => {
@@ -3573,6 +3612,7 @@ uiManager.managementPanel.on(
     async ({ texturePath }: { texturePath: string }) => {
         // Apply the space texture from the user's selection
         await loadSpaceTexture(scene, texturePath);
+        environmentState.spaceTextureFilename = texturePath;
     }
 );
 
@@ -3582,6 +3622,7 @@ if (enableSkydomeCheckbox) {
         const checked = enableSkydomeCheckbox.checked;
         // Show or hide the background
         showSpaceBackground(scene, checked);
+        environmentState.spaceBackgroundVisible = checked;
     };
 }
 
@@ -3968,6 +4009,8 @@ uiManager.managementPanel.on(
 const starDeathCheckbox = document.getElementById('enableStarDeath');
 if (starDeathCheckbox) {
     starDeathCheckbox.addEventListener('change', () => {
+        environmentState.starDeathEnabled = (starDeathCheckbox as HTMLInputElement).checked;
+
         // Update stats display if a body is currently selected
         if (selectedBody && statsSprite && statsSprite.visible) {
             statsSprite.material.map?.dispose();
@@ -4360,6 +4403,7 @@ window.addEventListener('resize', () => {
 
 // Apply initial background visibility (pre-launch view): kuiper off
 if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) kuiperBeltPoints.visible = false;
+environmentState.kuiperBeltVisible = false;
 if (uiManager.managementPanel.enableKuiperBeltCheckbox)
     uiManager.managementPanel.enableKuiperBeltCheckbox.checked = false;
 

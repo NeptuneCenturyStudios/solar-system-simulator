@@ -11,6 +11,7 @@ import {
 } from '../simulation/simulation';
 import { getBodyTypeLabel } from '../utilities/utilities';
 import type { ISimStateSnapshot } from '../interfaces';
+import { environmentState } from '../simulation/environment-state';
 
 /**
  * Plain, serialisable snapshot of a simulation body. Vue reactivity cannot
@@ -169,6 +170,16 @@ export interface VueSimHooks {
     deleteBodyById?: (bodyId: string) => void;
     /** Re-roll add-custom form preview values for the given body type (old Randomize button). */
     getRandomizedCreateDefaults?: (bodyType: string) => RandomizedCreateDefaults;
+
+    // ── Solar System Management (same sim paths as the old management panel) ─
+    /** Toggle Kuiper belt point-cloud visibility. */
+    setKuiperBeltVisible?: (checked: boolean) => void;
+    /** Show/hide the skydome background texture. */
+    setSpaceBackgroundVisible?: (checked: boolean) => void;
+    /** Load & apply a new skydome background texture by filename. */
+    setSpaceTexture?: (texturePath: string) => void;
+    /** Toggle natural star death (fuel burn → stellar remnants). */
+    setStarDeathEnabled?: (checked: boolean) => void;
 }
 
 const SNAPSHOT_INTERVAL_MS = 100;
@@ -205,6 +216,12 @@ export interface VueSimStore {
     showTrails: boolean;
     showOrbitPrediction: boolean;
 
+    // ── Solar System Management (environment settings) ─────────────────────
+    kuiperBeltVisible: boolean;
+    spaceBackgroundVisible: boolean;
+    spaceTextureFilename: string | null;
+    starDeathEnabled: boolean;
+
     /** Id of the autopilot target body, or null when autopilot is off. */
     autopilotTargetId: string | null;
 
@@ -237,6 +254,11 @@ const state = reactive<VueSimStore>({
     // Same display defaults as the old panel's HTML checkboxes.
     showTrails: true,
     showOrbitPrediction: false,
+    // Environment defaults mirror environmentState's initial values.
+    kuiperBeltVisible: false,
+    spaceBackgroundVisible: true,
+    spaceTextureFilename: null as string | null,
+    starDeathEnabled: false,
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
@@ -322,10 +344,19 @@ function refreshCameraState(): void {
     state.isAdvancedMode = flightState.isAdvancedMode;
 }
 
+/** Copy environment settings into the reactive store for the Vue UI. */
+function refreshEnvironmentState(): void {
+    state.kuiperBeltVisible = environmentState.kuiperBeltVisible;
+    state.spaceBackgroundVisible = environmentState.spaceBackgroundVisible;
+    state.spaceTextureFilename = environmentState.spaceTextureFilename;
+    state.starDeathEnabled = environmentState.starDeathEnabled;
+}
+
 function refreshAll(): void {
     refreshScalarState();
     snapshotBodies();
     refreshCameraState();
+    refreshEnvironmentState();
 }
 
 let intervalId: number | null = null;
@@ -548,6 +579,48 @@ export function deleteBodyById(bodyId: string): void {
 /** Get freshly-randomized preview values for the add-custom form. */
 export function getRandomizedCreateDefaults(bodyType: string): RandomizedCreateDefaults | null {
     return hookRegistry.getRandomizedCreateDefaults?.(bodyType) ?? null;
+}
+
+// ── Solar System Management actions ──────────────────────────────────────
+
+/** Toggle Kuiper belt visibility (old panel's kuiperBeltChange event path). */
+export function setKuiperBeltVisible(checked: boolean): void {
+    if (hookRegistry.setKuiperBeltVisible) {
+        hookRegistry.setKuiperBeltVisible(checked);
+    } else {
+        environmentState.kuiperBeltVisible = checked;
+        refreshEnvironmentState();
+    }
+}
+
+/** Show/hide the skydome background texture (old enableSkydome checkbox path). */
+export function setSpaceBackgroundVisible(checked: boolean): void {
+    if (hookRegistry.setSpaceBackgroundVisible) {
+        hookRegistry.setSpaceBackgroundVisible(checked);
+    } else {
+        environmentState.spaceBackgroundVisible = checked;
+        refreshEnvironmentState();
+    }
+}
+
+/** Load & apply a skydome background texture by filename (old spaceTextureChange path). */
+export function setSpaceTexture(texturePath: string): void {
+    if (hookRegistry.setSpaceTexture) {
+        hookRegistry.setSpaceTexture(texturePath);
+    } else {
+        environmentState.spaceTextureFilename = texturePath;
+        refreshEnvironmentState();
+    }
+}
+
+/** Toggle natural star death (old enableStarDeath checkbox path). */
+export function setStarDeathEnabled(checked: boolean): void {
+    if (hookRegistry.setStarDeathEnabled) {
+        hookRegistry.setStarDeathEnabled(checked);
+    } else {
+        environmentState.starDeathEnabled = checked;
+        refreshEnvironmentState();
+    }
 }
 
 // ── Flight Controls actions ───────────────────────────────────────────────

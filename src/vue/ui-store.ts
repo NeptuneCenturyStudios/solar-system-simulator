@@ -6,6 +6,8 @@ export enum ActivePanel {
     Options = 'options',
     FlightControls = 'flightControls',
     BodyEditor = 'bodyEditor',
+    /** Solar System Management panel (environment settings: kuiper belt, skydome, star death, gravity). */
+    SolarManagement = 'solarManagement',
 }
 
 export interface BodyEditorState {

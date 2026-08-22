@@ -23,7 +23,12 @@
                 <span class="material-symbols-outlined">settings</span>
             </button>
 
-            <button class="btn toolbar-btn" title="Edit Solar System">
+            <button
+                class="btn toolbar-btn"
+                :class="{ active: activePanel === ActivePanel.SolarManagement }"
+                title="Edit Solar System"
+                @click="setActivePanel(ActivePanel.SolarManagement)"
+            >
                 <span class="material-symbols-outlined">edit</span>
             </button>
 
@@ -54,6 +59,7 @@
             <SystemExplorer v-if="activePanel === ActivePanel.SystemExplorer" />
             <FlightControls v-if="activePanel === ActivePanel.FlightControls" />
             <AddEditBodyPanel v-if="activePanel === ActivePanel.BodyEditor" />
+            <SolarSystemManagement v-if="activePanel === ActivePanel.SolarManagement" />
         </div>
     </div>
 </template>
@@ -66,6 +72,7 @@ import { showAboutModal } from '../about-modal-service';
 import SystemExplorer from '../components/SystemExplorer.vue';
 import FlightControls from '../components/FlightControls.vue';
 import AddEditBodyPanel from '../components/AddEditBodyPanel.vue';
+import SolarSystemManagement from '../components/SolarSystemManagement.vue';
 
 const isExpanded = computed(() => {
     // TODO: Determine if the panel manager should be expanded based on the UI state. Currently, it is expanded if the explorer is visible.

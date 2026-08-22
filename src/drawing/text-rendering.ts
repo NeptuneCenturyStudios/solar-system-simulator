@@ -8,6 +8,7 @@ import { Moon } from '../bodies/moon';
 import { MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
+import { environmentState } from '../simulation/environment-state';
 
 /**
  * Flight speed HUD texture — drawn in the same style as the FPS counter
@@ -341,8 +342,7 @@ export function createStatsTexture(body: Body) {
     }
 
     // Fuel (for stars with fuel system, only if star death is enabled)
-    const starDeathEnabled =
-        (document.getElementById('enableStarDeath') as HTMLInputElement)?.checked || false;
+    const starDeathEnabled = environmentState.starDeathEnabled;
     if (
         starDeathEnabled &&
         body instanceof MainSequenceStar &&

@@ -23,15 +23,12 @@ import { StarGlow } from '../effects/star-glow';
 import { StarLensflare } from '../effects/star-lensflare';
 import { BodyTypeEnum } from './body-enums';
 import { settingsStore } from '../settings/settings-store';
+import { environmentState } from '../simulation/environment-state';
 
-// Cached reference to the star-death checkbox — avoids a DOM query on every physics substep.
-let _starDeathCheckboxEl: HTMLInputElement | null | undefined;
+// Star death is a shared environment setting (toggled from either UI layer);
+// reading it from the state singleton avoids DOM coupling in body classes.
 function _isStarDeathEnabled(): boolean {
-    if (_starDeathCheckboxEl === undefined) {
-        _starDeathCheckboxEl =
-            (document.getElementById('enableStarDeath') as HTMLInputElement | null) ?? null;
-    }
-    return _starDeathCheckboxEl?.checked ?? false;
+    return environmentState.starDeathEnabled;
 }
 
 export class MainSequenceStar extends Star {
