@@ -24,6 +24,12 @@ export interface BodyEditorState {
 export interface VueUiState {
     activePanel: ActivePanel;
     /**
+     * Whether the PanelManager card (toolbar + panels) is shown at all.
+     * Independent of `activePanel`: hiding it via the menu toggle keeps the
+     * active panel so re-showing restores exactly what was open before.
+     */
+    panelManagerVisible: boolean;
+    /**
      * When set, the System Explorer body list is replaced by the add/edit body
      * panel. `null` means the explorer list is shown.
      */
@@ -32,16 +38,30 @@ export interface VueUiState {
 
 const uiState = reactive<VueUiState>({
     activePanel: ActivePanel.SystemExplorer,
+    panelManagerVisible: true,
     bodyEditor: null,
 });
 
 /** Reactive store consumed by Vue components for overlay visibility. */
 export const vueUiState: VueUiState = uiState;
 
+/** Activate a panel and make sure the PanelManager showing it is visible
+ *  (activating a panel implies wanting to see it). */
+export function setActivePanel(panel: ActivePanel): void {
+    uiState.activePanel = panel;
+    uiState.panelManagerVisible = true;
+}
+
+/** Show/hide the whole PanelManager without changing the active panel —
+ *  re-showing restores whatever panel was open when it was hidden. */
+export function togglePanelManager(): void {
+    uiState.panelManagerVisible = !uiState.panelManagerVisible;
+}
+
 /** Open the add/edit body panel. Add mode defaults the orbit parent to the
  *  currently selected body (handled by the editor via simStore.selectedId). */
 export function openBodyEditor(mode: 'add' | 'edit', bodyId: string | null = null): void {
-    uiState.activePanel = ActivePanel.BodyEditor;
+    setActivePanel(ActivePanel.BodyEditor);
     uiState.bodyEditor = { mode, bodyId };
 }
 

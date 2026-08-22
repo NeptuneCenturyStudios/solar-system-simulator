@@ -1,7 +1,12 @@
 <template>
     <div class="toolbar toolbar-bottom visible">
-        <!-- Main menu button (no-op for now) -->
-        <button class="btn toolbar-btn" title="Toggle Menu" aria-label="Toggle Menu">
+        <!-- Main menu button: toggles PanelManager visibility without changing the active panel -->
+        <button
+            class="btn toolbar-btn"
+            title="Toggle Menu"
+            aria-label="Toggle Menu"
+            @click="togglePanelManager"
+        >
             <span class="material-symbols-outlined">menu</span>
         </button>
 
@@ -62,7 +67,7 @@
 import { computed } from 'vue';
 
 import { formatTimeScale, setTimeScale, simStore, togglePause } from '../sim-bridge';
-import { ActivePanel, vueUiState } from '../ui-store';
+import { ActivePanel, setActivePanel, togglePanelManager, vueUiState } from '../ui-store';
 
 // Same bounds the old bottom toolbar used (ui-manager.ts).
 const MIN_TIME_SCALE = 0.01;
@@ -99,7 +104,8 @@ function stepTimeScale(factor: number): void {
 }
 
 function toggleExplorer(): void {
-    vueUiState.activePanel = ActivePanel.SystemExplorer;
+    // Show the PanelManager and switch to the System Explorer view.
+    setActivePanel(ActivePanel.SystemExplorer);
 }
 
 </script>

@@ -1,5 +1,5 @@
 <template>
-    <div class="vue-ui-panel-manager vue-ui-card" :class="{ expanded: isExpanded }">
+    <div class="vue-ui-panel-manager vue-ui-card expanded">
         <div class="vue-ui-panel-manager-toolbar ">
             <div class="toolbar-group">
             <button
@@ -60,7 +60,7 @@
             </div>
         </div>
 
-        <div v-show="isExpanded" class="vue-ui-panel-manager-panels" >
+        <div class="vue-ui-panel-manager-panels" >
             <SystemExplorer v-if="activePanel === ActivePanel.SystemExplorer" />
             <FlightControls v-if="activePanel === ActivePanel.FlightControls" />
             <AddEditBodyPanel v-if="activePanel === ActivePanel.BodyEditor" />
@@ -72,7 +72,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ActivePanel, vueUiState } from '../ui-store';
+import { ActivePanel, setActivePanel, vueUiState } from '../ui-store';
 import { requestRelaunch } from '../sim-bridge';
 import { showAboutModal } from '../about-modal-service';
 import SystemExplorer from '../components/SystemExplorer.vue';
@@ -81,16 +81,7 @@ import AddEditBodyPanel from '../components/AddEditBodyPanel.vue';
 import SolarSystemManagement from '../components/SolarSystemManagement.vue';
 import OptionsPanel from '../components/OptionsPanel.vue';
 
-const isExpanded = computed(() => {
-    // TODO: Determine if the panel manager should be expanded based on the UI state. Currently, it is expanded if the explorer is visible.
-    return vueUiState.activePanel !== ActivePanel.None;
-});
-
 const activePanel = computed(() => vueUiState.activePanel);
-
-function setActivePanel(panel: ActivePanel): void {
-    vueUiState.activePanel = panel;
-}
 
 function openAbout(): void {
     showAboutModal();
