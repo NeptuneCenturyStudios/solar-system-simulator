@@ -147,6 +147,7 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 import { mountVueUi } from './vue/main';
 import { registerVueSimHooks, setDisplayState, simStore } from './vue/sim-bridge';
 import { environmentState } from './simulation/environment-state';
+import { SettingKey, settingsStore } from './settings/settings-store';
 import {
     getStartupGMultiplier,
     hideStartupModal,
@@ -2952,6 +2953,29 @@ mountVueUi();
 // Mirror the old panel's default display-option state in the Vue store
 // (Show Orbit Trails checked, Show Orbit Prediction unchecked).
 setDisplayState({ showTrails: true, showOrbitPrediction: false });
+
+// Vue Options panel: persisted user settings (same settingsStore paths as the
+// old panel). Music volume must also be pushed to the live AmbientSoundManager
+// — a playing track only picks up volume changes via setVolume().
+registerVueSimHooks({
+    setParticleEffectsEnabled: (checked: boolean) => {
+        settingsStore.update(SettingKey.ParticleEffectsEnabled, checked);
+    },
+    setLensflareEnabled: (checked: boolean) => {
+        settingsStore.update(SettingKey.LensflareEnabled, checked);
+    },
+    setSubsteps: (value: number) => {
+        settingsStore.update(SettingKey.Substeps, value);
+    },
+    setSfxVolume: (percent: number) => {
+        settingsStore.update(SettingKey.SfxVolume, percent / 100);
+    },
+    setMusicVolume: (percent: number) => {
+        const normalized = percent / 100;
+        settingsStore.update(SettingKey.MusicVolume, normalized);
+        ambientMusic.setVolume(normalized);
+    },
+});
 
 const optionsPanel = new OptionsPanel('options-panel');
 optionsPanel.initialize();

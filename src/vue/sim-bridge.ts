@@ -12,6 +12,7 @@ import {
 import { getBodyTypeLabel } from '../utilities/utilities';
 import type { ISimStateSnapshot } from '../interfaces';
 import { environmentState } from '../simulation/environment-state';
+import { SettingKey, settingsStore } from '../settings/settings-store';
 
 /**
  * Plain, serialisable snapshot of a simulation body. Vue reactivity cannot
@@ -180,6 +181,19 @@ export interface VueSimHooks {
     setSpaceTexture?: (texturePath: string) => void;
     /** Toggle natural star death (fuel burn → stellar remnants). */
     setStarDeathEnabled?: (checked: boolean) => void;
+
+    // ── Options (persisted user settings; same paths as the old panel) ──────
+    /** Toggle particle effects (persisted via settingsStore). */
+    setParticleEffectsEnabled?: (checked: boolean) => void;
+    /** Toggle lens flares (persisted via settingsStore). */
+    setLensflareEnabled?: (checked: boolean) => void;
+    /** Set physics substeps per frame (persisted via settingsStore). */
+    setSubsteps?: (value: number) => void;
+    /** Set sound effects volume, 0–100 percent (persisted via settingsStore). */
+    setSfxVolume?: (percent: number) => void;
+    /** Set background music volume, 0–100 percent. Also applied to the live
+     *  AmbientSoundManager, which only picks up changes via setVolume(). */
+    setMusicVolume?: (percent: number) => void;
 }
 
 const SNAPSHOT_INTERVAL_MS = 100;
@@ -222,6 +236,16 @@ export interface VueSimStore {
     spaceTextureFilename: string | null;
     starDeathEnabled: boolean;
 
+    // ── Options (persisted user settings, mirrored from settingsStore) ─────
+    particleEffectsEnabled: boolean;
+    lensflareEnabled: boolean;
+    /** Physics substeps per frame. */
+    substeps: number;
+    /** Sound effects volume as 0–100 percent. */
+    sfxVolumePercent: number;
+    /** Background music volume as 0–100 percent. */
+    musicVolumePercent: number;
+
     /** Id of the autopilot target body, or null when autopilot is off. */
     autopilotTargetId: string | null;
 
@@ -259,6 +283,13 @@ const state = reactive<VueSimStore>({
     spaceBackgroundVisible: true,
     spaceTextureFilename: null as string | null,
     starDeathEnabled: false,
+    // Options mirror settingsStore (persisted in localStorage) at startup; the
+    // Vue Options panel is the only live writer afterwards.
+    particleEffectsEnabled: settingsStore.settings.particleEffectsEnabled,
+    lensflareEnabled: settingsStore.settings.lensflareEnabled,
+    substeps: settingsStore.settings.substeps,
+    sfxVolumePercent: Math.round(settingsStore.settings.sfxVolume * 100),
+    musicVolumePercent: Math.round(settingsStore.settings.musicVolume * 100),
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
@@ -621,6 +652,59 @@ export function setStarDeathEnabled(checked: boolean): void {
         environmentState.starDeathEnabled = checked;
         refreshEnvironmentState();
     }
+}
+
+// ── Options actions (persisted user settings) ────────────────────────────
+
+/** Toggle particle effects (old panel's particleEffectsChange path). */
+export function setParticleEffectsEnabled(checked: boolean): void {
+    if (hookRegistry.setParticleEffectsEnabled) {
+        hookRegistry.setParticleEffectsEnabled(checked);
+    } else {
+        settingsStore.update(SettingKey.ParticleEffectsEnabled, checked);
+    }
+    state.particleEffectsEnabled = checked;
+}
+
+/** Toggle lens flares (old panel's lensflare path). */
+export function setLensflareEnabled(checked: boolean): void {
+    if (hookRegistry.setLensflareEnabled) {
+        hookRegistry.setLensflareEnabled(checked);
+    } else {
+        settingsStore.update(SettingKey.LensflareEnabled, checked);
+    }
+    state.lensflareEnabled = checked;
+}
+
+/** Set physics substeps per frame (old panel's substepsChange path). */
+export function setSubsteps(value: number): void {
+    if (hookRegistry.setSubsteps) {
+        hookRegistry.setSubsteps(value);
+    } else {
+        settingsStore.update(SettingKey.Substeps, value);
+    }
+    state.substeps = value;
+}
+
+/** Set sound effects volume, 0–100 percent (old panel's sfxVolumeChange path). */
+export function setSfxVolume(percent: number): void {
+    if (hookRegistry.setSfxVolume) {
+        hookRegistry.setSfxVolume(percent);
+    } else {
+        settingsStore.update(SettingKey.SfxVolume, percent / 100);
+    }
+    state.sfxVolumePercent = percent;
+}
+
+/** Set background music volume, 0–100 percent (old panel's musicVolumeChange
+ *  path; the registered hook also applies it to the live AmbientSoundManager). */
+export function setMusicVolume(percent: number): void {
+    if (hookRegistry.setMusicVolume) {
+        hookRegistry.setMusicVolume(percent);
+    } else {
+        settingsStore.update(SettingKey.MusicVolume, percent / 100);
+    }
+    state.musicVolumePercent = percent;
 }
 
 // ── Flight Controls actions ───────────────────────────────────────────────

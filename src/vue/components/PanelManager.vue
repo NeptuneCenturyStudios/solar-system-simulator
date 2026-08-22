@@ -19,7 +19,12 @@
                 <span class="material-symbols-outlined">music_note</span>
             </button>
 
-            <button class="btn toolbar-btn" title="Options">
+            <button
+                class="btn toolbar-btn"
+                :class="{ active: activePanel === ActivePanel.Options }"
+                title="Options"
+                @click="setActivePanel(ActivePanel.Options)"
+            >
                 <span class="material-symbols-outlined">settings</span>
             </button>
 
@@ -60,6 +65,7 @@
             <FlightControls v-if="activePanel === ActivePanel.FlightControls" />
             <AddEditBodyPanel v-if="activePanel === ActivePanel.BodyEditor" />
             <SolarSystemManagement v-if="activePanel === ActivePanel.SolarManagement" />
+            <OptionsPanel v-if="activePanel === ActivePanel.Options" />
         </div>
     </div>
 </template>
@@ -73,6 +79,7 @@ import SystemExplorer from '../components/SystemExplorer.vue';
 import FlightControls from '../components/FlightControls.vue';
 import AddEditBodyPanel from '../components/AddEditBodyPanel.vue';
 import SolarSystemManagement from '../components/SolarSystemManagement.vue';
+import OptionsPanel from '../components/OptionsPanel.vue';
 
 const isExpanded = computed(() => {
     // TODO: Determine if the panel manager should be expanded based on the UI state. Currently, it is expanded if the explorer is visible.
