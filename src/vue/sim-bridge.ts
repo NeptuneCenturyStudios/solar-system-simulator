@@ -13,6 +13,7 @@ import { getBodyTypeLabel } from '../utilities/utilities';
 import type { ISimStateSnapshot } from '../interfaces';
 import { environmentState } from '../simulation/environment-state';
 import { SettingKey, settingsStore } from '../settings/settings-store';
+import type { PlaylistEntry } from '../utilities/playlist';
 
 /**
  * Plain, serialisable snapshot of a simulation body. Vue reactivity cannot
@@ -194,6 +195,29 @@ export interface VueSimHooks {
     /** Set background music volume, 0–100 percent. Also applied to the live
      *  AmbientSoundManager, which only picks up changes via setVolume(). */
     setMusicVolume?: (percent: number) => void;
+
+    // ── Playlist (same sim paths as the old playlist panel) ─────────────────
+    /** Snapshot of the shuffled playlist + current playback state. */
+    getPlaylistSnapshot?: () => PlaylistSnapshot;
+    /** Skip to the previous track. */
+    playlistPrev?: () => void;
+    /** Skip to the next track. */
+    playlistNext?: () => void;
+    /** Pause the current track, or resume if paused. */
+    playlistTogglePlayPause?: () => void;
+    /** Immediately play the track at the given shuffled-playlist index. */
+    playlistSelectTrack?: (index: number) => void;
+}
+
+/** Snapshot of the background-music playlist state, mirrored into
+ *  `playlistStore` for the Vue PlaylistPanel. */
+export interface PlaylistSnapshot {
+    /** Shuffled playlist entries (same order as the legacy panel). */
+    entries: PlaylistEntry[];
+    /** Index of the current track in the shuffled list, or -1 if none. */
+    currentIndex: number;
+    /** True when a track is actively playing (not paused). */
+    isPlaying: boolean;
 }
 
 const SNAPSHOT_INTERVAL_MS = 100;
@@ -317,14 +341,27 @@ const bodyEditorState = reactive<BodyEditorStore>({
 /** Reactive store consumed by AddEditBodyPanel. */
 export const bodyEditorStore: BodyEditorStore = bodyEditorState;
 
+/** Reactive store backing the Playlist panel. Mirrors the live
+ *  AmbientSoundManager state (shuffled entries + current track + playing). */
+export interface PlaylistStore {
+    entries: PlaylistEntry[];
+    currentIndex: number;
+    isPlaying: boolean;
+}
+
+const playlistState = reactive<PlaylistStore>({
+    entries: [] as PlaylistEntry[],
+    currentIndex: -1,
+    isPlaying: false,
+});
+
+/** Reactive store consumed by PlaylistPanel. */
+export const playlistStore: PlaylistStore = playlistState;
+
 function snapshotBodies(): void {
     const selected = (() => {
         const focus = cameraState.focusBody;
-        if (
-            focus &&
-            !focus._isDisposed &&
-            simulationState.bodies.some((b) => b === focus)
-        ) {
+        if (focus && !focus._isDisposed && simulationState.bodies.some((b) => b === focus)) {
             return focus;
         }
         return null;
@@ -366,11 +403,7 @@ function refreshCameraState(): void {
     state.surfaceEnabled = surface?.isEnabled ?? false;
 
     const ship = flightState.knownShip;
-    state.hasKnownShip = !!(
-        ship &&
-        !ship._isDisposed &&
-        simulationState.bodies.includes(ship)
-    );
+    state.hasKnownShip = !!(ship && !ship._isDisposed && simulationState.bodies.includes(ship));
     state.knownShipTypeId = state.hasKnownShip ? (ship?.shipTypeId ?? null) : null;
     state.isAdvancedMode = flightState.isAdvancedMode;
 }
@@ -383,11 +416,26 @@ function refreshEnvironmentState(): void {
     state.starDeathEnabled = environmentState.starDeathEnabled;
 }
 
+/** Copy the ambient-music playlist state into the reactive store for the
+ *  Vue PlaylistPanel. */
+function refreshPlaylistState(): void {
+    const snapshot = hookRegistry.getPlaylistSnapshot?.();
+    if (!snapshot) return;
+    // Copy entries only when the shuffled list actually changes (once per
+    // session) so Vue doesn't re-render the whole list every poll tick.
+    if (snapshot.entries.length !== playlistState.entries.length) {
+        playlistState.entries = snapshot.entries;
+    }
+    playlistState.currentIndex = snapshot.currentIndex;
+    playlistState.isPlaying = snapshot.isPlaying;
+}
+
 function refreshAll(): void {
     refreshScalarState();
     snapshotBodies();
     refreshCameraState();
     refreshEnvironmentState();
+    refreshPlaylistState();
 }
 
 let intervalId: number | null = null;
@@ -705,6 +753,28 @@ export function setMusicVolume(percent: number): void {
         settingsStore.update(SettingKey.MusicVolume, percent / 100);
     }
     state.musicVolumePercent = percent;
+}
+
+// ── Playlist actions (same event paths as the old playlist panel) ────────
+
+/** Skip to the previous track. */
+export function playlistPrev(): void {
+    hookRegistry.playlistPrev?.();
+}
+
+/** Skip to the next track. */
+export function playlistNext(): void {
+    hookRegistry.playlistNext?.();
+}
+
+/** Pause the current track, or resume if paused. */
+export function playlistTogglePlayPause(): void {
+    hookRegistry.playlistTogglePlayPause?.();
+}
+
+/** Immediately play the track at the given shuffled-playlist index. */
+export function playlistSelectTrack(index: number): void {
+    hookRegistry.playlistSelectTrack?.(index);
 }
 
 // ── Flight Controls actions ───────────────────────────────────────────────

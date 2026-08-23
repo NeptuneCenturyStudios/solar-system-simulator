@@ -2811,7 +2811,6 @@ function setFocusBody(bodyOrNull: Body | null, { zoom = false } = {}) {
         // Look At OFF: selection should not affect orbit anchor.
         controls.target.copy(NONE_FOCUS_POSITION);
     }
-
 }
 
 function getFocusObject() {
@@ -2886,8 +2885,12 @@ registerVueSimHooks({
         else surfaceCam.enter(selectedBody || manuallySelectedBody);
         dispatchSimStateChange();
     },
-    zoomIn: () => { zoomRelativeToTarget(getZoomTarget(), 0.5); },
-    zoomOut: () => { zoomRelativeToTarget(getZoomTarget(), 2.0); },
+    zoomIn: () => {
+        zoomRelativeToTarget(getZoomTarget(), 0.5);
+    },
+    zoomOut: () => {
+        zoomRelativeToTarget(getZoomTarget(), 2.0);
+    },
     setLockToSun: (checked: boolean) => {
         cameraState.lockToSun = checked;
         dispatchSimStateChange();
@@ -3067,15 +3070,12 @@ if (vueUiRoot) {
     // body list bubbles up to the window-level zoom handler, which calls
     // preventDefault() and zooms the canvas instead. `stopPropagation` here
     // (not preventDefault) lets the list scroll normally.
-    ['mousedown', 'mouseup', 'click', 'wheel', 'keydown', 'keyup'].forEach(
-        (eventName) => {
-            vueUiRoot.addEventListener(eventName, (e) => {
-                e.stopPropagation();
-            });
-        }
-    );
+    ['mousedown', 'mouseup', 'click', 'wheel', 'keydown', 'keyup'].forEach((eventName) => {
+        vueUiRoot.addEventListener(eventName, (e) => {
+            e.stopPropagation();
+        });
+    });
 }
-
 
 // NOTE: Preset camera buttons were removed from the UI (replaced with toggles + bodies table).
 // The old `cameraChange` event path is intentionally removed to reduce dead code.
@@ -3175,9 +3175,7 @@ registerVueSimHooks({
 
         const vel = body.velocity;
         const horizontalSpeed = vel ? Math.sqrt(vel.x * vel.x + vel.z * vel.z) : 0;
-        const orbitalAngle = vel
-            ? ((Math.atan2(vel.z, vel.x) * 180) / Math.PI + 360) % 360
-            : 0;
+        const orbitalAngle = vel ? ((Math.atan2(vel.z, vel.x) * 180) / Math.PI + 360) % 360 : 0;
         const inclination = vel ? (Math.atan2(vel.y, horizontalSpeed) * 180) / Math.PI : 0;
 
         // Asteroids/comets are plain Body instances (no rotation); everything
@@ -3195,7 +3193,10 @@ registerVueSimHooks({
                     const b = Math.max(0, Math.min(255, Math.round(rgb.b * 255)));
                     return (
                         '#' +
-                        [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('').toLowerCase()
+                        [r, g, b]
+                            .map((n) => n.toString(16).padStart(2, '0'))
+                            .join('')
+                            .toLowerCase()
                     );
                 }
                 if (typeof c === 'number' && isFinite(c)) {
@@ -3207,10 +3208,11 @@ registerVueSimHooks({
             return '#ffffff';
         };
 
-        const colorValue = isAsteroidBody || isCometBody
-            ? (body as Body & { baseColor?: unknown; color?: unknown }).baseColor ||
-              (body as Body & { baseColor?: unknown; color?: unknown }).color
-            : null;
+        const colorValue =
+            isAsteroidBody || isCometBody
+                ? (body as Body & { baseColor?: unknown; color?: unknown }).baseColor ||
+                  (body as Body & { baseColor?: unknown; color?: unknown }).color
+                : null;
 
         return {
             id: body.id,
@@ -3614,11 +3616,6 @@ function spawnShip(targetShip?: Spaceship) {
 
 window.addEventListener('mousemove', surfaceCam.onMouseMove, { passive: true });
 
-
-
-
-
-
 uiManager.managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = checked;
@@ -3649,9 +3646,6 @@ if (enableSkydomeCheckbox) {
         environmentState.spaceBackgroundVisible = checked;
     };
 }
-
-
-
 
 optionsPanel.on('sfxVolumeChange', () => {
     // settingsStore.settings.sfxVolume is already updated by the panel
@@ -3697,6 +3691,26 @@ uiManager.playlistPanel.on('playPause', () => {
 
 uiManager.playlistPanel.on('trackSelected', (index: number) => {
     ambientMusic.playTrackAt(index);
+});
+
+// ── Vue Playlist panel wiring (same paths as the old panel above) ────────
+
+registerVueSimHooks({
+    getPlaylistSnapshot: () => ({
+        entries: ambientMusic.getShuffledPlaylist(),
+        currentIndex: ambientMusic.getCurrentTrackIndex(),
+        isPlaying: !ambientMusic.isPaused,
+    }),
+    playlistPrev: () => ambientMusic.skipToPrev(),
+    playlistNext: () => ambientMusic.skipToNext(),
+    playlistTogglePlayPause: () => {
+        if (ambientMusic.isPaused) {
+            ambientMusic.resume();
+        } else {
+            ambientMusic.pause();
+        }
+    },
+    playlistSelectTrack: (index: number) => ambientMusic.playTrackAt(index),
 });
 
 uiManager.on('timeScaleChange', ({ value }: { value: number }) => {
@@ -3844,7 +3858,19 @@ interface IApplyBodyEditParams {
 function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
     if (!body || !simulationState.bodies.includes(body) || body._isDisposed) return;
 
-    const { name, mass, temperature, lightIntensity, radius, velocity, orbitalAngle, inclination, color, editTilt, editAzimuth } = params;
+    const {
+        name,
+        mass,
+        temperature,
+        lightIntensity,
+        radius,
+        velocity,
+        orbitalAngle,
+        inclination,
+        color,
+        editTilt,
+        editAzimuth,
+    } = params;
 
     // Update name
     if (name !== null && name !== '') {
@@ -3918,13 +3944,11 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         const currentHorizSpeed = Math.sqrt(
             currentVel.x * currentVel.x + currentVel.z * currentVel.z
         );
-        const currentInclinationDeg =
-            (Math.atan2(currentVel.y, currentHorizSpeed) * 180) / Math.PI;
+        const currentInclinationDeg = (Math.atan2(currentVel.y, currentHorizSpeed) * 180) / Math.PI;
 
         const resolvedSpeed = velocity !== null ? velocity : currentSpeed;
         const resolvedAngleDeg = orbitalAngle !== null ? orbitalAngle : currentAngleDeg;
-        const resolvedInclinationDeg =
-            inclination !== null ? inclination : currentInclinationDeg;
+        const resolvedInclinationDeg = inclination !== null ? inclination : currentInclinationDeg;
 
         const angleRad = (resolvedAngleDeg * Math.PI) / 180;
         const inclinationRad = (resolvedInclinationDeg * Math.PI) / 180;
@@ -3963,10 +3987,7 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
             new THREE.Vector3(1, 0, 0),
             tiltRad
         );
-        const azQuat = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 1, 0),
-            azRad
-        );
+        const azQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), azRad);
         body.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
         if (body.rings) {
             body.rings.position.copy(body.mesh.position);
@@ -4009,9 +4030,10 @@ uiManager.managementPanel.on(
     }) => {
         if (!body) return;
 
-        const radius = uiManager.managementPanel && uiManager.managementPanel.editRadiusSlider
-            ? parseFloat((uiManager.managementPanel.editRadiusSlider as HTMLInputElement).value)
-            : null;
+        const radius =
+            uiManager.managementPanel && uiManager.managementPanel.editRadiusSlider
+                ? parseFloat((uiManager.managementPanel.editRadiusSlider as HTMLInputElement).value)
+                : null;
 
         applyBodyEditToBody(body, {
             name,
@@ -4430,7 +4452,6 @@ if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) kuiperBeltPoint
 environmentState.kuiperBeltVisible = false;
 if (uiManager.managementPanel.enableKuiperBeltCheckbox)
     uiManager.managementPanel.enableKuiperBeltCheckbox.checked = false;
-
 
 function handleBodyBecameInvalid(body: Body | null | undefined) {
     if (!body) return;

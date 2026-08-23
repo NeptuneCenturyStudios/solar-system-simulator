@@ -607,6 +607,7 @@ function onClose(): void {
 .vue-ui-body-editor-fields {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: auto;
+    min-width: 0;
 }
 </style>

@@ -8,6 +8,8 @@ export enum ActivePanel {
     BodyEditor = 'bodyEditor',
     /** Solar System Management panel (environment settings: kuiper belt, skydome, star death, gravity). */
     SolarManagement = 'solarManagement',
+    /** Music Playlist panel (view/control the shuffled background-music playlist). */
+    Playlist = 'playlist',
 }
 
 export interface BodyEditorState {

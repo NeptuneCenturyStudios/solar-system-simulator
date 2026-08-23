@@ -15,7 +15,7 @@
     --new-ui-panel-header-color: #00ffcc;
     --new-ui-shadow: 0 18px 50px rgba(0, 0, 0, 0.65), 0 0 22px rgba(0, 255, 204, 0.18);
     --new-ui-button-bg: rgba(0, 68, 136, 0.6);
-    --new-ui-input-bg: rgba(0, 68, 136, 0.6);
+    --new-ui-input-bg: rgba(6, 27, 47, 0.6);
     --new-ui-toolbar-button-shadow: 0 0 1rem rgba(78, 123, 168, 0.5);
     --new-ui-toolbar-button-hover-bg: rgba(27, 57, 87, 0.5);
     --new-ui-toolbar-button-active-bg: rgba(27, 57, 87, 0.5);
@@ -88,8 +88,7 @@
     gap: var(--new-ui-gap-2) !important;
 }
 
-.gap-1
-{
+.gap-1 {
     gap: var(--new-ui-gap-1) !important;
 }
 
@@ -106,6 +105,19 @@
 }
 
 /* Reset default styles and set up base styles */
+* {
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+input[type="range"] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
 body {
     margin: 0;
     overflow: hidden;
@@ -134,8 +146,6 @@ body {
     width: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 /* Main ui panels */
@@ -303,8 +313,6 @@ body {
     border-radius: var(--new-ui-table-border-radius);
     background: rgba(0, 34, 68, 0.35);
     margin-bottom: 12px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 /* Chromium/Edge/Safari */
@@ -913,6 +921,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 .vue-ui-panel-manager.expanded .vue-ui-panel-manager-panels {
     padding: var(--new-ui-gap-3) 0 var(--new-ui-gap-3) var(--new-ui-gap-3);
     flex: 1;
+    min-width: 0;
 }
 
 .vue-ui-card {
@@ -931,6 +940,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-width: 0;
 }
 
 .vue-ui-card-header {
@@ -1061,8 +1071,6 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     flex-direction: column;
     margin-bottom: var(--new-ui-gap-3);
     gap: var(--new-ui-gap-1);
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .vue-ui-body-list::-webkit-scrollbar {
@@ -1173,12 +1181,12 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     }
 
     .vue-ui-panel-manager {
-        width: 25rem;
+        width: 26rem;
     }
 
     .toolbar.toolbar-bottom {
         align-self: flex-start;
-        width: 25rem;
+        width: 26rem;
     }
 
     #ui-container {
@@ -1234,7 +1242,6 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    max-height: 18rem;
     margin-bottom: var(--new-ui-gap-3);
     gap: 2px;
 }
@@ -1313,8 +1320,6 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     border: 1px solid var(--new-ui-border);
     box-shadow: var(--new-ui-shadow);
     pointer-events: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 .vue-modal-card:focus {
