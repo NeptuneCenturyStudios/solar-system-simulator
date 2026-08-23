@@ -94,3 +94,7 @@ src/
 - **Static assets** (textures, models, sounds) are copied to dist via `vite-plugin-static-copy`
 - Run `npm run tsc` before committing to catch type errors
 - Run `npm run lint` and `npm run format` to keep code clean
+
+## Debugging and Verification
+
+- User will verify runtime manually
