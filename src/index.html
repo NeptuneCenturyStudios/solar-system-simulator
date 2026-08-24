@@ -13,7 +13,6 @@
     </head>
 
     <body>
-
         <!-- Vue UI overlay root (new UI, developed in parallel with the existing UI) -->
         <div id="vue-ui-root"></div>
 
@@ -42,10 +41,6 @@
 
                     <button id="btn-playlist" class="btn toolbar-btn" title="Music Playlist">
                         <span class="material-symbols-outlined">music_note</span>
-                    </button>
-
-                    <button id="btn-performance-options" class="btn toolbar-btn" title="Options">
-                        <span class="material-symbols-outlined">settings</span>
                     </button>
 
                     <button
@@ -79,103 +74,6 @@
 
                 <!-- UI Panels -->
                 <div id="ui-container">
-
-                    <div id="options-panel" class="ui-panel">
-                        <div class="panel-header">
-                            Options
-                            <button
-                                id="btn-close-options-panel"
-                                class="old-ui btn-danger btn-icon-only ml-auto mb-0"
-                                title="Close Options"
-                            >
-                                <span class="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-                        <label class="checkbox-row">
-                            <input type="checkbox" id="enableParticleEffects" checked /> Enable
-                            Particle Effects
-                        </label>
-
-                        <label class="checkbox-row">
-                            <input type="checkbox" id="enableLensflare" checked /> Lens Flares
-                        </label>
-
-                        <div class="control-group">
-                            <label
-                                >Physics Accuracy
-                                <span id="substeps-val" class="val-display">64</span></label
-                            >
-                            <div class="slider-row">
-                                <input
-                                    type="range"
-                                    id="substepsSlider"
-                                    min="1"
-                                    max="512"
-                                    step="1"
-                                    value="64"
-                                    title="Controls how many physics steps are calculated per frame. Higher values improve orbital accuracy but use more CPU. Lower values are faster but less precise."
-                                />
-                                <button
-                                    class="old-ui btn-slider-reset"
-                                    id="substepsResetBtn"
-                                    title="Reset to default (64)"
-                                >
-                                    <span class="material-symbols-outlined">replay</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="control-group">
-                            <label
-                                >Sound Effects Volume
-                                <span id="sfx-volume-val" class="val-display">100%</span></label
-                            >
-                            <div class="slider-row">
-                                <input
-                                    type="range"
-                                    id="sfxVolumeSlider"
-                                    min="0"
-                                    max="100"
-                                    step="1"
-                                    value="100"
-                                    title="Controls the volume of weapon sounds, impacts, and warp loop effects."
-                                />
-                                <button
-                                    class="old-ui btn-slider-reset"
-                                    id="sfxVolumeResetBtn"
-                                    title="Reset to 100%"
-                                >
-                                    <span class="material-symbols-outlined">replay</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="control-group">
-                            <label
-                                >Background Music Volume
-                                <span id="music-volume-val" class="val-display">50%</span></label
-                            >
-                            <div class="slider-row">
-                                <input
-                                    type="range"
-                                    id="musicVolumeSlider"
-                                    min="0"
-                                    max="100"
-                                    step="1"
-                                    value="50"
-                                    title="Controls the volume of background music."
-                                />
-                                <button
-                                    class="old-ui btn-slider-reset"
-                                    id="musicVolumeResetBtn"
-                                    title="Reset to 50%"
-                                >
-                                    <span class="material-symbols-outlined">replay</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
                     <div id="flight-controls-panel" class="ui-panel">
                         <div class="panel-header">
                             Flight Controls

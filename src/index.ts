@@ -139,7 +139,6 @@ import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simula
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
 import { UIManager } from './ui/ui-manager';
-import { OptionsPanel } from './ui/options-panel';
 import { runAnimationLoop, AnimationContext } from './simulation/animation-loop';
 import { registerCustomEventListeners } from './events/custom-event-listeners';
 
@@ -2980,27 +2979,12 @@ registerVueSimHooks({
     },
 });
 
-const optionsPanel = new OptionsPanel('options-panel');
-optionsPanel.initialize();
+
 
 // Wire Flight Controls button and panel events
 
 const flightControlsPanel = uiManager.flightControlsPanel;
-const performanceOptionsBtn = document.getElementById('btn-performance-options');
-if (performanceOptionsBtn) {
-    performanceOptionsBtn.onclick = () => {
-        const visible = optionsPanel.toggle();
-        if (visible) {
-            performanceOptionsBtn.classList.add('active');
-        } else {
-            performanceOptionsBtn.classList.remove('active');
-        }
-    };
 
-    optionsPanel.on('closed', () => {
-        performanceOptionsBtn.classList.remove('active');
-    });
-}
 flightControlsPanel.on('spawnShip', () => spawnShip());
 flightControlsPanel.on('toggleView', () => {
     flightState.isCockpitView = !flightState.isCockpitView;
@@ -3646,15 +3630,6 @@ if (enableSkydomeCheckbox) {
         environmentState.spaceBackgroundVisible = checked;
     };
 }
-
-optionsPanel.on('sfxVolumeChange', () => {
-    // settingsStore.settings.sfxVolume is already updated by the panel
-    // sfxVolume is read live by audio.ts playBuffer() and playSoundEffect() each call
-});
-
-optionsPanel.on('musicVolumeChange', ({ value }: { value: number }) => {
-    ambientMusic.setVolume(value);
-});
 
 // ── Playlist panel wiring ────────────────────────────────────────────────
 
