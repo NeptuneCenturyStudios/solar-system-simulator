@@ -5,17 +5,11 @@ export class UIManager extends Panel {
     toolbarLeft: HTMLElement | null = null;
 
     // Left toolbar buttons
-    btnDonate: HTMLButtonElement | null = null;
-    btnEditSolarSystem: HTMLButtonElement | null = null;
-    btnPlaylist: HTMLButtonElement | null = null;
+
     btnTextureGenerator: HTMLButtonElement | null = null;
-    btnReset: HTMLButtonElement | null = null;
 
     // Panels
     textureGeneratorPanel: TextureGeneratorPanel;
-
-    // State variables
-    timeScale: number = 1;
 
     constructor(elementId: string | HTMLElement) {
         super(elementId);
@@ -30,34 +24,12 @@ export class UIManager extends Panel {
 
         this.toolbarLeft = document.getElementById('toolbar-left') as HTMLElement;
 
-        // Bottom toolbar buttons
-        this.btnDonate = document.getElementById('btn-donate') as HTMLButtonElement;
-        this.btnEditSolarSystem = document.getElementById(
-            'btn-edit-solar-system'
-        ) as HTMLButtonElement;
-        this.btnPlaylist = document.getElementById('btn-playlist') as HTMLButtonElement;
         this.btnTextureGenerator = document.getElementById(
             'btn-texture-generator'
         ) as HTMLButtonElement;
-        this.btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
 
         // Block events on UI elements to prevent them from affecting the 3D scene
         this.blockUIEvents(this.toolbarLeft);
-
-
-        // Left toolbar button events
-        if (this.btnDonate) {
-            this.btnDonate.onclick = () => {
-                window.open('https://ko-fi.com/neptunecentury', '_blank', 'noopener,noreferrer');
-            };
-        }
-
-
-        if (this.btnReset) {
-            this.btnReset.onclick = () => {
-                this.emit('reset');
-            };
-        }
 
         // Listen to panel events to update button states
 
@@ -76,7 +48,6 @@ export class UIManager extends Panel {
             this.btnTextureGenerator?.classList.remove('active');
         });
     }
-
 
     setLeftToolbarVisibility(visible: boolean) {
         if (this.toolbarLeft) {
