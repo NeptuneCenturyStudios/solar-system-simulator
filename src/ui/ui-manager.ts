@@ -5,14 +5,6 @@ export class UIManager extends Panel {
     toolbarBottom: HTMLElement | null = null;
     toolbarLeft: HTMLElement | null = null;
 
-    // Bottom toolbar elements
-    toggleMenuBtn: HTMLButtonElement | null = null;
-    btnOpenExplorer: HTMLButtonElement | null = null;
-    btnNormalSpeed: HTMLButtonElement | null = null;
-    btnForwardSpeed: HTMLButtonElement | null = null;
-    btnReverseSpeed: HTMLButtonElement | null = null;
-    btnPause: HTMLButtonElement | null = null;
-
     // Left toolbar buttons
     btnDonate: HTMLButtonElement | null = null;
     btnEditSolarSystem: HTMLButtonElement | null = null;
@@ -40,14 +32,6 @@ export class UIManager extends Panel {
         this.toolbarLeft = document.getElementById('toolbar-left') as HTMLElement;
 
         // Bottom toolbar buttons
-        this.toggleMenuBtn = document.getElementById('btn-toggle-menu') as HTMLButtonElement;
-        this.btnOpenExplorer = document.getElementById('btn-open-explorer') as HTMLButtonElement;
-        this.btnNormalSpeed = document.getElementById('btn-normal-speed') as HTMLButtonElement;
-        this.btnForwardSpeed = document.getElementById('btn-forward-speed') as HTMLButtonElement;
-        this.btnReverseSpeed = document.getElementById('btn-reverse-speed') as HTMLButtonElement;
-        this.btnPause = document.getElementById('btn-pause') as HTMLButtonElement;
-
-        // Bottom toolbar buttons
         this.btnDonate = document.getElementById('btn-donate') as HTMLButtonElement;
         this.btnEditSolarSystem = document.getElementById(
             'btn-edit-solar-system'
@@ -61,43 +45,6 @@ export class UIManager extends Panel {
         // Block events on UI elements to prevent them from affecting the 3D scene
         this.blockUIEvents(this.toolbarBottom);
         this.blockUIEvents(this.toolbarLeft);
-
-        // Set up event listeners for buttons and other interactive elements
-        if (this.toggleMenuBtn) {
-            this.toggleMenuBtn.onclick = () => {
-                this.setLeftToolbarVisibility(!this.toolbarLeft?.classList.contains('visible'));
-            };
-        }
-
-        // Set up event listeners for bottom toolbar buttons
-        if (this.btnReverseSpeed) {
-            this.btnReverseSpeed.onclick = () => {
-                this.timeScale /= 2; // Halve the time scale for reverse/slow
-                if (this.timeScale < 0.01) this.timeScale = 0.01; // Prevent time scale from getting too small
-                this.emit('timeScaleChange', { value: this.timeScale });
-            };
-        }
-
-        if (this.btnPause) {
-            this.btnPause.onclick = () => {
-                this.emit('pause');
-            };
-        }
-
-        if (this.btnNormalSpeed) {
-            this.btnNormalSpeed.onclick = () => {
-                this.timeScale = 1;
-                this.emit('timeScaleChange', { value: this.timeScale });
-            };
-        }
-
-        if (this.btnForwardSpeed) {
-            this.btnForwardSpeed.onclick = () => {
-                this.timeScale *= 2; // Double the time scale for forward speed
-                if (this.timeScale > 2 ** 10) this.timeScale = 2 ** 10; // Cap the time scale to prevent it from getting too high
-                this.emit('timeScaleChange', { value: this.timeScale });
-            };
-        }
 
 
         // Left toolbar button events
@@ -132,15 +79,6 @@ export class UIManager extends Panel {
         });
     }
 
-    setPauseState(isPaused: boolean) {
-        if (this.btnPause) {
-            if (isPaused) {
-                this.btnPause.classList.add('active');
-            } else {
-                this.btnPause.classList.remove('active');
-            }
-        }
-    }
 
     setLeftToolbarVisibility(visible: boolean) {
         if (this.toolbarLeft) {

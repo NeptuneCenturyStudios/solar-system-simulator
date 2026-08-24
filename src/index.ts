@@ -1743,8 +1743,6 @@ function togglePause() {
         simulationState.savedTimeScale = simulationState.timeScale;
         simulationState.timeScale = 0;
 
-        uiManager.setPauseState(true);
-        // Keep slider enabled so user can adjust speed while paused
     } else {
         // Restore the saved speed (which may have been adjusted while paused)
         simulationState.timeScale = simulationState.savedTimeScale;
