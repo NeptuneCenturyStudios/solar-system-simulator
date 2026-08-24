@@ -2997,16 +2997,21 @@ if (uiContainer) {
     });
 }
 
-// Block events from the Vue UI overlay so interactions never reach the 3D scene.
-// (The Vue UI sits above the old toolbar/panels, so without this, clicks on it
-// would rotate the camera / select bodies underneath.)
+// Block pointer/wheel events from the Vue UI overlay so clicks and scrolling
+// never reach the 3D scene. (The Vue UI sits above the old toolbar/panels, so
+// without this, clicks on it would rotate the camera / select bodies underneath.)
+//
+// NOTE: keyboard events are intentionally NOT blocked here. The window-level
+// key handlers run in capture phase and decide for themselves whether a key
+// belongs to the sim (flight/camera) or to a typing target (isEditableTarget),
+// so WASD works no matter which panel last had focus.
 const vueUiRoot = document.getElementById('vue-ui-root');
 if (vueUiRoot) {
     // `wheel` must be blocked too: without it, scrolling the System Explorer
     // body list bubbles up to the window-level zoom handler, which calls
     // preventDefault() and zooms the canvas instead. `stopPropagation` here
     // (not preventDefault) lets the list scroll normally.
-    ['mousedown', 'mouseup', 'click', 'wheel', 'keydown', 'keyup'].forEach((eventName) => {
+    ['mousedown', 'mouseup', 'click', 'wheel'].forEach((eventName) => {
         vueUiRoot.addEventListener(eventName, (e) => {
             e.stopPropagation();
         });
@@ -3513,6 +3518,14 @@ function spawnShip(targetShip?: Spaceship) {
         speedSprite.visible = true;
     }
 
+    // Release DOM focus from whichever UI element triggered entry (e.g. the
+    // System Explorer "Enter Ship" icon button) so focus doesn't linger inside
+    // the overlay during flight. Keyboard routing itself no longer depends on
+    // focus location; this is hygiene for focus outlines and browser defaults.
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+        document.activeElement.blur();
+    }
+
     // Pointer lock so the mouse steers freely without leaving the window
     renderer.domElement.requestPointerLock();
     controls.enabled = false;
@@ -3864,9 +3877,23 @@ function deleteSelectedBody() {
     return true;
 }
 
-// Keyboard controls for free camera
-window.addEventListener('keydown', (e) => {
-    const key = e.key.toLowerCase();
+// Keyboard controls for free camera / flight mode.
+// Registered in CAPTURE phase so these handlers run BEFORE any UI-level
+// stopPropagation() handlers (Vue overlay, legacy panels): keys reach the sim
+// regardless of which UI element has focus. Typing targets (search box,
+// inputs, selects, contenteditable) are excluded explicitly below instead of
+// relying on events being blocked somewhere in the UI.
+window.addEventListener(
+    'keydown',
+    (e) => {
+        // While a modal is open, let it own the keyboard entirely.
+        if (modalBlocksInput()) return;
+
+        // Never hijack keys while the user is typing in a form control
+        // (System Explorer search box, ship-type dropdown, etc.).
+        if (isEditableTarget(e.target)) return;
+
+        const key = e.key.toLowerCase();
 
     // Arrow-key movement for selected bodies when the gizmo is visible.
     if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
@@ -4020,8 +4047,13 @@ window.addEventListener('keydown', (e) => {
     if (key === 'delete') {
         deleteSelectedBody();
     }
-});
+    },
+    true
+);
 
+// Keyup runs in capture phase with NO guards: held-key flags must ALWAYS be
+// cleared, otherwise a key pressed before focusing a text field (or opening a
+// modal) would get stuck "down" forever.
 window.addEventListener('keyup', (e) => {
     const key = e.key.toLowerCase();
     if (key === 'w') keys.w = false;
@@ -4069,7 +4101,9 @@ window.addEventListener('keyup', (e) => {
             velArc.hideAll();
         }
     }
-});
+    },
+    true
+);
 
 window.addEventListener('mousedown', onMouseDown);
 window.addEventListener('mousemove', onMouseMove);
@@ -4361,6 +4395,19 @@ const _origOnMouseUp = onMouseUp;
 
 function modalBlocksInput() {
     return startupModalIsVisible() || proceduralModalIsVisible() || aboutModalIsVisible();
+}
+
+/**
+ * Whether a keyboard event's target is a text-editing control.
+ * Used by the capture-phase window key handlers so WASD / Space / Esc / etc.
+ * flow through to the sim, but typing in the System Explorer search box or any
+ * other form field is left alone.
+ */
+function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return true;
+    if (target instanceof HTMLSelectElement) return true;
+    return target.isContentEditable;
 }
 
 function onMouseDownWrapped(e: MouseEvent) {
