@@ -2,7 +2,6 @@ import { Panel } from './panel';
 import { TextureGeneratorPanel } from './texture-generator-panel';
 
 export class UIManager extends Panel {
-    toolbarBottom: HTMLElement | null = null;
     toolbarLeft: HTMLElement | null = null;
 
     // Left toolbar buttons
@@ -28,7 +27,7 @@ export class UIManager extends Panel {
 
     initialize(): void {
         // Add event listeners for menu buttons
-        this.toolbarBottom = document.getElementById('toolbar-bottom') as HTMLElement;
+
         this.toolbarLeft = document.getElementById('toolbar-left') as HTMLElement;
 
         // Bottom toolbar buttons
@@ -43,7 +42,6 @@ export class UIManager extends Panel {
         this.btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
 
         // Block events on UI elements to prevent them from affecting the 3D scene
-        this.blockUIEvents(this.toolbarBottom);
         this.blockUIEvents(this.toolbarLeft);
 
 
