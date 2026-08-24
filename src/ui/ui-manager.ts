@@ -1,7 +1,6 @@
 import { FlightControlsPanel } from './flight-controls-panel';
 import { ManagementPanel } from './management-panel';
 import { Panel } from './panel';
-import { PlaylistPanel } from './playlist-panel';
 import { TextureGeneratorPanel } from './texture-generator-panel';
 
 export class UIManager extends Panel {
@@ -27,7 +26,6 @@ export class UIManager extends Panel {
     // Panels
     flightControlsPanel: FlightControlsPanel;
     managementPanel: ManagementPanel;
-    playlistPanel: PlaylistPanel;
     textureGeneratorPanel: TextureGeneratorPanel;
 
     // State variables
@@ -39,12 +37,10 @@ export class UIManager extends Panel {
         // Initialize control panels
         this.flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
         this.managementPanel = new ManagementPanel('management-panel');
-        this.playlistPanel = new PlaylistPanel('playlist-panel');
         this.textureGeneratorPanel = new TextureGeneratorPanel('texture-generator-panel');
 
         this.flightControlsPanel.initialize();
         this.managementPanel.initialize();
-        this.playlistPanel.initialize();
         this.textureGeneratorPanel.initialize();
     }
 
@@ -153,18 +149,6 @@ export class UIManager extends Panel {
             };
         }
 
-        if (this.btnPlaylist) {
-            this.btnPlaylist.onclick = () => {
-                const visible = this.playlistPanel.toggle();
-                if (visible) {
-                    this.btnPlaylist?.classList.add('active');
-                    this.emit('playlistOpened');
-                } else {
-                    this.btnPlaylist?.classList.remove('active');
-                }
-            };
-        }
-
         // Listen to panel events to update button states
         this.managementPanel.on('closed', () => {
             this.btnEditSolarSystem?.classList.remove('active');
@@ -172,10 +156,6 @@ export class UIManager extends Panel {
 
         this.flightControlsPanel.on('closed', () => {
             this.btnFlightControls?.classList.remove('active');
-        });
-
-        this.playlistPanel.on('closed', () => {
-            this.btnPlaylist?.classList.remove('active');
         });
 
         if (this.btnTextureGenerator) {

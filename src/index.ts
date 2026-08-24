@@ -3631,43 +3631,6 @@ if (enableSkydomeCheckbox) {
     };
 }
 
-// ── Playlist panel wiring ────────────────────────────────────────────────
-
-ambientMusic.onTrackChange = (index: number) => {
-    uiManager.playlistPanel.setCurrentTrack(index);
-    uiManager.playlistPanel.setPlayingState(true);
-};
-
-uiManager.on('playlistOpened', () => {
-    uiManager.playlistPanel.setPlaylist(
-        ambientMusic.getShuffledPlaylist(),
-        ambientMusic.getCurrentTrackIndex()
-    );
-    uiManager.playlistPanel.setPlayingState(!ambientMusic.isPaused);
-});
-
-uiManager.playlistPanel.on('prev', () => {
-    ambientMusic.skipToPrev();
-});
-
-uiManager.playlistPanel.on('next', () => {
-    ambientMusic.skipToNext();
-});
-
-uiManager.playlistPanel.on('playPause', () => {
-    if (ambientMusic.isPaused) {
-        ambientMusic.resume();
-        uiManager.playlistPanel.setPlayingState(true);
-    } else {
-        ambientMusic.pause();
-        uiManager.playlistPanel.setPlayingState(false);
-    }
-});
-
-uiManager.playlistPanel.on('trackSelected', (index: number) => {
-    ambientMusic.playTrackAt(index);
-});
-
 // ── Vue Playlist panel wiring (same paths as the old panel above) ────────
 
 registerVueSimHooks({
