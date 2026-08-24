@@ -111,27 +111,6 @@ export function exitFlightMode(ctx: IFlightControlContext) {
         flightState.knownShip.trail.hide();
     }
     if (ctx.speedSprite) ctx.speedSprite.visible = false;
-    ctx.uiManager.flightControlsPanel.setFlightActive(false);
-    // Keep autopilot button enabled as long as the known ship still exists
-    const _exitShip = flightState.knownShip;
-    const _exitShipAlive = !!(
-        _exitShip &&
-        !_exitShip._isDisposed &&
-        simulationState.bodies.includes(_exitShip)
-    );
-    ctx.uiManager.flightControlsPanel.setAutopilotState(autopilotState.isActive, _exitShipAlive);
-    // updateFlightSpawnBtnLabel is defined after this function; call via a timeout
-    // to avoid forward-reference issues in the module execution order.
-    setTimeout(() => {
-        try {
-            ctx.uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
-                flightState.knownShip,
-                simulationState.bodies
-            );
-        } catch {
-            // Empty
-        }
-    }, 0);
 
     ctx.addEvent({
         message: 'Flight mode exited.',

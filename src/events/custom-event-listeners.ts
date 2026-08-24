@@ -11,7 +11,6 @@ import {
     flightState,
     simulationState,
 } from '../simulation/simulation';
-import { UIManager } from '../ui/ui-manager';
 import { NotificationType } from '../event-log/event-log';
 
 export interface ICustomEventContext {
@@ -20,7 +19,6 @@ export interface ICustomEventContext {
     /** Module-level manuallySelectedBody (mutable). */
     manuallySelectedBody: { value: Body | null };
     gizmo: CoordinateGizmo;
-    uiManager: UIManager;
     scene: THREE.Scene;
     dependencies: IStateDependencies;
     addEvent: (event: { message: string; notificationType: NotificationType }) => void;
@@ -36,7 +34,6 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         selectedBody,
         manuallySelectedBody,
         gizmo,
-        uiManager,
         scene,
         dependencies,
         addEvent,
@@ -64,17 +61,6 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
                 autopilotState.phase = null;
                 autopilotState.isBoostActive = false;
             }
-            setTimeout(() => {
-                try {
-                    uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
-                        flightState.knownShip,
-                        simulationState.bodies
-                    );
-                    uiManager.flightControlsPanel.setAutopilotState(false, false);
-                } catch {
-                    // Empty
-                }
-            }, 0);
         }
         handleBodyBecameInvalid(removedBody);
     });
@@ -111,13 +97,6 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
                 autopilotState.targetBody = null;
                 autopilotState.phase = null;
                 autopilotState.isBoostActive = false;
-                setTimeout(() => {
-                    try {
-                        uiManager.flightControlsPanel.setAutopilotState(false, false);
-                    } catch {
-                        // Empty
-                    }
-                }, 0);
             }
 
             // Ensure truly-dead bodies are removed from the simulation array.

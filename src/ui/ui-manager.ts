@@ -1,4 +1,3 @@
-import { FlightControlsPanel } from './flight-controls-panel';
 import { Panel } from './panel';
 import { TextureGeneratorPanel } from './texture-generator-panel';
 
@@ -17,13 +16,11 @@ export class UIManager extends Panel {
     // Left toolbar buttons
     btnDonate: HTMLButtonElement | null = null;
     btnEditSolarSystem: HTMLButtonElement | null = null;
-    btnFlightControls: HTMLButtonElement | null = null;
     btnPlaylist: HTMLButtonElement | null = null;
     btnTextureGenerator: HTMLButtonElement | null = null;
     btnReset: HTMLButtonElement | null = null;
 
     // Panels
-    flightControlsPanel: FlightControlsPanel;
     textureGeneratorPanel: TextureGeneratorPanel;
 
     // State variables
@@ -33,10 +30,7 @@ export class UIManager extends Panel {
         super(elementId);
 
         // Initialize control panels
-        this.flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
         this.textureGeneratorPanel = new TextureGeneratorPanel('texture-generator-panel');
-
-        this.flightControlsPanel.initialize();
         this.textureGeneratorPanel.initialize();
     }
 
@@ -58,7 +52,6 @@ export class UIManager extends Panel {
         this.btnEditSolarSystem = document.getElementById(
             'btn-edit-solar-system'
         ) as HTMLButtonElement;
-        this.btnFlightControls = document.getElementById('flightControlsBtn') as HTMLButtonElement;
         this.btnPlaylist = document.getElementById('btn-playlist') as HTMLButtonElement;
         this.btnTextureGenerator = document.getElementById(
             'btn-texture-generator'
@@ -115,20 +108,6 @@ export class UIManager extends Panel {
         }
 
 
-        if (this.btnFlightControls) {
-            this.btnFlightControls.onclick = () => {
-                const visible = this.flightControlsPanel.toggle();
-                if (visible) {
-                    this.btnFlightControls?.classList.add('active');
-                } else {
-                    this.btnFlightControls?.classList.remove('active');
-                }
-
-                // Update spawn button label to reflect whether there is a re-enterable ship
-                //updateFlightSpawnBtnLabel();
-            };
-        }
-
         if (this.btnReset) {
             this.btnReset.onclick = () => {
                 this.emit('reset');
@@ -136,10 +115,6 @@ export class UIManager extends Panel {
         }
 
         // Listen to panel events to update button states
-
-        this.flightControlsPanel.on('closed', () => {
-            this.btnFlightControls?.classList.remove('active');
-        });
 
         if (this.btnTextureGenerator) {
             this.btnTextureGenerator.onclick = () => {

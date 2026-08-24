@@ -13,16 +13,6 @@ import { autopilotState, flightState, simulationState } from './simulation';
 
 // ── Exported functions ────────────────────────────────────────────────────────
 
-/** Reflect autopilot state back to buttons after any state change. */
-export function updateAutopilotUI(ctx: IAutopilotContext): void {
-    const ship = flightState.knownShip;
-    const shipExists = !!(ship && !ship._isDisposed && simulationState.bodies.includes(ship));
-    ctx.setAutopilotState(
-        autopilotState.isActive,
-        (shipExists && !!autopilotState.targetBody) || autopilotState.isActive
-    );
-}
-
 /** Cancel the autopilot with an optional log message. */
 export function cancelAutopilot(ctx: IAutopilotContext, message?: string): void {
     const ship = flightState.knownShip;
@@ -58,8 +48,6 @@ export function cancelAutopilot(ctx: IAutopilotContext, message?: string): void 
     if (message) {
         ctx.addEvent({ message, notificationType: NotificationType.Info });
     }
-    // Defer DOM update — this may be called from inside the physics substep loop.
-    setTimeout(() => updateAutopilotUI(ctx), 0);
 }
 
 /** Engage the autopilot toward a specific target body. */
@@ -213,7 +201,6 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
             notificationType: NotificationType.Info,
         });
     }
-    updateAutopilotUI(ctx);
 }
 
 /**
@@ -241,5 +228,4 @@ export function drainAutopilotEvents(ctx: IAutopilotContext): void {
     }
 
     ship.autopilotEventMessages = [];
-    setTimeout(() => updateAutopilotUI(ctx), 0);
 }

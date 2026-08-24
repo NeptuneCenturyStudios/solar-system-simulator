@@ -51,10 +51,6 @@
                         <span class="material-symbols-outlined">edit</span>
                     </button>
 
-                    <button id="flightControlsBtn" class="btn toolbar-btn" title="Flight Controls">
-                        <span class="material-symbols-outlined">rocket</span>
-                    </button>
-
                     <!-- <button
                         id="btn-texture-generator"
                         class="btn toolbar-btn"
@@ -74,39 +70,6 @@
 
                 <!-- UI Panels -->
                 <div id="ui-container">
-                    <div id="flight-controls-panel" class="ui-panel">
-                        <div class="panel-header">
-                            Flight Controls
-                            <button
-                                id="btn-close-flight-controls-panel"
-                                class="old-ui btn-danger btn-icon-only ml-auto mb-0"
-                                title="Close Flight Controls"
-                            >
-                                <span class="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-                        <p style="color: #aaa; margin: 4px 0 8px">
-                            W/S — speed &nbsp; A/D — roll &nbsp; Shift — boost<br />C — view &nbsp;
-                            Mouse steers &nbsp; Hold space — warp &nbsp; Esc — exit
-                        </p>
-                        <label class="checkbox-row" style="margin-bottom: 8px">
-                            <input type="checkbox" id="flightAdvancedMode" /> Advanced Flight Mode
-                        </label>
-                        <div class="control-group" style="margin-bottom: 8px">
-                            <label for="flightShipTypeSelect">Ship Type</label>
-                            <!-- Populated at runtime from SHIP_TYPES in flight-controls-panel.ts -->
-                            <select id="flightShipTypeSelect"></select>
-                        </div>
-                        <button id="flightSpawnBtn" class="old-ui btn-with-icon mb-3">
-                            <span class="material-symbols-outlined">rocket_launch</span>
-                            SPAWN SPACESHIP
-                        </button>
-                        <button id="flightAutopilotBtn" class="old-ui btn-with-icon mb-3" disabled>
-                            <span class="material-symbols-outlined">rocket</span>
-                            AUTOPILOT
-                        </button>
-                    </div>
-
                     <div id="texture-generator-panel" class="ui-panel">
                         <div class="panel-header">
                             Texture Generator

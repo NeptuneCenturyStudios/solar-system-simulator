@@ -2952,15 +2952,9 @@ registerVueSimHooks({
 
 // Wire Flight Controls button and panel events
 
-const flightControlsPanel = uiManager.flightControlsPanel;
-
-flightControlsPanel.on('spawnShip', () => spawnShip());
-flightControlsPanel.on('toggleView', () => {
-    flightState.isCockpitView = !flightState.isCockpitView;
-});
-
-// Autopilot toggle from the flight controls panel (targets currently selected body)
-flightControlsPanel.on('autopilot', () => {
+// Autopilot toggle (targets the currently-selected/clicked body). Shared by the
+// legacy panel and the Vue Flight Controls panel.
+function toggleAutopilot() {
     if (autopilotState.isActive) {
         cancelAutopilot(autopilotCtx, 'Autopilot disengaged.');
         return;
@@ -2975,22 +2969,13 @@ flightControlsPanel.on('autopilot', () => {
         return;
     }
     engageAutopilot(autopilotCtx, target);
-});
-
-// Advanced flight mode checkbox
-const advancedModeChk = document.getElementById('flightAdvancedMode') as HTMLInputElement | null;
-if (advancedModeChk) {
-    advancedModeChk.checked = flightState.isAdvancedMode;
-    advancedModeChk.addEventListener('change', () => {
-        flightState.isAdvancedMode = advancedModeChk.checked;
-    });
 }
 
-// Vue Flight Controls panel: same event paths as the old panel above, just
-// triggered from the new UI instead of DOM button clicks.
+// Vue Flight Controls panel: same event paths as the old panel, just triggered from
+// the new UI instead of DOM button clicks.
 registerVueSimHooks({
     spawnShip: () => spawnShip(),
-    toggleAutopilot: () => flightControlsPanel.emit('autopilot', {}),
+    toggleAutopilot,
 });
 
 // Prevent UI clicks and keyboard events from interfering with scene interaction
@@ -3366,8 +3351,6 @@ const flightCtx: IFlightControlContext = {
 const autopilotCtx: IAutopilotContext = {
     flightHUD,
     addEvent,
-    setAutopilotState: (active, canEngage) =>
-        flightControlsPanel.setAutopilotState(active, canEngage),
 };
 
 /** Spawn a spaceship in front of the camera and enter flight mode.
@@ -3434,8 +3417,6 @@ function spawnShip(targetShip?: Spaceship) {
             cameraState.isFreeCameraMode = false;
             setFocusBody(ship, { zoom: true });
 
-            uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(ship, simulationState.bodies);
-
             addEvent({
                 message: 'Spaceship spawned.',
                 notificationType: NotificationType.Info,
@@ -3482,12 +3463,6 @@ function spawnShip(targetShip?: Spaceship) {
         cameraState.isLookAtMode = true;
         cameraState.isFreeCameraMode = false;
         setFocusBody(ship, { zoom: true });
-
-        // Update button label to "RE-ENTER SHIP"
-        uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
-            flightState.knownShip,
-            simulationState.bodies
-        );
 
         addEvent({
             message: 'Spaceship spawned.',
@@ -3548,14 +3523,8 @@ function spawnShip(targetShip?: Spaceship) {
     steeringEndMarker.visible = true;
     steeringOriginMarker.visible = true;
     flightHUD.hideWarpSprite();
-    flightControlsPanel.setFlightActive(true);
-    // Enable the autopilot button now that a ship is active
-    flightControlsPanel.setAutopilotState(autopilotState.isActive, true);
 
     ambientMusic.startPlayback();
-
-    // Close the flight controls panel
-    flightControlsPanel.hide();
 
     addEvent({
         message: 'Entered spaceship.',
@@ -4277,7 +4246,6 @@ registerCustomEventListeners({
         },
     },
     gizmo,
-    uiManager,
     scene,
     dependencies,
     addEvent,

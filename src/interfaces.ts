@@ -404,7 +404,6 @@ export interface IAutopilotContext {
         notificationType: NotificationType;
         logMethod?: LogMethods;
     }) => void;
-    setAutopilotState: (active: boolean, canEngage: boolean) => void;
 }
 
 /**
