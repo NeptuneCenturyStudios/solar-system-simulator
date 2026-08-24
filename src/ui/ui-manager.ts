@@ -1,5 +1,4 @@
 import { FlightControlsPanel } from './flight-controls-panel';
-import { ManagementPanel } from './management-panel';
 import { Panel } from './panel';
 import { TextureGeneratorPanel } from './texture-generator-panel';
 
@@ -25,7 +24,6 @@ export class UIManager extends Panel {
 
     // Panels
     flightControlsPanel: FlightControlsPanel;
-    managementPanel: ManagementPanel;
     textureGeneratorPanel: TextureGeneratorPanel;
 
     // State variables
@@ -36,11 +34,9 @@ export class UIManager extends Panel {
 
         // Initialize control panels
         this.flightControlsPanel = new FlightControlsPanel('flight-controls-panel');
-        this.managementPanel = new ManagementPanel('management-panel');
         this.textureGeneratorPanel = new TextureGeneratorPanel('texture-generator-panel');
 
         this.flightControlsPanel.initialize();
-        this.managementPanel.initialize();
         this.textureGeneratorPanel.initialize();
     }
 
@@ -118,16 +114,6 @@ export class UIManager extends Panel {
             };
         }
 
-        if (this.btnEditSolarSystem) {
-            this.btnEditSolarSystem.onclick = () => {
-                const visible = this.managementPanel.toggle();
-                if (visible) {
-                    this.btnEditSolarSystem?.classList.add('active');
-                } else {
-                    this.btnEditSolarSystem?.classList.remove('active');
-                }
-            };
-        }
 
         if (this.btnFlightControls) {
             this.btnFlightControls.onclick = () => {
@@ -150,9 +136,6 @@ export class UIManager extends Panel {
         }
 
         // Listen to panel events to update button states
-        this.managementPanel.on('closed', () => {
-            this.btnEditSolarSystem?.classList.remove('active');
-        });
 
         this.flightControlsPanel.on('closed', () => {
             this.btnFlightControls?.classList.remove('active');

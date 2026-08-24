@@ -136,6 +136,5 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         manuallySelectedBody.value = null;
         cameraState.focusBody = null;
         gizmo.attach(null);
-        uiManager.managementPanel.setSelectedBody(null);
     });
 }

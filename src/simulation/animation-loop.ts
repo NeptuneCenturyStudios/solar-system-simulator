@@ -435,7 +435,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         ) {
                             ctx.setFocusBody(winner, { zoom: false });
                             if (ctx.cameraState.isTargetMode) ctx.gizmo.attach(winner);
-                            ctx.uiManager.managementPanel?.setSelectedBody?.(winner);
+
                         }
 
                         if (outcome.type === 'absorb') {

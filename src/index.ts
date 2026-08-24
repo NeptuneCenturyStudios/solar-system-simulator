@@ -89,7 +89,6 @@ import {
     getMetalnessForMoonTexture,
     moonTexture,
     cloudTextures,
-    spaceTextures,
 } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
@@ -1077,7 +1076,6 @@ function createPresetBody(presetKey: string) {
     } else {
         gizmo.attach(null);
     }
-    uiManager.managementPanel.setSelectedBody(newBody);
 
     setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
 
@@ -1579,10 +1577,8 @@ function createNewBody(
         // For moons: keep selection/focus on the parent so the user can keep adding
         // moons to the same body without re-selecting it each time.
         if (moonCreationParent) {
-            uiManager.managementPanel.setSelectedBody(moonCreationParent);
             setFocusBody(moonCreationParent, { zoom: false });
         } else {
-            uiManager.managementPanel.setSelectedBody(newBody);
             // Focus selection/camera on the new body (object-based, not id-based)
             setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
         }
@@ -1605,11 +1601,6 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
         kuiperBeltPoints.visible = !hideKuiper;
     }
     environmentState.kuiperBeltVisible = !hideKuiper;
-
-    // Keep UI in sync
-    if (uiManager.managementPanel?.enableKuiperBeltCheckbox) {
-        uiManager.managementPanel.enableKuiperBeltCheckbox.checked = !hideKuiper;
-    }
 }
 
 /**
@@ -1711,9 +1702,6 @@ async function spawn(
     // Apply the space texture from the generated solar system
     await loadSpaceTexture(scene, solarSystem.spaceTexture.filename);
     environmentState.spaceTextureFilename = solarSystem.spaceTexture.filename;
-
-    // Sync the texture with the management panel UI
-    uiManager.managementPanel.setSelectedSpaceTexture(solarSystem.spaceTexture);
 
     // Update the url with the seed and seed type
     if (seedType) {
@@ -2128,9 +2116,6 @@ function onMouseDown(event: MouseEvent) {
 
             selectedBody = clickedBody; // Update global selection
 
-            // Update management panel with selected body
-            uiManager.managementPanel.setSelectedBody(clickedBody);
-
             // Update bodies table highlight
 
             const isDifferentSelection = prevSelectedBody !== clickedBody;
@@ -2165,7 +2150,6 @@ function onMouseDown(event: MouseEvent) {
         }
 
         gizmo.attach(null);
-        uiManager.managementPanel.setSelectedBody(null);
 
         flightHUD.forceHintRefresh();
     }
@@ -2835,10 +2819,6 @@ function setF(id: string) {
 
 // Create and initialize panels
 const uiManager = new UIManager('ui-container');
-uiManager.managementPanel.registerGetFocusObject(() => {
-    const body = cameraState.focusBody;
-    return body && !body._isDisposed && simulationState.bodies.includes(body) ? body : null;
-});
 
 uiManager.initialize();
 
@@ -2850,10 +2830,7 @@ registerVueSimHooks({
     setTimeScale: (value: number) => uiManager.emit('timeScaleChange', { value }),
     setGMultiplier: (value: number) => {
         simulationState.gMultiplier = value;
-        const mpSlider = uiManager.managementPanel.gravitationalConstantSlider;
-        const mpDisplay = uiManager.managementPanel.gravitationalConstantDisplay;
-        if (mpSlider) mpSlider.value = String(value);
-        if (mpDisplay) mpDisplay.textContent = value.toFixed(value < 10 ? 2 : 0);
+
         dispatchSimStateChange();
     },
     selectBody: (body: Body) => {
@@ -2921,21 +2898,15 @@ registerVueSimHooks({
             kuiperBeltPoints.visible = checked;
         }
         environmentState.kuiperBeltVisible = checked;
-        if (uiManager.managementPanel?.enableKuiperBeltCheckbox) {
-            uiManager.managementPanel.enableKuiperBeltCheckbox.checked = checked;
-        }
     },
     setSpaceBackgroundVisible: (checked: boolean) => {
         showSpaceBackground(scene, checked);
         environmentState.spaceBackgroundVisible = checked;
-        const skydomeEl = document.getElementById('enableSkydome') as HTMLInputElement | null;
-        if (skydomeEl) skydomeEl.checked = checked;
+        
     },
     setSpaceTexture: async (texturePath: string) => {
         await loadSpaceTexture(scene, texturePath);
         environmentState.spaceTextureFilename = texturePath;
-        const match = spaceTextures.find((t) => t.filename === texturePath);
-        if (match) uiManager.managementPanel.setSelectedSpaceTexture(match);
     },
     setStarDeathEnabled: (checked: boolean) => {
         environmentState.starDeathEnabled = checked;
@@ -2978,8 +2949,6 @@ registerVueSimHooks({
         ambientMusic.setVolume(normalized);
     },
 });
-
-
 
 // Wire Flight Controls button and panel events
 
@@ -3260,7 +3229,6 @@ registerVueSimHooks({
             selectedBody = body;
             manuallySelectedBody = body;
             cameraState.focusBody = body;
-            uiManager.managementPanel.setSelectedBody(body);
         }
         deleteSelectedBody();
     },
@@ -3465,7 +3433,6 @@ function spawnShip(targetShip?: Spaceship) {
             cameraState.isLookAtMode = true;
             cameraState.isFreeCameraMode = false;
             setFocusBody(ship, { zoom: true });
-            uiManager.managementPanel.setSelectedBody(ship);
 
             uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(ship, simulationState.bodies);
 
@@ -3515,7 +3482,6 @@ function spawnShip(targetShip?: Spaceship) {
         cameraState.isLookAtMode = true;
         cameraState.isFreeCameraMode = false;
         setFocusBody(ship, { zoom: true });
-        uiManager.managementPanel.setSelectedBody(ship);
 
         // Update button label to "RE-ENTER SHIP"
         uiManager.flightControlsPanel.updateFlightSpawnBtnLabel(
@@ -3561,7 +3527,6 @@ function spawnShip(targetShip?: Spaceship) {
         selectedBody = null;
         manuallySelectedBody = null;
         gizmo.attach(null);
-        uiManager.managementPanel.setSelectedBody(null);
     }
 
     // Initialize the ship's trail (but it will be hidden until warp ends, to avoid showing a long trail from spawn point to first flight location)
@@ -3599,37 +3564,6 @@ function spawnShip(targetShip?: Spaceship) {
 }
 
 window.addEventListener('mousemove', surfaceCam.onMouseMove, { passive: true });
-
-uiManager.managementPanel.on('kuiperBeltChange', ({ checked }: { checked: boolean }) => {
-    if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
-        kuiperBeltPoints.visible = checked;
-    }
-    environmentState.kuiperBeltVisible = checked;
-});
-
-uiManager.managementPanel.on('gChange', ({ value }: { value: number }) => {
-    simulationState.gMultiplier = value;
-    dispatchSimStateChange();
-});
-
-uiManager.managementPanel.on(
-    'spaceTextureChange',
-    async ({ texturePath }: { texturePath: string }) => {
-        // Apply the space texture from the user's selection
-        await loadSpaceTexture(scene, texturePath);
-        environmentState.spaceTextureFilename = texturePath;
-    }
-);
-
-const enableSkydomeCheckbox = document.getElementById('enableSkydome') as HTMLInputElement;
-if (enableSkydomeCheckbox) {
-    enableSkydomeCheckbox.onchange = () => {
-        const checked = enableSkydomeCheckbox.checked;
-        // Show or hide the background
-        showSpaceBackground(scene, checked);
-        environmentState.spaceBackgroundVisible = checked;
-    };
-}
 
 // ── Vue Playlist panel wiring (same paths as the old panel above) ────────
 
@@ -3669,7 +3603,6 @@ uiManager.on('pause', () => {
 
 uiManager.on('reset', () => {
     // Auto-close management UI and show launcher with Cancel
-    uiManager.managementPanel.hide();
     void startStartupFlow({ allowCancel: true });
 });
 
@@ -3686,62 +3619,6 @@ uiManager.on('reset', () => {
 
 // LOOK AT button (toggle): when enabled, orbit/zoom around selected body.
 // When disabled, behave like "None camera": orbit/zoom around the scene center.
-
-// Subscribe to ManagementPanel events
-uiManager.managementPanel.on(
-    'createBody',
-    ({
-        bodyType,
-        planetType,
-        orbitType,
-        inclination,
-        hasAtmosphere,
-        hasRings,
-        customMass,
-        customTemperature,
-        customLightIntensity,
-        customRadius,
-        orbitParent,
-        createTilt,
-        createAzimuth,
-    }: {
-        bodyType: string;
-        planetType: string;
-        orbitType: string;
-        inclination: number;
-        hasAtmosphere: boolean;
-        hasRings: boolean;
-        customMass: number | null;
-        customTemperature: number | null;
-        customLightIntensity: number | null;
-        customRadius: number | null;
-        orbitParent: Body | null;
-        createTilt: number | null;
-        createAzimuth: number | null;
-    }) => {
-        createNewBody(
-            bodyType,
-            planetType,
-            orbitType,
-            inclination,
-            hasAtmosphere,
-            hasRings,
-            customMass,
-            customTemperature,
-            customLightIntensity,
-            customRadius,
-            orbitParent ?? null,
-            createTilt ?? null,
-            createAzimuth ?? null
-        );
-    }
-);
-
-// Preset bodies (canonical solar-system objects)
-uiManager.managementPanel.on('createPresetBody', ({ presetKey }: { presetKey: string }) => {
-    if (!presetKey) return;
-    createPresetBody(presetKey);
-});
 
 function refreshSelectionVisuals() {
     // Recompute gizmo scale immediately when selected body properties change (e.g., star mass -> radius)
@@ -3813,10 +3690,6 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
     // Update name
     if (name !== null && name !== '') {
         body.updateLabel(name);
-        // Update just the edit form label without repopulating the entire form
-        if (uiManager.managementPanel.editBodyName) {
-            uiManager.managementPanel.editBodyName.textContent = body.name;
-        }
     }
 
     // Update mass — setMass handles brown dwarf transition for stars
@@ -3935,60 +3808,6 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
     }
 }
 
-uiManager.managementPanel.on('deleteBody', () => {
-    deleteSelectedBody();
-});
-
-uiManager.managementPanel.on(
-    'applyEdit',
-    ({
-        body,
-        name,
-        mass,
-        temperature,
-        lightIntensity,
-        velocity,
-        orbitalAngle,
-        inclination,
-        color,
-        editTilt,
-        editAzimuth,
-    }: {
-        body: Body;
-        name: string;
-        mass: number;
-        temperature: number | null;
-        lightIntensity: number | null;
-        velocity: number | null;
-        orbitalAngle: number | null;
-        inclination: number | null;
-        color: string;
-        editTilt: number | null;
-        editAzimuth: number | null;
-    }) => {
-        if (!body) return;
-
-        const radius =
-            uiManager.managementPanel && uiManager.managementPanel.editRadiusSlider
-                ? parseFloat((uiManager.managementPanel.editRadiusSlider as HTMLInputElement).value)
-                : null;
-
-        applyBodyEditToBody(body, {
-            name,
-            mass,
-            temperature,
-            lightIntensity,
-            radius,
-            velocity,
-            orbitalAngle,
-            inclination,
-            color,
-            editTilt,
-            editAzimuth,
-        });
-    }
-);
-
 // Update stats display when star death checkbox is toggled
 const starDeathCheckbox = document.getElementById('enableStarDeath');
 if (starDeathCheckbox) {
@@ -4071,7 +3890,6 @@ function deleteSelectedBody() {
 
     // Update UI selection state (match existing empty-space click behavior)
     selectedBody = null;
-    uiManager.managementPanel?.setSelectedBody?.(null);
     if (cameraState?.isTargetMode) {
         gizmo.attach(null);
     }
@@ -4388,8 +4206,6 @@ window.addEventListener('resize', () => {
 // Apply initial background visibility (pre-launch view): kuiper off
 if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) kuiperBeltPoints.visible = false;
 environmentState.kuiperBeltVisible = false;
-if (uiManager.managementPanel.enableKuiperBeltCheckbox)
-    uiManager.managementPanel.enableKuiperBeltCheckbox.checked = false;
 
 function handleBodyBecameInvalid(body: Body | null | undefined) {
     if (!body) return;
@@ -4429,11 +4245,6 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
 
         // Legacy alias kept in sync for any older call sites
         cameraState.focusID = 'camNone';
-    }
-
-    // Clear edit panel selection if it is showing this body
-    if (uiManager.managementPanel && uiManager.managementPanel.selectedBody === body) {
-        uiManager.managementPanel.setSelectedBody(null);
     }
 
     // Clear gizmo if it was attached to this body
@@ -4499,7 +4310,6 @@ function applyDefaultCameraTogglesAfterSpawn() {
 
     // No selection => no gizmo attachment yet.
     gizmo.attach(null);
-    uiManager.managementPanel.setSelectedBody(null);
 
     // Hint text depends on toggle state (Target/Look At).
     flightHUD.forceHintRefresh();
@@ -4508,10 +4318,7 @@ function applyDefaultCameraTogglesAfterSpawn() {
 function applyStartupGMultiplier() {
     const gMult = getStartupGMultiplier();
     simulationState.gMultiplier = gMult;
-    const mpSlider = uiManager.managementPanel.gravitationalConstantSlider;
-    const mpDisplay = uiManager.managementPanel.gravitationalConstantDisplay;
-    if (mpSlider) mpSlider.value = String(gMult);
-    if (mpDisplay) mpDisplay.textContent = gMult.toFixed(gMult < 10 ? 2 : 0);
+
     dispatchSimStateChange();
 }
 
@@ -4525,7 +4332,6 @@ async function launchSystem(
     proceduralResult?: IProceduralGeneratorPromptResult
 ) {
     applyStartupGMultiplier();
-    uiManager.managementPanel.hide();
 
     hideStartupModal();
 
@@ -4633,7 +4439,6 @@ window.addEventListener(
     if (urlSeed) {
         // Skip startup modal — proceed directly to generation
         applyStartupGMultiplier();
-        uiManager.managementPanel.hide();
 
         const mode =
             urlSeed.type === SEED_TYPE_BLACKHOLE
@@ -4672,7 +4477,7 @@ window.addEventListener('popstate', async () => {
         if (getLastPushedSeed() !== null) {
             resetLastPushedSeed();
             applyStartupGMultiplier();
-            uiManager.managementPanel.hide();
+
             hideStartupModal();
             const progressReporter = showProceduralProgress({ title: 'Generate Solar System' });
             await spawn(SimulationStartMode.Default, undefined, progressReporter);
@@ -4688,7 +4493,7 @@ window.addEventListener('popstate', async () => {
     setLastPushedSeed(fullValue);
 
     applyStartupGMultiplier();
-    uiManager.managementPanel.hide();
+
     hideStartupModal();
 
     const mode =
