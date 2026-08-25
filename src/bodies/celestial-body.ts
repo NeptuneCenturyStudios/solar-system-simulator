@@ -403,7 +403,15 @@ export class CelestialBody extends Body {
     private clampToLightSpeed(): void {
         const speed = this.velocity.length();
         const lightSpeed = this.dependencies.getC();
-        if (speed >= lightSpeed) {
+
+        // No meaningful speed cap when effective c is zero/non-finite
+        // (e.g. gravity multiplier = 0 → c = C * sqrt(0) = 0). Clamping here
+        // would first zero every velocity and then produce 0/0 = NaN on the
+        // next substep, poisoning positions and every geometry buffer.
+        if (!Number.isFinite(lightSpeed) || lightSpeed <= 0) return;
+        if (speed <= 0 || !Number.isFinite(speed)) return;
+
+        if (speed > lightSpeed) {
             this.velocity.multiplyScalar((lightSpeed * 0.9999) / speed);
         }
     }

@@ -591,7 +591,9 @@ const dependencies: IStateDependencies = {
     },
     getBodies: () => simulationState.bodies,
     getG: () => (G * simulationState.gMultiplier) as EffectiveGForce,
-    getC: () => (C * Math.sqrt(simulationState.gMultiplier)) as EffectiveCSpeed,
+    // Math.max(0, …) guards sqrt against a negative multiplier, which would
+    // otherwise yield NaN effective lightspeed and poison every velocity.
+    getC: () => (C * Math.sqrt(Math.max(0, simulationState.gMultiplier))) as EffectiveCSpeed,
 };
 
 // --- Velocity editing arc helpers ---
