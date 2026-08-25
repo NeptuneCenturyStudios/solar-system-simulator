@@ -484,6 +484,13 @@ export function togglePause(): void {
 }
 
 export function setTimeScale(value: number): void {
+
+    // Unpause if paused
+    if (state.isPaused)
+    {
+        togglePause();
+    }
+
     if (hookRegistry.setTimeScale) {
         hookRegistry.setTimeScale(value);
     } else {
@@ -819,9 +826,7 @@ export function formatNumber(value: number): string {
 
 export function formatTimeScale(value: number): string {
     if (state.isPaused) {
-        const next = Math.abs(state.savedTimeScale).toFixed(1);
-        const direction = state.savedTimeScale < 0 ? ' REVERSE' : '';
-        return `0.0x (PAUSED - next: ${next}x${direction})`;
+        return `PAUSED`;
     }
     if (value < 0) return `${Math.abs(value).toFixed(1)}x REVERSE`;
     return `${value.toFixed(1)}x`;

@@ -45,7 +45,7 @@
     <div v-if="mode === 'progress'" class="d-flex flex-column gap-2">
         <div style="display: flex; align-items: center" class="mb-1">
             <span class="material-symbols-outlined loading-icon mr-1">progress_activity</span>
-            <div style="font-weight: bold; color: #00ffcc">
+            <div style="font-weight: bold;">
                 {{ progressStatus }}
             </div>
         </div>
@@ -57,7 +57,7 @@
             ></div>
         </div>
 
-        <div style="margin-top: 8px; color: rgba(255, 255, 255, 0.8)">
+        <div style="margin-top: 8px">
             {{ progressText }}
         </div>
 

@@ -4,13 +4,13 @@
     --scrollbar-thumb: rgba(69, 171, 255, 0.45);
     --scrollbar-thumb-hover: rgba(69, 171, 255, 0.75);
     --scrollbar-border: #224466;
-    --new-ui-bg: rgba(7, 8, 10, 0.5);
-    --new-ui-backdrop-filter: blur(10px);
+    --new-ui-bg: rgba(0, 0, 10, 0.8);
+    --new-ui-backdrop-filter: blur(20px);
     --new-ui-border: rgba(34, 68, 102, 1);
     --new-ui-border-radius: 0.5rem;
     --new-ui-color: #fff;
     --new-ui-label-color: rgb(92, 181, 255);
-    --new-ui-panel-header-color: rgb(92, 181, 255);
+    --new-ui-panel-header-color: rgb(183, 223, 255);
     --new-ui-shadow: 0 18px 50px rgba(0, 0, 0, 0.65), 0 0 22px rgba(0, 255, 204, 0.18);
     --new-ui-button-bg: rgba(6, 27, 47, 0.6);
     --new-ui-button-hover-bg: rgba(9, 44, 77, 0.6);
@@ -312,76 +312,6 @@ body {
 .startup-g-labels span {
     cursor: help;
     text-transform: none;
-}
-
-/* --- Bodies table (below Camera section) --- */
-#bodiesTableContainer {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto; /* (optional, but recommended for scrolling) */
-    border: 1px solid var(--new-ui-border);
-    border-radius: var(--new-ui-table-border-radius);
-    background: rgba(0, 34, 68, 0.35);
-    margin-bottom: 12px;
-}
-
-/* Chromium/Edge/Safari */
-#bodiesTableContainer::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-#bodiesTableContainer::-webkit-scrollbar-track {
-    background: var(--scrollbar-track);
-    border-radius: var(--new-ui-border-radius);
-}
-
-#bodiesTableContainer::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border: 1px solid var(--scrollbar-border);
-    border-radius: var(--new-ui-border-radius);
-    box-shadow: 0 0 10px rgba(0, 255, 204, 0.18);
-}
-
-#bodiesTableContainer::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
-}
-
-#bodiesTableContainer table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-#bodiesTableContainer thead th {
-    position: sticky;
-    top: 0;
-    background: rgba(0, 68, 136, 0.9);
-    color: var(--new-ui-label-color);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-
-    padding: 8px 6px;
-    border-bottom: 1px solid #224466;
-}
-
-#bodiesTableContainer tbody td {
-    padding: 7px 6px;
-    border-bottom: 1px solid rgba(34, 68, 102, 0.6);
-    color: #fff;
-}
-
-#bodiesTableContainer tbody tr {
-    cursor: pointer;
-    transition: background 0.15s ease;
-}
-
-#bodiesTableContainer tbody tr:hover {
-    background: rgba(0, 102, 204, 0.25);
-}
-
-#bodiesTableContainer tbody tr.selected {
-    background: rgba(0, 255, 204, 0.25);
-    outline: 1px solid rgba(0, 255, 204, 0.7);
 }
 
 .body-creation-form {
@@ -768,7 +698,7 @@ button.btn-with-icon {
     color: var(--new-ui-color);
     border: 1px solid var(--new-ui-border);
     border-radius: var(--new-ui-border-radius);
-    backdrop-filter: blur(10px);
+    backdrop-filter: var(--new-ui-backdrop-filter);
     box-shadow: var(--new-ui-shadow);
 }
 
@@ -951,7 +881,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     margin-bottom: 0.5rem;
     padding-bottom: 0.4rem;
     border-bottom: 1px solid var(--new-ui-border);
-    color: var(--new-ui-label-color);
+    color: var(--new-ui-panel-header-color);
     font-family: monospace;
     font-size: 0.85rem;
     font-weight: bold;
@@ -1193,10 +1123,6 @@ button.btn.toolbar-btn.btn-care:focus-visible {
         flex-direction: row;
     }
 
-    #bodiesTableContainer {
-        max-height: 30rem;
-    }
-
     .ui-panel {
         align-self: flex-start;
         width: 20rem;
@@ -1333,7 +1259,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     justify-content: center;
     font-size: 1.5em;
     font-weight: bold;
-    color: var(--new-ui-label-color);
+    color: var(--new-ui-panel-header-color);
     text-align: center;
     margin-bottom: 15px;
     padding-bottom: 10px;
