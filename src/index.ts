@@ -64,6 +64,7 @@ import {
     TEXT_SPRITE_Z,
     C,
     EARTH_RADIUS,
+    WORMHOLE_DEFAULT_RADIUS,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -124,6 +125,12 @@ import { createMainSequenceStarFromParams } from './procedural/star-factory';
 import { createPlanetBodyFromProceduralCreation } from './procedural/planet-factory';
 import { upgradeProceduralTexture } from './procedural/texture-upgrader';
 import { Asteroid } from './bodies/asteroid';
+import { Wormhole } from './bodies/wormhole';
+import {
+    getPendingWormholeLink,
+    setPendingWormholeLink,
+    clearPendingWormholeLink,
+} from './bodies/wormhole-link-state';
 
 import { Spaceship } from './bodies/ships/spaceship';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
@@ -1522,6 +1529,37 @@ function createNewBody(
         // Apply custom radius if the user overrode the slider
         if (typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0) {
             setBodyRadius(newBody as unknown as CelestialBody, customRadius);
+        }
+    } else if (bodyType === 'wormhole') {
+        const wormholeSpawnPos = getNearCameraSpawnPos();
+        const wormholeRadius =
+            typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
+                ? customRadius
+                : WORMHOLE_DEFAULT_RADIUS;
+
+        const wormhole = new Wormhole(
+            dependencies,
+            scene,
+            wormholeSpawnPos,
+            wormholeRadius,
+            createUniqueId('wormhole'),
+            generateIAUName(BodyTypeEnum.Wormhole, null, simulationState.bodies),
+            { tilt: 0, speed: 0 }
+        );
+        newBody = wormhole;
+
+        // First wormhole created starts a pending pair; the next one links to it.
+        const pendingLink = getPendingWormholeLink();
+        if (pendingLink) {
+            pendingLink.setLinkedWormhole(wormhole.id);
+            wormhole.setLinkedWormhole(pendingLink.id);
+            clearPendingWormholeLink();
+            addEvent({
+                message: `${pendingLink.name} and ${wormhole.name} are now linked`,
+                notificationType: NotificationType.Info,
+            });
+        } else {
+            setPendingWormholeLink(wormhole);
         }
     }
 
@@ -3267,6 +3305,22 @@ registerVueSimHooks({
                 lightIntensity: null,
                 tilt: null,
                 azimuth: null,
+                inclination,
+                hasAtmosphere: false,
+                hasRings: false,
+                planetType: null,
+                moonType: null,
+            };
+        }
+
+        if (bodyType === 'wormhole') {
+            return {
+                mass: null,
+                radius: WORMHOLE_DEFAULT_RADIUS,
+                temperature: null,
+                lightIntensity: null,
+                tilt: 0,
+                azimuth: 0,
                 inclination,
                 hasAtmosphere: false,
                 hasRings: false,

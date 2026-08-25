@@ -299,5 +299,15 @@ export const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
  */
 export const HP_MASS_MULTIPLIER = 100;
 
+// === Wormhole tuning ===
+/** Default mouth (gate) radius for a newly created wormhole, in sim units. */
+export const WORMHOLE_DEFAULT_RADIUS = 40 * SCALE_FACTOR;
+/** Visual length of the swirling funnel/tail effect, as a multiple of the mouth radius. */
+export const WORMHOLE_FUNNEL_LENGTH_FACTOR = 3;
+/** Number of pooled particles in the funnel vortex effect. */
+export const WORMHOLE_FUNNEL_PARTICLE_COUNT = 400;
+/** Distance (as a multiple of exit radius) a teleported body is pushed clear of the exit mouth. */
+export const WORMHOLE_EMERGE_BUFFER_FACTOR = 1.5;
+
 // Set the Z position slightly above 0 for linux systems
 export const TEXT_SPRITE_Z = 0.01;

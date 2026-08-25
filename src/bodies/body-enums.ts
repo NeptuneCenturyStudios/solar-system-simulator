@@ -18,6 +18,7 @@ export enum BodyTypeEnum {
     BrownDwarf = 1 << 11,
     Pulsar = 1 << 12,
     Satellite = 1 << 13,
+    Wormhole = 1 << 14,
 }
 
 /**

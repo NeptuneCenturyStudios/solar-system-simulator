@@ -225,6 +225,7 @@ export function getBodyTypeLabel(b: Body) {
     if (b.bodyType && b.bodyType & BodyTypeEnum.Comet) return 'Comet';
     if (b.bodyType && b.bodyType & BodyTypeEnum.SpaceShip) return 'Spaceship';
     if (b.bodyType && b.bodyType & BodyTypeEnum.Satellite) return 'Satellite';
+    if (b.bodyType && b.bodyType & BodyTypeEnum.Wormhole) return 'Wormhole';
 
     return 'Unknown';
 }

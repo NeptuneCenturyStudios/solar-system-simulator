@@ -38,10 +38,11 @@
                             <option value="asteroid">Asteroid</option>
                             <option value="comet">Comet</option>
                             <option value="black_hole">Black Hole</option>
+                            <option value="wormhole">Wormhole</option>
                         </select>
                     </div>
 
-                    <div v-if="showMassRadius" class="control-group">
+                    <div v-if="showMass" class="control-group">
                         <label>Mass <span class="val-display">{{ formatNumber(mass) }}</span></label>
                         <input
                             v-model.number="mass"
@@ -80,7 +81,7 @@
                         />
                     </div>
 
-                    <div v-if="showMassRadius" class="control-group">
+                    <div v-if="showRadius" class="control-group">
                         <label
                             >Size (Radius)
                             <span class="val-display">{{ formatNumber(radius) }}</span></label
@@ -414,9 +415,17 @@ const showMassRadius = computed(
         bodyType.value === 'moon' ||
         bodyType.value === 'black_hole'
 );
-const showOrbitControls = computed(() => bodyType.value !== 'black_hole');
+const showMass = computed(() => showMassRadius.value);
+const showRadius = computed(() => showMassRadius.value || bodyType.value === 'wormhole');
+const showOrbitControls = computed(
+    () => bodyType.value !== 'black_hole' && bodyType.value !== 'wormhole'
+);
 const showTilt = computed(
-    () => bodyType.value === 'sun' || bodyType.value === 'planet' || bodyType.value === 'moon'
+    () =>
+        bodyType.value === 'sun' ||
+        bodyType.value === 'planet' ||
+        bodyType.value === 'moon' ||
+        bodyType.value === 'wormhole'
 );
 const canHaveAtmosphere = computed(() => {
     if (bodyType.value === 'planet') {
@@ -536,7 +545,11 @@ function onCreate(): void {
         newId = createPresetBodyByKey(presetKey.value);
     } else {
         if (bodyType.value === 'moon' && !canCreateMoon.value) return;
-        const hidesMassRadius = bodyType.value === 'asteroid' || bodyType.value === 'comet';
+        const hidesMass =
+            bodyType.value === 'asteroid' ||
+            bodyType.value === 'comet' ||
+            bodyType.value === 'wormhole';
+        const hidesRadius = bodyType.value === 'asteroid' || bodyType.value === 'comet';
         const payload: CreateBodyPayload = {
             bodyType: bodyType.value,
             planetType: bodyType.value === 'moon' ? moonType.value : planetType.value,
@@ -544,10 +557,10 @@ function onCreate(): void {
             inclination: inclination.value,
             hasAtmosphere: hasAtmosphere.value,
             hasRings: hasRings.value,
-            customMass: hidesMassRadius ? null : mass.value,
+            customMass: hidesMass ? null : mass.value,
             customTemperature: bodyType.value === 'sun' ? temperature.value : null,
             customLightIntensity: bodyType.value === 'sun' ? lightIntensity.value : null,
-            customRadius: hidesMassRadius ? null : radius.value,
+            customRadius: hidesRadius ? null : radius.value,
             orbitParentId: resolveOrbitParentId(simStore.selectedId),
             createTilt: showTilt.value ? tilt.value : null,
             createAzimuth: showTilt.value ? azimuth.value : null,

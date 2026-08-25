@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
 import { Body } from '../bodies/body';
+import { Wormhole } from '../bodies/wormhole';
+import { clearPendingWormholeLink, getPendingWormholeLink } from '../bodies/wormhole-link-state';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { ImpactShockwave } from '../effects/impact-shockwave';
 import { SoundEffect, playSoundEffect } from '../utilities/audio.js';
@@ -77,6 +79,9 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
             new ImpactShockwave(dependencies, scene, position, body.mesh.position, body.radius)
         );
 
+        // Wormholes are indestructible — weapons can hit them but never damage them.
+        if (body instanceof Wormhole) return;
+
         body.healthPoints -= e.detail.damage;
         if (body.healthPoints <= 0) {
             body.die();
@@ -103,6 +108,17 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
             // Collision deaths already remove immediately, but other death paths (e.g. star fuel death)
             // can emit `body:dead` without being spliced out here.
             simulationState.bodies = (simulationState.bodies || []).filter((b) => b !== body);
+
+            // A deleted wormhole's partner (if any) reverts to unlinked/destructive.
+            if (body instanceof Wormhole) {
+                if (getPendingWormholeLink() === body) clearPendingWormholeLink();
+                if (body.linkedWormholeId) {
+                    const partner = simulationState.bodies.find(
+                        (b) => b instanceof Wormhole && b.id === body.linkedWormholeId
+                    ) as Wormhole | undefined;
+                    partner?.clearLink();
+                }
+            }
         }
 
         handleBodyBecameInvalid(body);

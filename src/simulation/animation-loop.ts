@@ -17,6 +17,8 @@ import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
 import { Star } from '../bodies/star';
+import { Wormhole } from '../bodies/wormhole';
+import { processWormholeInteractions } from '../physics/wormhole-collision';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { settingsStore } from '../settings/settings-store';
 import { UIManager } from '../ui/ui-manager';
@@ -148,6 +150,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
     const _animOldPos = new THREE.Vector3();
     const _prevCamPos = new THREE.Vector3();
     const _cameraVel = new THREE.Vector3();
+    // Pre-substep position snapshot, used for the swept wormhole-entrance test.
+    const _wormholePrevPositions = new Map<string, THREE.Vector3>();
 
     let fpsLastUpdate = 0;
     let lastT = performance.now();
@@ -351,6 +355,19 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         const oldPos = _animOldPos;
 
         // ── Physics ──────────────────────────────────────────────────────
+        // Snapshot positions before the physics step so wormhole entrance detection can
+        // sweep each body's path across the frame instead of a static end-of-frame test
+        // (needed since a ship in warp can cross a thin wormhole mouth within one frame).
+        for (const b of ctx.simulationState.bodies) {
+            if (!b || b._isDisposed || !b.mesh) continue;
+            let snapshot = _wormholePrevPositions.get(b.id);
+            if (!snapshot) {
+                snapshot = new THREE.Vector3();
+                _wormholePrevPositions.set(b.id, snapshot);
+            }
+            snapshot.copy(b.mesh.position);
+        }
+
         // Manual thrust (WASD) is applied per substep via applyFlightThrustSubstep
         // so it interleaves correctly with gravity at any time scale.
         // flightState param kept for signature compatibility with updateSimulation
@@ -383,12 +400,17 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 if (b1 instanceof CelestialBody) b1.updateTrail(ctx.camera.position);
                 if (b1 instanceof CelestialBody) b1.updateVisuals(dtTotal, ctx.camera.position);
                 if (b1 instanceof Comet) b1.updateTail(dtTotal, ctx.camera.position);
+                if (b1 instanceof Wormhole) b1.funnelEffect.update(dtTotal);
 
                 if (b1._isDisposed || !b1.mesh) continue;
 
                 for (let k = j + 1; k < ctx.simulationState.bodies.length; k++) {
                     const b2 = ctx.simulationState.bodies[k];
                     if (!b2 || b2._isDisposed || !b2.mesh) continue;
+
+                    // Wormholes are indestructible and never absorb/destroy via the normal
+                    // mass-based rules — entrance/teleport is handled by a dedicated pass below.
+                    if (b1 instanceof Wormhole || b2 instanceof Wormhole) continue;
 
                     const dx = b1.mesh.position.x - b2.mesh.position.x;
                     const dy = b1.mesh.position.y - b2.mesh.position.y;
@@ -467,6 +489,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     }
                 }
             }
+
+            processWormholeInteractions(ctx.simulationState.bodies, _wormholePrevPositions);
         }
 
         // ── Gizmo / vel arc / orbit prediction ──────────────────────────

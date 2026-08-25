@@ -463,6 +463,13 @@ export function generateProceduralBodyName(
             return `${core}${secondToken ? ` ${secondToken}` : ''} ${letter}`;
         }
 
+        case BodyTypeEnum.Wormhole: {
+            const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
+            const letter = markerLetter(rngPrimary);
+
+            return `${core} Gate ${letter}`;
+        }
+
         default: {
             const core = makeWordFromSyllables(rngPrimary, { minSyllables: 2, maxSyllables: 3 });
             const letter = markerLetter(rngPrimary);
