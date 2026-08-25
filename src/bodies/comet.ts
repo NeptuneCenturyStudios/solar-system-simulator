@@ -269,7 +269,7 @@ float alpha = vLife * strength;`
         const avgParticleSpeed = 0.7;
         const lifeIncrement = (avgParticleSpeed * 60) / targetTailLength;
 
-        const dtScaled = Math.abs(dt) * 6000;
+        const dtScaled = Math.abs(dt) * 120;
         const spread = this.radius * 3 * SCALE_FACTOR;
 
         // Nucleus world position — read once outside the loop (float64, exact).
