@@ -1,21 +1,25 @@
 /* Extracted from index.html */
 :root {
-    /* --- Scrollbar theme (matches UI) --- */
     --scrollbar-track: rgba(0, 34, 68, 0.35);
-    --scrollbar-thumb: rgba(0, 255, 204, 0.45);
-    --scrollbar-thumb-hover: rgba(0, 255, 204, 0.75);
+    --scrollbar-thumb: rgba(69, 171, 255, 0.45);
+    --scrollbar-thumb-hover: rgba(69, 171, 255, 0.75);
     --scrollbar-border: #224466;
-    /* New UI theme */
     --new-ui-bg: rgba(7, 8, 10, 0.5);
     --new-ui-backdrop-filter: blur(10px);
     --new-ui-border: rgba(34, 68, 102, 1);
     --new-ui-border-radius: 0.5rem;
     --new-ui-color: #fff;
-    --new-ui-label-color: #00ffcc;
-    --new-ui-panel-header-color: #00ffcc;
+    --new-ui-label-color: rgb(92, 181, 255);
+    --new-ui-panel-header-color: rgb(92, 181, 255);
     --new-ui-shadow: 0 18px 50px rgba(0, 0, 0, 0.65), 0 0 22px rgba(0, 255, 204, 0.18);
-    --new-ui-button-bg: rgba(0, 68, 136, 0.6);
+    --new-ui-button-bg: rgba(6, 27, 47, 0.6);
+    --new-ui-button-hover-bg: rgba(9, 44, 77, 0.6);
+    --new-ui-button-shadow: 0 2px 8px rgba(17, 97, 177, 0.5);
+    --new-ui-button-active-bg: rgba(69, 171, 255, 0.8);
+    --new-ui-button-active-hover-bg: rgba(128, 198, 255, 0.8);
     --new-ui-input-bg: rgba(6, 27, 47, 0.6);
+    --new-ui-input-hover: rgba(9, 40, 70, 0.6);
+    --new-ui-input-shadow: 0 0 12px rgba(0, 195, 255, 0.4), inset 0 1px 3px rgba(0, 174, 255, 0.1);
     --new-ui-toolbar-button-shadow: 0 0 1rem rgba(78, 123, 168, 0.5);
     --new-ui-toolbar-button-hover-bg: rgba(27, 57, 87, 0.5);
     --new-ui-toolbar-button-active-bg: rgba(27, 57, 87, 0.5);
@@ -32,8 +36,14 @@
     --new-ui-btn-care-color: #f2b6b6;
     --new-ui-btn-care-border: #bb8d8d;
     --new-ui-btn-care-shadow: 0 0 1rem rgba(242, 182, 182, 0.5);
+    --new-ui-btn-danger-bg: rgba(87, 0, 0, 0.6);
+    --new-ui-btn-danger-hover-bg: rgba(126, 0, 0, 0.6);
     --new-ui-icon-button-color: rgba(255, 255, 255, 0.25);
     --new-ui-icon-button-hover-color: rgba(255, 255, 255, 1);
+    --new-ui-list-row-color: rgb(172, 218, 255);
+    --new-ui-list-row-bg: rgba(6, 27, 47, 0.6);
+    --new-ui-list-row-hover-bg: rgba(10, 69, 128, 0.5);
+    --new-ui-list-row-selected-bg: rgba(13, 90, 167, 0.5);
     --new-ui-gap-3: 0.5rem;
     --new-ui-gap-2: 0.25rem;
     --new-ui-gap-1: 0.125rem;
@@ -111,11 +121,11 @@
     scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-input[type="range"] {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  margin: 0;
+input[type='range'] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
 }
 
 body {
@@ -210,7 +220,7 @@ body {
 .modal-header {
     font-size: 1.5em;
     font-weight: bold;
-    color: #00ffcc;
+    color: var(--new-ui-label-color);
     text-align: center;
     margin-bottom: 15px;
     padding-bottom: 10px;
@@ -264,7 +274,7 @@ body {
 .procedural-progress-bar {
     width: 100%;
     height: 14px;
-    border: 1px solid #00ffcc;
+    border: 1px solid var(--new-ui-label-color);
     background: rgba(0, 68, 136, 0.35);
     border-radius: 999px;
     overflow: hidden;
@@ -274,7 +284,7 @@ body {
 .procedural-progress-bar-fill {
     height: 100%;
     width: 0%;
-    background: #00ffcc;
+    background: var(--new-ui-label-color);
     border-radius: 999px;
     transition: width 100ms linear;
 }
@@ -390,18 +400,12 @@ body {
     display: block;
 }
 
-#editBodyName {
-    color: #00ffcc;
-    margin-bottom: 15px;
-    text-align: center;
-}
-
 select {
     width: 100%;
     padding: 10px 12px;
     background: var(--new-ui-input-bg);
-    color: white;
-    border: 1px solid #224466;
+    color: var(--new-ui-color);
+    border: 1px solid var(--new-ui-border);
     border-radius: var(--new-ui-border-radius);
     height: 42px;
     font-family: monospace;
@@ -410,23 +414,21 @@ select {
 }
 
 select:hover {
-    border-color: #00ffcc;
-    background: rgba(0, 68, 136, 0.7);
+    border-color: var(--new-ui-label-color);
+    background: var(--new-ui-input-hover);
 }
 
 select:focus {
     outline: none;
-    border: 1px solid #00ffcc;
-    background: rgba(0, 68, 136, 0.8);
-    box-shadow:
-        0 0 12px rgba(0, 255, 204, 0.4),
-        inset 0 1px 3px rgba(0, 255, 204, 0.1);
+    border: 1px solid var(--new-ui-label-color);
+    background: var(--new-ui-input-hover);
+    box-shadow: var(--new-ui-input-shadow);
     transform: translateY(-1px);
 }
 
 select option {
-    background: #002244;
-    color: white;
+    background: var(--new-ui-input-bg);
+    color: var(--new-ui-color);
 }
 
 .control-group {
@@ -437,7 +439,7 @@ label {
     display: block;
 
     margin-bottom: 4px;
-    color: #00ffcc;
+    color: var(--new-ui-label-color);
     text-transform: uppercase;
 }
 
@@ -446,7 +448,7 @@ label {
     align-items: center;
     font-size: 1.5em;
     font-weight: bold;
-    color: #00ffcc;
+    color: var(--new-ui-label-color);
     text-align: start;
     margin-bottom: 15px;
     padding-bottom: 10px;
@@ -458,7 +460,7 @@ label {
 input[type='range'] {
     width: 100%;
     cursor: pointer;
-    accent-color: #00ffcc;
+    accent-color: var(--new-ui-label-color);
 }
 
 .slider-row {
@@ -496,8 +498,8 @@ button.old-ui {
     width: 100%;
     padding: 8px 8px;
     background: var(--new-ui-button-bg);
-    color: white;
-    border: 1px solid #2a547e;
+    color: var(--new-ui-color);
+    border: 1px solid var(--new-ui-border);
     border-radius: var(--new-ui-border-radius);
     cursor: pointer;
     height: 42px;
@@ -509,9 +511,9 @@ button.old-ui.table-row-btn {
 }
 
 button.old-ui:hover {
-    background: #0054a899;
+    background: var(--new-ui-button-hover-bg);
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 255, 204, 0.3);
+    box-shadow: var(--new-ui-button-shadow);
 }
 
 button.old-ui:active {
@@ -535,12 +537,12 @@ button.old-ui:disabled:hover {
 
 /* Toggled active state */
 button.old-ui.active {
-    background: #00ffcc;
+    background: var(--new-ui-button-active-bg);
     color: #000;
 }
 
 button.old-ui.active:hover {
-    background: #00ddaa;
+    background: var(--new-ui-button-active-hover-bg);
 }
 
 /* Dark button */
@@ -560,12 +562,12 @@ button.old-ui.btn-dark:active {
 
 /* Danger button */
 button.old-ui.btn-danger {
-    background: #8b000099;
-    color: white;
+    background: var(--new-ui-btn-danger-bg);
+    color: var(--new-ui-color);
     border: 1px solid #8b0000;
 }
 button.old-ui.btn-danger:hover {
-    background: #a0000099;
+    background: var(--new-ui-btn-danger-hover-bg);
     box-shadow: 0 2px 8px rgba(139, 0, 0, 0.3);
 }
 button.old-ui.btn-danger:active {
@@ -591,7 +593,7 @@ button.old-ui.btn-danger:active {
 }
 
 .radio-group label {
-    color: #00ffcc;
+    color: var(--new-ui-label-color);
     text-transform: uppercase;
     margin-bottom: 6px;
 }
@@ -612,7 +614,7 @@ button.old-ui.btn-danger:active {
 
 .radio-option input[type='radio'] {
     cursor: pointer;
-    accent-color: #00ffcc;
+    accent-color: var(--new-ui-label-color);
 }
 
 .radio-option label {
@@ -626,8 +628,8 @@ button.old-ui.btn-danger:active {
     width: 100%;
     padding: 10px 12px;
     background: var(--new-ui-input-bg);
-    color: white;
-    border: 1px solid #224466;
+    color: var(--new-ui-color);
+    border: 1px solid var(--new-ui-border);
     border-radius: var(--new-ui-border-radius);
     height: 42px;
     font-family: monospace;
@@ -640,17 +642,15 @@ button.old-ui.btn-danger:active {
 }
 
 .text-input:hover {
-    border-color: #00ffcc;
-    background: rgba(0, 68, 136, 0.7);
+    border-color: var(--new-ui-label-color);
+    background: var(--new-ui-input-hover);
 }
 
 .text-input:focus {
     outline: none;
-    border: 1px solid #00ffcc;
-    background: rgba(0, 68, 136, 0.8);
-    box-shadow:
-        0 0 12px rgba(0, 255, 204, 0.4),
-        inset 0 1px 3px rgba(0, 255, 204, 0.1);
+    border: 1px solid var(--new-ui-label-color);
+    background: var(--new-ui-input-hover);
+    box-shadow: var(--new-ui-input-shadow);
     transform: translateY(-1px);
 }
 
@@ -1098,19 +1098,19 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     border-radius: var(--new-ui-border-radius);
     cursor: pointer;
 
-    background: rgba(0, 102, 204, 0.2);
+    background: var(--new-ui-list-row-bg);
     border: 1px solid transparent;
     transition: background 0.12s ease;
     user-select: none;
 }
 
 .vue-ui-body-row:hover {
-    background-color: var(--new-ui-button-bg);
+    background-color: var(--new-ui-list-row-hover-bg);
 }
 
 .vue-ui-body-row.vue-ui-body-row-selected {
-    background: rgba(0, 255, 204, 0.16);
-    border-color: rgba(0, 255, 204, 0.55);
+    background: var(--new-ui-list-row-selected-bg);
+    border-color: var(--new-ui-border);
 }
 
 .vue-ui-body-name {
@@ -1253,18 +1253,18 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     padding: 0.35rem 0.5rem;
     border-radius: 0.4rem;
     cursor: pointer;
-    color: var(--new-ui-color);
+    color: var(--new-ui-list-row-color);
     transition: background 0.15s ease;
     user-select: none;
 }
 
 .playlist-item:hover {
-    background: var(--new-ui-toolbar-button-hover-bg);
+    background: var(--new-ui-list-row-hover-bg);
 }
 
 .playlist-item--active {
-    color: var(--new-ui-label-color);
-    background: rgba(0, 255, 204, 0.08);
+    color: var(--new-ui-color);
+    background: var(--new-ui-list-row-selected-bg);
 }
 
 .playlist-item__num {
@@ -1333,20 +1333,18 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     justify-content: center;
     font-size: 1.5em;
     font-weight: bold;
-    color: #00ffcc;
+    color: var(--new-ui-label-color);
     text-align: center;
     margin-bottom: 15px;
     padding-bottom: 10px;
+
     border-bottom: 1px solid var(--new-ui-border);
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .vue-modal-close {
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
+    margin-left: auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;

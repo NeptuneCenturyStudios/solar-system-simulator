@@ -102,49 +102,5 @@ watch(
     min-height: 0;
 }
 
-.playlist-item {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    padding: 0.35rem 0.5rem;
-    border-radius: 0.4rem;
-    cursor: pointer;
-    color: var(--new-ui-color);
-    transition: background 0.15s ease;
-    user-select: none;
-}
 
-.playlist-item:hover {
-    background: var(--new-ui-toolbar-button-hover-bg);
-}
-
-.playlist-item--active {
-    color: var(--new-ui-label-color);
-    background: rgba(0, 255, 204, 0.08);
-}
-
-.playlist-item__num {
-    flex-shrink: 0;
-    width: 1.6rem;
-    font-size: 0.7rem;
-    opacity: 0.5;
-    text-align: right;
-}
-
-.playlist-item__title {
-    flex: 1;
-    font-size: 0.78rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.playlist-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.5rem;
-    padding-top: 0.25rem;
-    border-top: 1px solid var(--new-ui-border);
-}
 </style>

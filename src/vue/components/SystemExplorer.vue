@@ -71,11 +71,6 @@
             aria-label="Search bodies"
         />
 
-        <button class="old-ui btn-with-icon mb-3" type="button" @click="openBodyEditor('add', null)">
-            <span class="material-symbols-outlined">add</span>
-            ADD BODY
-        </button>
-
         <hr class="vue-ui-hr" />
 
         <div class="vue-ui-body-list" role="listbox" aria-label="Celestial bodies">
@@ -141,6 +136,15 @@
         </div>
 
         <div>
+            <button
+                class="old-ui btn-with-icon mb-3"
+                type="button"
+                @click="openBodyEditor('add', null)"
+            >
+                <span class="material-symbols-outlined">add</span>
+                ADD BODY
+            </button>
+
             <label class="checkbox-row">
                 <input
                     type="checkbox"
