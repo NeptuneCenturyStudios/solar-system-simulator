@@ -286,7 +286,7 @@
                         <label
                             >Velocity <span class="val-display">{{ editVelocity.toFixed(1) }}</span></label
                         >
-                        <input v-model.number="editVelocity" type="range" min="0" max="200" step="0.1" />
+                        <input v-model.number="editVelocity" class="text-input" type="number" min="0" />
                     </div>
 
                     <div class="control-group">
