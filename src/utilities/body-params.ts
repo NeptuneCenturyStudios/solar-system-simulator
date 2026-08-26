@@ -36,6 +36,7 @@ import {
     NEPTUNE_MASS,
     URANUS_RADIUS,
     NEPTUNE_RADIUS,
+    WORMHOLE_DEFAULT_RADIUS,
 } from './consts';
 import { SeededRandom } from './prng';
 
@@ -525,4 +526,72 @@ export function randomCometParams(
             : 1 + Math.random() * 2;
 
     return { mass, radius };
+}
+
+// ---------------------------------------------------------------------------
+// Wormhole
+// ---------------------------------------------------------------------------
+
+export interface WormholeParams {
+    radius: number;
+    rotationTilt: number;
+    rotationAzimuth: number;
+    /** The seed actually used to derive this wormhole's properties. */
+    seed: string;
+}
+
+/**
+ * Returns deterministic (or override-applied) params for a new custom/procedural wormhole.
+ * Mouth radius is log-sampled around the default gate size; tilt/azimuth use the same
+ * orientation ranges as custom planets so the RANDOMIZE button behaves consistently.
+ */
+export function randomWormholeParams(
+    opts: {
+        radius?: number | null;
+        rotationTilt?: number | null;
+        rotationAzimuth?: number | null;
+        seed?: string | null;
+    } = {}
+): WormholeParams {
+    const inputSeed = (opts.seed ?? '').trim();
+    const seed = inputSeed.length > 0 ? inputSeed : generateSeedString();
+
+    const rng = new SeededRandom(seed);
+
+    // Gate mouth radius anchored to the default gate size, log-spread so tiny jump gates
+    // and large hub gates both feel distinct rather than clustering at 1.5× Earth.
+    const WORMHOLE_MIN_RADIUS = WORMHOLE_DEFAULT_RADIUS * 0.5;
+    const WORMHOLE_MAX_RADIUS = WORMHOLE_DEFAULT_RADIUS * 3;
+
+    const radius =
+        typeof opts.radius === 'number' && isFinite(opts.radius) && opts.radius > 0
+            ? opts.radius
+            : WORMHOLE_MIN_RADIUS * Math.pow(WORMHOLE_MAX_RADIUS / WORMHOLE_MIN_RADIUS, rng.next());
+
+    // Same orientation ranges as custom planets: tilt over [0, 90], full spin over [0, 360].
+    const rotationTilt =
+        typeof opts.rotationTilt === 'number' && isFinite(opts.rotationTilt)
+            ? opts.rotationTilt
+            : rng.range(0, 90);
+
+    const rotationAzimuth =
+        typeof opts.rotationAzimuth === 'number' && isFinite(opts.rotationAzimuth)
+            ? opts.rotationAzimuth
+            : rng.range(0, 360);
+
+    // Defensive: ensure outputs are finite + positive so the collision/disc geometry stays valid.
+    const safeRadius =
+        typeof radius === 'number' && isFinite(radius) && radius > 0
+            ? radius
+            : WORMHOLE_DEFAULT_RADIUS;
+    const safeTilt = typeof rotationTilt === 'number' && isFinite(rotationTilt) ? rotationTilt : 0;
+    const safeAzimuth =
+        typeof rotationAzimuth === 'number' && isFinite(rotationAzimuth) ? rotationAzimuth : 0;
+
+    return {
+        radius: safeRadius,
+        rotationTilt: safeTilt,
+        rotationAzimuth: safeAzimuth,
+        seed,
+    };
 }

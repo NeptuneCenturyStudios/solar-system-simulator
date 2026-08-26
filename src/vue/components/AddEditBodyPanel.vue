@@ -1,5 +1,5 @@
 <template>
-    <PanelBase :title="isEditMode ? 'Edit Body' : 'Add Body'">
+    <PanelBase :title="isEditMode ? 'Edit Object' : 'Add Object'">
 
         <div class="vue-ui-body-editor-fields">
             <!-- ══════════════════════════ ADD MODE ══════════════════════════ -->
@@ -13,7 +13,7 @@
                 </div>
 
                 <div v-if="addMode === 'preset'" class="control-group">
-                    <label for="vuePresetBodySelect">Preset Body</label>
+                    <label for="vuePresetBodySelect">Presets</label>
                     <select id="vuePresetBodySelect" v-model="presetKey">
                         <option v-for="p in PRESET_BODIES" :key="p.value" :value="p.value">
                             {{ p.label }}
@@ -335,7 +335,7 @@
                     <div class="button-group">
                         <button class="old-ui btn-with-icon" type="button" @click="onApply">
                             <span class="material-symbols-outlined">save</span>
-                            APPLY CHANGES
+                            APPLY
                         </button>
                         <button class="old-ui btn-with-icon btn-danger" type="button" @click="onDelete">
                             <span class="material-symbols-outlined">delete</span>

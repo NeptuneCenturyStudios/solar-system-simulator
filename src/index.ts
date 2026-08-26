@@ -82,6 +82,7 @@ import {
     randomMoonParams,
     randomCometParams,
     randomAsteroidParams,
+    randomWormholeParams,
 } from './utilities/body-params';
 import {
     loadSpaceTexture,
@@ -3317,13 +3318,14 @@ registerVueSimHooks({
         }
 
         if (bodyType === 'wormhole') {
+            const wormhole = randomWormholeParams();
             return {
                 mass: null,
-                radius: WORMHOLE_DEFAULT_RADIUS,
+                radius: wormhole.radius,
                 temperature: null,
                 lightIntensity: null,
-                tilt: 0,
-                azimuth: 0,
+                tilt: Math.round(wormhole.rotationTilt),
+                azimuth: Math.round(wormhole.rotationAzimuth),
                 inclination,
                 hasAtmosphere: false,
                 hasRings: false,

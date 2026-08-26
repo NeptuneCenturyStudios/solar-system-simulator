@@ -63,15 +63,15 @@
             v-model="searchQuery"
             type="search"
             class="vue-ui-input"
-            placeholder="Search bodies…"
-            aria-label="Search bodies"
+            placeholder="Search objects…"
+            aria-label="Search objects"
         />
 
         <hr class="vue-ui-hr" />
 
-        <div class="vue-ui-body-list" role="listbox" aria-label="Celestial bodies">
+        <div class="vue-ui-body-list" role="listbox" aria-label="Celestial objects">
             <p v-if="filteredBodies.length === 0" class="vue-ui-empty">
-                No bodies yet — launch a system first.
+                No objects yet — launch a system first.
             </p>
             <div
                 v-for="body in filteredBodies"
@@ -138,7 +138,7 @@
                 @click="openBodyEditor('add', null)"
             >
                 <span class="material-symbols-outlined">add</span>
-                ADD BODY
+                ADD NEW
             </button>
 
             <label class="checkbox-row">
