@@ -2,7 +2,11 @@ import * as THREE from 'three';
 
 import { Body } from '../bodies/body';
 import { Wormhole } from '../bodies/wormhole';
-import { clearPendingWormholeLink, getPendingWormholeLink } from '../bodies/wormhole-link-state';
+import {
+    clearPendingWormholeLink,
+    getPendingWormholeLink,
+    setPendingWormholeLink,
+} from '../bodies/wormhole-link-state';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { ImpactShockwave } from '../effects/impact-shockwave';
 import { SoundEffect, playSoundEffect } from '../utilities/audio.js';
@@ -109,14 +113,21 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
             // can emit `body:dead` without being spliced out here.
             simulationState.bodies = (simulationState.bodies || []).filter((b) => b !== body);
 
-            // A deleted wormhole's partner (if any) reverts to unlinked/destructive.
+            // A deleted wormhole's partner (if any) reverts to unlinked, then awaits a new link.
             if (body instanceof Wormhole) {
                 if (getPendingWormholeLink() === body) clearPendingWormholeLink();
                 if (body.linkedWormholeId) {
                     const partner = simulationState.bodies.find(
                         (b) => b instanceof Wormhole && b.id === body.linkedWormholeId
                     ) as Wormhole | undefined;
-                    partner?.clearLink();
+                    if (partner) {
+                        partner.clearLink();
+                        setPendingWormholeLink(partner);
+                        addEvent({
+                            message: `${partner.name} is now awaiting a new link`,
+                            notificationType: NotificationType.Info,
+                        });
+                    }
                 }
             }
         }

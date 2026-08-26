@@ -301,7 +301,7 @@ export const HP_MASS_MULTIPLIER = 100;
 
 // === Wormhole tuning ===
 /** Default mouth (gate) radius for a newly created wormhole, in sim units. */
-export const WORMHOLE_DEFAULT_RADIUS = 40 * SCALE_FACTOR;
+export const WORMHOLE_DEFAULT_RADIUS = EARTH_RADIUS * 1.5;
 /** Visual length of the swirling funnel/tail effect, as a multiple of the mouth radius. */
 export const WORMHOLE_FUNNEL_LENGTH_FACTOR = 1.2;
 /** Number of pooled particles in the funnel vortex effect. */
