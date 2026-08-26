@@ -1,8 +1,5 @@
 <template>
-    <section class="vue-ui-panel vue-ui-body-editor">
-        <header class="vue-ui-card-header">
-            <span>{{ isEditMode ? 'Edit Body' : 'Add Body' }}</span>
-        </header>
+    <PanelBase :title="isEditMode ? 'Edit Body' : 'Add Body'">
 
         <div class="vue-ui-body-editor-fields">
             <!-- ══════════════════════════ ADD MODE ══════════════════════════ -->
@@ -352,7 +349,7 @@
                 </template>
             </template>
         </div>
-    </section>
+    </PanelBase>
 </template>
 
 <script setup lang="ts">
@@ -373,6 +370,7 @@ import {
     simStore,
 } from '../sim-bridge';
 import type { ApplyBodyEditPayload, CreateBodyPayload } from '../sim-bridge';
+import PanelBase from './PanelBase.vue';
 
 const PRESET_BODIES = [
     { value: 'sun', label: 'Sun' },

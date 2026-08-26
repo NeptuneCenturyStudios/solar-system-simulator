@@ -71,6 +71,24 @@ export class Wormhole extends StaticBody {
         this.mesh.traverse((child) => (child.userData.parentBody = this));
     }
 
+    /** Rebuilds the disc mesh and funnel effect at the new radius (mesh is a flat disc, not a sphere). */
+    override setRadius(newRadius: number) {
+        if (!Number.isFinite(newRadius) || newRadius <= 0) return;
+
+        this.radius = newRadius;
+
+        try {
+            this.mesh.geometry.dispose();
+            const discGeo = new THREE.CircleGeometry(newRadius, 48);
+            discGeo.rotateX(Math.PI / 2);
+            this.mesh.geometry = discGeo;
+        } catch (e) {
+            console.error('Error updating wormhole mesh radius:', e);
+        }
+
+        this.funnelEffect.setRadius(newRadius);
+    }
+
     /** World-space entrance/exit normal — the gate's local +Y axis after orientation. */
     getEntranceNormal(): THREE.Vector3 {
         return new THREE.Vector3(0, 1, 0).applyQuaternion(this.mesh.quaternion);

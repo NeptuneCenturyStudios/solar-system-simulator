@@ -1,9 +1,5 @@
 <template>
-    <section class="vue-ui-panel vue-ui-explorer">
-        <header class="vue-ui-card-header">
-            <span>System Explorer</span>
-        </header>
-
+    <PanelBase title="System Explorer">
         <div class="btn-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr">
             <button
                 class="old-ui btn-icon-only"
@@ -173,7 +169,7 @@
 
             <div class="footer-note">© {{ new Date().getFullYear() }} Neptune Century</div>
         </div>
-    </section>
+    </PanelBase>
 </template>
 
 <script setup lang="ts">
@@ -198,6 +194,7 @@ import {
 } from '../sim-bridge';
 import type { BodySnapshot } from '../sim-bridge';
 import { openBodyEditor } from '../ui-store';
+import PanelBase from './PanelBase.vue';
 
 const searchQuery = ref('');
 

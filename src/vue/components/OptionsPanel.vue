@@ -1,8 +1,5 @@
 <template>
-    <section class="vue-ui-panel vue-ui-options">
-        <header class="vue-ui-card-header">
-            <span>Options</span>
-        </header>
+    <PanelBase title="Options">
 
         <div class="vue-ui-options-fields">
             <label class="checkbox-row">
@@ -98,7 +95,7 @@
                 </div>
             </div>
         </div>
-    </section>
+    </PanelBase>
 </template>
 
 <script setup lang="ts">
@@ -110,6 +107,8 @@ import {
     setSubsteps,
     simStore,
 } from '../sim-bridge';
+
+import PanelBase from './PanelBase.vue';
 
 /** Same defaults as the legacy panel's reset buttons. */
 const DEFAULT_SUBSTEPS = 64;

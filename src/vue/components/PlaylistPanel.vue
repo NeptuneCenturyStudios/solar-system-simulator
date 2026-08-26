@@ -1,8 +1,5 @@
 <template>
-    <section class="vue-ui-panel vue-ui-playlist">
-        <header class="vue-ui-card-header">
-            <span>Music Playlist</span>
-        </header>
+    <PanelBase title="Music Playlist">
 
         <div ref="trackListEl" class="playlist-track-list">
             <div
@@ -36,7 +33,7 @@
                 <span class="material-symbols-outlined">skip_next</span>
             </button>
         </div>
-    </section>
+    </PanelBase>
 </template>
 
 <script setup lang="ts">
@@ -48,6 +45,7 @@ import {
     playlistTogglePlayPause,
     playlistStore,
 } from '../sim-bridge';
+import PanelBase from './PanelBase.vue';
 
 const trackListEl = ref<HTMLElement | null>(null);
 

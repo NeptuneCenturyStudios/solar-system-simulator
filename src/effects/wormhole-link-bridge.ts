@@ -166,6 +166,7 @@ export class WormholeLinkBridge implements IEffect {
         this._speedMul = new Float32Array(count);
         this._phase = new Float32Array(count);
         this._radial = new Float32Array(count);
+        this._dir = new Float32Array(count);
 
         for (let i = 0; i < count; i++) {
             this._tPos[i] = Math.random();
@@ -212,7 +213,7 @@ vT = aT;`
             );
             shader.vertexShader = shader.vertexShader.replace(
                 'gl_PointSize = size;',
-                'gl_PointSize = size * aSize * 1.4;'
+                'gl_PointSize = size * aSize * 1.1;'
             );
 
             shader.fragmentShader = shader.fragmentShader.replace(

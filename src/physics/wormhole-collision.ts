@@ -24,8 +24,12 @@ interface IWormholeCrossing {
 function testWormholeEntrance(
     prevPos: THREE.Vector3,
     newPos: THREE.Vector3,
-    wormhole: Wormhole
+    wormhole: Wormhole,
+    body: Body
 ): IWormholeCrossing | null {
+    // Bodies larger than the wormhole's mouth are too big to be swallowed and just pass through.
+    if (body.radius >= wormhole.radius) return null;
+
     const normal = wormhole.getEntranceNormal();
     const center = wormhole.mesh.position;
 
@@ -146,7 +150,7 @@ export function processWormholeInteractions(
             const prevPos = prevPositions.get(body.id);
             if (!prevPos) continue;
 
-            const crossing = testWormholeEntrance(prevPos, body.mesh.position, wormhole);
+            const crossing = testWormholeEntrance(prevPos, body.mesh.position, wormhole, body);
             if (!crossing) continue;
 
             handled.add(body.id);

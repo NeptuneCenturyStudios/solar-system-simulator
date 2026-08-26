@@ -45,6 +45,7 @@ export class WormholeFunnelEffect implements IEffect {
     private _spinPhase = 0;
     private _linked = false;
     private _lastParticlesEnabled = true;
+    private _parentMesh: THREE.Object3D;
 
     private _particleT: Float32Array = new Float32Array(0);
 
@@ -54,11 +55,46 @@ export class WormholeFunnelEffect implements IEffect {
         this.dependencies = dependencies;
         this._mouthRadius = mouthRadius;
         this._tailLength = mouthRadius * WORMHOLE_FUNNEL_LENGTH_FACTOR;
+        this._parentMesh = parentMesh;
 
         this._buildParticles(parentMesh);
         this._buildFallbackMesh(parentMesh);
         this._lastParticlesEnabled = settingsStore.settings.particleEffectsEnabled;
         this._applyMode();
+    }
+
+    /** Rebuilds the particle funnel and fallback cone at a new mouth radius, preserving linked state. */
+    setRadius(newRadius: number): void {
+        if (!Number.isFinite(newRadius) || newRadius <= 0 || newRadius === this._mouthRadius) return;
+
+        this._disposeVisuals();
+
+        this._mouthRadius = newRadius;
+        this._tailLength = newRadius * WORMHOLE_FUNNEL_LENGTH_FACTOR;
+
+        this._buildParticles(this._parentMesh);
+        this._buildFallbackMesh(this._parentMesh);
+        this.setLinkedState(this._linked);
+        this._applyMode();
+    }
+
+    private _disposeVisuals(): void {
+        if (this._points) {
+            this._points.parent?.remove(this._points);
+            this._points.geometry.dispose();
+            (this._points.material as THREE.Material).dispose();
+            this._points = null;
+        }
+        if (this._fallbackMesh) {
+            this._fallbackMesh.parent?.remove(this._fallbackMesh);
+            this._fallbackMesh.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.geometry.dispose();
+                    (child.material as THREE.Material).dispose();
+                }
+            });
+            this._fallbackMesh = null;
+        }
     }
 
     private _buildParticles(parentMesh: THREE.Object3D): void {
@@ -234,21 +270,6 @@ float strength = smoothstep(0.5, 0.1, dist);`
 
     dispose(): void {
         this.active = false;
-        if (this._points) {
-            this._points.parent?.remove(this._points);
-            this._points.geometry.dispose();
-            (this._points.material as THREE.Material).dispose();
-            this._points = null;
-        }
-        if (this._fallbackMesh) {
-            this._fallbackMesh.parent?.remove(this._fallbackMesh);
-            this._fallbackMesh.traverse((child) => {
-                if (child instanceof THREE.Mesh) {
-                    child.geometry.dispose();
-                    (child.material as THREE.Material).dispose();
-                }
-            });
-            this._fallbackMesh = null;
-        }
+        this._disposeVisuals();
     }
 }

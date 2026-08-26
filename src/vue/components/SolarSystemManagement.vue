@@ -1,8 +1,5 @@
 <template>
-    <section class="vue-ui-panel vue-ui-solar-management">
-        <header class="vue-ui-card-header">
-            <span>Solar System Management</span>
-        </header>
+    <PanelBase title="Solar System Management" >
 
         <div class="vue-ui-solar-management-fields">
             <label class="checkbox-row">
@@ -74,7 +71,7 @@
                 </div>
             </div>
         </div>
-    </section>
+    </PanelBase>
 </template>
 
 <script setup lang="ts">
@@ -87,6 +84,7 @@ import {
     simStore,
 } from '../sim-bridge';
 import { spaceTextures } from '../../drawing/textures';
+import PanelBase from './PanelBase.vue';
 
 /** Space background texture options (same list the legacy panel dropdown used). */
 const SPACE_TEXTURES = spaceTextures;

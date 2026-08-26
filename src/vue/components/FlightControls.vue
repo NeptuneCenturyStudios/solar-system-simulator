@@ -1,9 +1,5 @@
 <template>
-    <section class="vue-ui-panel vue-ui-flight-controls">
-        <header class="vue-ui-card-header">
-            <span>Flight Controls</span>
-        </header>
-
+    <PanelBase title="Flight Controls">
         <p class="vue-ui-hint">
             W/S — speed &nbsp; A/D — roll &nbsp; Shift — boost<br />
             C — view &nbsp; Mouse steers &nbsp; Hold space — warp &nbsp; Esc — exit
@@ -51,7 +47,7 @@
             }}</span>
             {{ simStore.autopilotTargetId !== null ? 'CANCEL AUTOPILOT' : 'AUTOPILOT' }}
         </button>
-    </section>
+    </PanelBase>
 </template>
 
 <script setup lang="ts">
@@ -65,6 +61,8 @@ import {
     setSelectedShipTypeId,
     simStore,
 } from '../sim-bridge';
+
+import PanelBase from './PanelBase.vue';
 
 const canReenter = computed(
     () => simStore.hasKnownShip && simStore.knownShipTypeId === simStore.selectedShipTypeId

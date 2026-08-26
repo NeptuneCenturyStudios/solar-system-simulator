@@ -849,7 +849,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 }
 
 .vue-ui-panel-manager.expanded .vue-ui-panel-manager-panels {
-    padding: var(--new-ui-gap-3) 0 var(--new-ui-gap-3) var(--new-ui-gap-3);
+    padding: 0 0 0 var(--new-ui-gap-3);
     flex: 1;
     min-width: 0;
 }
@@ -1281,7 +1281,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     border: none;
     color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: var(--new-ui-border-radius);
     transition: all 0.2s ease;
 }
 
