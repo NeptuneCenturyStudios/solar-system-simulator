@@ -6,33 +6,24 @@ import { WormholeFunnelEffect } from '../effects/wormhole-funnel';
 
 const WORMHOLE_COLOR = 0x8844ff;
 
-/** Builds the gate mesh: a ring (ArrowHelper-scaled by the gizmo like any body) plus a
- *  translucent portal disc. Geometry is rotated so its normal is local +Y, matching the
- *  tilt/azimuth gizmo's spin-axis convention used as the wormhole's entrance normal. */
+/**
+ * Builds the gate mesh: a flat, invisible disk. The mesh's position/quaternion define the
+ * wormhole's entrance plane and normal (geometry rotated so its normal is local +Y, matching
+ * the tilt/azimuth gizmo's spin-axis convention used as the wormhole's entrance normal).
+ *
+ * The disk is intentionally invisible (material.visible = false) because the WormholeFunnelEffect
+ * provides all the visuals. It is still raycastable (Mesh.raycast ignores material.visible), so
+ * click-picking resolves to the owning body via userData.parentBody. Swept-plane collision
+ * (wormhole-collision.ts) uses only mesh.position, getEntranceNormal(), and radius, not geometry.
+ */
 function createWormholeMesh(radius: number): THREE.Mesh {
-    const ringGeo = new THREE.TorusGeometry(radius, Math.max(radius * 0.08, 0.05), 16, 48);
-    ringGeo.rotateX(Math.PI / 2);
-    const ringMat = new THREE.MeshStandardMaterial({
-        color: WORMHOLE_COLOR,
-        emissive: 0x4411aa,
-        emissiveIntensity: 0.6,
-        metalness: 0.6,
-        roughness: 0.3,
-    });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-
-    const discGeo = new THREE.CircleGeometry(radius * 0.96, 48);
+    const discGeo = new THREE.CircleGeometry(radius, 48);
     discGeo.rotateX(Math.PI / 2);
     const discMat = new THREE.MeshBasicMaterial({
-        color: 0x220033,
-        transparent: true,
-        opacity: 0.35,
+        visible: false,
         side: THREE.DoubleSide,
-        depthWrite: false,
     });
-    ringMesh.add(new THREE.Mesh(discGeo, discMat));
-
-    return ringMesh;
+    return new THREE.Mesh(discGeo, discMat);
 }
 
 /**
@@ -76,7 +67,7 @@ export class Wormhole extends StaticBody {
         if (this.trail) this.trail.visible = false;
 
         this.funnelEffect = new WormholeFunnelEffect(dependencies, this.mesh, radius);
-        // Let clicks anywhere on the gate (disc, particles, fallback cones) resolve to this body.
+        // Let clicks anywhere on the gate (disk, particles, fallback cones) resolve to this body.
         this.mesh.traverse((child) => (child.userData.parentBody = this));
     }
 
