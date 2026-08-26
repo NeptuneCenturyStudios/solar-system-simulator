@@ -96,6 +96,7 @@ import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { AmbientSoundManager } from './utilities/ambient-sound';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
+import { createBridgeForPair } from './effects/wormhole-link-bridge';
 import { GridHelperManager } from './gizmos/grid-helper';
 import { PositionIndicatorManager } from './gizmos/position-indicator';
 import { FlightHUD } from './drawing/flight-hud';
@@ -1553,6 +1554,8 @@ function createNewBody(
         if (pendingLink) {
             pendingLink.setLinkedWormhole(wormhole.id);
             wormhole.setLinkedWormhole(pendingLink.id);
+            // Spawn the bezier particle bridge connecting the two funnels.
+            createBridgeForPair(pendingLink, wormhole, scene);
             clearPendingWormholeLink();
             addEvent({
                 message: `${pendingLink.name} and ${wormhole.name} are now linked`,

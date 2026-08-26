@@ -19,6 +19,7 @@ import { Comet } from '../bodies/comet';
 import { Star } from '../bodies/star';
 import { Wormhole } from '../bodies/wormhole';
 import { processWormholeInteractions } from '../physics/wormhole-collision';
+import { updateWormholeBridges } from '../effects/wormhole-link-bridge';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { settingsStore } from '../settings/settings-store';
 import { UIManager } from '../ui/ui-manager';
@@ -491,6 +492,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
 
             processWormholeInteractions(ctx.simulationState.bodies, _wormholePrevPositions);
+
+            // Bezier particle streams between linked wormholes (once per frame, not per body).
+            updateWormholeBridges(dtTotal);
         }
 
         // ── Gizmo / vel arc / orbit prediction ──────────────────────────
