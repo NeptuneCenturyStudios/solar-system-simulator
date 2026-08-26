@@ -305,7 +305,7 @@ export const WORMHOLE_DEFAULT_RADIUS = EARTH_RADIUS * 1.5;
 /** Visual length of the swirling funnel/tail effect, as a multiple of the mouth radius. */
 export const WORMHOLE_FUNNEL_LENGTH_FACTOR = 1.2;
 /** Number of pooled particles in the funnel vortex effect. */
-export const WORMHOLE_FUNNEL_PARTICLE_COUNT = 20000;
+export const WORMHOLE_FUNNEL_PARTICLE_COUNT = 50000;
 /** Distance (as a multiple of exit radius) a teleported body is pushed clear of the exit mouth. */
 export const WORMHOLE_EMERGE_BUFFER_FACTOR = 1.5;
 
@@ -317,11 +317,13 @@ export const WORMHOLE_BRIDGE_TUBE_RADIUS_FACTOR = 0.22;
 /** Bézier control-point length as a multiple of the funnel-tip-to-tip distance. */
 export const WORMHOLE_BRIDGE_CONTROL_FACTOR = 0.35;
 /** Mean flow speed along the bridge in sim units per second (normalised by curve length). */
-export const WORMHOLE_BRIDGE_FLOW_SPEED = 60 * SCALE_FACTOR;
+export const WORMHOLE_BRIDGE_FLOW_SPEED = C;
 /** Angular speed (rad/s) of the swirling motion around the bridge axis. */
 export const WORMHOLE_BRIDGE_SWIRL_SPEED = 1.2 * 0.25;
-/** Sampled points in the fallback line shown when particle effects are disabled. */
-export const WORMHOLE_BRIDGE_LINE_SEGMENTS = 64;
+/** Rings sampled along the glowing bridge tube (also drives the particle curve params). */
+export const WORMHOLE_BRIDGE_TUBE_SEGMENTS = 1024;
+/** Vertices around each ring of the glowing bridge tube. */
+export const WORMHOLE_BRIDGE_TUBE_RADIAL_SEGMENTS = 12;
 
 // Set the Z position slightly above 0 for linux systems
 export const TEXT_SPRITE_Z = 0.01;
