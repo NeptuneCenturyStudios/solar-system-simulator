@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
-import { BLACK_HOLE_RADIUS_PER_SOL, G, PLUTO_DIST } from '../utilities/consts';
+import { BLACK_HOLE_RADIUS_PER_SOL, G, PLUTO_DIST, SUN_MASS } from '../utilities/consts';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { BlackHole } from '../bodies/black-hole';
 import { CelestialBody } from '../bodies/celestial-body';
@@ -381,5 +381,8 @@ export function destroyBody(winner: Body | null, victims: Body[]) {
 export function blackHoleMassToEventHorizonRadius(mass: number): number {
     const safeMass = Math.max(0, mass);
 
-    return BLACK_HOLE_RADIUS_PER_SOL * safeMass;
+    // Convert mass to solar masses (if needed) before multiplying by the constant.
+    const massInSolarMasses = safeMass / SUN_MASS;
+    // Convert mass to radius using the constant for solar masses.
+    return BLACK_HOLE_RADIUS_PER_SOL * massInSolarMasses;
 }
