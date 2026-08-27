@@ -2,6 +2,11 @@
     <PanelBase title="Options">
 
         <div class="vue-ui-options-fields">
+
+            <div class="vue-ui-card-header">
+                Graphics
+            </div>
+
             <label class="checkbox-row">
                 <input
                     type="checkbox"
@@ -20,6 +25,9 @@
                 Lens Flares
             </label>
 
+            <div class="vue-ui-card-header">
+                Physics
+            </div>
             <div class="control-group">
                 <label>
                     Physics Accuracy
@@ -45,6 +53,9 @@
                 </div>
             </div>
 
+            <div class="vue-ui-card-header">
+                Audio
+            </div>
             <div class="control-group">
                 <label>
                     Sound Effects Volume
