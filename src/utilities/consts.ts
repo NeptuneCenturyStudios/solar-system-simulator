@@ -244,8 +244,10 @@ export const ORBIT_PREDICTION_MAX_SEGMENTS = 2048;
 export const ORBIT_PREDICTION_HIGH_E_THRESHOLD = 0.6;
 
 // === Simulation / integration timing ===
-/** Base frame dt used for physics integration (approx 60fps). */
+/** Reference frame duration (approx 60fps) that the substep count is calibrated against; actual dt is derived from measured wall-clock time. */
 export const BASE_FRAME_DT = 0.016;
+/** Hard cap on physics substeps per rendered frame, bounding worst-case CPU cost during a lag spike combined with high time-warp. */
+export const MAX_SUBSTEPS_PER_FRAME = 512;
 
 // === Flight controls ===
 export const FLIGHT_MAX_POINTER_OFFSET = 260; // pixels before reaching full turn rate

@@ -95,8 +95,8 @@ export function updateSimulation(
         updatePhysics(simulationState);
 
         // Apply autopilot thrust impulse each substep so it scales correctly with timeScale.
-        // Running once per frame at BASE_FRAME_DT would let the ship fly through brake zones
-        // at high time-warp without ever triggering phase transitions.
+        // Running once per frame would let the ship fly through brake zones at high
+        // time-warp or low framerate without ever triggering phase transitions.
         if (autopilotState.isActive) updateAutopilot(dt);
 
         // Apply accelerations to positions

@@ -40,6 +40,7 @@ import {
 
 import {
     BASE_FRAME_DT,
+    MAX_SUBSTEPS_PER_FRAME,
     GIZMO_TUNING,
     TIME_SCALE,
     TEXT_SPRITE_Z,
@@ -178,8 +179,18 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         _prevCamPos.copy(ctx.camera.position);
 
         const tScale = simulationState.timeScale;
-        const steps = settingsStore.settings.substeps;
-        const dt = (BASE_FRAME_DT * TIME_SCALE * tScale) / steps;
+        // Substep count scales with how much real time this frame represents, so each
+        // substep's dt stays bounded (keeps orbits stable and autopilot brake zones from
+        // being skipped) regardless of framerate or time-warp. dtTotal is always exactly
+        // wallDt * TIME_SCALE * tScale, so total sim-time advanced stays wall-clock accurate
+        // even if the cap below is hit (only per-substep accuracy is reduced in that case).
+        const baseSubsteps = settingsStore.settings.substeps;
+        const frameRatio = wallDt / BASE_FRAME_DT;
+        const steps = Math.min(
+            Math.max(1, Math.ceil(baseSubsteps * frameRatio)),
+            MAX_SUBSTEPS_PER_FRAME
+        );
+        const dt = (wallDt * TIME_SCALE * tScale) / steps;
         const dtTotal = dt * steps;
 
         // ── Surface camera ───────────────────────────────────────────────

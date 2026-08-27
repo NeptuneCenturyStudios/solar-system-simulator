@@ -80,7 +80,7 @@ const speedTitle = computed(() => {
     }
     return simStore.timeScale < 0
         ? `Running in reverse at ${Math.abs(simStore.timeScale).toFixed(1)}x`
-        : `Running at ${simStore.timeScale.toFixed(1)}x`;
+        : `Running at ${formatTimeScale(simStore.timeScale)}`;
 });
 
 function onTogglePause(): void {

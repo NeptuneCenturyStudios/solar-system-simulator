@@ -828,6 +828,6 @@ export function formatTimeScale(value: number): string {
     if (state.isPaused) {
         return `PAUSED`;
     }
-    if (value < 0) return `${Math.abs(value).toFixed(1)}x REVERSE`;
-    return `${value.toFixed(1)}x`;
+    if (value < 0) return `${Math.abs(value).toFixed(2)}x REVERSE`;
+    return `${value.toFixed(2)}x`;
 }

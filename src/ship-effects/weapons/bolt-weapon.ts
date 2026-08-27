@@ -228,7 +228,7 @@ export class BoltWeapon extends Weapon {
      *                       flight duration is consistent regardless of FPS.
      * @param simDt          Total physics simulation advance this frame (seconds) — used
      *                       for position so bolts stay in sync with the ship's physics
-     *                       movement (dtTotal = BASE_FRAME_DT × TIME_SCALE × tScale).
+     *                       movement (dtTotal = wallDt × TIME_SCALE × tScale).
      * @param bodies         All active simulation bodies for collision testing.
      * @param cameraPosition World-space camera position for camera-relative rendering.
      * @param owner          Ship firing this weapon — skipped in collision checks.
