@@ -41,6 +41,7 @@ import {
 import {
     BASE_FRAME_DT,
     MAX_SUBSTEPS_PER_FRAME,
+    WALL_DT_SMOOTHING,
     GIZMO_TUNING,
     TIME_SCALE,
     TEXT_SPRITE_Z,
@@ -146,6 +147,10 @@ export interface AnimationContext {
 export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightControlContext): void {
     // Pre-allocated scratch vectors (eliminate per-frame GC pressure)
     const _lastFrameTime = { value: performance.now() };
+    // EMA-smoothed frame delta — raw rAF timing has small frame-to-frame jitter even at a
+    // stable refresh rate, which is invisible at fixed dt but shows up as stutter in fast
+    // per-frame motion (e.g. warp tunnel streaks) once dt tracks real elapsed time.
+    const _smoothedWallDt = { value: BASE_FRAME_DT };
     const _animCamDirection = new THREE.Vector3();
     const _animCamRight = new THREE.Vector3();
     const _animCamMovement = new THREE.Vector3();
@@ -162,9 +167,13 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
     function animate(): void {
         const now = performance.now();
-        const wallDt = Math.min((now - _lastFrameTime.value) / 1000, 0.1);
+        const rawWallDt = Math.min((now - _lastFrameTime.value) / 1000, 0.1);
         _lastFrameTime.value = now;
         requestAnimationFrame(animate);
+
+        // Smooth toward the raw delta rather than using it directly (see comment above).
+        _smoothedWallDt.value += (rawWallDt - _smoothedWallDt.value) * WALL_DT_SMOOTHING;
+        const wallDt = _smoothedWallDt.value;
 
         // ── Camera velocity (frame-to-frame delta for labels / ETA) ────
         _cameraVel.subVectors(ctx.camera.position, _prevCamPos);
