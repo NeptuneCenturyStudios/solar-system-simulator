@@ -1,6 +1,5 @@
 <template>
     <PanelBase :title="isEditMode ? 'Edit Object' : 'Add Object'">
-
         <div class="vue-ui-body-editor-fields">
             <!-- ══════════════════════════ ADD MODE ══════════════════════════ -->
             <template v-if="!isEditMode">
@@ -40,7 +39,9 @@
                     </div>
 
                     <div v-if="showMass" class="control-group">
-                        <label>Mass <span class="val-display">{{ formatNumber(mass) }}</span></label>
+                        <label
+                            >Mass <span class="val-display">{{ formatNumber(mass) }}</span></label
+                        >
                         <input
                             v-model.number="mass"
                             type="number"
@@ -67,7 +68,9 @@
                     <div v-if="bodyType === 'sun'" class="control-group">
                         <label
                             >Light Intensity
-                            <span class="val-display">{{ formatNumber(lightIntensity) }}</span></label
+                            <span class="val-display">{{
+                                formatNumber(lightIntensity)
+                            }}</span></label
                         >
                         <input
                             v-model.number="lightIntensity"
@@ -94,7 +97,8 @@
 
                     <div v-if="showOrbitControls" class="control-group">
                         <label
-                            >Orbit Parent <span class="val-display">{{ orbitParentName }}</span></label
+                            >Orbit Parent
+                            <span class="val-display">{{ orbitParentName }}</span></label
                         >
                     </div>
 
@@ -126,17 +130,33 @@
                         <label
                             >Inclination <span class="val-display">{{ inclination }}°</span></label
                         >
-                        <input v-model.number="inclination" type="range" min="0" max="90" step="1" />
+                        <input
+                            v-model.number="inclination"
+                            type="range"
+                            min="0"
+                            max="90"
+                            step="1"
+                        />
                     </div>
 
                     <div v-if="showTilt" class="control-group">
-                        <label>Axial Tilt <span class="val-display">{{ tilt }}°</span></label>
+                        <label
+                            >Axial Tilt <span class="val-display">{{ tilt }}°</span></label
+                        >
                         <input v-model.number="tilt" type="range" min="-180" max="180" step="1" />
                     </div>
 
                     <div v-if="showTilt" class="control-group">
-                        <label>Tilt Azimuth <span class="val-display">{{ azimuth }}°</span></label>
-                        <input v-model.number="azimuth" type="range" min="-180" max="180" step="1" />
+                        <label
+                            >Tilt Azimuth <span class="val-display">{{ azimuth }}°</span></label
+                        >
+                        <input
+                            v-model.number="azimuth"
+                            type="range"
+                            min="-180"
+                            max="180"
+                            step="1"
+                        />
                     </div>
 
                     <div v-if="bodyType === 'planet'" class="control-group">
@@ -181,12 +201,19 @@
                         <input v-model="hasRings" type="checkbox" /> Has Rings
                     </label>
 
-                    <p v-if="bodyType === 'moon' && !canCreateMoon" class="validation-message visible">
+                    <p
+                        v-if="bodyType === 'moon' && !canCreateMoon"
+                        class="validation-message visible"
+                    >
                         Please select a body first to create a moon
                     </p>
 
                     <div class="d-flex gap-3 mb-3">
-                        <button class="old-ui btn-with-icon" type="button" @click="applyRandomDefaults">
+                        <button
+                            class="old-ui btn-with-icon"
+                            type="button"
+                            @click="applyRandomDefaults"
+                        >
                             <span class="material-symbols-outlined">shuffle</span>
                             RANDOMIZE
                         </button>
@@ -230,7 +257,10 @@
                     </div>
 
                     <div class="control-group">
-                        <label>Mass <span class="val-display">{{ formatNumber(editMass) }}</span></label>
+                        <label
+                            >Mass
+                            <span class="val-display">{{ formatNumber(editMass) }}</span></label
+                        >
                         <input
                             v-model.number="editMass"
                             type="number"
@@ -243,7 +273,9 @@
                     <div v-if="snapshot.isStar" class="control-group">
                         <label
                             >Temperature
-                            <span class="val-display">{{ Math.round(editTemperature) }}K</span></label
+                            <span class="val-display"
+                                >{{ Math.round(editTemperature) }}K</span
+                            ></label
                         >
                         <input
                             v-model.number="editTemperature"
@@ -257,7 +289,9 @@
                     <div v-if="snapshot.isStar" class="control-group">
                         <label
                             >Light Intensity
-                            <span class="val-display">{{ formatNumber(editLightIntensity) }}</span></label
+                            <span class="val-display">{{
+                                formatNumber(editLightIntensity)
+                            }}</span></label
                         >
                         <input
                             v-model.number="editLightIntensity"
@@ -284,9 +318,15 @@
 
                     <div class="control-group">
                         <label
-                            >Velocity <span class="val-display">{{ editVelocity.toFixed(1) }}</span></label
+                            >Velocity
+                            <span class="val-display">{{ editVelocity.toFixed(1) }}</span></label
                         >
-                        <input v-model.number="editVelocity" class="text-input" type="number" min="0" />
+                        <input
+                            v-model.number="editVelocity"
+                            class="text-input"
+                            type="number"
+                            min="0"
+                        />
                     </div>
 
                     <div class="control-group">
@@ -305,7 +345,8 @@
 
                     <div class="control-group">
                         <label
-                            >Inclination <span class="val-display">{{ editInclination }}°</span></label
+                            >Inclination
+                            <span class="val-display">{{ editInclination }}°</span></label
                         >
                         <input
                             v-model.number="editInclination"
@@ -317,12 +358,22 @@
                     </div>
 
                     <div v-if="snapshot.hasTilt" class="control-group">
-                        <label>Axial Tilt <span class="val-display">{{ editTilt }}°</span></label>
-                        <input v-model.number="editTilt" type="range" min="-180" max="180" step="1" />
+                        <label
+                            >Axial Tilt <span class="val-display">{{ editTilt }}°</span></label
+                        >
+                        <input
+                            v-model.number="editTilt"
+                            type="range"
+                            min="-180"
+                            max="180"
+                            step="1"
+                        />
                     </div>
 
                     <div v-if="snapshot.hasTilt" class="control-group">
-                        <label>Tilt Azimuth <span class="val-display">{{ editAzimuth }}°</span></label>
+                        <label
+                            >Tilt Azimuth <span class="val-display">{{ editAzimuth }}°</span></label
+                        >
                         <input
                             v-model.number="editAzimuth"
                             type="range"
@@ -337,13 +388,32 @@
                             <span class="material-symbols-outlined">save</span>
                             APPLY
                         </button>
-                        <button class="old-ui btn-with-icon btn-danger" type="button" @click="onDelete">
+                        <button
+                            class="old-ui btn-with-icon btn-danger"
+                            type="button"
+                            @click="onDelete"
+                        >
                             <span class="material-symbols-outlined">delete</span>
                             DELETE
                         </button>
-                        <button class="old-ui btn-with-icon btn-danger" type="button" @click="onClose">
+                        <button
+                            class="old-ui btn-with-icon btn-danger"
+                            type="button"
+                            @click="onClose"
+                        >
                             <span class="material-symbols-outlined">cancel</span>
                             CLOSE
+                        </button>
+                    </div>
+
+                    <div class="button-group">
+                        <button
+                            class="old-ui btn-with-icon mb-3"
+                            type="button"
+                            @click="openBodyEditor('add', null)"
+                        >
+                            <span class="material-symbols-outlined">add</span>
+                            ADD NEW
                         </button>
                     </div>
                 </template>

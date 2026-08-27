@@ -11,7 +11,11 @@
                     <span class="material-symbols-outlined">info</span>
                 </button>
 
-                <button class="btn toolbar-btn btn-care" title="Support Neptune Century on Ko-fi" @click="openDonateWindow">
+                <button
+                    class="btn toolbar-btn btn-care"
+                    title="Support Neptune Century on Ko-fi"
+                    @click="openDonateWindow"
+                >
                     <span class="material-symbols-outlined">favorite</span>
                 </button>
 
@@ -60,6 +64,15 @@
                     </button> -->
 
                 <button
+                    class="btn toolbar-btn"
+                    type="button"
+                    title="Add New Object"
+                    @click="openBodyEditor('add', null)"
+                >
+                    <span class="material-symbols-outlined">add</span>
+                </button>
+
+                <button
                     class="btn toolbar-btn btn-warning"
                     title="Re-launch System"
                     @click="requestRelaunch()"
@@ -82,7 +95,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ActivePanel, setActivePanel, vueUiState } from '../ui-store';
+import { ActivePanel, setActivePanel, vueUiState, openBodyEditor } from '../ui-store';
 import { requestRelaunch } from '../sim-bridge';
 import { showAboutModal } from '../about-modal-service';
 import SystemExplorer from '../components/SystemExplorer.vue';
