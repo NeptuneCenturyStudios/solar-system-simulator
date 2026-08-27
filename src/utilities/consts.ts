@@ -305,7 +305,7 @@ export const WORMHOLE_DEFAULT_RADIUS = EARTH_RADIUS * 1.5;
 /** Visual length of the swirling funnel/tail effect, as a multiple of the mouth radius. */
 export const WORMHOLE_FUNNEL_LENGTH_FACTOR = 1.2;
 /** Number of pooled particles in the funnel vortex effect. */
-export const WORMHOLE_FUNNEL_PARTICLE_COUNT = 50000;
+export const WORMHOLE_FUNNEL_PARTICLE_COUNT = 25000;
 /** Distance (as a multiple of exit radius) a teleported body is pushed clear of the exit mouth. */
 export const WORMHOLE_EMERGE_BUFFER_FACTOR = 1.5;
 
