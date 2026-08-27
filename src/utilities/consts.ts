@@ -249,7 +249,7 @@ export const BASE_FRAME_DT = 0.016;
 /** Hard cap on physics substeps per rendered frame, bounding worst-case CPU cost during a lag spike combined with high time-warp. */
 export const MAX_SUBSTEPS_PER_FRAME = 512;
 /** EMA factor (0-1) used to smooth measured frame delta; higher reacts faster but lets more raw rAF jitter through. */
-export const WALL_DT_SMOOTHING = 0.2;
+export const WALL_DT_SMOOTHING = 0.08;
 
 // === Flight controls ===
 export const FLIGHT_MAX_POINTER_OFFSET = 260; // pixels before reaching full turn rate
