@@ -169,6 +169,10 @@ import {
     proceduralModalIsVisible,
 } from './vue/procedural-modal-service';
 import { aboutModalIsVisible } from './vue/about-modal-service';
+import {
+    showWhatsNewModalIfNeeded,
+    whatsNewModalIsVisible,
+} from './vue/whats-new-modal-service';
 
 // State singletons
 import {
@@ -4455,7 +4459,12 @@ const _origOnMouseMove = onMouseMove;
 const _origOnMouseUp = onMouseUp;
 
 function modalBlocksInput() {
-    return startupModalIsVisible() || proceduralModalIsVisible() || aboutModalIsVisible();
+    return (
+        startupModalIsVisible() ||
+        proceduralModalIsVisible() ||
+        aboutModalIsVisible() ||
+        whatsNewModalIsVisible()
+    );
 }
 
 /**
@@ -4509,6 +4518,9 @@ window.addEventListener(
 
 // ── Initialize: check for URL seed or show startup modal ────────────────────
 (async function initializeApp() {
+    // Show the "What's New" modal first if the version marker has changed.
+    await showWhatsNewModalIfNeeded();
+
     const urlSeed = parseSeedFromURL();
     if (urlSeed) {
         // Skip startup modal — proceed directly to generation
