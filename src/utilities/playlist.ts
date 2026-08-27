@@ -42,4 +42,13 @@ export const PLAYLIST_FILENAMES: string[] = [
     'sergepavkinmusic-outer-space-188045.mp3',
     'universfield-starlight-harmonies-185900.mp3',
     'neptunecentury-lost-in-the-cosmos.mp3',
+    'alexrockbeat-drone-591036.mp3',
+    'atlasaudio-atmosphere-590805.mp3',
+    'atlasaudio-true-crime-590803.mp3',
+    'danyvin-trip-hop-591699.mp3',
+    'databend-dark-suspense-trip-hop-background-500760.mp3',
+    'databend-neon-nebula-ambient-electronic-background-500763.mp3',
+    'databend-peaceful-ambient-for-studying-589449.mp3',
+    'leberch-riser-590947.mp3',
+    'strawberry_candy-chill-minimal-warm-atmosphere-591183.mp3',
 ];

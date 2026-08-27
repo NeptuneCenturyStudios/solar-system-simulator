@@ -9,24 +9,31 @@
             <p class="whats-new-intro">Here's what's new in this update:</p>
             <ul class="whats-new-list">
                 <li>
-                    <span class="material-symbols-outlined whats-new-icon">hub</span>
+                    <span class="material-symbols-outlined whats-new-icon">cyclone</span>
                     <div>
-                        <strong>New Wormhole Feature</strong>
-                        <span>Link wormholes together to travel across the system instantly.</span>
+                        <strong>Introducing: Wormholes!</strong>
+                        <span>Link wormholes together to send planets across the system instantly. Experiment with different sizes. Can you transport a whole star?</span>
                     </div>
                 </li>
                 <li>
                     <span class="material-symbols-outlined whats-new-icon">palette</span>
                     <div>
                         <strong>Revamped UI</strong>
-                        <span>A fresh new look and feel for the interface.</span>
+                        <span>Major updates to the UI.</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="material-symbols-outlined whats-new-icon">music_note</span>
+                    <div>
+                        <strong>New Music Tracks</strong>
+                        <span>Added nine new audio tracks to enjoy while exploring the cosmos.</span>
                     </div>
                 </li>
                 <li>
                     <span class="material-symbols-outlined whats-new-icon">bug_report</span>
                     <div>
-                        <strong>Several Bug Fixes</strong>
-                        <span>Stability and performance improvements throughout.</span>
+                        <strong>Bug Fixes</strong>
+                        <span>Fixed lots of bugs.</span>
                     </div>
                 </li>
             </ul>

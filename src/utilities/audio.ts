@@ -133,7 +133,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     },
     // Loop sounds
     [SoundEffect.WarpLoop]: {
-        soundEffectBank: [new URL('../assets/sounds/warp-loop.wav', import.meta.url).href],
+        soundEffectBank: [new URL('../assets/sounds/warp-loop.mp3', import.meta.url).href],
         buffers: [],
         volume: 0.6,
         defaultFadeDuration: 1.5,
