@@ -7,6 +7,7 @@ export const enum SettingKey {
     SfxVolume = 'sfxVolume',
     MusicVolume = 'musicVolume',
     LensflareEnabled = 'lensflareEnabled',
+    FrameRateLimit = 'frameRateLimit',
 }
 
 export interface SpaceSimSettings {
@@ -15,6 +16,8 @@ export interface SpaceSimSettings {
     sfxVolume: number;
     musicVolume: number;
     lensflareEnabled: boolean;
+    /** Maximum frames per second (0 = unlimited). */
+    frameRateLimit: number;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -23,6 +26,7 @@ const defaultSettings: SpaceSimSettings = {
     sfxVolume: 1.0,
     musicVolume: 0.5,
     lensflareEnabled: true,
+    frameRateLimit: 0,
 };
 
 class SettingsStore {

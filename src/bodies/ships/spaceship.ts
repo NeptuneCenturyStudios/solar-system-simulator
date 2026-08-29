@@ -802,6 +802,10 @@ export class Spaceship extends Body {
             const brakeEntryTrigger =
                 orbitRadius + Math.max(brakeDistance, this.autopilotBrakeArcDist);
             if (nearApproachSpeed && distance <= brakeEntryTrigger) {
+                // Voice prompt: destination reached — the ship arrives at the
+                // body and begins circularizing into orbit.
+                playSoundEffect(SoundEffect.AutopilotDestinationReached);
+                
                 this.autopilotPhase = 'BRAKE';
                 this.autopilotBrakeEntryDistance = distance;
             }
@@ -812,9 +816,7 @@ export class Spaceship extends Body {
             const withinOrbit = distance <= orbitRadius * 1.02;
             const driftedToOrbit = distance <= orbitRadius * 1.1 && radialClosingSpeed < 1;
             if (withinOrbit || driftedToOrbit) {
-                // Voice prompt: destination reached — the ship arrives at the
-                // body and begins circularizing into orbit.
-                playSoundEffect(SoundEffect.AutopilotDestinationReached);
+                
                 this.autopilotPhase = 'CIRCULARIZE';
             }
         }

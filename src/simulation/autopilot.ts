@@ -24,7 +24,12 @@ export function cancelAutopilot(ctx: IAutopilotContext, message?: string): void 
         // Brake to a complete stop from whatever speed the ship is at (warp,
         // boost, or normal approach).  Runs through advanceWarpSpeed() so the
         // decel continues in flight mode AND in the background updater.
-        ship.beginStopBrake();
+        // EXCEPTION: in the orbit-locked (TIDAL_LOCK) phase the ship is already
+        // in a stable orbit — disengaging autopilot should let it keep drifting
+        // on that orbit instead of braking to a stop (which loses the orbit).
+        if (autopilotState.phase !== 'TIDAL_LOCK') {
+            ship.beginStopBrake();
+        }
     }
     // Clear any in-progress warp charge.
     if (autopilotState.phase === 'WARP_CHARGING') {

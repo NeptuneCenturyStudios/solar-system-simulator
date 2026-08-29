@@ -168,6 +168,17 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
     function animate(): void {
         const now = performance.now();
         const rawWallDt = Math.min((now - _lastFrameTime.value) / 1000, 0.1);
+
+        // Frame-rate limiter: when the user sets a max FPS, hold each frame until
+        // enough wall time has elapsed. The limit is read live from settings so
+        // changes apply immediately, like substeps. 0 = unlimited.
+        const frameRateLimit = settingsStore.settings.frameRateLimit;
+        const frameIntervalMs = frameRateLimit > 0 ? 1000 / frameRateLimit : 0;
+        if (frameIntervalMs > 0 && rawWallDt * 1000 < frameIntervalMs) {
+            requestAnimationFrame(animate);
+            return;
+        }
+
         _lastFrameTime.value = now;
         requestAnimationFrame(animate);
 

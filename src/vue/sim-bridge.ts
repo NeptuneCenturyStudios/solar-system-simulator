@@ -195,6 +195,8 @@ export interface VueSimHooks {
     /** Set background music volume, 0–100 percent. Also applied to the live
      *  AmbientSoundManager, which only picks up changes via setVolume(). */
     setMusicVolume?: (percent: number) => void;
+    /** Set the maximum frames per second (0 = unlimited). */
+    setFrameRateLimit?: (value: number) => void;
 
     // ── Playlist (same sim paths as the old playlist panel) ─────────────────
     /** Snapshot of the shuffled playlist + current playback state. */
@@ -269,6 +271,8 @@ export interface VueSimStore {
     sfxVolumePercent: number;
     /** Background music volume as 0–100 percent. */
     musicVolumePercent: number;
+    /** Maximum frames per second (0 = unlimited). */
+    frameRateLimit: number;
 
     /** Id of the autopilot target body, or null when autopilot is off. */
     autopilotTargetId: string | null;
@@ -314,6 +318,7 @@ const state = reactive<VueSimStore>({
     substeps: settingsStore.settings.substeps,
     sfxVolumePercent: Math.round(settingsStore.settings.sfxVolume * 100),
     musicVolumePercent: Math.round(settingsStore.settings.musicVolume * 100),
+    frameRateLimit: settingsStore.settings.frameRateLimit,
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
@@ -760,6 +765,16 @@ export function setMusicVolume(percent: number): void {
         settingsStore.update(SettingKey.MusicVolume, percent / 100);
     }
     state.musicVolumePercent = percent;
+}
+
+/** Set the maximum frames per second (0 = unlimited). */
+export function setFrameRateLimit(value: number): void {
+    if (hookRegistry.setFrameRateLimit) {
+        hookRegistry.setFrameRateLimit(value);
+    } else {
+        settingsStore.update(SettingKey.FrameRateLimit, value);
+    }
+    state.frameRateLimit = value;
 }
 
 // ── Playlist actions (same event paths as the old playlist panel) ────────

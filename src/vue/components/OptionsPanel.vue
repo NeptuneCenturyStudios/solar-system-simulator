@@ -25,6 +25,22 @@
                 Lens Flares
             </label>
 
+            <div class="control-group">
+                <label>
+                    Frame Rate Limit
+                    <span class="val-display">{{ simStore.frameRateLimit || 'Unlimited' }}</span>
+                </label>
+                <input
+                    class="text-input"
+                    type="number"
+                    min="0"
+                    max="240"
+                    :value="simStore.frameRateLimit"
+                    title="Maximum frames per second. 0 or blank = unlimited."
+                    @input="onFrameRateLimitInput"
+                />
+            </div>
+
             <div class="vue-ui-card-header">
                 Physics
             </div>
@@ -111,6 +127,7 @@
 
 <script setup lang="ts">
 import {
+    setFrameRateLimit,
     setLensflareEnabled,
     setMusicVolume,
     setParticleEffectsEnabled,
@@ -125,6 +142,8 @@ import PanelBase from './PanelBase.vue';
 const DEFAULT_SUBSTEPS = 64;
 const DEFAULT_SFX_VOLUME_PERCENT = 100;
 const DEFAULT_MUSIC_VOLUME_PERCENT = 50;
+/** Max frame-rate-limit value the Options panel permits. */
+const MAX_FRAME_RATE_LIMIT = 240;
 
 function onParticleEffectsChange(e: Event): void {
     setParticleEffectsEnabled((e.target as HTMLInputElement).checked);
@@ -144,6 +163,24 @@ function onSfxVolumeInput(e: Event): void {
 
 function onMusicVolumeInput(e: Event): void {
     setMusicVolume(parseInt((e.target as HTMLInputElement).value, 10));
+}
+
+function onFrameRateLimitInput(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    const raw = input.value.trim();
+    // Blank is treated as unlimited (0).
+    if (raw === '') {
+        setFrameRateLimit(0);
+        return;
+    }
+    const parsed = parseInt(raw, 10);
+    const value =
+        Number.isNaN(parsed) ? 0 : Math.min(Math.max(parsed, 0), MAX_FRAME_RATE_LIMIT);
+    setFrameRateLimit(value);
+    // If the typed value was clamped, reflect the stored value back in the field.
+    if (raw !== String(value)) {
+        input.value = String(value);
+    }
 }
 
 function resetSubsteps(): void {
