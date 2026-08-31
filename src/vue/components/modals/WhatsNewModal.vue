@@ -33,7 +33,11 @@
                     <span class="material-symbols-outlined whats-new-icon">bug_report</span>
                     <div>
                         <strong>Bug Fixes</strong>
-                        <span>Fixed lots of bugs.</span>
+                        <ul>
+                            <li>Fixed an issue that caused the camera to focus on scene center and disabled Look At when an object was destroyed.</li>
+                            <li>Fixed an issue where the ship flame would get stuck in scene when ship was destroyed.</li>
+                            
+                        </ul>
                     </div>
                 </li>
             </ul>

@@ -112,10 +112,12 @@ export const cameraState: ICameraState = {
     lockToSun: false,
     // Target mode controls gizmo visibility behavior (similar to Look At toggle, but for gizmo)
     isTargetMode: false,
-    // Keep id string for legacy/debug, but camera behavior should not rely on it.
-    focusID: 'camSun',
     // Canonical camera focus target (used when Look At is enabled)
     focusBody: null as Body | null,
+    // Holds the last position of a focused body that was destroyed/deleted, so the
+    // camera keeps orbiting there instead of snapping to the scene center. Look At
+    // stays enabled; this is used as the orbit target until a new body is selected.
+    frozenFocusPosition: null as THREE.Vector3 | null,
     offset: new THREE.Vector3(),
     lastPlanetAngle: 0,
     speed: 10,

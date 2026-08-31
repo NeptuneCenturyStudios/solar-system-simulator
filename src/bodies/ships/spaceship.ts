@@ -1200,6 +1200,7 @@ export class Spaceship extends Body {
         for (const weapon of this.weapons) weapon.dispose();
         this.weapons = [];
         this.resetAutopilotState();
+        this.trail.dispose();
         super.die(deathOptions);
     }
 }

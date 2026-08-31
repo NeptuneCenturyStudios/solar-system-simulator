@@ -291,11 +291,13 @@ export interface ICameraState {
     // Target mode controls gizmo visibility behavior
     isTargetMode: boolean;
 
-    // Legacy/debug identifier
-    focusID: string;
-
     // Canonical camera focus target
     focusBody: Body | null;
+
+    // When the focused body is destroyed/deleted, this holds its last position so the
+    // camera keeps orbiting there instead of snapping to the scene center. Look At is
+    // left enabled, and this is used as the orbit target until a new body is selected.
+    frozenFocusPosition: THREE.Vector3 | null;
 
     offset: THREE.Vector3;
     lastPlanetAngle: number;

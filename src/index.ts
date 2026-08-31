@@ -447,6 +447,9 @@ function applyOrbitRotationDelta(dx: number, dy: number) {
         if (focusObj && simulationState.bodies.includes(focusObj) && !focusObj._isDisposed) {
             return focusObj.mesh.position.clone();
         }
+        if (cameraState.frozenFocusPosition) {
+            return cameraState.frozenFocusPosition.clone();
+        }
         return NONE_FOCUS_POSITION.clone();
     })();
 
@@ -2193,6 +2196,7 @@ function onMouseDown(event: MouseEvent) {
 
         if (!cameraState.isLookAtMode) {
             cameraState.focusBody = null;
+            cameraState.frozenFocusPosition = null;
         }
 
         gizmo.attach(null);
@@ -2560,44 +2564,30 @@ function onMouseMove(event: MouseEvent) {
         } else {
             // Look At ON:
             // - If a body is focused => orbit around it
-            // - If no body is focused => behave like Look At OFF (center orbit)
+            // - If no body is focused but we have a frozen position (body destroyed) => orbit that
+            // - Otherwise behave like Look At OFF (center orbit)
             const focusObj = getFocusObject();
+            let target: THREE.Vector3;
             if (focusObj && simulationState.bodies.includes(focusObj) && !focusObj._isDisposed) {
-                const target = focusObj.mesh.position.clone();
-                const offset = camera.position.clone().sub(target);
-
-                // Convert to spherical coordinates
-                const spherical = new THREE.Spherical();
-                spherical.setFromVector3(offset);
-
-                // Update angles based on mouse movement
-                spherical.theta -= movementX * cameraRotationSpeed;
-                spherical.phi -= movementY * cameraRotationSpeed;
-
-                // Clamp phi to prevent flipping
-                spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-
-                // Convert back to cartesian
-                offset.setFromSpherical(spherical);
-                camera.position.copy(target).add(offset);
-                camera.lookAt(target);
-                controls.target.copy(target);
+                target = focusObj.mesh.position.clone();
+            } else if (cameraState.frozenFocusPosition) {
+                target = cameraState.frozenFocusPosition.clone();
             } else {
-                const target = NONE_FOCUS_POSITION.clone();
-                const offset = camera.position.clone().sub(target);
-
-                const spherical = new THREE.Spherical();
-                spherical.setFromVector3(offset);
-
-                spherical.theta -= movementX * cameraRotationSpeed;
-                spherical.phi -= movementY * cameraRotationSpeed;
-                spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-
-                offset.setFromSpherical(spherical);
-                camera.position.copy(target).add(offset);
-                camera.lookAt(target);
-                controls.target.copy(target);
+                target = NONE_FOCUS_POSITION.clone();
             }
+
+            const offset = camera.position.clone().sub(target);
+            const spherical = new THREE.Spherical();
+            spherical.setFromVector3(offset);
+
+            spherical.theta -= movementX * cameraRotationSpeed;
+            spherical.phi -= movementY * cameraRotationSpeed;
+            spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+
+            offset.setFromSpherical(spherical);
+            camera.position.copy(target).add(offset);
+            camera.lookAt(target);
+            controls.target.copy(target);
         }
 
         // If dragging velocity arrow, keep drag plane consistent with the active edit mode.
@@ -2763,11 +2753,14 @@ function onMouseUp(event: MouseEvent) {
         ) {
             camera.position.copy(gizmo.target.mesh.position).add(interactionState.dragCameraOffset);
 
-            // If Look At is enabled, keep controls target consistent with the focus.
-            // Otherwise keep orbit anchored at center.
+            // If Look At is enabled, keep controls target consistent with the focus
+            // (live body or frozen position from a destroyed body). Otherwise keep
+            // orbit anchored at center.
             const lookAtFocus = getFocusObject();
             if (cameraState.isLookAtMode && lookAtFocus) {
                 controls.target.copy(lookAtFocus.mesh.position);
+            } else if (cameraState.isLookAtMode && cameraState.frozenFocusPosition) {
+                controls.target.copy(cameraState.frozenFocusPosition);
             } else {
                 controls.target.copy(NONE_FOCUS_POSITION);
             }
@@ -2822,6 +2815,9 @@ function setFocusBody(bodyOrNull: Body | null, { zoom = false } = {}) {
             ? bodyOrNull
             : null;
     cameraState.focusBody = body;
+    // Selecting a new focus (or clearing it) replaces any frozen orbit position left
+    // behind by a previously-destroyed focused body.
+    cameraState.frozenFocusPosition = null;
 
     // Maintain selection pointers used by UI/gizmo
     selectedBody = body;
@@ -2853,12 +2849,6 @@ function getFocusObject() {
         !cameraState.focusBody._isDisposed
         ? cameraState.focusBody
         : null;
-}
-
-function setF(id: string) {
-    // Legacy helper kept for compatibility with existing call sites,
-    // but camera behavior should no longer depend on id.
-    cameraState.focusID = id;
 }
 
 // --- UI PANEL INITIALIZATION ---
@@ -3070,11 +3060,15 @@ if (vueUiRoot) {
 // The old `cameraChange` event path is intentionally removed to reduce dead code.
 
 function zoomRelativeToTarget(target: Body | null, factor: number) {
-    // target=null means "zoom around scene center" (used when Look At is OFF)
+    // target=null means "zoom around scene center" (used when Look At is OFF).
+    // When Look At is ON but the focused body was destroyed, zoom around the
+    // frozen position instead of snapping back to the scene center.
     const targetPos =
         target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
             ? target.mesh.position
-            : NONE_FOCUS_POSITION;
+            : cameraState.isLookAtMode && cameraState.frozenFocusPosition
+              ? cameraState.frozenFocusPosition
+              : NONE_FOCUS_POSITION;
 
     // Direction from target -> camera
     const dir = new THREE.Vector3().subVectors(camera.position, targetPos);
@@ -3873,9 +3867,6 @@ function deleteSelectedBody() {
         return false;
     const bodyToDelete = selectedBody;
 
-    // Check if this body is the camera's current focus (legacy id check kept)
-    const wasCameraTarget = bodyToDelete.id === cameraState.focusID;
-
     // For stars: delete immediately with NO supernova / black hole.
     // (Natural star death still triggers those effects via the fuel system.)
     const deletingStar = isBodyType(bodyToDelete, BodyTypeEnum.Star);
@@ -3924,13 +3915,6 @@ function deleteSelectedBody() {
             notificationType: NotificationType.Alert,
         });
 
-        if (wasCameraTarget) {
-            setF('camNone');
-            controls.enabled = true;
-            controls.target.set(0, 0, 0);
-            controls.mouseButtons.RIGHT = null;
-            triggerZoomToBody(null);
-        }
     }
 
     // Update UI selection state (match existing empty-space click behavior)
@@ -4276,41 +4260,31 @@ environmentState.kuiperBeltVisible = false;
 function handleBodyBecameInvalid(body: Body | null | undefined) {
     if (!body) return;
 
-    // If collision logic already handed camera focus off to a different body this frame,
-    // do NOT force a fallback to center/orbit-off.
-    // We still clear selection pointers for the dead body.
-    const collisionHandoffTarget =
-        cameraState?.pendingCollisionFocusBody &&
-        simulationState.bodies.includes(cameraState.pendingCollisionFocusBody) &&
-        !cameraState.pendingCollisionFocusBody._isDisposed
-            ? cameraState.pendingCollisionFocusBody
-            : null;
-
     const wasLookAtTarget = cameraState.focusBody === body;
-    const focusAlreadyMoved =
-        collisionHandoffTarget && cameraState.focusBody === collisionHandoffTarget;
 
     // Clear selection state
     if (selectedBody === body) selectedBody = null;
     if (manuallySelectedBody === body) manuallySelectedBody = null;
-    if (cameraState.focusBody === body && !focusAlreadyMoved) cameraState.focusBody = null;
 
-    // If Look At is ON and we just lost the focus target, fall back to "None" orbit mode.
-    // Otherwise RMB mouse-look has no valid orbit anchor and camera rotation appears "stuck".
-    //
-    // But: if a collision just re-focused the camera to the "killer" body, keep Look At ON and
-    // keep the new focus.
-    if (cameraState.isLookAtMode && wasLookAtTarget && !focusAlreadyMoved) {
-        cameraState.isLookAtMode = false;
+    if (wasLookAtTarget) {
+        // The focused body is gone. Freeze the orbit at its last position so the camera
+        // keeps looking where the body was, instead of snapping to the scene center or
+        // turning Look At off. Look At stays enabled and OrbitControls orbit this point.
+        const lastPos = body.mesh?.position
+            ? body.mesh.position.clone()
+            : cameraState.frozenFocusPosition ?? controls.target.clone();
+
+        cameraState.focusBody = null;
+        cameraState.frozenFocusPosition = lastPos;
+
+        if (cameraState.isLookAtMode) {
+            controls.target.copy(lastPos);
+            controls.update();
+            camera.lookAt(lastPos);
+        }
         dispatchSimStateChange();
-
-        controls.enabled = !cameraState.isFreeCameraMode;
-        controls.target.copy(NONE_FOCUS_POSITION);
-        controls.update();
-        camera.lookAt(NONE_FOCUS_POSITION);
-
-        // Legacy alias kept in sync for any older call sites
-        cameraState.focusID = 'camNone';
+    } else if (cameraState.focusBody === body) {
+        cameraState.focusBody = null;
     }
 
     // Clear gizmo if it was attached to this body
@@ -4670,7 +4644,6 @@ const animCtx: AnimationContext = {
     },
     cancelAutopilot: (message?: string) => cancelAutopilot(autopilotCtx, message),
     engageAutopilot: (target: Body) => engageAutopilot(autopilotCtx, target),
-    setF,
     triggerZoomToBody,
     uiManager,
 };

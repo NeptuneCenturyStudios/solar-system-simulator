@@ -141,6 +141,7 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         selectedBody.value = null;
         manuallySelectedBody.value = null;
         cameraState.focusBody = null;
+        cameraState.frozenFocusPosition = null;
         gizmo.attach(null);
     });
 }

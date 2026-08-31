@@ -16,7 +16,6 @@ import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator'
 import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet-name-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
-import { Star } from '../bodies/star';
 import { Wormhole } from '../bodies/wormhole';
 import { processWormholeInteractions } from '../physics/wormhole-collision';
 import { updateWormholeBridges } from '../effects/wormhole-link-bridge';
@@ -135,7 +134,6 @@ export interface AnimationContext {
     updateAutopilotStep: (dt: number) => void;
     cancelAutopilot: (message?: string) => void;
     engageAutopilot: (target: Body) => void;
-    setF: (id: string) => void;
     triggerZoomToBody: (body: Body | null) => void;
     uiManager: UIManager;
 }
@@ -305,7 +303,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
             if (_animCamMovement.lengthSq() > 0) {
                 ctx.camera.position.add(_animCamMovement);
-                if (!cameraState.isFreeCameraMode && cameraState.focusID !== 'camNone') {
+                if (
+                    !cameraState.isFreeCameraMode &&
+                    (cameraState.focusBody !== null || cameraState.frozenFocusPosition !== null)
+                ) {
                     ctx.controls.target.add(_animCamMovement);
                 }
 
@@ -456,21 +457,12 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
                         if (outcome.type === 'destroy-both') {
                             // Comparable-mass bodies: no winner — both are destroyed.
+                            // The camera focus (if it was one of these bodies) is frozen at
+                            // the body's last position by handleBodyBecameInvalid (via the
+                            // body:dead event fired inside victim.die()).
                             destroyBody(null, outcome.victims);
 
-                            const primaryStar = ctx.simulationState.bodies.find(
-                                (b) => b && !b._isDisposed && b instanceof Star
-                            ) as Star | undefined;
                             for (const victim of outcome.victims) {
-                                if (victim === primaryStar && cameraState.focusID === 'camSun') {
-                                    ctx.setF('camNone');
-                                    ctx.selectedBody.value = null;
-                                    ctx.gizmo.attach(null);
-                                    ctx.controls.enabled = true;
-                                    ctx.controls.target.set(0, 0, 0);
-                                    ctx.controls.mouseButtons.RIGHT = null;
-                                    ctx.triggerZoomToBody(null);
-                                }
                                 victim.die();
                                 ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
                                     (b) => b !== victim
@@ -482,15 +474,6 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
                         const { winner, victims } = outcome;
                         const victim = victims[0];
-                        if (
-                            ctx.cameraState?.focusBody === victim &&
-                            winner &&
-                            !winner._isDisposed
-                        ) {
-                            ctx.setFocusBody(winner, { zoom: false });
-                            if (ctx.cameraState.isTargetMode) ctx.gizmo.attach(winner);
-
-                        }
 
                         if (outcome.type === 'absorb') {
                             absorbBody(winner, victim);
@@ -498,19 +481,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                             destroyBody(winner, victims);
                         }
 
-                        const primaryStar = ctx.simulationState.bodies.find(
-                            (b) => b && !b._isDisposed && b instanceof Star
-                        ) as Star | undefined;
-                        if (victim === primaryStar && cameraState.focusID === 'camSun') {
-                            ctx.setF('camNone');
-                            ctx.selectedBody.value = null;
-                            ctx.gizmo.attach(null);
-                            ctx.controls.enabled = true;
-                            ctx.controls.target.set(0, 0, 0);
-                            ctx.controls.mouseButtons.RIGHT = null;
-                            ctx.triggerZoomToBody(null);
-                        }
-
+                        // If the camera was focused on the destroyed victim, its focus is
+                        // frozen at the victim's last position by handleBodyBecameInvalid
+                        // (via the body:dead event fired inside victim.die()).
                         victim.die();
                         ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
                             (b) => b !== victim
@@ -848,6 +821,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     ctx.camera.position.add(delta);
                     ctx.controls.target.copy(focusObj.mesh.position);
                 }
+            } else if (ctx.cameraState.isLookAtMode && ctx.cameraState.frozenFocusPosition) {
+                // The focused body was destroyed; keep orbiting the frozen last position
+                // instead of snapping back to the scene center.
+                ctx.controls.target.copy(ctx.cameraState.frozenFocusPosition);
             } else {
                 ctx.controls.target.copy(ctx.NONE_FOCUS_POSITION);
             }
