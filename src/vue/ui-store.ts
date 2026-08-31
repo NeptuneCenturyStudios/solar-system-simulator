@@ -36,16 +36,27 @@ export interface VueUiState {
      * panel. `null` means the explorer list is shown.
      */
     bodyEditor: BodyEditorState | null;
+    /**
+     * Whether the first system has finished loading. Latches to `true` once
+     * set and is never reset, so later re-launches don't re-hide the UI.
+     */
+    systemReady: boolean;
 }
 
 const uiState = reactive<VueUiState>({
     activePanel: ActivePanel.SystemExplorer,
     panelManagerVisible: true,
     bodyEditor: null,
+    systemReady: false,
 });
 
 /** Reactive store consumed by Vue components for overlay visibility. */
 export const vueUiState: VueUiState = uiState;
+
+/** Marks the initial system load as complete, revealing the toolbar/panels. */
+export function setSystemReady(ready: boolean): void {
+    uiState.systemReady = ready;
+}
 
 /** Activate a panel and make sure the PanelManager showing it is visible
  *  (activating a panel implies wanting to see it). */

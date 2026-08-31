@@ -153,6 +153,7 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 // Vue UI overlay (new UI, developed in parallel with the existing UI)
 import { mountVueUi } from './vue/main';
 import { registerVueSimHooks, setDisplayState, simStore } from './vue/sim-bridge';
+import { setSystemReady } from './vue/ui-store';
 import { environmentState } from './simulation/environment-state';
 import { SettingKey, settingsStore } from './settings/settings-store';
 import {
@@ -4421,6 +4422,7 @@ async function launchSystem(
     await spawn(mode, proceduralResult, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
     if (progressReporter) hideProceduralModal();
+    setSystemReady(true);
 }
 
 /**
@@ -4557,6 +4559,7 @@ window.addEventListener(
         applyDefaultCameraTogglesAfterSpawn();
 
         hideProceduralModal();
+        setSystemReady(true);
     } else {
         // Load the default space texture to display while the startup modal is active before the user
         // does anything. This will get replaced once the actual space texture is loaded during the simulation setup.

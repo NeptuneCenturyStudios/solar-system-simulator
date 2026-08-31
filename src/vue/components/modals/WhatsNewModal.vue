@@ -32,11 +32,12 @@
                 <li>
                     <span class="material-symbols-outlined whats-new-icon">bug_report</span>
                     <div>
-                        <strong>Bug Fixes</strong>
+                        <strong>Bug fixes and improvements</strong>
                         <ul>
                             <li>Fixed an issue that caused the camera to focus on scene center and disabled Look At when an object was destroyed.</li>
                             <li>Fixed an issue where the ship flame would get stuck in scene when ship was destroyed.</li>
-                            
+                            <li>Fixed issue where main UI was visible even before the system was fully loaded.</li>
+                            <li>Improved the particle explosion effect</li>
                         </ul>
                     </div>
                 </li>

@@ -1,10 +1,10 @@
 <template>
     <div class="vue-ui-shell gap-3">
 
-        <PanelManager v-show="vueUiState.panelManagerVisible" />
+        <PanelManager v-show="vueUiState.panelManagerVisible && vueUiState.systemReady" />
 
         <div class="vue-ui-toolbar-slot">
-            <SimControls />
+            <SimControls v-show="vueUiState.systemReady" />
         </div>
     </div>
 
