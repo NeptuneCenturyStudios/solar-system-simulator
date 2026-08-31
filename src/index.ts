@@ -396,7 +396,12 @@ controls.mouseButtons = {
 // ONE finger: rotate camera
 // TWO fingers: pinch/dolly zoom (no pan)
 controls.enablePan = false;
-controls.enableZoom = true;
+// Zoom is driven by our own wheel/touch handlers below (zoomRelativeToTarget),
+// not by OrbitControls. Leaving OrbitControls' wheel dolly enabled would double
+// every zoom (its ~5%/notch dolly + our ~10%/notch custom zoom) and, in free
+// camera mode, pivot around a different point than our handler — which is what
+// made free-cam zoom feel extreme. Disable it so there's a single zoom path.
+controls.enableZoom = false;
 // Note: OrbitControls touch support seems unreliable on some mobile browsers.
 // We still set touches here, but we also add our own custom handlers below.
 controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
@@ -3060,6 +3065,32 @@ if (vueUiRoot) {
 // The old `cameraChange` event path is intentionally removed to reduce dead code.
 
 function zoomRelativeToTarget(target: Body | null, factor: number) {
+    // Free camera: there is no orbit target, so the wheel should dolly along the
+    // camera's own view direction. The step scales with the distance from the
+    // camera to the nearest body surface (falling back to the distance to the
+    // world origin, clamped so zooming near the origin still moves). This keeps
+    // the zoom proportional across the sim's huge scale range and avoids the old
+    // behaviour of dragging the camera toward the world origin (usually the
+    // central star). It's a pure translation, so it can't collapse into a point.
+    if (cameraState.isFreeCameraMode) {
+        const forward = new THREE.Vector3();
+        camera.getWorldDirection(forward);
+
+        let nearestSurfaceDist = Infinity;
+        for (const b of simulationState.bodies) {
+            if (!b || b._isDisposed || !b.mesh) continue;
+            const d = b.mesh.position.distanceTo(camera.position) - (b.radius || 0);
+            if (d > 0 && d < nearestSurfaceDist) nearestSurfaceDist = d;
+        }
+
+        const base = isFinite(nearestSurfaceDist)
+            ? nearestSurfaceDist
+            : Math.max(camera.position.length(), SUN_RADIUS * 2);
+
+        camera.position.addScaledVector(forward, base * (1 - factor));
+        return;
+    }
+
     // target=null means "zoom around scene center" (used when Look At is OFF).
     // When Look At is ON but the focused body was destroyed, zoom around the
     // frozen position instead of snapping back to the scene center.
@@ -3072,8 +3103,8 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
 
     // Direction from target -> camera
     const dir = new THREE.Vector3().subVectors(camera.position, targetPos);
-    //const currentDist = Math.max(1, dir.length());
     const currentDist = dir.length();
+    if (currentDist < 1e-9) return; // camera already at the pivot; nothing to zoom
     dir.normalize();
 
     const maxDist = MAX_ZOOM_OUT_DISTANCE;
@@ -3090,17 +3121,26 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
         )
     );
 
-    const zoomInLimit = 0;
-    //     target && simulationState.bodies.includes(target) && !target._isDisposed ? 0.001 : 0.01;
+    // Never let zoom collapse the camera into the pivot. When there's a real
+    // body, keep the camera just outside its surface; when orbiting the scene
+    // center (no target), keep it outside the central star; otherwise fall back
+    // to a small near-plane floor. If the camera is already closer than the
+    // safe floor (e.g. it got there by flying), don't push it outward — just
+    // stop the zoom-in.
+    const primaryStar = getPrimaryStar();
+    const starRadius = primaryStar?.radius || 0;
+    const minSafeDist = Math.max(
+        target && target.radius ? target.radius * 1.5 : starRadius * 1.5,
+        camera.near * 100
+    );
+    const zoomInLimit = Math.min(currentDist, minSafeDist);
     const zoomOutLimit = farLimit;
 
     const newDist = THREE.MathUtils.clamp(currentDist * factor, zoomInLimit, zoomOutLimit);
     camera.position.copy(targetPos).add(dir.multiplyScalar(newDist));
 
-    if (!cameraState.isFreeCameraMode) {
-        // When Look At is OFF, keep orbit controls anchored to the center.
-        controls.target.copy(targetPos);
-    }
+    // When Look At is OFF, keep orbit controls anchored to the center.
+    controls.target.copy(targetPos);
 }
 
 function getZoomTarget() {
