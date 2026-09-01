@@ -12,7 +12,7 @@ export const WHATSNEW_STORAGE_KEY = 'spaceSimWhatsNewVersion';
  * random string on each release) so the modal is shown again on the next app
  * start, until the user dismisses it and the key is recorded in localStorage.
  */
-export const WHATSNEW_VERSION = '2026-08-26';
+export const WHATSNEW_VERSION = '2026-08-31';
 
 export interface WhatsNewModalController {
     /** Shows the modal and resolves once the user dismisses it (null = cancelled). */

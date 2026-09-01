@@ -138,7 +138,7 @@
                 @click="openBodyEditor('add', null)"
             >
                 <span class="material-symbols-outlined">add</span>
-                ADD NEW
+                ADD NEW OBJECT
             </button>
 
             <label class="checkbox-row">

@@ -7,12 +7,42 @@
     >
         <div class="modal-body whats-new-body">
             <p class="whats-new-intro">Here's what's new in this update:</p>
+
+            <h3>Version 1.1.2 - Maintenance Update</h3>
+            <ul class="whats-new-list">
+                <li>
+                    <span class="material-symbols-outlined whats-new-icon">bug_report</span>
+                    <div>
+                        <strong>Bug fixes and improvements</strong>
+                        <ul>
+                            <li>
+                                Fixed an issue that caused the camera to focus on scene center and
+                                disabled Look At when an object was destroyed.
+                            </li>
+                            <li>
+                                Fixed an issue where the ship flame would get stuck in scene when
+                                ship was destroyed.
+                            </li>
+                            <li>
+                                Fixed issue where main UI was visible even before the system was
+                                fully loaded.
+                            </li>
+                            <li>Improved the particle explosion effect</li>
+                        </ul>
+                    </div>
+                </li>
+            </ul>
+
+            <h3>Version 1.1.1 - Major Update</h3>
             <ul class="whats-new-list">
                 <li>
                     <span class="material-symbols-outlined whats-new-icon">cyclone</span>
                     <div>
                         <strong>Introducing: Wormholes!</strong>
-                        <span>Link wormholes together to send planets across the system instantly. Experiment with different sizes. Can you transport a whole star?</span>
+                        <span
+                            >Link wormholes together to send planets across the system instantly.
+                            Experiment with different sizes. Can you transport a whole star?</span
+                        >
                     </div>
                 </li>
                 <li>
@@ -26,19 +56,15 @@
                     <span class="material-symbols-outlined whats-new-icon">music_note</span>
                     <div>
                         <strong>New Music Tracks</strong>
-                        <span>Added nine new audio tracks to enjoy while exploring the cosmos.</span>
+                        <span
+                            >Added nine new audio tracks to enjoy while exploring the cosmos.</span
+                        >
                     </div>
                 </li>
                 <li>
                     <span class="material-symbols-outlined whats-new-icon">bug_report</span>
                     <div>
                         <strong>Bug fixes and improvements</strong>
-                        <ul>
-                            <li>Fixed an issue that caused the camera to focus on scene center and disabled Look At when an object was destroyed.</li>
-                            <li>Fixed an issue where the ship flame would get stuck in scene when ship was destroyed.</li>
-                            <li>Fixed issue where main UI was visible even before the system was fully loaded.</li>
-                            <li>Improved the particle explosion effect</li>
-                        </ul>
                     </div>
                 </li>
             </ul>
@@ -88,7 +114,7 @@ onMounted(() => {
 
 <style scoped>
 .whats-new-intro {
-    margin: 0 0 12px;
+    margin: 0 0 0;
 }
 
 .whats-new-list {
@@ -100,7 +126,7 @@ onMounted(() => {
     gap: 12px;
 }
 
-.whats-new-list li {
+.whats-new-list > li {
     display: flex;
     gap: 10px;
     align-items: flex-start;

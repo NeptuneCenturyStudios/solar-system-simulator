@@ -138,6 +138,11 @@ body {
     height: 100%;
 }
 
+h2, h3 {
+    margin: 0;
+    color: var(--new-ui-btn-warning-color);
+}
+
 /* Container for all UI elements */
 #ui-container {
     display: flex;
@@ -1240,6 +1245,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     max-width: calc(100vw - 40px);
     max-height: calc(100vh - 40px);
     overflow-y: auto;
+    overscroll-behavior: contain;
     background: var(--new-ui-bg);
     padding: var(--new-ui-gap-3);
     border-radius: var(--new-ui-border-radius);
@@ -1293,6 +1299,10 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 .vue-modal-body {
     line-height: 1.5;
     color: #fff;
+    max-height: 30rem;
+    overflow: auto;
+    overscroll-behavior: contain;
+    margin-bottom: 1rem;
 }
 
 .vue-modal-actions {

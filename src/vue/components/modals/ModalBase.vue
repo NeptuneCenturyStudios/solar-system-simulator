@@ -62,8 +62,15 @@ let previouslyFocused: HTMLElement | null = null;
 
 // Blocks wheel events from reaching the sim's zoom handler while the modal is
 // open (matches the old startup overlay, which stopped wheel propagation).
+// Wheel events over the modal card itself are left alone (aside from being
+// kept from bubbling to the sim) so native scrolling still works on any
+// scrollable content inside it, e.g. .vue-modal-body's max-height + overflow.
 function onGlobalWheel(e: WheelEvent): void {
     if (!props.visible) return;
+    if (cardEl.value && e.target instanceof Node && cardEl.value.contains(e.target)) {
+        e.stopPropagation();
+        return;
+    }
     e.preventDefault();
     e.stopPropagation();
 }
