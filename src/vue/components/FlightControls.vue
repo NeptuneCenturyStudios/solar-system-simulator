@@ -5,15 +5,6 @@
             C — view &nbsp; Mouse steers &nbsp; Hold space — warp &nbsp; Esc — exit
         </p>
 
-        <label class="checkbox-row">
-            <input
-                type="checkbox"
-                :checked="simStore.isAdvancedMode"
-                @change="setAdvancedMode(($event.target as HTMLInputElement).checked)"
-            />
-            Advanced Flight Mode
-        </label>
-
         <div class="control-group">
             <label for="vueFlightShipTypeSelect">Ship Type</label>
             <select
@@ -57,7 +48,6 @@ import { SHIP_TYPES } from '../../bodies/ships/ship-registry';
 import {
     requestSpawnShip,
     requestToggleAutopilot,
-    setAdvancedMode,
     setSelectedShipTypeId,
     simStore,
 } from '../sim-bridge';

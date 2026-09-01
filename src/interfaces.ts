@@ -206,9 +206,6 @@ export interface IFlightState {
     rollLeft: boolean;
     rollRight: boolean;
 
-    /** Whether advanced (additive) flight physics are active. */
-    isAdvancedMode: boolean;
-
     // Pre-flight camera snapshot
     prevCameraPos: THREE.Vector3;
     prevCameraUp: THREE.Vector3;

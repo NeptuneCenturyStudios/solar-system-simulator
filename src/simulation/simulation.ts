@@ -40,8 +40,7 @@ export const flightState: IFlightState = {
     pointerOffsetY: 0,
     rollLeft: false,
     rollRight: false,
-    /** Whether advanced (additive) flight physics are active. Default = false (simple mode). */
-    isAdvancedMode: false,
+
     // Pre-flight camera snapshot so we can restore exactly on exit
     prevCameraPos: new THREE.Vector3(),
     prevCameraUp: new THREE.Vector3(0, 1, 0),

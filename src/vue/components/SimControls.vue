@@ -24,7 +24,7 @@
         <!-- Simulation controls -->
         <button
             class="btn toolbar-btn"
-            title="Slow/Reverse"
+            title="Slow"
             aria-label="Halve time scale"
             @click="stepTimeScale(0.5)"
         >
@@ -71,7 +71,7 @@ import { ActivePanel, setActivePanel, togglePanelManager, vueUiState } from '../
 
 // Same bounds the old bottom toolbar used (ui-manager.ts).
 const MIN_TIME_SCALE = 0.01;
-const MAX_TIME_SCALE = 2 ** 10;
+const MAX_TIME_SCALE = 2 ** 12;
 
 const speedText = computed(() => formatTimeScale(simStore.timeScale));
 const speedTitle = computed(() => {

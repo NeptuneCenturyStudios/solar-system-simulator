@@ -44,6 +44,8 @@
     --new-ui-list-row-bg: rgba(6, 27, 47, 0.6);
     --new-ui-list-row-hover-bg: rgba(10, 69, 128, 0.5);
     --new-ui-list-row-selected-bg: rgba(13, 90, 167, 0.5);
+    --new-ui-paused-box-shadow-high: 0 0 10px 10px rgba(255, 208, 0, 0.8);
+    --new-ui-paused-box-shadow-low: 0 0 10px 5px rgba(255, 208, 0, 0.3);
     --new-ui-gap-3: 0.5rem;
     --new-ui-gap-2: 0.25rem;
     --new-ui-gap-1: 0.125rem;
@@ -138,7 +140,8 @@ body {
     height: 100%;
 }
 
-h2, h3 {
+h2,
+h3 {
     margin: 0;
     color: var(--new-ui-btn-warning-color);
 }
@@ -814,6 +817,11 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     align-items: flex-start;
     height: 100%;
     pointer-events: none;
+    border-radius: var(--new-ui-border-radius);
+}
+
+#vue-ui-root .vue-ui-shell.paused {
+    animation: paused-pulse 3s infinite;
 }
 
 .vue-ui-toolbar-slot {
@@ -1106,6 +1114,18 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     100% {
         background: var(--new-ui-toolbar-button-active-bg);
         box-shadow: 0 0 0 transparent;
+    }
+}
+
+@keyframes paused-pulse {
+    0% {
+        box-shadow: var(--new-ui-paused-box-shadow-low);
+    }
+    50% {
+        box-shadow: var(--new-ui-paused-box-shadow-high);
+    }
+    100% {
+        box-shadow: var(--new-ui-paused-box-shadow-low);
     }
 }
 

@@ -284,8 +284,7 @@ export interface VueSimStore {
     hasKnownShip: boolean;
     /** Registry id of the known ship's type, or null if none exists. */
     knownShipTypeId: string | null;
-    /** Whether advanced (additive) flight physics are enabled. */
-    isAdvancedMode: boolean;
+
 }
 
 const state = reactive<VueSimStore>({
@@ -322,8 +321,7 @@ const state = reactive<VueSimStore>({
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
-    knownShipTypeId: null as string | null,
-    isAdvancedMode: false,
+    knownShipTypeId: null as string | null
 });
 
 /**
@@ -410,7 +408,6 @@ function refreshCameraState(): void {
     const ship = flightState.knownShip;
     state.hasKnownShip = !!(ship && !ship._isDisposed && simulationState.bodies.includes(ship));
     state.knownShipTypeId = state.hasKnownShip ? (ship?.shipTypeId ?? null) : null;
-    state.isAdvancedMode = flightState.isAdvancedMode;
 }
 
 /** Copy environment settings into the reactive store for the Vue UI. */
@@ -804,11 +801,6 @@ export function playlistSelectTrack(index: number): void {
 /** Update the ship type selected in the Flight Controls dropdown (pure UI state). */
 export function setSelectedShipTypeId(id: string): void {
     state.selectedShipTypeId = id;
-}
-
-export function setAdvancedMode(checked: boolean): void {
-    flightState.isAdvancedMode = checked;
-    state.isAdvancedMode = checked;
 }
 
 /** Spawn (or re-enter) a spaceship of the currently selected type. */

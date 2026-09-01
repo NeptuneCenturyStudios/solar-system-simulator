@@ -377,75 +377,43 @@ export class Spaceship extends Body {
         const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
         const fwdSpeed = this.velocity.dot(forward);
 
-        if (!flightState.isAdvancedMode) {
-            // ── Simple mode ──────────────────────────────────────────────────
-            // While a thrust key is held: forward thrust is ADDED to velocity so
-            // gravity accumulates freely and is never overwritten.
-            // Perpendicular drift is always decayed while any thrust key is held.
-            const thrustActive = keys.shift || keys.w || keys.s;
-            if (thrustActive) {
-                const shiftEffective = keys.shift && fwdSpeed < this.handling.flightBoostMaxSpeed;
-                const wEffective = keys.w && fwdSpeed < this.handling.flightMaxSpeed;
+        // While a thrust key is held: forward thrust is ADDED to velocity so
+        // gravity accumulates freely and is never overwritten.
+        // Perpendicular drift is always decayed while any thrust key is held.
+        const thrustActive = keys.shift || keys.w || keys.s;
+        if (thrustActive) {
+            const shiftEffective = keys.shift && fwdSpeed < this.handling.flightBoostMaxSpeed;
+            const wEffective = keys.w && fwdSpeed < this.handling.flightMaxSpeed;
 
-                if (shiftEffective) {
-                    const delta = Math.min(
-                        this.handling.flightBoostAccel * dt,
-                        this.handling.flightBoostMaxSpeed - fwdSpeed
-                    );
-                    this.velocity.addScaledVector(forward, delta);
-                } else if (wEffective && !keys.shift) {
-                    const delta = Math.min(
-                        this.handling.flightThrustAccel * dt,
-                        this.handling.flightMaxSpeed - fwdSpeed
-                    );
-                    this.velocity.addScaledVector(forward, delta);
-                } else if (keys.s) {
-                    // Decel stops applying when ship reaches 0 speed
-                    const ceiling = Math.max(-this.handling.flightMaxSpeed, -fwdSpeed);
-                    const decelRate =
-                        fwdSpeed > this.handling.flightMaxSpeed
-                            ? this.handling.flightBoostDecel
-                            : this.handling.flightThrustDecel;
-                    const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
-                    this.velocity.addScaledVector(forward, delta);
-                }
-
-                // Decay perpendicular drift when any thrust key is held.
-                const newFwdSpd = this.velocity.dot(forward);
-                const perpVel = this.velocity.clone().addScaledVector(forward, -newFwdSpd);
-                const decay = Math.max(0, 1 - this.handling.flightPerpDecay * dt);
-                perpVel.multiplyScalar(decay);
-                this.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
-            }
-        } else {
-            // ── Advanced mode ────────────────────────────────────────────────
-            // Thrust adds to velocity without removing gravity-accumulated
-            // perpendicular components, so orbital mechanics work at all times.
-            if (keys.shift) {
-                if (fwdSpeed < this.handling.flightBoostMaxSpeed) {
-                    const delta = Math.min(
-                        this.handling.flightBoostAccel * dt,
-                        this.handling.flightBoostMaxSpeed - fwdSpeed
-                    );
-                    this.velocity.addScaledVector(forward, delta);
-                }
-            } else if (keys.w) {
-                if (fwdSpeed < this.handling.flightMaxSpeed) {
-                    const delta = Math.min(
-                        this.handling.flightThrustAccel * dt,
-                        this.handling.flightMaxSpeed - fwdSpeed
-                    );
-                    this.velocity.addScaledVector(forward, delta);
-                }
+            if (shiftEffective) {
+                const delta = Math.min(
+                    this.handling.flightBoostAccel * dt,
+                    this.handling.flightBoostMaxSpeed - fwdSpeed
+                );
+                this.velocity.addScaledVector(forward, delta);
+            } else if (wEffective && !keys.shift) {
+                const delta = Math.min(
+                    this.handling.flightThrustAccel * dt,
+                    this.handling.flightMaxSpeed - fwdSpeed
+                );
+                this.velocity.addScaledVector(forward, delta);
             } else if (keys.s) {
-                if (fwdSpeed > -this.handling.flightMaxSpeed) {
-                    const delta = Math.max(
-                        -this.handling.flightThrustDecel * dt,
-                        -this.handling.flightMaxSpeed - fwdSpeed
-                    );
-                    this.velocity.addScaledVector(forward, delta);
-                }
+                // Decel stops applying when ship reaches 0 speed
+                const ceiling = Math.max(-this.handling.flightMaxSpeed, -fwdSpeed);
+                const decelRate =
+                    fwdSpeed > this.handling.flightMaxSpeed
+                        ? this.handling.flightBoostDecel
+                        : this.handling.flightThrustDecel;
+                const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
+                this.velocity.addScaledVector(forward, delta);
             }
+
+            // Decay perpendicular drift when any thrust key is held.
+            const newFwdSpd = this.velocity.dot(forward);
+            const perpVel = this.velocity.clone().addScaledVector(forward, -newFwdSpd);
+            const decay = Math.max(0, 1 - this.handling.flightPerpDecay * dt);
+            perpVel.multiplyScalar(decay);
+            this.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
         }
     }
 
@@ -805,7 +773,7 @@ export class Spaceship extends Body {
                 // Voice prompt: destination reached — the ship arrives at the
                 // body and begins circularizing into orbit.
                 playSoundEffect(SoundEffect.AutopilotDestinationReached);
-                
+
                 this.autopilotPhase = 'BRAKE';
                 this.autopilotBrakeEntryDistance = distance;
             }
@@ -816,7 +784,6 @@ export class Spaceship extends Body {
             const withinOrbit = distance <= orbitRadius * 1.02;
             const driftedToOrbit = distance <= orbitRadius * 1.1 && radialClosingSpeed < 1;
             if (withinOrbit || driftedToOrbit) {
-                
                 this.autopilotPhase = 'CIRCULARIZE';
             }
         }
