@@ -331,3 +331,28 @@ export const WORMHOLE_BRIDGE_TUBE_RADIAL_SEGMENTS = 12;
 
 // Set the Z position slightly above 0 for linux systems
 export const TEXT_SPRITE_Z = 0.01;
+
+// === Ship AI (NPC controllers) ===
+/** Station-keeping distance for the follow AI: 5,000 km expressed in sim units. */
+export const NPC_FOLLOW_DISTANCE = 5000 / DIST_SCALE;
+/** Half-width of the follow AI's dead band around NPC_FOLLOW_DISTANCE, as a fraction
+ *  of that distance. Prevents thrust/brake chatter while station-keeping. */
+export const NPC_FOLLOW_DEAD_BAND = 0.2;
+/** Angular error (radians) at which an AI applies full steering deflection.
+ *  Smaller values make AI ships steer more aggressively off-axis. */
+export const AI_STEER_FULL_DEFLECTION_ANGLE = Math.PI / 6;
+/** Maximum off-axis angle (radians) at which an AI will still apply forward thrust.
+ *  Beyond this the ship only turns, so it never accelerates sideways. */
+export const AI_THRUST_ALIGN_ANGLE = Math.PI / 6;
+/** Proportional gain converting distance error (u) into a desired closing speed (u/s). */
+export const AI_FOLLOW_APPROACH_GAIN = 0.5;
+/** Closing-speed tolerance as a fraction of the ship's normal max speed. Inside this
+ *  band the AI coasts rather than pulsing thrust or brake. */
+export const AI_CLOSING_SPEED_TOLERANCE = 0.02;
+/** Distance from the primary star at which the starting NPC ship spawns, expressed
+ *  as a multiple of that star's radius. Scaling off the star (rather than using a
+ *  fixed distance) keeps the ship safely outside the corona for procedural stars of
+ *  any size, while staying close to where the camera frames the star on launch. */
+export const NPC_SPAWN_STAR_RADII = 12;
+/** Fallback spawn distance (sim units) when the system has no star to orbit. */
+export const NPC_SPAWN_FALLBACK_DISTANCE = 5000000 / DIST_SCALE;

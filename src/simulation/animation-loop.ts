@@ -59,6 +59,8 @@ import {
 } from '../drawing/text-rendering';
 import { interactionState, simulationState, cameraState } from './simulation';
 import { exitFlightMode, updateFlightControls } from './flight-controllers';
+import { stepNpcShips } from './ai/npc-manager';
+import type { Spaceship } from '../bodies/ships/spaceship';
 
 // ── Context interface ───────────────────────────────────────────────────────
 
@@ -136,6 +138,46 @@ export interface AnimationContext {
     engageAutopilot: (target: Body) => void;
     triggerZoomToBody: (body: Body | null) => void;
     uiManager: UIManager;
+}
+
+// Scratch vectors for updateShipTrail (called once per ship per frame).
+const _trailNozzle = new THREE.Vector3();
+const _trailExhaustDir = new THREE.Vector3();
+
+/**
+ * Update one ship's engine trail.  Shared by the player's ship and every
+ * AI-piloted ship so they render identically.
+ *
+ * @param ship     The ship whose trail to update.
+ * @param speed    Speed to drive the trail intensity with (u/s).
+ * @param boosting True when the ship is at or shedding boost speed — selects the
+ *                 boost ceiling for intensity normalisation.
+ * @param dtTotal  Sim-time seconds advanced this frame.
+ * @param cameraPos Camera world position, for distance-based trail detail.
+ */
+function updateShipTrail(
+    ship: Spaceship,
+    speed: number,
+    boosting: boolean,
+    dtTotal: number,
+    cameraPos: THREE.Vector3
+): void {
+    _trailNozzle
+        .copy(ship.thrusterOffset)
+        .applyQuaternion(ship.mesh.quaternion)
+        .add(ship.mesh.position);
+    _trailExhaustDir.set(0, 0, -1).applyQuaternion(ship.mesh.quaternion);
+    const trailMax = boosting ? ship.handling.flightBoostMaxSpeed : ship.handling.flightMaxSpeed;
+    ship.trail.update(
+        _trailNozzle,
+        speed,
+        trailMax,
+        true,
+        ship.velocity,
+        _trailExhaustDir,
+        dtTotal,
+        cameraPos
+    );
 }
 
 /**
@@ -256,6 +298,12 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         if (isFlightModeActive) {
             updateFlightControls(flightCtx, wallDt, dtTotal);
         }
+
+        // ── AI-piloted ships ─────────────────────────────────────────────
+        // Runs whether or not the player is in flight mode: NPC ships fly on
+        // regardless. Frame-level only (decisions + steering/roll); their thrust
+        // is applied per physics substep inside updateSimulation().
+        stepNpcShips(wallDt);
 
         // ── Background warp/boost speed (unified) ────────────────────────
         const bgShip = ctx.flightState.knownShip;
@@ -771,33 +819,29 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
         }
 
-        // ── Ship trail ──────────────────────────────────────────────────────
-        const trailShip = !_shakeShip?.warpActive
+        // ── Ship trails ─────────────────────────────────────────────────────
+        // The player's ship, plus every AI-piloted ship.
+        const playerTrailShip = !_shakeShip?.warpActive
             ? (ctx.flightState.activeShip ?? ctx.flightState.knownShip)
             : null;
-        if (trailShip && trailShip.mesh) {
-            const nozzle = trailShip.thrusterOffset
-                .clone()
-                .applyQuaternion(trailShip.mesh.quaternion)
-                .add(trailShip.mesh.position);
-            const exDir = new THREE.Vector3(0, 0, -1).applyQuaternion(trailShip.mesh.quaternion);
+        if (playerTrailShip && playerTrailShip.mesh) {
             const trailSpd = isFlightModeActive
                 ? ctx.flightState.currentSpeed
-                : trailShip.velocity.length();
-            const trailMax =
-                ctx.keys.shift || trailShip.boostDecelerating || ctx.autopilotState.isBoostActive
-                    ? trailShip.handling.flightBoostMaxSpeed
-                    : trailShip.handling.flightMaxSpeed;
-            trailShip.trail.update(
-                nozzle,
-                trailSpd,
-                trailMax,
-                true,
-                trailShip.velocity,
-                exDir,
-                dtTotal,
-                ctx.camera.position
-            );
+                : playerTrailShip.velocity.length();
+            const boosting =
+                ctx.keys.shift ||
+                playerTrailShip.boostDecelerating ||
+                ctx.autopilotState.isBoostActive;
+            updateShipTrail(playerTrailShip, trailSpd, boosting, dtTotal, ctx.camera.position);
+        }
+
+        for (const npc of ctx.simulationState.npcShips) {
+            if (!npc || npc._isDisposed || !npc.mesh) continue;
+            // Skip the ship the player is flying — it was already handled above.
+            if (npc === playerTrailShip) continue;
+            if (npc.warpActive) continue;
+            const boosting = npc.controlInput.boost || npc.boostDecelerating;
+            updateShipTrail(npc, npc.velocity.length(), boosting, dtTotal, ctx.camera.position);
         }
 
         // ── Camera follow (non-flight) ──────────────────────────────────────

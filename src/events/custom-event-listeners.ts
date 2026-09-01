@@ -18,6 +18,7 @@ import {
     simulationState,
 } from '../simulation/simulation';
 import { NotificationType } from '../event-log/event-log';
+import { unregisterNpcShip } from '../simulation/ai/npc-manager';
 
 export interface ICustomEventContext {
     /** Module-level selectedBody (mutable). */
@@ -56,6 +57,8 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
     // Body removed cleanup
     window.addEventListener('body:removed', (e: WindowEventMap['body:removed']) => {
         const removedBody = e.detail.body;
+        // Drop it from the NPC registry if it was an AI-piloted ship.
+        unregisterNpcShip(removedBody);
         // If the deleted body was the player's known ship, clear the reference
         // so the button reverts to "SPAWN SPACESHIP" rather than "ENTER SHIP".
         if (removedBody && removedBody === flightState.knownShip) {
@@ -95,6 +98,8 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
     // Body death cleanup
     window.addEventListener('body:dead', (e: WindowEventMap['body:dead']) => {
         const body = e.detail.body;
+        // Drop it from the NPC registry if it was an AI-piloted ship.
+        unregisterNpcShip(body);
         if (body) {
             // If the dead body was the player's ship, disengage autopilot globally.
             // Do NOT clear flightState.activeShip or flightState.knownShip here —

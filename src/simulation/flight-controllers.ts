@@ -141,11 +141,51 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // Keep the active flight state intact so unpausing resumes from the exact same ship state.
     if (simulationState.isPaused || simulationState.timeScale === 0) {
         flightState.thrustActive = false;
+        ship.thrustActive = false;
         return;
     }
 
     const keys = cameraState.keys;
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
+
+    // The active ship's control frame IS the flight camera frame. Sync it in here
+    // and back out after steering, so the ship's own flight-control methods (which
+    // read ship.controlFrameQuat) and the camera stay in lockstep.
+    ship.controlFrameQuat.copy(flightState.flightCameraQuat);
+
+    const h = ship.handling;
+
+    // ── Translate the player's keys and pointer into the ship's control input ──
+    // From here on the player is just one input source among possible others: an
+    // AI writes the same struct, and everything downstream is shared.
+    const rawXFull = THREE.MathUtils.clamp(
+        flightState.pointerOffsetX / h.flightMaxPointerOffset,
+        -1,
+        1
+    );
+    const rawYFull = THREE.MathUtils.clamp(
+        flightState.pointerOffsetY / h.flightMaxPointerOffset,
+        -1,
+        1
+    );
+    function applyDeadzone(v: number) {
+        const d = h.flightSteerDeadzone;
+        if (Math.abs(v) < d) return 0;
+        return (Math.sign(v) * (Math.abs(v) - d)) / (1 - d);
+    }
+    const rawX = applyDeadzone(rawXFull);
+    const rawY = applyDeadzone(rawYFull);
+
+    const playerInput = ship.controlInput;
+    playerInput.thrust = keys.w;
+    playerInput.boost = keys.shift;
+    playerInput.brake = keys.s;
+    playerInput.rollLeft = flightState.rollLeft;
+    playerInput.rollRight = flightState.rollRight;
+    playerInput.steerX = rawX;
+    playerInput.steerY = rawY;
+    playerInput.fire = flightState.isFiring;
+
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
 
     // ── Warp/boost speed management (unified) ──────────────────────────────
     // Handles warp-active acceleration, warp decel → boost, and boost decel → idle
@@ -228,26 +268,19 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     const fwdSpeed = ship.velocity.dot(forward);
 
     // Sync thrustActive flag for trail / HUD (key state, not physics).
-    const thrustActive = manualInput && (keys.shift || keys.w || keys.s);
+    const thrustActive =
+        manualInput && (playerInput.boost || playerInput.thrust || playerInput.brake);
     if (manualInput) flightState.thrustActive = thrustActive;
+    ship.thrustActive = thrustActive;
 
-    // Trigger boost decel when Shift is *released* while still above normal max speed.
-    const shiftJustReleased = ship.prevShiftHeld && !keys.shift;
-    if (
-        manualInput &&
-        shiftJustReleased &&
-        !ship.boostDecelerating &&
-        !ship.stopBraking &&
-        !ship.warpActive &&
-        !ship.warpDecelerating
-    ) {
-        if (fwdSpeed > ship.handling.flightMaxSpeed) {
-            ship.boostDecelerating = true;
-        }
-    }
-    // Re-engaging boost cancels the decel — but only when we're already at or below boost max speed.
-    if (manualInput && keys.shift && fwdSpeed <= ship.handling.flightBoostMaxSpeed) {
-        ship.boostDecelerating = false;
+    // Boost decel on release / cancel on re-engage — shared with AI ships.
+    // (This also advances prevShiftHeld for next frame's release detection.)
+    if (manualInput) {
+        ship.updateBoostDecelState();
+    } else {
+        // Under autopilot the player's boost key must not touch decel state, but
+        // still track it so re-taking control doesn't see a stale "just released".
+        ship.prevShiftHeld = playerInput.boost;
     }
 
     // Autopilot speed display (velocity is managed by the autopilot subsystem).
@@ -261,61 +294,16 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         }
     }
 
-    // ── Roll with inertia (A/D) — delegated to ship ──────────────────────────
+    // ── Roll + steering with smoothing — delegated to the ship ────────────────
+    // applyFrameOrientation() folds roll and steering into ship.controlFrameQuat
+    // and writes mesh.quaternion (frame × bank). NPC ships call the same method,
+    // so player and AI orientation handling cannot drift apart.
     if (manualInput && !flightState.altOrbitActive) {
-        const rollDelta = ship.applyRoll(dt, flightState.rollLeft, flightState.rollRight);
-        // Apply the roll delta (from key input OR friction decay) to the camera quaternion.
-        if (rollDelta !== 0) {
-            const dqRoll = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(0, 0, 1),
-                rollDelta
-            );
-            flightState.flightCameraQuat.multiply(dqRoll);
-        }
-    }
-
-    // ── Steering with smoothing + dead zone (mouse) ───────────────────────────
-    const h = ship.handling;
-    const rawXFull = THREE.MathUtils.clamp(
-        flightState.pointerOffsetX / h.flightMaxPointerOffset,
-        -1,
-        1
-    );
-    const rawYFull = THREE.MathUtils.clamp(
-        flightState.pointerOffsetY / h.flightMaxPointerOffset,
-        -1,
-        1
-    );
-    function applyDeadzone(v: number) {
-        const d = h.flightSteerDeadzone;
-        if (Math.abs(v) < d) return 0;
-        return (Math.sign(v) * (Math.abs(v) - d)) / (1 - d);
-    }
-    const rawX = applyDeadzone(rawXFull);
-    const rawY = applyDeadzone(rawYFull);
-
-    if (manualInput && !flightState.altOrbitActive) {
-        const { yawDelta, pitchDelta, bankQuat } = ship.applySteering(dt, rawX, rawY);
-
-        if (yawDelta !== 0) {
-            const yawQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(0, 1, 0),
-                yawDelta
-            );
-            flightState.flightCameraQuat.multiply(yawQuat);
-        }
-        if (pitchDelta !== 0) {
-            const pitchQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(1, 0, 0),
-                pitchDelta
-            );
-            flightState.flightCameraQuat.multiply(pitchQuat);
-        }
-
-        ship.mesh.quaternion.copy(flightState.flightCameraQuat).multiply(bankQuat);
-        flightState.flightCameraQuat.normalize();
+        ship.applyFrameOrientation(dt);
+        flightState.flightCameraQuat.copy(ship.controlFrameQuat);
     } else {
         flightState.flightCameraQuat.copy(ship.mesh.quaternion);
+        ship.controlFrameQuat.copy(ship.mesh.quaternion);
         ship.shipBankRoll = 0;
         ship.shipBankPitch = 0;
         ship.steerX = 0;
@@ -393,6 +381,6 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         ctx.flightHUD.hideWarpSprite();
     }
 
-    // ── Track prevShiftHeld for next frame's Shift-release detection ──────
-    ship.prevShiftHeld = keys.shift;
+    // prevShiftHeld for the next frame's boost-release detection is tracked by
+    // ship.updateBoostDecelState(), called above.
 }

@@ -24,6 +24,7 @@ export const simulationState: ISimulationState = {
     impacts: [] as ImpactShockwave[],
     showNames: false,
     gMultiplier: 1,
+    npcShips: [] as Spaceship[],
 };
 
 /**

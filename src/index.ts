@@ -65,6 +65,8 @@ import {
     C,
     EARTH_RADIUS,
     WORMHOLE_DEFAULT_RADIUS,
+    NPC_SPAWN_STAR_RADII,
+    NPC_SPAWN_FALLBACK_DISTANCE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -260,6 +262,7 @@ import {
     resetLastPushedSeed,
 } from './utilities/url-seed';
 import { getShipTypeById } from './bodies/ships/ship-registry';
+import { clearNpcShips, spawnNpcShip } from './simulation/ai/npc-manager';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: {
@@ -1665,6 +1668,10 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
  * Resets the simulation state and notifies the UI of the reset.
  */
 function cleanUpSolarSystem() {
+    // Drop the NPC registry before disposing bodies, so the animation loop and
+    // physics substep stop touching ships that are about to be torn down.
+    clearNpcShips();
+
     // Unified cleanup: always dispose existing bodies (stars included).
     // No special-casing is required here; Star.die({ skipExplosion: true }) is already the canonical disposal path.
     for (const b of simulationState.bodies || []) {
@@ -4421,8 +4428,58 @@ async function launchSystem(
         mode === SimulationStartMode.Empty ? undefined : showProceduralProgress();
     await spawn(mode, proceduralResult, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
+    spawnStartingNpcShip();
     if (progressReporter) hideProceduralModal();
     setSystemReady(true);
+}
+
+/**
+ * Spawn the starting AI-piloted ship for a freshly launched system.
+ *
+ * Placed on a circular orbit around the primary star so it stays put instead of
+ * falling in, and pointed along its own orbital velocity. In an empty system
+ * (no star) it spawns at the origin at rest.
+ */
+function spawnStartingNpcShip() {
+    const star = getPrimaryStar();
+
+    let position: THREE.Vector3;
+    let velocity: THREE.Vector3;
+
+    if (star?.mesh) {
+        // Scale the offset off the star's own radius so procedural stars of any
+        // size put the ship safely outside the corona rather than inside it.
+        const offset = Math.max(star.radius * NPC_SPAWN_STAR_RADII, NPC_SPAWN_FALLBACK_DISTANCE);
+        position = star.mesh.position.clone().add(new THREE.Vector3(offset, 0, 0));
+        velocity = computeOrbitVelocityAtPos(
+            position,
+            star.mesh.position,
+            star.mass,
+            'circular',
+            0,
+            0
+        ).add(star.velocity);
+    } else {
+        position = new THREE.Vector3(NPC_SPAWN_FALLBACK_DISTANCE, 0, 0);
+        velocity = new THREE.Vector3();
+    }
+
+    const ship = spawnNpcShip({
+        dependencies,
+        scene,
+        position,
+        velocity,
+        name: 'NPC Zenith',
+    });
+
+    // Point the ship along its initial velocity so it doesn't start flying backwards.
+    if (velocity.lengthSq() > 1e-12) {
+        const heading = velocity.clone().normalize();
+        const eye = ship.mesh.position.clone().add(heading);
+        const m = new THREE.Matrix4().lookAt(eye, ship.mesh.position, new THREE.Vector3(0, 1, 0));
+        ship.mesh.quaternion.setFromRotationMatrix(m);
+    }
+    ship.controlFrameQuat.copy(ship.mesh.quaternion);
 }
 
 /**

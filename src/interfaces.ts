@@ -43,6 +43,35 @@ export interface ISimulationState {
     impacts: ImpactShockwave[];
     showNames: boolean;
     gMultiplier: number;
+    /** AI-piloted (non-player) ships currently in the simulation.
+     *  Maintained by simulation/ai/npc-manager.ts; always a subset of `bodies`. */
+    npcShips: Spaceship[];
+}
+
+/**
+ * Virtual control surface for a single ship — the ship-level equivalent of the
+ * player's keyboard/mouse state.  Written either by the player input path
+ * (updateFlightControls) or by a ShipAI, and read by the ship's own flight
+ * control methods.  Nothing downstream knows or cares which one wrote it, so an
+ * AI-piloted ship goes through exactly the same handling as a piloted one.
+ */
+export interface IShipControlInput {
+    /** Forward thrust — the "W" key for the player. */
+    thrust: boolean;
+    /** Boost — the "Shift" key for the player. */
+    boost: boolean;
+    /** Reverse / decelerate — the "S" key for the player. */
+    brake: boolean;
+    /** Roll left — the "A" key for the player. */
+    rollLeft: boolean;
+    /** Roll right — the "D" key for the player. */
+    rollRight: boolean;
+    /** Horizontal steering, already normalised to [-1, 1] AND past the deadzone. */
+    steerX: number;
+    /** Vertical steering, already normalised to [-1, 1] AND past the deadzone. */
+    steerY: number;
+    /** Trigger held. Not used by AI controllers yet — reserved. */
+    fire: boolean;
 }
 
 /**

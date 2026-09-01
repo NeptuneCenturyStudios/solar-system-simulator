@@ -91,6 +91,14 @@ export function updateSimulation(
         // any time scale.
         flightState.activeShip?.applyFlightThrustSubstep?.(dt);
 
+        // Same for every AI-piloted ship. Doing this per substep (rather than once
+        // per frame) is what keeps AI thrust correctly interleaved with gravity at
+        // high time-warp, exactly as it is for the player's ship above.
+        for (const npc of simulationState.npcShips) {
+            if (!npc || npc._isDisposed || npc === flightState.activeShip) continue;
+            npc.applyFlightThrustSubstep(dt);
+        }
+
         // Apply physics to bodies
         updatePhysics(simulationState);
 

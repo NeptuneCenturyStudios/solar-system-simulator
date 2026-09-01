@@ -12,14 +12,11 @@ import {
     AutopilotPhase,
     IWarpStepResult,
     ISpaceshipCreationOptions,
+    IShipControlInput,
 } from '../../interfaces';
+import type { ShipAI } from '../../simulation/ai/ship-ai';
 import { Weapon } from '../../ship-effects/weapons/weapon';
-import {
-    autopilotState,
-    cameraState,
-    flightState,
-    simulationState,
-} from '../../simulation/simulation';
+import { autopilotState, flightState, simulationState } from '../../simulation/simulation';
 import { G } from '../../utilities/consts';
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
@@ -72,6 +69,36 @@ export class Spaceship extends Body {
      *  Used to detect when the user selects a different ship class than the one
      *  currently spawned, so the old ship can be destroyed and replaced. */
     readonly shipTypeId: string;
+
+    // ── Control input (player keys OR AI) ────────────────────────────────────
+    /** This ship's virtual control surface. The player input path writes into the
+     *  active ship's struct; a ShipAI writes into its own ship's. The flight
+     *  control methods below read only from here, never from global key state,
+     *  so both pilots exercise identical handling. */
+    controlInput: IShipControlInput = {
+        thrust: false,
+        boost: false,
+        brake: false,
+        rollLeft: false,
+        rollRight: false,
+        steerX: 0,
+        steerY: 0,
+        fire: false,
+    };
+
+    /** This ship's steering reference frame, independent of the visual banking
+     *  applied to mesh.quaternion. Thrust is applied along its +Z axis, and
+     *  steering/roll deltas accumulate into it. For the player's active ship this
+     *  is kept in sync with flightState.flightCameraQuat (the camera follows it);
+     *  for an AI ship it is the ship's own authoritative heading. */
+    controlFrameQuat: THREE.Quaternion = new THREE.Quaternion();
+
+    /** Pluggable AI controller piloting this ship, or null when player-controlled. */
+    ai: ShipAI | null = null;
+
+    /** True while this ship applied thrust on the current frame. Per-ship
+     *  equivalent of flightState.thrustActive; drives the engine trail. */
+    thrustActive: boolean = false;
 
     /** Current angular roll velocity (rad/s). Decays when key released. */
     rollVelocity: number = 0;
@@ -240,6 +267,10 @@ export class Spaceship extends Body {
         // Warp tunnel effect — visibility is speed-driven (no explicit start/stop needed)
         this.warpEffect = new WarpEffect(scene);
 
+        // Seed the control frame from the mesh's starting orientation so thrust
+        // and steering begin from wherever the ship was placed.
+        this.controlFrameQuat.copy(this.mesh.quaternion);
+
         // Keep default label (shows in bodies table) but hide it during flight
         if (this.label) this.label.visible = false;
         if (this.labelLine) this.labelLine.visible = false;
@@ -362,6 +393,9 @@ export class Spaceship extends Body {
      * Apply manual thrust for one physics substep.
      * Called from inside the physics substep loop so thrust and gravity interleave
      * correctly at any time scale.
+     *
+     * Reads this ship's own controlInput and controlFrameQuat, so it behaves
+     * identically whether the player or a ShipAI is at the controls.
      */
     applyFlightThrustSubstep(dt: number): void {
         if (this._isDisposed || !this.mesh) return;
@@ -373,17 +407,17 @@ export class Spaceship extends Body {
         if (this.warpActive || this.warpDecelerating || this.boostDecelerating || this.stopBraking)
             return;
 
-        const keys = cameraState.keys;
-        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(flightState.flightCameraQuat);
+        const input = this.controlInput;
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.controlFrameQuat);
         const fwdSpeed = this.velocity.dot(forward);
 
         // While a thrust key is held: forward thrust is ADDED to velocity so
         // gravity accumulates freely and is never overwritten.
         // Perpendicular drift is always decayed while any thrust key is held.
-        const thrustActive = keys.shift || keys.w || keys.s;
+        const thrustActive = input.boost || input.thrust || input.brake;
         if (thrustActive) {
-            const shiftEffective = keys.shift && fwdSpeed < this.handling.flightBoostMaxSpeed;
-            const wEffective = keys.w && fwdSpeed < this.handling.flightMaxSpeed;
+            const shiftEffective = input.boost && fwdSpeed < this.handling.flightBoostMaxSpeed;
+            const wEffective = input.thrust && fwdSpeed < this.handling.flightMaxSpeed;
 
             if (shiftEffective) {
                 const delta = Math.min(
@@ -391,13 +425,13 @@ export class Spaceship extends Body {
                     this.handling.flightBoostMaxSpeed - fwdSpeed
                 );
                 this.velocity.addScaledVector(forward, delta);
-            } else if (wEffective && !keys.shift) {
+            } else if (wEffective && !input.boost) {
                 const delta = Math.min(
                     this.handling.flightThrustAccel * dt,
                     this.handling.flightMaxSpeed - fwdSpeed
                 );
                 this.velocity.addScaledVector(forward, delta);
-            } else if (keys.s) {
+            } else if (input.brake) {
                 // Decel stops applying when ship reaches 0 speed
                 const ceiling = Math.max(-this.handling.flightMaxSpeed, -fwdSpeed);
                 const decelRate =
@@ -611,14 +645,13 @@ export class Spaceship extends Body {
     }
 
     /**
-     * Apply roll with inertia for one frame.
+     * Apply roll with inertia for one frame, driven by this ship's controlInput.
      * @param dt  Wall-clock seconds (non-physics-scaled).
-     * @param rollLeft  True if A (left roll) is held.
-     * @param rollRight True if D (right roll) is held.
-     * @returns The angular delta (radians) to apply to the camera quaternion.
+     * @returns The angular delta (radians) to apply to the control frame quaternion.
      */
-    applyRoll(dt: number, rollLeft: boolean, rollRight: boolean): number {
+    applyRoll(dt: number): number {
         const h = this.handling;
+        const { rollLeft, rollRight } = this.controlInput;
         const rollTarget = rollLeft ? -h.flightRollSpeed : rollRight ? h.flightRollSpeed : 0;
 
         if (rollLeft || rollRight) {
@@ -642,17 +675,19 @@ export class Spaceship extends Body {
 
     /**
      * Apply steering smoothing and compute yaw/pitch deltas for one frame.
+     * Reads the (already normalised and deadzoned) steerX/steerY from this ship's
+     * controlInput, so the player and an AI get identical smoothing and banking.
      * @param dt  Wall-clock seconds.
-     * @param rawX  Normalised horizontal pointer position after deadzone [-1..1].
-     * @param rawY  Normalised vertical pointer position after deadzone [-1..1].
      * @returns yawDelta, pitchDelta, and a banking quaternion for the ship mesh.
      */
-    applySteering(
-        dt: number,
-        rawX: number,
-        rawY: number
-    ): { yawDelta: number; pitchDelta: number; bankQuat: THREE.Quaternion } {
+    applySteering(dt: number): {
+        yawDelta: number;
+        pitchDelta: number;
+        bankQuat: THREE.Quaternion;
+    } {
         const h = this.handling;
+        const rawX = this.controlInput.steerX;
+        const rawY = this.controlInput.steerY;
         const steerAlpha = 1 - Math.exp(-h.flightSteerSmoothRate * dt);
 
         this.steerX += (rawX - this.steerX) * steerAlpha;
@@ -674,6 +709,96 @@ export class Spaceship extends Body {
     }
 
     /**
+     * Advance one frame of steering + roll and fold the result into this ship's
+     * control frame and mesh orientation.
+     *
+     * This is the shared body of the player's per-frame steering block and the
+     * NPC step, so the two can never drift apart. Call once per frame, after the
+     * controlInput for this frame has been written.
+     *
+     * @param dt Wall-clock seconds (non-physics-scaled).
+     */
+    applyFrameOrientation(dt: number): void {
+        if (this._isDisposed || !this.mesh) return;
+
+        // ── Roll with inertia ────────────────────────────────────────────────
+        const rollDelta = this.applyRoll(dt);
+        if (rollDelta !== 0) {
+            const dqRoll = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 0, 1),
+                rollDelta
+            );
+            this.controlFrameQuat.multiply(dqRoll);
+        }
+
+        // ── Steering (yaw + pitch) with smoothing and visual banking ─────────
+        const { yawDelta, pitchDelta, bankQuat } = this.applySteering(dt);
+
+        if (yawDelta !== 0) {
+            const yawQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                yawDelta
+            );
+            this.controlFrameQuat.multiply(yawQuat);
+        }
+        if (pitchDelta !== 0) {
+            const pitchQuat = new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(1, 0, 0),
+                pitchDelta
+            );
+            this.controlFrameQuat.multiply(pitchQuat);
+        }
+
+        this.controlFrameQuat.normalize();
+        this.mesh.quaternion.copy(this.controlFrameQuat).multiply(bankQuat);
+    }
+
+    /**
+     * Frame-level boost deceleration state machine, driven by controlInput.boost.
+     *
+     * Releasing boost while still above normal max speed starts the boost decel
+     * ramp; re-engaging boost at or below boost max speed cancels it. Shared by
+     * the player path and AI ships so both shed boost speed the same way.
+     */
+    updateBoostDecelState(): void {
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.controlFrameQuat);
+        const fwdSpeed = this.velocity.dot(forward);
+        const boostHeld = this.controlInput.boost;
+        const boostJustReleased = this.prevShiftHeld && !boostHeld;
+
+        if (
+            boostJustReleased &&
+            !this.boostDecelerating &&
+            !this.stopBraking &&
+            !this.warpActive &&
+            !this.warpDecelerating &&
+            fwdSpeed > this.handling.flightMaxSpeed
+        ) {
+            this.boostDecelerating = true;
+        }
+
+        // Re-engaging boost cancels the decel — but only once we're at or below boost max.
+        if (boostHeld && fwdSpeed <= this.handling.flightBoostMaxSpeed) {
+            this.boostDecelerating = false;
+        }
+
+        this.prevShiftHeld = boostHeld;
+    }
+
+    /** Zero this ship's virtual control surface (all inputs released, sticks centred). */
+    resetControlInput(): void {
+        const input = this.controlInput;
+        input.thrust = false;
+        input.boost = false;
+        input.brake = false;
+        input.rollLeft = false;
+        input.rollRight = false;
+        input.steerX = 0;
+        input.steerY = 0;
+        input.fire = false;
+    }
+
+    /**
      * Zero all ship-local flight control state (roll, steer, banking, prevShift).
      * Call on flight-mode exit and re-entry so the ship doesn't retain stale inputs.
      */
@@ -684,6 +809,7 @@ export class Spaceship extends Body {
         this.shipBankRoll = 0;
         this.shipBankPitch = 0;
         this.prevShiftHeld = false;
+        this.resetControlInput();
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -1154,9 +1280,14 @@ export class Spaceship extends Body {
     }
 
     /**
-     * Override die() to clean up the warp sound controller, warp effect, and autopilot state.
+     * Override die() to clean up the warp sound controller, warp effect, AI
+     * controller, and autopilot state.
      */
     die(deathOptions?: IDeathOptions): void {
+        if (this.ai) {
+            this.ai.dispose();
+            this.ai = null;
+        }
         if (this._warpSound) {
             this._warpSound.dispose();
             this._warpSound = null;
