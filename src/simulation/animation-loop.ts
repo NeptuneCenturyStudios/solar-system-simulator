@@ -303,7 +303,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // Runs whether or not the player is in flight mode: NPC ships fly on
         // regardless. Frame-level only (decisions + steering/roll); their thrust
         // is applied per physics substep inside updateSimulation().
-        stepNpcShips(wallDt);
+        stepNpcShips(wallDt, dtTotal);
 
         // ── Background warp/boost speed (unified) ────────────────────────
         const bgShip = ctx.flightState.knownShip;

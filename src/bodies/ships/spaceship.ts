@@ -754,11 +754,17 @@ export class Spaceship extends Body {
     }
 
     /**
-     * Frame-level boost deceleration state machine, driven by controlInput.boost.
+     * Frame-level boost deceleration state machine, driven by controlInput.
      *
      * Releasing boost while still above normal max speed starts the boost decel
      * ramp; re-engaging boost at or below boost max speed cancels it. Shared by
      * the player path and AI ships so both shed boost speed the same way.
+     *
+     * NOTE for AI ships: while this ramp is active applyFlightThrustSubstep()
+     * refuses all thrust, and the ramp is only advanced frame-level by
+     * advanceWarpSpeed(). Any code path that drives a ship must therefore call
+     * advanceWarpSpeed() each frame, or the ship coasts at boost speed forever
+     * with its pilot locked out. See stepNpcShips() in simulation/ai/npc-manager.ts.
      */
     updateBoostDecelState(): void {
         const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.controlFrameQuat);

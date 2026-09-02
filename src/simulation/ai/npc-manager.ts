@@ -15,6 +15,9 @@ import { FollowShipAI } from './follow-ship-ai';
  * drive their controllers without scanning every body each frame.
  */
 
+/** Scratch vector reused by stepNpcShips — avoids a per-ship, per-frame allocation. */
+const _npcForward = new THREE.Vector3();
+
 /** Options for spawning an NPC ship. */
 export interface ISpawnNpcShipOptions {
     /** Shared dependency bag passed through to the ship constructor. */
@@ -113,9 +116,10 @@ export function spawnNpcShip(options: ISpawnNpcShipOptions): Spaceship {
  * is driven, and is what keeps AI thrust correctly interleaved with gravity at
  * high time-warp.
  *
- * @param dt Wall-clock seconds since the previous frame (not time-scaled).
+ * @param dt    Wall-clock seconds since the previous frame (not time-scaled).
+ * @param simDt Sim-time seconds advanced this frame (wall dt × time scale).
  */
-export function stepNpcShips(dt: number): void {
+export function stepNpcShips(dt: number, simDt: number): void {
     if (simulationState.isPaused || simulationState.timeScale === 0) return;
 
     for (const ship of simulationState.npcShips) {
@@ -123,6 +127,23 @@ export function stepNpcShips(dt: number): void {
         // If the player has taken this ship over, or the autopilot has it, they
         // own the controls this frame — the AI stands down.
         if (ship === flightState.activeShip || ship.autopilotActive) continue;
+
+        // Advance any warp/boost/stop deceleration first. These phases are driven
+        // frame-level (not per substep), and while one is active
+        // applyFlightThrustSubstep() deliberately refuses to add thrust — so
+        // without this the ship would enter boostDecelerating on a boost release
+        // and stay stuck there forever, coasting at boost speed with the AI
+        // unable to slow it down. updateFlightControls() does the same for the
+        // player's ship, and animation-loop.ts for the parked known ship.
+        if (
+            ship.warpActive ||
+            ship.warpDecelerating ||
+            ship.boostDecelerating ||
+            ship.stopBraking
+        ) {
+            _npcForward.set(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
+            ship.advanceWarpSpeed(simDt, _npcForward);
+        }
 
         ship.ai.update(dt);
         ship.applyFrameOrientation(dt);

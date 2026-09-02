@@ -335,8 +335,9 @@ export const TEXT_SPRITE_Z = 0.01;
 // === Ship AI (NPC controllers) ===
 /** Station-keeping distance for the follow AI: 5,000 km expressed in sim units. */
 export const NPC_FOLLOW_DISTANCE = 5000 / DIST_SCALE;
-/** Half-width of the follow AI's dead band around NPC_FOLLOW_DISTANCE, as a fraction
- *  of that distance. Prevents thrust/brake chatter while station-keeping. */
+/** Half-width of the follow AI's slack zone around NPC_FOLLOW_DISTANCE, as a fraction
+ *  of that distance. The commanded speed ramps up from zero at the edge of this zone
+ *  rather than switching on at it, so station-keeping settles instead of limit-cycling. */
 export const NPC_FOLLOW_DEAD_BAND = 0.2;
 /** Angular error (radians) at which an AI applies full steering deflection.
  *  Smaller values make AI ships steer more aggressively off-axis. */
@@ -346,9 +347,18 @@ export const AI_STEER_FULL_DEFLECTION_ANGLE = Math.PI / 6;
 export const AI_THRUST_ALIGN_ANGLE = Math.PI / 6;
 /** Proportional gain converting distance error (u) into a desired closing speed (u/s). */
 export const AI_FOLLOW_APPROACH_GAIN = 0.5;
-/** Closing-speed tolerance as a fraction of the ship's normal max speed. Inside this
- *  band the AI coasts rather than pulsing thrust or brake. */
+/** Closing-speed tolerance, as a fraction of the larger of the ship's normal max speed
+ *  and the currently commanded speed. Inside this band the AI coasts rather than pulsing
+ *  thrust or brake; scaling it with the command keeps high-speed runs from chattering. */
 export const AI_CLOSING_SPEED_TOLERANCE = 0.02;
+/** Safety factor applied to the runway an AI assumes it has for braking. Values above 1
+ *  make it commit to its approach speed more conservatively, trading arrival time for
+ *  less overshoot. */
+export const AI_APPROACH_SAFETY_PAD = 1.5;
+/** How far above normal max speed the commanded speed must reach before an AI engages
+ *  boost. Boost is then held until the command falls back below normal max speed, so the
+ *  gap between the two thresholds is the hysteresis that stops boost from flickering. */
+export const AI_BOOST_ENGAGE_FACTOR = 1.25;
 /** Distance from the primary star at which the starting NPC ship spawns, expressed
  *  as a multiple of that star's radius. Scaling off the star (rather than using a
  *  fixed distance) keeps the ship safely outside the corona for procedural stars of
