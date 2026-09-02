@@ -18,6 +18,14 @@
                 BLACK HOLE
             </button>
             <button
+                class="old-ui btn-dark btn-with-icon"
+                type="button"
+                @click="selectScenario('testAiShips')"
+            >
+                <span class="material-symbols-outlined">smart_toy</span>
+                TEST AI SHIPS
+            </button>
+            <button
                 class="old-ui btn-with-icon btn-danger"
                 type="button"
                 @click="onCancel"

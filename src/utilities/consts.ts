@@ -3,6 +3,8 @@ export enum SimulationStartMode {
     Empty = 1,
     BlackHole = 2,
     Procedural = 3,
+    /** Scenario: a bare star plus one AI-piloted ship, for testing ship AI. */
+    TestAiShips = 4,
 }
 
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===

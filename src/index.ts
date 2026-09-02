@@ -65,8 +65,6 @@ import {
     C,
     EARTH_RADIUS,
     WORMHOLE_DEFAULT_RADIUS,
-    NPC_SPAWN_STAR_RADII,
-    NPC_SPAWN_FALLBACK_DISTANCE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -266,7 +264,8 @@ import {
     resetLastPushedSeed,
 } from './utilities/url-seed';
 import { getShipTypeById } from './bodies/ships/ship-registry';
-import { clearNpcShips, spawnNpcShip } from './simulation/ai/npc-manager';
+import { TestAiShipsGenerator } from './procedural/test-ai-ships-generator';
+import { clearNpcShips, registerNpcShipsIn } from './simulation/ai/npc-manager';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: {
@@ -1659,7 +1658,8 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
     const hideKuiper =
         mode === SimulationStartMode.Empty ||
         mode === SimulationStartMode.BlackHole ||
-        mode === SimulationStartMode.Procedural;
+        mode === SimulationStartMode.Procedural ||
+        mode === SimulationStartMode.TestAiShips;
 
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = !hideKuiper;
@@ -1757,6 +1757,9 @@ async function spawn(
         // Black hole system generator
         generator = new BlackHoleSystemGenerator(dependencies, scene, proceduralResult?.seed);
         seedType = SEED_TYPE_BLACKHOLE;
+    } else if (mode === SimulationStartMode.TestAiShips) {
+        // Ship AI test bed: one star, one AI-piloted ship.
+        generator = new TestAiShipsGenerator(dependencies, scene, proceduralResult?.seed);
     } else {
         // Empty system generator
         generator = new EmptySystemGenerator(dependencies, scene);
@@ -1767,6 +1770,9 @@ async function spawn(
 
     // Set the bodies
     simulationState.bodies = solarSystem.bodies;
+    // Scenario generators may include AI-piloted ships; pick them up now that the
+    // system is live, so the registry never holds a ship the physics loop can't see.
+    registerNpcShipsIn(simulationState.bodies);
     // Apply the space texture from the generated solar system
     await loadSpaceTexture(scene, solarSystem.spaceTexture.filename);
     environmentState.spaceTextureFilename = solarSystem.spaceTexture.filename;
@@ -4432,58 +4438,8 @@ async function launchSystem(
         mode === SimulationStartMode.Empty ? undefined : showProceduralProgress();
     await spawn(mode, proceduralResult, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
-    spawnStartingNpcShip();
     if (progressReporter) hideProceduralModal();
     setSystemReady(true);
-}
-
-/**
- * Spawn the starting AI-piloted ship for a freshly launched system.
- *
- * Placed on a circular orbit around the primary star so it stays put instead of
- * falling in, and pointed along its own orbital velocity. In an empty system
- * (no star) it spawns at the origin at rest.
- */
-function spawnStartingNpcShip() {
-    const star = getPrimaryStar();
-
-    let position: THREE.Vector3;
-    let velocity: THREE.Vector3;
-
-    if (star?.mesh) {
-        // Scale the offset off the star's own radius so procedural stars of any
-        // size put the ship safely outside the corona rather than inside it.
-        const offset = Math.max(star.radius * NPC_SPAWN_STAR_RADII, NPC_SPAWN_FALLBACK_DISTANCE);
-        position = star.mesh.position.clone().add(new THREE.Vector3(offset, 0, 0));
-        velocity = computeOrbitVelocityAtPos(
-            position,
-            star.mesh.position,
-            star.mass,
-            'circular',
-            0,
-            0
-        ).add(star.velocity);
-    } else {
-        position = new THREE.Vector3(NPC_SPAWN_FALLBACK_DISTANCE, 0, 0);
-        velocity = new THREE.Vector3();
-    }
-
-    const ship = spawnNpcShip({
-        dependencies,
-        scene,
-        position,
-        velocity,
-        name: 'NPC Zenith',
-    });
-
-    // Point the ship along its initial velocity so it doesn't start flying backwards.
-    if (velocity.lengthSq() > 1e-12) {
-        const heading = velocity.clone().normalize();
-        const eye = ship.mesh.position.clone().add(heading);
-        const m = new THREE.Matrix4().lookAt(eye, ship.mesh.position, new THREE.Vector3(0, 1, 0));
-        ship.mesh.quaternion.setFromRotationMatrix(m);
-    }
-    ship.controlFrameQuat.copy(ship.mesh.quaternion);
 }
 
 /**
@@ -4532,6 +4488,9 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
                     return;
                 }
                 await launchSystem(SimulationStartMode.BlackHole, seedResult);
+            } else if (scenarioResult.scenario === 'testAiShips') {
+                // Fixed test bed — no seed prompt, so every run starts identically.
+                await launchSystem(SimulationStartMode.TestAiShips);
             }
             break;
         }

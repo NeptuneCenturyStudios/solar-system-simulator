@@ -18,8 +18,8 @@ import { FollowShipAI } from './follow-ship-ai';
 /** Scratch vector reused by stepNpcShips — avoids a per-ship, per-frame allocation. */
 const _npcForward = new THREE.Vector3();
 
-/** Options for spawning an NPC ship. */
-export interface ISpawnNpcShipOptions {
+/** Options for building an NPC ship. */
+export interface ICreateNpcShipOptions {
     /** Shared dependency bag passed through to the ship constructor. */
     dependencies: object;
     scene: THREE.Scene;
@@ -58,15 +58,18 @@ export function clearNpcShips(): void {
 }
 
 /**
- * Create an AI-piloted ship, add it to the simulation, and register it.
+ * Build an AI-piloted ship, ready to be added to a system's body list.
  *
- * The caller is responsible for choosing a sensible position and velocity — see
- * `spawnStartingNpcShip()` in index.ts, which places it on an orbit around the
- * primary star.
+ * This deliberately does NOT touch `simulationState` — a SolarSystemGenerator
+ * runs asynchronously, before its bodies have been handed to the simulation, and
+ * a ship in the NPC registry but not yet in `simulationState.bodies` would be
+ * flown by its AI while gravity was not yet acting on it. Generators push the
+ * returned ship into their own `bodies` array; `registerNpcShipsIn()` then picks
+ * it up once the system goes live.
  *
- * @returns The spawned ship.
+ * @returns The new ship, with its controller attached.
  */
-export function spawnNpcShip(options: ISpawnNpcShipOptions): Spaceship {
+export function createNpcShip(options: ICreateNpcShipOptions): Spaceship {
     const shipType = getShipTypeById(options.shipTypeId);
     const ship = shipType.create(
         options.dependencies,
@@ -90,20 +93,20 @@ export function spawnNpcShip(options: ISpawnNpcShipOptions): Spaceship {
     // Engine trail, same as the player's ship gets on flight entry.
     ship.trail.init();
 
-    simulationState.bodies.push(ship);
-    registerNpcShip(ship);
-
-    try {
-        window.dispatchEvent(
-            new CustomEvent('body:added', {
-                detail: { body: ship, id: ship.id, name: ship.name },
-            })
-        );
-    } catch {
-        // Empty — body:added is advisory (UI refresh only).
-    }
-
     return ship;
+}
+
+/**
+ * Register every AI-piloted ship found in `bodies`.
+ *
+ * Called by spawn() in index.ts once a generated system has been handed to
+ * `simulationState.bodies`, so any scenario generator can include AI ships in
+ * its output and have them picked up automatically — no per-scenario wiring.
+ */
+export function registerNpcShipsIn(bodies: Body[]): void {
+    for (const body of bodies) {
+        if (body instanceof Spaceship && body.ai) registerNpcShip(body);
+    }
 }
 
 /**

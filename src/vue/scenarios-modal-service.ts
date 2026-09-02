@@ -4,7 +4,7 @@
  * module directly; ScenariosModal.vue self-registers its controller on mount.
  */
 
-export type ScenarioAction = 'blackHole';
+export type ScenarioAction = 'blackHole' | 'testAiShips';
 
 export interface ScenariosModalResult {
     scenario: ScenarioAction;
