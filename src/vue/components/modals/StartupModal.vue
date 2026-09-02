@@ -37,9 +37,9 @@
             <span class="material-symbols-outlined">auto_fix_high</span>
             GENERATE
         </button>
-        <button class="old-ui btn-dark btn-with-icon" type="button" @click="launch('blackHole')">
-            <span class="material-symbols-outlined">brightness_1</span>
-            BLACK HOLE
+        <button class="old-ui btn-dark btn-with-icon" type="button" @click="launch('scenarios')">
+            <span class="material-symbols-outlined">interests</span>
+            SCENARIOS
         </button>
         <button
             v-show="allowCancel"

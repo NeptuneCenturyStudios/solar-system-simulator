@@ -173,6 +173,10 @@ import {
 } from './vue/procedural-modal-service';
 import { aboutModalIsVisible } from './vue/about-modal-service';
 import {
+    showScenariosModal,
+    scenariosModalIsVisible,
+} from './vue/scenarios-modal-service';
+import {
     showWhatsNewModalIfNeeded,
     whatsNewModalIsVisible,
 } from './vue/whats-new-modal-service';
@@ -4511,16 +4515,24 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
             await launchSystem(SimulationStartMode.Procedural, seedResult);
             break;
         }
-        case 'blackHole': {
+        case 'scenarios': {
             hideStartupModal();
-            const seedResult = await showProceduralPrompt({
-                title: 'Generate Black Hole System',
-            });
-            if (seedResult === null) {
+            const scenarioResult = await showScenariosModal();
+            if (scenarioResult === null) {
+                // Cancelled back to startup.
                 void startStartupFlow({ allowCancel: startupModalAllowsCancel() });
                 return;
             }
-            await launchSystem(SimulationStartMode.BlackHole, seedResult);
+            if (scenarioResult.scenario === 'blackHole') {
+                const seedResult = await showProceduralPrompt({
+                    title: 'Generate Black Hole System',
+                });
+                if (seedResult === null) {
+                    void startStartupFlow({ allowCancel: startupModalAllowsCancel() });
+                    return;
+                }
+                await launchSystem(SimulationStartMode.BlackHole, seedResult);
+            }
             break;
         }
     }
@@ -4536,7 +4548,8 @@ function modalBlocksInput() {
         startupModalIsVisible() ||
         proceduralModalIsVisible() ||
         aboutModalIsVisible() ||
-        whatsNewModalIsVisible()
+        whatsNewModalIsVisible() ||
+        scenariosModalIsVisible()
     );
 }
 

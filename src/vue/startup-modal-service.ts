@@ -4,7 +4,7 @@
  * directly; StartupModal.vue self-registers its controller on mount.
  */
 
-export type StartupModalAction = 'launchDefault' | 'launchEmpty' | 'generate' | 'blackHole';
+export type StartupModalAction = 'launchDefault' | 'launchEmpty' | 'generate' | 'scenarios';
 
 export interface StartupModalResult {
     action: StartupModalAction;
