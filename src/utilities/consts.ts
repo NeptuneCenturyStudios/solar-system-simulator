@@ -126,8 +126,6 @@ export const URANUS_ORBITAL_PERIOD_REAL = 30685.4 * 24 * 3600;
 export const NEPTUNE_ORBITAL_PERIOD_REAL = 60190.03 * 24 * 3600;
 export const PLUTO_ORBITAL_PERIOD_REAL = 90560 * 24 * 3600;
 
-export const SUN_LIGHT_INTENSITY = 10_000;
-
 // === Planetary System: Per-planet Time Scale Factors ===
 // Used by individual body classes to compute rotation speed at construction time,
 // accounting for the effective G (including gMultiplier) via dependencies.getG().
@@ -187,18 +185,40 @@ export const WARP_FADE_DIST = 200 * SCALE_FACTOR;
 export const WARP_SHAKE_MAG = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
 
 // === Miscellaneous & Simulation Parameters ===
-export const ASTEROID_SPAWN_MIN_DIST = 50000 * SCALE_FACTOR;
-export const ASTEROID_SPAWN_MAX_DIST = 300000 * SCALE_FACTOR;
 export const KUIPER_BELT_COUNT = 12000;
 export const KUIPER_BELT_INNER_DIST = (4500000000 / DIST_SCALE) * SCALE_FACTOR; // 4,500,000,000 km
 export const KUIPER_BELT_OUTER_DIST = (7500000000 / DIST_SCALE) * SCALE_FACTOR; // 7,500,000,000 km
 export const KUIPER_BELT_VERTICAL_SPREAD = (100000000 / DIST_SCALE) * SCALE_FACTOR; // 100,000,000 km
 
-// Star light intensity bounds (used for procedural stars + custom star creation)
-export const STAR_LIGHT_INTENSITY_MIN = 1_000;
-export const STAR_LIGHT_INTENSITY_MAX = 15_000;
-export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
+// === Star Light ===
+/** The DIST_SCALE at which the base light intensity values below were tuned. */
+export const LIGHT_INTENSITY_REFERENCE_DIST_SCALE = 100;
+/** Point-light decay exponent. decay=2 would be the physical inverse-square law;
+ *  0.45 is tuned for the visual model. */
 export const STAR_LIGHT_DECAY = 0.45; // Tuned for model
+
+// Base light intensity values, tuned at DIST_SCALE = LIGHT_INTENSITY_REFERENCE_DIST_SCALE.
+const BASE_SUN_LIGHT_INTENSITY = 10_000;
+const BASE_STAR_LIGHT_INTENSITY_MIN = 1_000;
+const BASE_STAR_LIGHT_INTENSITY_MAX = 15_000;
+
+/**
+ * Multiplier that keeps a star's punctual-light irradiance constant as
+ * DIST_SCALE changes. Irradiance ∝ intensity × distance^(-decay), and every
+ * distance scales by (reference / DIST_SCALE), so intensity must scale by
+ * (reference / DIST_SCALE)^decay to leave the scene identically lit.
+ */
+export const STAR_LIGHT_SCALE = Math.pow(
+    LIGHT_INTENSITY_REFERENCE_DIST_SCALE / DIST_SCALE,
+    STAR_LIGHT_DECAY
+);
+
+export const SUN_LIGHT_INTENSITY = BASE_SUN_LIGHT_INTENSITY * STAR_LIGHT_SCALE;
+
+// Star light intensity bounds (used for procedural stars + custom star creation)
+export const STAR_LIGHT_INTENSITY_MIN = BASE_STAR_LIGHT_INTENSITY_MIN * STAR_LIGHT_SCALE;
+export const STAR_LIGHT_INTENSITY_MAX = BASE_STAR_LIGHT_INTENSITY_MAX * STAR_LIGHT_SCALE;
+export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
 
 // ─── Lens Flare element sizes ──────────────────────────────────────────────
 export const LENSFLARE_STARBURST_SIZE = 128;
