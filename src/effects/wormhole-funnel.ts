@@ -65,7 +65,8 @@ export class WormholeFunnelEffect implements IEffect {
 
     /** Rebuilds the particle funnel and fallback cone at a new mouth radius, preserving linked state. */
     setRadius(newRadius: number): void {
-        if (!Number.isFinite(newRadius) || newRadius <= 0 || newRadius === this._mouthRadius) return;
+        if (!Number.isFinite(newRadius) || newRadius <= 0 || newRadius === this._mouthRadius)
+            return;
 
         this._disposeVisuals();
 

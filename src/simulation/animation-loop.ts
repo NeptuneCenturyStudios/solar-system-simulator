@@ -11,6 +11,7 @@ import { VelocityArcManager } from '../drawing/velocity-arc';
 import { OrbitPredictionManager } from '../drawing/orbit-prediction';
 import { PositionIndicatorManager } from '../gizmos/position-indicator';
 import { GridHelperManager } from '../gizmos/grid-helper';
+import { AiAvoidanceGizmo } from '../gizmos/ai-avoidance-gizmo';
 import { FlightHUD } from '../drawing/flight-hud';
 import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator';
 import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet-name-indicator';
@@ -102,6 +103,7 @@ export interface AnimationContext {
     orbitPrediction: OrbitPredictionManager;
     posIndicator: PositionIndicatorManager;
     gridHelperManager: GridHelperManager;
+    aiAvoidanceGizmo: AiAvoidanceGizmo;
     flightHUD: FlightHUD;
     targetIndicator: AutopilotTargetIndicator;
     planetNameIndicator: PlanetNameIndicator;
@@ -304,6 +306,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // regardless. Frame-level only (decisions + steering/roll); their thrust
         // is applied per physics substep inside updateSimulation().
         stepNpcShips(wallDt, dtTotal);
+
+        // Draw what those controllers just decided. After the step, so the overlay shows the
+        // heading the ships are flying this frame rather than the previous one's.
+        ctx.aiAvoidanceGizmo.update();
 
         // ── Background warp/boost speed (unified) ────────────────────────
         const bgShip = ctx.flightState.knownShip;

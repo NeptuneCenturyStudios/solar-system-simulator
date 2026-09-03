@@ -16,7 +16,9 @@ export interface ProceduralModalProgressOptions {
 }
 
 export interface ProceduralModalController {
-    showPrompt(options: ProceduralModalPromptOptions): Promise<IProceduralGeneratorPromptResult | null>;
+    showPrompt(
+        options: ProceduralModalPromptOptions
+    ): Promise<IProceduralGeneratorPromptResult | null>;
     showProgress(options: ProceduralModalProgressOptions): ProceduralGenerationReporter;
     hide(): void;
     isVisible(): boolean;

@@ -1,3 +1,4 @@
+import { ObstacleAvoidance } from './obstacle-avoidance';
 import type { Spaceship } from '../../bodies/ships/spaceship';
 
 /**
@@ -20,11 +21,20 @@ export abstract class ShipAI {
     /** The ship this controller is piloting. */
     protected readonly ship: Spaceship;
 
+    /**
+     * Obstacle perception, shared by every controller so none has to re-derive it.
+     *
+     * Public rather than protected because the AI debug gizmo reads `avoidance.last` to draw
+     * what the controller is currently seeing.
+     */
+    readonly avoidance: ObstacleAvoidance;
+
     /** Short human-readable name for this controller, shown in debug output. */
     abstract readonly name: string;
 
     constructor(ship: Spaceship) {
         this.ship = ship;
+        this.avoidance = new ObstacleAvoidance(ship);
     }
 
     /**
@@ -32,8 +42,11 @@ export abstract class ShipAI {
      * `this.ship.controlInput`.
      *
      * @param dt Wall-clock seconds since the previous frame (not time-scaled).
+     * @param simDt Sim-time seconds advanced this frame (wall dt × time scale). Decisions are
+     *   made at wall-clock rate but the world moves at sim rate, so anything that reasons about
+     *   how far the ship travels before the next decision needs this rather than `dt`.
      */
-    abstract update(dt: number): void;
+    abstract update(dt: number, simDt: number): void;
 
     /**
      * Release any resources this controller holds. Called when the ship dies or

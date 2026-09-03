@@ -23,18 +23,16 @@ npm run dev          # Start Vite dev server
 npm run build        # Production build to dist/
 npm run tsc          # Type-check (vue-tsc --noEmit)
 npm run lint         # ESLint
-npm run format       # Prettier format
-npm run format:check # Prettier check (CI)
 ```
 
 ## Tooling
 
 - **ripgrep (`rg`)** is installed via Chocolatey at `C:\ProgramData\chocolatey\bin\rg.exe` and is on the machine PATH.
-  - If the Sixth extension's built-in `search_files` tool reports "Could not find ripgrep binary", fix it:
-    1. Open VSCode Settings (`Ctrl+,`)
-    2. Search for `ripgrep`
-    3. Set **Search: Rg Path** to: `C:\ProgramData\chocolatey\bin\rg.exe`
-  - CLI example: `rg "class.*Body" src/bodies/` or `rg "TODO|FIXME" src/`
+    - If the Sixth extension's built-in `search_files` tool reports "Could not find ripgrep binary", fix it:
+        1. Open VSCode Settings (`Ctrl+,`)
+        2. Search for `ripgrep`
+        3. Set **Search: Rg Path** to: `C:\ProgramData\chocolatey\bin\rg.exe`
+    - CLI example: `rg "class.*Body" src/bodies/` or `rg "TODO|FIXME" src/`
 
 ## Architecture
 
@@ -80,6 +78,7 @@ src/
 - **Bridge:** `src/vue/sim-bridge.ts` connects Vue components to the Three.js simulation core
 
 **When building new UI features:**
+
 1. Work in `src/vue/` using Vue 3 composition API
 2. Use existing composables and `sim-bridge.ts` to interact with the simulation
 3. Do NOT add new features to `src/ui/`

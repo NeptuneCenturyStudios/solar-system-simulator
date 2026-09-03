@@ -8,6 +8,7 @@ export const enum SettingKey {
     MusicVolume = 'musicVolume',
     LensflareEnabled = 'lensflareEnabled',
     FrameRateLimit = 'frameRateLimit',
+    ShowAiDebug = 'showAiDebug',
 }
 
 export interface SpaceSimSettings {
@@ -18,6 +19,8 @@ export interface SpaceSimSettings {
     lensflareEnabled: boolean;
     /** Maximum frames per second (0 = unlimited). */
     frameRateLimit: number;
+    /** Draw the ship-AI obstacle avoidance overlay (lookahead corridor, hazard sphere, heading). */
+    showAiDebug: boolean;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -27,6 +30,7 @@ const defaultSettings: SpaceSimSettings = {
     musicVolume: 0.5,
     lensflareEnabled: true,
     frameRateLimit: 0,
+    showAiDebug: false,
 };
 
 class SettingsStore {

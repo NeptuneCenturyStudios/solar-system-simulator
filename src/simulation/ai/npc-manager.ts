@@ -148,7 +148,7 @@ export function stepNpcShips(dt: number, simDt: number): void {
             ship.advanceWarpSpeed(simDt, _npcForward);
         }
 
-        ship.ai.update(dt);
+        ship.ai.update(dt, simDt);
         ship.applyFrameOrientation(dt);
     }
 }

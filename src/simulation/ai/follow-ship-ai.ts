@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ShipAI } from './ship-ai';
+import { brakingSpeedLimit } from './obstacle-avoidance';
 import { flightState, simulationState } from '../simulation';
 import {
     AI_APPROACH_SAFETY_PAD,
@@ -23,32 +24,6 @@ const _forward = new THREE.Vector3();
 const _invFrame = new THREE.Quaternion();
 
 /**
- * Highest speed from which a ship can still shed all of its motion within
- * `distance`, given the two deceleration regimes it actually flies with:
- * flightBoostDecel while above flightMaxSpeed, flightThrustDecel below it.
- *
- * This is the inverse of the ship's stopping-distance curve, and it is what
- * keeps an approach from committing to a speed the ship cannot get rid of in
- * time. A pure proportional controller has no notion of this: it will happily
- * ask for boost speed at a range that needs ten times the runway, sail past the
- * target, and come back — the rubber-banding this replaces.
- */
-function brakingSpeedLimit(distance: number, h: ISpaceshipHandling): number {
-    if (distance <= 0) return 0;
-
-    // Runway needed to brake from normal max speed to a standstill.
-    const lowRegimeDistance = (h.flightMaxSpeed * h.flightMaxSpeed) / (2 * h.flightThrustDecel);
-    if (distance <= lowRegimeDistance) {
-        return Math.sqrt(2 * h.flightThrustDecel * distance);
-    }
-
-    // Anything left over is covered at the (much higher) boost decel rate.
-    const remaining = distance - lowRegimeDistance;
-    const speedSquared = h.flightMaxSpeed * h.flightMaxSpeed + 2 * h.flightBoostDecel * remaining;
-    return Math.min(Math.sqrt(speedSquared), h.flightBoostMaxSpeed);
-}
-
-/**
  * The first (and simplest) concrete ship AI: tail the player's ship and hold
  * station at NPC_FOLLOW_DISTANCE.
  *
@@ -61,6 +36,10 @@ function brakingSpeedLimit(distance: number, h: ISpaceshipHandling): number {
  * by what the ship can actually brake away before it arrives. Working in
  * relative terms lets it hold station against a player ship that is itself
  * moving (coasting along an orbit, say) instead of chasing a stale point.
+ *
+ * The straight line to the target is filtered through the shared obstacle
+ * avoidance layer before it becomes a heading, so a player parked on the far
+ * side of a star gets tailed around the limb rather than through it.
  */
 export class FollowShipAI extends ShipAI {
     readonly name = 'Follow';
@@ -133,7 +112,7 @@ export class FollowShipAI extends ShipAI {
         this.ship.updateBoostDecelState();
     }
 
-    update(_dt: number): void {
+    update(_dt: number, simDt: number): void {
         const ship = this.ship;
         const input = ship.controlInput;
         const h = ship.handling;
@@ -152,6 +131,13 @@ export class FollowShipAI extends ShipAI {
             return;
         }
         _dir.copy(_toTarget).divideScalar(dist);
+
+        // ── Obstacle avoidance ───────────────────────────────────────────────
+        // Bend the straight line to the target around anything in the way. The result is still
+        // just a heading and a speed cap, so everything below is unchanged — the ship flies the
+        // detour under its own handling limits exactly as it flies the direct line.
+        const avoid = this.avoidance.evaluate(_dir, simDt);
+        _dir.copy(avoid.heading);
 
         // ── Steering ─────────────────────────────────────────────────────────
         // Express the desired heading in the ship's own control frame, then turn
@@ -182,6 +168,19 @@ export class FollowShipAI extends ShipAI {
         _forward.set(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
         const aligned = _forward.dot(_dir) > Math.cos(AI_THRUST_ALIGN_ANGLE);
 
+        // About to hit something. Station-keeping is no longer the question: _dir already points
+        // clear of the hazard, so get on that heading and run. Braking alone wouldn't do it —
+        // a ship shedding speed inside a gravity well is still falling into it.
+        if (avoid.flee) {
+            input.thrust = aligned;
+            input.boost = aligned;
+            input.brake = false;
+            this.boosting = aligned;
+            ship.thrustActive = input.thrust || input.boost;
+            ship.updateBoostDecelState();
+            return;
+        }
+
         // Slack zone around the hold distance. Shrinking the gap by the zone's
         // width (rather than zeroing it inside) keeps the commanded speed
         // continuous across the boundary — a hard switch there makes the ship
@@ -190,7 +189,9 @@ export class FollowShipAI extends ShipAI {
         const rawGap = dist - this.followDistance; // positive = too far away
         const gap = rawGap > slack ? rawGap - slack : rawGap < -slack ? rawGap + slack : 0;
 
-        const desiredClosing = this.desiredClosingSpeed(gap, h);
+        // Cap the approach at a speed we could still shed before reaching the hazard's surface.
+        // Only ever a reduction: avoidance can slow the chase down, never speed it up.
+        const desiredClosing = Math.min(this.desiredClosingSpeed(gap, h), avoid.speedLimit);
 
         // Actual closing speed, measured relative to the target so an orbiting
         // player ship doesn't read as "running away".
@@ -213,6 +214,9 @@ export class FollowShipAI extends ShipAI {
             input.brake = closing > desiredClosing + tolerance;
         } else if (closing < desiredClosing - tolerance) {
             input.thrust = true;
+            // Boost needs no special case near an obstacle: the commanded speed above is already
+            // capped at what the ship can steer past, and wantBoost() only engages when the
+            // command exceeds normal max — so a cap that rules boost out has already ruled it out.
             input.boost = this.wantBoost(desiredClosing, h);
             input.brake = false;
         } else if (closing > desiredClosing + tolerance) {

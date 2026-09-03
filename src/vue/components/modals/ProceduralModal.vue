@@ -1,71 +1,71 @@
 <template>
-<ModalBase
-    :visible="modal.isVisible.value"
-    :title="title"
-    :allow-close="false"
-    @cancel="onCancel"
->
-    <!-- Seed entry section -->
-    <div v-if="mode === 'seed-entry'" class="d-flex flex-column gap-3">
-        <div class="control-group">
-            <label for="vueProceduralSeedInput">Seed (optional)</label>
-            <input
-                id="vueProceduralSeedInput"
-                ref="seedInputRef"
-                v-model="seedValue"
-                type="text"
-                class="text-input"
-                placeholder="Leave blank for random seed"
-            />
-        </div>
+    <ModalBase
+        :visible="modal.isVisible.value"
+        :title="title"
+        :allow-close="false"
+        @cancel="onCancel"
+    >
+        <!-- Seed entry section -->
+        <div v-if="mode === 'seed-entry'" class="d-flex flex-column gap-3">
+            <div class="control-group">
+                <label for="vueProceduralSeedInput">Seed (optional)</label>
+                <input
+                    id="vueProceduralSeedInput"
+                    ref="seedInputRef"
+                    v-model="seedValue"
+                    type="text"
+                    class="text-input"
+                    placeholder="Leave blank for random seed"
+                />
+            </div>
 
-        <div class="d-flex gap-3">
-            <button
-                class="old-ui btn-with-icon"
-                type="button"
-                :disabled="inputsLocked"
-                @click="onCreate"
-            >
-                <span class="material-symbols-outlined">auto_fix_high</span>
-                CREATE
-            </button>
-            <button
-                class="old-ui btn-with-icon btn-danger"
-                type="button"
-                :disabled="inputsLocked"
-                @click="onCancel"
-            >
-                <span class="material-symbols-outlined">cancel</span>
-                CANCEL
-            </button>
-        </div>
-    </div>
-
-    <!-- Progress section -->
-    <div v-if="mode === 'progress'" class="d-flex flex-column gap-2">
-        <div style="display: flex; align-items: center" class="mb-1">
-            <span class="material-symbols-outlined loading-icon mr-1">progress_activity</span>
-            <div style="font-weight: bold;">
-                {{ progressStatus }}
+            <div class="d-flex gap-3">
+                <button
+                    class="old-ui btn-with-icon"
+                    type="button"
+                    :disabled="inputsLocked"
+                    @click="onCreate"
+                >
+                    <span class="material-symbols-outlined">auto_fix_high</span>
+                    CREATE
+                </button>
+                <button
+                    class="old-ui btn-with-icon btn-danger"
+                    type="button"
+                    :disabled="inputsLocked"
+                    @click="onCancel"
+                >
+                    <span class="material-symbols-outlined">cancel</span>
+                    CANCEL
+                </button>
             </div>
         </div>
 
-        <div class="procedural-progress-bar" aria-hidden="true">
-            <div
-                class="procedural-progress-bar-fill"
-                :style="{ width: progressPercent + '%' }"
-            ></div>
-        </div>
+        <!-- Progress section -->
+        <div v-if="mode === 'progress'" class="d-flex flex-column gap-2">
+            <div style="display: flex; align-items: center" class="mb-1">
+                <span class="material-symbols-outlined loading-icon mr-1">progress_activity</span>
+                <div style="font-weight: bold">
+                    {{ progressStatus }}
+                </div>
+            </div>
 
-        <div style="margin-top: 8px">
-            {{ progressText }}
-        </div>
+            <div class="procedural-progress-bar" aria-hidden="true">
+                <div
+                    class="procedural-progress-bar-fill"
+                    :style="{ width: progressPercent + '%' }"
+                ></div>
+            </div>
 
-        <div v-if="progressError" class="procedural-progress-error">
-            Generation failed. Check console for details.
+            <div style="margin-top: 8px">
+                {{ progressText }}
+            </div>
+
+            <div v-if="progressError" class="procedural-progress-error">
+                Generation failed. Check console for details.
+            </div>
         </div>
-    </div>
-</ModalBase>
+    </ModalBase>
 </template>
 
 <script setup lang="ts">
@@ -152,9 +152,7 @@ const controller: ProceduralModalController = {
         return modal.show();
     },
 
-    showProgress(
-        options: ProceduralModalProgressOptions = {}
-    ): ProceduralGenerationReporter {
+    showProgress(options: ProceduralModalProgressOptions = {}): ProceduralGenerationReporter {
         title.value = options.title ?? 'Generate Procedural System';
         mode.value = 'progress';
         inputsLocked.value = true;

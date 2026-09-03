@@ -99,6 +99,7 @@ import { AmbientSoundManager } from './utilities/ambient-sound';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
 import { createBridgeForPair } from './effects/wormhole-link-bridge';
 import { GridHelperManager } from './gizmos/grid-helper';
+import { AiAvoidanceGizmo } from './gizmos/ai-avoidance-gizmo';
 import { PositionIndicatorManager } from './gizmos/position-indicator';
 import { FlightHUD } from './drawing/flight-hud';
 import { AutopilotTargetIndicator } from './drawing/autopilot-target-indicator';
@@ -170,14 +171,8 @@ import {
     proceduralModalIsVisible,
 } from './vue/procedural-modal-service';
 import { aboutModalIsVisible } from './vue/about-modal-service';
-import {
-    showScenariosModal,
-    scenariosModalIsVisible,
-} from './vue/scenarios-modal-service';
-import {
-    showWhatsNewModalIfNeeded,
-    whatsNewModalIsVisible,
-} from './vue/whats-new-modal-service';
+import { showScenariosModal, scenariosModalIsVisible } from './vue/scenarios-modal-service';
+import { showWhatsNewModalIfNeeded, whatsNewModalIsVisible } from './vue/whats-new-modal-service';
 
 // State singletons
 import {
@@ -585,6 +580,10 @@ const gridHelperManager = new GridHelperManager(scene);
 gridHelperManager.init();
 const posIndicator = new PositionIndicatorManager(scene, gridHelperManager, gizmo);
 posIndicator.init();
+
+// Ship-AI obstacle avoidance overlay. Off unless the user turns it on in Options.
+const aiAvoidanceGizmo = new AiAvoidanceGizmo(scene);
+aiAvoidanceGizmo.setVisible(settingsStore.settings.showAiDebug);
 
 const dependencies: IStateDependencies = {
     gizmo: gizmo,
@@ -1816,7 +1815,6 @@ function togglePause() {
         // Remember the current speed and set to 0
         simulationState.savedTimeScale = simulationState.timeScale;
         simulationState.timeScale = 0;
-
     } else {
         // Restore the saved speed (which may have been adjusted while paused)
         simulationState.timeScale = simulationState.savedTimeScale;
@@ -2961,7 +2959,6 @@ registerVueSimHooks({
     setSpaceBackgroundVisible: (checked: boolean) => {
         showSpaceBackground(scene, checked);
         environmentState.spaceBackgroundVisible = checked;
-        
     },
     setSpaceTexture: async (texturePath: string) => {
         await loadSpaceTexture(scene, texturePath);
@@ -2995,6 +2992,10 @@ registerVueSimHooks({
     },
     setLensflareEnabled: (checked: boolean) => {
         settingsStore.update(SettingKey.LensflareEnabled, checked);
+    },
+    setShowAiDebug: (checked: boolean) => {
+        settingsStore.update(SettingKey.ShowAiDebug, checked);
+        aiAvoidanceGizmo.setVisible(checked);
     },
     setSubsteps: (value: number) => {
         settingsStore.update(SettingKey.Substeps, value);
@@ -3972,7 +3973,6 @@ function deleteSelectedBody() {
             message: `${bodyToDelete.name} deleted`,
             notificationType: NotificationType.Alert,
         });
-
     }
 
     // Update UI selection state (match existing empty-space click behavior)
@@ -4002,158 +4002,164 @@ window.addEventListener(
 
         const key = e.key.toLowerCase();
 
-    // Arrow-key movement for selected bodies when the gizmo is visible.
-    if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
-        if (moveSelectedBodyRelativeToCamera(key, e.ctrlKey)) {
-            e.preventDefault();
-            return;
-        }
-    }
-
-    // Toggle velocity edit mode while actively editing velocity
-    // G toggles between XZ (horizontal) and Y (vertical).
-    if (
-        (interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity) &&
-        key === 'g'
-    ) {
-        interactionState.velocityEditMode = interactionState.velocityEditMode === 'xz' ? 'y' : 'xz';
-
-        // Update the drag plane to match the active velocity edit mode.
-        // - XZ: horizontal plane through the body (constrains to XZ while still tracking mouse up/down)
-        // - Y: vertical plane containing world-up and the current horizontal heading
-        if (gizmo?.target) {
-            const origin = gizmo.target.mesh.position;
-
-            if (interactionState.velocityEditMode === 'y') {
-                const v = gizmo.target.velocity.clone();
-                v.y = 0;
-
-                const hDir = v.lengthSq() > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
-                const up = new THREE.Vector3(0, 1, 0);
-
-                const planeNormal = new THREE.Vector3().crossVectors(hDir, up).normalize();
-                interactionState.dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
-            } else {
-                // XZ mode: use horizontal plane (not a camera-facing plane)
-                interactionState.dragPlane.setFromNormalAndCoplanarPoint(
-                    new THREE.Vector3(0, 1, 0),
-                    origin
-                );
+        // Arrow-key movement for selected bodies when the gizmo is visible.
+        if (
+            key === 'arrowleft' ||
+            key === 'arrowright' ||
+            key === 'arrowup' ||
+            key === 'arrowdown'
+        ) {
+            if (moveSelectedBodyRelativeToCamera(key, e.ctrlKey)) {
+                e.preventDefault();
+                return;
             }
         }
 
-        velArc.update();
-        // Prevent the key from doing anything else
-        e.preventDefault();
-        return;
-    }
+        // Toggle velocity edit mode while actively editing velocity
+        // G toggles between XZ (horizontal) and Y (vertical).
+        if (
+            (interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity) &&
+            key === 'g'
+        ) {
+            interactionState.velocityEditMode =
+                interactionState.velocityEditMode === 'xz' ? 'y' : 'xz';
 
-    if (key === 'w') {
-        // Flight mode: W = hold to thrust forward
-        if (flightState.isActive) {
+            // Update the drag plane to match the active velocity edit mode.
+            // - XZ: horizontal plane through the body (constrains to XZ while still tracking mouse up/down)
+            // - Y: vertical plane containing world-up and the current horizontal heading
+            if (gizmo?.target) {
+                const origin = gizmo.target.mesh.position;
+
+                if (interactionState.velocityEditMode === 'y') {
+                    const v = gizmo.target.velocity.clone();
+                    v.y = 0;
+
+                    const hDir = v.lengthSq() > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
+                    const up = new THREE.Vector3(0, 1, 0);
+
+                    const planeNormal = new THREE.Vector3().crossVectors(hDir, up).normalize();
+                    interactionState.dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
+                } else {
+                    // XZ mode: use horizontal plane (not a camera-facing plane)
+                    interactionState.dragPlane.setFromNormalAndCoplanarPoint(
+                        new THREE.Vector3(0, 1, 0),
+                        origin
+                    );
+                }
+            }
+
+            velArc.update();
+            // Prevent the key from doing anything else
+            e.preventDefault();
+            return;
+        }
+
+        if (key === 'w') {
+            // Flight mode: W = hold to thrust forward
+            if (flightState.isActive) {
+                keys.w = true;
+                e.preventDefault();
+                return;
+            }
             keys.w = true;
-            e.preventDefault();
-            return;
         }
-        keys.w = true;
-    }
-    if (key === 'a') {
-        // Flight mode: A rolls left
-        if (flightState.isActive) {
-            flightState.rollLeft = true;
-            e.preventDefault();
-            return;
-        }
-        keys.a = true;
-    }
-    if (key === 's') {
-        // Flight mode: S = hold to thrust backward / decelerate
-        if (flightState.isActive) {
-            keys.s = true;
-            e.preventDefault();
-            return;
-        }
-        keys.s = true;
-    }
-    if (key === 'd') {
-        // Flight mode: D rolls right
-        if (flightState.isActive) {
-            flightState.rollRight = true;
-            e.preventDefault();
-            return;
-        }
-        keys.d = true;
-    }
-    if (key === 'c') {
-        // Flight mode: C toggles between cockpit and 3rd-person view
-        if (flightState.isActive) {
-            flightState.isCockpitView = !flightState.isCockpitView;
-            e.preventDefault();
-            return;
-        }
-        keys.c = true;
-    }
-    if (key === 'e' && flightState.isActive) {
-        keys.e = true;
-        e.preventDefault();
-        return;
-    }
-    if (key === ' ') {
-        if (flightState.isActive) {
-            e.preventDefault();
-            if (e.repeat) return; // ignore key-repeat; only act on the initial press
-            const ship = flightState.activeShip;
-            if (ship?.warpActive && !autopilotState.isActive) {
-                // Disengage warp (manual only — autopilot manages its own warp lifecycle)
-                ship.beginWarpDecel();
-                ship.cancelWarpCharge();
-                flightSteeringLine.visible = true;
-                addEvent({
-                    message: 'Warp disengaged. Decelerating...',
-                    notificationType: NotificationType.Info,
-                });
-            } else if (ship && !ship.warpDecelerating && !autopilotState.isActive) {
-                // Only start charging when not already decelerating from a previous warp,
-                // and not under autopilot control.
-                ship.startWarpCharge();
+        if (key === 'a') {
+            // Flight mode: A rolls left
+            if (flightState.isActive) {
+                flightState.rollLeft = true;
+                e.preventDefault();
+                return;
             }
+            keys.a = true;
+        }
+        if (key === 's') {
+            // Flight mode: S = hold to thrust backward / decelerate
+            if (flightState.isActive) {
+                keys.s = true;
+                e.preventDefault();
+                return;
+            }
+            keys.s = true;
+        }
+        if (key === 'd') {
+            // Flight mode: D rolls right
+            if (flightState.isActive) {
+                flightState.rollRight = true;
+                e.preventDefault();
+                return;
+            }
+            keys.d = true;
+        }
+        if (key === 'c') {
+            // Flight mode: C toggles between cockpit and 3rd-person view
+            if (flightState.isActive) {
+                flightState.isCockpitView = !flightState.isCockpitView;
+                e.preventDefault();
+                return;
+            }
+            keys.c = true;
+        }
+        if (key === 'e' && flightState.isActive) {
+            keys.e = true;
+            e.preventDefault();
             return;
         }
-        keys.space = true;
-    }
-    if (key === 'shift') {
-        keys.shift = true;
-    }
-    if (key === 'alt' && flightState.isActive) {
-        flightState.altOrbitActive = true;
-        // Zero steering offsets so the ship stops turning immediately
-        flightState.pointerOffsetX = 0;
-        flightState.pointerOffsetY = 0;
-        e.preventDefault();
-    }
+        if (key === ' ') {
+            if (flightState.isActive) {
+                e.preventDefault();
+                if (e.repeat) return; // ignore key-repeat; only act on the initial press
+                const ship = flightState.activeShip;
+                if (ship?.warpActive && !autopilotState.isActive) {
+                    // Disengage warp (manual only — autopilot manages its own warp lifecycle)
+                    ship.beginWarpDecel();
+                    ship.cancelWarpCharge();
+                    flightSteeringLine.visible = true;
+                    addEvent({
+                        message: 'Warp disengaged. Decelerating...',
+                        notificationType: NotificationType.Info,
+                    });
+                } else if (ship && !ship.warpDecelerating && !autopilotState.isActive) {
+                    // Only start charging when not already decelerating from a previous warp,
+                    // and not under autopilot control.
+                    ship.startWarpCharge();
+                }
+                return;
+            }
+            keys.space = true;
+        }
+        if (key === 'shift') {
+            keys.shift = true;
+        }
+        if (key === 'alt' && flightState.isActive) {
+            flightState.altOrbitActive = true;
+            // Zero steering offsets so the ship stops turning immediately
+            flightState.pointerOffsetX = 0;
+            flightState.pointerOffsetY = 0;
+            e.preventDefault();
+        }
 
-    // Escape exits flight mode
-    if (key === 'escape' && flightState.isActive) {
-        exitFlightMode(flightCtx);
-        e.preventDefault();
-        return;
-    }
+        // Escape exits flight mode
+        if (key === 'escape' && flightState.isActive) {
+            exitFlightMode(flightCtx);
+            e.preventDefault();
+            return;
+        }
 
-    // Delete key to remove selected body
-    if (key === 'n') {
-        simulationState.showNames = !simulationState.showNames;
-        dispatchSimStateChange();
-    }
+        // Delete key to remove selected body
+        if (key === 'n') {
+            simulationState.showNames = !simulationState.showNames;
+            dispatchSimStateChange();
+        }
 
-    if (key === 'p') {
-        handlePauseShortcut();
-        e.preventDefault();
-        return;
-    }
+        if (key === 'p') {
+            handlePauseShortcut();
+            e.preventDefault();
+            return;
+        }
 
-    if (key === 'delete') {
-        deleteSelectedBody();
-    }
+        if (key === 'delete') {
+            deleteSelectedBody();
+        }
     },
     true
 );
@@ -4161,53 +4167,60 @@ window.addEventListener(
 // Keyup runs in capture phase with NO guards: held-key flags must ALWAYS be
 // cleared, otherwise a key pressed before focusing a text field (or opening a
 // modal) would get stuck "down" forever.
-window.addEventListener('keyup', (e) => {
-    const key = e.key.toLowerCase();
-    if (key === 'w') keys.w = false;
-    if (key === 'a') {
-        keys.a = false;
-        if (flightState.isActive) flightState.rollLeft = false;
-    }
-    if (key === 's') keys.s = false;
-    if (key === 'd') {
-        keys.d = false;
-        if (flightState.isActive) flightState.rollRight = false;
-    }
-    if (key === 'c') keys.c = false;
-    if (key === 'e') {
-        keys.e = false;
-        if (flightState.isActive) flightState.autopilotCharge = 0;
-    }
-    if (key === ' ') {
-        keys.space = false;
-        if (flightState.isActive) {
-            // Cancel warp charge if space released before full charge
-            const _spaceShip = flightState.activeShip;
-            if (_spaceShip?.warpCharging) {
-                _spaceShip.cancelWarpCharge();
-                flightHUD.hideWarpSprite();
+window.addEventListener(
+    'keyup',
+    (e) => {
+        const key = e.key.toLowerCase();
+        if (key === 'w') keys.w = false;
+        if (key === 'a') {
+            keys.a = false;
+            if (flightState.isActive) flightState.rollLeft = false;
+        }
+        if (key === 's') keys.s = false;
+        if (key === 'd') {
+            keys.d = false;
+            if (flightState.isActive) flightState.rollRight = false;
+        }
+        if (key === 'c') keys.c = false;
+        if (key === 'e') {
+            keys.e = false;
+            if (flightState.isActive) flightState.autopilotCharge = 0;
+        }
+        if (key === ' ') {
+            keys.space = false;
+            if (flightState.isActive) {
+                // Cancel warp charge if space released before full charge
+                const _spaceShip = flightState.activeShip;
+                if (_spaceShip?.warpCharging) {
+                    _spaceShip.cancelWarpCharge();
+                    flightHUD.hideWarpSprite();
+                }
             }
         }
-    }
-    if (key === 'shift') keys.shift = false;
-    if (key === 'alt' && flightState.isActive) {
-        flightState.altOrbitActive = false;
-        // Zero steering offsets so the ship doesn't lurch when steering resumes
-        flightState.pointerOffsetX = 0;
-        flightState.pointerOffsetY = 0;
-        e.preventDefault();
-    }
-
-    if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
-        if (
-            !interactionState.isChangingVelocity &&
-            !interactionState.isMiddleMouseVelocity &&
-            !interactionState.isRepositioning
-        ) {
-            posIndicator.hide();
-            velArc.hideAll();
+        if (key === 'shift') keys.shift = false;
+        if (key === 'alt' && flightState.isActive) {
+            flightState.altOrbitActive = false;
+            // Zero steering offsets so the ship doesn't lurch when steering resumes
+            flightState.pointerOffsetX = 0;
+            flightState.pointerOffsetY = 0;
+            e.preventDefault();
         }
-    }
+
+        if (
+            key === 'arrowleft' ||
+            key === 'arrowright' ||
+            key === 'arrowup' ||
+            key === 'arrowdown'
+        ) {
+            if (
+                !interactionState.isChangingVelocity &&
+                !interactionState.isMiddleMouseVelocity &&
+                !interactionState.isRepositioning
+            ) {
+                posIndicator.hide();
+                velArc.hideAll();
+            }
+        }
     },
     true
 );
@@ -4330,7 +4343,7 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
         // turning Look At off. Look At stays enabled and OrbitControls orbit this point.
         const lastPos = body.mesh?.position
             ? body.mesh.position.clone()
-            : cameraState.frozenFocusPosition ?? controls.target.clone();
+            : (cameraState.frozenFocusPosition ?? controls.target.clone());
 
         cameraState.focusBody = null;
         cameraState.frozenFocusPosition = lastPos;
@@ -4680,6 +4693,7 @@ const animCtx: AnimationContext = {
     orbitPrediction,
     posIndicator,
     gridHelperManager,
+    aiAvoidanceGizmo,
     flightHUD,
     targetIndicator,
     planetNameIndicator,

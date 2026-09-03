@@ -1,6 +1,5 @@
 <template>
-    <PanelBase title="Solar System Management" >
-
+    <PanelBase title="Solar System Management">
         <div class="vue-ui-solar-management-fields">
             <label class="checkbox-row">
                 <input

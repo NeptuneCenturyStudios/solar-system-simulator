@@ -96,10 +96,7 @@ function onTogglePause(): void {
 function stepTimeScale(factor: number): void {
     const base = simStore.isPaused ? simStore.savedTimeScale : simStore.timeScale;
     const next = base * factor;
-    const clamped =
-        factor < 1
-            ? Math.max(MIN_TIME_SCALE, next)
-            : Math.min(MAX_TIME_SCALE, next);
+    const clamped = factor < 1 ? Math.max(MIN_TIME_SCALE, next) : Math.min(MAX_TIME_SCALE, next);
     setTimeScale(clamped);
 }
 
@@ -107,5 +104,4 @@ function toggleExplorer(): void {
     // Show the PanelManager and switch to the System Explorer view.
     setActivePanel(ActivePanel.SystemExplorer);
 }
-
 </script>

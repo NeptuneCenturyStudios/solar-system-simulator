@@ -1,11 +1,7 @@
 <template>
     <PanelBase title="Options">
-
         <div class="vue-ui-options-fields">
-
-            <div class="vue-ui-card-header">
-                Graphics
-            </div>
+            <div class="vue-ui-card-header">Graphics</div>
 
             <label class="checkbox-row">
                 <input
@@ -25,6 +21,15 @@
                 Lens Flares
             </label>
 
+            <label class="checkbox-row">
+                <input
+                    type="checkbox"
+                    :checked="simStore.showAiDebug"
+                    @change="onShowAiDebugChange"
+                />
+                Show Ship AI Debug
+            </label>
+
             <div class="control-group">
                 <label>
                     Frame Rate Limit
@@ -41,9 +46,7 @@
                 />
             </div>
 
-            <div class="vue-ui-card-header">
-                Physics
-            </div>
+            <div class="vue-ui-card-header">Physics</div>
             <div class="control-group">
                 <label>
                     Physics Accuracy
@@ -69,9 +72,7 @@
                 </div>
             </div>
 
-            <div class="vue-ui-card-header">
-                Audio
-            </div>
+            <div class="vue-ui-card-header">Audio</div>
             <div class="control-group">
                 <label>
                     Sound Effects Volume
@@ -132,6 +133,7 @@ import {
     setMusicVolume,
     setParticleEffectsEnabled,
     setSfxVolume,
+    setShowAiDebug,
     setSubsteps,
     simStore,
 } from '../sim-bridge';
@@ -151,6 +153,10 @@ function onParticleEffectsChange(e: Event): void {
 
 function onLensflareChange(e: Event): void {
     setLensflareEnabled((e.target as HTMLInputElement).checked);
+}
+
+function onShowAiDebugChange(e: Event): void {
+    setShowAiDebug((e.target as HTMLInputElement).checked);
 }
 
 function onSubstepsInput(e: Event): void {
@@ -174,8 +180,7 @@ function onFrameRateLimitInput(e: Event): void {
         return;
     }
     const parsed = parseInt(raw, 10);
-    const value =
-        Number.isNaN(parsed) ? 0 : Math.min(Math.max(parsed, 0), MAX_FRAME_RATE_LIMIT);
+    const value = Number.isNaN(parsed) ? 0 : Math.min(Math.max(parsed, 0), MAX_FRAME_RATE_LIMIT);
     setFrameRateLimit(value);
     // If the typed value was clamped, reflect the stored value back in the field.
     if (raw !== String(value)) {

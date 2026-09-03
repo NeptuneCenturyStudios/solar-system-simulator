@@ -197,6 +197,8 @@ export interface VueSimHooks {
     setMusicVolume?: (percent: number) => void;
     /** Set the maximum frames per second (0 = unlimited). */
     setFrameRateLimit?: (value: number) => void;
+    /** Toggle the ship-AI obstacle avoidance debug overlay (persisted via settingsStore). */
+    setShowAiDebug?: (checked: boolean) => void;
 
     // ── Playlist (same sim paths as the old playlist panel) ─────────────────
     /** Snapshot of the shuffled playlist + current playback state. */
@@ -273,6 +275,8 @@ export interface VueSimStore {
     musicVolumePercent: number;
     /** Maximum frames per second (0 = unlimited). */
     frameRateLimit: number;
+    /** Draw the ship-AI obstacle avoidance debug overlay. */
+    showAiDebug: boolean;
 
     /** Id of the autopilot target body, or null when autopilot is off. */
     autopilotTargetId: string | null;
@@ -284,7 +288,6 @@ export interface VueSimStore {
     hasKnownShip: boolean;
     /** Registry id of the known ship's type, or null if none exists. */
     knownShipTypeId: string | null;
-
 }
 
 const state = reactive<VueSimStore>({
@@ -318,10 +321,11 @@ const state = reactive<VueSimStore>({
     sfxVolumePercent: Math.round(settingsStore.settings.sfxVolume * 100),
     musicVolumePercent: Math.round(settingsStore.settings.musicVolume * 100),
     frameRateLimit: settingsStore.settings.frameRateLimit,
+    showAiDebug: settingsStore.settings.showAiDebug,
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
-    knownShipTypeId: null as string | null
+    knownShipTypeId: null as string | null,
 });
 
 /**
@@ -486,10 +490,8 @@ export function togglePause(): void {
 }
 
 export function setTimeScale(value: number): void {
-
     // Unpause if paused
-    if (state.isPaused)
-    {
+    if (state.isPaused) {
         togglePause();
     }
 
@@ -731,6 +733,16 @@ export function setLensflareEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.LensflareEnabled, checked);
     }
     state.lensflareEnabled = checked;
+}
+
+/** Toggle the ship-AI obstacle avoidance debug overlay. */
+export function setShowAiDebug(checked: boolean): void {
+    if (hookRegistry.setShowAiDebug) {
+        hookRegistry.setShowAiDebug(checked);
+    } else {
+        settingsStore.update(SettingKey.ShowAiDebug, checked);
+    }
+    state.showAiDebug = checked;
 }
 
 /** Set physics substeps per frame (old panel's substepsChange path). */

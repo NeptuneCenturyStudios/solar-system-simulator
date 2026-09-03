@@ -11,7 +11,7 @@
             :aria-label="title"
             @mousedown.self="onBackdropDown"
         >
-            <div ref="cardEl" class="vue-modal-card" tabindex="-1" >
+            <div ref="cardEl" class="vue-modal-card" tabindex="-1">
                 <header class="vue-modal-header">
                     <span>{{ title }}</span>
                     <button

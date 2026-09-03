@@ -1,6 +1,5 @@
 <template>
     <PanelBase title="Music Playlist">
-
         <div ref="trackListEl" class="playlist-track-list">
             <div
                 v-for="(entry, i) in playlistStore.entries"
@@ -99,6 +98,4 @@ watch(
     flex: 1;
     min-height: 0;
 }
-
-
 </style>

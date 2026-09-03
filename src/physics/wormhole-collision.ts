@@ -77,16 +77,15 @@ function teleportThroughWormhole(
     const newVelocity = localVel.applyQuaternion(exit.mesh.quaternion);
 
     const exitNormal = exit.getEntranceNormal();
-    const buffer = exitNormal
-        .clone()
-        .multiplyScalar(exit.radius * WORMHOLE_EMERGE_BUFFER_FACTOR);
+    const buffer = exitNormal.clone().multiplyScalar(exit.radius * WORMHOLE_EMERGE_BUFFER_FACTOR);
 
     // Rotating entry->exit local frame is a mirror (not a pure rotation) once the axial
     // velocity component is force-flipped above, so re-using that same delta quaternion to
     // spin the mesh/camera makes the body face backward. Instead, rotate the body's current
     // orientation by however much its travel direction itself just changed — this keeps
     // roll/bank continuity while guaranteeing the nose points along the new heading.
-    const oldVelocityDir = body.velocity.lengthSq() > 1e-8 ? body.velocity.clone().normalize() : null;
+    const oldVelocityDir =
+        body.velocity.lengthSq() > 1e-8 ? body.velocity.clone().normalize() : null;
 
     body.mesh.position.copy(exit.mesh.position).add(worldOffset).add(buffer);
     body.velocity.copy(newVelocity);

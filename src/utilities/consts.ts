@@ -368,3 +368,31 @@ export const AI_BOOST_ENGAGE_FACTOR = 1.25;
 export const NPC_SPAWN_STAR_RADII = 12;
 /** Fallback spawn distance (sim units) when the system has no star to orbit. */
 export const NPC_SPAWN_FALLBACK_DISTANCE = 5000000 / DIST_SCALE;
+
+// === Ship AI obstacle avoidance ===
+/** Hazard sphere around an ordinary body, as a multiple of its radius. Matches
+ *  AUTOPILOT_ORBIT_ALTITUDE_FACTOR — the standoff the autopilot already treats as safe. */
+export const AI_AVOID_HAZARD_FACTOR = 1.3;
+/** Hazard sphere around a star or black hole, as a multiple of its radius. Wider than the
+ *  ordinary factor because a corona or accretion disk kills well outside the rendered surface,
+ *  and because gravity bends the flight path most sharply exactly here — the straight-ray
+ *  corridor test is least accurate around the bodies it most matters for. */
+export const AI_AVOID_STAR_HAZARD_FACTOR = 1.5;
+/** How far ahead (in seconds of travel at the current speed) an AI looks for obstacles. */
+export const AI_AVOID_LOOKAHEAD_TIME = 6;
+/** Decision intervals of headroom folded into the lookahead. AI controllers run once per
+ *  rendered frame on wall-clock time while the world advances by wall dt × time scale, so at
+ *  high warp a ship covers enormous ground between two decisions. Without this term the
+ *  lookahead is shorter than a single decision interval and the ship flies blind into things. */
+export const AI_AVOID_DECISION_MARGIN = 3;
+/** Angular margin (radians) added past the geometric tangent of a hazard, so the ship aims to
+ *  clear the sphere rather than graze it. */
+export const AI_AVOID_CLEARANCE_ANGLE = Math.PI / 18;
+/** Extra angular margin (radians) the direct path must clear before an AI gives up on a detour
+ *  it has already committed to. This is pure hysteresis: without it a ship releases the moment
+ *  it is nominally clear, turns straight back toward whatever it was avoiding, immediately
+ *  re-engages, and weaves at the obstacle instead of arcing around it. */
+export const AI_AVOID_RELEASE_ANGLE = Math.PI / 36;
+/** Seconds-to-surface below which an AI abandons whatever it was doing and flies directly away
+ *  from the hazard. Braking alone is not enough this late — the ship has to thrust out. */
+export const AI_AVOID_PANIC_TIME = 2;
