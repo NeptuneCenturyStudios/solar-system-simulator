@@ -6,6 +6,7 @@ export interface IShipEffect {
         nozzle: THREE.Vector3,
         speed: number,
         maxSpeed: number,
+        boosting: boolean,
         thrusting: boolean,
         shipVelocity: THREE.Vector3,
         exhaustDir: THREE.Vector3,

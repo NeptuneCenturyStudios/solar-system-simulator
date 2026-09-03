@@ -174,6 +174,7 @@ function updateShipTrail(
         _trailNozzle,
         speed,
         trailMax,
+        boosting,
         true,
         ship.velocity,
         _trailExhaustDir,

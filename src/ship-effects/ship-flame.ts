@@ -186,6 +186,7 @@ export class ShipFlame implements IShipEffect {
         nozzle: THREE.Vector3,
         speed: number,
         maxSpeed: number,
+        boosting: boolean,
         thrusting: boolean,
         shipVelocity: THREE.Vector3,
         exhaustDir: THREE.Vector3,
@@ -320,17 +321,32 @@ export class ShipFlame implements IShipEffect {
             this.gpuPos[n * 3 + 1] = this.py[i] - cpy;
             this.gpuPos[n * 3 + 2] = this.pz[i] - cpz;
 
-            // Inner core: white-hot at birth → yellow → orange → dim red at death
+            // Inner core — colour scheme depends on boost state.
+            // Boosting: white-hot at birth → yellow → orange → dim red at death.
+            // Normal:   white-cyan at birth → cyan → blue at death.
             const hot = alive * speedFactor;
-            this.gpuColorInner[n * 3] = hot; // R: full
-            this.gpuColorInner[n * 3 + 1] = hot * (0.6 + 0.4 * alive); // G: high when young (white/yellow), low when old (red)
-            this.gpuColorInner[n * 3 + 2] = hot * 0.15 * alive; // B: slight white tint only at birth
+            if (boosting) {
+                this.gpuColorInner[n * 3] = hot; // R: full
+                this.gpuColorInner[n * 3 + 1] = hot * (0.6 + 0.4 * alive); // G: high when young (white/yellow), low when old (red)
+                this.gpuColorInner[n * 3 + 2] = hot * 0.15 * alive; // B: slight white tint only at birth
+            } else {
+                this.gpuColorInner[n * 3] = hot * 0.15 * alive; // R: slight white tint only at birth
+                this.gpuColorInner[n * 3 + 1] = hot * (0.6 + 0.4 * alive); // G: high when young (white/cyan), low when old (blue)
+                this.gpuColorInner[n * 3 + 2] = hot; // B: full
+            }
 
-            // Outer glow: orange halo, fades faster than inner
+            // Outer glow — colour scheme depends on boost state. Fades faster than inner.
+            // Boosting: orange halo.  Normal: blue/cyan halo.
             const warm = alive * alive * speedFactor;
-            this.gpuColorOuter[n * 3] = warm;
-            this.gpuColorOuter[n * 3 + 1] = warm * 0.35;
-            this.gpuColorOuter[n * 3 + 2] = 0;
+            if (boosting) {
+                this.gpuColorOuter[n * 3] = warm;
+                this.gpuColorOuter[n * 3 + 1] = warm * 0.35;
+                this.gpuColorOuter[n * 3 + 2] = 0;
+            } else {
+                this.gpuColorOuter[n * 3] = warm * 0.1;
+                this.gpuColorOuter[n * 3 + 1] = warm * 0.5;
+                this.gpuColorOuter[n * 3 + 2] = warm;
+            }
 
             n++;
         }
