@@ -84,6 +84,7 @@ export class Spaceship extends Body {
         steerX: 0,
         steerY: 0,
         fire: false,
+        warp: false,
     };
 
     /** This ship's steering reference frame, independent of the visual banking
@@ -111,6 +112,9 @@ export class Spaceship extends Body {
     shipBankPitch: number = 0;
     /** Whether Shift was held on the previous frame. */
     prevShiftHeld: boolean = false;
+    /** Whether warp intent was held on the previous frame. Drives the rising/falling
+     *  edge detection in updateWarpIntentState(); AI-piloted ships only. */
+    prevWarpHeld: boolean = false;
 
     // ── Warp drive state ─────────────────────────────────────────────────────
     /** Accumulated charge time (seconds) during the warp charging phase (0 → FLIGHT_WARP_CHARGE_TIME). */
@@ -506,6 +510,43 @@ export class Spaceship extends Body {
     }
 
     /**
+     * Runway (u) this ship needs to shed `speed` all the way down to rest, walking
+     * down the same three deceleration bands decelRateForSpeed() selects between:
+     * warp → boost max at flightWarpDecel, boost max → normal max at
+     * flightBoostDecel, and normal max → rest at flightThrustDecel.
+     *
+     * Gravity is not modelled — this is the free-space stopping curve.
+     *
+     * Shared by the autopilot (which uses it to time its WARP → APPROACH → BRAKE
+     * transitions) and by ship AIs deciding when to drop out of warp, so both are
+     * asking the same question of the same curve. See also brakingSpeedLimit() in
+     * simulation/ai/obstacle-avoidance.ts, which is this curve's inverse over the
+     * lower two bands.
+     */
+    stoppingDistanceFrom(speed: number): number {
+        const h = this.handling;
+        if (speed > h.flightBoostMaxSpeed) {
+            return (
+                (speed * speed - h.flightBoostMaxSpeed * h.flightBoostMaxSpeed) /
+                    (2 * h.flightWarpDecel) +
+                (h.flightBoostMaxSpeed * h.flightBoostMaxSpeed -
+                    h.flightMaxSpeed * h.flightMaxSpeed) /
+                    (2 * h.flightBoostDecel) +
+                (h.flightMaxSpeed * h.flightMaxSpeed) / (2 * h.flightThrustDecel)
+            );
+        }
+        if (speed > h.flightMaxSpeed) {
+            return (
+                (speed * speed - h.flightMaxSpeed * h.flightMaxSpeed) / (2 * h.flightBoostDecel) +
+                (h.flightMaxSpeed * h.flightMaxSpeed) / (2 * h.flightThrustDecel)
+            );
+        }
+        // Floored at normal max speed: below it the runway a caller needs is the one
+        // for the speed it is about to accelerate back up to, not its current crawl.
+        return Math.max(speed, h.flightMaxSpeed) ** 2 / (2 * h.flightThrustDecel);
+    }
+
+    /**
      * Apply one stop-brake step: shed forward speed toward zero in straight-line
      * fashion (perpendicular drift is decayed) using the decel rate matching the
      * ship's current speed band: warp decel above boost max, boost decel above
@@ -791,6 +832,61 @@ export class Spaceship extends Body {
         this.prevShiftHeld = boostHeld;
     }
 
+    /**
+     * Drive the warp drive from `controlInput.warp`, the AI-side equivalent of the
+     * player's Space key.
+     *
+     * The player's warp control is edge-triggered and lives in the keydown handler
+     * in index.ts: one press starts a charge, a second press while warping
+     * disengages. An AI holds a *level* instead, so this method does the edge
+     * detection and then calls exactly the same public warp API the key handler
+     * does — startWarpCharge / cancelWarpCharge / engageWarp / beginWarpDecel. An
+     * AI therefore gains no warp capability the player doesn't already have.
+     *
+     * Advancing the charge timer is folded in here too, mirroring the manual
+     * charging block in updateFlightControls(); the player's copy of that also
+     * drives the HUD charge bar, which NPCs have no use for.
+     *
+     * Only called for AI-piloted ships (see stepNpcShips). The player input path
+     * never writes controlInput.warp, so calling this on the player's ship would
+     * be a no-op that also clobbered nothing — but it isn't called there.
+     *
+     * @param dt Wall-clock seconds since the previous frame, matching the rate the
+     *   player's own charge advances at.
+     */
+    updateWarpIntentState(dt: number): void {
+        const want = this.controlInput.warp;
+        const rising = want && !this.prevWarpHeld;
+        const falling = !want && this.prevWarpHeld;
+
+        if (rising) {
+            // Same guards as the key handler: no charging into an already-live warp
+            // or on top of a deceleration that still owns the throttle.
+            if (
+                !this.warpActive &&
+                !this.warpCharging &&
+                !this.warpDecelerating &&
+                !this.stopBraking
+            ) {
+                this.startWarpCharge();
+            }
+        } else if (falling) {
+            if (this.warpActive) {
+                this.beginWarpDecel();
+            } else if (this.warpCharging) {
+                this.cancelWarpCharge();
+            }
+        }
+
+        // Hold the charge only while the intent is held — releasing mid-spool
+        // aborts it, exactly as releasing Space does.
+        if (want && this.warpCharging && this.updateWarpCharge(dt) >= 1) {
+            this.engageWarp();
+        }
+
+        this.prevWarpHeld = want;
+    }
+
     /** Zero this ship's virtual control surface (all inputs released, sticks centred). */
     resetControlInput(): void {
         const input = this.controlInput;
@@ -802,6 +898,7 @@ export class Spaceship extends Body {
         input.steerX = 0;
         input.steerY = 0;
         input.fire = false;
+        input.warp = false;
     }
 
     /**
@@ -815,6 +912,7 @@ export class Spaceship extends Body {
         this.shipBankRoll = 0;
         this.shipBankPitch = 0;
         this.prevShiftHeld = false;
+        this.prevWarpHeld = false;
         this.resetControlInput();
     }
 
@@ -863,19 +961,7 @@ export class Spaceship extends Body {
         // Three-phase stopping distance: shed warp→boost at warp decel,
         // boost→normal at boost decel, normal→stop at thrust decel.
         const h = this.handling;
-        const effectiveStopDist =
-            approachSpeed > h.flightBoostMaxSpeed
-                ? (approachSpeed * approachSpeed - h.flightBoostMaxSpeed * h.flightBoostMaxSpeed) /
-                      (2 * h.flightWarpDecel) +
-                  (h.flightBoostMaxSpeed * h.flightBoostMaxSpeed -
-                      h.flightMaxSpeed * h.flightMaxSpeed) /
-                      (2 * h.flightBoostDecel) +
-                  (h.flightMaxSpeed * h.flightMaxSpeed) / (2 * h.flightThrustDecel)
-                : approachSpeed > h.flightMaxSpeed
-                  ? (approachSpeed * approachSpeed - h.flightMaxSpeed * h.flightMaxSpeed) /
-                        (2 * h.flightBoostDecel) +
-                    (h.flightMaxSpeed * h.flightMaxSpeed) / (2 * h.flightThrustDecel)
-                  : Math.max(approachSpeed, h.flightMaxSpeed) ** 2 / (2 * h.flightThrustDecel);
+        const effectiveStopDist = this.stoppingDistanceFrom(approachSpeed);
         const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
         // Max-warp braking threshold — only used by ALIGN to decide whether to
@@ -1210,15 +1296,23 @@ export class Spaceship extends Body {
 
     /**
      * Transition from WARP_CHARGING → WARP active.  Caller is responsible for
-     * triggering flash, sound, and HUD updates.
+     * HUD updates and event-log messages.
+     *
+     * The screen flash and engage sound are first-person effects — they belong to
+     * the pilot, not to the drive — so they only fire for the ship the player is
+     * flying or last flew. Without that gate an AI ship engaging warp on the far
+     * side of the system would white out the player's screen.
      */
     engageWarp(): void {
         this.warpActive = true;
         this.warpCharging = false;
         this.warpChargeTimer = 0;
 
-        triggerScreenFlash(200, 0.01, 2.5);
-        playSoundEffect(SoundEffect.WarpDriveActive);
+        const isPlayerShip = flightState.activeShip === this || flightState.knownShip === this;
+        if (isPlayerShip) {
+            triggerScreenFlash(200, 0.01, 2.5);
+            playSoundEffect(SoundEffect.WarpDriveActive);
+        }
     }
 
     /**

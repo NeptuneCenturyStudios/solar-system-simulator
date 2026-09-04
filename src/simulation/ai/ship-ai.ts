@@ -13,6 +13,12 @@ import type { Spaceship } from '../../bodies/ships/spaceship';
  * handles exactly like a player-piloted one and automatically inherits any
  * future change to a ship's handling.
  *
+ * That includes the warp drive: `controlInput.warp` is the AI's equivalent of the
+ * player holding Space, and `Spaceship.updateWarpIntentState()` turns it into the
+ * same charge/engage/disengage calls the key handler makes. A controller therefore
+ * has to live with the same restrictions — a ship at warp flies a locked straight
+ * heading with steering, thrust and weapons all disabled.
+ *
  * Subclasses implement `update()`, which runs once per rendered frame at
  * wall-clock dt. Thrust itself is applied later, per physics substep, by
  * `Spaceship.applyFlightThrustSubstep()`.

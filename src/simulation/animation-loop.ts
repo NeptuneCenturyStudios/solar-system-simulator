@@ -306,7 +306,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // Runs whether or not the player is in flight mode: NPC ships fly on
         // regardless. Frame-level only (decisions + steering/roll); their thrust
         // is applied per physics substep inside updateSimulation().
-        stepNpcShips(wallDt, dtTotal);
+        stepNpcShips(wallDt, dtTotal, flightCtx.addEvent);
 
         // Draw what those controllers just decided. After the step, so the overlay shows the
         // heading the ships are flying this frame rather than the previous one's.
@@ -340,6 +340,15 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         const _warpShip = ctx.flightState.activeShip ?? ctx.flightState.knownShip;
         if (_warpShip && !_warpShip._isDisposed && _warpShip.mesh) {
             _warpShip.updateWarpEffect(dtTotal, _warpShip.handling.flightWarpSpeed);
+        }
+
+        // AI ships warp too, so their tunnels need driving as well. The effect is
+        // speed-driven and self-hiding, so this is safe to run on every NPC every frame —
+        // one that isn't warping simply stays invisible. Skips whichever ship the block
+        // above already handled, so a player-owned ship isn't updated twice.
+        for (const npc of ctx.simulationState.npcShips) {
+            if (!npc || npc === _warpShip || npc._isDisposed || !npc.mesh) continue;
+            npc.updateWarpEffect(dtTotal, npc.handling.flightWarpSpeed);
         }
 
         // ── WASD camera movement ─────────────────────────────────────────
@@ -925,6 +934,21 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 1
             );
             visShip.updateWarpSound(vol, wdf);
+        }
+
+        // NPC warp tunnels fade on camera distance alone. The look-at-mode test above exists
+        // only to decide whether the player's own parked ship is actually on screen; an AI
+        // ship is never the flight-mode ship, so distance is the whole question here.
+        // No warp sound: several NPCs warping at once would stack the loop on top of itself.
+        for (const npc of ctx.simulationState.npcShips) {
+            if (!npc || npc === visShip || npc._isDisposed || !npc.mesh) continue;
+            const d = ctx.camera.position.distanceTo(npc.mesh.position);
+            const t = THREE.MathUtils.clamp(
+                (d - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST),
+                0,
+                1
+            );
+            npc.setWarpEffectOpacity(1 - t);
         }
 
         // ── Render ──────────────────────────────────────────────────────────

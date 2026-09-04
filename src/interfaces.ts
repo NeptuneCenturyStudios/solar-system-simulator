@@ -72,6 +72,17 @@ export interface IShipControlInput {
     steerY: number;
     /** Trigger held. Not used by AI controllers yet — reserved. */
     fire: boolean;
+    /**
+     * Warp intent — the "Space" key for the player, but held as a *level* rather
+     * than an edge: true means "I want warp", false means "I don't".
+     *
+     * The player's Space key is edge-triggered (press to charge, press again to
+     * disengage) and is handled directly by the key handler in index.ts, which
+     * never writes this field. A ShipAI instead holds the level and lets
+     * `Spaceship.updateWarpIntentState()` turn the rising and falling edges into
+     * exactly the same charge/engage/cancel/decel calls the key handler makes.
+     */
+    warp: boolean;
 }
 
 /**

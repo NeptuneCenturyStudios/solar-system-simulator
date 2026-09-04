@@ -5,6 +5,11 @@ import { Body } from '../../bodies/body';
 import { createUniqueId } from '../../utilities/utilities';
 import { flightState, simulationState } from '../simulation';
 import { FollowShipAI } from './follow-ship-ai';
+import { settingsStore } from '../../settings/settings-store';
+import { NotificationType } from '../../event-log/event-log';
+
+/** Event-log sink, matching the `addEvent` the flight control context already carries. */
+type NpcEventSink = (event: { message: string; notificationType: NotificationType }) => void;
 
 /**
  * Registry and lifecycle for AI-piloted (non-player) ships.
@@ -119,10 +124,17 @@ export function registerNpcShipsIn(bodies: Body[]): void {
  * is driven, and is what keeps AI thrust correctly interleaved with gravity at
  * high time-warp.
  *
+ * This is the AI-side counterpart of `updateFlightControls()`, and it enforces the
+ * same restrictions on an AI pilot that the player lives with — most importantly
+ * the warp lockout: a ship at warp flies a locked straight heading and cannot
+ * steer, roll, thrust or fire.
+ *
  * @param dt    Wall-clock seconds since the previous frame (not time-scaled).
  * @param simDt Sim-time seconds advanced this frame (wall dt × time scale).
+ * @param addEvent Optional event-log sink, used only for AI warp debug messages
+ *   when the `showAiDebug` setting is on.
  */
-export function stepNpcShips(dt: number, simDt: number): void {
+export function stepNpcShips(dt: number, simDt: number, addEvent?: NpcEventSink): void {
     if (simulationState.isPaused || simulationState.timeScale === 0) return;
 
     for (const ship of simulationState.npcShips) {
@@ -130,6 +142,8 @@ export function stepNpcShips(dt: number, simDt: number): void {
         // If the player has taken this ship over, or the autopilot has it, they
         // own the controls this frame — the AI stands down.
         if (ship === flightState.activeShip || ship.autopilotActive) continue;
+
+        const wasWarping = ship.warpActive;
 
         // Advance any warp/boost/stop deceleration first. These phases are driven
         // frame-level (not per substep), and while one is active
@@ -145,10 +159,39 @@ export function stepNpcShips(dt: number, simDt: number): void {
             ship.stopBraking
         ) {
             _npcForward.set(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
-            ship.advanceWarpSpeed(simDt, _npcForward);
+            const result = ship.advanceWarpSpeed(simDt, _npcForward);
+
+            // Warp decel just handed over to boost decel. If the AI is still asking for
+            // boost, abort that second ramp and let the ship sit at boost speed — the same
+            // thing holding Shift does for the player as a warp run bleeds off, and what an
+            // AI wants for the last leg of a chase it just warped most of the way across.
+            if (result.decelDone && result.phase === 'boost_decel' && ship.controlInput.boost) {
+                ship.boostDecelerating = false;
+            }
         }
 
         ship.ai.update(dt, simDt);
-        ship.applyFrameOrientation(dt);
+
+        // Turn the AI's warp intent into charge/engage/cancel/decel on the drive. After the
+        // controller has run, so an intent raised this frame is acted on this frame.
+        ship.updateWarpIntentState(dt);
+
+        // The warp lockout. Skipping applyFrameOrientation() is what actually holds the ship
+        // to a straight line: it is the call that folds steering and roll into the control
+        // frame, and the control frame is the direction warp thrust and deceleration are
+        // applied along. updateFlightControls() enforces this for the player by returning
+        // before the equivalent call. Thrust needs no gate here — applyFlightThrustSubstep()
+        // already refuses to add any while a warp flag is set — and the controller releases
+        // the trigger itself for the duration.
+        if (!ship.warpActive) ship.applyFrameOrientation(dt);
+
+        if (addEvent && settingsStore.settings.showAiDebug && ship.warpActive !== wasWarping) {
+            addEvent({
+                message: ship.warpActive
+                    ? `⚡ ${ship.name}: warp engaged`
+                    : `${ship.name}: dropping out of warp`,
+                notificationType: NotificationType.Info,
+            });
+        }
     }
 }

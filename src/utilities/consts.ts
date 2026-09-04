@@ -381,6 +381,32 @@ export const AI_APPROACH_SAFETY_PAD = 1.5;
  *  boost. Boost is then held until the command falls back below normal max speed, so the
  *  gap between the two thresholds is the hysteresis that stops boost from flickering. */
 export const AI_BOOST_ENGAGE_FACTOR = 1.25;
+
+// === Ship AI warp drive ===
+/** Multiplier on a ship's own `autopilotWarpThreshold` before an AI will charge warp.
+ *  That threshold is already the full warp→rest stopping distance with a 1.5× margin
+ *  baked in, so 1.0 puts an AI on the same footing as the autopilot: warp whenever the
+ *  run is long enough that there is still room to shed the speed again afterwards. */
+export const AI_WARP_ENGAGE_FACTOR = 1.0;
+/** Hysteresis on the above: an AI abandons a charge already in progress only once the
+ *  distance falls below this fraction of the engage threshold. Without the gap, a target
+ *  drifting across the threshold makes the charge start and abort on alternating frames. */
+export const AI_WARP_ABORT_FACTOR = 0.8;
+/** Maximum off-axis angle (radians) at which an AI will start or hold a warp charge.
+ *  Far tighter than AI_THRUST_ALIGN_ANGLE because warp is flown on a locked heading with
+ *  steering disabled: whatever error is present at engagement is error the ship carries
+ *  all the way to the drop-out point. */
+export const AI_WARP_ALIGN_ANGLE = Math.PI / 90;
+/** Safety margin on the distance at which an AI drops out of warp, applied to the ship's
+ *  own three-band stopping distance. Matches the margin the autopilot uses for its own
+ *  WARP → APPROACH transition. */
+export const AI_WARP_DROP_PAD = 1.5;
+/** Clearance radius for the straight-line warp corridor, as a multiple of a body's hazard
+ *  radius. The corridor is a cylinder rather than avoidance's silhouette cone: a fixed
+ *  angular margin that is sensible at steering range sweeps an enormous exclusion volume
+ *  when projected down a warp run hundreds of thousands of units long. */
+export const AI_WARP_CORRIDOR_PAD = 3;
+
 /** Distance from the primary star at which the starting NPC ship spawns, expressed
  *  as a multiple of that star's radius. Scaling off the star (rather than using a
  *  fixed distance) keeps the ship safely outside the corona for procedural stars of

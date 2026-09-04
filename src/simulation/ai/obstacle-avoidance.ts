@@ -11,6 +11,7 @@ import {
     AI_AVOID_PANIC_TIME,
     AI_AVOID_RELEASE_ANGLE,
     AI_AVOID_STAR_HAZARD_FACTOR,
+    AI_WARP_CORRIDOR_PAD,
 } from '../../utilities/consts';
 import type { Body } from '../../bodies/body';
 import type { Spaceship } from '../../bodies/ships/spaceship';
@@ -73,6 +74,7 @@ const _u = new THREE.Vector3();
 const _perp = new THREE.Vector3();
 const _axis = new THREE.Vector3();
 const _ref = new THREE.Vector3();
+const _corridorToBody = new THREE.Vector3();
 
 /** What the avoidance layer wants the controller to do this frame. */
 export interface IAvoidanceResult {
@@ -464,5 +466,62 @@ export class ObstacleAvoidance {
         result.flee = timeToSurface < AI_AVOID_PANIC_TIME;
 
         return result;
+    }
+
+    /**
+     * How far the ship can run in a dead straight line along `dir` before something gets in
+     * the way. Returns the distance to the nearest blocking hazard's surface, or Infinity if
+     * the corridor is clear for the whole of `range`.
+     *
+     * This exists for the warp drive, and it asks a different question from `evaluate()`.
+     * Avoidance tests a silhouette *cone* widened by a fixed angular clearance, which is the
+     * right shape for a ship that can steer: the margin it needs scales with how far away the
+     * obstacle is, because so does the room it has to turn. A ship at warp cannot steer at
+     * all, and the runs are hundreds of thousands of units long — projecting a 10° margin
+     * down one of those sweeps an exclusion volume tens of thousands of units wide and would
+     * veto essentially every warp. So the corridor is a *cylinder*: a fixed clearance radius
+     * around the line, independent of distance.
+     *
+     * Unlike `evaluate()` this is stateless — nothing is latched and no result object is
+     * touched — so it is safe to call at any point in a controller's frame.
+     *
+     * Costs a full pass over `simulationState.bodies`, so controllers should only call it
+     * when they are actually considering or flying a warp, not every frame.
+     *
+     * @param dir Unit direction of the intended straight run.
+     * @param range How far along `dir` to care about, in sim units.
+     * @returns Distance (u) to the nearest blocker's surface, or Infinity when clear.
+     */
+    straightPathClearance(dir: THREE.Vector3, range: number): number {
+        const ship = this.ship;
+        const shipPos = ship.mesh.position;
+        let nearest = Infinity;
+
+        for (const body of simulationState.bodies) {
+            if (!body || body === ship || body._isDisposed || !body.mesh) continue;
+            if (isBodyType(body, EXCLUDED_TYPES)) continue;
+            if (!(body.radius > 0) || !Number.isFinite(body.radius)) continue;
+
+            const hazardRadius = this.hazardRadiusOf(body);
+
+            _corridorToBody.subVectors(body.mesh.position, shipPos);
+            const along = _corridorToBody.dot(dir);
+
+            // Behind us, or past the end of the run we care about. Both tests are against the
+            // body's surface rather than its centre so a body straddling either end still counts.
+            if (along + hazardRadius <= 0) continue;
+            if (along - hazardRadius > range) continue;
+
+            // Perpendicular offset from the line, by Pythagoras — no sqrt, no allocation.
+            const clearRadius = hazardRadius * AI_WARP_CORRIDOR_PAD;
+            const perpSquared = Math.max(0, _corridorToBody.lengthSq() - along * along);
+            if (perpSquared >= clearRadius * clearRadius) continue;
+
+            // Blocked. Report the distance to its surface; already-overlapping reads as 0.
+            const surfaceDistance = Math.max(0, along - hazardRadius);
+            if (surfaceDistance < nearest) nearest = surfaceDistance;
+        }
+
+        return nearest;
     }
 }
