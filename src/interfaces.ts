@@ -110,6 +110,15 @@ export interface IOrbitalBodyCreationOptions extends IBodyCreationOptions {
     maxTrail?: number;
 }
 
+/**
+ * Options for creating a comet, extending the orbital-body options with the
+ * comet-tail main color. Kept separate from IOrbitalBodyCreationOptions so
+ * `tailColor` isn't exposed to non-comet bodies.
+ */
+export interface ICometCreationOptions extends ICelestialBodyCreationOptions {
+    tailColor?: number;
+}
+
 export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptions {
     mesh?: THREE.Mesh;
     /** Deterministic seed used to derive procedural textures and other procedural features at runtime. */

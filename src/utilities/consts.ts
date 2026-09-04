@@ -416,3 +416,22 @@ export const AI_AVOID_RELEASE_ANGLE = Math.PI / 36;
 /** Seconds-to-surface below which an AI abandons whatever it was doing and flies directly away
  *  from the hazard. Braking alone is not enough this late — the ship has to thrust out. */
 export const AI_AVOID_PANIC_TIME = 2;
+// === Comet tail coloring ===
+/** Default main color for a comet's particle tail (blue — matches the original look). */
+export const DEFAULT_COMET_TAIL_COLOR = 0x7ab8ff;
+
+/** Palette of pleasing main tail colors used by procedural comet generation and the
+ *  Add/Edit body panel's randomize action: red, blue, green, purple, orange, yellow, etc. */
+export const COMET_TAIL_COLOR_PALETTE = [
+    0x7ab8ff, // blue
+    0x66e0ff, // cyan
+    0x55ffd5, // teal
+    0x7aff7a, // green
+    0xc8ff66, // lime
+    0xffe066, // gold
+    0xffaa55, // orange
+    0xff5566, // red
+    0xff88dd, // pink
+    0xbb88ff, // purple
+    0xff66ff, // magenta
+];

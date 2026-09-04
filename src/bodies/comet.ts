@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
-import { SCALE_FACTOR } from '../utilities/consts.js';
+import { DEFAULT_COMET_TAIL_COLOR, SCALE_FACTOR } from '../utilities/consts.js';
 import { BodyTypeEnum } from './body-enums.js';
 import { CelestialBody } from './celestial-body';
-import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces.js';
+import { ICometCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces.js';
 import { settingsStore } from '../settings/settings-store.js';
 
 /**
@@ -27,9 +27,10 @@ export abstract class Comet extends CelestialBody {
     private tailGpuBuf: Float32Array | null;
     private tailColors: Float32Array | null;
     private tailOpacities: Float32Array | null;
-    private tailVelocities:
-        | { life: number; lifeIncrement: number; vel: THREE.Vector3; isBlue: boolean }[]
-        | null;
+    private tailVelocities: { life: number; lifeIncrement: number; vel: THREE.Vector3 }[] | null;
+    private tailColorMain: THREE.Color;
+    /** Fraction of tail particles that take the comet's main tail color (vs white). */
+    private static readonly COLORED_PARTICLE_RATIO = 0.8;
 
     /**
      * Constructs a new Comet with a nucleus and initializes its tail particle system.
@@ -41,7 +42,7 @@ export abstract class Comet extends CelestialBody {
     constructor(
         deps: IStateDependencies,
         scene: THREE.Scene,
-        options: ICelestialBodyCreationOptions
+        options: ICometCreationOptions
     ) {
         super(
             deps,
@@ -70,6 +71,7 @@ export abstract class Comet extends CelestialBody {
         this.tailColors = new Float32Array(this.tailCount * 3);
         this.tailOpacities = new Float32Array(this.tailCount);
         this.tailVelocities = [];
+        this.tailColorMain = new THREE.Color(options.tailColor ?? DEFAULT_COMET_TAIL_COLOR);
 
         // Direction away from sun for initial tail positioning
         const awayFromSun = new THREE.Vector3(
@@ -79,8 +81,6 @@ export abstract class Comet extends CelestialBody {
         ).normalize();
 
         for (let i = 0; i < this.tailCount; i++) {
-            const isBlue = Math.random() < 0.5;
-
             // Create velocity vector — direction will be refreshed on first death anyway
             const velVec = awayFromSun
                 .clone()
@@ -100,7 +100,7 @@ export abstract class Comet extends CelestialBody {
             this.tailPz[i] = options.pos.z;
 
             const colorIdx = i * 3;
-            const color = isBlue ? new THREE.Color(0x7ab8ff) : new THREE.Color(0xffffff);
+            const color = this.generateTailParticleColor();
             this.tailColors[colorIdx] = color.r;
             this.tailColors[colorIdx + 1] = color.g;
             this.tailColors[colorIdx + 2] = color.b;
@@ -110,7 +110,7 @@ export abstract class Comet extends CelestialBody {
             // lifeIncrement.  Previously life was Math.random() (0–1) with lifeIncrement=0.001,
             // meaning a particle at life=0 needed 62,500 frames (~17 min at timeScale=1) to die
             // and reset — leaving half the particles frozen near the spawn position for ages.
-            this.tailVelocities[i] = { life: 1.001, lifeIncrement: 0.001, vel: velVec, isBlue };
+            this.tailVelocities[i] = { life: 1.001, lifeIncrement: 0.001, vel: velVec };
         }
 
         // Initialize tailOpacities to 0 so the life attribute starts quiet
@@ -175,6 +175,47 @@ float alpha = vLife * strength;`
         this.tailParticles.frustumCulled = false;
 
         this.scene.add(this.tailParticles);
+    }
+
+    /**
+     * Produces a per-particle tail color. ~80% of particles take the comet's main
+     * tail color with a little HSL variation (the procedural coloring), and the
+     * rest stay white for the icy sheen.
+     */
+    private generateTailParticleColor(): THREE.Color {
+        if (Math.random() < Comet.COLORED_PARTICLE_RATIO) {
+            const hsl = { h: 0, s: 0, l: 0 };
+            this.tailColorMain.getHSL(hsl);
+            const hue = (hsl.h + (Math.random() - 0.5) * 0.08 + 1) % 1;
+            const sat = Math.min(1, Math.max(0.2, hsl.s * (0.8 + Math.random() * 0.4)));
+            const light = Math.min(1, Math.max(0.15, hsl.l * (0.7 + Math.random() * 0.6)));
+            return new THREE.Color().setHSL(hue, sat, light);
+        }
+        return new THREE.Color(0xffffff);
+    }
+
+    /**
+     * Sets the comet tail's main color. New particles sample around it, and all
+     * live particles are re-tinted immediately so the change is visible at once.
+     */
+    setTailColor(color: THREE.ColorRepresentation): void {
+        this.tailColorMain.set(color);
+        if (this.tailColors && this.tailVelocities) {
+            for (let i = 0; i < this.tailCount; i++) {
+                const c = this.generateTailParticleColor();
+                this.tailColors[i * 3] = c.r;
+                this.tailColors[i * 3 + 1] = c.g;
+                this.tailColors[i * 3 + 2] = c.b;
+            }
+            if (this.tailGeo) {
+                this.tailGeo.attributes.color.needsUpdate = true;
+            }
+        }
+    }
+
+    /** Current comet tail main color. */
+    get tailColor(): THREE.Color {
+        return this.tailColorMain;
     }
 
     update(acc: THREE.Vector3, dt: number) {
@@ -309,8 +350,7 @@ float alpha = vLife * strength;`
                 vel.vel.y = awayFromSunY * baseSpeed + (Math.random() - 0.5) * 0.2;
                 vel.vel.z = awayFromSunZ * baseSpeed + (Math.random() - 0.5) * 0.2;
 
-                vel.isBlue = Math.random() < 0.5;
-                const color = vel.isBlue ? new THREE.Color(0x7ab8ff) : new THREE.Color(0xffffff);
+                const color = this.generateTailParticleColor();
                 this.tailColors[idx] = color.r;
                 this.tailColors[idx + 1] = color.g;
                 this.tailColors[idx + 2] = color.b;

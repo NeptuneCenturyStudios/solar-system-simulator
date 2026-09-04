@@ -63,6 +63,8 @@ export interface BodyEditSnapshot {
     azimuth: number;
     /** Hex color string for the color picker (asteroids/comets only). */
     colorHex: string | null;
+    /** Comet tail main color as a hex string (comets only). */
+    tailColorHex: string | null;
     /** Readable type label e.g. "Planet". */
     typeLabel: string;
 }
@@ -84,6 +86,8 @@ export interface CreateBodyPayload {
     orbitParentId: string | null;
     createTilt: number | null;
     createAzimuth: number | null;
+    /** Comet tail main color as a hex string (comets only). */
+    tailColor?: string | null;
 }
 
 /** Payload for applying an edit. Mirrors the old panel's `applyEdit` event. */
@@ -97,6 +101,8 @@ export interface ApplyBodyEditPayload {
     orbitalAngle: number | null;
     inclination: number | null;
     color: string | null;
+    /** Comet tail main color as a hex string (comets only). */
+    tailColor: string | null;
     /** Star-flag mirrors the old panel's isStarBody; radius cap differs for stars. */
     isStarBody: boolean;
     editTilt: number | null;

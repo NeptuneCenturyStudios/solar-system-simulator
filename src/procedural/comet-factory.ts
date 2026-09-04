@@ -12,6 +12,7 @@ export type ProceduralCometCreation = {
     rotationSpeed: number;
     rotationTilt: number;
     rotationAzimuth: number;
+    tailColor: number;
 };
 
 /**
@@ -22,8 +23,18 @@ export function createCometBodyFromProceduralCreation(
     scene: THREE.Scene,
     creation: ProceduralCometCreation
 ): GenericComet {
-    const { id, name, pos, vel, radius, mass, rotationSpeed, rotationTilt, rotationAzimuth } =
-        creation;
+    const {
+        id,
+        name,
+        pos,
+        vel,
+        radius,
+        mass,
+        rotationSpeed,
+        rotationTilt,
+        rotationAzimuth,
+        tailColor,
+    } = creation;
 
     return new GenericComet(dependencies, scene, {
         id,
@@ -33,5 +44,6 @@ export function createCometBodyFromProceduralCreation(
         radius,
         mass,
         rotation: { tilt: rotationTilt, speed: rotationSpeed, azimuth: rotationAzimuth },
+        tailColor,
     });
 }

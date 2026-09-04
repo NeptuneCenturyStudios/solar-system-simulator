@@ -208,6 +208,11 @@
                         Please select a body first to create a moon
                     </p>
 
+                    <div v-if="bodyType === 'comet'" class="control-group">
+                        <label for="vueAddTailColor">Tail Color</label>
+                        <input id="vueAddTailColor" v-model="addTailColor" type="color" />
+                    </div>
+
                     <div class="d-flex gap-3 mb-3">
                         <button
                             class="old-ui btn-with-icon"
@@ -254,6 +259,11 @@
                     <div v-if="snapshot.isAsteroid || snapshot.isComet" class="control-group">
                         <label>Color</label>
                         <input v-model="editColor" type="color" />
+                    </div>
+
+                    <div v-if="snapshot.isComet" class="control-group">
+                        <label>Tail Color</label>
+                        <input v-model="editTailColor" type="color" />
                     </div>
 
                     <div class="control-group">
@@ -425,6 +435,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
+import { COMET_TAIL_COLOR_PALETTE } from '../../utilities/consts';
 import { closeBodyEditor, openBodyEditor, vueUiState } from '../ui-store';
 import {
     applyBodyEdit,
@@ -461,6 +472,7 @@ const snapshot = computed(() => bodyEditorStore.snapshot);
 
 // ── Add-mode form state ───────────────────────────────────────────────────
 const addMode = ref<'preset' | 'custom'>('preset');
+const addTailColor = ref('#7ab8ff');
 const presetKey = ref('sun');
 const bodyType = ref('sun');
 const planetType = ref('solid');
@@ -527,6 +539,7 @@ watch(
 
 function resetAddForm(): void {
     addMode.value = 'preset';
+    addTailColor.value = '#7ab8ff';
     presetKey.value = 'sun';
     bodyType.value = 'sun';
     planetType.value = 'solid';
@@ -553,11 +566,24 @@ function applyRandomDefaults(): void {
     hasRings.value = defaults.hasRings;
     if (defaults.planetType) planetType.value = defaults.planetType;
     if (defaults.moonType) moonType.value = defaults.moonType;
+
+    // Comets get a randomized tail color from the shared procedural palette.
+    if (bodyType.value === 'comet') {
+        addTailColor.value = randomCometTailColorHex();
+    }
+}
+
+/** Picks a random comet-tail color from the shared procedural palette, as a hex string. */
+function randomCometTailColorHex(): string {
+    const color =
+        COMET_TAIL_COLOR_PALETTE[Math.floor(Math.random() * COMET_TAIL_COLOR_PALETTE.length)];
+    return '#' + color.toString(16).padStart(6, '0');
 }
 
 // ── Edit-mode form state ──────────────────────────────────────────────────
 const editName = ref('');
 const editColor = ref('#ffffff');
+const editTailColor = ref('#7ab8ff');
 const editMass = ref(0);
 const editRadius = ref(0);
 const editTemperature = ref(5778);
@@ -573,6 +599,7 @@ function syncEditFormFromSnapshot(): void {
     if (!snap) return;
     editName.value = snap.name;
     editColor.value = snap.colorHex ?? '#ffffff';
+    editTailColor.value = snap.tailColorHex ?? '#7ab8ff';
     editMass.value = snap.mass;
     editRadius.value = snap.radius;
     editTemperature.value = snap.temperature ?? 5778;
@@ -632,6 +659,7 @@ function onCreate(): void {
             orbitParentId: resolveOrbitParentId(simStore.selectedId),
             createTilt: showTilt.value ? tilt.value : null,
             createAzimuth: showTilt.value ? azimuth.value : null,
+            tailColor: bodyType.value === 'comet' ? addTailColor.value : null,
         };
         newId = createCustomBody(payload);
     }
@@ -656,6 +684,7 @@ function onApply(): void {
         orbitalAngle: editOrbitalAngle.value,
         inclination: editInclination.value,
         color: snap.isAsteroid || snap.isComet ? editColor.value : null,
+        tailColor: snap.isComet ? editTailColor.value : null,
         isStarBody: snap.isStar,
         editTilt: snap.hasTilt ? editTilt.value : null,
         editAzimuth: snap.hasTilt ? editAzimuth.value : null,

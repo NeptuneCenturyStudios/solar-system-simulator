@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Comet } from './comet';
-import { IOrbitalBodyCreationOptions, IStateDependencies } from '../interfaces.js';
+import { ICometCreationOptions, IStateDependencies } from '../interfaces.js';
 import { MTLLoader, OBJLoader } from 'three/examples/jsm/Addons.js';
 
 /**
@@ -17,7 +17,7 @@ export class GenericComet extends Comet {
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        options: IOrbitalBodyCreationOptions
+        options: ICometCreationOptions
     ) {
         // Geometry factory returns a placeholder geometry until OBJ loads
         const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
@@ -34,6 +34,7 @@ export class GenericComet extends Comet {
             rotation: options.rotation,
             trailColor: options.trailColor,
             maxTrail: options.maxTrail,
+            tailColor: options.tailColor,
             mesh: placeholderMesh,
         });
 

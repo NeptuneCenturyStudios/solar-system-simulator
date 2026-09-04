@@ -147,6 +147,7 @@ import {
 import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simulation/autopilot';
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
+import { Comet } from './bodies/comet';
 import { UIManager } from './ui/ui-manager';
 import { runAnimationLoop, AnimationContext } from './simulation/animation-loop';
 import { registerCustomEventListeners } from './events/custom-event-listeners';
@@ -1124,7 +1125,8 @@ function createNewBody(
     customRadius: number | null = null,
     orbitParent: Body | null = null,
     createTilt: number | null = null,
-    createAzimuth: number | null = null
+    createAzimuth: number | null = null,
+    tailColor: string | null = null
 ) {
     let newBody;
     let moonCreationParent: Body | null = null; // tracked so post-creation can re-focus the parent
@@ -1531,6 +1533,10 @@ function createNewBody(
             id: createUniqueId('comet'),
             name: generateIAUName(BodyTypeEnum.Comet, null, simulationState.bodies),
             rotation: { tilt: 0, speed: 0.05 },
+            tailColor:
+                typeof tailColor === 'string' && tailColor.startsWith('#')
+                    ? parseInt(tailColor.slice(1), 16)
+                    : undefined,
         });
     } else if (bodyType === 'black_hole') {
         const bhSpawnPos = getNearCameraSpawnPos();
@@ -3273,7 +3279,10 @@ registerVueSimHooks({
             inclination,
             tilt: rotation?.tilt ?? 0,
             azimuth: rotation?.azimuth ?? 0,
-            colorHex: toHexColor(colorValue),
+colorHex: toHexColor(colorValue),
+            tailColorHex: isCometBody
+                ? toHexColor((body as unknown as Comet).tailColor)
+                : null,
         };
     },
     createBody: (payload) => {
@@ -3296,7 +3305,8 @@ registerVueSimHooks({
             payload.customRadius,
             orbitParent,
             payload.createTilt,
-            payload.createAzimuth
+            payload.createAzimuth,
+            payload.tailColor
         );
         return body && !body._isDisposed ? body.id : null;
     },
@@ -3764,6 +3774,7 @@ interface IApplyBodyEditParams {
     orbitalAngle: number | null;
     inclination: number | null;
     color: string | null;
+    tailColor: string | null;
     editTilt: number | null;
     editAzimuth: number | null;
 }
@@ -3781,6 +3792,7 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         orbitalAngle,
         inclination,
         color,
+        tailColor,
         editTilt,
         editAzimuth,
     } = params;
@@ -3881,6 +3893,15 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
             if (body instanceof CelestialBody) body.baseColor.set(col);
         } catch (e) {
             console.error('Error applying body color edit:', e);
+        }
+    }
+
+    // Apply comet tail main color if provided and the body is a comet
+    if (tailColor && body instanceof Comet) {
+        try {
+            body.setTailColor(tailColor);
+        } catch (e) {
+            console.error('Error applying comet tail color edit:', e);
         }
     }
 

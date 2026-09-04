@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { StarParams } from '../utilities/body-params';
-import { EARTH_DIST } from '../utilities/consts';
+import { COMET_TAIL_COLOR_PALETTE, EARTH_DIST } from '../utilities/consts';
 import { calculateOrbitalSpeed } from '../physics/physics';
 import { generateProceduralBodyName } from './body-naming';
 import type { ProceduralCometCreation } from './comet-factory';
@@ -152,6 +152,12 @@ export function generateProceduralComets(params: {
             sequenceNumber: i + 1,
         });
 
+        const tailColorRng = rngFor(masterSeed, 'cometTailColor', i);
+        const tailColor =
+            COMET_TAIL_COLOR_PALETTE[
+                Math.floor(tailColorRng.next() * COMET_TAIL_COLOR_PALETTE.length)
+            ];
+
         creations.push({
             id,
             name,
@@ -162,6 +168,7 @@ export function generateProceduralComets(params: {
             rotationSpeed,
             rotationTilt,
             rotationAzimuth,
+            tailColor,
         });
     }
 
