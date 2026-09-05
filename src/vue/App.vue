@@ -2,7 +2,7 @@
     <div
         v-show="vueUiState.systemReady"
         class="vue-ui-shell gap-3"
-        :class="{ paused: simStore.isPaused }"
+        
     >
         <PanelManager v-show="vueUiState.panelManagerVisible" />
 
@@ -28,5 +28,5 @@ import ScenariosModal from './components/modals/ScenariosModal.vue';
 import AboutModal from './components/modals/AboutModal.vue';
 
 import { vueUiState } from './ui-store';
-import { simStore } from './sim-bridge';
+
 </script>

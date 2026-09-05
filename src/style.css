@@ -723,7 +723,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     border-radius: var(--new-ui-border-radius);
 }
 
-#vue-ui-root .vue-ui-shell.paused {
+.paused {
     animation: paused-pulse 3s infinite;
 }
 

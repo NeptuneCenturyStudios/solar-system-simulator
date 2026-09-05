@@ -7,7 +7,7 @@
                 type="button"
                 title="Close"
                 aria-label="Close"
-                @click="vueUiState.panelManagerVisible = false"
+                @click="closePanel"
             >
                 <span class="material-symbols-outlined">close</span>
             </button>
@@ -18,9 +18,16 @@
 </template>
 
 <script setup lang="ts">
-import { vueUiState } from '../ui-store';
+import { ActivePanel, vueUiState } from '../ui-store';
 
 const props = defineProps<{
     title: string;
 }>();
+
+function closePanel() {
+    vueUiState.panelManagerVisible = false;
+    // Set the active panel to none
+    vueUiState.activePanel = ActivePanel.None;
+}
+
 </script>

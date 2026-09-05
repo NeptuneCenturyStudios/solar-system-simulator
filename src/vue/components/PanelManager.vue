@@ -1,5 +1,5 @@
 <template>
-    <div class="vue-ui-panel-manager vue-ui-card expanded">
+    <div class="vue-ui-panel-manager vue-ui-card expanded" :class="{ paused: simStore.isPaused }">
         <div class="vue-ui-panel-manager-toolbar">
             <div class="toolbar-group">
                 <button
@@ -99,7 +99,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ActivePanel, setActivePanel, vueUiState, openBodyEditor } from '../ui-store';
-import { requestRelaunch } from '../sim-bridge';
+import { requestRelaunch, simStore } from '../sim-bridge';
 import { showAboutModal } from '../about-modal-service';
 import SystemExplorer from '../components/SystemExplorer.vue';
 import FlightControls from '../components/FlightControls.vue';

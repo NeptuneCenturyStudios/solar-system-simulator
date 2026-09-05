@@ -1,5 +1,5 @@
 <template>
-    <div class="toolbar toolbar-bottom visible">
+    <div class="toolbar toolbar-bottom visible" :class="{ paused: simStore.isPaused }">
         <!-- Main menu button: toggles PanelManager visibility without changing the active panel -->
         <button
             class="btn toolbar-btn"
