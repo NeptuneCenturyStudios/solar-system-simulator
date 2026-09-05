@@ -146,46 +146,6 @@ h3 {
     color: var(--new-ui-btn-warning-color);
 }
 
-/* Container for all UI elements */
-#ui-container {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    align-content: flex-start;
-
-    /* Key for flexbox shrinking:
-       - flex-basis: 0 prevents the item's content height from becoming the basis
-       - ensure min-size doesn't block shrinking */
-    flex: 1 1 0;
-    min-height: 0;
-    padding: 0.5rem 0.5rem 0 0.5rem;
-    gap: 0.5rem;
-    pointer-events: none;
-    width: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-/* Main ui panels */
-.ui-panel {
-    align-self: stretch;
-    pointer-events: auto;
-    background: var(--new-ui-bg);
-    backdrop-filter: var(--new-ui-backdrop-filter);
-    padding: 1rem;
-    border-radius: var(--new-ui-border-radius);
-    border: 1px solid var(--new-ui-border);
-    box-shadow: var(--new-ui-shadow);
-    display: none;
-
-    /* Allow flexbox to actually shrink these panels when the viewport height shrinks */
-    min-height: 0;
-}
-
-.ui-panel.visible {
-    display: block;
-}
-
 /* --- Modals --- */
 .modal-overlay {
     position: fixed;
@@ -202,16 +162,6 @@ h3 {
 .modal-overlay.visible {
     display: flex;
 }
-
-/* Procedural overlay must be above Launch Control overlay during generation */
-/* #procedural-overlay {
-    z-index: 10001;
-}
-
-#procedural-overlay .modal {
-    position: relative;
-    z-index: 10002;
-} */
 
 .modal {
     width: 360px;
@@ -379,20 +329,6 @@ label {
     margin-bottom: 4px;
     color: var(--new-ui-label-color);
     text-transform: uppercase;
-}
-
-.panel-header {
-    display: flex;
-    align-items: center;
-    font-size: 1.5em;
-    font-weight: bold;
-    color: var(--new-ui-label-color);
-    text-align: start;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #224466;
-    text-transform: uppercase;
-    letter-spacing: 1px;
 }
 
 input[type='range'] {
@@ -672,32 +608,6 @@ button.btn-with-icon {
     gap: 8px;
 }
 
-.new-ui.toolbar-container {
-    position: fixed;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    gap: 0.5rem;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    /* justify-content: flex-end; */
-    height: 100%;
-
-    /* Ensure UI stays above WebGL canvas; keep modal overlays above this. */
-    z-index: 9000;
-}
-
-.ui-top {
-    display: flex;
-    flex-direction: row;
-    /* Make this top section take up all available space, pushing the bottom toolbar down */
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
-}
-
 .toolbar {
     display: none;
     gap: 0.5rem;
@@ -712,13 +622,6 @@ button.btn-with-icon {
 
 .toolbar.visible {
     display: flex;
-}
-
-.toolbar.toolbar-left {
-    flex-direction: column;
-    justify-content: flex-end;
-    /* Only margin left and top */
-    margin: 0.5rem 0 0 0.5rem;
 }
 
 .toolbar.toolbar-bottom {
@@ -1143,15 +1046,6 @@ button.btn.toolbar-btn.btn-care:focus-visible {
         align-self: flex-start;
         width: 26rem;
     }
-
-    #ui-container {
-        flex-direction: row;
-    }
-
-    .ui-panel {
-        align-self: flex-start;
-        width: 20rem;
-    }
 }
 
 /* Mobile gesture support:
@@ -1162,15 +1056,6 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     position: fixed;
     inset: 0;
     z-index: 0;
-}
-
-/* UI canvas elements (e.g. texture generator preview) must not inherit
-   the fixed full-viewport positioning applied to the WebGL canvas. */
-.ui-canvas {
-    position: static;
-    inset: auto;
-    z-index: auto;
-    touch-action: auto;
 }
 
 .loading-icon {

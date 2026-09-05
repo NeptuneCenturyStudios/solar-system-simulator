@@ -148,7 +148,6 @@ import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simula
 import { Sun } from './bodies/sun';
 import { GenericComet } from './bodies/generic-comet';
 import { Comet } from './bodies/comet';
-import { UIManager } from './ui/ui-manager';
 import { runAnimationLoop, AnimationContext } from './simulation/animation-loop';
 import { registerCustomEventListeners } from './events/custom-event-listeners';
 
@@ -486,7 +485,6 @@ function isTouchOverUI(e: TouchEvent) {
     return Boolean(
         el.closest('.vue-modal-overlay') ||
         el.closest('#vue-ui-root') ||
-        el.closest('.ui-panel') ||
         el.closest('button, input, select, textarea, label, a') ||
         el.closest('.toolbar-btn') ||
         el.closest('.old-ui')
@@ -2878,19 +2876,22 @@ function getFocusObject() {
         : null;
 }
 
-// --- UI PANEL INITIALIZATION ---
-
-// Create and initialize panels
-const uiManager = new UIManager('ui-container');
-
-uiManager.initialize();
-
 // ── Vue UI overlay (new UI, developed in parallel with the existing UI) ──
 // Wire the Vue bridge to the same control paths the old UI uses, so both UIs
 // stay in sync. `togglePause` is a hoisted function declaration defined above.
 registerVueSimHooks({
     togglePause: () => togglePause(),
-    setTimeScale: (value: number) => uiManager.emit('timeScaleChange', { value }),
+    setTimeScale: (value: number) => {
+        const newSpeed = value;
+        if (simulationState.isPaused) {
+            // When paused, update the saved value that will be used on resume
+            simulationState.savedTimeScale = newSpeed;
+        } else {
+            // When running, immediately update the speed
+            simulationState.timeScale = newSpeed;
+        }
+        dispatchSimStateChange();
+    },
     setGMultiplier: (value: number) => {
         simulationState.gMultiplier = value;
 
@@ -2902,7 +2903,10 @@ registerVueSimHooks({
     },
 
     // ── Re-launch system (shows StartupModal with Cancel enabled) ──
-    relaunch: () => uiManager.emit('reset'),
+    relaunch: () => {
+        // Auto-close management UI and show launcher with Cancel
+        void startStartupFlow({ allowCancel: true });
+    },
 
     // ── System Explorer: direct sim state ──
     toggleTargetMode: () => {
@@ -3043,27 +3047,6 @@ registerVueSimHooks({
     spawnShip: () => spawnShip(),
     toggleAutopilot,
 });
-
-// Prevent UI clicks and keyboard events from interfering with scene interaction
-const uiContainer = document.getElementById('ui-container');
-if (uiContainer) {
-    uiContainer.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-    });
-    uiContainer.addEventListener('mouseup', (e) => {
-        e.stopPropagation();
-    });
-    uiContainer.addEventListener('click', (e) => {
-        e.stopPropagation();
-    });
-    // Prevent keyboard events (WASD, etc.) from triggering camera movement when typing in UI
-    uiContainer.addEventListener('keydown', (e) => {
-        e.stopPropagation();
-    });
-    uiContainer.addEventListener('keyup', (e) => {
-        e.stopPropagation();
-    });
-}
 
 // Block pointer/wheel events from the Vue UI overlay so clicks and scrolling
 // never reach the 3D scene. (The Vue UI sits above the old toolbar/panels, so
@@ -3467,7 +3450,6 @@ const flightCtx: IFlightControlContext = {
     camera,
     renderer,
     controls,
-    uiManager,
     flightSteeringLine,
     steeringLinePositions,
     steeringEndMarker,
@@ -3691,27 +3673,6 @@ registerVueSimHooks({
         }
     },
     playlistSelectTrack: (index: number) => ambientMusic.playTrackAt(index),
-});
-
-uiManager.on('timeScaleChange', ({ value }: { value: number }) => {
-    const newSpeed = value;
-    if (simulationState.isPaused) {
-        // When paused, update the saved value that will be used on resume
-        simulationState.savedTimeScale = newSpeed;
-    } else {
-        // When running, immediately update the speed
-        simulationState.timeScale = newSpeed;
-    }
-    dispatchSimStateChange();
-});
-
-uiManager.on('pause', () => {
-    togglePause();
-});
-
-uiManager.on('reset', () => {
-    // Auto-close management UI and show launcher with Cancel
-    void startStartupFlow({ allowCancel: true });
 });
 
 // "Fly Here" button from the bodies table
@@ -4251,20 +4212,12 @@ window.addEventListener('mousemove', onMouseMove);
 window.addEventListener('mouseup', onMouseUp);
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// Allow zooming while dragging velocity arrow:
-// - Wheel scroll zooms camera (relative to selected/focus body)
-// - EXCEPT when the wheel event originates over the UI (e.g. Bodies table),
-//   in which case we allow normal scrolling and do NOT zoom the scene.
+// Wheel scroll zooms the camera (relative to selected/focus body). Wheel events
+// originating over the Vue UI (e.g. the Bodies table) never reach here — they're
+// stopped at #vue-ui-root so the UI can scroll normally without zooming the scene.
 window.addEventListener(
     'wheel',
     (e) => {
-        // If the wheel is used over the UI panel, let it scroll normally.
-        // This allows scrolling the Bodies table without zooming the scene.
-        const uiContainer = document.getElementById('ui-container');
-        if (uiContainer && e.target instanceof Node && uiContainer.contains(e.target)) {
-            return;
-        }
-
         // Disable wheel zoom while dragging gizmos (position or velocity).
         // Wheel zoom during a drag causes unstable interaction / weird cursor-plane mapping.
         if (
@@ -4752,7 +4705,6 @@ const animCtx: AnimationContext = {
     cancelAutopilot: (message?: string) => cancelAutopilot(autopilotCtx, message),
     engageAutopilot: (target: Body) => engageAutopilot(autopilotCtx, target),
     triggerZoomToBody,
-    uiManager,
 };
 
 runAnimationLoop(animCtx, flightCtx);

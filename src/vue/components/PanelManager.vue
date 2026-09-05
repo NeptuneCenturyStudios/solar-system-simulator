@@ -55,13 +55,15 @@
                     <span class="material-symbols-outlined">rocket</span>
                 </button>
 
-                <!-- <button
-                        
-                        class="btn toolbar-btn"
-                        title="Texture Generator"
-                    >
-                        <span class="material-symbols-outlined">texture</span>
-                    </button> -->
+                <button
+                    style="display: none;"
+                    class="btn toolbar-btn"
+                    :class="{ active: activePanel === ActivePanel.TextureGenerator }"
+                    title="Texture Generator"
+                    @click="setActivePanel(ActivePanel.TextureGenerator)"
+                >
+                    <span class="material-symbols-outlined">texture</span>
+                </button>
 
                 <button
                     class="btn toolbar-btn"
@@ -89,6 +91,7 @@
             <SolarSystemManagement v-if="activePanel === ActivePanel.SolarManagement" />
             <OptionsPanel v-if="activePanel === ActivePanel.Options" />
             <PlaylistPanel v-if="activePanel === ActivePanel.Playlist" />
+            <TextureGeneratorPanel v-if="activePanel === ActivePanel.TextureGenerator" />
         </div>
     </div>
 </template>
@@ -104,6 +107,7 @@ import AddEditBodyPanel from '../components/AddEditBodyPanel.vue';
 import SolarSystemManagement from '../components/SolarSystemManagement.vue';
 import OptionsPanel from '../components/OptionsPanel.vue';
 import PlaylistPanel from '../components/PlaylistPanel.vue';
+import TextureGeneratorPanel from '../components/TextureGeneratorPanel.vue';
 
 const activePanel = computed(() => vueUiState.activePanel);
 

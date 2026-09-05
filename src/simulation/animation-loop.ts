@@ -22,7 +22,6 @@ import { processWormholeInteractions } from '../physics/wormhole-collision';
 import { updateWormholeBridges } from '../effects/wormhole-link-bridge';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { settingsStore } from '../settings/settings-store';
-import { UIManager } from '../ui/ui-manager';
 import {
     absorbBody,
     chooseCollisionWinner,
@@ -139,7 +138,6 @@ export interface AnimationContext {
     cancelAutopilot: (message?: string) => void;
     engageAutopilot: (target: Body) => void;
     triggerZoomToBody: (body: Body | null) => void;
-    uiManager: UIManager;
 }
 
 // Scratch vectors for updateShipTrail (called once per ship per frame).

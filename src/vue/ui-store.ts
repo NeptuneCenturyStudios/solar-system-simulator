@@ -10,6 +10,8 @@ export enum ActivePanel {
     SolarManagement = 'solarManagement',
     /** Music Playlist panel (view/control the shuffled background-music playlist). */
     Playlist = 'playlist',
+    /** Procedural planet texture generator (dev tool, not part of normal gameplay). */
+    TextureGenerator = 'textureGenerator',
 }
 
 export interface BodyEditorState {

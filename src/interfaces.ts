@@ -13,7 +13,6 @@ import { EffectiveCSpeed, EffectiveGForce } from './types';
 import { Spaceship } from './bodies/ships/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { FlightHUD } from './drawing/flight-hud';
-import { UIManager } from './ui/ui-manager';
 import { Weapon } from './ship-effects/weapons/weapon';
 
 /**
@@ -428,9 +427,6 @@ export interface IFlightControlContext {
     camera: THREE.PerspectiveCamera;
     renderer: THREE.WebGLRenderer;
     controls: OrbitControls;
-
-    // UI
-    uiManager: UIManager;
 
     // Steering / flight UI geometry (mutable buffer / meshes created once in index.ts)
     flightSteeringLine: THREE.Line;
