@@ -104,6 +104,7 @@ import { PositionIndicatorManager } from './gizmos/position-indicator';
 import { FlightHUD } from './drawing/flight-hud';
 import { AutopilotTargetIndicator } from './drawing/autopilot-target-indicator';
 import { PlanetNameIndicator } from './drawing/planet-name-indicator';
+import { HealthBarIndicator } from './drawing/health-bar-indicator';
 import { VelocityArcManager } from './drawing/velocity-arc';
 import { OrbitPredictionManager } from './drawing/orbit-prediction';
 import { SurfaceCameraManager } from './camera/surface-camera';
@@ -744,6 +745,8 @@ const targetIndicator = new AutopilotTargetIndicator(uiScene, autopilotState, fl
 targetIndicator.init();
 
 const planetNameIndicator = new PlanetNameIndicator(uiScene, simulationState);
+
+const healthBarIndicator = new HealthBarIndicator(uiScene, simulationState);
 
 // Backward-compatible let kept for basic module-level state
 let manuallySelectedBody = null as Body | null; // Track bodies clicked in space (without camera buttons)
@@ -4671,6 +4674,7 @@ const animCtx: AnimationContext = {
     flightHUD,
     targetIndicator,
     planetNameIndicator,
+    healthBarIndicator,
     surfaceCam,
     fpsSprite: { value: fpsSprite },
     statsSprite: { value: statsSprite },

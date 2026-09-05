@@ -15,6 +15,7 @@ import { AiAvoidanceGizmo } from '../gizmos/ai-avoidance-gizmo';
 import { FlightHUD } from '../drawing/flight-hud';
 import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator';
 import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet-name-indicator';
+import { HealthBarIndicator } from '../drawing/health-bar-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
 import { Wormhole } from '../bodies/wormhole';
@@ -106,6 +107,7 @@ export interface AnimationContext {
     flightHUD: FlightHUD;
     targetIndicator: AutopilotTargetIndicator;
     planetNameIndicator: PlanetNameIndicator;
+    healthBarIndicator: HealthBarIndicator;
     surfaceCam: SurfaceCameraManager;
 
     // Sprites
@@ -716,6 +718,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             ctx.autopilotState,
             _flightHoverCtx
         );
+        ctx.healthBarIndicator.update(ctx.camera);
 
         // ── E-key autopilot charge accumulation ──────────────────────────
         if (isFlightModeActive) {
