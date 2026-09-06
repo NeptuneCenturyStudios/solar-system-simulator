@@ -65,6 +65,8 @@ import {
     C,
     EARTH_RADIUS,
     WORMHOLE_DEFAULT_RADIUS,
+    WORMHOLE_SHORTCUT_G_MULTIPLIER,
+    WORMHOLE_SHORTCUT_TIME_SCALE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -261,6 +263,7 @@ import {
 } from './utilities/url-seed';
 import { getShipTypeById } from './bodies/ships/ship-registry';
 import { TestAiShipsGenerator } from './procedural/test-ai-ships-generator';
+import { WormholeShortcutGenerator } from './procedural/wormhole-shortcut-generator';
 import { clearNpcShips, registerNpcShipsIn } from './simulation/ai/npc-manager';
 
 // --- Event notifications (replaces sprite-based event log) ---
@@ -1665,7 +1668,8 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
         mode === SimulationStartMode.Empty ||
         mode === SimulationStartMode.BlackHole ||
         mode === SimulationStartMode.Procedural ||
-        mode === SimulationStartMode.TestAiShips;
+        mode === SimulationStartMode.TestAiShips ||
+        mode === SimulationStartMode.WormholeShortcut;
 
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = !hideKuiper;
@@ -1766,6 +1770,10 @@ async function spawn(
     } else if (mode === SimulationStartMode.TestAiShips) {
         // Ship AI test bed: one star, one AI-piloted ship.
         generator = new TestAiShipsGenerator(dependencies, scene, proceduralResult?.seed);
+    } else if (mode === SimulationStartMode.WormholeShortcut) {
+        // Wormhole short-cut scenario: Earth orbits the Sun but takes a linked-wormhole
+        // short-cut on a tighter ellipse inside Mercury's orbit.
+        generator = new WormholeShortcutGenerator(dependencies, scene, proceduralResult?.seed);
     } else {
         // Empty system generator
         generator = new EmptySystemGenerator(dependencies, scene);
@@ -4420,6 +4428,15 @@ async function launchSystem(
 ) {
     applyStartupGMultiplier();
 
+    // The wormhole short-cut scenario launches at a preset gravity (and a modest time
+    // scale) so Earth's circular velocity is computed consistently at sim start and the
+    // motion is immediately watchable without an extreme time scale.
+    if (mode === SimulationStartMode.WormholeShortcut) {
+        simulationState.gMultiplier = WORMHOLE_SHORTCUT_G_MULTIPLIER;
+        simulationState.timeScale = WORMHOLE_SHORTCUT_TIME_SCALE;
+        dispatchSimStateChange();
+    }
+
     hideStartupModal();
 
     // Every launch mode except "Build your own system" runs through a
@@ -4481,6 +4498,9 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
             } else if (scenarioResult.scenario === 'testAiShips') {
                 // Fixed test bed — no seed prompt, so every run starts identically.
                 await launchSystem(SimulationStartMode.TestAiShips);
+            } else if (scenarioResult.scenario === 'wormholeShortcut') {
+                // Fixed wormhole short-cut scenario — no seed prompt.
+                await launchSystem(SimulationStartMode.WormholeShortcut);
             }
             break;
         }

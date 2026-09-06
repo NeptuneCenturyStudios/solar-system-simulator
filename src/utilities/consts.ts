@@ -5,6 +5,8 @@ export enum SimulationStartMode {
     Procedural = 3,
     /** Scenario: a bare star plus one AI-piloted ship, for testing ship AI. */
     TestAiShips = 4,
+    /** Scenario: Earth orbits the Sun but takes a linked-wormhole short-cut on a tighter ellipse. */
+    WormholeShortcut = 5,
 }
 
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===
@@ -334,6 +336,16 @@ export const WORMHOLE_FUNNEL_LENGTH_FACTOR = 1.2;
 export const WORMHOLE_FUNNEL_PARTICLE_COUNT = 25000;
 /** Distance (as a multiple of exit radius) a teleported body is pushed clear of the exit mouth. */
 export const WORMHOLE_EMERGE_BUFFER_FACTOR = 1.5;
+
+// === Wormhole Shortcut scenario ===
+// Earth orbits the Sun but takes a linked-wormhole short-cut on a tighter ellipse.
+// The shortcut gate sits at WORMHOLE_SHORTCUT_RADIUS — inside Mercury's orbit — and the
+// scenario launches with a high gravity multiplier so the motion is watchable without an
+// extreme time scale (which would destabilise the integrator). Effective lightspeed scales
+// with sqrt(gMultiplier), so these periapsis speeds stay far below the clamp.
+export const WORMHOLE_SHORTCUT_RADIUS = 220_000; // sim units (22,000,000 km / DIST_SCALE)
+export const WORMHOLE_SHORTCUT_G_MULTIPLIER = 5_000_000; // preset gravity at scenario launch
+export const WORMHOLE_SHORTCUT_TIME_SCALE = 250; // modest time scale so the orbit is watchable
 
 // === Wormhole link bridge (bezier particle curve between linked funnels) ===
 /** Number of pooled particles flowing along a linked-wormhole bridge curve. */

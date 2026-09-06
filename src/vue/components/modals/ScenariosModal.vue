@@ -25,6 +25,14 @@
                 <span class="material-symbols-outlined">smart_toy</span>
                 TEST AI SHIPS
             </button>
+            <button
+                class="old-ui btn-dark btn-with-icon"
+                type="button"
+                @click="selectScenario('wormholeShortcut')"
+            >
+                <span class="material-symbols-outlined">sync_alt</span>
+                WORMHOLE SHORTCUT
+            </button>
             <button class="old-ui btn-with-icon btn-danger" type="button" @click="onCancel">
                 <span class="material-symbols-outlined">arrow_back</span>
                 CANCEL
