@@ -134,13 +134,24 @@ export class Earth extends Planet {
      * Constructs a new Earth object with its unique properties, orbit, and cloud layer.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Earth belongs.
+     * @param angleRad Starting orbital angle in radians (0 = +X axis, π/2 = +Z axis).
+     * @param orbitDistance Radius of the circular orbit around the Sun. Defaults to Earth's
+     * real distance; scenarios may place Earth closer.
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        angleRad: number = 0,
+        orbitDistance: number = EARTH_DIST
+    ) {
         const gEff = dependencies.getG();
+        // The spin rate stays keyed to EARTH_DIST even when orbitDistance differs, so a day
+        // keeps looking like a day. Deriving it from a much tighter orbit would shorten the
+        // sim year and spin Earth into a blur.
         const timeScale =
             EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (23.934 * 3600)) * timeScale;
-        const trajectory = calculateTrajectory(gEff, EARTH_DIST, SUN_MASS, angleRad);
+        const trajectory = calculateTrajectory(gEff, orbitDistance, SUN_MASS, angleRad);
         const geometry = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
 
         const customUniforms: EarthUniforms = {

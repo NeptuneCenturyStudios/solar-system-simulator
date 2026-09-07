@@ -328,24 +328,34 @@ export const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
 export const HP_MASS_MULTIPLIER = 100;
 
 // === Wormhole tuning ===
-/** Default mouth (gate) radius for a newly created wormhole, in sim units. */
+/** Default mouth (gate) radius for a newly created wormhole, in sim units. Used for randomization range */
 export const WORMHOLE_DEFAULT_RADIUS = EARTH_RADIUS * 1.5;
 /** Visual length of the swirling funnel/tail effect, as a multiple of the mouth radius. */
 export const WORMHOLE_FUNNEL_LENGTH_FACTOR = 1.2;
 /** Number of pooled particles in the funnel vortex effect. */
 export const WORMHOLE_FUNNEL_PARTICLE_COUNT = 25000;
 /** Distance (as a multiple of exit radius) a teleported body is pushed clear of the exit mouth. */
-export const WORMHOLE_EMERGE_BUFFER_FACTOR = 1.5;
+export const WORMHOLE_EMERGE_BUFFER_FACTOR = 1.000;
 
 // === Wormhole Shortcut scenario ===
-// Earth orbits the Sun but takes a linked-wormhole short-cut on a tighter ellipse.
-// The shortcut gate sits at WORMHOLE_SHORTCUT_RADIUS — inside Mercury's orbit — and the
-// scenario launches with a high gravity multiplier so the motion is watchable without an
-// extreme time scale (which would destabilise the integrator). Effective lightspeed scales
-// with sqrt(gMultiplier), so these periapsis speeds stay far below the clamp.
-export const WORMHOLE_SHORTCUT_RADIUS = 220_000; // sim units (22,000,000 km / DIST_SCALE)
-export const WORMHOLE_SHORTCUT_G_MULTIPLIER = 5_000_000; // preset gravity at scenario launch
-export const WORMHOLE_SHORTCUT_TIME_SCALE = 250; // modest time scale so the orbit is watchable
+// Earth flies a tight circular orbit around the Sun, and a linked wormhole pair acts as a
+// literal short-cut: the two gates sit on that same orbit on exactly opposite sides of the
+// Sun, so Earth only ever traverses half the circle and its observed period is halved.
+// Both gates share WORMHOLE_SHORTCUT_ORBIT_RADIUS — that shared radius is what keeps the
+// orbit circular, since the teleport preserves speed exactly. The scenario launches with a
+// high gravity multiplier so the motion is watchable without an extreme time scale (which
+// would destabilise the integrator). Effective lightspeed scales with sqrt(gMultiplier), so
+// these orbital speeds stay far below the clamp.
+/** Radius of the circular orbit shared by Earth and both gates (10,000,000 km / DIST_SCALE). */
+export const WORMHOLE_SHORTCUT_ORBIT_RADIUS = 100_000;
+/**
+ * Mouth radius of the two short-cut gates. Capture requires the body to be strictly smaller
+ * than the mouth, and a wider mouth also tolerates more time-warp before a frame's chord bows
+ * outside it, so this is deliberately roomier than WORMHOLE_DEFAULT_RADIUS.
+ */
+export const WORMHOLE_SHORTCUT_GATE_RADIUS = EARTH_RADIUS * 3;
+export const WORMHOLE_SHORTCUT_G_MULTIPLIER = 2_500_000; // preset gravity at scenario launch
+export const WORMHOLE_SHORTCUT_TIME_SCALE = 1; // modest time scale so the orbit is watchable
 
 // === Wormhole link bridge (bezier particle curve between linked funnels) ===
 /** Number of pooled particles flowing along a linked-wormhole bridge curve. */
