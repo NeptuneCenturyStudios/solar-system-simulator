@@ -9,6 +9,8 @@ import { MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { environmentState } from '../simulation/environment-state';
+import { formatMass, formatRadius, formatSpeed } from '../utilities/display-format';
+import { C } from '../utilities/consts';
 
 /**
  * Flight speed HUD texture — drawn in the same style as the FPS counter
@@ -109,7 +111,8 @@ export function createSpeedTexture(
     ctx.shadowColor = glow;
     ctx.shadowBlur = 28;
     ctx.font = 'bold 68px monospace';
-    ctx.fillText(Math.abs(speed).toFixed(1), W - 24, hasExtra ? 140 : 172);
+    const useWarp = isWarp || isBoosting || Math.abs(speed) >= C;
+    ctx.fillText(formatSpeed(Math.abs(speed), useWarp), W - 24, hasExtra ? 140 : 172);
 
     if (hasExtra) {
         const lh = 56; // canvas-pixel line height for data rows
@@ -321,12 +324,12 @@ export function createStatsTexture(body: Body) {
     }
 
     // Mass
-    drawStat('Mass: ', formatNumber(body.mass), y);
+    drawStat('Mass: ', formatMass(body.mass), y);
     y += lineHeight;
 
     // Radius
     if (body instanceof Body) {
-        drawStat('Radius: ', formatNumber(body.radius), y);
+        drawStat('Radius: ', formatRadius(body.radius), y);
         y += lineHeight;
     }
 
@@ -366,7 +369,7 @@ export function createStatsTexture(body: Body) {
 
     // Speed (velocity magnitude)
     const speed = vel.length();
-    drawStat('Speed: ', speed.toFixed(2), y);
+    drawStat('Speed: ', formatSpeed(speed, speed >= C), y);
     y += lineHeight;
 
     // Net gravitational force (force experienced FROM other bodies, F = m * a)

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { IAutopilotState, ISimulationState } from '../interfaces';
 import { TEXT_SPRITE_Z } from '../utilities/consts';
+import { formatDistance } from '../utilities/display-format';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 const PAD = 12;
@@ -263,7 +264,7 @@ export class PlanetNameIndicator {
 
             const uiX = v.nx * (window.innerWidth / 2);
             const uiY = v.ny * (window.innerHeight / 2);
-            const distLabel = `${Math.round(v.dist).toLocaleString()} u`;
+            const distLabel = formatDistance(v.dist);
 
             if (showEta) {
                 const closingSpeed = computeClosingSpeed(
@@ -294,7 +295,7 @@ export class PlanetNameIndicator {
                 const uiX = this._scratch.x * (window.innerWidth / 2);
                 const uiY = this._scratch.y * (window.innerHeight / 2);
                 const dist = camera.position.distanceTo(hoveredBody.mesh.position);
-                const distLabel = `${Math.round(dist).toLocaleString()} u`;
+                const distLabel = formatDistance(dist);
                 const canvasResized = this.drawPanel(
                     this._hoverEntry,
                     hoveredBody.name,

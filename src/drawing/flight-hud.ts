@@ -5,6 +5,7 @@ import {
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
     TEXT_SPRITE_Z,
 } from '../utilities/consts';
+import { formatDistance } from '../utilities/display-format';
 import { IAutopilotState } from '../interfaces';
 
 export type AutopilotHudState =
@@ -545,7 +546,7 @@ export class FlightHUD {
                     const orbitRadius =
                         this.autopilotState.targetBody.radius * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
                     const distToOrbit = Math.max(0, rawDist - orbitRadius);
-                    distLabel = `Distance to target: ${Math.round(distToOrbit).toLocaleString()} u`;
+                    distLabel = `Distance to target: ${formatDistance(distToOrbit)}`;
                 }
             }
 

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { IAutopilotState } from '../interfaces';
 import { AUTOPILOT_ORBIT_ALTITUDE_FACTOR, TEXT_SPRITE_Z } from '../utilities/consts';
+import { formatDistance } from '../utilities/display-format';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Canvas + context reused forever (resized dynamically)
@@ -316,7 +317,7 @@ export class AutopilotTargetIndicator {
             const orbitRadius = target.radius * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
             const distToOrbit = Math.max(0, rawDist - orbitRadius);
 
-            distLabel = `${Math.round(distToOrbit).toLocaleString()} u`;
+            distLabel = formatDistance(distToOrbit);
 
             const closingSpeed = computeClosingSpeed(ship, target);
             etaLabel = closingSpeed > 0.001 ? formatETA(distToOrbit / closingSpeed) : 'ETA: ∞';
