@@ -32,8 +32,8 @@ export const BASE_TIME_SCALE = Math.sqrt(DIST_SCALE ** 3 / MASS_SCALE);
 export const USER_TIME_MULTIPLIER = 1 / BASE_TIME_SCALE;
 // 3. Final TIME_SCALE used in dt
 export const TIME_SCALE = BASE_TIME_SCALE * USER_TIME_MULTIPLIER; // ≈ 1
-export const G = 6.6743e-20 * (MASS_SCALE / DIST_SCALE ** 3) * G_SCALE; //0.00408; // 6.67430e-20; // km^3 / kg / s^2 //
-export const C = 299792.458 / DIST_SCALE; // * Math.sqrt(G_SCALE) Speed of light in vacuum (units/s)
+export const G = 6.6743e-20 * (MASS_SCALE / DIST_SCALE ** 3) * G_SCALE; // km^3 / kg / s^2 //
+export const C = 299792.458 / DIST_SCALE; // Speed of light
 
 // === Planetary System: Mass ===
 // Masses use: (real-world mass in kg / MASS_SCALE)
