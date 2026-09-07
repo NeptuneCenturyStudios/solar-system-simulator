@@ -3,7 +3,7 @@ import { Star, IStarCreationOptions } from './star';
 import { IStateDependencies, ISiphonTarget, IMassTransferBody, IDeathOptions } from '../interfaces';
 import { loadSrgbTexture } from '../drawing/textures';
 import { IRotation } from '../interfaces';
-import { SCALE_FACTOR, SUN_MASS, EARTH_DIST, DIST_SCALE } from '../utilities/consts';
+import { SUN_MASS, EARTH_DIST, DIST_SCALE } from '../utilities/consts';
 import { PulsarBeam } from '../effects/pulsar-beam';
 import { StarGlow } from '../effects/star-glow';
 import { AccretionDiskEffect, PULSAR_DISK_COLORS } from '../effects/accretion-disk';
@@ -23,7 +23,7 @@ import { BodyTypeEnum } from './body-enums';
  * This is considerably more compressed than a white dwarf (base 8 × SCALE_FACTOR)
  * but still larger than a stellar black hole (~1 × SCALE_FACTOR).
  */
-const PULSAR_BASE_RADIUS = (10 / DIST_SCALE) * SCALE_FACTOR;
+const PULSAR_BASE_RADIUS = 10 / DIST_SCALE;
 
 /**
  * Computes the radius of a neutron star for a given mass.
@@ -35,7 +35,7 @@ function massToNeutronStarRadius(mass: number): number {
 
 const PULSAR_TEMPERATURE = 1_000_000;
 const PULSAR_LIGHT_INTENSITY = 1_000_000_000;
-const PULSAR_LIGHT_DISTANCE = 1_000_000 * SCALE_FACTOR;
+const PULSAR_LIGHT_DISTANCE = 100_000_000 / DIST_SCALE; // ~100 million units, scaled to solar system size
 
 /**
  * Minimum / maximum spin rates for visual clarity (radians per sim-second).
@@ -280,7 +280,7 @@ export class Pulsar extends Star implements IMassTransferBody {
                 star.setMass(Math.max(0, star.mass - transfer));
                 totalTransfer += transfer;
                 if (star.fuel !== null) {
-                    star.fuel = Math.max(0, star.fuel - transfer * 100000 * SCALE_FACTOR);
+                    star.fuel = Math.max(0, star.fuel - transfer * 100000);
                 }
             }
 

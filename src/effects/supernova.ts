@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
 
-import { SCALE_FACTOR } from '../utilities/consts';
-
 export class Supernova implements IEffect {
     // Cooldown fade factor per frame (tweakable)
     static readonly COOLDOWN_FADE = 0.9998;
@@ -83,7 +81,7 @@ export class Supernova implements IEffect {
                 vz += (Math.random() - 0.5) * 0.4;
 
                 // Randomize speed scaling per axis for more chaos
-                const speed = (Math.random() * 180 + 80) * SCALE_FACTOR; // Increased max speed and scaled
+                const speed = Math.random() * 180 + 80; // Increased max speed and scaled
                 const v = new THREE.Vector3(
                     vx * (1 + (Math.random() - 0.5) * 0.2),
                     vy * (1 + (Math.random() - 0.5) * 0.2),
@@ -119,7 +117,7 @@ export class Supernova implements IEffect {
                 vz += (Math.random() - 0.5) * 0.7;
 
                 // Randomize speed scaling per axis for more chaos
-                const speed = (Math.random() * 1500 + 600) * SCALE_FACTOR; // Increased max speed and scaled
+                const speed = Math.random() * 1500 + 600; // Increased max speed and scaled
                 const v = new THREE.Vector3(
                     vx * (1 + (Math.random() - 0.5) * 0.3),
                     vy * (1 + (Math.random() - 0.5) * 0.3),

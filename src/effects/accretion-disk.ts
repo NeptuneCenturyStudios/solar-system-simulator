@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
-import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA, SCALE_FACTOR } from '../utilities/consts';
+import { MIN_PARTICLE_ALPHA, MAX_PARTICLE_ALPHA } from '../utilities/consts';
 import { settingsStore } from '../settings/settings-store';
 
 /** Color pair defining the gradient from the hot inner edge to the cool outer edge. */
@@ -258,7 +258,7 @@ export class AccretionDiskEffect implements IEffect {
             colors[i * 3 + 2] = inner.b + (outer.b - inner.b) * tClamped;
 
             // If particle reaches the inner edge, hand off and deactivate.
-            if (newRadius < this._hostRadius + 2 * SCALE_FACTOR) {
+            if (newRadius < this._hostRadius + 2) {
                 const up = Math.random() < 0.5 ? 1 : -1;
                 this._onParticleConsumed(up);
                 state.activeFlags[i] = 0;
@@ -414,7 +414,7 @@ export class AccretionDiskEffect implements IEffect {
 
         angularPositions[slot] = angle;
 
-        const inwardSpeed = (2 + Math.random() * 0.1) * SCALE_FACTOR;
+        const inwardSpeed = 2 + Math.random() * 0.1;
         const orbitalSpeed = Math.sqrt(this._hostMass / maxRadius) * 0.005;
         vels[slot] = { inward: inwardSpeed, orbital: orbitalSpeed, radius: maxRadius };
 

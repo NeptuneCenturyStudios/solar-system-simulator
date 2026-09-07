@@ -5,10 +5,7 @@ import { Earth } from '../bodies/earth';
 import { Wormhole } from '../bodies/wormhole';
 import { createBridgeForPair } from '../effects/wormhole-link-bridge';
 import { createUniqueId, generateIAUName } from '../utilities/utilities';
-import {
-    WORMHOLE_SHORTCUT_GATE_RADIUS,
-    WORMHOLE_SHORTCUT_ORBIT_RADIUS,
-} from '../utilities/consts';
+import { WORMHOLE_SHORTCUT_GATE_RADIUS, WORMHOLE_SHORTCUT_ORBIT_RADIUS } from '../utilities/consts';
 import { pickRandomSpaceTexture, generateSeedString } from './seed-utils';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import type { Body } from '../bodies/body';

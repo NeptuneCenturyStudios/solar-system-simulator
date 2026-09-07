@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Body } from '../body';
-import { SCALE_FACTOR } from '../../utilities/consts.js';
 import { IShipEffect } from '../../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../../ship-effects/ship-flame.js';
 import { BodyTypeEnum } from '../body-enums';
@@ -26,8 +25,6 @@ import {
     AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN,
 } from '../../utilities/consts';
 import { triggerScreenFlash } from '../../effects/screen-flash';
-
-const SF = SCALE_FACTOR / SCALE_FACTOR;
 
 /**
  * Player-controllable spaceship body.
@@ -248,8 +245,8 @@ export class Spaceship extends Body {
         this.shipTypeId = options.shipTypeId;
 
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
-        this.cockpitOffset = new THREE.Vector3(0, 0.3 * SF, 0.52 * SF);
-        this.thrusterOffset = new THREE.Vector3(0, -0.1 * SF, -0.9 * SF);
+        this.cockpitOffset = new THREE.Vector3(0, 0.3, 0.52);
+        this.thrusterOffset = new THREE.Vector3(0, -0.1, -0.9);
 
         // Subclasses may supply explicit camera offsets. The chase-cam offset is
         // used as-is; an explicit cockpit offset is kept and skipped by

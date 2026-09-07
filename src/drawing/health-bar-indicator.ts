@@ -74,20 +74,13 @@ export class HealthBarIndicator {
         for (let i = 0; i < visible.length; i++) {
             const v = visible[i];
             const entry = this.pool[i];
-            const fraction = Math.max(
-                0,
-                Math.min(1, v.body.healthPoints / v.body.maxHealthPoints)
-            );
+            const fraction = Math.max(0, Math.min(1, v.body.healthPoints / v.body.maxHealthPoints));
 
             this.drawBar(entry, fraction);
             entry.texture.needsUpdate = true;
 
             entry.sprite.scale.set(SPRITE_W, SPRITE_H, 1);
-            entry.sprite.position.set(
-                v.uiX,
-                v.uiY + v.apparentR + SPRITE_H / 2 + 6,
-                TEXT_SPRITE_Z
-            );
+            entry.sprite.position.set(v.uiX, v.uiY + v.apparentR + SPRITE_H / 2 + 6, TEXT_SPRITE_Z);
             entry.sprite.visible = true;
         }
     }

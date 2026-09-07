@@ -29,5 +29,4 @@ function closePanel() {
     // Set the active panel to none
     vueUiState.activePanel = ActivePanel.None;
 }
-
 </script>

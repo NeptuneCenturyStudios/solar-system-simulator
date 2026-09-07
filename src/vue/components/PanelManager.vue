@@ -56,7 +56,7 @@
                 </button>
 
                 <button
-                    style="display: none;"
+                    style="display: none"
                     class="btn toolbar-btn"
                     :class="{ active: activePanel === ActivePanel.TextureGenerator }"
                     title="Texture Generator"

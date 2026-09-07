@@ -35,7 +35,6 @@ declare global {
 
 // Import all consts
 import {
-    SCALE_FACTOR,
     G,
     SUN_MASS,
     PLUTO_DIST,
@@ -205,10 +204,7 @@ const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 scene.add(ambientLight);
 
 // --- Camera and renderer setup ---
-const CAMERA_FAR_PLANE =
-    PLUTO_DIST +
-    (300_000_000 / DIST_SCALE) * SCALE_FACTOR +
-    (2_000_000_000 / DIST_SCALE) * SCALE_FACTOR;
+const CAMERA_FAR_PLANE = PLUTO_DIST + 300_000_000 / DIST_SCALE + 2_000_000_000 / DIST_SCALE;
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
@@ -383,7 +379,7 @@ steeringOriginMarker.visible = false;
 uiScene.add(steeringOriginMarker);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-camera.position.set(INITIAL_CAMERA_DISTANCE, 12018 * SCALE_FACTOR, INITIAL_CAMERA_DISTANCE); // Scaled for new world size
+camera.position.set(INITIAL_CAMERA_DISTANCE, SUN_RADIUS * 3, INITIAL_CAMERA_DISTANCE); // Scaled for new world size
 // Start in "center scene" orbit mode (NONE_FOCUS_POSITION is defined later)
 controls.target.set(0, 0, 0);
 controls.update();
@@ -942,7 +938,7 @@ const dragLine = new THREE.Line(lineGeo, lineMat);
 dragLine.visible = false;
 scene.add(dragLine);
 
-function getNearCameraSpawnPos(offset = 500 * SCALE_FACTOR): THREE.Vector3 {
+function getNearCameraSpawnPos(offset = 500): THREE.Vector3 {
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     return camera.position.clone().add(dir.multiplyScalar(offset));
@@ -2819,7 +2815,7 @@ function calcFitDistanceForBody(body: Body | null) {
     const minDist = radius * 2.2;
     const maxDist = MAX_ZOOM_OUT_DISTANCE;
     const worldRadius = radius;
-    const farMargin = Math.max(worldRadius * 2, radius * 20, 100000 * SCALE_FACTOR);
+    const farMargin = Math.max(worldRadius * 2, radius * 20, 10_000_000 / DIST_SCALE);
     return THREE.MathUtils.clamp(dist, minDist, Math.min(maxDist, farMargin));
 }
 
@@ -3133,11 +3129,7 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
             : 0;
     const farLimit = Math.min(
         MAX_CAMERA_VIEW_DISTANCE,
-        Math.max(
-            targetDistance * 2,
-            targetDistance + (5_000_000_000 / DIST_SCALE) * SCALE_FACTOR,
-            maxDist
-        )
+        Math.max(targetDistance * 2, targetDistance + 5_000_000_000 / DIST_SCALE, maxDist)
     );
 
     // Never let zoom collapse the camera into the pivot. When there's a real
@@ -3273,10 +3265,8 @@ registerVueSimHooks({
             inclination,
             tilt: rotation?.tilt ?? 0,
             azimuth: rotation?.azimuth ?? 0,
-colorHex: toHexColor(colorValue),
-            tailColorHex: isCometBody
-                ? toHexColor((body as unknown as Comet).tailColor)
-                : null,
+            colorHex: toHexColor(colorValue),
+            tailColorHex: isCometBody ? toHexColor((body as unknown as Comet).tailColor) : null,
         };
     },
     createBody: (payload) => {

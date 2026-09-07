@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
-import { SCALE_FACTOR } from '../utilities/consts.js';
 
 /** Maximum number of recorded path positions kept in the ring buffer. */
 const MAX_HISTORY = 300;
@@ -11,7 +10,7 @@ const MAX_SEGMENTS = MAX_HISTORY - 1;
 /** How long (sim-seconds) each recorded point persists before expiring from the tail. */
 const TRAIL_LIFETIME = 2.5;
 /** Minimum world-unit gap between consecutive recorded nozzle positions. */
-const MIN_DIST = 0.5 * SCALE_FACTOR;
+const MIN_DIST = 0.5;
 
 /**
  * Architecture:

@@ -5,7 +5,6 @@ import { NotificationType } from '../event-log/event-log';
 import { loadSrgbTexture } from '../drawing/textures';
 import { createUniqueId } from '../utilities/utilities';
 import {
-    SCALE_FACTOR,
     PLUTO_DIST,
     BROWN_DWARF_MASS_THRESHOLD,
     MIN_BLACK_HOLE_MASS,
@@ -74,7 +73,7 @@ export class MainSequenceStar extends Star {
         this.initialRadius = options.radius;
         this.initialColor = this.baseColor.clone();
 
-        this.maxFuel = options.mass * 100000 * SCALE_FACTOR;
+        this.maxFuel = options.mass * 100000;
         this.fuel = this.maxFuel;
 
         this.isBecomingWhiteDwarf = false;
@@ -497,7 +496,7 @@ export class MainSequenceStar extends Star {
         this.bodyType &= ~BodyTypeEnum.BrownDwarf;
 
         // Restore fuel proportional to current mass.
-        this.maxFuel = this.mass * 100000 * SCALE_FACTOR;
+        this.maxFuel = this.mass * 100000;
         this.fuel = this.maxFuel;
 
         // Restore corona.

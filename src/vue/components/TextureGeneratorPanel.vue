@@ -2,7 +2,12 @@
     <PanelBase title="Texture Generator">
         <div class="texture-gen-scroll">
             <div class="texture-gen-preview-frame">
-                <canvas ref="previewCanvas" class="texture-gen-preview-canvas" width="512" height="256" />
+                <canvas
+                    ref="previewCanvas"
+                    class="texture-gen-preview-canvas"
+                    width="512"
+                    height="256"
+                />
                 <div v-if="previewLoading" class="texture-gen-preview-loading">
                     <span class="material-symbols-outlined loading-icon">progress_activity</span>
                     Generating…
@@ -203,7 +208,8 @@
 
             <div class="control-group">
                 <label
-                    >Storm Size <span class="val-display">{{ params.stormSize.toFixed(2) }}</span></label
+                    >Storm Size
+                    <span class="val-display">{{ params.stormSize.toFixed(2) }}</span></label
                 >
                 <div class="slider-row">
                     <input
@@ -219,7 +225,8 @@
 
             <div class="control-group">
                 <label
-                    >Contrast <span class="val-display">{{ params.contrast.toFixed(1) }}</span></label
+                    >Contrast
+                    <span class="val-display">{{ params.contrast.toFixed(1) }}</span></label
                 >
                 <div class="slider-row">
                     <input

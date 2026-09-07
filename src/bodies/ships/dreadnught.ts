@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Spaceship } from './spaceship';
 import { ISpaceshipHandling } from '../../interfaces';
-import { C, MASS_SCALE, RADIUS_SCALE, SCALE_FACTOR } from '../../utilities/consts';
+import { C, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
 import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
 
@@ -16,8 +16,8 @@ export class Dreadnaught extends Spaceship {
         velocity: THREE.Vector3,
         id: string
     ) {
-        const SPACESHIP_MASS = (40_000_000 / MASS_SCALE) * SCALE_FACTOR;
-        const SPACESHIP_RADIUS = (2 / RADIUS_SCALE) * SCALE_FACTOR;
+        const SPACESHIP_MASS = 40_000_000 / MASS_SCALE;
+        const SPACESHIP_RADIUS = 2 / RADIUS_SCALE;
 
         // Camera placement (ship-local space; +Z = forward, +Y = up). Tune these to
         // adjust how the chase cam frames the destroyer.

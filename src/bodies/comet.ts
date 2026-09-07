@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { DEFAULT_COMET_TAIL_COLOR, SCALE_FACTOR } from '../utilities/consts.js';
+import { DEFAULT_COMET_TAIL_COLOR } from '../utilities/consts.js';
 import { BodyTypeEnum } from './body-enums.js';
 import { CelestialBody } from './celestial-body';
 import { ICometCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces.js';
@@ -39,11 +39,7 @@ export abstract class Comet extends CelestialBody {
      * @param options Creation options for the comet.
      * @param material The material used for rendering the comet nucleus.
      */
-    constructor(
-        deps: IStateDependencies,
-        scene: THREE.Scene,
-        options: ICometCreationOptions
-    ) {
+    constructor(deps: IStateDependencies, scene: THREE.Scene, options: ICometCreationOptions) {
         super(
             deps,
             scene,
@@ -289,7 +285,7 @@ float alpha = vLife * strength;`
         // Intensity reference: full tail at Earth-orbit distance (~1.5e8 km)^2 = 2.25e16.
         // Apply the inverse square law.
         //2.25e16
-        const tailIntensity = Math.min(1, (10000 * SCALE_FACTOR) / distToSunSq);
+        const tailIntensity = Math.min(1, 10000 / distToSunSq);
 
         // Direction away from sun (normalized once)
         const invDistToSun = 1 / distToSun;
@@ -301,9 +297,9 @@ float alpha = vLife * strength;`
         // baseTailLength=3500  → ~500,000 km base tail (always present)
         // intensityBonus=35000 → up to ~5,000,000 km extra near perihelion (Earth-orbit)
         // velocityBonus        → small extra length proportional to comet speed
-        const baseTailLength = 3500 * SCALE_FACTOR;
-        const intensityBonus = tailIntensity * 2 * SCALE_FACTOR;
-        const velocityBonus = cometSpeed * 1 * SCALE_FACTOR;
+        const baseTailLength = 3500;
+        const intensityBonus = tailIntensity * 2;
+        const velocityBonus = cometSpeed * 1;
         const targetTailLength = baseTailLength + intensityBonus + velocityBonus;
 
         // Convert tail length to life increment
@@ -311,7 +307,7 @@ float alpha = vLife * strength;`
         const lifeIncrement = (avgParticleSpeed * 60) / targetTailLength;
 
         const dtScaled = Math.abs(dt) * 120;
-        const spread = this.radius * 3 * SCALE_FACTOR;
+        const spread = this.radius * 3;
 
         // Nucleus world position — read once outside the loop (float64, exact).
         const nx = this.mesh.position.x,

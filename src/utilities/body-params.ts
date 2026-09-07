@@ -8,7 +8,6 @@
 import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { blackHoleMassToEventHorizonRadius } from '../physics/physics';
 import {
-    SCALE_FACTOR,
     SUN_MASS,
     SUN_RADIUS,
     STAR_LIGHT_INTENSITY_MIN,
@@ -117,7 +116,7 @@ export function randomStarParams(
         : minMass * Math.pow(maxMass / minMass, rng.next());
 
     const minRadius = SUN_RADIUS * 0.15;
-    const maxRadius = 200000 * SCALE_FACTOR;
+    const maxRadius = SUN_RADIUS * 100;
     const computedRadius = calculateStarRadius(mass, SUN_MASS, SUN_RADIUS);
     const radius = isFinitePositiveNumber(opts.radius)
         ? opts.radius

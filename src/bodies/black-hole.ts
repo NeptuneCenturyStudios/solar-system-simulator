@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SCALE_FACTOR, SUN_MASS, EARTH_DIST } from '../utilities/consts.js';
+import { SUN_MASS, EARTH_DIST } from '../utilities/consts.js';
 import { CelestialBody } from './celestial-body';
 import { IRotation } from '../interfaces';
 import { IStateDependencies, ISiphonTarget, IMassTransferBody } from '../interfaces.js';
@@ -29,14 +29,14 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
         // "Compress" a star's mass into a tiny sphere.
         // Baseline: at 3 solar masses, radius ~= 1 (much smaller than Earth in our sim units).
         const BASE_MASS = 3 * SUN_MASS;
-        const BASE_RADIUS = 1 * SCALE_FACTOR;
+        const BASE_RADIUS = 1;
 
         // Constant-density approximation: radius scales with the cube root of mass.
         // This keeps black holes visually small while still allowing growth via absorption.
         const r = BASE_RADIUS * Math.cbrt(Math.max(0, mass) / BASE_MASS);
 
         // Clamp to avoid degenerate geometry / rendering issues.
-        return Math.max(0.25 * SCALE_FACTOR, r);
+        return Math.max(0.25, r);
     }
 
     constructor(
@@ -319,9 +319,9 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
                 totalTransfer += transfer;
 
                 // Fuel drain uses the same ratio as Star's initial fuel assignment:
-                //   maxFuel = mass * 100000 * SCALE_FACTOR
+                //   maxFuel = mass * 100000
                 if (star.fuel !== null) {
-                    star.fuel = Math.max(0, star.fuel - transfer * 100000 * SCALE_FACTOR);
+                    star.fuel = Math.max(0, star.fuel - transfer * 100000);
                 }
             }
 

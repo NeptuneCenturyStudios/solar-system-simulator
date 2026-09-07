@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { LogMethods, NotificationType } from '../event-log/event-log';
 import {
-    SCALE_FACTOR,
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_BLOCKED_NOTIFY_DURATION,
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
@@ -126,7 +125,7 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
 
         const shipRadius0 =
             typeof ship0.radius === 'number' && isFinite(ship0.radius) ? ship0.radius : 0;
-        const padding0 = 0.5 * SCALE_FACTOR;
+        const padding0 = 0.5;
 
         for (const other of simulationState.bodies) {
             if (!other || other._isDisposed) continue;

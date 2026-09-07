@@ -1,9 +1,5 @@
 <template>
-    <div
-        v-show="vueUiState.systemReady"
-        class="vue-ui-shell gap-3"
-        
-    >
+    <div v-show="vueUiState.systemReady" class="vue-ui-shell gap-3">
         <PanelManager v-show="vueUiState.panelManagerVisible" />
 
         <div class="vue-ui-toolbar-slot">
@@ -28,5 +24,4 @@ import ScenariosModal from './components/modals/ScenariosModal.vue';
 import AboutModal from './components/modals/AboutModal.vue';
 
 import { vueUiState } from './ui-store';
-
 </script>
