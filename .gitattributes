@@ -1,0 +1,15 @@
+# Normalize line endings for every text file to LF, both in the repository and
+# in the working tree.
+#
+# Prettier writes LF (its default), so on Windows — where core.autocrlf=true
+# checks files out as CRLF — every `npm run format` rewrote the line endings of
+# every file in the repo on disk. Pinning the working tree to LF makes format
+# runs a no-op for files that did not actually change, and overrides whatever
+# core.autocrlf each developer has set locally.
+* text=auto eol=lf
+
+# Binary assets — never normalize, never diff as text.
+*.jpg binary
+*.png binary
+*.mp3 binary
+*.wav binary
