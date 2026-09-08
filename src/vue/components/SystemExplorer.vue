@@ -71,7 +71,7 @@
 
         <div class="vue-ui-body-list" role="listbox" aria-label="Celestial objects">
             <p v-if="filteredBodies.length === 0" class="vue-ui-empty">
-                No objects yet — launch a system first.
+                No objects - add a new object or launch a system.
             </p>
             <div
                 v-for="body in filteredBodies"

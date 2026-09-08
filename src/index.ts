@@ -4435,7 +4435,7 @@ async function launchSystem(
     // Every launch mode except "Build your own system" runs through a
     // generator, so show the progress overlay while it works.
     const progressReporter =
-        mode === SimulationStartMode.Empty ? undefined : showProceduralProgress();
+        mode === SimulationStartMode.Empty ? undefined : showProceduralProgress({'title': 'Generate System'});
     await spawn(mode, proceduralResult, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
     if (progressReporter) hideProceduralModal();
