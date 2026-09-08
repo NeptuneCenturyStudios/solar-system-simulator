@@ -86,6 +86,18 @@ export const URANUS_DIST = 2870990000 / DIST_SCALE;
 export const NEPTUNE_DIST = 4504000000 / DIST_SCALE;
 export const PLUTO_DIST = 5906380000 / DIST_SCALE;
 
+// === Pluto: Orbital Elements (J2000) ===
+// Pluto's orbit is the most eccentric and most inclined of the major bodies, so it is modelled
+// from real orbital elements rather than the flat circular orbit used for the other planets.
+// PLUTO_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
+export const PLUTO_PERIHELION_DIST = 4436820000 / DIST_SCALE; // 29.658 AU
+export const PLUTO_APHELION_DIST = 7375930000 / DIST_SCALE; // 49.305 AU
+export const PLUTO_INCLINATION = 17.16; // degrees, relative to the ecliptic
+export const PLUTO_LONG_ASC_NODE = 110.299; // degrees, longitude of the ascending node (Ω)
+export const PLUTO_ARG_PERIHELION = 113.834; // degrees, argument of perihelion (ω)
+// Real mean anomaly at epoch is 14.53°, but the generator places Pluto at a random true anomaly
+// instead, matching how the other planets and Halley are seeded.
+
 // === Planetary System: Rotation Axis (degrees) ===
 export const SUN_AXIS = 7.25;
 export const MERCURY_AXIS = 0.034;

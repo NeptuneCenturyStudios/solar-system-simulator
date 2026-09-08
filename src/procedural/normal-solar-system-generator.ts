@@ -368,7 +368,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         report({ phase: 'planets', label: `Neptune ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Pluto
+        // Pluto — random true anomaly preserves the eccentric, inclined orbit shape
         bodies.push(new Pluto(this.dependencies, this.scene, randomAngle()));
         completed++;
         report({ phase: 'planets', label: `Pluto ${completed}/${totalBodies}` });

@@ -61,6 +61,76 @@ export function safeUnitCross(a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3
 }
 
 /**
+ * Converts classical Keplerian orbital elements into position and velocity state vectors.
+ *
+ * Reference plane and angle convention match {@link calculateTrajectory} in physics.ts:
+ * the reference (ecliptic) plane is XZ and angles are measured from +X toward +Z, which is
+ * the direction of motion. Note this means the orbit normal is -Y, not +Y.
+ *
+ * @param semiMajorAxis  Semi-major axis `a`, in simulation distance units
+ * @param eccentricity   Eccentricity `e` (0 = circular, <1 = elliptical)
+ * @param inclinationRad Inclination `i` relative to the reference plane
+ * @param longitudeAscendingNodeRad Longitude of the ascending node `Ω`
+ * @param argumentOfPeriapsisRad    Argument of periapsis `ω`, measured from the ascending node
+ * @param trueAnomalyRad Position along the orbit `ν`, measured from periapsis (0 = periapsis)
+ * @param mu             Standard gravitational parameter — effective G × parent mass
+ */
+export function stateVectorsFromElements(params: {
+    semiMajorAxis: number;
+    eccentricity: number;
+    inclinationRad: number;
+    longitudeAscendingNodeRad: number;
+    argumentOfPeriapsisRad: number;
+    trueAnomalyRad: number;
+    mu: number;
+}): { pos: THREE.Vector3; vel: THREE.Vector3 } {
+    const {
+        semiMajorAxis,
+        eccentricity: ecc,
+        inclinationRad,
+        longitudeAscendingNodeRad: raan,
+        argumentOfPeriapsisRad: argPe,
+        trueAnomalyRad: nu,
+        mu,
+    } = params;
+
+    // Semi-latus rectum
+    const p = semiMajorAxis * (1 - ecc * ecc);
+
+    // --- Perifocal basis, built in the reference plane then tilted about the node line ---
+    // Node line: direction from the focus toward the ascending node.
+    const nodeDir = new THREE.Vector3(Math.cos(raan), 0, Math.sin(raan));
+    // ê_p: toward periapsis. ê_q: 90° ahead of periapsis in the direction of motion.
+    const pAxis = new THREE.Vector3(Math.cos(raan + argPe), 0, Math.sin(raan + argPe));
+    const qAxis = new THREE.Vector3(
+        Math.cos(raan + argPe + Math.PI / 2),
+        0,
+        Math.sin(raan + argPe + Math.PI / 2)
+    );
+
+    // Tilt the orbital plane about the node line. The angle is NEGATED because
+    // applyAxisAngle is right-handed while this simulation's orbit normal is -Y — a positive
+    // right-handed rotation would send the body *descending* through its ascending node.
+    pAxis.applyAxisAngle(nodeDir, -inclinationRad).normalize();
+    qAxis.applyAxisAngle(nodeDir, -inclinationRad).normalize();
+
+    // --- Kepler position and velocity at the given true anomaly ---
+    const r = p / (1 + ecc * Math.cos(nu));
+
+    const pos = new THREE.Vector3()
+        .addScaledVector(pAxis, r * Math.cos(nu))
+        .addScaledVector(qAxis, r * Math.sin(nu));
+
+    // Perifocal velocity: v = sqrt(mu/p) * [-sin(ν) ê_p + (e + cos(ν)) ê_q]
+    const velScale = Math.sqrt(mu / p);
+    const vel = new THREE.Vector3()
+        .addScaledVector(pAxis, -velScale * Math.sin(nu))
+        .addScaledVector(qAxis, velScale * (ecc + Math.cos(nu)));
+
+    return { pos, vel };
+}
+
+/**
  * Computes centre-of-mass binary orbit placements for two bodies.
  * Both bodies orbit their shared barycentre; their positions and velocities
  * are expressed relative to the origin (0,0,0).
