@@ -111,12 +111,12 @@ export class Pulsar extends Star implements IMassTransferBody {
         const mesh = new THREE.Mesh(geometry, material);
 
         const options: IStarCreationOptions = {
-            pos,
+            pos: pos,
             vel: new THREE.Vector3(0, 0, 0),
-            mass,
+            mass: mass,
             radius: pulsarRadius,
-            id,
-            name,
+            id: id,
+            name: name,
             temperature: PULSAR_TEMPERATURE,
             lightIntensity: PULSAR_LIGHT_INTENSITY,
             lightDistance: PULSAR_LIGHT_DISTANCE,

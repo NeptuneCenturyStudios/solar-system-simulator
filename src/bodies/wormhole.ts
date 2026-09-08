@@ -4,8 +4,6 @@ import { BodyTypeEnum } from './body-enums';
 import { IDeathOptions, IRotation, IStateDependencies } from '../interfaces';
 import { WormholeFunnelEffect } from '../effects/wormhole-funnel';
 
-const WORMHOLE_COLOR = 0x8844ff;
-
 /**
  * Builds the gate mesh: a flat, invisible disk. The mesh's position/quaternion define the
  * wormhole's entrance plane and normal (geometry rotated so its normal is local +Y, matching
@@ -49,19 +47,19 @@ export class Wormhole extends StaticBody {
         super(
             dependencies,
             scene,
-            radius,
-            WORMHOLE_COLOR,
-            pos,
-            new THREE.Vector3(0, 0, 0),
-            0, // mass — a wormhole exerts no gravity on other bodies
-            id,
-            name,
-            BodyTypeEnum.Wormhole,
-            WORMHOLE_COLOR,
-            0, // maxTrail — a stationary gate has no orbit trail
-            false,
-            rotation,
-            mesh
+            {
+                radius: radius,
+                pos: pos,
+                vel: new THREE.Vector3(0, 0, 0),
+                mass: 0, // mass — a wormhole exerts no gravity on other bodies
+                id: id,
+                name: name,
+                maxTrail: 0, // maxTrail — a stationary gate has no orbit trail
+                hasRings: false,
+                rotation: rotation,
+                mesh: mesh,
+            },
+            BodyTypeEnum.Wormhole
         );
 
         if (this.trail) this.trail.visible = false;

@@ -13,20 +13,21 @@ export class Satellite extends CelestialBody {
         super(
             dependencies,
             scene,
-            options.radius,
-            0xffffff,
-            options.pos,
-            options.vel,
-            options.mass,
-            options.id,
-            options.name,
-            BodyTypeEnum.Satellite,
-            options.trailColor,
-            options.maxTrail,
-            false,
-            options.rotation,
-            options.mesh,
-            options.tidalLock
+            {
+                radius: options.radius,
+                pos: options.pos,
+                vel: options.vel,
+                mass: options.mass,
+                id: options.id,
+                name: options.name,
+                trailColor: options.trailColor,
+                maxTrail: options.maxTrail,
+                hasRings: false,
+                rotation: options.rotation,
+                mesh: options.mesh,
+                tidalLock: options.tidalLock,
+            },
+            BodyTypeEnum.Satellite
         );
     }
 }

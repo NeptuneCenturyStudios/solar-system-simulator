@@ -18,22 +18,22 @@ export class Planet extends CelestialBody {
         super(
             dependencies,
             scene,
-            options.radius,
-            0xffffff,
-            options.pos,
-            options.vel,
-            options.mass,
-            options.id,
-            options.name,
-            BodyTypeEnum.Planet,
-            options.trailColor ?? 0xffffff,
-            options.maxTrail ?? 500,
-            options.hasRings ?? false,
-            options.rotation,
-            options.mesh,
-            undefined,
-            options.seed,
-            options.atmosphere
+            {
+                radius: options.radius,
+                pos: options.pos,
+                vel: options.vel,
+                mass: options.mass,
+                id: options.id,
+                name: options.name,
+                trailColor: options.trailColor ?? 0xffffff,
+                maxTrail: options.maxTrail ?? 500,
+                hasRings: options.hasRings ?? false,
+                rotation: options.rotation,
+                mesh: options.mesh,
+                seed: options.seed,
+                atmosphere: options.atmosphere
+            },
+            BodyTypeEnum.Planet
         );
 
         this.planetType = options.bodySubtype;

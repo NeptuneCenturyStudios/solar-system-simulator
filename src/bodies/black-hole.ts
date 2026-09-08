@@ -59,19 +59,20 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
         super(
             dependencies,
             scene,
-            EVENT_HORIZON_RADIUS,
-            BLACK_HOLE_COLOR,
-            pos,
-            new THREE.Vector3(0, 0, 0),
-            mass,
-            id,
-            name,
-            BodyTypeEnum.BlackHole,
-            0xffffff,
-            500,
-            false,
-            rotation,
-            mesh
+            {
+                radius: EVENT_HORIZON_RADIUS,
+                pos: pos,
+                vel: new THREE.Vector3(0, 0, 0),
+                mass: mass,
+                id: id,
+                name: name,
+                trailColor: 0xffffff,
+                maxTrail: 500,
+                hasRings: false,
+                rotation,
+                mesh,
+            },
+            BodyTypeEnum.BlackHole
         );
 
         this.dependencies = dependencies;

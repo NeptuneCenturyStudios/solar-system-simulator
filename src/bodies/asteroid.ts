@@ -3,73 +3,36 @@ import * as THREE from 'three';
 import { CelestialBody } from './celestial-body';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
-import { IRotation, IStateDependencies } from '../interfaces.js';
+import { IOrbitalBodyCreationOptions, IStateDependencies } from '../interfaces.js';
 import { BodyTypeEnum } from './body-enums';
 
-export interface IAsteroidOptions {
-    pos: THREE.Vector3 | number[];
-    vel: THREE.Vector3 | number[];
-    radius?: number;
-    color?: number;
-    mass?: number;
-    id?: string | null;
-    name?: string | null;
-    trailColor?: number;
-    maxTrail?: number;
-    roughness?: number;
-    metalness?: number;
-    rotation?: IRotation;
-}
 
 export class Asteroid extends CelestialBody {
     /**
      * Represents an asteroid in the simulation, inheriting from CelestialBody.
      * Randomizes shape, color, and physical properties if not provided.
      */
-    constructor(deps: IStateDependencies, scene: THREE.Scene, options: IAsteroidOptions) {
-        const {
-            radius = 0.5 + Math.random() * 2,
-            color = 0x666666 + Math.random() * 0x444444,
-            pos,
-            vel,
-            mass = 0.01 + Math.random() * 0.08,
-            id = null,
-            name = null,
-            trailColor = 0x888888,
-            maxTrail = 1500,
-        } = options;
-
-        if (!pos || !vel) {
-            throw new Error('Asteroid requires { pos, vel }');
-        }
-
-        const posVec = Array.isArray(pos) ? new THREE.Vector3(pos[0], pos[1], pos[2]) : pos;
-        const velVec = Array.isArray(vel) ? new THREE.Vector3(vel[0], vel[1], vel[2]) : vel;
+    constructor(deps: IStateDependencies, scene: THREE.Scene, options: IOrbitalBodyCreationOptions) {
 
         // Geometry factory returns a placeholder geometry until OBJ loads
         const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
         const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
         const placeholderMesh = new THREE.Mesh(geometryFactory(), placeholderMaterial);
 
-        const rotation = options.rotation ?? { tilt: 0, speed: 0 };
-
-        super(
-            deps,
-            scene,
-            radius,
-            color,
-            posVec,
-            velVec,
-            mass,
-            id ?? `asteroid-${Math.random().toString(36).slice(2)}`,
-            name ?? 'Asteroid',
-            BodyTypeEnum.Asteroid,
-            trailColor,
-            maxTrail,
-            false,
-            rotation,
-            placeholderMesh
-        );
+        super(deps, scene, {
+            radius: options.radius,
+            pos: options.pos,
+            vel: options.vel,
+            mass: options.mass,
+            id: options.id ?? `asteroid-${Math.random().toString(36).slice(2)}`,
+            name: options.name ?? 'Asteroid',
+            trailColor: options.trailColor,
+            hasRings: false,
+            maxTrail: options.maxTrail,
+            rotation: options.rotation,
+            mesh: placeholderMesh,
+        }
+    ,BodyTypeEnum.Asteroid);
 
         // Async OBJ + MTL load for Asteroid model
         const mtlLoader = new MTLLoader();

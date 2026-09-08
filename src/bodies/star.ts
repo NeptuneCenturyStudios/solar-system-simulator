@@ -113,7 +113,7 @@ export class Star extends CelestialBody {
             throw new Error('Star requires textures to be injected');
         }
 
-        const color = Star.temperatureToColor(options.temperature);
+        //const color = Star.temperatureToColor(options.temperature);
 
         // TODO: Move mesh creation to MainSequenceStar and other derived classes.
         if (!options.mesh) {
@@ -132,19 +132,21 @@ export class Star extends CelestialBody {
         super(
             dependencies,
             scene,
-            options.radius,
-            color,
-            options.pos,
-            options.vel ?? new THREE.Vector3(0, 0, 0),
-            options.mass,
-            options.id,
-            options.name,
-            BodyTypeEnum.Star,
-            0xffffff,
-            500,
-            false,
-            options.rotation,
-            options.mesh
+            {
+                radius: options.radius,
+                //color: color,
+                pos: options.pos,
+                vel: options.vel ?? new THREE.Vector3(0, 0, 0),
+                mass: options.mass,
+                id: options.id,
+                name: options.name,
+                trailColor: 0xffffff,
+                maxTrail: 500,
+                hasRings: false,
+                rotation: options.rotation,
+                mesh: options.mesh,
+            },
+            BodyTypeEnum.Star
         );
 
         this.textures = textures;

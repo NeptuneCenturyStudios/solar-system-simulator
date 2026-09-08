@@ -43,19 +43,20 @@ export abstract class Comet extends CelestialBody {
         super(
             deps,
             scene,
-            options.radius,
-            0x888888,
-            options.pos,
-            options.vel,
-            options.mass,
-            options.id,
-            options.name,
-            BodyTypeEnum.Comet,
-            options.trailColor ?? 0xaaaaaa,
-            options.maxTrail ?? 2000,
-            false,
-            options.rotation,
-            options.mesh
+            {
+                radius: options.radius,
+                pos: options.pos,
+                vel: options.vel,
+                mass: options.mass,
+                id: options.id,
+                name: options.name,
+                trailColor: options.trailColor ?? 0xaaaaaa,
+                maxTrail: options.maxTrail ?? 2000,
+                hasRings: false,
+                rotation: options.rotation,
+                mesh: options.mesh,
+            },
+            BodyTypeEnum.Comet
         );
 
         this.tailCount = 1200;

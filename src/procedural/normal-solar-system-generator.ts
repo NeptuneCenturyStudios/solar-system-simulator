@@ -192,15 +192,13 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         );
         const vesta = new Asteroid(this.dependencies, this.scene, {
             radius: VESTA_RADIUS,
-            color: 0xb8a890,
-            pos: [vestaTrajectory.pos.x, (Math.random() - 0.5) * 1639, vestaTrajectory.pos.z],
-            vel: [vestaTrajectory.vel.x, 0, vestaTrajectory.vel.z],
+            pos: new THREE.Vector3(vestaTrajectory.pos.x, (Math.random() - 0.5) * 1639, vestaTrajectory.pos.z),
+            vel: new THREE.Vector3(vestaTrajectory.vel.x, 0, vestaTrajectory.vel.z),
             mass: VESTA_MASS,
             id: 'vesta',
             name: 'Vesta',
             trailColor: 0xc9b89a,
             maxTrail: 1500,
-            roughness: 0.9,
         });
         bodies.push(vesta);
         completed++;
@@ -217,15 +215,13 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         );
         const pallas = new Asteroid(this.dependencies, this.scene, {
             radius: PALLAS_RADIUS,
-            color: 0x8a8a8a,
-            pos: [pallasTrajectory.pos.x, (Math.random() - 0.5) * 2185, pallasTrajectory.pos.z],
-            vel: [pallasTrajectory.vel.x, 0, pallasTrajectory.vel.z],
+            pos: new THREE.Vector3(pallasTrajectory.pos.x, (Math.random() - 0.5) * 2185, pallasTrajectory.pos.z),
+            vel: new THREE.Vector3(pallasTrajectory.vel.x, 0, pallasTrajectory.vel.z),
             mass: PALLAS_MASS,
             id: 'pallas',
             name: 'Pallas',
             trailColor: 0x999999,
             maxTrail: 1500,
-            roughness: 0.9,
         });
         bodies.push(pallas);
         completed++;
@@ -242,15 +238,13 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         );
         const hygiea = new Asteroid(this.dependencies, this.scene, {
             radius: HYGIEA_RADIUS,
-            color: 0x7a7a7a,
-            pos: [hygieaTrajectory.pos.x, (Math.random() - 0.5) * 1093, hygieaTrajectory.pos.z],
-            vel: [hygieaTrajectory.vel.x, 0, hygieaTrajectory.vel.z],
+            pos: new THREE.Vector3(hygieaTrajectory.pos.x, (Math.random() - 0.5) * 1093, hygieaTrajectory.pos.z),
+            vel: new THREE.Vector3(hygieaTrajectory.vel.x, 0, hygieaTrajectory.vel.z),
             mass: HYGIEA_MASS,
             id: 'hygiea',
             name: 'Hygiea',
             trailColor: 0x888888,
-            maxTrail: 1500,
-            roughness: 0.9,
+            maxTrail: 1500
         });
         bodies.push(hygiea);
         completed++;

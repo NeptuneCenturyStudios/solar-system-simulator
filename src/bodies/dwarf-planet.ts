@@ -19,21 +19,21 @@ export class DwarfPlanet extends CelestialBody {
             super(
                 dependencies,
                 scene,
-                options.radius,
-                0xffffff,
-                options.pos,
-                options.vel,
-                options.mass,
-                options.id,
-                options.name,
-                BodyTypeEnum.DwarfPlanet,
-                options.trailColor ?? 0xffffff,
-                options.maxTrail ?? 500,
-                options.hasRings ?? false,
-                options.rotation,
-                options.mesh,
-                undefined,
-                options.seed
+                {
+                    radius: options.radius,
+                    pos: options.pos,
+                    vel: options.vel,
+                    mass: options.mass,
+                    id: options.id,
+                    name: options.name,
+                    trailColor: options.trailColor ?? 0xffffff,
+                    maxTrail: options.maxTrail ?? 500,
+                    hasRings: options.hasRings ?? false,
+                    rotation: options.rotation,
+                    mesh: options.mesh,
+                    seed: options.seed,
+                },
+                BodyTypeEnum.DwarfPlanet
             );
 
             this.planetType = options.bodySubtype;

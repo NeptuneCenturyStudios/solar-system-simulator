@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Body } from './body';
-import { IAtmosphereOptions, IDeathOptions, IRotation } from '../interfaces';
+import { ICelestialBodyCreationOptions, IDeathOptions, IRotation } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
 import { triggerScreenFlash } from '../effects/screen-flash';
@@ -8,8 +8,8 @@ import { DIST_SCALE } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
-import { BodyTypeEnum } from './body-enums';
 import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/atmosphere-shell';
+import { BodyTypeEnum } from './body-enums';
 
 // Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
 const _Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -61,35 +61,40 @@ export class CelestialBody extends Body {
     rotationSpeed!: number;
     rotationAxis!: THREE.Vector3;
 
+    /** Magnetic axis in its initial orientation (before any spin phase is applied). */
+    magneticAxisBase?: THREE.Vector3;
+
     /** Deterministic seed from which procedural features (textures, etc.) are derived. */
     readonly seed!: string | undefined;
 
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        radius: number,
-        color: number,
-        pos: THREE.Vector3,
-        vel: THREE.Vector3,
-        mass: number,
-        id: string,
-        name: string,
-        bodyType: BodyTypeEnum,
-        trailColor = 0xffffff,
-        maxTrail = 500,
-        hasRings = false,
-        rotation: IRotation = { tilt: 0, speed: 0 },
-        mesh?: THREE.Mesh,
-        tidalLock?: ITidalLockOptions,
-        seed?: string,
-        atmosphere?: IAtmosphereOptions
+        options: ICelestialBodyCreationOptions,
+        bodyType: BodyTypeEnum
+        // radius: number,
+        // color: number,
+        // pos: THREE.Vector3,
+        // vel: THREE.Vector3,
+        // mass: number,
+        // id: string,
+        // name: string,
+        // bodyType: BodyTypeEnum,
+        // trailColor = 0xffffff,
+        // maxTrail = 500,
+        // hasRings = false,
+        // rotation: IRotation = { tilt: 0, speed: 0 },
+        // mesh?: THREE.Mesh,
+        // tidalLock?: ITidalLockOptions,
+        // seed?: string,
+        // atmosphere?: IAtmosphereOptions
     ) {
         // Create a simple material if one isn't provided
-        if (!mesh) {
-            mesh = new THREE.Mesh(
-                new THREE.SphereGeometry(radius, 32, 32),
+        if (!options.mesh) {
+            options.mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(options.radius, 32, 32),
                 new THREE.MeshStandardMaterial({
-                    color: color,
+                    color: 0xffffff,
                     emissive: 0x000000,
                     emissiveIntensity: 0,
                     roughness: 0.7,
@@ -98,28 +103,29 @@ export class CelestialBody extends Body {
             );
         }
 
-        super(dependencies, scene, mass, radius, pos, vel, mesh, id, name, bodyType);
-        this.seed = seed;
+        super(dependencies, scene, options.mass, options.radius, options.pos, options.vel, options.mesh, options.id, options.name, bodyType);
+        this.seed = options.seed;
 
         this.dependencies = dependencies;
         this.scene = scene;
-        this.radius = radius;
-        this.mass = mass;
-        this.color = color;
+        this.radius = options.radius;
+        this.mass = options.mass;
+        this.color = 0xffffff;
         this.bodyType = bodyType;
-        this.rotation = rotation;
+        this.rotation = options.rotation ?? { tilt: 0, speed: 0 };
+        this.magneticAxisBase = options.magneticAxisBase;
 
         // Create the atmosphere shell if atmosphere options were provided
-        if (atmosphere) {
+        if (options.atmosphere) {
             this.atmosphereShell = createAtmosphereShell(
                 scene,
-                atmosphere.radius,
-                atmosphere.tint,
-                mesh
+                options.atmosphere.radius,
+                options.atmosphere.tint,
+                options.mesh
             );
         }
 
-        this.setRotation(rotation);
+        this.setRotation(this.rotation);
 
         // Tidal lock behavior
         this.tidalLockEnabled = false;
@@ -129,38 +135,38 @@ export class CelestialBody extends Body {
         this.tidalLockAngularSpeed = 0; // radians/s
         this._tidalLockConfigured = false;
 
-        if (tidalLock && tidalLock.target) {
+        if (options.tidalLock && options.tidalLock.target) {
             this.tidalLockEnabled = true;
-            this.tidalLockTarget = tidalLock.target;
+            this.tidalLockTarget = options.tidalLock.target;
 
-            if (tidalLock.spinAxisWorld) {
-                if (Array.isArray(tidalLock.spinAxisWorld)) {
+            if (options.tidalLock.spinAxisWorld) {
+                if (Array.isArray(options.tidalLock.spinAxisWorld)) {
                     this.tidalLockSpinAxis = new THREE.Vector3(
-                        ...tidalLock.spinAxisWorld
+                        ...options.tidalLock.spinAxisWorld
                     ).normalize();
                 } else {
                     this.tidalLockSpinAxis = new THREE.Vector3(
-                        tidalLock.spinAxisWorld.x,
-                        tidalLock.spinAxisWorld.y,
-                        tidalLock.spinAxisWorld.z
+                        options.tidalLock.spinAxisWorld.x,
+                        options.tidalLock.spinAxisWorld.y,
+                        options.tidalLock.spinAxisWorld.z
                     ).normalize();
                 }
             }
 
-            if (tidalLock.faceAxisLocal) {
+            if (options.tidalLock.faceAxisLocal) {
                 this.tidalLockFaceAxisLocal = new THREE.Vector3(
-                    ...tidalLock.faceAxisLocal
+                    ...options.tidalLock.faceAxisLocal
                 ).normalize();
             }
 
-            this.tidalLockAngularSpeed = tidalLock.angularSpeed;
+            this.tidalLockAngularSpeed = options.tidalLock.angularSpeed;
             this._tidalLockConfigured = true;
         }
 
-        this.baseColor = new THREE.Color(color);
+        this.baseColor = new THREE.Color(this.color);
 
-        this.maxTrail = maxTrail;
-        this._trailRing = new Float32Array(maxTrail * 3);
+        this.maxTrail = options.maxTrail ?? 500;
+        this._trailRing = new Float32Array(this.maxTrail * 3);
         this._trailHead = 0;
         this._trailCount = 0;
         this.trailGeo = new THREE.BufferGeometry();
@@ -173,7 +179,7 @@ export class CelestialBody extends Body {
         this.trail = new THREE.Line(
             this.trailGeo,
             new THREE.LineBasicMaterial({
-                color: trailColor,
+                color: options.trailColor,
                 transparent: true,
                 opacity: 0.5,
                 linewidth: 2,
@@ -184,19 +190,19 @@ export class CelestialBody extends Body {
         scene.add(this.trail);
 
         // Deterministic rings (PRNG from body id)
-        if (hasRings) {
+        if (options.hasRings) {
             const ringCount = 300000 / DIST_SCALE;
-            const ringRng = new SeededRandom(`${name}|rings`);
+            const ringRng = new SeededRandom(`${options.name}|rings`);
 
             const ringGeo = new THREE.BufferGeometry();
             const ringPos = new Float32Array(ringCount * 3);
 
             for (let i = 0; i < ringCount; i++) {
-                const r = radius * 1.6 + ringRng.next() * radius * 1.2;
+                const r = options.radius * 1.6 + ringRng.next() * options.radius * 1.2;
                 const theta = ringRng.next() * Math.PI * 2;
 
                 ringPos[i * 3] = Math.cos(theta) * r;
-                ringPos[i * 3 + 1] = (ringRng.next() - 0.5) * (radius * 0.08);
+                ringPos[i * 3 + 1] = (ringRng.next() - 0.5) * (options.radius * 0.08);
                 ringPos[i * 3 + 2] = Math.sin(theta) * r;
             }
 

@@ -118,6 +118,7 @@ export interface IOrbitalBodyCreationOptions extends IBodyCreationOptions {
     rotation?: IRotation;
     trailColor?: number;
     maxTrail?: number;
+    tidalLock?: ITidalLockOptions;
 }
 
 /**
@@ -131,6 +132,9 @@ export interface ICometCreationOptions extends ICelestialBodyCreationOptions {
 
 export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptions {
     mesh?: THREE.Mesh;
+    hasRings?: boolean;
+    atmosphere?: IAtmosphereOptions;
+    magneticAxisBase?: THREE.Vector3;
     /** Deterministic seed used to derive procedural textures and other procedural features at runtime. */
     seed?: string;
 }
@@ -140,7 +144,6 @@ export interface ISatelliteCreationOptions extends ICelestialBodyCreationOptions
     angle?: number;
     inclinationDeg?: number;
     yVariation?: number;
-    tidalLock?: ITidalLockOptions;
 }
 
 export interface IMoonCreationOptions extends ISatelliteCreationOptions {
@@ -149,7 +152,6 @@ export interface IMoonCreationOptions extends ISatelliteCreationOptions {
 }
 
 export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {
-    hasRings?: boolean;
     bodySubtype: PlanetTypeEnum;
     atmosphere?: IAtmosphereOptions;
 }

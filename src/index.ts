@@ -1497,10 +1497,12 @@ function createNewBody(
         });
 
         newBody = new Asteroid(dependencies, scene, {
-            pos: asteroidSpawnPos.toArray(),
-            vel: asteroidVel.toArray(),
+            pos: asteroidSpawnPos,
+            vel: asteroidVel,
             mass: asteroidMass,
             radius: asteroidRadius,
+            id: createUniqueId('asteroid'),
+            name: generateIAUName(BodyTypeEnum.Asteroid, null, simulationState.bodies),
         });
     } else if (bodyType === 'comet') {
         // Create a comet near the camera with appropriate orbital velocity

@@ -19,21 +19,22 @@ export class Moon extends CelestialBody {
         super(
             dependencies,
             scene,
-            options.radius,
-            0xffffff,
-            options.pos,
-            options.vel,
-            options.mass,
-            options.id,
-            options.name,
-            BodyTypeEnum.Moon,
-            options.trailColor,
-            options.maxTrail,
-            false,
-            options.rotation,
-            options.mesh,
-            options.tidalLock,
-            options.seed
+            {
+                radius: options.radius,
+                pos: options.pos,
+                vel: options.vel,
+                mass: options.mass,
+                id: options.id,
+                name: options.name,
+                trailColor: options.trailColor ?? 0xffffff,
+                maxTrail: options.maxTrail ?? 500,
+                hasRings: false,
+                rotation: options.rotation,
+                mesh: options.mesh,
+                tidalLock: options.tidalLock,
+                seed: options.seed
+            },
+            BodyTypeEnum.Moon
         );
 
         this.moonType = options.moonType;
