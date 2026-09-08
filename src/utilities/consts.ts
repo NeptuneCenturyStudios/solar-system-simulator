@@ -358,7 +358,7 @@ export const WORMHOLE_EMERGE_BUFFER_FACTOR = 1.0;
 // would destabilise the integrator). Effective lightspeed scales with sqrt(gMultiplier), so
 // these orbital speeds stay far below the clamp.
 /** Radius of the circular orbit shared by Earth and both gates (10,000,000 km / DIST_SCALE). */
-export const WORMHOLE_SHORTCUT_ORBIT_RADIUS = 100_000;
+export const WORMHOLE_SHORTCUT_ORBIT_RADIUS = 10_000_000 / DIST_SCALE;
 /**
  * Mouth radius of the two short-cut gates. Capture requires the body to be strictly smaller
  * than the mouth, and a wider mouth also tolerates more time-warp before a frame's chord bows
