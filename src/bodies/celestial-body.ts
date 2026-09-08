@@ -61,9 +61,6 @@ export class CelestialBody extends Body {
     rotationSpeed!: number;
     rotationAxis!: THREE.Vector3;
 
-    /** Magnetic axis in its initial orientation (before any spin phase is applied). */
-    magneticAxisBase?: THREE.Vector3;
-
     /** Deterministic seed from which procedural features (textures, etc.) are derived. */
     readonly seed!: string | undefined;
 
@@ -113,7 +110,6 @@ export class CelestialBody extends Body {
         this.color = 0xffffff;
         this.bodyType = bodyType;
         this.rotation = options.rotation ?? { tilt: 0, speed: 0 };
-        this.magneticAxisBase = options.magneticAxisBase;
 
         // Create the atmosphere shell if atmosphere options were provided
         if (options.atmosphere) {

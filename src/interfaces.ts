@@ -134,7 +134,6 @@ export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptio
     mesh?: THREE.Mesh;
     hasRings?: boolean;
     atmosphere?: IAtmosphereOptions;
-    magneticAxisBase?: THREE.Vector3;
     /** Deterministic seed used to derive procedural textures and other procedural features at runtime. */
     seed?: string;
 }
