@@ -52,7 +52,6 @@ src/
 ├── settings/         # Settings store
 ├── ship-effects/     # Ship visuals (flames, trails, weapons)
 ├── simulation/       # Animation loop, autopilot, flight controllers, simulation core
-├── ui/               # ⚠️ LEGACY — imperative HTML UI (being replaced)
 ├── utilities/        # Audio, PRNG, constants, URL seed parsing, helpers
 ├── vue/              # ✅ NEW — Vue 3 UI layer
 │   ├── components/   # Vue components (modals, panels)
@@ -69,11 +68,8 @@ src/
 └── global.d.ts       # Global type declarations
 ```
 
-## UI Migration (Legacy HTML → Vue)
+## UI (Vue)
 
-> **⚠️ This project is actively transitioning from a legacy imperative HTML UI to Vue 3.**
-
-- **Legacy UI:** `src/ui/` — hand-built DOM manipulation, modal classes, panel classes
 - **New UI:** `src/vue/` — Vue 3 SFC components, composables, reactive state via `ui-store.ts`
 - **Bridge:** `src/vue/sim-bridge.ts` connects Vue components to the Three.js simulation core
 
@@ -81,8 +77,11 @@ src/
 
 1. Work in `src/vue/` using Vue 3 composition API
 2. Use existing composables and `sim-bridge.ts` to interact with the simulation
-3. Do NOT add new features to `src/ui/`
-4. Existing legacy panels in `src/ui/` are migrated incrementally
+
+## Distance, radius, and mass calculations
+
+- All distances and radius should be stored in km and scaled with DIST_SCALE and RADIUS_SCALE consts.
+- Mass should be expressed in kg and scaled with MASS_SCALE
 
 ## Code Conventions
 
