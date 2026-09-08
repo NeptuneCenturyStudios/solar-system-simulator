@@ -162,6 +162,8 @@ export interface VueSimHooks {
     spawnShip?: () => void;
     /** Engage autopilot toward the current selection, or cancel if already active. */
     toggleAutopilot?: () => void;
+    /** Exit flight mode (restores normal camera controls). */
+    exitFlightMode?: () => void;
     /** Re-launch the system by showing the StartupModal with Cancel enabled. */
     relaunch?: () => void;
 
@@ -829,6 +831,11 @@ export function requestSpawnShip(): void {
 /** Engage autopilot toward the current selection, or cancel if already active. */
 export function requestToggleAutopilot(): void {
     hookRegistry.toggleAutopilot?.();
+}
+
+/** Exit flight mode (restores normal camera controls). */
+export function requestExitFlightMode(): void {
+    hookRegistry.exitFlightMode?.();
 }
 
 /** Re-launch the system by showing the StartupModal with Cancel enabled. */

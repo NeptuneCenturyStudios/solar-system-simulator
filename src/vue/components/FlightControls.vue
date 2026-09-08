@@ -28,15 +28,12 @@
         </button>
 
         <button
+            v-if="simStore.inFlight"
             class="old-ui btn-with-icon mb-3"
-            :class="{ active: simStore.autopilotTargetId !== null }"
-            :disabled="!simStore.hasKnownShip"
-            @click="requestToggleAutopilot()"
+            @click="requestExitFlightMode()"
         >
-            <span class="material-symbols-outlined">{{
-                simStore.autopilotTargetId !== null ? 'cancel' : 'rocket'
-            }}</span>
-            {{ simStore.autopilotTargetId !== null ? 'CANCEL AUTOPILOT' : 'AUTOPILOT' }}
+            <span class="material-symbols-outlined">logout</span>
+            EXIT FLIGHT MODE
         </button>
     </PanelBase>
 </template>
@@ -46,8 +43,8 @@ import { computed } from 'vue';
 
 import { SHIP_TYPES } from '../../bodies/ships/ship-registry';
 import {
+    requestExitFlightMode,
     requestSpawnShip,
-    requestToggleAutopilot,
     setSelectedShipTypeId,
     simStore,
 } from '../sim-bridge';

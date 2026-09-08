@@ -17,8 +17,8 @@ export const MAX_PARTICLE_ALPHA = 1.0;
 export const G_SCALE = 1; //10000000;
 // Tuned so that SUN_MASS = 33,000,000 exactly
 export const MASS_SCALE = 6.025757575757576e22;
-export const RADIUS_SCALE = 100;
-export const DIST_SCALE = 100;
+export const RADIUS_SCALE = 1;
+export const DIST_SCALE = 1;
 
 // === Free Camera Movement Speeds ===
 // WASD normal speed and shift-boost speed, scaled proportionally to DIST_SCALE

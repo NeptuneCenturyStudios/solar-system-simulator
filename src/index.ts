@@ -3053,6 +3053,7 @@ function toggleAutopilot() {
 registerVueSimHooks({
     spawnShip: () => spawnShip(),
     toggleAutopilot,
+    exitFlightMode: () => exitFlightMode(flightCtx),
 });
 
 // Block pointer/wheel events from the Vue UI overlay so clicks and scrolling
