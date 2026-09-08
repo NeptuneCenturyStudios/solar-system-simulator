@@ -192,7 +192,11 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         );
         const vesta = new Asteroid(this.dependencies, this.scene, {
             radius: VESTA_RADIUS,
-            pos: new THREE.Vector3(vestaTrajectory.pos.x, (Math.random() - 0.5) * 1639, vestaTrajectory.pos.z),
+            pos: new THREE.Vector3(
+                vestaTrajectory.pos.x,
+                (Math.random() - 0.5) * 1639,
+                vestaTrajectory.pos.z
+            ),
             vel: new THREE.Vector3(vestaTrajectory.vel.x, 0, vestaTrajectory.vel.z),
             mass: VESTA_MASS,
             id: 'vesta',
@@ -215,7 +219,11 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         );
         const pallas = new Asteroid(this.dependencies, this.scene, {
             radius: PALLAS_RADIUS,
-            pos: new THREE.Vector3(pallasTrajectory.pos.x, (Math.random() - 0.5) * 2185, pallasTrajectory.pos.z),
+            pos: new THREE.Vector3(
+                pallasTrajectory.pos.x,
+                (Math.random() - 0.5) * 2185,
+                pallasTrajectory.pos.z
+            ),
             vel: new THREE.Vector3(pallasTrajectory.vel.x, 0, pallasTrajectory.vel.z),
             mass: PALLAS_MASS,
             id: 'pallas',
@@ -238,13 +246,17 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         );
         const hygiea = new Asteroid(this.dependencies, this.scene, {
             radius: HYGIEA_RADIUS,
-            pos: new THREE.Vector3(hygieaTrajectory.pos.x, (Math.random() - 0.5) * 1093, hygieaTrajectory.pos.z),
+            pos: new THREE.Vector3(
+                hygieaTrajectory.pos.x,
+                (Math.random() - 0.5) * 1093,
+                hygieaTrajectory.pos.z
+            ),
             vel: new THREE.Vector3(hygieaTrajectory.vel.x, 0, hygieaTrajectory.vel.z),
             mass: HYGIEA_MASS,
             id: 'hygiea',
             name: 'Hygiea',
             trailColor: 0x888888,
-            maxTrail: 1500
+            maxTrail: 1500,
         });
         bodies.push(hygiea);
         completed++;

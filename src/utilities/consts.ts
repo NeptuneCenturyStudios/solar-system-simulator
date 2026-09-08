@@ -128,6 +128,73 @@ export const NEPTUNE_AZIMUTH = 49; // IAU α₀=299.36°, δ₀= 43.46° → λ_
 export const PLUTO_AZIMUTH = 227; // IAU α₀=132.99°, δ₀= -6.16° → λ_pole≈137°
 export const CERES_AZIMUTH = 101; // IAU α₀=291.42°, δ₀= 66.76° → λ_pole≈  11°
 
+// === Planetary System: Magnetic Fields ===
+// Dipole parameters for the bodies with a global intrinsic magnetic field. Attribute-only data,
+// consumed via IMagneticFieldOptions; nothing here is rendered directly.
+//
+// *_MAG_STRENGTH — surface equatorial dipole field strength, in gauss (Earth ≈ 0.305 G).
+// *_MAG_TILT     — dipole tilt away from the body's own rotation axis, in degrees.
+// *_MAG_OFFSET   — dipole-centre displacement from the body centre, as a fraction of radius.
+// *_MAG_REVERSED — true when the dipole moment points opposite the rotation axis, as Earth's does.
+// Strength, tilt, and offset are real published values.
+//
+// *_MAG_AZIMUTH is NOT a real measurement. A magnetic pole's longitude is epoch- and
+// reference-frame-dependent, and this sim's azimuth is a rotation about world Y rather than a
+// planetary longitude, so there is nothing meaningful to transcribe. These are plausible fixed
+// values chosen so each body's field is stable and distinct from its neighbours.
+//
+// Venus, Mars, Pluto, Ceres, and the Moon are deliberately absent: they have no global dipole,
+// and that absence is itself real data an aurora effect should respect.
+
+// Mercury: very weak but genuinely global, and strongly offset toward the north pole.
+export const MERCURY_MAG_STRENGTH = 0.003;
+export const MERCURY_MAG_TILT = 0.03;
+export const MERCURY_MAG_AZIMUTH = 0; // tilt ≈ 0, so azimuth has no visible effect
+export const MERCURY_MAG_OFFSET = 0.2;
+export const MERCURY_MAG_REVERSED = true; // same sense as Earth's
+
+export const EARTH_MAG_STRENGTH = 0.305;
+export const EARTH_MAG_TILT = 11.5;
+export const EARTH_MAG_AZIMUTH = 288;
+export const EARTH_MAG_OFFSET = 0.08;
+export const EARTH_MAG_REVERSED = true; // geographic north is a magnetic south pole
+
+export const JUPITER_MAG_STRENGTH = 4.17; // by far the strongest planetary field
+export const JUPITER_MAG_TILT = 9.6;
+export const JUPITER_MAG_AZIMUTH = 200;
+export const JUPITER_MAG_OFFSET = 0.1;
+export const JUPITER_MAG_REVERSED = false; // opposite sense to Earth's
+
+// Saturn's dipole is almost perfectly aligned with its spin axis — unusually so.
+export const SATURN_MAG_STRENGTH = 0.21;
+export const SATURN_MAG_TILT = 0.01;
+export const SATURN_MAG_AZIMUTH = 0;
+export const SATURN_MAG_OFFSET = 0.04;
+export const SATURN_MAG_REVERSED = false;
+
+// Uranus and Neptune have wildly tilted, strongly offset fields — the reason their aurorae
+// appear far from their geographic poles. Their REVERSED values are the least certain here:
+// at these tilts the polarity convention is close to meaningless, so treat them as nominal.
+export const URANUS_MAG_STRENGTH = 0.23;
+export const URANUS_MAG_TILT = 58.6;
+export const URANUS_MAG_AZIMUTH = 48;
+export const URANUS_MAG_OFFSET = 0.31;
+export const URANUS_MAG_REVERSED = false;
+
+export const NEPTUNE_MAG_STRENGTH = 0.14;
+export const NEPTUNE_MAG_TILT = 46.9;
+export const NEPTUNE_MAG_AZIMUTH = 79;
+export const NEPTUNE_MAG_OFFSET = 0.55; // the most extreme offset in the solar system
+export const NEPTUNE_MAG_REVERSED = false;
+
+// The Sun's large-scale dipole component. The real solar field is dominated by its active
+// regions and flips every ~11 years; this is the smooth background dipole only.
+export const SUN_MAG_STRENGTH = 1.0;
+export const SUN_MAG_TILT = 7;
+export const SUN_MAG_AZIMUTH = 0;
+export const SUN_MAG_OFFSET = 0;
+export const SUN_MAG_REVERSED = false;
+
 // === Planetary System: Real Orbital Periods (seconds) ===
 export const MERCURY_ORBITAL_PERIOD_REAL = 87.969 * 24 * 3600; // days to seconds
 export const VENUS_ORBITAL_PERIOD_REAL = 224.701 * 24 * 3600;

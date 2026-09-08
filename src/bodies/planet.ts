@@ -31,7 +31,8 @@ export class Planet extends CelestialBody {
                 rotation: options.rotation,
                 mesh: options.mesh,
                 seed: options.seed,
-                atmosphere: options.atmosphere
+                atmosphere: options.atmosphere,
+                magneticField: options.magneticField,
             },
             BodyTypeEnum.Planet
         );

@@ -18,6 +18,7 @@ import { MoonTypeEnum } from '../bodies/body-enums';
 import { SeededRandom } from '../utilities/prng';
 import { addCloudLayer } from './planet-factory';
 import { createAtmosphereShell } from '../effects/atmosphere-shell';
+import { rollMagneticField } from './magnetic-field';
 
 /**
  * Given a moon type and a seeded random number generator, this function selects an appropriate texture for the moon.
@@ -125,6 +126,7 @@ function buildProceduralMoon(params: {
         yVariation,
         moonType,
         textureSeed,
+        magneticField,
     } = creation;
 
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
@@ -167,6 +169,12 @@ function buildProceduralMoon(params: {
         mesh,
         tidalLock,
         seed: textureSeed,
+        // An explicit override (from the Add/Edit panel) wins; otherwise roll. Most moons
+        // come out with no field at all — Ganymede is the real-world exception, not the rule.
+        magneticField:
+            magneticField !== undefined
+                ? magneticField
+                : rollMagneticField(new SeededRandom(`${id}|magnetic-field`), 'moon'),
     });
 }
 

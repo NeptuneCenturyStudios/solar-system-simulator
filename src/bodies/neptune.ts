@@ -8,6 +8,11 @@ import {
     NEPTUNE_RADIUS,
     NEPTUNE_AXIS,
     NEPTUNE_AZIMUTH,
+    NEPTUNE_MAG_AZIMUTH,
+    NEPTUNE_MAG_OFFSET,
+    NEPTUNE_MAG_REVERSED,
+    NEPTUNE_MAG_STRENGTH,
+    NEPTUNE_MAG_TILT,
     NEPTUNE_ORBITAL_PERIOD_REAL,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
@@ -60,6 +65,13 @@ export class Neptune extends Planet {
             atmosphere: {
                 radius: NEPTUNE_RADIUS * 1.07,
                 tint: 0x4488ff,
+            },
+            magneticField: {
+                strength: NEPTUNE_MAG_STRENGTH,
+                tilt: NEPTUNE_MAG_TILT,
+                azimuth: NEPTUNE_MAG_AZIMUTH,
+                offset: NEPTUNE_MAG_OFFSET,
+                reversed: NEPTUNE_MAG_REVERSED,
             },
         });
     }

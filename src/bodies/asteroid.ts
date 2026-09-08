@@ -6,33 +6,39 @@ import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { IOrbitalBodyCreationOptions, IStateDependencies } from '../interfaces.js';
 import { BodyTypeEnum } from './body-enums';
 
-
 export class Asteroid extends CelestialBody {
     /**
      * Represents an asteroid in the simulation, inheriting from CelestialBody.
      * Randomizes shape, color, and physical properties if not provided.
      */
-    constructor(deps: IStateDependencies, scene: THREE.Scene, options: IOrbitalBodyCreationOptions) {
-
+    constructor(
+        deps: IStateDependencies,
+        scene: THREE.Scene,
+        options: IOrbitalBodyCreationOptions
+    ) {
         // Geometry factory returns a placeholder geometry until OBJ loads
         const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
         const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
         const placeholderMesh = new THREE.Mesh(geometryFactory(), placeholderMaterial);
 
-        super(deps, scene, {
-            radius: options.radius,
-            pos: options.pos,
-            vel: options.vel,
-            mass: options.mass,
-            id: options.id ?? `asteroid-${Math.random().toString(36).slice(2)}`,
-            name: options.name ?? 'Asteroid',
-            trailColor: options.trailColor,
-            hasRings: false,
-            maxTrail: options.maxTrail,
-            rotation: options.rotation,
-            mesh: placeholderMesh,
-        }
-    ,BodyTypeEnum.Asteroid);
+        super(
+            deps,
+            scene,
+            {
+                radius: options.radius,
+                pos: options.pos,
+                vel: options.vel,
+                mass: options.mass,
+                id: options.id ?? `asteroid-${Math.random().toString(36).slice(2)}`,
+                name: options.name ?? 'Asteroid',
+                trailColor: options.trailColor,
+                hasRings: false,
+                maxTrail: options.maxTrail,
+                rotation: options.rotation,
+                mesh: placeholderMesh,
+            },
+            BodyTypeEnum.Asteroid
+        );
 
         // Async OBJ + MTL load for Asteroid model
         const mtlLoader = new MTLLoader();

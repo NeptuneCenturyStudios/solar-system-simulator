@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import type { StarParams } from '../utilities/body-params';
-import type { IStateDependencies } from '../interfaces';
+import type { IMagneticFieldOptions, IStateDependencies } from '../interfaces';
 import { STAR_LIGHT_DISTANCE } from '../utilities/consts';
+import { SeededRandom } from '../utilities/prng';
+import { rollMagneticField } from './magnetic-field';
 
 export type ProceduralStarCreation = {
     id: string;
@@ -11,6 +13,11 @@ export type ProceduralStarCreation = {
     vel: THREE.Vector3;
     starParams: StarParams;
     rotation?: { tilt: number; speed: number; azimuth?: number };
+    /**
+     * Optional override for this star's magnetic field, set by the Add/Edit panel.
+     * Undefined means "roll for one"; an explicit null means "no field".
+     */
+    magneticField?: IMagneticFieldOptions | null;
 };
 
 /**
@@ -30,12 +37,14 @@ export function createMainSequenceStarFromParams(
         pos,
         vel,
         rotation,
+        magneticField,
     }: {
         id: string;
         name: string;
         pos: THREE.Vector3;
         vel: THREE.Vector3;
         rotation?: { tilt: number; speed: number; azimuth?: number };
+        magneticField?: IMagneticFieldOptions | null;
     }
 ): MainSequenceStar {
     return new MainSequenceStar(dependencies, scene, {
@@ -54,6 +63,12 @@ export function createMainSequenceStarFromParams(
             azimuth: params.rotationAzimuth,
         },
         mesh: undefined, // use default star material/mesh
+        // Every star has a field, so an absent override always rolls one. Keyed to the
+        // star's own params seed so the same seed reproduces the same field.
+        magneticField:
+            magneticField !== undefined
+                ? magneticField
+                : rollMagneticField(new SeededRandom(`${params.seed}|magnetic-field`), 'star'),
     });
 }
 
@@ -73,5 +88,6 @@ export function createStarBodyFromProceduralCreation(
         pos: creation.pos,
         vel: creation.vel,
         rotation: creation.rotation,
+        magneticField: creation.magneticField,
     });
 }

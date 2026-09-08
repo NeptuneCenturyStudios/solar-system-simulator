@@ -32,7 +32,8 @@ export class Moon extends CelestialBody {
                 rotation: options.rotation,
                 mesh: options.mesh,
                 tidalLock: options.tidalLock,
-                seed: options.seed
+                seed: options.seed,
+                magneticField: options.magneticField,
             },
             BodyTypeEnum.Moon
         );

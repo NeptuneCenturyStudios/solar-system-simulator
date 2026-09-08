@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { IStateDependencies } from '../interfaces';
+import { IStateDependencies, type IMagneticFieldOptions } from '../interfaces';
 import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { SeededRandom } from '../utilities/prng';
@@ -21,6 +21,7 @@ import {
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import type { CelestialBody } from '../bodies/celestial-body';
 import { createAtmosphereShell } from '../effects/atmosphere-shell';
+import { rollMagneticField, type MagneticFieldKind } from './magnetic-field';
 
 export type ProceduralPlanetSubtype =
     | 'solid'
@@ -56,6 +57,12 @@ export type ProceduralPlanetCreation = {
     hasRings?: boolean;
 
     /**
+     * Optional override for this planet's magnetic field, set by the Add/Edit panel.
+     * Undefined means "roll for one"; an explicit null means "no field".
+     */
+    magneticField?: IMagneticFieldOptions | null;
+
+    /**
      * Seed used for deterministic textures (currently: desert/ocean/frozen).
      * Generated in planet-generator.ts and kept stable across runs.
      */
@@ -83,6 +90,28 @@ function computeRingPresence(creation: ProceduralPlanetCreation): { hasRings: bo
             : hasRingsProbabilistic;
 
     return { hasRings: resolved };
+}
+
+/**
+ * Resolves a planet's magnetic field: an explicit override from the UI wins, otherwise
+ * a seeded roll keyed to the body id (mirroring how `computeRingPresence` resolves rings).
+ */
+function computeMagneticField(creation: ProceduralPlanetCreation): IMagneticFieldOptions | null {
+    const { id, bodySubtype, bodyType, magneticField } = creation;
+
+    // The panel sends null to mean "explicitly no field", so only an absent key rolls.
+    if (magneticField !== undefined) return magneticField;
+
+    const kind: MagneticFieldKind =
+        bodyType === BodyTypeEnum.DwarfPlanet
+            ? 'dwarf'
+            : bodySubtype === PlanetTypeEnum.GasGiant
+              ? 'gasGiant'
+              : bodySubtype === PlanetTypeEnum.IceGiant
+                ? 'iceGiant'
+                : 'solid';
+
+    return rollMagneticField(new SeededRandom(`${id}|magnetic-field`), kind);
 }
 
 /**
@@ -172,7 +201,8 @@ function createCommonPlanetOptions(
     scene: THREE.Scene,
     creation: ProceduralPlanetCreation,
     mesh: THREE.Mesh,
-    hasRings: boolean
+    hasRings: boolean,
+    magneticField: IMagneticFieldOptions | null
 ): Planet | DwarfPlanet {
     const {
         radius,
@@ -203,6 +233,7 @@ function createCommonPlanetOptions(
         rotation: { tilt: rotationTilt, speed: rotationSpeed, azimuth: rotationAzimuth },
         mesh,
         seed: textureSeed,
+        magneticField,
     };
 
     if (bodyType === BodyTypeEnum.DwarfPlanet) {
@@ -284,7 +315,15 @@ export function createPlanetBodyFromProceduralCreation(
     const mesh = new THREE.Mesh(geometry, material);
 
     const { hasRings } = computeRingPresence(creation);
-    const body = createCommonPlanetOptions(dependencies, scene, creation, mesh, hasRings);
+    const magneticField = computeMagneticField(creation);
+    const body = createCommonPlanetOptions(
+        dependencies,
+        scene,
+        creation,
+        mesh,
+        hasRings,
+        magneticField
+    );
 
     addCloudLayer(body, creation.bodySubtype, creation.textureSeed!, creation.rotationSpeed);
 

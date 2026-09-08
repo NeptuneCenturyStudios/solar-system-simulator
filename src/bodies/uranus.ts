@@ -8,6 +8,11 @@ import {
     URANUS_DIST,
     URANUS_MASS,
     URANUS_RADIUS,
+    URANUS_MAG_AZIMUTH,
+    URANUS_MAG_OFFSET,
+    URANUS_MAG_REVERSED,
+    URANUS_MAG_STRENGTH,
+    URANUS_MAG_TILT,
     URANUS_ORBITAL_PERIOD_REAL,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
@@ -60,6 +65,13 @@ export class Uranus extends Planet {
             atmosphere: {
                 radius: URANUS_RADIUS * 1.07,
                 tint: 0x88ddff,
+            },
+            magneticField: {
+                strength: URANUS_MAG_STRENGTH,
+                tilt: URANUS_MAG_TILT,
+                azimuth: URANUS_MAG_AZIMUTH,
+                offset: URANUS_MAG_OFFSET,
+                reversed: URANUS_MAG_REVERSED,
             },
         });
     }

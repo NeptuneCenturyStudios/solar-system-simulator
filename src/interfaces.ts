@@ -24,6 +24,33 @@ export interface IAtmosphereOptions {
 }
 
 /**
+ * Dipole magnetic field of a celestial body.
+ *
+ * Attribute-only: nothing is rendered from this directly. It exists so effects
+ * (aurorae) can derive a magnetic axis and an intensity from real per-body data.
+ * The magnetic axis is expressed relative to the body's rotation axis, so `tilt`
+ * and `azimuth` here are offsets from `IRotation`, not world-space angles.
+ */
+export interface IMagneticFieldOptions {
+    /** Surface equatorial dipole field strength, in gauss. Earth ≈ 0.305 G. */
+    strength: number;
+    /** Dipole tilt away from the body's rotation axis, in degrees (0 = aligned). */
+    tilt: number;
+    /** Rotation of the tilt direction about the rotation axis, in degrees. */
+    azimuth: number;
+    /**
+     * Displacement of the dipole centre from the body centre, as a fraction of the
+     * body radius. 0 = centred. Neptune is the extreme real case at ≈0.55.
+     */
+    offset?: number;
+    /**
+     * True when the dipole moment points opposite the rotation axis, as Earth's does
+     * (which is why Earth's geographic north pole is a magnetic south pole).
+     */
+    reversed?: boolean;
+}
+
+/**
  * The interface for a solar system, containing an array of celestial bodies and a space texture.
  */
 export interface ISolarSystem {
@@ -134,6 +161,8 @@ export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptio
     mesh?: THREE.Mesh;
     hasRings?: boolean;
     atmosphere?: IAtmosphereOptions;
+    /** Dipole magnetic field, or omitted/null when the body has no global field. */
+    magneticField?: IMagneticFieldOptions | null;
     /** Deterministic seed used to derive procedural textures and other procedural features at runtime. */
     seed?: string;
 }

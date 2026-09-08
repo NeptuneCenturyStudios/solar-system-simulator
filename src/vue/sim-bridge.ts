@@ -10,7 +10,7 @@ import {
     simulationState,
 } from '../simulation/simulation';
 import { getBodyTypeLabel } from '../utilities/utilities';
-import type { ISimStateSnapshot } from '../interfaces';
+import type { IMagneticFieldOptions, ISimStateSnapshot } from '../interfaces';
 import { environmentState } from '../simulation/environment-state';
 import { SettingKey, settingsStore } from '../settings/settings-store';
 import type { PlaylistEntry } from '../utilities/playlist';
@@ -61,6 +61,10 @@ export interface BodyEditSnapshot {
     inclination: number;
     tilt: number;
     azimuth: number;
+    /** True when this body type can carry a magnetic field (star/planet/dwarf/moon). */
+    canHaveMagneticField: boolean;
+    /** The body's dipole magnetic field, or null when it has none. */
+    magneticField: IMagneticFieldOptions | null;
     /** Hex color string for the color picker (asteroids/comets only). */
     colorHex: string | null;
     /** Comet tail main color as a hex string (comets only). */
@@ -86,6 +90,8 @@ export interface CreateBodyPayload {
     orbitParentId: string | null;
     createTilt: number | null;
     createAzimuth: number | null;
+    /** Dipole magnetic field, or null when the checkbox is unchecked / not applicable. */
+    magneticField: IMagneticFieldOptions | null;
     /** Comet tail main color as a hex string (comets only). */
     tailColor?: string | null;
 }
@@ -107,6 +113,8 @@ export interface ApplyBodyEditPayload {
     isStarBody: boolean;
     editTilt: number | null;
     editAzimuth: number | null;
+    /** Dipole magnetic field, or null to clear it. Undefined leaves it untouched. */
+    magneticField?: IMagneticFieldOptions | null;
 }
 
 /** Freshly-randomized preview values for the add-custom form, keyed by `bodyType`. Mirrors the
@@ -121,6 +129,8 @@ export interface RandomizedCreateDefaults {
     inclination: number | null;
     hasAtmosphere: boolean;
     hasRings: boolean;
+    /** Randomized field, or null when this body type never has one (checkbox comes up unchecked). */
+    magneticField: IMagneticFieldOptions | null;
     planetType: string | null;
     moonType: string | null;
 }

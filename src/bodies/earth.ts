@@ -7,6 +7,11 @@ import {
     EARTH_RADIUS,
     EARTH_AXIS,
     EARTH_AZIMUTH,
+    EARTH_MAG_AZIMUTH,
+    EARTH_MAG_OFFSET,
+    EARTH_MAG_REVERSED,
+    EARTH_MAG_STRENGTH,
+    EARTH_MAG_TILT,
     EARTH_ORBITAL_PERIOD_REAL,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
@@ -183,6 +188,13 @@ export class Earth extends Planet {
             atmosphere: {
                 radius: EARTH_RADIUS * 1.07,
                 tint: 0x5599ff,
+            },
+            magneticField: {
+                strength: EARTH_MAG_STRENGTH,
+                tilt: EARTH_MAG_TILT,
+                azimuth: EARTH_MAG_AZIMUTH,
+                offset: EARTH_MAG_OFFSET,
+                reversed: EARTH_MAG_REVERSED,
             },
         });
 

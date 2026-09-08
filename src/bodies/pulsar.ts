@@ -62,7 +62,9 @@ const SIPHON_MASS_TRANSFER_SCALE = 0.0001;
 export class Pulsar extends Star implements IMassTransferBody {
     private beam: PulsarBeam;
     private glow: StarGlow;
-    private magneticField: PulsarMagneticField;
+    /** The rendered dipole field-line effect. Named to avoid colliding with
+     *  `CelestialBody.magneticField`, which is the attribute-only field data. */
+    private magneticFieldEffect: PulsarMagneticField;
     accretionDisk: AccretionDiskEffect;
     siphonEffects: Map<string, IPipelineFeedEffect> = new Map();
 
@@ -174,7 +176,7 @@ export class Pulsar extends Star implements IMassTransferBody {
 
         // Magnetic field dipole loops — shares the same magnetic axis as the beam
 
-        this.magneticField = new PulsarMagneticField(
+        this.magneticFieldEffect = new PulsarMagneticField(
             dependencies,
             scene,
             this.mesh.position.clone(),
@@ -211,8 +213,8 @@ export class Pulsar extends Star implements IMassTransferBody {
         this.beam.update(dt);
         this.glow.setPosition(this.mesh.position);
         this.glow.update(dt);
-        this.magneticField.setPosition(this.mesh.position);
-        this.magneticField.update(dt);
+        this.magneticFieldEffect.setPosition(this.mesh.position);
+        this.magneticFieldEffect.update(dt);
         this.accretionDisk.setPosition(this.mesh.position);
         this.accretionDisk.update(dt);
         this._updateSiphon(dt);
@@ -336,7 +338,7 @@ export class Pulsar extends Star implements IMassTransferBody {
             // ignore
         }
         try {
-            this.magneticField?.dispose();
+            this.magneticFieldEffect?.dispose();
         } catch {
             // ignore
         }

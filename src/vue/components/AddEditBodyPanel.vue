@@ -201,6 +201,71 @@
                         <input v-model="hasRings" type="checkbox" /> Has Rings
                     </label>
 
+                    <label v-if="showMagneticField" class="checkbox-row">
+                        <input v-model="hasMagneticField" type="checkbox" /> Has Magnetic Field
+                    </label>
+
+                    <template v-if="showMagneticField && hasMagneticField">
+                        <div class="control-group">
+                            <label
+                                >Field Strength
+                                <span class="val-display">{{ magStrength }} G</span></label
+                            >
+                            <input
+                                v-model.number="magStrength"
+                                type="number"
+                                class="text-input"
+                                min="0.0001"
+                                step="any"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Dipole Tilt <span class="val-display">{{ magTilt }}°</span></label
+                            >
+                            <input
+                                v-model.number="magTilt"
+                                type="range"
+                                min="0"
+                                max="90"
+                                step="1"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Dipole Azimuth
+                                <span class="val-display">{{ magAzimuth }}°</span></label
+                            >
+                            <input
+                                v-model.number="magAzimuth"
+                                type="range"
+                                min="-180"
+                                max="180"
+                                step="1"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Dipole Offset
+                                <span class="val-display">{{ magOffset }} R</span></label
+                            >
+                            <input
+                                v-model.number="magOffset"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                            />
+                        </div>
+
+                        <label class="checkbox-row">
+                            <input v-model="magReversed" type="checkbox" /> Reversed Polarity
+                        </label>
+                    </template>
+
                     <p
                         v-if="bodyType === 'moon' && !canCreateMoon"
                         class="validation-message visible"
@@ -393,6 +458,72 @@
                         />
                     </div>
 
+                    <label v-if="snapshot.canHaveMagneticField" class="checkbox-row">
+                        <input v-model="editHasMagneticField" type="checkbox" /> Has Magnetic Field
+                    </label>
+
+                    <template v-if="snapshot.canHaveMagneticField && editHasMagneticField">
+                        <div class="control-group">
+                            <label
+                                >Field Strength
+                                <span class="val-display">{{ editMagStrength }} G</span></label
+                            >
+                            <input
+                                v-model.number="editMagStrength"
+                                type="number"
+                                class="text-input"
+                                min="0.0001"
+                                step="any"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Dipole Tilt
+                                <span class="val-display">{{ editMagTilt }}°</span></label
+                            >
+                            <input
+                                v-model.number="editMagTilt"
+                                type="range"
+                                min="0"
+                                max="90"
+                                step="1"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Dipole Azimuth
+                                <span class="val-display">{{ editMagAzimuth }}°</span></label
+                            >
+                            <input
+                                v-model.number="editMagAzimuth"
+                                type="range"
+                                min="-180"
+                                max="180"
+                                step="1"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >Dipole Offset
+                                <span class="val-display">{{ editMagOffset }} R</span></label
+                            >
+                            <input
+                                v-model.number="editMagOffset"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                            />
+                        </div>
+
+                        <label class="checkbox-row">
+                            <input v-model="editMagReversed" type="checkbox" /> Reversed Polarity
+                        </label>
+                    </template>
+
                     <div class="button-group">
                         <button class="old-ui btn-with-icon" type="button" @click="onApply">
                             <span class="material-symbols-outlined">save</span>
@@ -451,6 +582,7 @@ import {
     simStore,
 } from '../sim-bridge';
 import type { ApplyBodyEditPayload, CreateBodyPayload } from '../sim-bridge';
+import type { IMagneticFieldOptions } from '../../interfaces';
 import PanelBase from './PanelBase.vue';
 
 const PRESET_BODIES = [
@@ -487,6 +619,12 @@ const temperature = ref(5778);
 const lightIntensity = ref(15000);
 const tilt = ref(0);
 const azimuth = ref(0);
+const hasMagneticField = ref(false);
+const magStrength = ref(0.3);
+const magTilt = ref(0);
+const magAzimuth = ref(0);
+const magOffset = ref(0);
+const magReversed = ref(false);
 
 const showMassRadius = computed(
     () =>
@@ -516,6 +654,10 @@ const canHaveAtmosphere = computed(() => {
     }
     return false;
 });
+/** Stars, planets, and moons can carry a magnetic field; nothing else can. */
+const showMagneticField = computed(
+    () => bodyType.value === 'sun' || bodyType.value === 'planet' || bodyType.value === 'moon'
+);
 const orbitParentName = computed(() => {
     const body = simStore.bodies.find((b) => b.id === simStore.selectedId);
     return body ? body.name : 'None';
@@ -536,6 +678,9 @@ watch(
         if (!isPlanet) hasRings.value = false;
     }
 );
+watch(showMagneticField, (val) => {
+    if (!val) hasMagneticField.value = false;
+});
 
 function resetAddForm(): void {
     addMode.value = 'preset';
@@ -550,6 +695,12 @@ function resetAddForm(): void {
     hasRings.value = false;
     tilt.value = 0;
     azimuth.value = 0;
+    hasMagneticField.value = false;
+    magStrength.value = 0.3;
+    magTilt.value = 0;
+    magAzimuth.value = 0;
+    magOffset.value = 0;
+    magReversed.value = false;
 }
 
 function applyRandomDefaults(): void {
@@ -564,6 +715,17 @@ function applyRandomDefaults(): void {
     if (defaults.inclination !== null) inclination.value = defaults.inclination;
     hasAtmosphere.value = defaults.hasAtmosphere;
     hasRings.value = defaults.hasRings;
+
+    // A null field means this body type never has one, so the checkbox comes up unchecked.
+    hasMagneticField.value = defaults.magneticField !== null;
+    if (defaults.magneticField) {
+        magStrength.value = roundStrength(defaults.magneticField.strength);
+        magTilt.value = Math.round(defaults.magneticField.tilt);
+        magAzimuth.value = Math.round(normalizeAzimuth(defaults.magneticField.azimuth));
+        magOffset.value = roundOffset(defaults.magneticField.offset ?? 0);
+        magReversed.value = defaults.magneticField.reversed ?? false;
+    }
+
     if (defaults.planetType) planetType.value = defaults.planetType;
     if (defaults.moonType) moonType.value = defaults.moonType;
 
@@ -571,6 +733,26 @@ function applyRandomDefaults(): void {
     if (bodyType.value === 'comet') {
         addTailColor.value = randomCometTailColorHex();
     }
+}
+
+// ── Magnetic field helpers ────────────────────────────────────────────────
+// The procedural roll produces azimuth over 0–360 and full-precision floats; the
+// sliders want -180..180 and something readable. These convert between the two.
+
+/** Wraps an angle into the -180..180 range the azimuth slider uses. */
+function normalizeAzimuth(deg: number): number {
+    const wrapped = ((deg % 360) + 360) % 360;
+    return wrapped > 180 ? wrapped - 360 : wrapped;
+}
+
+/** Field strengths span 0.001–100 G, so keep enough significant digits at the low end. */
+function roundStrength(gauss: number): number {
+    return Number(gauss.toPrecision(3));
+}
+
+/** Dipole offset is a 0–1 fraction of radius shown at slider (0.01) resolution. */
+function roundOffset(fraction: number): number {
+    return Math.round(fraction * 100) / 100;
 }
 
 /** Picks a random comet-tail color from the shared procedural palette, as a hex string. */
@@ -593,6 +775,25 @@ const editOrbitalAngle = ref(0);
 const editInclination = ref(0);
 const editTilt = ref(0);
 const editAzimuth = ref(0);
+const editHasMagneticField = ref(false);
+const editMagStrength = ref(0.3);
+const editMagTilt = ref(0);
+const editMagAzimuth = ref(0);
+const editMagOffset = ref(0);
+const editMagReversed = ref(false);
+
+/** Builds the IMagneticFieldOptions payload from a set of form refs, or null when unchecked. */
+function buildMagneticFieldPayload(
+    enabled: boolean,
+    strength: number,
+    fieldTilt: number,
+    fieldAzimuth: number,
+    offset: number,
+    reversed: boolean
+): IMagneticFieldOptions | null {
+    if (!enabled) return null;
+    return { strength, tilt: fieldTilt, azimuth: fieldAzimuth, offset, reversed };
+}
 
 function syncEditFormFromSnapshot(): void {
     const snap = bodyEditorStore.snapshot;
@@ -609,6 +810,15 @@ function syncEditFormFromSnapshot(): void {
     editInclination.value = Math.round(snap.inclination);
     editTilt.value = Math.round(snap.tilt);
     editAzimuth.value = Math.round(snap.azimuth);
+
+    editHasMagneticField.value = snap.magneticField !== null;
+    if (snap.magneticField) {
+        editMagStrength.value = roundStrength(snap.magneticField.strength);
+        editMagTilt.value = Math.round(snap.magneticField.tilt);
+        editMagAzimuth.value = Math.round(normalizeAzimuth(snap.magneticField.azimuth));
+        editMagOffset.value = roundOffset(snap.magneticField.offset ?? 0);
+        editMagReversed.value = snap.magneticField.reversed ?? false;
+    }
 }
 
 watch(() => bodyEditorStore.snapshot, syncEditFormFromSnapshot);
@@ -659,6 +869,14 @@ function onCreate(): void {
             orbitParentId: resolveOrbitParentId(simStore.selectedId),
             createTilt: showTilt.value ? tilt.value : null,
             createAzimuth: showTilt.value ? azimuth.value : null,
+            magneticField: buildMagneticFieldPayload(
+                showMagneticField.value && hasMagneticField.value,
+                magStrength.value,
+                magTilt.value,
+                magAzimuth.value,
+                magOffset.value,
+                magReversed.value
+            ),
             tailColor: bodyType.value === 'comet' ? addTailColor.value : null,
         };
         newId = createCustomBody(payload);
@@ -688,6 +906,17 @@ function onApply(): void {
         isStarBody: snap.isStar,
         editTilt: snap.hasTilt ? editTilt.value : null,
         editAzimuth: snap.hasTilt ? editAzimuth.value : null,
+        // Undefined leaves the field untouched for body types that can't carry one.
+        magneticField: snap.canHaveMagneticField
+            ? buildMagneticFieldPayload(
+                  editHasMagneticField.value,
+                  editMagStrength.value,
+                  editMagTilt.value,
+                  editMagAzimuth.value,
+                  editMagOffset.value,
+                  editMagReversed.value
+              )
+            : undefined,
     };
 
     applyBodyEdit(bodyId, payload);

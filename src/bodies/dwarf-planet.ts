@@ -32,6 +32,7 @@ export class DwarfPlanet extends CelestialBody {
                     rotation: options.rotation,
                     mesh: options.mesh,
                     seed: options.seed,
+                    magneticField: options.magneticField,
                 },
                 BodyTypeEnum.DwarfPlanet
             );

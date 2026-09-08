@@ -8,6 +8,11 @@ import {
     JUPITER_RADIUS,
     JUPITER_AXIS,
     JUPITER_AZIMUTH,
+    JUPITER_MAG_AZIMUTH,
+    JUPITER_MAG_OFFSET,
+    JUPITER_MAG_REVERSED,
+    JUPITER_MAG_STRENGTH,
+    JUPITER_MAG_TILT,
     JUPITER_ORBITAL_PERIOD_REAL,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
@@ -60,6 +65,13 @@ export class Jupiter extends Planet {
             atmosphere: {
                 radius: JUPITER_RADIUS * 1.07,
                 tint: 0xffcc88,
+            },
+            magneticField: {
+                strength: JUPITER_MAG_STRENGTH,
+                tilt: JUPITER_MAG_TILT,
+                azimuth: JUPITER_MAG_AZIMUTH,
+                offset: JUPITER_MAG_OFFSET,
+                reversed: JUPITER_MAG_REVERSED,
             },
         });
     }

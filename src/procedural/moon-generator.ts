@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { IStateDependencies } from '../interfaces';
+import type { IMagneticFieldOptions, IStateDependencies } from '../interfaces';
 import { SeededRandom } from '../utilities/prng';
 import { calculateTrajectory } from '../physics/physics';
 import { randomMoonParams } from '../utilities/body-params';
@@ -36,6 +36,12 @@ export type ProceduralMoonCreation = {
      * Only set for ocean-type moons.
      */
     textureSeed?: string;
+
+    /**
+     * Optional override for this moon's magnetic field, set by the Add/Edit panel.
+     * Undefined means "roll for one"; an explicit null means "no field".
+     */
+    magneticField?: IMagneticFieldOptions | null;
 
     parentIndex: number;
 };

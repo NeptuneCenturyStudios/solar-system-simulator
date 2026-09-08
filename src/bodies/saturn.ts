@@ -8,6 +8,11 @@ import {
     SATURN_RADIUS,
     SATURN_AXIS,
     SATURN_AZIMUTH,
+    SATURN_MAG_AZIMUTH,
+    SATURN_MAG_OFFSET,
+    SATURN_MAG_REVERSED,
+    SATURN_MAG_STRENGTH,
+    SATURN_MAG_TILT,
     SATURN_ORBITAL_PERIOD_REAL,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
@@ -60,6 +65,13 @@ export class Saturn extends Planet {
             atmosphere: {
                 radius: SATURN_RADIUS * 1.07,
                 tint: 0xffeebb,
+            },
+            magneticField: {
+                strength: SATURN_MAG_STRENGTH,
+                tilt: SATURN_MAG_TILT,
+                azimuth: SATURN_MAG_AZIMUTH,
+                offset: SATURN_MAG_OFFSET,
+                reversed: SATURN_MAG_REVERSED,
             },
         });
     }

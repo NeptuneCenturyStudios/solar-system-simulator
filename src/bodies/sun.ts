@@ -6,6 +6,11 @@ import {
     SUN_AXIS,
     SUN_AZIMUTH,
     SUN_LIGHT_INTENSITY,
+    SUN_MAG_AZIMUTH,
+    SUN_MAG_OFFSET,
+    SUN_MAG_REVERSED,
+    SUN_MAG_STRENGTH,
+    SUN_MAG_TILT,
     SUN_MASS,
     SUN_RADIUS,
 } from '../utilities/consts';
@@ -26,6 +31,13 @@ export class Sun extends MainSequenceStar {
             lightDistance: STAR_LIGHT_DISTANCE,
             rotation: { tilt: SUN_AXIS, speed: rotSpeed, azimuth: SUN_AZIMUTH },
             mesh: undefined, // Todo, implment star material/mesh in MainSequenceStar and use here
+            magneticField: {
+                strength: SUN_MAG_STRENGTH,
+                tilt: SUN_MAG_TILT,
+                azimuth: SUN_MAG_AZIMUTH,
+                offset: SUN_MAG_OFFSET,
+                reversed: SUN_MAG_REVERSED,
+            },
         });
     }
 }

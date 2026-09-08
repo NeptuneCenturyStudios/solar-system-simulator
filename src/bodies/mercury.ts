@@ -4,6 +4,11 @@ import {
     MERCURY_AXIS,
     MERCURY_AZIMUTH,
     MERCURY_DIST,
+    MERCURY_MAG_AZIMUTH,
+    MERCURY_MAG_OFFSET,
+    MERCURY_MAG_REVERSED,
+    MERCURY_MAG_STRENGTH,
+    MERCURY_MAG_TILT,
     MERCURY_MASS,
     MERCURY_ORBITAL_PERIOD_REAL,
     MERCURY_RADIUS,
@@ -61,6 +66,13 @@ export class Mercury extends Planet {
             maxTrail: 2000,
             bodySubtype: PlanetTypeEnum.Terrestrial,
             mesh: mesh,
+            magneticField: {
+                strength: MERCURY_MAG_STRENGTH,
+                tilt: MERCURY_MAG_TILT,
+                azimuth: MERCURY_MAG_AZIMUTH,
+                offset: MERCURY_MAG_OFFSET,
+                reversed: MERCURY_MAG_REVERSED,
+            },
         });
     }
 }

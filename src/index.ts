@@ -75,6 +75,7 @@ import {
     getBodyTypeLabel,
 } from './utilities/utilities';
 import { SeededRandom } from './utilities/prng';
+import { generateSeedString } from './procedural/seed-utils';
 import { setBodyRadius } from './physics/physics';
 import {
     randomStarParams,
@@ -129,6 +130,7 @@ import { MainSequenceStar } from './bodies/main-sequence-star';
 import { createMainSequenceStarFromParams } from './procedural/star-factory';
 import { createPlanetBodyFromProceduralCreation } from './procedural/planet-factory';
 import { upgradeProceduralTexture } from './procedural/texture-upgrader';
+import { rollMagneticField, type MagneticFieldKind } from './procedural/magnetic-field';
 import { Asteroid } from './bodies/asteroid';
 import { Wormhole } from './bodies/wormhole';
 import {
@@ -142,6 +144,7 @@ import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-l
 import {
     IAutopilotContext,
     IFlightControlContext,
+    IMagneticFieldOptions,
     IProceduralGeneratorPromptResult,
     ISimStateSnapshot,
     IStateDependencies,
@@ -1126,7 +1129,13 @@ function createNewBody(
     orbitParent: Body | null = null,
     createTilt: number | null = null,
     createAzimuth: number | null = null,
-    tailColor: string | null = null
+    tailColor: string | null = null,
+    // NOTE: this parameter list is long enough that it should become an options object;
+    // left positional here to match the existing call sites rather than widen this change.
+    //
+    // Undefined (the default, for callers that omit it) means "roll one procedurally";
+    // an explicit null from the panel means "this body has no field".
+    magneticField: IMagneticFieldOptions | null | undefined = undefined
 ) {
     let newBody;
     let moonCreationParent: Body | null = null; // tracked so post-creation can re-focus the parent
@@ -1170,6 +1179,7 @@ function createNewBody(
                       )
                     : new THREE.Vector3(0, 0, 0),
             rotation: { tilt: rotationTilt, speed: rotationSpeed },
+            magneticField,
         });
     } else if (bodyType === 'planet') {
         // Create a new planet near the camera with appropriate orbital velocity
@@ -1238,6 +1248,7 @@ function createNewBody(
             rotationTilt: planetRotationTilt,
             rotationAzimuth: planetRotationAzimuth,
             hasRings,
+            magneticField,
             textureSeed: planetSeed,
         });
 
@@ -1435,6 +1446,12 @@ function createNewBody(
                 rotation: { tilt: 0, speed: moonRotationSpeed },
                 mesh,
                 seed: moonSeed,
+                // Unlike the star and planet branches, this constructs the Moon directly
+                // rather than going through moon-factory, so roll here when unspecified.
+                magneticField:
+                    magneticField !== undefined
+                        ? magneticField
+                        : rollMagneticField(new SeededRandom(`${moonId}|magnetic-field`), 'moon'),
             });
 
             // Kick off background procedural texture upgrade (desert/ocean/frozen only)
@@ -3268,6 +3285,14 @@ registerVueSimHooks({
             inclination,
             tilt: rotation?.tilt ?? 0,
             azimuth: rotation?.azimuth ?? 0,
+            canHaveMagneticField: isBodyType(
+                body,
+                BodyTypeEnum.Star |
+                    BodyTypeEnum.Planet |
+                    BodyTypeEnum.DwarfPlanet |
+                    BodyTypeEnum.Moon
+            ),
+            magneticField: body instanceof CelestialBody ? body.magneticField : null,
             colorHex: toHexColor(colorValue),
             tailColorHex: isCometBody ? toHexColor((body as unknown as Comet).tailColor) : null,
         };
@@ -3293,7 +3318,8 @@ registerVueSimHooks({
             orbitParent,
             payload.createTilt,
             payload.createAzimuth,
-            payload.tailColor
+            payload.tailColor,
+            payload.magneticField
         );
         return body && !body._isDisposed ? body.id : null;
     },
@@ -3331,6 +3357,9 @@ registerVueSimHooks({
         ] as const;
         const MOON_TYPES = ['solid', 'temperate', 'volcanic', 'ocean', 'frozen', 'desert'] as const;
         const randBool = () => Math.random() < 0.5;
+        // The panel's randomize button is unseeded, so feed the shared roll a throwaway seed.
+        const rollField = (kind: MagneticFieldKind) =>
+            rollMagneticField(new SeededRandom(generateSeedString()), kind);
 
         if (bodyType === 'sun') {
             const star = randomStarParams();
@@ -3345,6 +3374,7 @@ registerVueSimHooks({
                 inclination: tilt,
                 hasAtmosphere: false,
                 hasRings: false,
+                magneticField: rollField('star'),
                 planetType: null,
                 moonType: null,
             };
@@ -3366,6 +3396,7 @@ registerVueSimHooks({
                 inclination,
                 hasAtmosphere: false,
                 hasRings: false,
+                magneticField: null,
                 planetType: null,
                 moonType: null,
             };
@@ -3383,6 +3414,7 @@ registerVueSimHooks({
                 inclination,
                 hasAtmosphere: false,
                 hasRings: false,
+                magneticField: null,
                 planetType: null,
                 moonType: null,
             };
@@ -3407,6 +3439,13 @@ registerVueSimHooks({
                 inclination,
                 hasAtmosphere: canHaveAtmosphere ? randBool() : planetType === 'temperate',
                 hasRings: randBool(),
+                magneticField: rollField(
+                    planetType === 'gas_giant'
+                        ? 'gasGiant'
+                        : planetType === 'ice_giant'
+                          ? 'iceGiant'
+                          : 'solid'
+                ),
                 planetType,
                 moonType: null,
             };
@@ -3425,6 +3464,7 @@ registerVueSimHooks({
                 inclination,
                 hasAtmosphere: moonType === 'temperate' ? true : randBool(),
                 hasRings: false,
+                magneticField: rollField('moon'),
                 planetType: null,
                 moonType,
             };
@@ -3442,6 +3482,7 @@ registerVueSimHooks({
             inclination,
             hasAtmosphere: false,
             hasRings: false,
+            magneticField: null,
             planetType: null,
             moonType: null,
         };
@@ -3742,6 +3783,8 @@ interface IApplyBodyEditParams {
     tailColor: string | null;
     editTilt: number | null;
     editAzimuth: number | null;
+    /** Dipole magnetic field, or null to clear it. Undefined leaves it untouched. */
+    magneticField?: IMagneticFieldOptions | null;
 }
 
 function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
@@ -3760,6 +3803,7 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         tailColor,
         editTilt,
         editAzimuth,
+        magneticField,
     } = params;
 
     // Update name
@@ -3868,6 +3912,12 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         } catch (e) {
             console.error('Error applying comet tail color edit:', e);
         }
+    }
+
+    // Apply the magnetic field when the panel sent one. Attribute-only, so there is
+    // nothing visual to rebuild — undefined means "leave it alone", null means "clear it".
+    if (magneticField !== undefined && body instanceof CelestialBody) {
+        body.magneticField = magneticField;
     }
 
     // Apply axial tilt and azimuth if the sliders were visible and the body supports rotation
@@ -4435,7 +4485,9 @@ async function launchSystem(
     // Every launch mode except "Build your own system" runs through a
     // generator, so show the progress overlay while it works.
     const progressReporter =
-        mode === SimulationStartMode.Empty ? undefined : showProceduralProgress({'title': 'Generate System'});
+        mode === SimulationStartMode.Empty
+            ? undefined
+            : showProceduralProgress({ title: 'Generate System' });
     await spawn(mode, proceduralResult, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
     if (progressReporter) hideProceduralModal();

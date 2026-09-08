@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { Body } from './body';
-import { ICelestialBodyCreationOptions, IDeathOptions, IRotation } from '../interfaces';
+import {
+    ICelestialBodyCreationOptions,
+    IDeathOptions,
+    IMagneticFieldOptions,
+    IRotation,
+} from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
 import { triggerScreenFlash } from '../effects/screen-flash';
@@ -48,6 +53,13 @@ export class CelestialBody extends Body {
     clouds: THREE.Mesh | null = null;
     cloudRotationSpeed: number = 0;
     atmosphereShell: AtmosphereShellHandle | null = null;
+
+    /**
+     * Dipole magnetic field, or null when the body has no global field.
+     * Attribute-only — nothing is rendered from it, so there is nothing to dispose
+     * in `die()` or re-sync in `updateVisuals()`.
+     */
+    magneticField: IMagneticFieldOptions | null = null;
 
     // Tidal lock properties
     tidalLockEnabled: boolean;
@@ -100,7 +112,18 @@ export class CelestialBody extends Body {
             );
         }
 
-        super(dependencies, scene, options.mass, options.radius, options.pos, options.vel, options.mesh, options.id, options.name, bodyType);
+        super(
+            dependencies,
+            scene,
+            options.mass,
+            options.radius,
+            options.pos,
+            options.vel,
+            options.mesh,
+            options.id,
+            options.name,
+            bodyType
+        );
         this.seed = options.seed;
 
         this.dependencies = dependencies;
@@ -110,6 +133,8 @@ export class CelestialBody extends Body {
         this.color = 0xffffff;
         this.bodyType = bodyType;
         this.rotation = options.rotation ?? { tilt: 0, speed: 0 };
+
+        this.magneticField = options.magneticField ?? null;
 
         // Create the atmosphere shell if atmosphere options were provided
         if (options.atmosphere) {
