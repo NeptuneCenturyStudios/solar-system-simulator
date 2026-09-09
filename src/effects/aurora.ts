@@ -45,6 +45,26 @@ const CURTAIN_HEIGHT_STRONG = 0.075;
 const OPACITY_WEAK = 0.25;
 const OPACITY_STRONG = 1.0;
 
+/**
+ * Ceiling on the per-frame animation step, in simulation seconds.
+ *
+ * Curtain drift and fold motion are visual flourishes rather than physics, so they should
+ * run at a steady wall-clock pace. Without this they would scale with `dtTotal` and strobe
+ * uncontrollably as soon as the user winds the time scale up.
+ */
+const MAX_ANIM_DELTA = 0.05;
+
+/** Radians/sec at which an oval's fold harmonics travel around the ring. */
+const WARP_DRIFT_MIN = 0.15;
+const WARP_DRIFT_MAX = 0.5;
+
+/** Radians/sec of the slow substorm breathing that expands and contracts the whole oval. */
+const BREATH_RATE_MIN = 0.05;
+const BREATH_RATE_MAX = 0.11;
+
+/** Peak substorm expansion, as a fraction of the oval's base co-latitude. */
+const BREATH_AMOUNT = 0.12;
+
 /** The two concentric layers drawn per pole: co-latitude scale, opacity scale, and drift rate. */
 const LAYERS = [
     { colatitudeMult: 1.0, opacityMult: 1.0, drift: 0.035 },
@@ -148,45 +168,89 @@ function drawCurtainTexture(rng: SeededRandom): HTMLCanvasElement {
     return canvas;
 }
 
+/** One term of the harmonic sum that warps an oval away from a perfect circle. */
+type Harmonic = {
+    harmonic: number;
+    amplitude: number;
+    /** Advanced every frame by `drift`, which sends the fold travelling around the ring. */
+    phase: number;
+    /** Radians per simulation second, signed so different terms travel opposite ways. */
+    drift: number;
+};
+
 /**
- * Builds one auroral oval as a closed ribbon of quads around the magnetic pole.
+ * The animated state of one auroral oval.
  *
- * Geometry is generated in a frame where the magnetic axis is +Y; the caller rotates the
- * containing group onto the real axis. `hemisphere` is +1 for the northern oval and -1 for
- * the southern one, which mirrors the band through the equatorial plane.
+ * Vertex positions are a pure function of this, so each frame re-evaluates the ribbon in
+ * place rather than rebuilding it — see `writeRibbonPositions`.
  */
-function buildRibbonGeometry(
+type RibbonShape = {
+    radius: number;
+    baseRadius: number;
+    colatitudeRad: number;
+    curtainHeight: number;
+    hemisphere: 1 | -1;
+    warp: Harmonic[];
+    heightWobble: Harmonic[];
+    /** Drives the slow substorm breathing that expands and contracts the whole oval. */
+    breathPhase: number;
+    breathRate: number;
+};
+
+/** Draws the seeded harmonics that give one oval both its shape and its motion. */
+function createRibbonShape(
     radius: number,
     colatitudeRad: number,
     curtainHeight: number,
     hemisphere: 1 | -1,
     rng: SeededRandom
-): THREE.BufferGeometry {
-    // Seeded harmonics warp the oval away from a perfect circle. Integer harmonic numbers
-    // keep the wobble continuous across the φ = 0 seam.
-    const warp = [2, 3, 5].map((harmonic) => ({
-        harmonic,
-        amplitude: rng.range(0.04, 0.12),
+): RibbonShape {
+    // Integer harmonic numbers keep the wobble continuous across the phi = 0 seam. Drift
+    // signs are mixed so the terms interfere rather than rotating the oval rigidly — that
+    // interference is what makes the motion read as writhing instead of spinning.
+    const harmonic = (n: number, minAmp: number, maxAmp: number): Harmonic => ({
+        harmonic: n,
+        amplitude: rng.range(minAmp, maxAmp),
         phase: rng.range(0, Math.PI * 2),
-    }));
-    const heightWobble = [2, 4, 7].map((harmonic) => ({
-        harmonic,
-        amplitude: rng.range(0.1, 0.3),
-        phase: rng.range(0, Math.PI * 2),
-    }));
+        drift: rng.range(WARP_DRIFT_MIN, WARP_DRIFT_MAX) * (rng.chance(0.5) ? 1 : -1),
+    });
 
-    const baseRadius = radius * BASE_ALTITUDE;
+    return {
+        radius,
+        baseRadius: radius * BASE_ALTITUDE,
+        colatitudeRad,
+        curtainHeight,
+        hemisphere,
+        warp: [2, 3, 5].map((n) => harmonic(n, 0.04, 0.12)),
+        heightWobble: [2, 4, 7].map((n) => harmonic(n, 0.1, 0.3)),
+        breathPhase: rng.range(0, Math.PI * 2),
+        breathRate: rng.range(BREATH_RATE_MIN, BREATH_RATE_MAX),
+    };
+}
 
-    // One extra vertex pair closes the ring. It sits exactly on top of the first pair —
-    // φ = 2π and the integer warp harmonics both repeat — but carries u = TEXTURE_REPEAT
-    // instead of u = 0. Wrapping the last quad back onto vertex 0 instead would run the
-    // texture backwards across the entire seam segment, leaving a smeared vertical band.
-    const vertexPairs = RING_SEGMENTS + 1;
-    const positions = new Float32Array(vertexPairs * 2 * 3);
-    const uvs = new Float32Array(vertexPairs * 2 * 2);
-    const indices: number[] = [];
+/** Advances an oval's fold phases and its breathing. `dt` is already clamped by the caller. */
+function advanceRibbonShape(shape: RibbonShape, dt: number): void {
+    for (const w of shape.warp) w.phase += w.drift * dt;
+    for (const w of shape.heightWobble) w.phase += w.drift * dt;
+    shape.breathPhase += shape.breathRate * dt;
+}
 
-    for (let i = 0; i < vertexPairs; i++) {
+/**
+ * Evaluates the oval into an existing position buffer.
+ *
+ * Writes `(RING_SEGMENTS + 1) * 2` vertices — a base/top pair per segment, plus one extra
+ * pair closing the ring (see `buildRibbonGeometry`).
+ */
+function writeRibbonPositions(positions: Float32Array, shape: RibbonShape): void {
+    const { radius, baseRadius, hemisphere, warp, heightWobble } = shape;
+
+    // A real substorm pushes the oval equatorward and drives the curtains higher at the same
+    // time, so both scale together off the one breathing term.
+    const breath = Math.sin(shape.breathPhase);
+    const colatitudeRad = shape.colatitudeRad * (1 + BREATH_AMOUNT * breath);
+    const curtainHeight = shape.curtainHeight * (1 + BREATH_AMOUNT * 1.5 * breath);
+
+    for (let i = 0; i <= RING_SEGMENTS; i++) {
         const phi = (i / RING_SEGMENTS) * Math.PI * 2;
 
         let warpSum = 0;
@@ -205,8 +269,7 @@ function buildRibbonGeometry(
         const cosPhi = Math.cos(phi);
         const sinPhi = Math.sin(phi);
 
-        const baseIdx = i * 2;
-        const p = baseIdx * 3;
+        const p = i * 2 * 3;
         positions[p] = Math.sin(theta) * cosPhi * baseRadius;
         positions[p + 1] = hemisphere * Math.cos(theta) * baseRadius;
         positions[p + 2] = Math.sin(theta) * sinPhi * baseRadius;
@@ -215,7 +278,35 @@ function buildRibbonGeometry(
         positions[p + 3] = Math.sin(thetaTop) * cosPhi * topRadius;
         positions[p + 4] = hemisphere * Math.cos(thetaTop) * topRadius;
         positions[p + 5] = Math.sin(thetaTop) * sinPhi * topRadius;
+    }
+}
 
+/**
+ * Builds one auroral oval as a closed ribbon of quads around the magnetic pole.
+ *
+ * Geometry is generated in a frame where the magnetic axis is +Y; the caller rotates the
+ * containing group onto the real axis. `shape.hemisphere` is +1 for the northern oval and
+ * -1 for the southern one, which mirrors the band through the equatorial plane.
+ *
+ * Returns the position buffer and its attribute alongside the geometry, so the caller can
+ * keep re-evaluating the ribbon in place as the shape animates.
+ */
+function buildRibbonGeometry(shape: RibbonShape): {
+    geo: THREE.BufferGeometry;
+    positions: Float32Array;
+    positionAttr: THREE.BufferAttribute;
+} {
+    // One extra vertex pair closes the ring. It sits exactly on top of the first pair —
+    // phi = 2pi and the integer warp harmonics both repeat — but carries u = TEXTURE_REPEAT
+    // instead of u = 0. Wrapping the last quad back onto vertex 0 instead would run the
+    // texture backwards across the entire seam segment, leaving a smeared vertical band.
+    const vertexPairs = RING_SEGMENTS + 1;
+    const positions = new Float32Array(vertexPairs * 2 * 3);
+    const uvs = new Float32Array(vertexPairs * 2 * 2);
+    const indices: number[] = [];
+
+    for (let i = 0; i < vertexPairs; i++) {
+        const baseIdx = i * 2;
         const u = (i / RING_SEGMENTS) * TEXTURE_REPEAT;
         const t = baseIdx * 2;
         uvs[t] = u;
@@ -231,12 +322,24 @@ function buildRibbonGeometry(
         }
     }
 
+    writeRibbonPositions(positions, shape);
+
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const positionAttr = new THREE.BufferAttribute(positions, 3);
+    positionAttr.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('position', positionAttr);
     geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     geo.setIndex(indices);
-    geo.computeBoundingSphere();
-    return geo;
+
+    // Fixed rather than recomputed per frame: every vertex lies between the body centre and
+    // `baseRadius + curtainHeight`, whatever the folds and breathing are doing, so an
+    // origin-centred sphere at that outer limit always contains the ribbon.
+    geo.boundingSphere = new THREE.Sphere(
+        new THREE.Vector3(0, 0, 0),
+        shape.baseRadius + shape.curtainHeight * (1 + BREATH_AMOUNT * 1.5) * 1.05
+    );
+
+    return { geo, positions, positionAttr };
 }
 
 /**
@@ -307,7 +410,12 @@ export function createAurora(
         geo: THREE.BufferGeometry;
         mat: THREE.MeshBasicMaterial;
         tex: THREE.Texture;
-        drift: number;
+        /** Animated shape state, re-evaluated into `positions` every frame. */
+        shape: RibbonShape;
+        positions: Float32Array;
+        positionAttr: THREE.BufferAttribute;
+        /** Texture scroll rate, distinct from the fold drift inside `shape`. */
+        scrollRate: number;
         baseOpacity: number;
         pulsePhase: number;
         pulseRate: number;
@@ -321,7 +429,8 @@ export function createAurora(
 
         for (const layer of LAYERS) {
             const colatitude = baseColatitude * colatitudeScale * layer.colatitudeMult;
-            const geo = buildRibbonGeometry(radius, colatitude, baseHeight, hemisphere, rng);
+            const shape = createRibbonShape(radius, colatitude, baseHeight, hemisphere, rng);
+            const { geo, positions, positionAttr } = buildRibbonGeometry(shape);
 
             const tex = baseTexture.clone();
             tex.needsUpdate = true;
@@ -347,7 +456,10 @@ export function createAurora(
                 geo,
                 mat,
                 tex,
-                drift: layer.drift,
+                shape,
+                positions,
+                positionAttr,
+                scrollRate: layer.drift,
                 baseOpacity: opacity,
                 pulsePhase: rng.range(0, Math.PI * 2),
                 pulseRate: rng.range(0.15, 0.35),
@@ -384,12 +496,23 @@ export function createAurora(
             }
             group.visible = true;
 
-            elapsed += dtTotal;
+            // Clamped so the curtains keep a steady wall-clock pace however fast the
+            // simulation is running, but still signed, so reversing time reverses the motion.
+            // Zero means the sim is paused, and the aurora holds its pose with it.
+            const dt = Math.sign(dtTotal) * Math.min(Math.abs(dtTotal), MAX_ANIM_DELTA);
+            if (dt === 0) return;
+
+            elapsed += dt;
             for (const r of ribbons) {
-                // Signed, so reversing simulation time reverses the curtain drift.
-                r.tex.offset.x += r.drift * dtTotal;
+                r.tex.offset.x += r.scrollRate * dt;
                 r.mat.opacity =
                     r.baseOpacity * (0.75 + 0.25 * Math.sin(elapsed * r.pulseRate + r.pulsePhase));
+
+                // Re-evaluate the oval in place: the folds travel around the ring and the
+                // whole band slowly breathes wider and narrower.
+                advanceRibbonShape(r.shape, dt);
+                writeRibbonPositions(r.positions, r.shape);
+                r.positionAttr.needsUpdate = true;
             }
         },
 
