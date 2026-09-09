@@ -42,8 +42,8 @@ const CURTAIN_HEIGHT_WEAK = 0.025;
 const CURTAIN_HEIGHT_STRONG = 0.075;
 
 /** Base opacity at min and max field strength. */
-const OPACITY_WEAK = 0.18;
-const OPACITY_STRONG = 0.95;
+const OPACITY_WEAK = 0.25;
+const OPACITY_STRONG = 1.0;
 
 /** The two concentric layers drawn per pole: co-latitude scale, opacity scale, and drift rate. */
 const LAYERS = [
@@ -60,14 +60,12 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 /**
- * Draws the aurora curtain texture: a vertical emission-colour gradient crossed by
- * ragged vertical striations.
+ * Draws the aurora curtain texture: ragged vertical striations, modulated into bright and
+ * dim arcs, then tinted by altitude.
  *
- * The gradient follows the real altitude banding of auroral emission — atomic oxygen
- * red (630 nm) high up, oxygen green (557.7 nm) forming the bright core, and an
- * ionised-nitrogen violet fringe along the bottom edge.
- *
- * `CanvasTexture` flips Y, so canvas row 0 becomes v = 1 — the *top* of the curtain.
+ * Built in three passes — the alpha structure in white, a horizontal brightness mask, then
+ * the emission colours. Applying colour last keeps the striations purely in the alpha
+ * channel, so one `source-in` fill can tint the whole sheet without flattening them.
  */
 function drawCurtainTexture(rng: SeededRandom): HTMLCanvasElement {
     const canvas = document.createElement('canvas');
@@ -76,22 +74,18 @@ function drawCurtainTexture(rng: SeededRandom): HTMLCanvasElement {
     const ctx = canvas.getContext('2d')!;
     ctx.clearRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
 
-    const grad = ctx.createLinearGradient(0, 0, 0, TEX_HEIGHT);
-    grad.addColorStop(0.0, 'rgba(255, 60, 110, 0.0)'); // fades out at the very top
-    grad.addColorStop(0.18, 'rgba(255, 70, 120, 0.35)'); // high-altitude oxygen red
-    grad.addColorStop(0.4, 'rgba(120, 255, 190, 0.75)'); // cyan-green transition
-    grad.addColorStop(0.75, 'rgba(60, 255, 140, 0.95)'); // oxygen green core
-    grad.addColorStop(0.92, 'rgba(150, 90, 255, 0.7)'); // nitrogen violet fringe
-    grad.addColorStop(1.0, 'rgba(120, 70, 220, 0.0)'); // fades out at the base
-    ctx.fillStyle = grad;
+    // ── Pass 1: alpha structure, drawn in white ──────────────────────────────────────
+    // A continuous base sheet first, so the curtain reads as a veil rather than loose rays.
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.fillRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
 
-    // Striations. Drawn additively so overlapping bands brighten rather than flatten.
+    // Striations, drawn additively so overlapping bands brighten rather than flatten.
     ctx.globalCompositeOperation = 'lighter';
 
     const drawBand = (x: number, width: number, alpha: number) => {
         // Any band crossing the right edge is drawn again on the left so the texture tiles.
-        for (const originX of x + width > TEX_WIDTH ? [x, x - TEX_WIDTH] : [x]) {
+        const origins = x + width > TEX_WIDTH ? [x, x - TEX_WIDTH] : [x];
+        for (const originX of origins) {
             const bandGrad = ctx.createLinearGradient(originX, 0, originX + width, 0);
             bandGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
             bandGrad.addColorStop(0.5, `rgba(255, 255, 255, ${alpha})`);
@@ -103,26 +97,52 @@ function drawCurtainTexture(rng: SeededRandom): HTMLCanvasElement {
 
     // Fine bands give the curtain its rayed structure.
     for (let i = 0; i < 160; i++) {
-        drawBand(rng.range(0, TEX_WIDTH), rng.range(1, 8), rng.range(0.05, 0.35));
+        drawBand(rng.range(0, TEX_WIDTH), rng.range(1, 8), rng.range(0.04, 0.22));
     }
 
     // A second, wider and dimmer pass groups those rays into broader folds.
     for (let i = 0; i < 24; i++) {
-        drawBand(rng.range(0, TEX_WIDTH), rng.range(20, 70), rng.range(0.04, 0.12));
+        drawBand(rng.range(0, TEX_WIDTH), rng.range(20, 70), rng.range(0.03, 0.1));
     }
 
-    // Low-frequency brightness modulation so the finished ring has bright and dim arcs
-    // instead of glowing uniformly all the way around.
-    ctx.globalCompositeOperation = 'destination-in';
+    // ── Pass 2: low-frequency brightness modulation ──────────────────────────────────
+    // Gives the finished ring bright and dim arcs instead of an even glow all the way round.
+    //
+    // This has to be a single fill spanning the full width. `destination-in` clears the
+    // destination everywhere the *source* is absent, so stepping across the canvas column by
+    // column would leave only the last column standing — the whole texture ends up empty.
     const modPhase = rng.range(0, Math.PI * 2);
     const modPhase2 = rng.range(0, Math.PI * 2);
-    for (let x = 0; x < TEX_WIDTH; x++) {
-        const u = (x / TEX_WIDTH) * Math.PI * 2;
-        // Harmonics 1 and 3 both tile exactly over the texture width, keeping the seam seamless.
+    const modGrad = ctx.createLinearGradient(0, 0, TEX_WIDTH, 0);
+    const MOD_STOPS = 64;
+    for (let i = 0; i <= MOD_STOPS; i++) {
+        const t = i / MOD_STOPS;
+        const u = t * Math.PI * 2;
+        // Integer harmonics repeat exactly over the width, so the seam stays invisible.
         const m = 0.55 + 0.3 * Math.sin(u + modPhase) + 0.15 * Math.sin(3 * u + modPhase2);
-        ctx.fillStyle = `rgba(0, 0, 0, ${clamp01(m)})`;
-        ctx.fillRect(x, 0, 1, TEX_HEIGHT);
+        modGrad.addColorStop(t, `rgba(0, 0, 0, ${clamp01(m).toFixed(4)})`);
     }
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.fillStyle = modGrad;
+    ctx.fillRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
+
+    // ── Pass 3: emission colour by altitude ──────────────────────────────────────────
+    // `source-in` replaces the RGB while multiplying this gradient's alpha into the
+    // structure above, so the rays survive as variation in opacity. The banding follows real
+    // auroral chemistry: atomic-oxygen red (630 nm) high up, the oxygen green core
+    // (557.7 nm), and an ionised-nitrogen violet fringe along the bottom edge.
+    // `CanvasTexture` flips Y, so row 0 becomes v = 1 — the top of the curtain.
+    const colorGrad = ctx.createLinearGradient(0, 0, 0, TEX_HEIGHT);
+    colorGrad.addColorStop(0.0, 'rgba(255, 60, 110, 0.0)'); // fades out at the very top
+    colorGrad.addColorStop(0.18, 'rgba(255, 70, 120, 0.45)'); // high-altitude oxygen red
+    colorGrad.addColorStop(0.4, 'rgba(120, 255, 190, 0.85)'); // cyan-green transition
+    colorGrad.addColorStop(0.75, 'rgba(60, 255, 140, 1.0)'); // oxygen green core
+    colorGrad.addColorStop(0.92, 'rgba(150, 90, 255, 0.75)'); // nitrogen violet fringe
+    colorGrad.addColorStop(1.0, 'rgba(120, 70, 220, 0.0)'); // fades out at the base
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = colorGrad;
+    ctx.fillRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
+
     ctx.globalCompositeOperation = 'source-over';
 
     return canvas;
