@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
-import { IStateDependencies } from '../interfaces';
+import { IStateDependencies, IMagneticFieldOptions } from '../interfaces';
 import { settingsStore } from '../settings/settings-store';
+import { computeMagneticAxis } from '../procedural/magnetic-field';
 
 /**
  * Number of azimuthal loops evenly spaced around the magnetic axis.
@@ -35,9 +36,10 @@ const FIELD_LOOP_RADIUS_MULT = 20;
  * equatorial maximum reach. Multiple lines are placed at evenly-spaced
  * azimuthal angles around the magnetic axis.
  *
- * The magnetic axis shares the same orientation logic as PulsarBeam:
- *  - Offset 10–45° from the spin (rotation) axis
- *  - Precesses (spins) around the rotation axis as the pulsar rotates
+ * The magnetic axis is derived from the host body's real `IMagneticFieldOptions`
+ * (tilt/azimuth relative to the spin/rotation axis) via `computeMagneticAxis`, the same
+ * pure function `Pulsar` uses to derive PulsarBeam's axis — both agree by construction.
+ * That axis then precesses (spins) around the rotation axis as the pulsar rotates.
  *
  * **Particles mode** (settingsStore.settings.particleEffectsEnabled = true):
  *  Small particles travel continuously along each field line, with colour
@@ -92,7 +94,7 @@ export class PulsarMagneticField implements IEffect {
         radius: number,
         rotationAxis: THREE.Vector3,
         rotationSpeed: number,
-        magneticAxisBase: THREE.Vector3
+        magneticField: IMagneticFieldOptions
     ) {
         this.dependencies = dependencies;
         this.scene = scene;
@@ -101,7 +103,7 @@ export class PulsarMagneticField implements IEffect {
         this.rotationAxis = rotationAxis.clone().normalize();
         this.rotationSpeed = rotationSpeed;
         this.fieldLoopRadius = radius * FIELD_LOOP_RADIUS_MULT;
-        this.magneticAxisBase = magneticAxisBase.clone().normalize();
+        this.magneticAxisBase = computeMagneticAxis(this.rotationAxis, magneticField);
 
         this._buildParticles();
     }

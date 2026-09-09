@@ -1,9 +1,17 @@
 import * as THREE from 'three';
 import { Star, IStarCreationOptions } from './star';
-import { IStateDependencies, ISiphonTarget, IMassTransferBody, IDeathOptions } from '../interfaces';
+import {
+    IStateDependencies,
+    ISiphonTarget,
+    IMassTransferBody,
+    IDeathOptions,
+    IMagneticFieldOptions,
+} from '../interfaces';
 import { loadSrgbTexture } from '../drawing/textures';
 import { IRotation } from '../interfaces';
 import { SUN_MASS, EARTH_DIST, DIST_SCALE } from '../utilities/consts';
+import { rollMagneticField, computeMagneticAxis } from '../procedural/magnetic-field';
+import { SeededRandom } from '../utilities/prng';
 import { PulsarBeam } from '../effects/pulsar-beam';
 import { StarGlow } from '../effects/star-glow';
 import { AccretionDiskEffect, PULSAR_DISK_COLORS } from '../effects/accretion-disk';
@@ -76,7 +84,8 @@ export class Pulsar extends Star implements IMassTransferBody {
         id: string,
         name: string,
         progenitorRotation: IRotation,
-        progenitorRadius: number
+        progenitorRadius: number,
+        progenitorMagneticField: IMagneticFieldOptions | null
     ) {
         const pulsarTexture = loadSrgbTexture('./assets/textures/bodies/2k/pulsar.jpg');
         const pulsarRadius = massToNeutronStarRadius(mass);
@@ -102,6 +111,13 @@ export class Pulsar extends Star implements IMassTransferBody {
             brownDwarfTexture: null,
         };
 
+        // Inherit the progenitor star's magnetic field (neutron-star formation compresses
+        // and amplifies the pre-existing field via flux freezing, it doesn't randomize a new
+        // one). Falls back to a fresh seeded roll only if the progenitor somehow has none.
+        const magneticField: IMagneticFieldOptions =
+            progenitorMagneticField ??
+            rollMagneticField(new SeededRandom(`${id}|magnetic-field`), 'star')!;
+
         const geometry = new THREE.SphereGeometry(pulsarRadius, 32, 32);
         const material = new THREE.MeshPhongMaterial({
             map: pulsarTexture,
@@ -124,6 +140,7 @@ export class Pulsar extends Star implements IMassTransferBody {
             lightDistance: PULSAR_LIGHT_DISTANCE,
             rotation: newRotation,
             mesh: mesh,
+            magneticField,
         };
 
         super(dependencies, scene, options, textures);
@@ -134,21 +151,12 @@ export class Pulsar extends Star implements IMassTransferBody {
         const tiltRad = (newRotation.tilt * Math.PI) / 180;
         const spinAxis = new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad));
 
-        // Compute a single shared magnetic axis offset 10–90° from the spin axis.
-        // Both PulsarBeam and PulsarMagneticField must use the same axis so the
-        // beam sweeps exactly through the field-line poles.
-        const _magAxisPerp = new THREE.Vector3(
-            Math.abs(spinAxis.x) < 0.9 ? 1 : 0,
-            Math.abs(spinAxis.x) < 0.9 ? 0 : 1,
-            0
-        )
-            .cross(spinAxis)
-            .normalize();
-        const _magOffsetAngle = (10 + Math.random() * 80) * (Math.PI / 180);
-        const magneticAxisBase = spinAxis
-            .clone()
-            .applyQuaternion(new THREE.Quaternion().setFromAxisAngle(_magAxisPerp, _magOffsetAngle))
-            .normalize();
+        // Magnetic axis derived from the real per-body field (tilt/azimuth relative to the
+        // spin axis). Both PulsarBeam and PulsarMagneticField must agree on this axis so the
+        // beam sweeps exactly through the field-line poles — computeMagneticAxis is pure and
+        // deterministic, so PulsarMagneticField can independently derive the same vector from
+        // `magneticField` rather than being handed this precomputed one.
+        const magneticAxisBase = computeMagneticAxis(spinAxis, magneticField);
 
         this.beam = new PulsarBeam(
             dependencies,
@@ -183,7 +191,7 @@ export class Pulsar extends Star implements IMassTransferBody {
             pulsarRadius,
             spinAxis,
             newSpeed,
-            magneticAxisBase
+            magneticField
         );
 
         // Accretion disk with pulsar color preset (light blue outer → bright white inner).

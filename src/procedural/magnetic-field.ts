@@ -10,6 +10,7 @@
  * Attribute-only: this produces data for IMagneticFieldOptions and renders nothing.
  * Strength is in gauss, matching the real-world constants in utilities/consts.ts.
  */
+import * as THREE from 'three';
 import type { IMagneticFieldOptions } from '../interfaces';
 import { SeededRandom } from '../utilities/prng';
 
@@ -81,4 +82,33 @@ export function rollMagneticField(
         offset,
         reversed: rng.chance(0.5),
     };
+}
+
+/**
+ * Derives the world-space magnetic axis unit vector from a body's rotation axis and its
+ * `IMagneticFieldOptions` (tilt/azimuth, both expressed relative to that rotation axis).
+ *
+ * Pure and deterministic: independent callers passing the same `(rotationAxis, field)`
+ * always agree on the result, so effects that need the same axis (e.g. a pulsar's beam
+ * and its dipole field-line rendering) don't need to share a precomputed vector.
+ */
+export function computeMagneticAxis(
+    rotationAxis: THREE.Vector3,
+    field: IMagneticFieldOptions
+): THREE.Vector3 {
+    const axis = rotationAxis.clone().normalize();
+    const perp0 = (Math.abs(axis.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0))
+        .cross(axis)
+        .normalize();
+
+    const azimuthRad = (field.azimuth * Math.PI) / 180;
+    const perp = perp0.clone().applyQuaternion(new THREE.Quaternion().setFromAxisAngle(axis, azimuthRad));
+
+    const tiltRad = (field.tilt * Math.PI) / 180;
+    const magAxis = axis
+        .clone()
+        .applyQuaternion(new THREE.Quaternion().setFromAxisAngle(perp, tiltRad))
+        .normalize();
+
+    return field.reversed ? magAxis.negate() : magAxis;
 }

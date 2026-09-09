@@ -360,7 +360,8 @@ export class MainSequenceStar extends Star {
                     createUniqueId('pulsar'),
                     this.name + ' (Pulsar)',
                     this.rotation,
-                    this.initialRadius
+                    this.initialRadius,
+                    this.magneticField
                 );
 
                 if (this.dependencies?.addBody) {
