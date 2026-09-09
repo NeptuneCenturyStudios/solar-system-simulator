@@ -83,7 +83,7 @@ export function formatSpeed(simSpeed: number, useWarp = false): string {
     if (useWarp) {
         return `${trimNumber(simSpeedToWarp(simSpeed), 2)} WARP`;
     }
-    return `${trimNumber(simSpeedToKmS(simSpeed), 1)} km/s`;
+    return `${trimNumber(simSpeedToKmS(simSpeed), 2)} km/s`;
 }
 
 /** Round to `maxDecimals` and strip trailing zeros (e.g. "0.50" → "0.5", "100.00" → "100"). */
