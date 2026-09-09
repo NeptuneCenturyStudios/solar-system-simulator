@@ -39,7 +39,11 @@ export class Mercury extends Planet {
         const trajectory = calculateTrajectory(gEff, MERCURY_DIST, SUN_MASS, angleRad);
 
         const texture = loadSrgbTexture('./assets/textures/bodies/2k/mercury.jpg');
-        const geometry = new THREE.SphereGeometry(MERCURY_RADIUS, 32, 32);
+        const geometry = new THREE.SphereGeometry(
+            MERCURY_RADIUS,
+            MERCURY_RADIUS * 16,
+            MERCURY_RADIUS * 16
+        );
         const material = new THREE.MeshStandardMaterial({
             map: texture,
             color: 0xffffff,

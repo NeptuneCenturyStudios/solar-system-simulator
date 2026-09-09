@@ -157,7 +157,7 @@ export class Earth extends Planet {
             EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (23.934 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, orbitDistance, SUN_MASS, angleRad);
-        const geometry = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
+        const geometry = new THREE.SphereGeometry(EARTH_RADIUS, EARTH_RADIUS * 16, EARTH_RADIUS * 16);
 
         const customUniforms: EarthUniforms = {
             nightTexture: { value: earthNightTexture },
