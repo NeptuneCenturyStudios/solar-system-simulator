@@ -1298,6 +1298,9 @@ function createNewBody(
             newBody.cloudRotationSpeed = atmosphereRng.range(0.12, 0.24);
         }
 
+        // The aurora needs the cloud layer above, which only exists now.
+        newBody.refreshAurora();
+
         // Ensure brightness scaling uses a neutral base when texture is present
         newBody.baseColor = new THREE.Color(0xffffff);
 
@@ -1483,6 +1486,9 @@ function createNewBody(
                 // 0.12 + Math.random()*0.12 => [0.12, 0.24)
                 newBody.cloudRotationSpeed = atmosphereRng.range(0.12, 0.24);
             }
+
+            // The aurora needs the cloud layer above, which only exists now.
+            newBody.refreshAurora();
 
             // Ensure brightness scaling uses a neutral base when texture is present
             newBody.baseColor = new THREE.Color(0xffffff);
@@ -3914,10 +3920,11 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         }
     }
 
-    // Apply the magnetic field when the panel sent one. Attribute-only, so there is
-    // nothing visual to rebuild — undefined means "leave it alone", null means "clear it".
+    // Apply the magnetic field when the panel sent one — undefined means "leave it alone",
+    // null means "clear it". The aurora is driven by this, so rebuild it to match.
     if (magneticField !== undefined && body instanceof CelestialBody) {
         body.magneticField = magneticField;
+        body.refreshAurora();
     }
 
     // Apply axial tilt and azimuth if the sliders were visible and the body supports rotation

@@ -102,7 +102,9 @@ export function computeMagneticAxis(
         .normalize();
 
     const azimuthRad = (field.azimuth * Math.PI) / 180;
-    const perp = perp0.clone().applyQuaternion(new THREE.Quaternion().setFromAxisAngle(axis, azimuthRad));
+    const perp = perp0
+        .clone()
+        .applyQuaternion(new THREE.Quaternion().setFromAxisAngle(axis, azimuthRad));
 
     const tiltRad = (field.tilt * Math.PI) / 180;
     const magAxis = axis

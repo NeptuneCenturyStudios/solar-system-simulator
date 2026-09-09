@@ -26,10 +26,10 @@ export interface IAtmosphereOptions {
 /**
  * Dipole magnetic field of a celestial body.
  *
- * Attribute-only: nothing is rendered from this directly. It exists so effects
- * (aurorae) can derive a magnetic axis and an intensity from real per-body data.
- * The magnetic axis is expressed relative to the body's rotation axis, so `tilt`
- * and `azimuth` here are offsets from `IRotation`, not world-space angles.
+ * Drives the aurora effect, which derives its magnetic axis and its intensity from
+ * these values — see `CelestialBody.refreshAurora()`. The magnetic axis is expressed
+ * relative to the body's rotation axis, so `tilt` and `azimuth` here are offsets from
+ * `IRotation`, not world-space angles.
  */
 export interface IMagneticFieldOptions {
     /** Surface equatorial dipole field strength, in gauss. Earth ≈ 0.305 G. */

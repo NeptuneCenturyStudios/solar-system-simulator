@@ -14,6 +14,7 @@ import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/atmosphere-shell';
+import { AuroraHandle, createAurora } from '../effects/aurora';
 import { BodyTypeEnum } from './body-enums';
 
 // Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
@@ -55,9 +56,15 @@ export class CelestialBody extends Body {
     atmosphereShell: AtmosphereShellHandle | null = null;
 
     /**
+     * Polar aurora curtains, or null when this body doesn't qualify for them.
+     * Built and torn down by `refreshAurora()` — never assign this directly.
+     */
+    aurora: AuroraHandle | null = null;
+
+    /**
      * Dipole magnetic field, or null when the body has no global field.
-     * Attribute-only — nothing is rendered from it, so there is nothing to dispose
-     * in `die()` or re-sync in `updateVisuals()`.
+     * Drives the aurora effect via `refreshAurora()`; call that after changing this
+     * so the visuals follow.
      */
     magneticField: IMagneticFieldOptions | null = null;
 
@@ -244,6 +251,45 @@ export class CelestialBody extends Body {
 
             scene.add(this.rings);
         }
+
+        this.refreshAurora();
+    }
+
+    /**
+     * (Re)builds or tears down the aurora so it matches the body's current state.
+     *
+     * Aurorae need both a magnetic field to funnel charged particles to the poles and an
+     * atmosphere for them to excite, so a body qualifies only when it has both.
+     *
+     * "Has an atmosphere" means an atmosphere shell *or* a cloud layer, and the test is on
+     * those runtime objects rather than `options.atmosphere`, because every creation path
+     * except the hand-built planets attaches them *after* construction: the procedural
+     * factories add a shell, and the Add/Edit panel's custom bodies add only clouds. Gating
+     * on the creation option would have excluded all of them.
+     *
+     * Idempotent, so it doubles as the rebuild path when the Add/Edit panel changes a field
+     * at runtime.
+     */
+    refreshAurora() {
+        if (this.aurora) {
+            try {
+                this.aurora.dispose();
+            } catch {
+                // ignore cleanup errors
+            }
+            this.aurora = null;
+        }
+
+        if (this._isDisposed) return;
+        if (!this.magneticField) return;
+        if (!this.atmosphereShell && !this.clouds) return;
+
+        this.aurora = createAurora(
+            this.radius,
+            this.magneticField,
+            this.seed ?? this.id,
+            this.mesh
+        );
     }
 
     die(deathOptions?: IDeathOptions) {
@@ -273,6 +319,16 @@ export class CelestialBody extends Body {
             } catch {
                 // ignore explosion failures
             }
+        }
+
+        // Aurora
+        if (this.aurora) {
+            try {
+                this.aurora.dispose();
+            } catch {
+                // ignore cleanup errors
+            }
+            this.aurora = null;
         }
 
         // Atmosphere shell
@@ -422,6 +478,12 @@ export class CelestialBody extends Body {
         } catch (e) {
             console.error('Error updating body rings scale:', e);
         }
+
+        try {
+            this.aurora?.setRadius(newRadius);
+        } catch (e) {
+            console.error('Error updating aurora scale:', e);
+        }
     }
 
     /**
@@ -535,6 +597,10 @@ export class CelestialBody extends Body {
             this.rings.position.copy(this.mesh.position);
             this.rings.quaternion.copy(this.mesh.quaternion);
         }
+
+        // The aurora is a child of the mesh, so it needs no position sync — only the
+        // curtain drift and brightness pulse advanced here.
+        this.aurora?.update(dtTotal);
     }
 
     updateTrail(cameraPos: THREE.Vector3) {

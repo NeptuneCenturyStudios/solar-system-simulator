@@ -22,6 +22,11 @@
             </label>
 
             <label class="checkbox-row">
+                <input type="checkbox" :checked="simStore.auroraEnabled" @change="onAuroraChange" />
+                Aurorae
+            </label>
+
+            <label class="checkbox-row">
                 <input
                     type="checkbox"
                     :checked="simStore.showAiDebug"
@@ -128,6 +133,7 @@
 
 <script setup lang="ts">
 import {
+    setAuroraEnabled,
     setFrameRateLimit,
     setLensflareEnabled,
     setMusicVolume,
@@ -153,6 +159,10 @@ function onParticleEffectsChange(e: Event): void {
 
 function onLensflareChange(e: Event): void {
     setLensflareEnabled((e.target as HTMLInputElement).checked);
+}
+
+function onAuroraChange(e: Event): void {
+    setAuroraEnabled((e.target as HTMLInputElement).checked);
 }
 
 function onShowAiDebugChange(e: Event): void {

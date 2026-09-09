@@ -7,6 +7,7 @@ export const enum SettingKey {
     SfxVolume = 'sfxVolume',
     MusicVolume = 'musicVolume',
     LensflareEnabled = 'lensflareEnabled',
+    AuroraEnabled = 'auroraEnabled',
     FrameRateLimit = 'frameRateLimit',
     ShowAiDebug = 'showAiDebug',
 }
@@ -17,6 +18,8 @@ export interface SpaceSimSettings {
     sfxVolume: number;
     musicVolume: number;
     lensflareEnabled: boolean;
+    /** Draw aurora curtains around the magnetic poles of bodies that have a field and an atmosphere. */
+    auroraEnabled: boolean;
     /** Maximum frames per second (0 = unlimited). */
     frameRateLimit: number;
     /** Draw the ship-AI obstacle avoidance overlay (lookahead corridor, hazard sphere, heading). */
@@ -29,6 +32,7 @@ const defaultSettings: SpaceSimSettings = {
     sfxVolume: 1.0,
     musicVolume: 0.5,
     lensflareEnabled: true,
+    auroraEnabled: true,
     frameRateLimit: 0,
     showAiDebug: false,
 };

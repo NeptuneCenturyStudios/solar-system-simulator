@@ -206,6 +206,8 @@ export interface VueSimHooks {
     setParticleEffectsEnabled?: (checked: boolean) => void;
     /** Toggle lens flares (persisted via settingsStore). */
     setLensflareEnabled?: (checked: boolean) => void;
+    /** Toggle polar aurorae (persisted via settingsStore). */
+    setAuroraEnabled?: (checked: boolean) => void;
     /** Set physics substeps per frame (persisted via settingsStore). */
     setSubsteps?: (value: number) => void;
     /** Set sound effects volume, 0–100 percent (persisted via settingsStore). */
@@ -285,6 +287,7 @@ export interface VueSimStore {
     // ── Options (persisted user settings, mirrored from settingsStore) ─────
     particleEffectsEnabled: boolean;
     lensflareEnabled: boolean;
+    auroraEnabled: boolean;
     /** Physics substeps per frame. */
     substeps: number;
     /** Sound effects volume as 0–100 percent. */
@@ -335,6 +338,7 @@ const state = reactive<VueSimStore>({
     // Vue Options panel is the only live writer afterwards.
     particleEffectsEnabled: settingsStore.settings.particleEffectsEnabled,
     lensflareEnabled: settingsStore.settings.lensflareEnabled,
+    auroraEnabled: settingsStore.settings.auroraEnabled,
     substeps: settingsStore.settings.substeps,
     sfxVolumePercent: Math.round(settingsStore.settings.sfxVolume * 100),
     musicVolumePercent: Math.round(settingsStore.settings.musicVolume * 100),
@@ -751,6 +755,16 @@ export function setLensflareEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.LensflareEnabled, checked);
     }
     state.lensflareEnabled = checked;
+}
+
+/** Toggle polar aurorae. */
+export function setAuroraEnabled(checked: boolean): void {
+    if (hookRegistry.setAuroraEnabled) {
+        hookRegistry.setAuroraEnabled(checked);
+    } else {
+        settingsStore.update(SettingKey.AuroraEnabled, checked);
+    }
+    state.auroraEnabled = checked;
 }
 
 /** Toggle the ship-AI obstacle avoidance debug overlay. */

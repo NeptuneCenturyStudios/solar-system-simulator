@@ -364,5 +364,9 @@ export function createPlanetBodyFromProceduralCreation(
         );
     }
 
+    // Aurorae need the atmosphere shell, which only exists now — the constructor's own
+    // refresh ran before this block and would have found nothing to attach to.
+    body.refreshAurora();
+
     return body;
 }
