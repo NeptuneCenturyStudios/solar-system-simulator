@@ -257,10 +257,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         const dtTotal = dt * steps;
 
         // ── Surface camera ───────────────────────────────────────────────
+        // updateTransform() runs later in the frame, after physics advances
+        // the world (see the post-physics surface-camera block below), so the
+        // cam anchors to the body's end-of-frame transform.
         const isSurfaceModeActive = !!ctx.surfaceCam.isActive;
-        if (isSurfaceModeActive) {
-            ctx.surfaceCam.updateTransform();
-        }
 
         // ── Flight mode ──────────────────────────────────────────────────
         const isFlightModeActive =
@@ -834,6 +834,17 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     (Math.random() - 0.5) * WARP_SHAKE_MAG * _shakeShip.radius
                 );
             }
+        }
+
+        // ── Surface camera (post-physics) ──────────────────────────────────
+        // Must run AFTER physics so it anchors to the body's end-of-frame
+        // position/quaternion — the exact transform the renderer draws. Running
+        // it before physics left the camera one frame behind; at high time-warp
+        // that gap is many planet radii, so the planet drifted away and the cam
+        // jittered trying to catch up. Placed after warp shake so a warping ship
+        // cannot shake the surface view.
+        if (isSurfaceModeActive) {
+            ctx.surfaceCam.updateTransform();
         }
 
         // ── Ship trails ─────────────────────────────────────────────────────

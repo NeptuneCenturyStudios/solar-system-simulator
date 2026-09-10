@@ -5,6 +5,7 @@ import { BlackHole } from '../bodies/black-hole';
 import { isBodyType } from '../utilities/utilities';
 import { FlightHUD } from '../drawing/flight-hud';
 import { BodyTypeEnum } from '../bodies/body-enums';
+import { DIST_SCALE } from '../utilities/consts';
 
 export interface SurfaceCameraState {
     isActive: boolean;
@@ -31,7 +32,7 @@ export class SurfaceCameraManager {
         prevCameraQuat: new THREE.Quaternion(),
         prevCameraUp: new THREE.Vector3(0, 1, 0),
         prevControlsTarget: new THREE.Vector3(),
-        eyeHeight: 0.2,
+        eyeHeight: 0.0019 / DIST_SCALE,
         lookSensitivity: 0.002,
     };
 
@@ -151,12 +152,12 @@ export class SurfaceCameraManager {
         const gravityUp = s.anchorLocalDir.clone().applyQuaternion(b.mesh!.quaternion).normalize();
 
         const worldRadius = (b.radius || 0) * (b.mesh?.scale?.x || 1);
-        const minEyeClearance = Math.max(worldRadius * 0.001, 0.05);
+        const minEyeClearance = worldRadius * 0.001 //Math.max(worldRadius * 0.001, 0.05);
         const eyeOffset = Math.max(s.eyeHeight, minEyeClearance);
 
         const surfacePoint = center
             .clone()
-            .add(gravityUp.clone().multiplyScalar(worldRadius + eyeOffset));
+            .add(gravityUp.clone().multiplyScalar(worldRadius + s.eyeHeight));
 
         const worldRefA = new THREE.Vector3(0, 1, 0);
         const worldRefB = new THREE.Vector3(0, 0, 1);
