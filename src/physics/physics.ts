@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
-import { BLACK_HOLE_RADIUS_PER_SOL, G, PLUTO_DIST, SUN_MASS } from '../utilities/consts';
+import {
+    BLACK_HOLE_RADIUS_PER_SOL,
+    G,
+    PLUTO_DIST,
+    SOFTENING_EPS,
+    SUN_MASS,
+} from '../utilities/consts';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { BlackHole } from '../bodies/black-hole';
 import { CelestialBody } from '../bodies/celestial-body';
@@ -10,15 +16,30 @@ import { NotificationType } from '../event-log/event-log';
 import { EffectiveGForce } from '../types';
 import { IFlightState, ISimulationState, IAutopilotState } from '../interfaces';
 import { flightState } from '../simulation/simulation';
+import { NBodyIntegrator, ISubstepHooks } from './nbody/integrator';
+import { getActiveSolver } from './nbody/solver-registry';
 
-// ── Scratch vectors for allocation-free physics ──────────────────────────────
-// Reused by getAcc() and updatePhysics() to eliminate GC churn in the hot path.
-const _scratchDiff = new THREE.Vector3();
-const _scratchZero = new THREE.Vector3(0, 0, 0);
-/** Pool of accelerations recycled each frame so updatePhysics never calls `new`. */
-const _accPool: THREE.Vector3[] = [];
-/** Number of bodies that _accPool was sized for on the last frame. */
-let _accPoolSize = 0;
+/** Squared Plummer softening, precomputed once. */
+const EPS2 = SOFTENING_EPS * SOFTENING_EPS;
+
+/** The engine that owns the SoA mirror and carries acceleration state between frames. */
+const _integrator = new NBodyIntegrator();
+
+/** Reusable hook object so the substep loop never allocates. */
+const _hooks: ISubstepHooks = {
+    applyThrust: () => {},
+    updateAutopilot: null,
+    autopilotTarget: null,
+};
+
+/**
+ * Drop acceleration state carried between frames.
+ * Call when the world is replaced wholesale (new system generated, sim reset) so a fresh
+ * simulation never inherits the previous one's opening half-kick.
+ */
+export function resetPhysicsState(): void {
+    _integrator.reset();
+}
 
 /**
  * Calculate position and velocity for a circular orbit around a parent body
@@ -69,8 +90,16 @@ export function calculateOrbitalSpeed(
 }
 
 /**
- * Update the physics simulation for all bodies in the simulation state, applying gravitational forces and autopilot thrust as needed.
- * @param simulationState The current state of the simulation, including all bodies and explosions.
+ * Advance the simulation by `steps` substeps of `dt`, applying gravity, ship thrust and
+ * autopilot impulses.
+ *
+ * Gravity is evaluated by the solver selected in Options -> Physics and integrated with a
+ * kick-drift-kick leapfrog over a flat structure-of-arrays mirror of the bodies (see
+ * {@link NBodyIntegrator}). Body state is copied into that mirror once per frame and copied
+ * back once at the end, so everything downstream — rendering, collisions, wormholes, orbit
+ * prediction — still sees ordinary `mesh.position` values.
+ *
+ * @param simulationState The current state of the simulation, including all bodies.
  * @param autopilotState The current state of the autopilot, including phase and target information.
  * @param steps The number of substeps to perform in the physics integration loop.
  * @param dt The time delta for each substep.
@@ -84,111 +113,25 @@ export function updateSimulation(
     dt: number,
     updateAutopilot: (dt: number) => void
 ) {
-    // Physics integration loop
-    for (let i = 0; i < steps; i++) {
-        // Apply manual thrust per substep so it interleaves with gravity
-        // integration, giving correct balance between thrust and gravity at
-        // any time scale.
-        flightState.activeShip?.applyFlightThrustSubstep?.(dt);
-
-        // Same for every AI-piloted ship. Doing this per substep (rather than once
-        // per frame) is what keeps AI thrust correctly interleaved with gravity at
-        // high time-warp, exactly as it is for the player's ship above.
-        for (const npc of simulationState.npcShips) {
-            if (!npc || npc._isDisposed || npc === flightState.activeShip) continue;
-            npc.applyFlightThrustSubstep(dt);
-        }
-
-        // Apply physics to bodies
-        updatePhysics(simulationState);
-
-        // Apply autopilot thrust impulse each substep so it scales correctly with timeScale.
-        // Running once per frame would let the ship fly through brake zones at high
-        // time-warp or low framerate without ever triggering phase transitions.
-        if (autopilotState.isActive) updateAutopilot(dt);
-
-        // Apply accelerations to positions
-        for (const body of simulationState.bodies) {
-            if (body && !body._isDisposed && body.mesh && body.tempAcc) {
-                body.update(body.tempAcc, dt);
-            }
-        }
-    }
-}
-
-// Private helpers
-/**
- * Get the gravitational acceleration vector exerted on a body at position p1 by another body at position p2 with mass m2.
- * @param p1 The position of the body experiencing the acceleration.
- * @param p2 The position of the body exerting the gravitational force.
- * @param m2 The mass of the body exerting the gravitational force.
- * @returns The gravitational acceleration vector.
- */
-function getAcc(p1: THREE.Vector3, p2: THREE.Vector3, m2: number, G: number) {
-    // 1. Compute scaled distance vector using scratch (no allocation)
-    _scratchDiff.subVectors(p2, p1);
-
-    // 2. Scaled distance magnitude
-    const r = _scratchDiff.length();
-
-    if (r < 0.01) return _scratchZero;
-
-    // 3. Gravitational acceleration in scaled units
-    const accMag = (G * m2) / (r * r);
-
-    // 4. Normalize and scale (in-place on scratch)
-    return _scratchDiff.normalize().multiplyScalar(accMag);
-}
-
-/**
- * Update the physics simulation for all bodies in the simulation state, calculating gravitational accelerations.
- * @param simulationState The current state of the simulation, including all bodies.
- */
-function updatePhysics(simulationState: ISimulationState) {
-    const bodies = simulationState.bodies;
-    const len = bodies.length;
     const gEff = G * simulationState.gMultiplier;
 
-    // Grow the reuse pool if needed (never shrinks — avoids allocation churn).
-    if (len > _accPoolSize) {
-        for (let i = _accPoolSize; i < len; i++) {
-            _accPool[i] = new THREE.Vector3(0, 0, 0);
+    // Thrust is applied per substep (rather than once per frame) so it stays correctly
+    // interleaved with gravity at any time-warp factor — the same reason the old loop did it.
+    _hooks.applyThrust = (substepDt: number) => {
+        flightState.activeShip?.applyFlightThrustSubstep?.(substepDt);
+
+        for (const npc of simulationState.npcShips) {
+            if (!npc || npc._isDisposed || npc === flightState.activeShip) continue;
+            npc.applyFlightThrustSubstep(substepDt);
         }
-        _accPoolSize = len;
-    }
+    };
 
-    for (let idx = 0; idx < len; idx++) {
-        const body = bodies[idx];
-        if (!body || body._isDisposed || !body.mesh) continue;
+    // Autopilot impulses likewise scale with timeScale only if applied per substep;
+    // once per frame would let the ship sail through brake zones at high warp.
+    _hooks.updateAutopilot = autopilotState.isActive ? updateAutopilot : null;
+    _hooks.autopilotTarget = autopilotState.targetBody;
 
-        // // Don't integrate physics if the ship is decelerating in warp or boost mode.
-        // // (kept as a silent skip — no console.info on the hot path)
-        // if (
-        //     body === flightState.knownShip &&
-        //     (body.warpDecelerating || body.boostDecelerating)
-        // ) {
-        //     continue;
-        // }
-
-        const totalAcc = _accPool[idx];
-        totalAcc.set(0, 0, 0);
-
-        // Calculate pull from ALL OTHER bodies (n-body simulation)
-        for (const other of bodies) {
-            if (other !== body && !other?._isDisposed && other.mesh) {
-                const accFromOther = getAcc(
-                    body.mesh.position,
-                    other.mesh.position,
-                    other.mass,
-                    gEff
-                );
-                totalAcc.add(accFromOther);
-            }
-        }
-
-        // Store the accumulated force to apply in the update step
-        body.tempAcc = totalAcc;
-    }
+    _integrator.step(simulationState.bodies, getActiveSolver(), gEff, EPS2, steps, dt, _hooks);
 }
 
 /**

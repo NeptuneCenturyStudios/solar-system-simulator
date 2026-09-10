@@ -355,6 +355,30 @@ export const MAX_SUBSTEPS_PER_FRAME = 512;
 /** EMA factor (0-1) used to smooth measured frame delta; higher reacts faster but lets more raw rAF jitter through. */
 export const WALL_DT_SMOOTHING = 0.08;
 
+// === N-body force solver ===
+/**
+ * Plummer softening length in scaled distance units, added as `r² + SOFTENING_EPS²` to
+ * every pair separation. Replaces the old hard `r < 0.01` cutoff, which was a force
+ * discontinuity that could fling bodies on close approach. Kept far below any real orbital
+ * separation so normal orbits are unaffected.
+ */
+export const SOFTENING_EPS = 0.01;
+/**
+ * Barnes-Hut opening angle. A node is accepted as a single point mass when
+ * `nodeWidth / distance < BH_THETA`. Lower is more accurate and slower; 0 degenerates to
+ * exact all-pairs.
+ */
+export const BH_THETA_DEFAULT = 0.5;
+/** Hard depth cap on the Barnes-Hut octree, bounding subdivision when bodies are near-coincident. */
+export const BH_MAX_DEPTH = 24;
+/**
+ * Mass threshold for the cutoff solver, as a fraction of the system's total mass. Bodies at
+ * or above this are "significant" and interact exactly with each other; bodies below it feel
+ * the significant bodies but not one another. At 1e-6 of total mass, a Sun-dominated system
+ * classifies planets and moons as significant while asteroids and debris become tracers.
+ */
+export const CUTOFF_MASS_FRACTION = 1e-6;
+
 // === Flight controls ===
 export const FLIGHT_MAX_POINTER_OFFSET = 260; // pixels before reaching full turn rate
 export const FLIGHT_AUTOPILOT_CHARGE_TIME = 1.0; // seconds to hold E over a body before autopilot engages
@@ -453,7 +477,7 @@ export const WORMHOLE_SHORTCUT_TIME_SCALE = 1; // modest time scale so the orbit
 // mows the whole band; the Moon eats anything it clips on the way past.
 
 /** Radius of the circular orbit shared by Earth, the Moon's parent, and the asteroid band. */
-export const ASTEROID_FIELD_ORBIT_RADIUS = 10_000_000 / DIST_SCALE;
+export const ASTEROID_FIELD_ORBIT_RADIUS = 1_000_000 / DIST_SCALE;
 /** Preset gravity multiplier at scenario launch. */
 export const ASTEROID_FIELD_G_MULTIPLIER = 1;
 /**
@@ -461,13 +485,13 @@ export const ASTEROID_FIELD_G_MULTIPLIER = 1;
  * closing speed is 2× orbital, so a larger warp would advance Earth more than the collision
  * capture radius (Earth + asteroid) in a single frame and let it tunnel through the swarm.
  */
-export const ASTEROID_FIELD_TIME_SCALE = 1;
+export const ASTEROID_FIELD_TIME_SCALE = 64;
 /**
  * Number of asteroids in the dense band. The n-body integrator runs 64 substeps per frame
  * at O(n²), so this is a balance: ~130 members costs roughly 9 ms/frame of physics, which
  * leaves enough of the frame budget for rendering while still reading as a dense field.
  */
-export const ASTEROID_FIELD_COUNT = 130;
+export const ASTEROID_FIELD_COUNT = 1000;
 /** Angular length of the band, in degrees. Kept tight so the swarm is genuinely *clustered*
  *  (and locally dense) rather than smeared thinly around a large arc. */
 export const ASTEROID_FIELD_ARC_DEG = 60;

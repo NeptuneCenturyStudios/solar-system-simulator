@@ -5,7 +5,9 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default tseslint.config(
     {
-        ignores: ['dist/**', 'node_modules/**', 'src/vendors/**'],
+        // tmp/ holds generated bundles (e.g. the esbuild output for bench_nbody.ts), which
+        // are build artifacts rather than source and should not be linted.
+        ignores: ['dist/**', 'node_modules/**', 'src/vendors/**', 'tmp/**'],
     },
     {
         files: ['**/*.{js,mjs,cjs,ts,mts,cts}'],

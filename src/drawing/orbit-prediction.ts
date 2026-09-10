@@ -69,12 +69,25 @@ export class OrbitPredictionManager {
         let best: Body | null = null;
         let bestAccel = -1;
 
+        // Scalar math on the raw components: this runs for every body every frame the
+        // prediction is visible, and previously allocated a THREE.Vector3 per pair — which
+        // at a thousand bodies is a million short-lived allocations per frame.
+        const px = body.mesh.position.x;
+        const py = body.mesh.position.y;
+        const pz = body.mesh.position.z;
+
         for (const other of allBodies) {
             if (other === body || other._isDisposed || !other.mesh) continue;
-            const diff = new THREE.Vector3().subVectors(other.mesh.position, body.mesh.position);
-            const r = diff.length();
-            if (r < 0.01) continue; // too close, skip to avoid division by near-zero
-            const accel = (G * other.mass) / (r * r);
+
+            const dx = other.mesh.position.x - px;
+            const dy = other.mesh.position.y - py;
+            const dz = other.mesh.position.z - pz;
+            const r2 = dx * dx + dy * dy + dz * dz;
+
+            if (r2 < 0.0001) continue; // too close, skip to avoid division by near-zero
+
+            // Ordering by GM/r² needs no square root — compare the squared-distance form.
+            const accel = (G * other.mass) / r2;
             if (accel > bestAccel) {
                 bestAccel = accel;
                 best = other;

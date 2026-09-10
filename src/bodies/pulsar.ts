@@ -214,18 +214,20 @@ export class Pulsar extends Star implements IMassTransferBody {
         this.accretionDisk.enqueueAccretionParticle(angle);
     }
 
-    override update(acc: THREE.Vector3, dt: number): void {
+    override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3): void {
+        super.updateVisuals(dtTotal, cameraPos);
+
         if (this._isDisposed) return;
-        super.update(acc, dt);
+
         this.beam.setPosition(this.mesh.position);
-        this.beam.update(dt);
+        this.beam.update(dtTotal);
         this.glow.setPosition(this.mesh.position);
-        this.glow.update(dt);
+        this.glow.update(dtTotal);
         this.magneticFieldEffect.setPosition(this.mesh.position);
-        this.magneticFieldEffect.update(dt);
+        this.magneticFieldEffect.update(dtTotal);
         this.accretionDisk.setPosition(this.mesh.position);
-        this.accretionDisk.update(dt);
-        this._updateSiphon(dt);
+        this.accretionDisk.update(dtTotal);
+        this._updateSiphon(dtTotal);
     }
 
     /**

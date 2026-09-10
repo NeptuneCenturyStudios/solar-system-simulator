@@ -249,10 +249,16 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // even if the cap below is hit (only per-substep accuracy is reduced in that case).
         const baseSubsteps = settingsStore.settings.substeps;
         const frameRatio = wallDt / BASE_FRAME_DT;
-        const steps = Math.min(
-            Math.max(1, Math.ceil(baseSubsteps * frameRatio)),
-            MAX_SUBSTEPS_PER_FRAME
-        );
+        // When the sim is paused (tScale === 0) every substep advances by dt = 0, so the
+        // whole loop is a no-op that still pays the full force-solve cost. One step is
+        // enough to keep dtTotal at exactly 0 while costing a single solve instead of 64+.
+        const steps =
+            tScale === 0
+                ? 1
+                : Math.min(
+                      Math.max(1, Math.ceil(baseSubsteps * frameRatio)),
+                      MAX_SUBSTEPS_PER_FRAME
+                  );
         const dt = (wallDt * TIME_SCALE * tScale) / steps;
         const dtTotal = dt * steps;
 

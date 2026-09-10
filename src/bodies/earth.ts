@@ -157,7 +157,11 @@ export class Earth extends Planet {
             EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (23.934 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, orbitDistance, SUN_MASS, angleRad);
-        const geometry = new THREE.SphereGeometry(EARTH_RADIUS, EARTH_RADIUS * 16, EARTH_RADIUS * 16);
+        const geometry = new THREE.SphereGeometry(
+            EARTH_RADIUS,
+            EARTH_RADIUS * 16,
+            EARTH_RADIUS * 16
+        );
 
         const customUniforms: EarthUniforms = {
             nightTexture: { value: earthNightTexture },
@@ -234,10 +238,13 @@ export class Earth extends Planet {
         this.cloudRotationSpeed = rotSpeed * 1.3;
     }
 
-    update(acc: THREE.Vector3, dt: number) {
-        super.update(acc, dt);
+    override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
+        super.updateVisuals(dtTotal, cameraPos);
+
+        if (this._isDisposed) return;
 
         // Feed live star positions into the day/night shader each frame.
+        // This allocated a filtered array once per substep before; now it runs once per frame.
         const stars = this.dependencies
             .getBodies()
             .filter((b) => isBodyType(b, BodyTypeEnum.Star) && !b._isDisposed);

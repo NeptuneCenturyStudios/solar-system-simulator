@@ -79,7 +79,7 @@ import {
 } from './utilities/utilities';
 import { SeededRandom } from './utilities/prng';
 import { generateSeedString } from './procedural/seed-utils';
-import { setBodyRadius } from './physics/physics';
+import { resetPhysicsState, setBodyRadius } from './physics/physics';
 import {
     randomStarParams,
     randomBlackHoleParams,
@@ -1751,6 +1751,10 @@ function cleanUpSolarSystem() {
 
     // Reset bodies array depending on mode
     simulationState.bodies = [];
+
+    // Drop the accelerations the leapfrog integrator carries between frames, so the new
+    // world doesn't open its first half-kick with the old world's forces.
+    resetPhysicsState();
 
     // Notify UI / systems that track live bodies
     try {

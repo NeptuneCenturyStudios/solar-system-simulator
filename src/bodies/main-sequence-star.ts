@@ -24,6 +24,16 @@ import { BodyTypeEnum } from './body-enums';
 import { settingsStore } from '../settings/settings-store';
 import { environmentState } from '../simulation/environment-state';
 
+/**
+ * Blend factor for the red-giant expansion lerps (radius, mass, colour, emissive intensity).
+ *
+ * These used to apply a 0.01 lerp once per physics substep. At the default 64 substeps the
+ * effective per-frame blend was `1 - 0.99^64 ≈ 0.47`, so applying that once per frame keeps
+ * the transition running at the speed it always did. As a bonus it no longer silently
+ * changes speed when the user adjusts the substep count.
+ */
+const RED_GIANT_BLEND = 0.47;
+
 // Star death is a shared environment setting (toggled from either UI layer);
 // reading it from the state singleton avoids DOM coupling in body classes.
 function _isStarDeathEnabled(): boolean {
@@ -86,11 +96,22 @@ export class MainSequenceStar extends Star {
         this.setMass(this.mass);
     }
 
-    override update(acc: THREE.Vector3, dt: number) {
+    /**
+     * Drives the star's evolution and effects once per rendered frame.
+     *
+     * This previously ran inside the physics substep loop — 64 times per frame by default —
+     * including corona particle updates, material colour lerps and label-line geometry
+     * rewrites. None of it affects the gravity solution, and fuel burn is linear in dt, so
+     * running it once per frame with the frame's total elapsed time is equivalent and vastly
+     * cheaper.
+     */
+    override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
+        super.updateVisuals(dtTotal, cameraPos);
+
         if (this._isDisposed) return;
 
         if (this.corona) {
-            this.corona.update(dt);
+            this.corona.update(dtTotal);
         }
         if (this.corona?.points) {
             this.corona.points.position.copy(this.mesh.position);
@@ -100,7 +121,7 @@ export class MainSequenceStar extends Star {
         if (starDeathEnabled && this.fuel !== null && this.fuel > 0) {
             const referenceMass = 1000;
             const massRatio = this.mass / referenceMass;
-            const burnRate = Math.pow(massRatio, 2.5) * 0.001 * Math.abs(dt);
+            const burnRate = Math.pow(massRatio, 2.5) * 0.001 * Math.abs(dtTotal);
             this.fuel -= burnRate;
 
             const fuelPercent = this.maxFuel !== null ? this.fuel / this.maxFuel : 0;
@@ -115,13 +136,13 @@ export class MainSequenceStar extends Star {
                     const targetRadiusUnclamped = this.initialRadius * (1 + expansionProgress * 99);
                     const targetRadius = Math.min(targetRadiusUnclamped, STAR_MAX_RADIUS);
 
-                    if (dt !== 0) {
-                        this.radius = this.radius + (targetRadius - this.radius) * 0.01;
+                    if (dtTotal !== 0) {
+                        this.radius = this.radius + (targetRadius - this.radius) * RED_GIANT_BLEND;
                         this.setRadius(this.radius);
                     }
 
                     const targetMass = this.initialMass * (1 - expansionProgress * 0.5);
-                    this.mass = this.mass + (targetMass - this.mass) * 0.01;
+                    this.mass = this.mass + (targetMass - this.mass) * RED_GIANT_BLEND;
 
                     if (this.labelLine) {
                         const labelHeight = this.radius * 3.5;
@@ -137,13 +158,14 @@ export class MainSequenceStar extends Star {
 
                     const redGiantColor = this.temperatureToColor(targetTemp);
                     if (this.mesh.material instanceof THREE.MeshPhongMaterial) {
-                        this.mesh.material.color.lerp(redGiantColor, 0.01);
-                        this.mesh.material.emissive.lerp(redGiantColor, 0.01);
+                        this.mesh.material.color.lerp(redGiantColor, RED_GIANT_BLEND);
+                        this.mesh.material.emissive.lerp(redGiantColor, RED_GIANT_BLEND);
 
                         const targetIntensity = Star.temperatureToEmissiveIntensity(targetTemp);
                         this.mesh.material.emissiveIntensity =
                             this.mesh.material.emissiveIntensity +
-                            (targetIntensity - this.mesh.material.emissiveIntensity) * 0.01;
+                            (targetIntensity - this.mesh.material.emissiveIntensity) *
+                                RED_GIANT_BLEND;
                     }
                 }
             }
@@ -155,16 +177,14 @@ export class MainSequenceStar extends Star {
             }
         }
 
-        super.update(acc, dt);
-
         if (this.sunGlow) {
             this.sunGlow.setPosition(this.mesh.position);
-            this.sunGlow.update(dt);
+            this.sunGlow.update(dtTotal);
         }
 
         // Solar flare timer
         if (!(this.bodyType & BodyTypeEnum.BrownDwarf) && !this._isDisposed) {
-            this._solarFlareTimer += dt;
+            this._solarFlareTimer += dtTotal;
             if (this._solarFlareTimer >= this._nextFlareInterval) {
                 this._solarFlareTimer = 0;
                 this._nextFlareInterval = 5 + Math.random() * 25;
@@ -174,7 +194,7 @@ export class MainSequenceStar extends Star {
 
         // Update active solar flares, dispose finished ones
         for (let i = this.activeSolarFlares.length - 1; i >= 0; i--) {
-            this.activeSolarFlares[i].update(dt);
+            this.activeSolarFlares[i].update(dtTotal);
             if (!this.activeSolarFlares[i].active) {
                 this.activeSolarFlares[i].dispose();
                 this.activeSolarFlares.splice(i, 1);

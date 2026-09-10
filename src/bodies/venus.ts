@@ -84,8 +84,4 @@ export class Venus extends Planet {
 
         this.cloudRotationSpeed = rotSpeed * 60; // Clouds rotate much faster than the surface
     }
-
-    update(acc: THREE.Vector3, dt: number): void {
-        super.update(acc, dt);
-    }
 }

@@ -510,10 +510,18 @@ export class CelestialBody extends Body {
         this.clampToLightSpeed();
     }
 
-    update(acc: THREE.Vector3, dt: number) {
-        super.update(acc, dt);
-        this.clampToLightSpeed();
-
+    /**
+     * Advance the body's own rotation — tidal locking, or plain axial spin.
+     *
+     * Runs once per rendered frame rather than once per physics substep. The spin branch is
+     * linear in dt, so stepping it with the frame's total elapsed time is exactly equivalent
+     * to stepping it every substep. The tidal-lock branch is a servo that drives the
+     * orientation error to zero on each call, so it reaches the same steady state either way.
+     *
+     * Velocity is no longer clamped here — the n-body integrator applies the light-speed cap
+     * in bulk across all bodies (see NBodyIntegrator.clampSpeeds).
+     */
+    protected advanceRotation(dtTotal: number) {
         if (this._isDisposed) return;
 
         if (
@@ -575,7 +583,7 @@ export class CelestialBody extends Body {
             }
         } else {
             if (this.rotationSpeed !== 0) {
-                this.mesh.rotateOnAxis(_Y_AXIS, this.rotationSpeed * dt);
+                this.mesh.rotateOnAxis(_Y_AXIS, this.rotationSpeed * dtTotal);
             }
         }
     }
@@ -588,6 +596,8 @@ export class CelestialBody extends Body {
      */
     updateVisuals(dtTotal: number, _cameraPos?: THREE.Vector3) {
         if (this._isDisposed) return;
+
+        this.advanceRotation(dtTotal);
 
         if (this.clouds && typeof this.cloudRotationSpeed === 'number') {
             this.clouds.rotation.y += this.cloudRotationSpeed * dtTotal;

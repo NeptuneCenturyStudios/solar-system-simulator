@@ -10,7 +10,20 @@ export const enum SettingKey {
     AuroraEnabled = 'auroraEnabled',
     FrameRateLimit = 'frameRateLimit',
     ShowAiDebug = 'showAiDebug',
+    PhysicsSolver = 'physicsSolver',
+    BarnesHutTheta = 'barnesHutTheta',
 }
+
+/**
+ * Which gravity solver the n-body engine uses.
+ *
+ * - `direct`     — exact all-pairs O(N²). No interaction dropped, no approximation.
+ * - `cutoff`     — exact between significant masses, skips dust-on-dust pairs. O(M² + M·T).
+ * - `barnes-hut` — octree multipole approximation. O(N log N) at any mass distribution.
+ *
+ * Declared here rather than in the physics layer so the settings store stays dependency-free.
+ */
+export type PhysicsSolverMode = 'direct' | 'cutoff' | 'barnes-hut';
 
 export interface SpaceSimSettings {
     particleEffectsEnabled: boolean;
@@ -24,6 +37,10 @@ export interface SpaceSimSettings {
     frameRateLimit: number;
     /** Draw the ship-AI obstacle avoidance overlay (lookahead corridor, hazard sphere, heading). */
     showAiDebug: boolean;
+    /** Gravity solver used by the n-body engine. */
+    physicsSolver: PhysicsSolverMode;
+    /** Barnes-Hut opening angle. Lower is more accurate and slower. Ignored by other solvers. */
+    barnesHutTheta: number;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -35,6 +52,10 @@ const defaultSettings: SpaceSimSettings = {
     auroraEnabled: true,
     frameRateLimit: 0,
     showAiDebug: false,
+    // Exact for everything that measurably matters, and degrades to all-pairs on its own
+    // when every body has comparable mass — so it is safe as the default in any scenario.
+    physicsSolver: 'cutoff',
+    barnesHutTheta: 0.5,
 };
 
 class SettingsStore {

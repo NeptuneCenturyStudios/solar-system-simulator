@@ -128,23 +128,18 @@ export class Body {
     }
 
     /**
-     * Applies the most basic physics update to the body using the given acceleration and time step.
-     * Uses Velocity Verlet integration for updating position and velocity.
+     * Advance purely visual state by one rendered frame.
+     *
+     * Integration no longer happens here. Position and velocity are advanced in bulk by the
+     * n-body engine (src/physics/nbody), which mirrors every body into flat typed arrays,
+     * runs all substeps there, and writes the result back to `mesh.position` once per frame.
+     * Subclasses override this to drive effects, and are called once per frame rather than
+     * once per substep — so anything here must scale with `dtTotal`, not a substep dt.
+     *
+     * @param _dtTotal Total elapsed simulation time for this frame (sum of all substep dts).
      */
-    update(acc: THREE.Vector3, dt: number) {
-        if (this._isDisposed) return;
-
-        this.velocity.x += acc.x * dt * 0.5;
-        this.velocity.y += acc.y * dt * 0.5;
-        this.velocity.z += acc.z * dt * 0.5;
-
-        this.mesh.position.x += this.velocity.x * dt;
-        this.mesh.position.y += this.velocity.y * dt;
-        this.mesh.position.z += this.velocity.z * dt;
-
-        this.velocity.x += acc.x * dt * 0.5;
-        this.velocity.y += acc.y * dt * 0.5;
-        this.velocity.z += acc.z * dt * 0.5;
+    updateVisuals(_dtTotal: number) {
+        // Base bodies have no per-frame visual state; subclasses override.
     }
 
     updateLabel(newName: string) {

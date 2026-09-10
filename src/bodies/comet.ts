@@ -215,12 +215,6 @@ float alpha = vLife * strength;`
         return this.tailColorMain;
     }
 
-    update(acc: THREE.Vector3, dt: number) {
-        super.update(acc, dt);
-        // updateTail is called from the outer animate loop (alongside updateTrail)
-        // so it receives the camera position for camera-relative rendering.
-    }
-
     /**
      * Updates the comet tail. Must be called from the outer animate loop (not the physics substep
      * loop) so that the camera position is available for camera-relative rendering.

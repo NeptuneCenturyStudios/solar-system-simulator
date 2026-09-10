@@ -309,25 +309,19 @@ export class Star extends CelestialBody {
         return light;
     }
 
-    update(acc: THREE.Vector3, dt: number) {
-        if (this._isDisposed) return;
-
-        super.update(acc, dt);
-
-        if (this.sunLight) {
-            this.sunLight.position.copy(this.mesh.position);
-        }
-    }
-
     /**
-     * Per-rendered-frame visual update. Drives the diffraction-cross shine so it
-     * follows the star and fades out as the camera approaches. Brown dwarfs never
-     * show the effect.
+     * Per-rendered-frame visual update. Keeps the star's light source on the star, and drives
+     * the diffraction-cross shine so it follows the star and fades out as the camera
+     * approaches. Brown dwarfs never show the effect.
      */
     override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
         super.updateVisuals(dtTotal, cameraPos);
 
         if (this._isDisposed) return;
+
+        if (this.sunLight) {
+            this.sunLight.position.copy(this.mesh.position);
+        }
 
         if (this.bodyType & BodyTypeEnum.BrownDwarf) {
             this.lensflare?.setVisible(false);

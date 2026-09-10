@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { CelestialBody } from './celestial-body';
 
 /**
@@ -8,16 +7,19 @@ import { CelestialBody } from './celestial-body';
  * Used by Wormhole today; Kuiper-belt objects are expected to extend this later.
  */
 export abstract class StaticBody extends CelestialBody {
-    /** Skips gravity integration entirely; only constant-velocity drift and spin apply. */
-    update(_acc: THREE.Vector3, dt: number) {
+    /**
+     * Static bodies spin about their own `rotationAxis` and are never tidally locked, so this
+     * replaces CelestialBody's tidal-lock/Y-axis rotation rather than adding to it.
+     *
+     * Constant-velocity drift still happens in the n-body integrator: the store tags these
+     * bodies FLAG_STATIC, which zeroes their gravitational acceleration while leaving the
+     * drift step untouched — the same net motion the old `update` produced.
+     */
+    protected override advanceRotation(dtTotal: number) {
         if (this._isDisposed) return;
 
-        this.mesh.position.x += this.velocity.x * dt;
-        this.mesh.position.y += this.velocity.y * dt;
-        this.mesh.position.z += this.velocity.z * dt;
-
         if (this.rotationSpeed) {
-            this.mesh.rotateOnAxis(this.rotationAxis, this.rotationSpeed * dt);
+            this.mesh.rotateOnAxis(this.rotationAxis, this.rotationSpeed * dtTotal);
         }
     }
 }

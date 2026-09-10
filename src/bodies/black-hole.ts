@@ -230,22 +230,23 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Updates the black hole's physics and all associated visual effects for the current simulation step.
-     * Calls parent update, then updates accretion disk, jet, and siphon effects.
+     * Updates the black hole's visual effects once per rendered frame: accretion disk, jet,
+     * halo sizing and mass siphon. Position and velocity are integrated by the n-body engine.
      *
-     * @param {THREE.Vector3} acc - The acceleration vector.
-     * @param {number} dt - The simulation time delta.
+     * @param {number} dtTotal - Total elapsed simulation time for this frame.
+     * @param {THREE.Vector3} [cameraPos] - Camera world position.
      */
-    update(acc: THREE.Vector3, dt: number) {
-        // Call parent update for physics
-        super.update(acc, dt);
+    override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
+        super.updateVisuals(dtTotal, cameraPos);
+
+        if (this._isDisposed) return;
 
         // Update accretion disk animation and position
-        this.accretionDisk?.update(dt);
+        this.accretionDisk?.update(dtTotal);
         this.accretionDisk?.setPosition(this.mesh.position);
 
         // Update jet flash-beam effect
-        this.jet?.update(dt);
+        this.jet?.update(dtTotal);
         this.jet?.setPosition(this.mesh.position);
 
         // Keep halo sized to current black hole radius (black holes can grow via absorption)
@@ -253,7 +254,7 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
             this.accretionGlow.scale.setScalar(this.radius * 10);
         }
 
-        this.updateSiphon(dt);
+        this.updateSiphon(dtTotal);
     }
 
     /**

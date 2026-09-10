@@ -152,8 +152,7 @@ export class SurfaceCameraManager {
         const gravityUp = s.anchorLocalDir.clone().applyQuaternion(b.mesh!.quaternion).normalize();
 
         const worldRadius = (b.radius || 0) * (b.mesh?.scale?.x || 1);
-        const minEyeClearance = worldRadius * 0.001 //Math.max(worldRadius * 0.001, 0.05);
-        const eyeOffset = Math.max(s.eyeHeight, minEyeClearance);
+
 
         const surfacePoint = center
             .clone()

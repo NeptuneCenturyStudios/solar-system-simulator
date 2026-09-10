@@ -53,6 +53,46 @@
 
             <div class="vue-ui-card-header">Physics</div>
             <div class="control-group">
+                <label>Gravity Solver</label>
+                <select
+                    class="solver-select"
+                    :value="simStore.physicsSolver"
+                    title="How gravitational forces are computed each step. Exact is the ground truth; Significant Mass is exact for everything that matters and far faster with many bodies; Barnes-Hut scales best when many bodies have comparable mass."
+                    @change="onPhysicsSolverChange"
+                >
+                    <option value="direct">Exact (all pairs)</option>
+                    <option value="cutoff">Significant Mass</option>
+                    <option value="barnes-hut">Barnes-Hut (octree)</option>
+                </select>
+                <p class="solver-hint">{{ solverHint }}</p>
+            </div>
+
+            <div v-if="simStore.physicsSolver === 'barnes-hut'" class="control-group">
+                <label>
+                    Opening Angle (θ)
+                    <span class="val-display">{{ simStore.barnesHutTheta.toFixed(2) }}</span>
+                </label>
+                <div class="slider-row">
+                    <input
+                        type="range"
+                        min="0.1"
+                        max="1.5"
+                        step="0.05"
+                        :value="simStore.barnesHutTheta"
+                        title="How aggressively distant groups of bodies are collapsed into a single point mass. Lower is more accurate and slower."
+                        @input="onBarnesHutThetaInput"
+                    />
+                    <button
+                        class="old-ui btn-slider-reset"
+                        title="Reset to default (0.5)"
+                        @click="resetBarnesHutTheta"
+                    >
+                        <span class="material-symbols-outlined">replay</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="control-group">
                 <label>
                     Physics Accuracy
                     <span class="val-display">{{ simStore.substeps }}</span>
@@ -132,22 +172,36 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+
 import {
     setAuroraEnabled,
+    setBarnesHutTheta,
     setFrameRateLimit,
     setLensflareEnabled,
     setMusicVolume,
     setParticleEffectsEnabled,
+    setPhysicsSolver,
     setSfxVolume,
     setShowAiDebug,
     setSubsteps,
     simStore,
 } from '../sim-bridge';
+import type { PhysicsSolverMode } from '../../settings/settings-store';
 
 import PanelBase from './PanelBase.vue';
 
 /** Same defaults as the legacy panel's reset buttons. */
 const DEFAULT_SUBSTEPS = 64;
+const DEFAULT_BARNES_HUT_THETA = 0.5;
+
+/** One-line explanation of the trade-off the selected solver is making. */
+const SOLVER_HINTS: Record<PhysicsSolverMode, string> = {
+    direct: 'Every pair computed exactly. Most accurate, but cost grows with the square of the body count.',
+    cutoff: 'Exact between significant masses; skips negligible asteroid-on-asteroid pulls. Falls back to exact when all masses are comparable.',
+    'barnes-hut':
+        'Groups distant bodies into single point masses. Scales best for large clusters where many bodies have comparable mass.',
+};
 const DEFAULT_SFX_VOLUME_PERCENT = 100;
 const DEFAULT_MUSIC_VOLUME_PERCENT = 50;
 /** Max frame-rate-limit value the Options panel permits. */
@@ -171,6 +225,20 @@ function onShowAiDebugChange(e: Event): void {
 
 function onSubstepsInput(e: Event): void {
     setSubsteps(parseInt((e.target as HTMLInputElement).value, 10));
+}
+
+const solverHint = computed(() => SOLVER_HINTS[simStore.physicsSolver]);
+
+function onPhysicsSolverChange(e: Event): void {
+    setPhysicsSolver((e.target as HTMLSelectElement).value as PhysicsSolverMode);
+}
+
+function onBarnesHutThetaInput(e: Event): void {
+    setBarnesHutTheta(parseFloat((e.target as HTMLInputElement).value));
+}
+
+function resetBarnesHutTheta(): void {
+    setBarnesHutTheta(DEFAULT_BARNES_HUT_THETA);
 }
 
 function onSfxVolumeInput(e: Event): void {
@@ -221,5 +289,14 @@ function resetMusicVolume(): void {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+}
+
+/* Explains the trade-off the selected solver is making, so the choice is not opaque. */
+.solver-hint {
+    margin: 6px 0 0;
+    color: var(--new-ui-color);
+    opacity: 0.65;
+    font-size: 0.85em;
+    line-height: 1.4;
 }
 </style>

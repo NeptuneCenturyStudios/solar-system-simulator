@@ -12,7 +12,7 @@ import {
 import { getBodyTypeLabel } from '../utilities/utilities';
 import type { IMagneticFieldOptions, ISimStateSnapshot } from '../interfaces';
 import { environmentState } from '../simulation/environment-state';
-import { SettingKey, settingsStore } from '../settings/settings-store';
+import { PhysicsSolverMode, SettingKey, settingsStore } from '../settings/settings-store';
 import type { PlaylistEntry } from '../utilities/playlist';
 
 /**
@@ -210,6 +210,10 @@ export interface VueSimHooks {
     setAuroraEnabled?: (checked: boolean) => void;
     /** Set physics substeps per frame (persisted via settingsStore). */
     setSubsteps?: (value: number) => void;
+    /** Select the gravity solver (persisted via settingsStore). */
+    setPhysicsSolver?: (mode: PhysicsSolverMode) => void;
+    /** Set the Barnes-Hut opening angle (persisted via settingsStore). */
+    setBarnesHutTheta?: (value: number) => void;
     /** Set sound effects volume, 0–100 percent (persisted via settingsStore). */
     setSfxVolume?: (percent: number) => void;
     /** Set background music volume, 0–100 percent. Also applied to the live
@@ -290,6 +294,10 @@ export interface VueSimStore {
     auroraEnabled: boolean;
     /** Physics substeps per frame. */
     substeps: number;
+    /** Gravity solver used by the n-body engine. */
+    physicsSolver: PhysicsSolverMode;
+    /** Barnes-Hut opening angle; only meaningful when physicsSolver is 'barnes-hut'. */
+    barnesHutTheta: number;
     /** Sound effects volume as 0–100 percent. */
     sfxVolumePercent: number;
     /** Background music volume as 0–100 percent. */
@@ -340,6 +348,8 @@ const state = reactive<VueSimStore>({
     lensflareEnabled: settingsStore.settings.lensflareEnabled,
     auroraEnabled: settingsStore.settings.auroraEnabled,
     substeps: settingsStore.settings.substeps,
+    physicsSolver: settingsStore.settings.physicsSolver,
+    barnesHutTheta: settingsStore.settings.barnesHutTheta,
     sfxVolumePercent: Math.round(settingsStore.settings.sfxVolume * 100),
     musicVolumePercent: Math.round(settingsStore.settings.musicVolume * 100),
     frameRateLimit: settingsStore.settings.frameRateLimit,
@@ -785,6 +795,31 @@ export function setSubsteps(value: number): void {
         settingsStore.update(SettingKey.Substeps, value);
     }
     state.substeps = value;
+}
+
+/**
+ * Select the gravity solver used by the n-body engine.
+ * Takes effect on the next frame — the engine reads the setting each step, so there is no
+ * need to restart the simulation or rebuild the world.
+ */
+export function setPhysicsSolver(mode: PhysicsSolverMode): void {
+    if (hookRegistry.setPhysicsSolver) {
+        hookRegistry.setPhysicsSolver(mode);
+    } else {
+        settingsStore.update(SettingKey.PhysicsSolver, mode);
+    }
+    state.physicsSolver = mode;
+}
+
+/** Set the Barnes-Hut opening angle. Lower is more accurate and slower. */
+export function setBarnesHutTheta(value: number): void {
+    const clamped = Math.min(Math.max(value, 0.1), 1.5);
+    if (hookRegistry.setBarnesHutTheta) {
+        hookRegistry.setBarnesHutTheta(clamped);
+    } else {
+        settingsStore.update(SettingKey.BarnesHutTheta, clamped);
+    }
+    state.barnesHutTheta = clamped;
 }
 
 /** Set sound effects volume, 0–100 percent (old panel's sfxVolumeChange path). */
