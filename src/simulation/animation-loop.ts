@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Body } from '../bodies/body';
 import { CelestialBody } from '../bodies/celestial-body';
 import { Supernova } from '../effects/supernova';
+import { ScreenFlashEffect } from '../effects/screen-flash';
 import { PlanetaryNebula } from '../effects/planetary-nebula';
 import { GravitationalLensingEffect } from '../effects/gravitational-lensing';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
@@ -109,6 +110,7 @@ export interface AnimationContext {
     planetNameIndicator: PlanetNameIndicator;
     healthBarIndicator: HealthBarIndicator;
     surfaceCam: SurfaceCameraManager;
+    screenFlash: ScreenFlashEffect;
 
     // Sprites
     fpsSprite: { value: THREE.Sprite | null };
@@ -970,6 +972,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         // ── Render ──────────────────────────────────────────────────────────
+        // The screen flash is advanced by simulation time (dtTotal) so it scales
+        // with the time-warp setting and freezes while the simulation is paused.
+        ctx.screenFlash.update(dtTotal);
+
         ctx.lensingEffect.beginCapture(ctx.renderer);
         try {
             ctx.renderer.render(ctx.scene, ctx.camera);

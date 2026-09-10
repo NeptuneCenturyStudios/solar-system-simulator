@@ -110,6 +110,7 @@ import { FlightHUD } from './drawing/flight-hud';
 import { AutopilotTargetIndicator } from './drawing/autopilot-target-indicator';
 import { PlanetNameIndicator } from './drawing/planet-name-indicator';
 import { HealthBarIndicator } from './drawing/health-bar-indicator';
+import { ScreenFlashEffect, registerScreenFlash } from './effects/screen-flash';
 import { VelocityArcManager } from './drawing/velocity-arc';
 import { OrbitPredictionManager } from './drawing/orbit-prediction';
 import { SurfaceCameraManager } from './camera/surface-camera';
@@ -753,6 +754,11 @@ targetIndicator.init();
 const planetNameIndicator = new PlanetNameIndicator(uiScene, simulationState);
 
 const healthBarIndicator = new HealthBarIndicator(uiScene, simulationState);
+
+// Full-screen white flash overlay (explosions, supernova, warp engage, wormhole transit).
+// Rendered as a screen-space quad in uiScene; advanced each frame by the animation loop.
+const screenFlash = new ScreenFlashEffect(uiScene);
+registerScreenFlash(screenFlash);
 
 // Backward-compatible let kept for basic module-level state
 let manuallySelectedBody = null as Body | null; // Track bodies clicked in space (without camera buttons)
@@ -4370,6 +4376,7 @@ window.addEventListener('resize', () => {
     }
 
     lensingEffect.resize(window.innerWidth, window.innerHeight);
+    screenFlash.resize(window.innerWidth, window.innerHeight);
 });
 
 // Apply initial background visibility (pre-launch view): kuiper off
@@ -4793,6 +4800,7 @@ const animCtx: AnimationContext = {
     planetNameIndicator,
     healthBarIndicator,
     surfaceCam,
+    screenFlash,
     fpsSprite: { value: fpsSprite },
     statsSprite: { value: statsSprite },
     speedSprite: { value: speedSprite },

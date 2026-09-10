@@ -8,7 +8,6 @@ import {
 } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
-import { triggerScreenFlash } from '../effects/screen-flash';
 import { DIST_SCALE } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
@@ -315,7 +314,7 @@ export class CelestialBody extends Body {
                 );
 
                 this.dependencies.addExplosion(exp);
-                triggerScreenFlash();
+                //triggerScreenFlash();
             } catch {
                 // ignore explosion failures
             }
