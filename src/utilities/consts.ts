@@ -7,6 +7,8 @@ export enum SimulationStartMode {
     TestAiShips = 4,
     /** Scenario: Earth orbits the Sun but takes a linked-wormhole short-cut on a tighter ellipse. */
     WormholeShortcut = 5,
+    /** Scenario: Earth (with its Moon) plows through a dense counter-orbiting asteroid field. */
+    AsteroidField = 6,
 }
 
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===
@@ -434,6 +436,61 @@ export const WORMHOLE_SHORTCUT_ORBIT_RADIUS = 10_000_000 / DIST_SCALE;
 export const WORMHOLE_SHORTCUT_GATE_RADIUS = EARTH_RADIUS * 3;
 export const WORMHOLE_SHORTCUT_G_MULTIPLIER = 2_500_000; // preset gravity at scenario launch
 export const WORMHOLE_SHORTCUT_TIME_SCALE = 1; // modest time scale so the orbit is watchable
+
+// === Asteroid Field scenario ===
+// Earth (with its Moon) flies a tight circular orbit around the Sun while a dense swarm of
+// asteroids occupies a band of that same orbit, directly in Earth's path.
+//
+// The swarm is COUNTER-ORBITING (retrograde). This is the key to the whole scenario: two
+// bodies at the same orbital radius with the same prograde velocity would simply travel
+// together with zero relative motion, and two bodies on circular orbits at *different*
+// radii never intersect at all. A retrograde swarm stays on a perfectly stable circular
+// orbit (it never spirals into the Sun) yet closes on Earth at twice the orbital speed, so
+// Earth sweeps straight through the band. Every asteroid shares ASTEROID_FIELD_ORBIT_RADIUS
+// so they all have an identical orbital speed and therefore never collide with each other.
+//
+// Earth wins every collision by mass ratio (see MASS_DOMINANCE_RATIO), so it survives and
+// mows the whole band; the Moon eats anything it clips on the way past.
+
+/** Radius of the circular orbit shared by Earth, the Moon's parent, and the asteroid band. */
+export const ASTEROID_FIELD_ORBIT_RADIUS = 10_000_000 / DIST_SCALE;
+/** Preset gravity multiplier at scenario launch. */
+export const ASTEROID_FIELD_G_MULTIPLIER = 1;
+/**
+ * Modest time scale so Earth visibly moves on launch. Kept ≤ ~20 deliberately: the relative
+ * closing speed is 2× orbital, so a larger warp would advance Earth more than the collision
+ * capture radius (Earth + asteroid) in a single frame and let it tunnel through the swarm.
+ */
+export const ASTEROID_FIELD_TIME_SCALE = 1;
+/**
+ * Number of asteroids in the dense band. The n-body integrator runs 64 substeps per frame
+ * at O(n²), so this is a balance: ~130 members costs roughly 9 ms/frame of physics, which
+ * leaves enough of the frame budget for rendering while still reading as a dense field.
+ */
+export const ASTEROID_FIELD_COUNT = 130;
+/** Angular length of the band, in degrees. Kept tight so the swarm is genuinely *clustered*
+ *  (and locally dense) rather than smeared thinly around a large arc. */
+export const ASTEROID_FIELD_ARC_DEG = 60;
+/**
+ * Angular lead of Earth ahead of the band's trailing edge, in degrees. Earth travels prograde
+ * while the band travels retrograde, so this is how long the user watches Earth approach
+ * before the first strike — larger values give a longer, calmer run-up.
+ */
+export const ASTEROID_FIELD_EARTH_LEAD_DEG = 12;
+/** Per-asteroid radial jitter (±, sim units) for visual variety. Kept tiny so the orbital
+ *  speed spread stays negligible and the swarm never self-collides. */
+export const ASTEROID_FIELD_RADIAL_JITTER = 8;
+/** Half-height of the band above/below the ecliptic (sim units). Must stay below the
+ *  collision capture radius so every asteroid in the band is actually reachable. */
+export const ASTEROID_FIELD_VERTICAL_HALF_HEIGHT = 22;
+/** Asteroid model radius range (sim units). Big enough to read as rocks, small enough that
+ *  Earth decisively outmasses them. */
+export const ASTEROID_FIELD_RADIUS_MIN = 1.5;
+export const ASTEROID_FIELD_RADIUS_MAX = 5.0;
+/** Short trails per asteroid keep the 150-strong swarm legible instead of smeared. */
+export const ASTEROID_FIELD_TRAIL_LENGTH = 50;
+/** Camera distance used to frame Earth, its Moon, and the local swarm on launch. */
+export const ASTEROID_FIELD_CAMERA_DISTANCE = 9_000;
 
 // === Wormhole link bridge (bezier particle curve between linked funnels) ===
 /** Number of pooled particles flowing along a linked-wormhole bridge curve. */

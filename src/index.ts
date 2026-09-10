@@ -66,6 +66,9 @@ import {
     WORMHOLE_DEFAULT_RADIUS,
     WORMHOLE_SHORTCUT_G_MULTIPLIER,
     WORMHOLE_SHORTCUT_TIME_SCALE,
+    ASTEROID_FIELD_G_MULTIPLIER,
+    ASTEROID_FIELD_TIME_SCALE,
+    ASTEROID_FIELD_CAMERA_DISTANCE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -263,6 +266,7 @@ import {
 import { getShipTypeById } from './bodies/ships/ship-registry';
 import { TestAiShipsGenerator } from './procedural/test-ai-ships-generator';
 import { WormholeShortcutGenerator } from './procedural/wormhole-shortcut-generator';
+import { AsteroidFieldGenerator } from './procedural/asteroid-field-generator';
 import { clearNpcShips, registerNpcShipsIn } from './simulation/ai/npc-manager';
 
 // --- Event notifications (replaces sprite-based event log) ---
@@ -1690,7 +1694,8 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
         mode === SimulationStartMode.BlackHole ||
         mode === SimulationStartMode.Procedural ||
         mode === SimulationStartMode.TestAiShips ||
-        mode === SimulationStartMode.WormholeShortcut;
+        mode === SimulationStartMode.WormholeShortcut ||
+        mode === SimulationStartMode.AsteroidField;
 
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = !hideKuiper;
@@ -1795,6 +1800,10 @@ async function spawn(
         // Wormhole short-cut scenario: Earth orbits the Sun but takes a linked-wormhole
         // short-cut on a tighter ellipse inside Mercury's orbit.
         generator = new WormholeShortcutGenerator(dependencies, scene, proceduralResult?.seed);
+    } else if (mode === SimulationStartMode.AsteroidField) {
+        // Asteroid field scenario: Earth (with its Moon) plows through a dense
+        // counter-orbiting asteroid band on its own orbit.
+        generator = new AsteroidFieldGenerator(dependencies, scene, proceduralResult?.seed);
     } else {
         // Empty system generator
         generator = new EmptySystemGenerator(dependencies, scene);
@@ -4487,6 +4496,15 @@ async function launchSystem(
         dispatchSimStateChange();
     }
 
+    // The asteroid-field scenario uses the same preset-gravity approach so Earth's and the
+    // Moon's circular velocities are computed consistently at sim start, plus a modest time
+    // scale so Earth is already visibly moving when the system appears.
+    if (mode === SimulationStartMode.AsteroidField) {
+        simulationState.gMultiplier = ASTEROID_FIELD_G_MULTIPLIER;
+        simulationState.timeScale = ASTEROID_FIELD_TIME_SCALE;
+        dispatchSimStateChange();
+    }
+
     hideStartupModal();
 
     // Every launch mode except "Build your own system" runs through a
@@ -4497,6 +4515,26 @@ async function launchSystem(
             : showProceduralProgress({ title: 'Generate System' });
     await spawn(mode, proceduralResult, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
+
+    // The asteroid-field scenario is only legible if the camera actually frames Earth — the
+    // default Sun-centred view leaves Earth (and its sub-pixel swarm) off screen. Focus Earth
+    // so the camera follows it, then pull back far enough to include the Moon and the incoming
+    // asteroid band. Must run after applyDefaultCameraTogglesAfterSpawn, which clears focus.
+    if (mode === SimulationStartMode.AsteroidField) {
+        const earth = simulationState.bodies.find((b) => b.name === 'Earth');
+        if (earth) {
+            setFocusBody(earth);
+
+            const viewDir = new THREE.Vector3(0.35, 0.45, 1).normalize();
+            camera.position
+                .copy(earth.mesh.position)
+                .addScaledVector(viewDir, ASTEROID_FIELD_CAMERA_DISTANCE);
+            controls.target.copy(earth.mesh.position);
+            controls.update();
+            camera.lookAt(earth.mesh.position);
+        }
+    }
+
     if (progressReporter) hideProceduralModal();
     setSystemReady(true);
 }
@@ -4553,6 +4591,9 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
             } else if (scenarioResult.scenario === 'wormholeShortcut') {
                 // Fixed wormhole short-cut scenario — no seed prompt.
                 await launchSystem(SimulationStartMode.WormholeShortcut);
+            } else if (scenarioResult.scenario === 'asteroidField') {
+                // Fixed asteroid-field scenario — no seed prompt.
+                await launchSystem(SimulationStartMode.AsteroidField);
             }
             break;
         }
