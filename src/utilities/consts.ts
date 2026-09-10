@@ -485,13 +485,13 @@ export const ASTEROID_FIELD_G_MULTIPLIER = 1;
  * closing speed is 2× orbital, so a larger warp would advance Earth more than the collision
  * capture radius (Earth + asteroid) in a single frame and let it tunnel through the swarm.
  */
-export const ASTEROID_FIELD_TIME_SCALE = 64;
+export const ASTEROID_FIELD_TIME_SCALE = 8;
 /**
  * Number of asteroids in the dense band. The n-body integrator runs 64 substeps per frame
  * at O(n²), so this is a balance: ~130 members costs roughly 9 ms/frame of physics, which
  * leaves enough of the frame budget for rendering while still reading as a dense field.
  */
-export const ASTEROID_FIELD_COUNT = 1000;
+export const ASTEROID_FIELD_COUNT = 500;
 /** Angular length of the band, in degrees. Kept tight so the swarm is genuinely *clustered*
  *  (and locally dense) rather than smeared thinly around a large arc. */
 export const ASTEROID_FIELD_ARC_DEG = 60;
