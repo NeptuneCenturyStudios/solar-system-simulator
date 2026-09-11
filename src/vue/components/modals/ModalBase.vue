@@ -6,12 +6,18 @@
         <div
             v-if="visible"
             class="vue-modal-overlay"
+            :class="`vue-modal-overlay--${variant}`"
             role="dialog"
             aria-modal="true"
             :aria-label="title"
             @mousedown.self="onBackdropDown"
         >
-            <div ref="cardEl" class="vue-modal-card" tabindex="-1">
+            <div
+                ref="cardEl"
+                class="vue-modal-card"
+                :class="`vue-modal-card--${variant}`"
+                tabindex="-1"
+            >
                 <header class="vue-modal-header">
                     <span>{{ title }}</span>
                     <button
@@ -47,9 +53,15 @@ const props = withDefaults(
         title: string;
         /** When true, shows the close (X) button and allows Escape to cancel. */
         allowClose?: boolean;
+        /**
+         * Visual treatment. 'default' and 'info' keep the normal UI colours;
+         * 'danger' and 'success' tint the backdrop and accent the card red/green.
+         */
+        variant?: 'default' | 'danger' | 'success' | 'info';
     }>(),
     {
         allowClose: true,
+        variant: 'default',
     }
 );
 

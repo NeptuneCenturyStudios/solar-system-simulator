@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Asteroid } from '../bodies/asteroid';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import type { Earth } from '../bodies/earth';
+import type { Spaceship } from '../bodies/ships/spaceship';
 import { NotificationType } from '../event-log/event-log';
 import type { IScenario, IStateDependencies } from '../interfaces';
 import { generateProceduralBodyName } from '../procedural/body-naming';
@@ -10,10 +11,12 @@ import { rngFor } from '../procedural/seed-utils';
 import { flightState } from '../simulation/simulation';
 import type { SeededRandom } from '../utilities/prng';
 import { createUniqueId } from '../utilities/utilities';
+import { reportScenarioOutcome } from './scenario-outcome';
 import {
     ASTEROID_DEFENSE_APPROACH_SPEED,
     ASTEROID_DEFENSE_FIRST_WAVE_DELAY,
     ASTEROID_DEFENSE_IMPACT_MARGIN,
+    ASTEROID_DEFENSE_MAX_WAVES,
     ASTEROID_DEFENSE_MAX_ELEVATION_DEG,
     ASTEROID_DEFENSE_MISS_DISTANCE_FACTOR,
     ASTEROID_DEFENSE_RADIUS_MAX,
@@ -78,13 +81,24 @@ export class AsteroidDefenseScenario implements IScenario {
     private waveImpacts = 0;
     private waveDestroyed = 0;
     private waveMissed = 0;
-    /** Set once Earth is gone, after which the scenario stops spawning. */
-    private earthLost = false;
+    /** Waves fully cleared so far — the score reported when the scenario ends. */
+    private wavesCleared = 0;
+    /** Set once the scenario has ended; every further update is a no-op. */
+    private finished = false;
+    /** The player's ship, watched so its destruction ends the scenario in failure. */
+    private readonly playerShip: Spaceship | null;
 
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, earth: Earth, seed: string) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        earth: Earth,
+        playerShip: Spaceship | null,
+        seed: string
+    ) {
         this.dependencies = dependencies;
         this.scene = scene;
         this.earth = earth;
+        this.playerShip = playerShip;
         this.seed = seed;
     }
 
@@ -92,7 +106,8 @@ export class AsteroidDefenseScenario implements IScenario {
         this.wave = 0;
         this.tracked = [];
         this.spawnedCount = 0;
-        this.earthLost = false;
+        this.wavesCleared = 0;
+        this.finished = false;
         this.nextWaveTimer = ASTEROID_DEFENSE_FIRST_WAVE_DELAY;
 
         this.dependencies.addEvent({
@@ -102,14 +117,15 @@ export class AsteroidDefenseScenario implements IScenario {
     }
 
     update(simDt: number): void {
-        if (this.earthLost) return;
+        if (this.finished) return;
 
+        // Earth gone, or the player's ship destroyed, ends the scenario in failure.
         if (this.earth._isDisposed) {
-            this.earthLost = true;
-            this.dependencies.addEvent({
-                message: `Earth has been destroyed during wave ${this.wave}.`,
-                notificationType: NotificationType.Alert,
-            });
+            this.finishFailed('Earth has been destroyed.');
+            return;
+        }
+        if (this.playerShip && this.playerShip._isDisposed) {
+            this.finishFailed('Your ship has been destroyed.');
             return;
         }
 
@@ -167,6 +183,8 @@ export class AsteroidDefenseScenario implements IScenario {
     }
 
     private onWaveCleared(): void {
+        this.wavesCleared = this.wave;
+
         const parts = [
             `${this.waveDestroyed} destroyed`,
             `${this.waveImpacts} impact${this.waveImpacts === 1 ? '' : 's'}`,
@@ -179,7 +197,52 @@ export class AsteroidDefenseScenario implements IScenario {
                 this.waveImpacts > 0 ? NotificationType.Warning : NotificationType.Success,
         });
 
+        // Earth still stands after the final wave: the player has won.
+        if (this.wave >= ASTEROID_DEFENSE_MAX_WAVES) {
+            this.finishSucceeded();
+            return;
+        }
+
         this.nextWaveTimer = ASTEROID_DEFENSE_WAVE_DELAY;
+    }
+
+    /** End the scenario in failure and report it once, with the scenario-agnostic shape. */
+    private finishFailed(reason: string): void {
+        this.finished = true;
+        this.dependencies.addEvent({
+            message: `${reason} Scenario failed during wave ${this.wave}.`,
+            notificationType: NotificationType.Alert,
+        });
+        reportScenarioOutcome({
+            outcome: 'failed',
+            scenarioName: this.name,
+            message: reason,
+            stats: [
+                {
+                    label: 'Waves survived',
+                    value: `${this.wavesCleared} / ${ASTEROID_DEFENSE_MAX_WAVES}`,
+                },
+            ],
+        });
+    }
+
+    /** End the scenario in success: every wave was cleared with Earth intact. */
+    private finishSucceeded(): void {
+        this.finished = true;
+        this.dependencies.addEvent({
+            message: `All ${ASTEROID_DEFENSE_MAX_WAVES} waves survived. Earth is safe!`,
+            notificationType: NotificationType.Success,
+        });
+        reportScenarioOutcome({
+            outcome: 'succeeded',
+            scenarioName: this.name,
+            stats: [
+                {
+                    label: 'Waves cleared',
+                    value: `${ASTEROID_DEFENSE_MAX_WAVES} / ${ASTEROID_DEFENSE_MAX_WAVES}`,
+                },
+            ],
+        });
     }
 
     private spawnWave(): void {

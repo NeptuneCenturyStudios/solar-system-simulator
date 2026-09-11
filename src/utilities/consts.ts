@@ -588,6 +588,11 @@ export const ASTEROID_DEFENSE_FIRST_WAVE_DELAY = 8;
 /** Sim seconds between one wave clearing and the next spawning. */
 export const ASTEROID_DEFENSE_WAVE_DELAY = 5;
 /**
+ * Total number of waves the player must survive to win. Wave N holds N asteroids,
+ * so ten waves is fifty-five asteroids in total.
+ */
+export const ASTEROID_DEFENSE_MAX_WAVES = 10;
+/**
  * An asteroid farther from Earth than SPAWN_DISTANCE × this factor has missed (e.g. it was
  * deflected) and is removed, so a stray rock can never stall the wave.
  */

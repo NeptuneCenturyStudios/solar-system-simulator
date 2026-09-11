@@ -1216,6 +1216,92 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     gap: 0.5rem;
 }
 
+/* ── Modal variants ─────────────────────────────────────────────────────────
+   The overlay already covers the whole canvas, so tinting it reads as a
+   scene-wide backdrop wash. 'danger' and 'success' colour that wash red/green
+   and soften the blur so the tinted scene stays visible behind the card;
+   'default' and 'info' keep the normal UI colours untouched. */
+
+.vue-modal-overlay--danger {
+    background: rgba(120, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+}
+
+.vue-modal-overlay--success {
+    background: rgba(0, 90, 25, 0.5);
+    backdrop-filter: blur(3px);
+}
+
+.vue-modal-card--danger {
+    border: 1px solid rgba(255, 90, 90, 0.65);
+    box-shadow:
+        0 0 0 1px rgba(255, 60, 60, 0.25),
+        0 12px 40px rgba(120, 0, 0, 0.55);
+}
+
+.vue-modal-card--danger .vue-modal-header {
+    color: #ff8a8a;
+    border-bottom-color: rgba(255, 90, 90, 0.5);
+}
+
+.vue-modal-card--success {
+    border: 1px solid rgba(90, 230, 130, 0.65);
+    box-shadow:
+        0 0 0 1px rgba(60, 220, 110, 0.25),
+        0 12px 40px rgba(0, 90, 25, 0.55);
+}
+
+.vue-modal-card--success .vue-modal-header {
+    color: #86f0a8;
+    border-bottom-color: rgba(90, 230, 130, 0.5);
+}
+
+/* 'info' and 'default' intentionally reuse the base modal styling. */
+
+/* ── Scenario outcome dialog ────────────────────────────────────────────────
+   Body layout for ScenarioOutcomeModal.vue: a centred message plus an optional
+   list of labelled stats (waves survived, asteroids destroyed, ...). */
+
+.scenario-dialog-message {
+    font-size: 0.9rem;
+    color: #fff;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.scenario-dialog-stats {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--new-ui-border);
+    border-radius: var(--new-ui-border-radius);
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.scenario-dialog-stat {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    font-family: monospace;
+}
+
+.scenario-dialog-stat dt {
+    color: var(--new-ui-label-color);
+    font-size: 0.72rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.scenario-dialog-stat dd {
+    margin: 0;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
 .vue-modal-fade-enter-active,
 .vue-modal-fade-leave-active {
     transition: opacity 0.2s ease;

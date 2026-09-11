@@ -172,6 +172,7 @@ export class AsteroidDefenseGenerator extends SolarSystemGenerator {
                 this.dependencies,
                 this.scene,
                 earth,
+                ship,
                 this.masterSeed
             ),
         };

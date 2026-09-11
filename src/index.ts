@@ -181,6 +181,10 @@ import {
 } from './vue/procedural-modal-service';
 import { aboutModalIsVisible } from './vue/about-modal-service';
 import { showScenariosModal, scenariosModalIsVisible } from './vue/scenarios-modal-service';
+import {
+    scenarioOutcomeModalIsVisible,
+    showScenarioOutcomeModal,
+} from './vue/scenario-outcome-modal-service';
 import { showWhatsNewModalIfNeeded, whatsNewModalIsVisible } from './vue/whats-new-modal-service';
 
 // State singletons
@@ -271,6 +275,10 @@ import { AsteroidFieldGenerator } from './procedural/asteroid-field-generator';
 import { AsteroidDefenseGenerator } from './procedural/asteroid-defense-generator';
 import { clearNpcShips, registerNpcShipsIn } from './simulation/ai/npc-manager';
 import { scenarioManager } from './scenarios/scenario-manager';
+import {
+    registerScenarioOutcomeHandler,
+    type ScenarioOutcomeReport,
+} from './scenarios/scenario-outcome';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: {
@@ -4576,10 +4584,18 @@ function applySystemLaunchOptions(options: ISystemLaunchOptions) {
  * the management panel, shows the procedural progress overlay (where
  * applicable), spawns the system, then hides the progress overlay.
  */
+/**
+ * The start mode of the most recent launch, remembered so a scenario's "restart" action can
+ * relaunch the same scenario without the outcome handler hard-coding which one it was.
+ */
+let lastLaunchedMode: SimulationStartMode = SimulationStartMode.Default;
+
 async function launchSystem(
     mode: SimulationStartMode,
     proceduralResult?: IProceduralGeneratorPromptResult
 ) {
+    lastLaunchedMode = mode;
+
     applyStartupGMultiplier();
 
     // Scenarios with a preset gravity apply it before generation, so the circular velocities
@@ -4673,6 +4689,33 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
     }
 }
 
+/**
+ * React to a scenario ending: show the themed outcome dialog, then either restart the same
+ * scenario or open the startup flow to pick a different one. The dialog's overlay variant
+ * (red on failure, green on success) supplies the scene-wide backdrop tint.
+ *
+ * The simulation is deliberately left running behind the dialog — the scenario itself has
+ * already stopped updating, and freezing the world would only hide the aftermath.
+ */
+async function handleScenarioOutcome(report: ScenarioOutcomeReport): Promise<void> {
+    // Leave flight mode so pointer lock / mouse capture is released, letting the player use
+    // the mouse on the dialog's buttons.
+    if (flightState.isActive) exitFlightMode(flightCtx);
+
+    const result = await showScenarioOutcomeModal(report);
+    if (!result) return;
+
+    if (result.action === 'restart') {
+        await launchSystem(lastLaunchedMode);
+    } else if (result.action === 'newScenario') {
+        await startStartupFlow();
+    }
+}
+
+registerScenarioOutcomeHandler((report) => {
+    void handleScenarioOutcome(report);
+});
+
 // Block input while modal visible
 const _origOnMouseDown = onMouseDown;
 const _origOnMouseMove = onMouseMove;
@@ -4684,7 +4727,8 @@ function modalBlocksInput() {
         proceduralModalIsVisible() ||
         aboutModalIsVisible() ||
         whatsNewModalIsVisible() ||
-        scenariosModalIsVisible()
+        scenariosModalIsVisible() ||
+        scenarioOutcomeModalIsVisible()
     );
 }
 

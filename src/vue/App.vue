@@ -11,6 +11,7 @@
     <StartupModal />
     <ProceduralModal />
     <ScenariosModal />
+    <ScenarioOutcomeModal />
     <AboutModal />
 </template>
 
@@ -21,6 +22,7 @@ import WhatsNewModal from './components/modals/WhatsNewModal.vue';
 import StartupModal from './components/modals/StartupModal.vue';
 import ProceduralModal from './components/modals/ProceduralModal.vue';
 import ScenariosModal from './components/modals/ScenariosModal.vue';
+import ScenarioOutcomeModal from './components/modals/ScenarioOutcomeModal.vue';
 import AboutModal from './components/modals/AboutModal.vue';
 
 import { vueUiState } from './ui-store';
