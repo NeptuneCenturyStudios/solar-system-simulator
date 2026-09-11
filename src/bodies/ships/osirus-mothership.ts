@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Spaceship } from './spaceship';
 import { ISpaceshipHandling } from '../../interfaces';
-import { C, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
+import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
 import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
 
@@ -28,16 +28,16 @@ export class OsirisMothership extends Spaceship {
         );
 
         // Flight tuning constants — deliberately much heavier/sluggish than the Zenith fighter
-        const FLIGHT_MAX_SPEED = C * 0.003;
-        const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.025;
-        const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.35;
+        const FLIGHT_MAX_SPEED = 60 / DIST_SCALE;
+        const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.004;
+        const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.6;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
-        const FLIGHT_BOOST_MAX_SPEED = C * 0.4;
+        const FLIGHT_BOOST_MAX_SPEED = C * 0.09;
         const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.2;
         const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED * 0.25;
         const FLIGHT_WARP_SPEED = C * 100;
         const FLIGHT_WARP_ACCEL = FLIGHT_WARP_SPEED * 0.04;
-        const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 0.9;
+        const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 4;
         const FLIGHT_WARP_DECEL_TOLERANCE = FLIGHT_WARP_SPEED * 0.01;
         const FLIGHT_PERP_DECAY = 0.5;
         const FLIGHT_MAX_POINTER_OFFSET = 340;

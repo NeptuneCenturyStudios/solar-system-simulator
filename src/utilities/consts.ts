@@ -524,7 +524,7 @@ export const ASTEROID_FIELD_TIME_SCALE = 8;
  * at O(n²), so this is a balance: ~130 members costs roughly 9 ms/frame of physics, which
  * leaves enough of the frame budget for rendering while still reading as a dense field.
  */
-export const ASTEROID_FIELD_COUNT = 500;
+export const ASTEROID_FIELD_COUNT = 300;
 /** Angular length of the band, in degrees. Kept tight so the swarm is genuinely *clustered*
  *  (and locally dense) rather than smeared thinly around a large arc. */
 export const ASTEROID_FIELD_ARC_DEG = 60;
