@@ -51,9 +51,9 @@ import { ProceduralGenerationReporter } from './procedural-generation-progress';
  * {@link ASTEROID_FIELD_ORBIT_RADIUS}, which gives them all an identical orbital speed and
  * guarantees they never collide with one another; only Earth and the Moon can hit them.
  *
- * Each collision resolves through the normal mass-dominance rule (see MASS_DOMINANCE_RATIO
- * in physics.ts): Earth outmasses an asteroid by ~10⁴, so Earth is always the winner and the
- * asteroid is absorbed. The Moon outmasses them too, so it eats anything it clips on the way.
+ * Each collision resolves through the normal damage rules (see resolveCollision in
+ * collision.ts): the impact destroys the asteroid, which Earth absorbs, and Earth takes
+ * kinetic-energy damage. The Moon does the same to anything it clips on the way past.
  * Absorption events use the default (console-only) log method, so a full pass is silent
  * rather than a burst of notifications.
  *

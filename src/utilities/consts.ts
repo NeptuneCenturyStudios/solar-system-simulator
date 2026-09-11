@@ -430,8 +430,38 @@ export const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
  *   - Moon     ~122 HP
  *   - Earth    ~9 900 HP
  *   - Sun      ~3.3 billion HP (practically indestructible)
+ * Collisions drain the same pool — see the collision damage constants below.
  */
 export const HP_MASS_MULTIPLIER = 100;
+
+// === Collision damage ===
+// Two colliding bodies each lose the same HP: the kinetic energy of their relative motion in
+// the centre-of-mass frame (½·μ·v_rel², μ = m₁m₂ / (m₁ + m₂)) × COLLISION_DAMAGE_PER_ENERGY.
+// Because HP scales with mass, that equal damage is a large fraction of a light body's HP and
+// a small fraction of a heavy body's. Roughly:
+//   - Asteroid striking Earth at ≥ 20 km/s → asteroid destroyed, Earth barely scratched
+//   - Earth and Mars head-on (~54 km/s)    → Mars destroyed, Earth loses ~70% of its HP
+/**
+ * Relative speed (20 km/s) at which a small body striking a far heavier one loses exactly its
+ * full HP. Slower impacts deal partial damage, subject to COLLISION_MIN_DAMAGE_FRACTION.
+ */
+export const COLLISION_DISRUPTION_SPEED = 20 / DIST_SCALE;
+/**
+ * HP damage per unit of collision kinetic energy, derived from COLLISION_DISRUPTION_SPEED so
+ * that ½·m·v_d² × this = m × HP_MASS_MULTIPLIER (≈ 5,000).
+ */
+export const COLLISION_DAMAGE_PER_ENERGY =
+    (2 * HP_MASS_MULTIPLIER) / COLLISION_DISRUPTION_SPEED ** 2;
+/**
+ * Minimum damage per contact, as a fraction of the lighter body's max HP, applied to both
+ * bodies. Guarantees the lighter body is destroyed within a bounded number of contacts, so
+ * a slow body can never survive indefinitely against a heavier one.
+ */
+export const COLLISION_MIN_DAMAGE_FRACTION = 0.25;
+/** Coefficient of restitution when both bodies survive a collision (0 = stick, 1 = elastic). */
+export const COLLISION_RESTITUTION = 0.3;
+/** Surviving bodies are pushed apart to (r₁ + r₂) × this factor so they don't re-contact next frame. */
+export const COLLISION_SEPARATION_FACTOR = 1.001;
 
 // === Wormhole tuning ===
 /** Default mouth (gate) radius for a newly created wormhole, in sim units. Used for randomization range */
@@ -475,8 +505,9 @@ export const WORMHOLE_SHORTCUT_TIME_SCALE = 1; // modest time scale so the orbit
 // Earth sweeps straight through the band. Every asteroid shares ASTEROID_FIELD_ORBIT_RADIUS
 // so they all have an identical orbital speed and therefore never collide with each other.
 //
-// Earth wins every collision by mass ratio (see MASS_DOMINANCE_RATIO), so it survives and
-// mows the whole band; the Moon eats anything it clips on the way past.
+// Each collision damages Earth by the impact's kinetic energy (see COLLISION_DAMAGE_PER_ENERGY)
+// and destroys the asteroid; the Moon eats anything it clips on the way past. At the current
+// tuning Earth does not survive the full band — the field still needs rebalancing.
 
 /** Radius of the circular orbit shared by Earth, the Moon's parent, and the asteroid band. */
 export const ASTEROID_FIELD_ORBIT_RADIUS = 1_000_000 / DIST_SCALE;
@@ -509,10 +540,10 @@ export const ASTEROID_FIELD_RADIAL_JITTER = 8;
 /** Half-height of the band above/below the ecliptic (sim units). Must stay below the
  *  collision capture radius so every asteroid in the band is actually reachable. */
 export const ASTEROID_FIELD_VERTICAL_HALF_HEIGHT = 22;
-/** Asteroid model radius range (sim units). Big enough to read as rocks, small enough that
- *  Earth decisively outmasses them. */
-export const ASTEROID_FIELD_RADIUS_MIN = 1.5;
-export const ASTEROID_FIELD_RADIUS_MAX = 5.0;
+/** Asteroid model radius range (sim units). Big enough to read as rocks; collision damage to
+ *  Earth scales with their mass. */
+export const ASTEROID_FIELD_RADIUS_MIN = 0.1 / RADIUS_SCALE;
+export const ASTEROID_FIELD_RADIUS_MAX = 200 / RADIUS_SCALE;
 /** Short trails per asteroid keep the 150-strong swarm legible instead of smeared. */
 export const ASTEROID_FIELD_TRAIL_LENGTH = 50;
 /** Camera distance used to frame Earth, its Moon, and the local swarm on launch. */
@@ -544,7 +575,10 @@ export const ASTEROID_DEFENSE_SPAWN_DISTANCE = 160_000 / DIST_SCALE;
 export const ASTEROID_DEFENSE_APPROACH_SPEED = 1_200 / DIST_SCALE;
 /** Maximum spawn elevation above/below Earth's orbital plane, in degrees. */
 export const ASTEROID_DEFENSE_MAX_ELEVATION_DEG = 30;
-/** Asteroid radius range. Big enough to read as rocks; Earth still decisively outmasses them. */
+/**
+ * Asteroid radius range. Big enough to read as rocks. Collision damage scales with mass, so
+ * together with APPROACH_SPEED this sets how hard each impact hits Earth.
+ */
 export const ASTEROID_DEFENSE_RADIUS_MIN = 300 / RADIUS_SCALE;
 export const ASTEROID_DEFENSE_RADIUS_MAX = 800 / RADIUS_SCALE;
 /** Long trails so the player can spot incoming asteroids from a distance. */

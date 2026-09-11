@@ -21,7 +21,7 @@ export class Body {
     labelLine: THREE.Line | null = null;
     bodyType: BodyTypeEnum;
     /** Current hit-points.  Initialised from mass × HP_MASS_MULTIPLIER.
-     *  Reduced by weapon impacts; reaching ≤ 0 triggers body.die(). */
+     *  Reduced by weapon impacts and collisions; reaching ≤ 0 triggers body.die(). */
     healthPoints: number;
     /** Maximum hit-points at spawn (same initial value as healthPoints).
      *  Use healthPoints / maxHealthPoints for a [0–1] health percentage. */

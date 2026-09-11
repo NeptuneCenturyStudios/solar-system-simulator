@@ -24,12 +24,8 @@ import { processWormholeInteractions } from '../physics/wormhole-collision';
 import { updateWormholeBridges } from '../effects/wormhole-link-bridge';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { settingsStore } from '../settings/settings-store';
-import {
-    absorbBody,
-    chooseCollisionWinner,
-    destroyBody,
-    updateSimulation,
-} from '../physics/physics';
+import { absorbBody, destroyBody, updateSimulation } from '../physics/physics';
+import { resolveCollision } from '../physics/collision';
 import {
     ISimulationState,
     IFlightState,
@@ -514,8 +510,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     const b2 = ctx.simulationState.bodies[k];
                     if (!b2 || b2._isDisposed || !b2.mesh) continue;
 
-                    // Wormholes are indestructible and never absorb/destroy via the normal
-                    // mass-based rules — entrance/teleport is handled by a dedicated pass below.
+                    // Wormholes are indestructible and never take collision damage —
+                    // entrance/teleport is handled by a dedicated pass below.
                     if (b1 instanceof Wormhole || b2 instanceof Wormhole) continue;
 
                     const dx = b1.mesh.position.x - b2.mesh.position.x;
@@ -526,10 +522,15 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         continue;
 
                     if (dx * dx + dy * dy + dz * dz < maxDist * maxDist) {
-                        const outcome = chooseCollisionWinner(b1, b2);
+                        // Applies impact damage to both bodies (and bounces them apart if
+                        // both survive); deaths are carried out below from the outcome.
+                        const outcome = resolveCollision(b1, b2);
+
+                        // Both survived (or were only nudged out of overlap) — nothing dies.
+                        if (outcome.type === 'bounce' || outcome.type === 'none') continue;
 
                         if (outcome.type === 'destroy-both') {
-                            // Comparable-mass bodies: no winner — both are destroyed.
+                            // The impact destroyed both bodies — no winner.
                             // The camera focus (if it was one of these bodies) is frozen at
                             // the body's last position by handleBodyBecameInvalid (via the
                             // body:dead event fired inside victim.die()).

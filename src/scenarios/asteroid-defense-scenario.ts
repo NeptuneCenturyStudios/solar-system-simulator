@@ -47,8 +47,9 @@ import {
  * ----------
  * Outcomes are polled each frame rather than hooked into collision code: a tracked asteroid
  * that is disposed is classified by where it died (Body.die() leaves mesh.position intact).
- * Dying next to Earth is an impact — Earth outmasses every asteroid, so it absorbs them — and
- * dying anywhere else means the player (or the ship itself) destroyed it. An asteroid that
+ * Dying next to Earth is an impact — the collision destroys the asteroid and Earth takes
+ * kinetic-energy damage (see resolveCollision) — and dying anywhere else means the player (or
+ * the ship itself) destroyed it. An asteroid that
  * somehow drifts well past its spawn distance has missed and is removed, so a stray rock can
  * never stall the wave.
  */
