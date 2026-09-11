@@ -20,6 +20,8 @@ import {
     ASTEROID_FIELD_RADIUS_MIN,
     ASTEROID_FIELD_RADIUS_MAX,
     ASTEROID_FIELD_TRAIL_LENGTH,
+    ASTEROID_FIELD_TIME_SCALE,
+    ASTEROID_FIELD_CAMERA_DISTANCE,
     CERES_MASS,
     CERES_RADIUS,
     SUN_MASS,
@@ -29,7 +31,7 @@ import {
 } from '../utilities/consts';
 import { BodyTypeEnum, MoonTypeEnum } from '../bodies/body-enums';
 import type { Body } from '../bodies/body';
-import type { ISolarSystem, IStateDependencies } from '../interfaces';
+import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 import { ProceduralGenerationReporter } from './procedural-generation-progress';
 
 /**
@@ -108,10 +110,15 @@ export class AsteroidFieldGenerator extends SolarSystemGenerator {
             const angle = t * arcRad + angleRng.range(-0.004, 0.004);
 
             const radialRng = rngFor(this.masterSeed, 'asteroidRadius', i);
-            const r = radius + radialRng.range(-ASTEROID_FIELD_RADIAL_JITTER, ASTEROID_FIELD_RADIAL_JITTER);
+            const r =
+                radius +
+                radialRng.range(-ASTEROID_FIELD_RADIAL_JITTER, ASTEROID_FIELD_RADIAL_JITTER);
 
             const heightRng = rngFor(this.masterSeed, 'asteroidHeight', i);
-            const y = heightRng.range(-ASTEROID_FIELD_VERTICAL_HALF_HEIGHT, ASTEROID_FIELD_VERTICAL_HALF_HEIGHT);
+            const y = heightRng.range(
+                -ASTEROID_FIELD_VERTICAL_HALF_HEIGHT,
+                ASTEROID_FIELD_VERTICAL_HALF_HEIGHT
+            );
 
             const sizeRng = rngFor(this.masterSeed, 'asteroidSize', i);
             const size = sizeRng.range(ASTEROID_FIELD_RADIUS_MIN, ASTEROID_FIELD_RADIUS_MAX);
@@ -149,7 +156,9 @@ export class AsteroidFieldGenerator extends SolarSystemGenerator {
         }
     }
 
-    async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
+    async generateSolarSystemAsync(
+        reporter?: ProceduralGenerationReporter
+    ): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
         const gForce = this.dependencies.getG();
 
@@ -215,8 +224,23 @@ export class AsteroidFieldGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         return {
-            bodies,
-            spaceTexture: pickRandomSpaceTexture(this.masterSeed),
+            system: {
+                bodies,
+                spaceTexture: pickRandomSpaceTexture(this.masterSeed),
+            },
+            options: {
+                // Modest time scale so Earth is already visibly moving when the system appears.
+                timeScale: ASTEROID_FIELD_TIME_SCALE,
+                // The scenario is only legible if the camera actually frames Earth — the default
+                // Sun-centred view leaves Earth (and its sub-pixel swarm) off screen. Follow Earth
+                // from far enough back to include the Moon and the incoming asteroid band.
+                camera: {
+                    focusBody: earth,
+                    distance: ASTEROID_FIELD_CAMERA_DISTANCE,
+                    viewDirection: new THREE.Vector3(0.35, 0.45, 1),
+                },
+            },
+            scenario: null,
         };
     }
 }

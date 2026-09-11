@@ -4,7 +4,7 @@ import { SeededRandom } from '../utilities/prng';
 import { generateSystemBodyInventory } from './system-body-inventory-generator';
 import type { Body } from '../bodies/body';
 import type { CelestialBody } from '../bodies/celestial-body';
-import type { ISolarSystem, IStateDependencies } from '../interfaces';
+import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 
 import { generateProceduralPlanets } from './planet-generator';
 import { createPlanetBodyFromProceduralCreation } from './planet-factory';
@@ -52,7 +52,9 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         this.prng = new SeededRandom(this.masterSeed);
     }
 
-    async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
+    async generateSolarSystemAsync(
+        reporter?: ProceduralGenerationReporter
+    ): Promise<ISolarSystemGenerationResult> {
         const inventory = generateSystemBodyInventory(this.prng);
 
         const starEntry = inventory.find((e) => e.bodyType === BodyTypeEnum.Star);
@@ -282,8 +284,12 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         const skydomeTexture = pickRandomSpaceTexture(this.masterSeed);
 
         return {
-            bodies,
-            spaceTexture: skydomeTexture,
+            system: {
+                bodies,
+                spaceTexture: skydomeTexture,
+            },
+            options: {},
+            scenario: null,
         };
     }
 }

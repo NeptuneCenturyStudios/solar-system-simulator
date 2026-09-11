@@ -65,10 +65,8 @@ import {
     EARTH_RADIUS,
     WORMHOLE_DEFAULT_RADIUS,
     WORMHOLE_SHORTCUT_G_MULTIPLIER,
-    WORMHOLE_SHORTCUT_TIME_SCALE,
     ASTEROID_FIELD_G_MULTIPLIER,
-    ASTEROID_FIELD_TIME_SCALE,
-    ASTEROID_FIELD_CAMERA_DISTANCE,
+    ASTEROID_DEFENSE_G_MULTIPLIER,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -151,7 +149,9 @@ import {
     IMagneticFieldOptions,
     IProceduralGeneratorPromptResult,
     ISimStateSnapshot,
+    ISolarSystemGenerationResult,
     IStateDependencies,
+    ISystemLaunchOptions,
 } from './interfaces';
 import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simulation/autopilot';
 import { Sun } from './bodies/sun';
@@ -268,7 +268,9 @@ import { getShipTypeById } from './bodies/ships/ship-registry';
 import { TestAiShipsGenerator } from './procedural/test-ai-ships-generator';
 import { WormholeShortcutGenerator } from './procedural/wormhole-shortcut-generator';
 import { AsteroidFieldGenerator } from './procedural/asteroid-field-generator';
+import { AsteroidDefenseGenerator } from './procedural/asteroid-defense-generator';
 import { clearNpcShips, registerNpcShipsIn } from './simulation/ai/npc-manager';
+import { scenarioManager } from './scenarios/scenario-manager';
 
 // --- Event notifications (replaces sprite-based event log) ---
 function addEvent(event: {
@@ -1701,7 +1703,8 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
         mode === SimulationStartMode.Procedural ||
         mode === SimulationStartMode.TestAiShips ||
         mode === SimulationStartMode.WormholeShortcut ||
-        mode === SimulationStartMode.AsteroidField;
+        mode === SimulationStartMode.AsteroidField ||
+        mode === SimulationStartMode.AsteroidDefense;
 
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = !hideKuiper;
@@ -1714,6 +1717,10 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
  * Resets the simulation state and notifies the UI of the reset.
  */
 function cleanUpSolarSystem() {
+    // Stop the running scenario first, so it never reacts to (or spawns into) a system
+    // that is being torn down.
+    scenarioManager.stop();
+
     // Drop the NPC registry before disposing bodies, so the animation loop and
     // physics substep stop touching ships that are about to be torn down.
     clearNpcShips();
@@ -1784,7 +1791,7 @@ async function spawn(
     mode = SimulationStartMode.Default,
     proceduralResult?: IProceduralGeneratorPromptResult,
     progressReporter?: ProceduralGenerationReporter
-) {
+): Promise<ISolarSystemGenerationResult> {
     applyEnvironmentDefaultsForMode(mode);
 
     cleanUpSolarSystem();
@@ -1814,19 +1821,31 @@ async function spawn(
         // Asteroid field scenario: Earth (with its Moon) plows through a dense
         // counter-orbiting asteroid band on its own orbit.
         generator = new AsteroidFieldGenerator(dependencies, scene, proceduralResult?.seed);
+    } else if (mode === SimulationStartMode.AsteroidDefense) {
+        // Asteroid defense scenario: the player flies the ship picked in Flight Controls
+        // and shoots down waves of asteroids thrown at Earth.
+        generator = new AsteroidDefenseGenerator(
+            dependencies,
+            scene,
+            simStore.selectedShipTypeId,
+            proceduralResult?.seed
+        );
     } else {
         // Empty system generator
         generator = new EmptySystemGenerator(dependencies, scene);
     }
 
     // Generate the solar system using the selected generator
-    const solarSystem = await generator.generateSolarSystemAsync(progressReporter);
+    const result = await generator.generateSolarSystemAsync(progressReporter);
+    const solarSystem = result.system;
 
     // Set the bodies
     simulationState.bodies = solarSystem.bodies;
     // Scenario generators may include AI-piloted ships; pick them up now that the
     // system is live, so the registry never holds a ship the physics loop can't see.
     registerNpcShipsIn(simulationState.bodies);
+    // Hand the scenario (if any) to the manager now that its bodies are live.
+    scenarioManager.start(result.scenario);
     // Apply the space texture from the generated solar system
     await loadSpaceTexture(scene, solarSystem.spaceTexture.filename);
     environmentState.spaceTextureFilename = solarSystem.spaceTexture.filename;
@@ -1843,6 +1862,8 @@ async function spawn(
     if (simulationState.bodies.length > 0) {
         triggerZoomToBody(simulationState.bodies[0]);
     }
+
+    return result;
 }
 
 /**
@@ -1888,6 +1909,14 @@ function onMouseDown(event: MouseEvent) {
 
     // In flight mode: LMB fires the weapon; all other non-RMB interactions are blocked.
     if (flightState.isActive && event.button === 0) {
+        // Flight mode was entered without pointer lock (the browser refused it). This click is
+        // a user gesture, so grab the lock now instead of firing.
+        if (document.pointerLockElement !== renderer.domElement) {
+            renderer.domElement.requestPointerLock().catch((e: unknown) => {
+                console.warn('[flight] Pointer lock refused.', e);
+            });
+            return;
+        }
         flightState.isFiring = true;
         return;
     }
@@ -3655,8 +3684,14 @@ function spawnShip(targetShip?: Spaceship) {
     }
 
     // --- Re-enter existing ship: enter flight mode immediately ---
-    const ship: Spaceship = existing;
+    enterFlightMode(existing);
+}
 
+/**
+ * Put the player into flight mode aboard `ship`. Used when re-entering a spawned ship and when
+ * a scenario hands the player a ship at launch (see applySystemLaunchOptions).
+ */
+function enterFlightMode(ship: Spaceship) {
     // Snapshot camera / controls state so exit can restore it cleanly
     flightState.prevCameraPos.copy(camera.position);
     flightState.prevCameraUp.copy(camera.up);
@@ -3706,8 +3741,12 @@ function spawnShip(targetShip?: Spaceship) {
         document.activeElement.blur();
     }
 
-    // Pointer lock so the mouse steers freely without leaving the window
-    renderer.domElement.requestPointerLock();
+    // Pointer lock so the mouse steers freely without leaving the window. The browser can
+    // refuse it when no user gesture is in flight (e.g. a scenario entering flight mode after
+    // async generation); onMouseDown then retries on the player's first click.
+    renderer.domElement.requestPointerLock().catch((e: unknown) => {
+        console.warn('[flight] Pointer lock refused; the next click will retry.', e);
+    });
     controls.enabled = false;
 
     flightSteeringLine.visible = true;
@@ -4488,6 +4527,51 @@ function applyStartupGMultiplier() {
 }
 
 /**
+ * Scenarios that launch at a preset gravity. Unlike the rest of a scenario's launch settings
+ * (which its generator returns as ISystemLaunchOptions), gravity must be applied BEFORE
+ * generation, because generators compute orbital velocities from the effective G.
+ */
+const PRESET_G_MULTIPLIERS: Partial<Record<SimulationStartMode, number>> = {
+    [SimulationStartMode.WormholeShortcut]: WORMHOLE_SHORTCUT_G_MULTIPLIER,
+    [SimulationStartMode.AsteroidField]: ASTEROID_FIELD_G_MULTIPLIER,
+    [SimulationStartMode.AsteroidDefense]: ASTEROID_DEFENSE_G_MULTIPLIER,
+};
+
+/**
+ * Apply the launch options a generator returned, once its system is live. Must run after
+ * applyDefaultCameraTogglesAfterSpawn, which clears the camera focus.
+ */
+function applySystemLaunchOptions(options: ISystemLaunchOptions) {
+    if (options.timeScale !== undefined) {
+        // While paused the live time scale is pinned at 0; the requested one takes effect on resume.
+        if (simulationState.isPaused) {
+            simulationState.savedTimeScale = options.timeScale;
+        } else {
+            simulationState.timeScale = options.timeScale;
+        }
+        dispatchSimStateChange();
+    }
+
+    const cam = options.camera;
+    if (cam && !cam.focusBody._isDisposed && simulationState.bodies.includes(cam.focusBody)) {
+        const target = cam.focusBody.mesh.position;
+        setFocusBody(cam.focusBody);
+
+        const viewDir = cam.viewDirection.clone().normalize();
+        camera.position.copy(target).addScaledVector(viewDir, cam.distance);
+        controls.target.copy(target);
+        controls.update();
+        camera.lookAt(target);
+    }
+
+    const ship = options.playerShip;
+    if (ship && !ship._isDisposed && simulationState.bodies.includes(ship)) {
+        flightState.knownShip = ship;
+        enterFlightMode(ship);
+    }
+}
+
+/**
  * Launches a system from the startup flow: applies the G multiplier, closes
  * the management panel, shows the procedural progress overlay (where
  * applicable), spawns the system, then hides the progress overlay.
@@ -4498,21 +4582,11 @@ async function launchSystem(
 ) {
     applyStartupGMultiplier();
 
-    // The wormhole short-cut scenario launches at a preset gravity (and a modest time
-    // scale) so Earth's circular velocity is computed consistently at sim start and the
-    // motion is immediately watchable without an extreme time scale.
-    if (mode === SimulationStartMode.WormholeShortcut) {
-        simulationState.gMultiplier = WORMHOLE_SHORTCUT_G_MULTIPLIER;
-        simulationState.timeScale = WORMHOLE_SHORTCUT_TIME_SCALE;
-        dispatchSimStateChange();
-    }
-
-    // The asteroid-field scenario uses the same preset-gravity approach so Earth's and the
-    // Moon's circular velocities are computed consistently at sim start, plus a modest time
-    // scale so Earth is already visibly moving when the system appears.
-    if (mode === SimulationStartMode.AsteroidField) {
-        simulationState.gMultiplier = ASTEROID_FIELD_G_MULTIPLIER;
-        simulationState.timeScale = ASTEROID_FIELD_TIME_SCALE;
+    // Scenarios with a preset gravity apply it before generation, so the circular velocities
+    // their generators compute are consistent with the world they launch into.
+    const presetG = PRESET_G_MULTIPLIERS[mode];
+    if (presetG !== undefined) {
+        simulationState.gMultiplier = presetG;
         dispatchSimStateChange();
     }
 
@@ -4524,29 +4598,14 @@ async function launchSystem(
         mode === SimulationStartMode.Empty
             ? undefined
             : showProceduralProgress({ title: 'Generate System' });
-    await spawn(mode, proceduralResult, progressReporter);
+    const result = await spawn(mode, proceduralResult, progressReporter);
     applyDefaultCameraTogglesAfterSpawn();
 
-    // The asteroid-field scenario is only legible if the camera actually frames Earth — the
-    // default Sun-centred view leaves Earth (and its sub-pixel swarm) off screen. Focus Earth
-    // so the camera follows it, then pull back far enough to include the Moon and the incoming
-    // asteroid band. Must run after applyDefaultCameraTogglesAfterSpawn, which clears focus.
-    if (mode === SimulationStartMode.AsteroidField) {
-        const earth = simulationState.bodies.find((b) => b.name === 'Earth');
-        if (earth) {
-            setFocusBody(earth);
-
-            const viewDir = new THREE.Vector3(0.35, 0.45, 1).normalize();
-            camera.position
-                .copy(earth.mesh.position)
-                .addScaledVector(viewDir, ASTEROID_FIELD_CAMERA_DISTANCE);
-            controls.target.copy(earth.mesh.position);
-            controls.update();
-            camera.lookAt(earth.mesh.position);
-        }
-    }
-
     if (progressReporter) hideProceduralModal();
+
+    // Time scale, camera framing and flight-mode entry requested by the generator.
+    applySystemLaunchOptions(result.options);
+
     setSystemReady(true);
 }
 
@@ -4605,6 +4664,9 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
             } else if (scenarioResult.scenario === 'asteroidField') {
                 // Fixed asteroid-field scenario — no seed prompt.
                 await launchSystem(SimulationStartMode.AsteroidField);
+            } else if (scenarioResult.scenario === 'asteroidDefense') {
+                // Asteroid defense scenario — no seed prompt; the player starts in flight mode.
+                await launchSystem(SimulationStartMode.AsteroidDefense);
             }
             break;
         }

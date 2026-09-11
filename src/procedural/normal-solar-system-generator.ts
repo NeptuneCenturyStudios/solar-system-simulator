@@ -19,7 +19,7 @@ import { Ceres } from '../bodies/ceres';
 import { Asteroid } from '../bodies/asteroid';
 
 import { createSatellite } from '../utilities/utilities';
-import type { ISolarSystem, IStateDependencies } from '../interfaces';
+import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 import { createMoon } from '../bodies/create-moon';
 
 import {
@@ -80,7 +80,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
     async generateSolarSystemAsync(
         progressReporter?: ProceduralGenerationReporter
-    ): Promise<ISolarSystem> {
+    ): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
 
         // Total bodies: Sun + 9 planets + Ceres + 3 asteroids + 5 moons + ISS + Halley = 21
@@ -390,8 +390,12 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         const spaceTexture = spaceTextures[0];
 
         return {
-            bodies,
-            spaceTexture: spaceTexture,
+            system: {
+                bodies,
+                spaceTexture: spaceTexture,
+            },
+            options: {},
+            scenario: null,
         };
     }
 }

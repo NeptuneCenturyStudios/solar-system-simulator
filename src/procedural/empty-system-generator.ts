@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SolarSystemGenerator } from './solar-system-generator';
 import type { Body } from '../bodies/body';
-import type { ISolarSystem, IStateDependencies } from '../interfaces';
+import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 import { pickRandomSpaceTexture, generateSeedString } from './seed-utils';
 
 /**
@@ -18,7 +18,7 @@ export class EmptySystemGenerator extends SolarSystemGenerator {
         console.info('[empty-system] using master seed:', this.masterSeed);
     }
 
-    async generateSolarSystemAsync(): Promise<ISolarSystem> {
+    async generateSolarSystemAsync(): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
 
         await this.yieldToEventLoop();
@@ -27,8 +27,12 @@ export class EmptySystemGenerator extends SolarSystemGenerator {
         const skydomeTexture = pickRandomSpaceTexture(this.masterSeed);
 
         return {
-            bodies,
-            spaceTexture: skydomeTexture,
+            system: {
+                bodies,
+                spaceTexture: skydomeTexture,
+            },
+            options: {},
+            scenario: null,
         };
     }
 }

@@ -41,6 +41,14 @@
                 <span class="material-symbols-outlined">grain</span>
                 ASTEROID FIELD
             </button>
+            <button
+                class="old-ui btn-dark btn-with-icon"
+                type="button"
+                @click="selectScenario('asteroidDefense')"
+            >
+                <span class="material-symbols-outlined">shield</span>
+                ASTEROID DEFENSE
+            </button>
             <button class="old-ui btn-with-icon btn-danger" type="button" @click="onCancel">
                 <span class="material-symbols-outlined">arrow_back</span>
                 CANCEL

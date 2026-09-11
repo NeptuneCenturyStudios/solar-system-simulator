@@ -6,7 +6,7 @@ import { createNpcShip } from '../simulation/ai/npc-manager';
 import { NPC_SPAWN_FALLBACK_DISTANCE, NPC_SPAWN_STAR_RADII } from '../utilities/consts';
 import { pickRandomSpaceTexture, generateSeedString } from './seed-utils';
 import type { Body } from '../bodies/body';
-import type { ISolarSystem, IStateDependencies } from '../interfaces';
+import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 import { ProceduralGenerationReporter } from './procedural-generation-progress';
 
 /**
@@ -37,7 +37,9 @@ export class TestAiShipsGenerator extends SolarSystemGenerator {
         console.info('[test-ai-ships] using master seed:', this.masterSeed);
     }
 
-    async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
+    async generateSolarSystemAsync(
+        reporter?: ProceduralGenerationReporter
+    ): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
 
         const totalBodies = 2; // one star + one AI ship
@@ -100,8 +102,12 @@ export class TestAiShipsGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         return {
-            bodies,
-            spaceTexture: pickRandomSpaceTexture(this.masterSeed),
+            system: {
+                bodies,
+                spaceTexture: pickRandomSpaceTexture(this.masterSeed),
+            },
+            options: {},
+            scenario: null,
         };
     }
 }

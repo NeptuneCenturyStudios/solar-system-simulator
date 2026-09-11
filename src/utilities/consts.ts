@@ -9,6 +9,8 @@ export enum SimulationStartMode {
     WormholeShortcut = 5,
     /** Scenario: Earth (with its Moon) plows through a dense counter-orbiting asteroid field. */
     AsteroidField = 6,
+    /** Scenario: the player defends Earth from continuous waves of incoming asteroids. */
+    AsteroidDefense = 7,
 }
 
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===
@@ -515,6 +517,59 @@ export const ASTEROID_FIELD_RADIUS_MAX = 5.0;
 export const ASTEROID_FIELD_TRAIL_LENGTH = 50;
 /** Camera distance used to frame Earth, its Moon, and the local swarm on launch. */
 export const ASTEROID_FIELD_CAMERA_DISTANCE = 9_000;
+
+// === Asteroid Defense scenario ===
+// The player starts in flight mode in a ship just off Earth's day side while waves of
+// asteroids are thrown at Earth. Wave N holds N asteroids, each spawned at a random angle
+// around Earth; the next wave follows once every asteroid in the current one has hit Earth,
+// been destroyed, or missed.
+//
+// Each asteroid spawns in Earth's co-moving frame: it inherits Earth's heliocentric velocity
+// plus a fixed approach speed aimed straight at Earth. Sitting at essentially Earth's distance
+// from the Sun, it also feels essentially the same solar pull, so relative to Earth it travels
+// in a straight line — Earth's velocity and its curving orbit are both accounted for, and
+// Earth's own gravity only focuses the path further.
+
+/** Preset gravity multiplier at scenario launch (real gravity). */
+export const ASTEROID_DEFENSE_G_MULTIPLIER = 1;
+/** Real-time pacing, so the flight controls and the incoming waves share one clock. */
+export const ASTEROID_DEFENSE_TIME_SCALE = 1;
+/**
+ * Distance from Earth's centre at which each asteroid spawns (160,000 km / DIST_SCALE).
+ * Well beyond bolt reach (~400 u) so the player has to fly out to meet it, and inside the
+ * Moon's orbit so the Moon never lies on an approach path.
+ */
+export const ASTEROID_DEFENSE_SPAWN_DISTANCE = 160_000 / DIST_SCALE;
+/** Approach speed relative to Earth (1,200 km/s / DIST_SCALE) — roughly 130 s to impact. */
+export const ASTEROID_DEFENSE_APPROACH_SPEED = 1_200 / DIST_SCALE;
+/** Maximum spawn elevation above/below Earth's orbital plane, in degrees. */
+export const ASTEROID_DEFENSE_MAX_ELEVATION_DEG = 30;
+/** Asteroid radius range. Big enough to read as rocks; Earth still decisively outmasses them. */
+export const ASTEROID_DEFENSE_RADIUS_MIN = 300 / RADIUS_SCALE;
+export const ASTEROID_DEFENSE_RADIUS_MAX = 800 / RADIUS_SCALE;
+/** Long trails so the player can spot incoming asteroids from a distance. */
+export const ASTEROID_DEFENSE_TRAIL_LENGTH = 300;
+/** Sim seconds before the first wave, so the player can get oriented. */
+export const ASTEROID_DEFENSE_FIRST_WAVE_DELAY = 8;
+/** Sim seconds between one wave clearing and the next spawning. */
+export const ASTEROID_DEFENSE_WAVE_DELAY = 5;
+/**
+ * An asteroid farther from Earth than SPAWN_DISTANCE × this factor has missed (e.g. it was
+ * deflected) and is removed, so a stray rock can never stall the wave.
+ */
+export const ASTEROID_DEFENSE_MISS_DISTANCE_FACTOR = 1.5;
+/** The player's ship spawns this far from Earth's centre, on the sunward (day) side. */
+export const ASTEROID_DEFENSE_SHIP_ALTITUDE = EARTH_RADIUS * 4;
+/** Asteroids never spawn closer than this to the player's ship (20,000 km / DIST_SCALE). */
+export const ASTEROID_DEFENSE_SHIP_CLEARANCE = 20_000 / DIST_SCALE;
+/** Maximum re-rolls of a spawn direction that lands too close to the player's ship. */
+export const ASTEROID_DEFENSE_SPAWN_ATTEMPTS = 5;
+/**
+ * An asteroid that dies within (Earth radius + asteroid radius) × this factor of Earth's
+ * centre is counted as an impact; anywhere else it was destroyed. The margin covers the
+ * distance a fast asteroid closes between its last visible frame and the collision.
+ */
+export const ASTEROID_DEFENSE_IMPACT_MARGIN = 1.25;
 
 // === Wormhole link bridge (bezier particle curve between linked funnels) ===
 /** Number of pooled particles flowing along a linked-wormhole bridge curve. */

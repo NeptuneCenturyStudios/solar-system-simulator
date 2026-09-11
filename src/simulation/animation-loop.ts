@@ -62,6 +62,7 @@ import {
 import { interactionState, simulationState, cameraState } from './simulation';
 import { exitFlightMode, updateFlightControls } from './flight-controllers';
 import { stepNpcShips } from './ai/npc-manager';
+import { scenarioManager } from '../scenarios/scenario-manager';
 import type { Spaceship } from '../bodies/ships/spaceship';
 
 // ── Context interface ───────────────────────────────────────────────────────
@@ -572,6 +573,11 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             // Bezier particle streams between linked wormholes (once per frame, not per body).
             updateWormholeBridges(dtTotal);
         }
+
+        // ── Scenario logic ───────────────────────────────────────────────
+        // After the collision pass, so bodies that died this frame are already disposed when
+        // the active scenario checks on them. Driven by sim time, so it freezes while paused.
+        scenarioManager.update(dtTotal);
 
         // ── Gizmo / vel arc / orbit prediction ──────────────────────────
         ctx.gizmo.update();

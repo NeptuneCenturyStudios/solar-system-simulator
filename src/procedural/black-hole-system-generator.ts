@@ -9,7 +9,7 @@ import { EARTH_DIST } from '../utilities/consts';
 import { createMainSequenceStarFromParams } from './star-factory';
 import { generateBinaryPlacements } from './orbital-math';
 import type { Body } from '../bodies/body';
-import type { ISolarSystem, IStateDependencies } from '../interfaces';
+import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 import { generateSeedString, pickRandomSpaceTexture, rngFor } from './seed-utils';
 import { ProceduralGenerationReporter } from './procedural-generation-progress';
 
@@ -33,7 +33,9 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         console.info('[black-hole-system] using master seed:', this.masterSeed);
     }
 
-    async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
+    async generateSolarSystemAsync(
+        reporter?: ProceduralGenerationReporter
+    ): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
 
         const bhParams = randomBlackHoleParams();
@@ -197,8 +199,12 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         const skydomeTexture = pickRandomSpaceTexture(this.masterSeed);
 
         return {
-            bodies,
-            spaceTexture: skydomeTexture,
+            system: {
+                bodies,
+                spaceTexture: skydomeTexture,
+            },
+            options: {},
+            scenario: null,
         };
     }
 }

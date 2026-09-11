@@ -59,6 +59,62 @@ export interface ISolarSystem {
     spaceTexture: ISpaceBackground;
 }
 
+/**
+ * Camera framing a generator can request once its system is live.
+ */
+export interface ILaunchCameraOptions {
+    /** Body the camera focuses on and follows. */
+    focusBody: Body;
+    /** Distance from the focus body to place the camera, in sim units. */
+    distance: number;
+    /** Direction from the focus body to the camera. Normalized when applied. */
+    viewDirection: THREE.Vector3;
+}
+
+/**
+ * Launch-time settings a generator can request. Every field is optional; a generator
+ * that needs none of them returns an empty object.
+ */
+export interface ISystemLaunchOptions {
+    /** Time scale applied once the system is live. */
+    timeScale?: number;
+    /** Camera framing applied once the system is live. */
+    camera?: ILaunchCameraOptions;
+    /** A ship (also present in `bodies`) the player is put into flight mode in immediately. */
+    playerShip?: Spaceship;
+}
+
+/**
+ * Per-frame scenario logic, driven by the scenario manager for as long as the
+ * generated system is live.
+ */
+export interface IScenario {
+    /** Display name, used for logging. */
+    readonly name: string;
+    /** Called once, after the generated bodies are live in the simulation. */
+    start(): void;
+    /**
+     * Called once per rendered frame.
+     * @param simDt Sim-time seconds advanced this frame (0 while paused).
+     */
+    update(simDt: number): void;
+    /**
+     * Called on teardown. Releases anything the scenario holds; does not kill bodies,
+     * since the system teardown already disposes them.
+     */
+    dispose(): void;
+}
+
+/**
+ * What every SolarSystemGenerator returns: the generated system, the launch options it
+ * wants applied, and the scenario (if any) the scenario manager should run.
+ */
+export interface ISolarSystemGenerationResult {
+    system: ISolarSystem;
+    options: ISystemLaunchOptions;
+    scenario: IScenario | null;
+}
+
 export interface ISimulationState {
     timeScale: number;
     isPaused: boolean;

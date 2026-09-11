@@ -5,11 +5,15 @@ import { Earth } from '../bodies/earth';
 import { Wormhole } from '../bodies/wormhole';
 import { createBridgeForPair } from '../effects/wormhole-link-bridge';
 import { createUniqueId, generateIAUName } from '../utilities/utilities';
-import { WORMHOLE_SHORTCUT_GATE_RADIUS, WORMHOLE_SHORTCUT_ORBIT_RADIUS } from '../utilities/consts';
+import {
+    WORMHOLE_SHORTCUT_GATE_RADIUS,
+    WORMHOLE_SHORTCUT_ORBIT_RADIUS,
+    WORMHOLE_SHORTCUT_TIME_SCALE,
+} from '../utilities/consts';
 import { pickRandomSpaceTexture, generateSeedString } from './seed-utils';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import type { Body } from '../bodies/body';
-import type { ISolarSystem, IStateDependencies } from '../interfaces';
+import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 import { ProceduralGenerationReporter } from './procedural-generation-progress';
 
 /**
@@ -112,7 +116,9 @@ export class WormholeShortcutGenerator extends SolarSystemGenerator {
         );
     }
 
-    async generateSolarSystemAsync(reporter?: ProceduralGenerationReporter): Promise<ISolarSystem> {
+    async generateSolarSystemAsync(
+        reporter?: ProceduralGenerationReporter
+    ): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
 
         const totalBodies = 4; // Sun + Earth + 2 wormholes
@@ -169,8 +175,14 @@ export class WormholeShortcutGenerator extends SolarSystemGenerator {
         createBridgeForPair(gateA, gateB, this.scene);
 
         return {
-            bodies,
-            spaceTexture: pickRandomSpaceTexture(this.masterSeed),
+            system: {
+                bodies,
+                spaceTexture: pickRandomSpaceTexture(this.masterSeed),
+            },
+            // Modest time scale so the short-cut orbit is watchable without destabilising
+            // the integrator. (The preset gravity is applied before generation in index.ts.)
+            options: { timeScale: WORMHOLE_SHORTCUT_TIME_SCALE },
+            scenario: null,
         };
     }
 }
