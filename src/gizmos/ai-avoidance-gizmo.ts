@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { flightState, simulationState } from '../simulation/simulation';
 import { NPC_FOLLOW_DISTANCE } from '../utilities/consts';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 
 /**
  * Debug visualisation for ship-AI obstacle avoidance.
@@ -103,7 +104,7 @@ export class AiAvoidanceGizmo {
             depthTest: false,
         });
         const hull = new THREE.Mesh(
-            new THREE.SphereGeometry(1, SPHERE_WIDTH_SEGMENTS, SPHERE_HEIGHT_SEGMENTS),
+            buildBodySphereGeometry(1, SPHERE_WIDTH_SEGMENTS, SPHERE_HEIGHT_SEGMENTS),
             hullMaterial
         );
         hull.renderOrder = 998;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
-import { createUniqueId } from '../utilities/utilities.js';
+import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import {
     SATURN_DIST,
     SATURN_MASS,
@@ -38,7 +38,7 @@ export class Saturn extends Planet {
         const rotSpeed = ((2 * Math.PI) / (10.656 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, SATURN_DIST, SUN_MASS, angleRad);
         const texture = loadSrgbTexture('./assets/textures/bodies/2k/saturn.jpg');
-        const geometry = new THREE.SphereGeometry(SATURN_RADIUS, 64, 64);
+        const geometry = buildBodySphereGeometry(SATURN_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
             color: 0xffffff,

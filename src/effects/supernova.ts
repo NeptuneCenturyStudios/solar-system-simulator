@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 
 export class Supernova implements IEffect {
     // Cooldown fade factor per frame (tweakable)
@@ -160,7 +161,7 @@ export class Supernova implements IEffect {
 
         // Massive initial flash sphere. Fades with simulation time in update()
         // and is removed + disposed once its opacity reaches zero.
-        const flashGeo = new THREE.SphereGeometry(radius * 6, 32, 32);
+        const flashGeo = buildBodySphereGeometry(radius * 6);
         const flashMat = new THREE.MeshBasicMaterial({
             color: 0xffffaa,
             transparent: true,

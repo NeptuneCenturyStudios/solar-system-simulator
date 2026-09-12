@@ -229,3 +229,35 @@ export function getBodyTypeLabel(b: Body) {
 
     return 'Unknown';
 }
+
+/**
+ * Creates a sphere geometry for a celestial body with a specified radius.
+ * @param radius Radius of the sphere to create
+ * @returns
+ */
+export function buildBodySphereGeometry(
+    radius: number,
+    widthSegments: number = 64,
+    heightSegments: number = 128
+): THREE.SphereGeometry {
+    // Calculate the number of segments based on radius to maintain visual fidelity
+    const minSegments = 64;
+    const maxSegments = 128;
+    const segmentFactor = 0.25; // Adjust this factor to control segment density
+
+    if (!widthSegments) {
+        widthSegments = Math.max(
+            minSegments,
+            Math.min(maxSegments, Math.floor((radius * segmentFactor)))
+        );
+    }
+
+    if (!heightSegments) {
+        heightSegments = Math.max(
+            minSegments,
+            Math.min(maxSegments, Math.floor((radius * segmentFactor) * 2))
+        );
+    }
+
+    return new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+}

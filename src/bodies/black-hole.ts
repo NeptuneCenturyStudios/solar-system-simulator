@@ -9,6 +9,7 @@ import { AccretionDiskEffect, BLACK_HOLE_DISK_COLORS } from '../effects/accretio
 import { BlackHoleJetEffect } from '../effects/black-hole-jet.js';
 import { NotificationType } from '../event-log/event-log.js';
 import { BodyTypeEnum } from './body-enums.js';
+import { buildBodySphereGeometry } from '../utilities/utilities.js';
 
 /** Multiplier for the gravitational mass-transfer formula. Tune to taste. */
 const SIPHON_MASS_TRANSFER_SCALE = 0.0001;
@@ -52,7 +53,7 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
         const EVENT_HORIZON_RADIUS = BlackHole.massToEventHorizonRadius(mass);
         const BLACK_HOLE_COLOR = 0x000000; // Pure black
         // The mesh is a simple sphere; the visual complexity comes from the accretion disk and jet effects.
-        const geometry = new THREE.SphereGeometry(EVENT_HORIZON_RADIUS, 32, 32);
+        const geometry = buildBodySphereGeometry(EVENT_HORIZON_RADIUS, 32, 32);
         const material = new THREE.MeshBasicMaterial({ color: BLACK_HOLE_COLOR });
         const mesh = new THREE.Mesh(geometry, material);
 

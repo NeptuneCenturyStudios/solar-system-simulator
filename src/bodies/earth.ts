@@ -15,7 +15,7 @@ import {
     EARTH_ORBITAL_PERIOD_REAL,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
-import { createUniqueId, isBodyType } from '../utilities/utilities.js';
+import { buildBodySphereGeometry, createUniqueId, isBodyType } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
@@ -157,11 +157,7 @@ export class Earth extends Planet {
             EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (23.934 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, orbitDistance, SUN_MASS, angleRad);
-        const geometry = new THREE.SphereGeometry(
-            EARTH_RADIUS,
-            EARTH_RADIUS * 16,
-            EARTH_RADIUS * 16
-        );
+        const geometry = buildBodySphereGeometry(EARTH_RADIUS);
 
         const customUniforms: EarthUniforms = {
             nightTexture: { value: earthNightTexture },
@@ -217,6 +213,7 @@ export class Earth extends Planet {
         const cloudsMat = new THREE.MeshStandardMaterial({
             map: earthCloudsTexture,
             alphaMap: earthCloudsTexture,
+            side: THREE.DoubleSide,
             transparent: true,
             opacity: 1.0,
             depthWrite: false,
@@ -226,7 +223,7 @@ export class Earth extends Planet {
             metalness: 0.0,
         });
 
-        const cloudsGeo = new THREE.SphereGeometry(this.radius * 1.03, 64, 64);
+        const cloudsGeo = buildBodySphereGeometry(this.radius * 1.03);
         this.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
         this.clouds.renderOrder = 2;
         this.clouds.receiveShadow = true;

@@ -20,6 +20,7 @@ import { MassSiphonEffect } from '../effects/mass-siphon';
 import { IPipelineFeedEffect } from '../effects/effect-base';
 import { NotificationType } from '../event-log/event-log';
 import { BodyTypeEnum } from './body-enums';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 
 /**
  * Base radius constant used in the neutron-star mass-to-radius formula.
@@ -118,7 +119,7 @@ export class Pulsar extends Star implements IMassTransferBody {
             progenitorMagneticField ??
             rollMagneticField(new SeededRandom(`${id}|magnetic-field`), 'star')!;
 
-        const geometry = new THREE.SphereGeometry(pulsarRadius, 32, 32);
+        const geometry = buildBodySphereGeometry(pulsarRadius);
         const material = new THREE.MeshPhongMaterial({
             map: pulsarTexture,
             color: 0xffffff,

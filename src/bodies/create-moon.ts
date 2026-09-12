@@ -8,6 +8,7 @@ import type { CelestialBody } from './celestial-body';
 import { MoonTypeEnum } from './body-enums';
 import { IMoonCreationOptions } from '../interfaces';
 import { pickMoonTextureForMoonType } from '../procedural/moon-factory';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 
 export function createMoon(
     parent: CelestialBody,
@@ -37,7 +38,7 @@ export function createMoon(
     const velZ = parent.velocity.z + Math.cos(angle) * trajectory.vel.z;
 
     const moonName = config.name || 'Moon';
-    const moonGeometry = new THREE.SphereGeometry(config.radius, 32, 32);
+    const moonGeometry = buildBodySphereGeometry(config.radius);
 
     const moonMaterial = new THREE.MeshStandardMaterial({
         map: texture,

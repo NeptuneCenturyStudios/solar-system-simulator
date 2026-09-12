@@ -15,7 +15,7 @@ import {
     SUN_MASS,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
-import { createUniqueId } from '../utilities/utilities.js';
+import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
@@ -39,11 +39,7 @@ export class Mercury extends Planet {
         const trajectory = calculateTrajectory(gEff, MERCURY_DIST, SUN_MASS, angleRad);
 
         const texture = loadSrgbTexture('./assets/textures/bodies/2k/mercury.jpg');
-        const geometry = new THREE.SphereGeometry(
-            MERCURY_RADIUS,
-            MERCURY_RADIUS * 16,
-            MERCURY_RADIUS * 16
-        );
+        const geometry = buildBodySphereGeometry(MERCURY_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
             color: 0xffffff,

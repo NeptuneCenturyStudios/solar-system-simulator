@@ -10,7 +10,7 @@ import {
     VENUS_RADIUS,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
-import { createUniqueId } from '../utilities/utilities.js';
+import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
@@ -33,7 +33,7 @@ export class Venus extends Planet {
         const rotSpeed = ((-2 * Math.PI) / (5832.5 * 3600)) * timeScale; // retrograde
         const trajectory = calculateTrajectory(gEff, VENUS_DIST, SUN_MASS, angleRad);
         const venusTexture = loadSrgbTexture('./assets/textures/bodies/2k/venus.jpg');
-        const geometry = new THREE.SphereGeometry(VENUS_RADIUS, 64, 64);
+        const geometry = buildBodySphereGeometry(VENUS_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: venusTexture,
             color: 0xffffff,
@@ -76,7 +76,7 @@ export class Venus extends Planet {
             metalness: 0.0,
         });
 
-        const cloudsGeo = new THREE.SphereGeometry(this.radius * 1.03, 64, 64);
+        const cloudsGeo =buildBodySphereGeometry(this.radius * 1.03);
         this.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
         this.clouds.renderOrder = 2;
         this.clouds.userData = { parentBody: this };

@@ -22,6 +22,7 @@ import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums
 import type { CelestialBody } from '../bodies/celestial-body';
 import { createAtmosphereShell } from '../effects/atmosphere-shell';
 import { rollMagneticField, type MagneticFieldKind } from './magnetic-field';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 
 export type ProceduralPlanetSubtype =
     | 'solid'
@@ -295,7 +296,7 @@ export function addCloudLayer(
         metalness: 0.0,
     });
 
-    const cloudsGeo = new THREE.SphereGeometry(body.radius * 1.03, 64, 64);
+    const cloudsGeo = buildBodySphereGeometry(body.radius * 1.03);
     body.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
     body.clouds.renderOrder = 2;
     body.clouds.receiveShadow = true;
@@ -310,7 +311,7 @@ export function createPlanetBodyFromProceduralCreation(
     scene: THREE.Scene,
     creation: ProceduralPlanetCreation
 ): Planet | DwarfPlanet {
-    const geometry = new THREE.SphereGeometry(creation.radius, 64, 64);
+    const geometry = buildBodySphereGeometry(creation.radius);
     const material = buildMeshMaterial(creation);
     const mesh = new THREE.Mesh(geometry, material);
 

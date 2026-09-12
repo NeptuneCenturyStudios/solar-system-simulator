@@ -19,6 +19,7 @@ import { SeededRandom } from '../utilities/prng';
 import { addCloudLayer } from './planet-factory';
 import { createAtmosphereShell } from '../effects/atmosphere-shell';
 import { rollMagneticField } from './magnetic-field';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 
 /**
  * Given a moon type and a seeded random number generator, this function selects an appropriate texture for the moon.
@@ -61,7 +62,7 @@ function createMoonMesh(
     texture: THREE.Texture,
     moonType: MoonTypeEnum
 ): THREE.Mesh {
-    const geometry = new THREE.SphereGeometry(radius, 32, 32);
+    const geometry = buildBodySphereGeometry(radius);
 
     const material = new THREE.MeshStandardMaterial({
         map: texture,

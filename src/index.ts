@@ -75,6 +75,7 @@ import {
     createUniqueId,
     generateIAUName,
     getBodyTypeLabel,
+    buildBodySphereGeometry,
 } from './utilities/utilities';
 import { SeededRandom } from './utilities/prng';
 import { generateSeedString } from './procedural/seed-utils';
@@ -1312,7 +1313,7 @@ function createNewBody(
                     : null;
 
             if (cloudsRadius !== null) {
-                const cloudsGeo = new THREE.SphereGeometry(cloudsRadius, 32, 32);
+                const cloudsGeo = buildBodySphereGeometry(cloudsRadius);
                 newBody.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
                 newBody.clouds.renderOrder = 2;
             } else {
@@ -1406,7 +1407,7 @@ function createNewBody(
                 simulationState.bodies
             );
 
-            const geometry = new THREE.SphereGeometry(moonRadius, 32, 32);
+            const geometry = buildBodySphereGeometry(moonRadius);
 
             // planetType is used as moonType for `bodyType === 'moon'` custom creation.
             // Map moonType -> texture to match planet subtype visuals.
@@ -1507,7 +1508,7 @@ function createNewBody(
                     metalness: 0.0,
                 });
 
-                const cloudsGeo = new THREE.SphereGeometry(newBody.radius * 1.03, 32, 32);
+                const cloudsGeo = buildBodySphereGeometry(newBody.radius * 1.03);
                 newBody.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
                 newBody.clouds.renderOrder = 2;
                 // Make cloud sphere selectable (raycaster maps back to owning body)

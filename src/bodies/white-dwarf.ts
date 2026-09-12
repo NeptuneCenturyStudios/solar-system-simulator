@@ -6,6 +6,7 @@ import { IRotation } from '../interfaces';
 import * as THREE from 'three';
 import { EARTH_RADIUS, SUN_MASS } from '../utilities/consts';
 import { BodyTypeEnum } from './body-enums';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 
 const WHITE_DWARF_RADIUS = EARTH_RADIUS;
 
@@ -40,7 +41,7 @@ export class WhiteDwarf extends Star {
         // Mass to radius relationship for white dwarfs (no clamping)
         const radius = massToWhiteDwarfRadius(mass);
 
-        const geometry = new THREE.SphereGeometry(radius, 32, 32);
+        const geometry = buildBodySphereGeometry(radius);
         const material = new THREE.MeshStandardMaterial({
             map: whiteDwarfTexture,
             color: 0xffffff,

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
-import { createUniqueId } from '../utilities/utilities.js';
+import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import {
     NEPTUNE_DIST,
     NEPTUNE_MASS,
@@ -38,7 +38,7 @@ export class Neptune extends Planet {
         const rotSpeed = ((2 * Math.PI) / (16.11 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, NEPTUNE_DIST, SUN_MASS, angleRad);
         const texture = loadSrgbTexture('./assets/textures/bodies/2k/neptune.jpg');
-        const geometry = new THREE.SphereGeometry(NEPTUNE_RADIUS, 64, 64);
+        const geometry = buildBodySphereGeometry(NEPTUNE_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
             color: 0xffffff,

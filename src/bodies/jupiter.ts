@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
-import { createUniqueId } from '../utilities/utilities.js';
+import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import {
     SUN_MASS,
     JUPITER_DIST,
@@ -38,7 +38,7 @@ export class Jupiter extends Planet {
         const rotSpeed = ((2 * Math.PI) / (9.925 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, JUPITER_DIST, SUN_MASS, angleRad);
         const texture = loadSrgbTexture('./assets/textures/bodies/2k/jupiter.jpg');
-        const geometry = new THREE.SphereGeometry(JUPITER_RADIUS, 64, 64);
+        const geometry = buildBodySphereGeometry(JUPITER_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
             color: 0xffffff,

@@ -138,14 +138,14 @@ export class AsteroidDefenseScenario implements IScenario {
             this.finishFailed('Your ship has been destroyed.');
             return;
         }
-        // if (this.playerShip) {
-        //     if (flightState.isActive) {
-        //         this.hasEnteredFlightMode = true;
-        //     } else if (this.hasEnteredFlightMode) {
-        //         this.finishFailed('You exited flight mode.');
-        //         return;
-        //     }
-        // }
+        if (this.playerShip) {
+            if (flightState.isActive) {
+                this.hasEnteredFlightMode = true;
+            } else if (this.hasEnteredFlightMode) {
+                this.finishFailed('You exited flight mode.');
+                return;
+            }
+        }
 
         // Paused: hold every timer and leave outcomes for the next running frame.
         if (simDt <= 0) return;

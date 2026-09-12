@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createUniqueId } from '../utilities/utilities.js';
+import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import {
     PLUTO_DIST,
     PLUTO_MASS,
@@ -60,7 +60,7 @@ export class Pluto extends DwarfPlanet {
         });
 
         const texture = loadSrgbTexture('./assets/textures/bodies/2k/pluto.jpg');
-        const geometry = new THREE.SphereGeometry(PLUTO_RADIUS, 32, 32);
+        const geometry = buildBodySphereGeometry(PLUTO_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
             color: 0xffffff,

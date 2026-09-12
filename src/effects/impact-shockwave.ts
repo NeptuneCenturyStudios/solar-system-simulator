@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base.js';
 import { IStateDependencies } from '../interfaces.js';
+import { buildBodySphereGeometry } from '../utilities/utilities.js';
 
 /**
  * Blue-white expanding flash sphere spawned at a weapon impact point.
@@ -40,7 +41,7 @@ export class ImpactShockwave implements IEffect {
         else outward.set(0, 1, 0);
         this.worldPos = bodyCenter.clone().addScaledVector(outward, bodyRadius);
 
-        const geo = new THREE.SphereGeometry(1, 16, 16);
+        const geo = buildBodySphereGeometry(1);
         this.mat = new THREE.MeshBasicMaterial({
             color: new THREE.Color(0x44bbff).lerp(new THREE.Color(0xffffff), 0.4),
             transparent: true,

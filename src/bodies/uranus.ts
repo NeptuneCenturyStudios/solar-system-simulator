@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
-import { createUniqueId } from '../utilities/utilities.js';
+import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import {
     SUN_MASS,
     URANUS_AXIS,
@@ -38,7 +38,7 @@ export class Uranus extends Planet {
         const rotSpeed = ((-2 * Math.PI) / (17.24 * 3600)) * timeScale; // retrograde
         const trajectory = calculateTrajectory(gEff, URANUS_DIST, SUN_MASS, angleRad);
         const texture = loadSrgbTexture('./assets/textures/bodies/2k/uranus.jpg');
-        const geometry = new THREE.SphereGeometry(URANUS_RADIUS, 64, 64);
+        const geometry = buildBodySphereGeometry(URANUS_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
             color: 0xffffff,

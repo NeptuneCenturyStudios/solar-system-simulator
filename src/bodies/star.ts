@@ -6,7 +6,7 @@ import {
     STAR_LIGHT_INTENSITY_MAX,
     STAR_LIGHT_DECAY,
 } from '../utilities/consts';
-import { isBodyType } from '../utilities/utilities';
+import { buildBodySphereGeometry, isBodyType } from '../utilities/utilities';
 import { settingsStore } from '../settings/settings-store';
 import { CelestialBody } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
@@ -117,7 +117,7 @@ export class Star extends CelestialBody {
 
         // TODO: Move mesh creation to MainSequenceStar and other derived classes.
         if (!options.mesh) {
-            const geometry = new THREE.SphereGeometry(options.radius, 64, 64);
+            const geometry = buildBodySphereGeometry(options.radius);
             const starMaterial = new THREE.MeshPhongMaterial({
                 map: textures.sunTexture,
                 color: 0xffffff,

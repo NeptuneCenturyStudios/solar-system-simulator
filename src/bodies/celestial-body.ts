@@ -15,6 +15,7 @@ import { NotificationType } from '../event-log/event-log';
 import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/atmosphere-shell';
 import { AuroraHandle, createAurora } from '../effects/aurora';
 import { BodyTypeEnum } from './body-enums';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 
 // Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
 const _Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -109,7 +110,7 @@ export class CelestialBody extends Body {
         // Create a simple material if one isn't provided
         if (!options.mesh) {
             options.mesh = new THREE.Mesh(
-                new THREE.SphereGeometry(options.radius, 32, 32),
+                buildBodySphereGeometry(options.radius),
                 new THREE.MeshStandardMaterial({
                     color: 0xffffff,
                     emissive: 0x000000,
@@ -430,7 +431,7 @@ export class CelestialBody extends Body {
         try {
             if (this.mesh && this.mesh.geometry) {
                 this.mesh.geometry.dispose();
-                this.mesh.geometry = new THREE.SphereGeometry(newRadius, 32, 32);
+                this.mesh.geometry = buildBodySphereGeometry(newRadius);
             }
         } catch (e) {
             console.error('Error updating body geometry radius:', e);
@@ -465,8 +466,7 @@ export class CelestialBody extends Body {
                 } catch (e) {
                     console.error('Error disposing old cloud geometry:', e);
                 }
-                const cloudFactor = 1.03;
-                this.clouds.geometry = new THREE.SphereGeometry(newRadius * cloudFactor, 32, 32);
+                this.clouds.geometry = buildBodySphereGeometry(newRadius * 1.03);
             }
         } catch (e) {
             console.error('Error updating cloud layer radius:', e);

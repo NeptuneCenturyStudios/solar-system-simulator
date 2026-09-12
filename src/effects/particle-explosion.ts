@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 
 export class ParticleExplosion implements IEffect {
     dependencies: IStateDependencies;
@@ -193,7 +194,7 @@ export class ParticleExplosion implements IEffect {
         }
 
         // Create bright flash sphere at impact
-        const flashGeo = new THREE.SphereGeometry(radius * 3, 16, 16);
+        const flashGeo = buildBodySphereGeometry(radius * 3);
         const flashMat = new THREE.MeshBasicMaterial({
             color: 0xffffff,
             transparent: true,

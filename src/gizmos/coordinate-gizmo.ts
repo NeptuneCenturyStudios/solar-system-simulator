@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GIZMO_TUNING, GRAV_ARROW_SCALE } from '../utilities/consts.js';
 import { Body } from '../bodies/body.js';
+import { buildBodySphereGeometry } from '../utilities/utilities.js';
 
 export class CoordinateGizmo {
     group: THREE.Group;
@@ -115,7 +116,7 @@ export class CoordinateGizmo {
 
         // Tilt knob — small sphere marking the current tilt angle on the ring.
         this.tiltKnob = new THREE.Mesh(
-            new THREE.SphereGeometry(6, 16, 16),
+            buildBodySphereGeometry(6, 16, 16),
             new THREE.MeshPhongMaterial({
                 color: 0xff8800,
                 emissive: new THREE.Color(0xff8800).multiplyScalar(0.25),
@@ -146,7 +147,7 @@ export class CoordinateGizmo {
 
         // Azimuth knob — small sphere marking the current azimuth direction on the ring.
         this.azimuthKnob = new THREE.Mesh(
-            new THREE.SphereGeometry(6, 16, 16),
+            buildBodySphereGeometry(6, 16, 16),
             new THREE.MeshPhongMaterial({
                 color: 0x00ccff,
                 emissive: new THREE.Color(0x00ccff).multiplyScalar(0.2),
@@ -230,10 +231,10 @@ export class CoordinateGizmo {
             const KNOB_RADIUS = Math.max(TUBE_RADIUS * 3.5, 0.8);
             const AZ_KNOB_RADIUS = Math.max(AZ_TUBE_RADIUS * 3.5, 0.8);
             this.tiltKnob.geometry.dispose();
-            this.tiltKnob.geometry = new THREE.SphereGeometry(KNOB_RADIUS, 16, 16);
+            this.tiltKnob.geometry = buildBodySphereGeometry(KNOB_RADIUS, 16, 16);
             this.tiltKnob.scale.setScalar(1);
             this.azimuthKnob.geometry.dispose();
-            this.azimuthKnob.geometry = new THREE.SphereGeometry(AZ_KNOB_RADIUS, 16, 16);
+            this.azimuthKnob.geometry = buildBodySphereGeometry(AZ_KNOB_RADIUS, 16, 16);
             this.azimuthKnob.scale.setScalar(1);
             this._tiltRingRadius = tiltRadius;
             this._azimuthRingRadius = azRadius;
