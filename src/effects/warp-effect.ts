@@ -6,21 +6,21 @@ import { settingsStore } from '../settings/settings-store.js';
 const N_STREAKS = 500;
 
 // How far ahead of the ship (along its +Z axis) new streaks spawn.
-const FAR_SPAWN_Z = 3000000 / DIST_SCALE;
+const FAR_SPAWN_Z = 3_000_000 / DIST_SCALE;
 // Past-the-ship Z at which a streak is fully gone and re-seeded.
-const EXPIRE_Z = -2000000 / DIST_SCALE;
+const EXPIRE_Z = -2_000_000 / DIST_SCALE;
 
 // Radial extents of the tunnel cylinder.
-const INNER_R = 10000 / DIST_SCALE;
-const OUTER_R = 200000 / DIST_SCALE;
+const INNER_R = 10_000 / DIST_SCALE;
+const OUTER_R = 20_0000 / DIST_SCALE;
 
 // Per-streak length range (along Z axis).
-const MIN_LEN = 40000 / DIST_SCALE;
-const MAX_LEN = 200000 / DIST_SCALE;
+const MIN_LEN = 40_000 / DIST_SCALE;
+const MAX_LEN = 200_000 / DIST_SCALE;
 
 // Per-streak travel speed toward the camera (u/s, along -Z in ship space).
-const MIN_SPD = 500000 / DIST_SCALE;
-const MAX_SPD = 1500000 / DIST_SCALE;
+const MIN_SPD = 500_000 / DIST_SCALE;
+const MAX_SPD = 1_500_000 / DIST_SCALE;
 
 // Band split: fraction of streaks allocated to the dense outer ring.
 const OUTER_BAND_FRAC = 0.7;
@@ -203,12 +203,31 @@ export class WarpEffect {
     }
 
     /**
+     * Compute the warp effect opacity based on ship speed.
+     * 0 at rest → 1 at maxSpeed, with a steep curve at low speeds.
+     * @param speedKmPerSec  Ship speed in km/s.
+     * @returns  Opacity in [0,1].
+     */
+    warpOpacity(speed: number, maxSpeed: number): number {
+        const alpha = 0.118; // chosen to make opacity(0.001) ≈ 0.1
+
+        const n = speed / maxSpeed;
+        let opacity = Math.pow(n, alpha);
+
+        // clamp 0–1
+        if (opacity < 0) opacity = 0;
+        if (opacity > 1) opacity = 1;
+
+        return opacity;
+    }
+
+    /**
      * Call every frame while a ship exists in the scene.
      *
      * @param dt           Delta time in seconds.
      * @param shipPos      World-space position of the ship.
      * @param shipVelocity World-space velocity of the ship.
-     * @param maxSpeed     Speed at which opacity reaches 1.0 (pass FLIGHT_WARP_SPEED).
+     * @param maxSpeed     Max speed to use for opacity scaling.
      */
     update(
         dt: number,
@@ -230,8 +249,8 @@ export class WarpEffect {
 
         this.lines.visible = true;
 
-        // Opacity ramps linearly: 0 at rest → 1 at 3% maxSpeed.
-        this.speedOpacity = Math.min(speed / (maxSpeed / 33.33), 1);
+        // Scale the opacity based on speed. The opacity should scale on a curve, so that it is 0 at rest and 1 at maxSpeed. The curve should be steep at low speeds and flatten out at high speeds.
+        this.speedOpacity = this.warpOpacity(speed, maxSpeed);
         this._applyOpacity();
 
         // Orient tunnel along velocity direction.

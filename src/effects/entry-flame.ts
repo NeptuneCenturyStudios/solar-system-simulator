@@ -55,12 +55,12 @@ export class EntryFlameEffect {
      *  low timewarp) still accumulate toward an emission instead of always rounding to 0. */
     private emitAccumulator = 0;
 
-    private readonly MAX_PARTICLES = 160;
+    private readonly MAX_PARTICLES = 250;
     /** Half-angle (radians) of the surface patch particles spawn from, measured from the
      *  direction of travel. > PI/2 so the flame wraps past the equator and reads as
      *  "engulfing" the body rather than a narrow directional jet. */
     private readonly SPREAD = 1.9;
-    private readonly EMIT_PER_SECOND = 260;
+    private readonly EMIT_PER_SECOND = 1000;
     private readonly DEAD = -1;
 
     /**
@@ -125,7 +125,7 @@ export class EntryFlameEffect {
 
         this.innerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: radius * 1.4,
+            size: radius * 1.01,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
@@ -147,7 +147,7 @@ export class EntryFlameEffect {
 
         this.outerMat = new THREE.PointsMaterial({
             vertexColors: true,
-            size: radius * 2,
+            size: radius * 1.01,
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
