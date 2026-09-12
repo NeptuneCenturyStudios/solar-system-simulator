@@ -189,17 +189,20 @@ function updateShipTrail(
     );
 }
 
-// TEMP DEBUG — remove once the "not visible in normal systems" issue is diagnosed.
-let _lastAtmosphereDebugLog = 0;
-
 /**
  * Checks one body pair for atmospheric-entry containment and creates/clears an
  * `EntryFlameEffect` on the asteroid/comet accordingly. A no-op unless one side is an
  * Asteroid/Comet and the other is a `CelestialBody` with an atmosphere.
  */
-function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene, ctx: AnimationContext): void {
+function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene): void {
     const isSmallBody = (body: Body) =>
-        isBodyType(body, BodyTypeEnum.Asteroid | BodyTypeEnum.Comet | BodyTypeEnum.Satellite | BodyTypeEnum.SpaceShip);
+        isBodyType(
+            body,
+            BodyTypeEnum.Asteroid |
+                BodyTypeEnum.Comet |
+                BodyTypeEnum.Satellite |
+                BodyTypeEnum.SpaceShip
+        );
 
     let small: Body | null = null;
     let planet: Body | null = null;
@@ -224,34 +227,14 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene, ctx: Animat
 
     if (leadingEdgeDistance < planet.atmosphereRadius) {
         if (!small.entryFlame) small.entryFlame = new EntryFlameEffect(scene, small, planet);
-    } else if (small.entryFlame) {
+    } else if (small.entryFlame && small.entryFlame.planet === planet) {
+        // Only clear the flame when leaving the specific planet it was created for — this
+        // function runs once per (small body, atmosphere-bearing planet) pair every frame,
+        // so a small body near Earth would otherwise have its just-created flame immediately
+        // disposed again by the very next pair checked against some unrelated planet (e.g.
+        // Mars, Jupiter) that it obviously isn't inside.
         small.entryFlame.dispose();
         small.entryFlame = null;
-    }
-
-    // TEMP DEBUG — remove once the "not visible in normal systems" issue is diagnosed.
-    if (isBodyType(small, BodyTypeEnum.SpaceShip) && leadingEdgeDistance < planet.atmosphereRadius * 3) {
-        const now = performance.now();
-        if (now - _lastAtmosphereDebugLog > 250) {
-            _lastAtmosphereDebugLog = now;
-            const relSpeed = small.velocity.distanceTo(planet.velocity);
-            const shipCount = ctx.simulationState.bodies.filter((body) =>
-                isBodyType(body, BodyTypeEnum.SpaceShip)
-            );
-            console.debug('[entry-flame debug] ship near atmosphere', {
-                shipId: small.id,
-                shipName: small.name,
-                activeShipId: ctx.flightState.activeShip?.id,
-                allShipIds: shipCount.map((s) => s.id),
-                planetName: planet.name,
-                leadingEdgeDistance,
-                atmosphereRadius: planet.atmosphereRadius,
-                inside: leadingEdgeDistance < planet.atmosphereRadius,
-                relativeSpeedSceneUnits: relSpeed,
-                relativeSpeedKmPerSec: relSpeed * DIST_SCALE,
-                hasEntryFlameAfterDecision: !!small.entryFlame,
-            });
-        }
     }
 }
 
@@ -618,7 +601,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     // entrance/teleport is handled by a dedicated pass below.
                     if (b1 instanceof Wormhole || b2 instanceof Wormhole) continue;
 
-                    checkAtmosphericEntry(b1, b2, ctx.scene, ctx);
+                    checkAtmosphericEntry(b1, b2, ctx.scene);
 
                     const dx = b1.mesh.position.x - b2.mesh.position.x;
                     const dy = b1.mesh.position.y - b2.mesh.position.y;

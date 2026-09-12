@@ -18,13 +18,14 @@ import { DIST_SCALE } from '../utilities/consts.js';
  * trail. Float64 world-space positions avoid float32 precision loss far from the
  * origin; the Points objects are rendered camera-relative like ShipFlame.
  */
-// TEMP DEBUG — remove once the "not visible in normal systems" issue is diagnosed.
-let _entryFlameDebugCounter = 0;
-
 export class EntryFlameEffect {
     private readonly scene: THREE.Scene;
     private readonly body: Body;
-    private readonly planet: Body;
+    /** The planet this flame is currently attributed to — exposed so the per-frame
+     *  containment check (checkAtmosphericEntry) only disposes this effect when *this*
+     *  specific planet's atmosphere is exited, not whenever the body doesn't happen to be
+     *  inside some other, unrelated atmosphere-bearing planet it's compared against. */
+    readonly planet: Body;
 
     private readonly px: Float64Array;
     private readonly py: Float64Array;
@@ -209,11 +210,10 @@ export class EntryFlameEffect {
         const bodyVel = this.body.velocity;
         const speed = bodyVel.length();
         const dir =
-            speed > 1e-6
-                ? bodyVel.clone().multiplyScalar(1 / speed)
-                : new THREE.Vector3(0, 0, 1);
+            speed > 1e-6 ? bodyVel.clone().multiplyScalar(1 / speed) : new THREE.Vector3(0, 0, 1);
 
-        const upRef = Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+        const upRef =
+            Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
         const perp1 = new THREE.Vector3().crossVectors(dir, upRef).normalize();
         const perp2 = new THREE.Vector3().crossVectors(dir, perp1);
 
@@ -301,28 +301,6 @@ export class EntryFlameEffect {
         const showing = n > 0 && intensity > 0;
         this.glowInner.visible = showing;
         this.glowOuter.visible = showing;
-
-        // TEMP DEBUG — remove once the "not visible in normal systems" issue is diagnosed.
-        _entryFlameDebugCounter++;
-        if (_entryFlameDebugCounter % 60 === 0) {
-            const camDistToBody = cameraPos.distanceTo(bodyPos);
-            const firstParticleCamRelDist =
-                n > 0 ? Math.hypot(this.gpuPos[0], this.gpuPos[1], this.gpuPos[2]) : null;
-            console.debug('[entry-flame debug] update', {
-                bodyId: this.body.id,
-                bodyName: this.body.name,
-                bodyRadius: this.body.radius,
-                innerSize: this.innerMat.size,
-                outerSize: this.outerMat.size,
-                intensity,
-                liveParticles: n,
-                showing,
-                cameraDistanceToBody: camDistToBody,
-                firstParticleCameraRelativeDistance: firstParticleCamRelDist,
-                cameraPos: cameraPos.toArray(),
-                bodyPos: bodyPos.toArray(),
-            });
-        }
     }
 
     /** Remove from scene and free GPU resources. */

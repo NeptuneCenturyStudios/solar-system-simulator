@@ -589,7 +589,7 @@ export const ASTEROID_DEFENSE_MAX_ELEVATION_DEG = 30;
 export const ASTEROID_DEFENSE_RADIUS_MIN = 300 / RADIUS_SCALE;
 export const ASTEROID_DEFENSE_RADIUS_MAX = 800 / RADIUS_SCALE;
 /** Long trails so the player can spot incoming asteroids from a distance. */
-export const ASTEROID_DEFENSE_TRAIL_LENGTH = 300;
+export const ASTEROID_DEFENSE_TRAIL_LENGTH = 100;
 /** Sim seconds before the first wave, so the player can get oriented. */
 export const ASTEROID_DEFENSE_FIRST_WAVE_DELAY = 8;
 /** Sim seconds between one wave clearing and the next spawning. */

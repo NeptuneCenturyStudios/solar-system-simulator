@@ -153,7 +153,6 @@ export class SurfaceCameraManager {
 
         const worldRadius = (b.radius || 0) * (b.mesh?.scale?.x || 1);
 
-
         const surfacePoint = center
             .clone()
             .add(gravityUp.clone().multiplyScalar(worldRadius + s.eyeHeight));
