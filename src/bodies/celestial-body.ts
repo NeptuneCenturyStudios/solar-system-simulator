@@ -314,7 +314,8 @@ export class CelestialBody extends Body {
                     this.scene,
                     this.mesh.position.clone(),
                     this.color,
-                    this.radius
+                    this.radius,
+                    deathOptions?.impactSpeed
                 );
 
                 this.dependencies.addExplosion(exp);

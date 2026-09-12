@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import type { IMagneticFieldOptions } from '../interfaces';
 import { computeMagneticAxis } from '../procedural/magnetic-field';
 import { SeededRandom } from '../utilities/prng';
-import { settingsStore } from '../settings/settings-store';
+import { settingsStore, type AuroraDetailMode } from '../settings/settings-store';
 
 export type AuroraHandle = {
     dispose: () => void;
-    /** Advances the curtain drift and brightness pulse. `dtTotal` is signed, so time reversal reverses the drift. */
+    /**
+     * Advances the curtain drift, the brightness pulse and the per-band shader animation.
+     * `dtTotal` is signed, so time reversal reverses the drift.
+     */
     update: (dtTotal: number) => void;
     setVisible: (visible: boolean) => void;
     /** Rescales the whole effect after the host body's radius changes — no geometry rebuild. */
@@ -80,12 +83,13 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 /**
- * Draws the aurora curtain texture: ragged vertical striations, modulated into bright and
- * dim arcs, then tinted by altitude.
+ * Draws the fine ray detail of the aurora curtain: ragged vertical striations in white,
+ * carried entirely in the alpha channel.
  *
- * Built in three passes — the alpha structure in white, a horizontal brightness mask, then
- * the emission colours. Applying colour last keeps the striations purely in the alpha
- * channel, so one `source-in` fill can tint the whole sheet without flattening them.
+ * This is deliberately *only* the high-frequency structure. The arc brightness modulation and
+ * the altitude colour ramp used to be baked in here too, but both now live in the fragment
+ * shader (`AURORA_FRAGMENT_CHUNK`) where they can vary per band and drift over time — which a
+ * texture drawn once never could.
  */
 function drawCurtainTexture(rng: SeededRandom): HTMLCanvasElement {
     const canvas = document.createElement('canvas');
@@ -94,7 +98,6 @@ function drawCurtainTexture(rng: SeededRandom): HTMLCanvasElement {
     const ctx = canvas.getContext('2d')!;
     ctx.clearRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
 
-    // ── Pass 1: alpha structure, drawn in white ──────────────────────────────────────
     // A continuous base sheet first, so the curtain reads as a veil rather than loose rays.
     ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.fillRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
@@ -125,47 +128,237 @@ function drawCurtainTexture(rng: SeededRandom): HTMLCanvasElement {
         drawBand(rng.range(0, TEX_WIDTH), rng.range(20, 70), rng.range(0.03, 0.1));
     }
 
-    // ── Pass 2: low-frequency brightness modulation ──────────────────────────────────
-    // Gives the finished ring bright and dim arcs instead of an even glow all the way round.
-    //
-    // This has to be a single fill spanning the full width. `destination-in` clears the
-    // destination everywhere the *source* is absent, so stepping across the canvas column by
-    // column would leave only the last column standing — the whole texture ends up empty.
-    const modPhase = rng.range(0, Math.PI * 2);
-    const modPhase2 = rng.range(0, Math.PI * 2);
-    const modGrad = ctx.createLinearGradient(0, 0, TEX_WIDTH, 0);
-    const MOD_STOPS = 64;
-    for (let i = 0; i <= MOD_STOPS; i++) {
-        const t = i / MOD_STOPS;
-        const u = t * Math.PI * 2;
-        // Integer harmonics repeat exactly over the width, so the seam stays invisible.
-        const m = 0.55 + 0.3 * Math.sin(u + modPhase) + 0.15 * Math.sin(3 * u + modPhase2);
-        modGrad.addColorStop(t, `rgba(0, 0, 0, ${clamp01(m).toFixed(4)})`);
-    }
-    ctx.globalCompositeOperation = 'destination-in';
-    ctx.fillStyle = modGrad;
-    ctx.fillRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
-
-    // ── Pass 3: emission colour by altitude ──────────────────────────────────────────
-    // `source-in` replaces the RGB while multiplying this gradient's alpha into the
-    // structure above, so the rays survive as variation in opacity. The banding follows real
-    // auroral chemistry: atomic-oxygen red (630 nm) high up, the oxygen green core
-    // (557.7 nm), and an ionised-nitrogen violet fringe along the bottom edge.
-    // `CanvasTexture` flips Y, so row 0 becomes v = 1 — the top of the curtain.
-    const colorGrad = ctx.createLinearGradient(0, 0, 0, TEX_HEIGHT);
-    colorGrad.addColorStop(0.0, 'rgba(255, 60, 110, 0.0)'); // fades out at the very top
-    colorGrad.addColorStop(0.18, 'rgba(255, 70, 120, 0.45)'); // high-altitude oxygen red
-    colorGrad.addColorStop(0.4, 'rgba(120, 255, 190, 0.85)'); // cyan-green transition
-    colorGrad.addColorStop(0.75, 'rgba(60, 255, 140, 1.0)'); // oxygen green core
-    colorGrad.addColorStop(0.92, 'rgba(150, 90, 255, 0.75)'); // nitrogen violet fringe
-    colorGrad.addColorStop(1.0, 'rgba(120, 70, 220, 0.0)'); // fades out at the base
-    ctx.globalCompositeOperation = 'source-in';
-    ctx.fillStyle = colorGrad;
-    ctx.fillRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
-
     ctx.globalCompositeOperation = 'source-over';
 
     return canvas;
+}
+
+/**
+ * Coarse procedural curtains per texture tile.
+ *
+ * This sets how densely curtains are *seeded*, not how wide they are — each one is jittered
+ * off its cell and typically overruns it, overlapping its neighbours.
+ *
+ * Must be an integer. The shader wraps ids modulo `TEXTURE_REPEAT * BANDS_PER_TILE` so the
+ * two sides of the phi = 0 seam draw the same curtain; that wrap only lines up if a whole
+ * number of cells fits in each tile.
+ *
+ * 20 per tile across 8 tiles is ~160 individually-varying curtains around the oval. That sits
+ * deliberately far below the ~1280 fine rays the canvas texture carries, so the two frequencies
+ * read as broad curtains made of finer rays rather than as one picket fence.
+ */
+const BANDS_PER_TILE = 20;
+
+/**
+ * How much taller the ribbon geometry is built than the average band reaches.
+ *
+ * Band heights are now clipped in the fragment shader, so without this headroom the mean
+ * curtain would come out visibly shorter than it used to be. `BAND_HEIGHT_MEAN` is its
+ * reciprocal, which keeps the typical silhouette matching the pre-shader look.
+ *
+ * Applied in both detail modes, so switching detail never pops the geometry.
+ */
+const BAND_HEIGHT_ENVELOPE = 1.3;
+const BAND_HEIGHT_MEAN = 1 / BAND_HEIGHT_ENVELOPE;
+
+/**
+ * Scales each curtain's contribution to the accumulated envelope.
+ *
+ * Three overlapping curtains are summed per fragment, so without this the oval would come out
+ * markedly brighter than the single-band version it replaced. Tuned so the mean alpha lands
+ * back within a few percent of that version over the upper two thirds of the curtain, leaving
+ * the base a little brighter — which reads as the diffuse glow a real oval has down there.
+ */
+const BAND_GAIN = 0.7;
+
+/**
+ * Per-ribbon shader uniforms.
+ *
+ * Owned by the ribbon and handed to `shader.uniforms`, rather than reaching back into a
+ * captured `shader` reference to write them: Three.js shares compiled programs between
+ * materials, so a captured reference can silently end up belonging to a different one. Same
+ * arrangement `black-hole-jet.ts` uses.
+ */
+type AuroraUniforms = {
+    /** Accumulated clamped, signed simulation time. Unreferenced in static mode. */
+    uTime: { value: number };
+    /** Decorrelates the band pattern between the four ribbons. */
+    uSeed: { value: number };
+};
+
+/**
+ * Uniform and helper declarations, injected ahead of `main()`.
+ *
+ * Kept separate from the body chunk because GLSL has no nested functions — these cannot be
+ * spliced in at `map_fragment`, which sits inside `main()`.
+ */
+const AURORA_PARS_CHUNK = /* glsl */ `
+    uniform float uTime;
+    uniform float uSeed;
+
+    // Cheap per-band hash. There is no GLSL noise anywhere in this codebase (noise-utils.ts is
+    // CPU-side only), and nothing here needs gradient noise — one decorrelated value per
+    // integer band id is enough.
+    //
+    // The salt selects which property is being drawn rather than being folded into the id, so
+    // the id's contribution to the argument stays bounded however many properties are added.
+    float auroraHash(float id, float salt) {
+        return fract(sin(id * 12.9898 + salt * 4.1414 + uSeed) * 43758.5453123);
+    }
+
+    // Emission colour by altitude, following real auroral chemistry: atomic-oxygen red
+    // (630 nm) high up, the oxygen green core (557.7 nm), and an ionised-nitrogen violet
+    // fringe along the bottom edge. Same stops as the canvas gradient this replaces.
+    //
+    // Sampled at absolute altitude, not altitude within the band — which is both physically
+    // right and the reason a short band reads green while a tall one flares red at the tip.
+    vec3 auroraRamp(float h) {
+        vec3 c = mix(vec3(0.47, 0.27, 0.86), vec3(0.59, 0.35, 1.00), smoothstep(0.00, 0.08, h));
+        c = mix(c, vec3(0.24, 1.00, 0.55), smoothstep(0.08, 0.25, h));
+        c = mix(c, vec3(0.47, 1.00, 0.75), smoothstep(0.25, 0.60, h));
+        c = mix(c, vec3(1.00, 0.27, 0.47), smoothstep(0.60, 0.82, h));
+        return c;
+    }
+`;
+
+/**
+ * Fragment body injected after `map_fragment`.
+ *
+ * `diffuseColor` arrives carrying the curtain texture's fine ray detail in its alpha (the map
+ * is white, so its RGB is neutral) already multiplied by the material colour and opacity.
+ * This chunk replaces the RGB with the altitude emission ramp and multiplies the alpha by the
+ * per-band envelope and the arc modulation.
+ *
+ * `vMapUv` is the varying Three.js declares for a mapped material. It already carries the
+ * texture's scroll offset, so the procedural bands travel with the rays they are shaped from
+ * rather than sliding through them.
+ */
+const AURORA_FRAGMENT_CHUNK = /* glsl */ `
+    // Every local here is aurora-prefixed: this block is spliced into the middle of
+    // MeshBasicMaterial's main(), and the stock chunks that follow it declare locals of
+    // their own that must not be shadowed or redeclared.
+
+    // Altitude up the curtain: 0 at the base, 1 at the top of the ribbon.
+    float auroraAlt = vMapUv.y;
+
+    // ── Per-band envelope ────────────────────────────────────────────────────────────
+    // Cells are a way of *seeding* curtains, not of bounding them. Each cell's curtain is
+    // jittered off its cell centre and is usually wider than the cell itself, and every
+    // fragment accumulates the three nearest cells — so curtains overlap their neighbours
+    // and the cell grid leaves no trace. Clipping each band to its own cell instead put a
+    // dark seam on every boundary, at perfectly regular spacing all the way round the oval.
+    float auroraX = vMapUv.x * ${BANDS_PER_TILE}.0;
+    float auroraCell = floor(auroraX);
+
+    // A dim continuous veil beneath the curtains, so the gaps between them are not empty sky.
+    // Deliberately constant in x: anything varying here would reintroduce structure of its own.
+    float auroraVeil = 0.13 * (1.0 - smoothstep(0.18, 0.46, auroraAlt));
+
+    // The veil seeds the hue accumulator as a neutral contributor, so bare sky between
+    // curtains lands mid-ramp instead of dividing by zero.
+    float auroraEnvelope = auroraVeil;
+    float auroraHueSum = 0.5 * auroraVeil;
+    float auroraHueWeight = auroraVeil;
+
+    for (int auroraI = -1; auroraI <= 1; auroraI++) {
+        float auroraN = auroraCell + float(auroraI);
+
+        // Hashes wrap to one full circuit of the oval, so the two sides of the phi = 0 seam
+        // (where the geometry's duplicated pair carries u = TEXTURE_REPEAT against u = 0)
+        // draw the same curtain. The centre below is left unwrapped, so it stays put.
+        float auroraId = mod(auroraN, ${(TEXTURE_REPEAT * BANDS_PER_TILE).toFixed(1)});
+
+        float auroraHHeight = auroraHash(auroraId, 0.0);
+        float auroraHBright = auroraHash(auroraId, 1.0);
+        float auroraHWidth = auroraHash(auroraId, 2.0);
+        float auroraHPhase = auroraHash(auroraId, 3.0);
+        float auroraHHue = auroraHash(auroraId, 4.0);
+        float auroraHJitter = auroraHash(auroraId, 5.0);
+        float auroraHRate = auroraHash(auroraId, 6.0);
+
+        // Spread around the mean so the average curtain still fills the ribbon it used to.
+        float auroraHeight = ${BAND_HEIGHT_MEAN.toFixed(4)} * (0.55 + 0.9 * auroraHHeight);
+        float auroraBright = 0.45 + 0.85 * auroraHBright;
+
+        #ifdef AURORA_DYNAMIC
+            // Two terms at incommensurate rates, so neighbouring bands drift out of step and
+            // the pattern never settles into something visibly periodic.
+            float auroraPhase = auroraHPhase * 6.2831853;
+            float auroraRate = 0.18 + 0.42 * auroraHRate;
+            auroraHeight *= 1.0
+                + 0.38 * sin(uTime * auroraRate + auroraPhase)
+                + 0.12 * sin(uTime * auroraRate * 2.7 + auroraPhase * 3.1);
+            auroraBright *= 1.0 + 0.45 * sin(uTime * auroraRate * 1.6 + auroraPhase * 1.7);
+        #endif
+
+        auroraHeight = clamp(auroraHeight, 0.12, 1.0);
+        auroraBright = max(auroraBright, 0.0);
+
+        // Half-width in cell units, always past 0.5 so every curtain spills into its
+        // neighbours — that overlap is what dissolves the grid.
+        float auroraHalf = 0.55 + 0.75 * auroraHWidth;
+
+        // The jitter spans a full cell. That matters more than it looks: at any smaller
+        // amplitude the centres stay clustered around the cell midpoints, coverage sags at
+        // the boundaries, and a regular dark seam survives the overlap. At 1.0 the centres
+        // are uniform across the cell and the periodic dip measures a few tenths of a percent.
+        float auroraCentre = auroraN + 0.5 + (auroraHJitter - 0.5);
+        float auroraD = (auroraX - auroraCentre) / auroraHalf;
+
+        // Squared so the shoulders meet zero with zero slope — a linear falloff would leave a
+        // faint crease wherever one curtain's edge lands.
+        float auroraProfile = max(0.0, 1.0 - auroraD * auroraD);
+        auroraProfile *= auroraProfile;
+
+        // Clip the curtain at its own height, with a fade proportional to that height so
+        // short ones do not end in a hard line.
+        float auroraFade = 0.18 * auroraHeight + 0.06;
+        float auroraMask = 1.0 - smoothstep(auroraHeight - auroraFade, auroraHeight, auroraAlt);
+
+        float auroraContrib = auroraProfile * auroraBright * auroraMask;
+        auroraEnvelope += ${BAND_GAIN.toFixed(2)} * auroraContrib;
+        auroraHueSum += auroraHHue * auroraContrib;
+        auroraHueWeight += auroraContrib;
+    }
+
+    // ── Arc modulation ───────────────────────────────────────────────────────────────
+    // Bright and dim arcs around the oval rather than an even glow. vMapUv.x spans whole
+    // turns across the seam, so integer harmonics of it stay continuous there.
+    float auroraArcU = vMapUv.x * 6.2831853;
+    float auroraArcPhase = uSeed;
+    #ifdef AURORA_DYNAMIC
+        // Drifting, so the arcs migrate around the oval instead of sitting at fixed longitudes.
+        auroraArcPhase += uTime * 0.07;
+    #endif
+    float auroraArc = 0.55
+        + 0.3 * sin(auroraArcU + auroraArcPhase)
+        + 0.15 * sin(3.0 * auroraArcU + auroraArcPhase * 2.3);
+    auroraArc = clamp(auroraArc, 0.0, 1.0);
+
+    // ── Colour ───────────────────────────────────────────────────────────────────────
+    // Sampling the ramp slightly off per curtain spreads the hue between neighbours, so the
+    // oval is not one uniform green. Weighting by each curtain's contribution means the hue
+    // crossfades through the overlap rather than switching at a cell boundary.
+    float auroraHueMix = auroraHueSum / max(auroraHueWeight, 0.0001);
+    float auroraRampAlt = clamp(auroraAlt + (auroraHueMix - 0.5) * 0.12, 0.0, 1.0);
+    vec3 auroraEmission = auroraRamp(auroraRampAlt);
+
+    // Fade out at both extremes: the very top thins into vacuum, the base into the horizon.
+    float auroraEdge = smoothstep(0.0, 0.06, auroraAlt) * (1.0 - smoothstep(0.9, 1.0, auroraAlt));
+
+    diffuseColor.rgb *= auroraEmission;
+    diffuseColor.a *= auroraEnvelope * auroraArc * auroraEdge;
+`;
+
+/** Attaches the band shader to a curtain material, driven by the caller-owned uniforms. */
+function applyBandShader(mat: THREE.MeshBasicMaterial, uniforms: AuroraUniforms): void {
+    mat.onBeforeCompile = (shader) => {
+        shader.uniforms.uTime = uniforms.uTime;
+        shader.uniforms.uSeed = uniforms.uSeed;
+        shader.fragmentShader = shader.fragmentShader
+            .replace('void main() {', `${AURORA_PARS_CHUNK}\nvoid main() {`)
+            .replace('#include <map_fragment>', `#include <map_fragment>\n${AURORA_FRAGMENT_CHUNK}`);
+    };
 }
 
 /** One term of the harmonic sum that warps an oval away from a perfect circle. */
@@ -350,6 +543,11 @@ function buildRibbonGeometry(shape: RibbonShape): {
  * texture that scrolls to give the drifting shimmer. Two concentric layers per pole drift
  * in opposite directions, which reads as depth.
  *
+ * The texture supplies only the fine ray detail. Each curtain's height, brightness and
+ * emission colour are decided per-pixel in the fragment shader, so neighbouring bands differ
+ * from one another — and, at the `dynamic` detail setting, flare and fade independently over
+ * time. See `AURORA_FRAGMENT_CHUNK`.
+ *
  * The group is added as a child of `parent` (the body mesh), so it inherits axial tilt and
  * spin automatically. That is also physically right: the auroral oval is fixed in magnetic
  * coordinates and turns with the body.
@@ -382,7 +580,11 @@ export function createAurora(
     const baseColatitude = THREE.MathUtils.degToRad(
         lerp(OVAL_COLATITUDE_WEAK, OVAL_COLATITUDE_STRONG, intensity)
     );
-    const baseHeight = radius * lerp(CURTAIN_HEIGHT_WEAK, CURTAIN_HEIGHT_STRONG, intensity);
+    // The envelope factor gives the shader's tallest bands somewhere to reach; the shader's
+    // mean band height is its reciprocal, so the typical curtain keeps the silhouette it had
+    // before band heights became a per-pixel decision.
+    const baseHeight =
+        radius * lerp(CURTAIN_HEIGHT_WEAK, CURTAIN_HEIGHT_STRONG, intensity) * BAND_HEIGHT_ENVELOPE;
     const baseOpacity = lerp(OPACITY_WEAK, OPACITY_STRONG, intensity);
 
     // A displaced dipole sits closer to one pole, so that hemisphere gets a tighter, brighter
@@ -410,6 +612,8 @@ export function createAurora(
         geo: THREE.BufferGeometry;
         mat: THREE.MeshBasicMaterial;
         tex: THREE.Texture;
+        /** Drives the per-band shader animation; `uTime` is advanced every frame. */
+        uniforms: AuroraUniforms;
         /** Animated shape state, re-evaluated into `positions` every frame. */
         shape: RibbonShape;
         positions: Float32Array;
@@ -421,6 +625,10 @@ export function createAurora(
         pulseRate: number;
     };
     const ribbons: Ribbon[] = [];
+
+    // Read once at build time and then edge-detected in `update()`, so switching detail
+    // recompiles the four materials in place rather than rebuilding the whole effect.
+    let detail: AuroraDetailMode = settingsStore.settings.auroraDetail;
 
     for (const hemisphere of [1, -1] as const) {
         const isNear = hemisphere === nearHemisphere;
@@ -447,6 +655,16 @@ export function createAurora(
                 side: THREE.DoubleSide,
             });
 
+            // The seed is distinct per ribbon so the four of them (two poles x two layers)
+            // don't share a band pattern, but drawn from the seeded stream so the whole
+            // effect stays deterministic for a given body seed.
+            const uniforms: AuroraUniforms = {
+                uTime: { value: 0 },
+                uSeed: { value: rng.range(0, 100) },
+            };
+            applyBandShader(mat, uniforms);
+            if (detail === 'dynamic') mat.defines = { AURORA_DYNAMIC: '' };
+
             const mesh = new THREE.Mesh(geo, mat);
             // Above the cloud layer (2) and atmosphere shell (1).
             mesh.renderOrder = 3;
@@ -456,6 +674,7 @@ export function createAurora(
                 geo,
                 mat,
                 tex,
+                uniforms,
                 shape,
                 positions,
                 positionAttr,
@@ -496,6 +715,19 @@ export function createAurora(
             }
             group.visible = true;
 
+            // Detail is polled rather than pushed — the same contract every other setting in
+            // this project uses. Swapping the define and flagging the material is enough to
+            // get a recompile; the geometry, textures and uniforms all survive untouched, so
+            // the switch costs one frame of shader compilation and nothing else.
+            const wanted = settingsStore.settings.auroraDetail;
+            if (wanted !== detail) {
+                detail = wanted;
+                for (const r of ribbons) {
+                    r.mat.defines = detail === 'dynamic' ? { AURORA_DYNAMIC: '' } : {};
+                    r.mat.needsUpdate = true;
+                }
+            }
+
             // Clamped so the curtains keep a steady wall-clock pace however fast the
             // simulation is running, but still signed, so reversing time reverses the motion.
             // Zero means the sim is paused, and the aurora holds its pose with it.
@@ -507,6 +739,11 @@ export function createAurora(
                 r.tex.offset.x += r.scrollRate * dt;
                 r.mat.opacity =
                     r.baseOpacity * (0.75 + 0.25 * Math.sin(elapsed * r.pulseRate + r.pulsePhase));
+
+                // Drives the band breathing and the arc drift. Unreferenced by the static
+                // shader variant, but kept advancing so switching back to dynamic resumes
+                // from where the curtain would have been rather than snapping to t = 0.
+                r.uniforms.uTime.value = elapsed;
 
                 // Re-evaluate the oval in place: the folds travel around the ring and the
                 // whole band slowly breathes wider and narrower.

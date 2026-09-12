@@ -30,7 +30,7 @@ import { absorbBody, destroyBody, updateSimulation } from '../physics/physics';
 import { resolveCollision } from '../physics/collision';
 import { isBodyType } from '../utilities/utilities';
 import { EntryFlameEffect } from '../effects/entry-flame';
-import { DIST_SCALE } from '../utilities/consts';
+
 import {
     ISimulationState,
     IFlightState,
@@ -236,36 +236,6 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene): void {
         small.entryFlame.dispose();
         small.entryFlame = null;
     }
-}
-
-/**
- * Finds the closest atmosphere-bearing planet to `ship` (within 5x its atmosphere radius)
- * and returns the ship's true closing speed relative to it, in km/s — the same quantity
- * `EntryFlameEffect` uses to decide how bright the flame is. Used to drive the HUD's "REL"
- * readout so it's visible on-screen alongside the ship's own forward-speed reading, which
- * can read very differently when the ship shares velocity with the planet's orbital motion.
- * Returns null when no atmosphere-bearing planet is nearby.
- */
-function findRelativeSpeedInfo(
-    ship: Body,
-    bodies: Body[]
-): { planetName: string; speedKmPerSec: number } | null {
-    let closest: CelestialBody | null = null;
-    let closestDist = Infinity;
-    for (const body of bodies) {
-        if (!(body instanceof CelestialBody) || body.atmosphereRadius == null) continue;
-        const dist = ship.mesh.position.distanceTo(body.mesh.position);
-        if (dist < closestDist) {
-            closestDist = dist;
-            closest = body;
-        }
-    }
-    if (!closest || closestDist > closest.atmosphereRadius! * 5) return null;
-
-    return {
-        planetName: closest.name,
-        speedKmPerSec: ship.velocity.distanceTo(closest.velocity) * DIST_SCALE,
-    };
 }
 
 /**
@@ -618,6 +588,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         // Both survived (or were only nudged out of overlap) — nothing dies.
                         if (outcome.type === 'bounce' || outcome.type === 'none') continue;
 
+                        // Captured before absorbBody() runs below, which mutates the winner's
+                        // velocity in place — this must reflect the pre-impact closing speed.
+                        const impactSpeed = b1.velocity.distanceTo(b2.velocity);
+
                         if (outcome.type === 'destroy-both') {
                             // The impact destroyed both bodies — no winner.
                             // The camera focus (if it was one of these bodies) is frozen at
@@ -626,7 +600,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                             destroyBody(null, outcome.victims);
 
                             for (const victim of outcome.victims) {
-                                victim.die();
+                                victim.die({ impactSpeed });
                                 ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
                                     (b) => b !== victim
                                 );
@@ -647,7 +621,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         // If the camera was focused on the destroyed victim, its focus is
                         // frozen at the victim's last position by handleBodyBecameInvalid
                         // (via the body:dead event fired inside victim.die()).
-                        victim.die();
+                        victim.die({ impactSpeed });
                         ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
                             (b) => b !== victim
                         );
@@ -1156,10 +1130,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         return h.flightThrustAccel;
                     return 0;
                 })();
+
                 const gRate = ship?.tempAcc?.length() ?? 0;
-                const relativeSpeedInfo = ship
-                    ? findRelativeSpeedInfo(ship, ctx.simulationState.bodies)
-                    : null;
+                
                 spd.material.map?.dispose();
                 spd.material.map = createSpeedTexture(
                     ctx.flightState.currentSpeed,
@@ -1169,8 +1142,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     hWarp,
                     hBrake,
                     thrustRate,
-                    gRate,
-                    relativeSpeedInfo
+                    gRate
                 );
                 spd.material.needsUpdate = true;
             }

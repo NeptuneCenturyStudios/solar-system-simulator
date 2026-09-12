@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
 import { buildBodySphereGeometry } from '../utilities/utilities';
+import {
+    EXPLOSION_REFERENCE_IMPACT_SPEED,
+    EXPLOSION_MIN_SPEED_MULTIPLIER,
+    EXPLOSION_MAX_SPEED_MULTIPLIER,
+} from '../utilities/consts';
 
 export class ParticleExplosion implements IEffect {
     dependencies: IStateDependencies;
@@ -35,7 +40,8 @@ export class ParticleExplosion implements IEffect {
         scene: THREE.Scene,
         pos: THREE.Vector3,
         color: number,
-        radius = 10
+        radius = 10,
+        impactSpeed?: number
     ) {
         this.dependencies = dependencies;
         this.count = Math.min(2000, radius * 50);
@@ -50,6 +56,20 @@ export class ParticleExplosion implements IEffect {
         this.debrisComplete = false;
 
         const maxSpeed = dependencies.getC() / 2; // 50% of C for visual effect
+
+        // Scale outward speed by how hard the bodies actually hit each other, so a gentle
+        // bump and a hypervelocity impact no longer look identical. 1.0 at the reference
+        // speed (today's default look); clamped so slow impacts stay visible and fast ones
+        // don't get absurd. Falls back to 1.0 when the caller has no collision speed to give
+        // (weapon kills, manual deletion, etc.).
+        const speedMultiplier =
+            impactSpeed !== undefined
+                ? THREE.MathUtils.clamp(
+                      impactSpeed / EXPLOSION_REFERENCE_IMPACT_SPEED,
+                      EXPLOSION_MIN_SPEED_MULTIPLIER,
+                      EXPLOSION_MAX_SPEED_MULTIPLIER
+                  )
+                : 1;
 
         for (let i = 0; i < this.count; i++) {
             // Spawn particles on the planet's surface
@@ -72,7 +92,7 @@ export class ParticleExplosion implements IEffect {
             this.worldPositions[i * 3 + 2] = surfacePos.z;
 
             // Outward velocity bias
-            const spreadScale = Math.max(5, radius * 0.004);
+            const spreadScale = Math.max(5, radius * 0.004) * speedMultiplier;
             const v = dir.clone().multiplyScalar((Math.random() * 0.8 + 0.2) * spreadScale);
 
             if (v.length() > maxSpeed) {
@@ -185,7 +205,7 @@ export class ParticleExplosion implements IEffect {
             this.debris.push(chunk);
 
             // Debris velocity (slower than particles)
-            const spreadScale = Math.max(5, radius * 0.004);
+            const spreadScale = Math.max(5, radius * 0.004) * speedMultiplier;
             const dv = dir.clone().multiplyScalar((Math.random() * 0.4 + 0.1) * spreadScale);
 
             if (dv.length() > maxSpeed) dv.setLength(maxSpeed);

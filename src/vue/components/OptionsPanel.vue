@@ -26,6 +26,20 @@
                 Aurorae
             </label>
 
+            <div v-if="simStore.auroraEnabled" class="control-group">
+                <label>Aurora Detail</label>
+                <select
+                    class="solver-select"
+                    :value="simStore.auroraDetail"
+                    title="How much per-pixel work the aurora curtains do. Dynamic animates each band's height, brightness and colour; Static gives every band its own fixed values and compiles a cheaper shader."
+                    @change="onAuroraDetailChange"
+                >
+                    <option value="static">Static Bands</option>
+                    <option value="dynamic">Dynamic Bands</option>
+                </select>
+                <p class="solver-hint">{{ auroraDetailHint }}</p>
+            </div>
+
             <label class="checkbox-row">
                 <input
                     type="checkbox"
@@ -175,6 +189,7 @@
 import { computed } from 'vue';
 
 import {
+    setAuroraDetail,
     setAuroraEnabled,
     setBarnesHutTheta,
     setFrameRateLimit,
@@ -187,7 +202,7 @@ import {
     setSubsteps,
     simStore,
 } from '../sim-bridge';
-import type { PhysicsSolverMode } from '../../settings/settings-store';
+import type { AuroraDetailMode, PhysicsSolverMode } from '../../settings/settings-store';
 
 import PanelBase from './PanelBase.vue';
 
@@ -217,6 +232,19 @@ function onLensflareChange(e: Event): void {
 
 function onAuroraChange(e: Event): void {
     setAuroraEnabled((e.target as HTMLInputElement).checked);
+}
+
+/** One-line explanation of what each aurora detail level buys. */
+const AURORA_DETAIL_HINTS: Record<AuroraDetailMode, string> = {
+    static: 'Each band keeps a fixed height, brightness and colour. Cheapest — the curtains still drift and writhe, but never flare.',
+    dynamic:
+        'Bands grow, brighten and fade independently, and the bright arcs migrate around the oval. Higher performance impact.',
+};
+
+const auroraDetailHint = computed(() => AURORA_DETAIL_HINTS[simStore.auroraDetail]);
+
+function onAuroraDetailChange(e: Event): void {
+    setAuroraDetail((e.target as HTMLSelectElement).value as AuroraDetailMode);
 }
 
 function onShowAiDebugChange(e: Event): void {

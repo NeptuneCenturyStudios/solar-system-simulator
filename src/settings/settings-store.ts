@@ -8,6 +8,7 @@ export const enum SettingKey {
     MusicVolume = 'musicVolume',
     LensflareEnabled = 'lensflareEnabled',
     AuroraEnabled = 'auroraEnabled',
+    AuroraDetail = 'auroraDetail',
     FrameRateLimit = 'frameRateLimit',
     ShowAiDebug = 'showAiDebug',
     PhysicsSolver = 'physicsSolver',
@@ -25,6 +26,18 @@ export const enum SettingKey {
  */
 export type PhysicsSolverMode = 'direct' | 'cutoff' | 'barnes-hut';
 
+/**
+ * How much per-pixel work the aurora curtains are allowed to do.
+ *
+ * - `static`  — every band still gets its own height, brightness and colour, but they hold
+ *               those values forever. The curtain only drifts and writhes, as it always has.
+ * - `dynamic` — band heights and brightness breathe independently, and the bright/dim arcs
+ *               migrate around the oval. Compiles a larger fragment shader.
+ *
+ * Declared here rather than in the effects layer so the settings store stays dependency-free.
+ */
+export type AuroraDetailMode = 'static' | 'dynamic';
+
 export interface SpaceSimSettings {
     particleEffectsEnabled: boolean;
     substeps: number;
@@ -33,6 +46,8 @@ export interface SpaceSimSettings {
     lensflareEnabled: boolean;
     /** Draw aurora curtains around the magnetic poles of bodies that have a field and an atmosphere. */
     auroraEnabled: boolean;
+    /** How much per-pixel work the aurora curtains do. Ignored when `auroraEnabled` is false. */
+    auroraDetail: AuroraDetailMode;
     /** Maximum frames per second (0 = unlimited). */
     frameRateLimit: number;
     /** Draw the ship-AI obstacle avoidance overlay (lookahead corridor, hazard sphere, heading). */
@@ -50,6 +65,9 @@ const defaultSettings: SpaceSimSettings = {
     musicVolume: 0.5,
     lensflareEnabled: true,
     auroraEnabled: true,
+    // The ribbons cover few pixels even at close range, so the animated bands are cheap enough
+    // to be the default. Static is there for machines where every fragment counts.
+    auroraDetail: 'dynamic',
     frameRateLimit: 0,
     showAiDebug: false,
     // Exact for everything that measurably matters, and degrades to all-pairs on its own

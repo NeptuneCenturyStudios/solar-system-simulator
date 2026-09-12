@@ -12,7 +12,12 @@ import {
 import { getBodyTypeLabel } from '../utilities/utilities';
 import type { IMagneticFieldOptions, ISimStateSnapshot } from '../interfaces';
 import { environmentState } from '../simulation/environment-state';
-import { PhysicsSolverMode, SettingKey, settingsStore } from '../settings/settings-store';
+import {
+    AuroraDetailMode,
+    PhysicsSolverMode,
+    SettingKey,
+    settingsStore,
+} from '../settings/settings-store';
 import type { PlaylistEntry } from '../utilities/playlist';
 
 /**
@@ -208,6 +213,8 @@ export interface VueSimHooks {
     setLensflareEnabled?: (checked: boolean) => void;
     /** Toggle polar aurorae (persisted via settingsStore). */
     setAuroraEnabled?: (checked: boolean) => void;
+    /** Select how much per-pixel work the aurora curtains do (persisted via settingsStore). */
+    setAuroraDetail?: (mode: AuroraDetailMode) => void;
     /** Set physics substeps per frame (persisted via settingsStore). */
     setSubsteps?: (value: number) => void;
     /** Select the gravity solver (persisted via settingsStore). */
@@ -292,6 +299,8 @@ export interface VueSimStore {
     particleEffectsEnabled: boolean;
     lensflareEnabled: boolean;
     auroraEnabled: boolean;
+    /** How much per-pixel work the aurora curtains do. */
+    auroraDetail: AuroraDetailMode;
     /** Physics substeps per frame. */
     substeps: number;
     /** Gravity solver used by the n-body engine. */
@@ -347,6 +356,7 @@ const state = reactive<VueSimStore>({
     particleEffectsEnabled: settingsStore.settings.particleEffectsEnabled,
     lensflareEnabled: settingsStore.settings.lensflareEnabled,
     auroraEnabled: settingsStore.settings.auroraEnabled,
+    auroraDetail: settingsStore.settings.auroraDetail,
     substeps: settingsStore.settings.substeps,
     physicsSolver: settingsStore.settings.physicsSolver,
     barnesHutTheta: settingsStore.settings.barnesHutTheta,
@@ -775,6 +785,20 @@ export function setAuroraEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.AuroraEnabled, checked);
     }
     state.auroraEnabled = checked;
+}
+
+/**
+ * Select how much per-pixel work the aurora curtains do.
+ * Takes effect on the next frame — the effect reads the setting each tick and recompiles its
+ * materials in place, so there is no need to rebuild the bodies or restart the simulation.
+ */
+export function setAuroraDetail(mode: AuroraDetailMode): void {
+    if (hookRegistry.setAuroraDetail) {
+        hookRegistry.setAuroraDetail(mode);
+    } else {
+        settingsStore.update(SettingKey.AuroraDetail, mode);
+    }
+    state.auroraDetail = mode;
 }
 
 /** Toggle the ship-AI obstacle avoidance debug overlay. */

@@ -509,6 +509,12 @@ export interface IProceduralGeneratorPromptResult {
 export interface IDeathOptions {
     skipImpactSound?: boolean;
     skipExplosion?: boolean;
+    /**
+     * Relative speed of the collision that caused this death, in sim units (same convention as
+     * Body.velocity / dependencies.getC()). When known, scales the explosion's particle/debris
+     * speed; omitted for non-collision deaths (weapon kills, manual deletion, etc.).
+     */
+    impactSpeed?: number;
 }
 
 export interface IFlightControlContext {

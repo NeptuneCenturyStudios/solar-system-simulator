@@ -470,6 +470,16 @@ export const COLLISION_RESTITUTION = 0.3;
 /** Surviving bodies are pushed apart to (r₁ + r₂) × this factor so they don't re-contact next frame. */
 export const COLLISION_SEPARATION_FACTOR = 1.001;
 
+// === Explosion speed scaling ===
+// ParticleExplosion scales its outward particle/debris speed by the relative impact speed that
+// caused the death, so a gentle bump and a hypervelocity impact no longer look identical.
+/** Impact speed at which the explosion renders at its default (multiplier = 1) speed. */
+export const EXPLOSION_REFERENCE_IMPACT_SPEED = COLLISION_DISRUPTION_SPEED;
+/** Floor on the speed multiplier, so even a very slow impact still shows a visible burst. */
+export const EXPLOSION_MIN_SPEED_MULTIPLIER = 0.25;
+/** Ceiling on the speed multiplier, so hypervelocity impacts look dramatic without becoming absurd. */
+export const EXPLOSION_MAX_SPEED_MULTIPLIER = 15;
+
 // === Wormhole tuning ===
 /** Default mouth (gate) radius for a newly created wormhole, in sim units. Used for randomization range */
 export const WORMHOLE_DEFAULT_RADIUS = EARTH_RADIUS * 1.5;
