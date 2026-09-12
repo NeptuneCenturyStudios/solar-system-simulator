@@ -416,6 +416,13 @@ export const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
 /** Duration (seconds) to show the "Autopilot blocked" HUD notification. */
 export const AUTOPILOT_BLOCKED_NOTIFY_DURATION = 2.5;
 
+/** Default fade-in duration (sim-seconds) for the scenario message banner. */
+export const SCENARIO_MESSAGE_FADE_IN_SECONDS = 0.4;
+/** Default hold duration (sim-seconds) for the scenario message banner. */
+export const SCENARIO_MESSAGE_HOLD_SECONDS = 2.0;
+/** Default fade-out duration (sim-seconds) for the scenario message banner. */
+export const SCENARIO_MESSAGE_FADE_OUT_SECONDS = 0.8;
+
 // (AUTOPILOT_BOOST_THRESHOLD, AUTOPILOT_APPROACH_MIN_DISTANCE, AUTOPILOT_BRAKE_ARC_DIST,
 //  AUTOPILOT_WARP_THRESHOLD, AUTOPILOT_WARP_ACCEL, and AUTOPILOT_WARP_DECEL are now computed
 //  at runtime from the ship's handling object via Spaceship getters.)
@@ -597,6 +604,15 @@ export const ASTEROID_DEFENSE_MAX_WAVES = 10;
  * deflected) and is removed, so a stray rock can never stall the wave.
  */
 export const ASTEROID_DEFENSE_MISS_DISTANCE_FACTOR = 1.5;
+/** Sim seconds the "exiting flight mode fails this scenario" warning banner stays fully lit. */
+export const ASTEROID_DEFENSE_FLIGHT_WARNING_HOLD_SECONDS = 5;
+
+/**
+ * Real-time delay (wall-clock ms, not sim time) between a scenario ending and its outcome
+ * modal appearing, so the fail/success moment reads rather than getting stepped on by an
+ * instant popup.
+ */
+export const SCENARIO_OUTCOME_MODAL_DELAY_MS = 1000;
 /** The player's ship spawns this far from Earth's centre, on the sunward (day) side. */
 export const ASTEROID_DEFENSE_SHIP_ALTITUDE = EARTH_RADIUS * 4;
 /** Asteroids never spawn closer than this to the player's ship (20,000 km / DIST_SCALE). */

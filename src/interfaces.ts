@@ -276,6 +276,8 @@ export interface IStateDependencies {
     getBodies: () => Body[];
     getG: () => EffectiveGForce;
     getC: () => EffectiveCSpeed;
+    /** Show or hide the Vue PanelManager (toolbar + System Explorer/panels). */
+    setPanelManagerVisible: (visible: boolean) => void;
 }
 
 /**

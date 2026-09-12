@@ -67,6 +67,7 @@ import {
     WORMHOLE_SHORTCUT_G_MULTIPLIER,
     ASTEROID_FIELD_G_MULTIPLIER,
     ASTEROID_DEFENSE_G_MULTIPLIER,
+    SCENARIO_OUTCOME_MODAL_DELAY_MS,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -108,7 +109,9 @@ import { FlightHUD } from './drawing/flight-hud';
 import { AutopilotTargetIndicator } from './drawing/autopilot-target-indicator';
 import { PlanetNameIndicator } from './drawing/planet-name-indicator';
 import { HealthBarIndicator } from './drawing/health-bar-indicator';
+import { ThreatIndicator } from './drawing/threat-indicator';
 import { ScreenFlashEffect, registerScreenFlash } from './effects/screen-flash';
+import { ScenarioMessageHud, registerScenarioMessageHud } from './drawing/scenario-message-hud';
 import { VelocityArcManager } from './drawing/velocity-arc';
 import { OrbitPredictionManager } from './drawing/orbit-prediction';
 import { SurfaceCameraManager } from './camera/surface-camera';
@@ -163,7 +166,7 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 // Vue UI overlay (new UI, developed in parallel with the existing UI)
 import { mountVueUi } from './vue/main';
 import { registerVueSimHooks, setDisplayState, simStore } from './vue/sim-bridge';
-import { setSystemReady } from './vue/ui-store';
+import { setPanelManagerVisible, setSystemReady } from './vue/ui-store';
 import { environmentState } from './simulation/environment-state';
 import { SettingKey, settingsStore } from './settings/settings-store';
 import {
@@ -638,6 +641,7 @@ const dependencies: IStateDependencies = {
     // Math.max(0, …) guards sqrt against a negative multiplier, which would
     // otherwise yield NaN effective lightspeed and poison every velocity.
     getC: () => (C * Math.sqrt(Math.max(0, simulationState.gMultiplier))) as EffectiveCSpeed,
+    setPanelManagerVisible: setPanelManagerVisible,
 };
 
 // --- Velocity editing arc helpers ---
@@ -765,10 +769,17 @@ const planetNameIndicator = new PlanetNameIndicator(uiScene, simulationState);
 
 const healthBarIndicator = new HealthBarIndicator(uiScene, simulationState);
 
+const threatIndicator = new ThreatIndicator(uiScene, simulationState);
+
 // Full-screen white flash overlay (explosions, supernova, warp engage, wormhole transit).
 // Rendered as a screen-space quad in uiScene; advanced each frame by the animation loop.
 const screenFlash = new ScreenFlashEffect(uiScene);
 registerScreenFlash(screenFlash);
+
+// Fading "Wave 1 / 10"-style banner scenarios can flash into the UI scene.
+// Rendered as a canvas-texture sprite in uiScene; advanced each frame by the animation loop.
+const scenarioMessageHud = new ScenarioMessageHud(uiScene);
+registerScenarioMessageHud(scenarioMessageHud);
 
 // Backward-compatible let kept for basic module-level state
 let manuallySelectedBody = null as Body | null; // Track bodies clicked in space (without camera buttons)
@@ -2792,8 +2803,8 @@ function onMouseUp(event: MouseEvent) {
     // Deactivate mouse look on right mouse button release
     if (event.button === 2) {
         interactionState.isMouseLookActive = false;
-        // Exit pointer lock
-        if (document.pointerLockElement === renderer.domElement) {
+        // Exit pointer lock (flight mode uses pointer lock for steering — leave it alone here)
+        if (!flightState.isActive && document.pointerLockElement === renderer.domElement) {
             document.exitPointerLock();
         }
     }
@@ -4424,6 +4435,7 @@ window.addEventListener('resize', () => {
 
     lensingEffect.resize(window.innerWidth, window.innerHeight);
     screenFlash.resize(window.innerWidth, window.innerHeight);
+    scenarioMessageHud.resize(window.innerWidth, window.innerHeight);
 });
 
 // Apply initial background visibility (pre-launch view): kuiper off
@@ -4702,6 +4714,10 @@ async function handleScenarioOutcome(report: ScenarioOutcomeReport): Promise<voi
     // the mouse on the dialog's buttons.
     if (flightState.isActive) exitFlightMode(flightCtx);
 
+    // Let the outcome (explosion, victory state, etc.) read for a beat before the modal
+    // steals focus — popping it up instantly feels jarring.
+    await new Promise((resolve) => setTimeout(resolve, SCENARIO_OUTCOME_MODAL_DELAY_MS));
+
     const result = await showScenarioOutcomeModal(report);
     if (!result) return;
 
@@ -4905,8 +4921,10 @@ const animCtx: AnimationContext = {
     targetIndicator,
     planetNameIndicator,
     healthBarIndicator,
+    threatIndicator,
     surfaceCam,
     screenFlash,
+    scenarioMessageHud,
     fpsSprite: { value: fpsSprite },
     statsSprite: { value: statsSprite },
     speedSprite: { value: speedSprite },

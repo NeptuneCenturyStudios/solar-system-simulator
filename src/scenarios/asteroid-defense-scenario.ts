@@ -6,6 +6,7 @@ import type { Earth } from '../bodies/earth';
 import type { Spaceship } from '../bodies/ships/spaceship';
 import { NotificationType } from '../event-log/event-log';
 import type { IScenario, IStateDependencies } from '../interfaces';
+import { triggerScenarioMessage } from '../drawing/scenario-message-hud';
 import { generateProceduralBodyName } from '../procedural/body-naming';
 import { rngFor } from '../procedural/seed-utils';
 import { flightState } from '../simulation/simulation';
@@ -15,6 +16,7 @@ import { reportScenarioOutcome } from './scenario-outcome';
 import {
     ASTEROID_DEFENSE_APPROACH_SPEED,
     ASTEROID_DEFENSE_FIRST_WAVE_DELAY,
+    ASTEROID_DEFENSE_FLIGHT_WARNING_HOLD_SECONDS,
     ASTEROID_DEFENSE_IMPACT_MARGIN,
     ASTEROID_DEFENSE_MAX_WAVES,
     ASTEROID_DEFENSE_MAX_ELEVATION_DEG,
@@ -85,6 +87,8 @@ export class AsteroidDefenseScenario implements IScenario {
     private wavesCleared = 0;
     /** Set once the scenario has ended; every further update is a no-op. */
     private finished = false;
+    /** Set once flight mode is observed active; a later drop to inactive fails the scenario. */
+    private hasEnteredFlightMode = false;
     /** The player's ship, watched so its destruction ends the scenario in failure. */
     private readonly playerShip: Spaceship | null;
 
@@ -108,11 +112,17 @@ export class AsteroidDefenseScenario implements IScenario {
         this.spawnedCount = 0;
         this.wavesCleared = 0;
         this.finished = false;
+        this.hasEnteredFlightMode = false;
         this.nextWaveTimer = ASTEROID_DEFENSE_FIRST_WAVE_DELAY;
+        this.dependencies.setPanelManagerVisible(false);
 
         this.dependencies.addEvent({
             message: 'Defend Earth! The first asteroid is inbound.',
             notificationType: NotificationType.Info,
+        });
+        triggerScenarioMessage('WARNING: Exiting flight mode (ESC) will fail this scenario!', {
+            holdSecs: ASTEROID_DEFENSE_FLIGHT_WARNING_HOLD_SECONDS,
+            fontSizePx: 32,
         });
     }
 
@@ -128,6 +138,14 @@ export class AsteroidDefenseScenario implements IScenario {
             this.finishFailed('Your ship has been destroyed.');
             return;
         }
+        // if (this.playerShip) {
+        //     if (flightState.isActive) {
+        //         this.hasEnteredFlightMode = true;
+        //     } else if (this.hasEnteredFlightMode) {
+        //         this.finishFailed('You exited flight mode.');
+        //         return;
+        //     }
+        // }
 
         // Paused: hold every timer and leave outcomes for the next running frame.
         if (simDt <= 0) return;
@@ -145,6 +163,7 @@ export class AsteroidDefenseScenario implements IScenario {
     dispose(): void {
         // The asteroids are ordinary bodies; the system teardown disposes them.
         this.tracked = [];
+        this.dependencies.setPanelManagerVisible(true);
     }
 
     /** Classify and drop every tracked asteroid that has hit Earth, been destroyed, or missed. */
@@ -260,6 +279,7 @@ export class AsteroidDefenseScenario implements IScenario {
             message: `Wave ${this.wave} incoming: ${this.wave} asteroid${this.wave === 1 ? '' : 's'}.`,
             notificationType: NotificationType.Warning,
         });
+        triggerScenarioMessage(`Wave ${this.wave} / ${ASTEROID_DEFENSE_MAX_WAVES}`);
     }
 
     /** Spawn one asteroid on a collision course with Earth and add it to the simulation. */
@@ -296,6 +316,7 @@ export class AsteroidDefenseScenario implements IScenario {
             trailColor: AsteroidDefenseScenario.ASTEROID_TRAIL_COLOR,
             maxTrail: ASTEROID_DEFENSE_TRAIL_LENGTH,
         });
+        asteroid.isThreat = true;
 
         this.dependencies.addBody(asteroid);
         return asteroid;

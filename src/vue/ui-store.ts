@@ -73,6 +73,12 @@ export function togglePanelManager(): void {
     uiState.panelManagerVisible = !uiState.panelManagerVisible;
 }
 
+/** Show or hide the whole PanelManager (toolbar + panels), independent of
+ *  the toolbar's own toggle button. */
+export function setPanelManagerVisible(visible: boolean): void {
+    uiState.panelManagerVisible = visible;
+}
+
 /** Open the add/edit body panel. Add mode defaults the orbit parent to the
  *  currently selected body (handled by the editor via simStore.selectedId). */
 export function openBodyEditor(mode: 'add' | 'edit', bodyId: string | null = null): void {

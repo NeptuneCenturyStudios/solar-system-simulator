@@ -356,6 +356,7 @@ export function createPlanetBodyFromProceduralCreation(
         const tintColor = new THREE.Color(tint);
         const shift = (tintRng.next() - 0.5) * 0.08;
         tintColor.offsetHSL(shift, 0, 0);
+        body.atmosphereRadius = creation.radius * 1.07;
         body.atmosphereShell = createAtmosphereShell(
             scene,
             creation.radius * 1.07,

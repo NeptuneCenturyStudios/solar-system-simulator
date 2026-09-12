@@ -5,6 +5,7 @@ import { Body } from '../bodies/body';
 import { CelestialBody } from '../bodies/celestial-body';
 import { Supernova } from '../effects/supernova';
 import { ScreenFlashEffect } from '../effects/screen-flash';
+import { ScenarioMessageHud } from '../drawing/scenario-message-hud';
 import { PlanetaryNebula } from '../effects/planetary-nebula';
 import { GravitationalLensingEffect } from '../effects/gravitational-lensing';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
@@ -17,6 +18,7 @@ import { FlightHUD } from '../drawing/flight-hud';
 import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator';
 import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet-name-indicator';
 import { HealthBarIndicator } from '../drawing/health-bar-indicator';
+import { ThreatIndicator } from '../drawing/threat-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
 import { Wormhole } from '../bodies/wormhole';
@@ -26,6 +28,9 @@ import { BodyTypeEnum } from '../bodies/body-enums';
 import { settingsStore } from '../settings/settings-store';
 import { absorbBody, destroyBody, updateSimulation } from '../physics/physics';
 import { resolveCollision } from '../physics/collision';
+import { isBodyType } from '../utilities/utilities';
+import { EntryFlameEffect } from '../effects/entry-flame';
+import { DIST_SCALE } from '../utilities/consts';
 import {
     ISimulationState,
     IFlightState,
@@ -106,8 +111,10 @@ export interface AnimationContext {
     targetIndicator: AutopilotTargetIndicator;
     planetNameIndicator: PlanetNameIndicator;
     healthBarIndicator: HealthBarIndicator;
+    threatIndicator: ThreatIndicator;
     surfaceCam: SurfaceCameraManager;
     screenFlash: ScreenFlashEffect;
+    scenarioMessageHud: ScenarioMessageHud;
 
     // Sprites
     fpsSprite: { value: THREE.Sprite | null };
@@ -180,6 +187,102 @@ function updateShipTrail(
         dtTotal,
         cameraPos
     );
+}
+
+// TEMP DEBUG — remove once the "not visible in normal systems" issue is diagnosed.
+let _lastAtmosphereDebugLog = 0;
+
+/**
+ * Checks one body pair for atmospheric-entry containment and creates/clears an
+ * `EntryFlameEffect` on the asteroid/comet accordingly. A no-op unless one side is an
+ * Asteroid/Comet and the other is a `CelestialBody` with an atmosphere.
+ */
+function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene, ctx: AnimationContext): void {
+    const isSmallBody = (body: Body) =>
+        isBodyType(body, BodyTypeEnum.Asteroid | BodyTypeEnum.Comet | BodyTypeEnum.Satellite | BodyTypeEnum.SpaceShip);
+
+    let small: Body | null = null;
+    let planet: Body | null = null;
+    if (isSmallBody(a)) {
+        small = a;
+        planet = b;
+    } else if (isSmallBody(b)) {
+        small = b;
+        planet = a;
+    }
+    if (!small || !planet) return;
+    if (!(planet instanceof CelestialBody) || planet.atmosphereRadius == null) return;
+
+    // Compare the asteroid/comet's *leading edge* (not its center) against the
+    // atmosphere shell, so the entry window is the shell's actual thickness
+    // (atmosphereRadius - planet.radius) regardless of the small body's own size.
+    // Comparing raw center-to-center distance to atmosphereRadius would make large
+    // bodies reach hard-surface-contact distance before their center ever crosses
+    // into the (thin) atmosphere radius, so the flame would never appear for them.
+    const distance = small.mesh.position.distanceTo(planet.mesh.position);
+    const leadingEdgeDistance = distance - small.radius;
+
+    if (leadingEdgeDistance < planet.atmosphereRadius) {
+        if (!small.entryFlame) small.entryFlame = new EntryFlameEffect(scene, small, planet);
+    } else if (small.entryFlame) {
+        small.entryFlame.dispose();
+        small.entryFlame = null;
+    }
+
+    // TEMP DEBUG — remove once the "not visible in normal systems" issue is diagnosed.
+    if (isBodyType(small, BodyTypeEnum.SpaceShip) && leadingEdgeDistance < planet.atmosphereRadius * 3) {
+        const now = performance.now();
+        if (now - _lastAtmosphereDebugLog > 250) {
+            _lastAtmosphereDebugLog = now;
+            const relSpeed = small.velocity.distanceTo(planet.velocity);
+            const shipCount = ctx.simulationState.bodies.filter((body) =>
+                isBodyType(body, BodyTypeEnum.SpaceShip)
+            );
+            console.debug('[entry-flame debug] ship near atmosphere', {
+                shipId: small.id,
+                shipName: small.name,
+                activeShipId: ctx.flightState.activeShip?.id,
+                allShipIds: shipCount.map((s) => s.id),
+                planetName: planet.name,
+                leadingEdgeDistance,
+                atmosphereRadius: planet.atmosphereRadius,
+                inside: leadingEdgeDistance < planet.atmosphereRadius,
+                relativeSpeedSceneUnits: relSpeed,
+                relativeSpeedKmPerSec: relSpeed * DIST_SCALE,
+                hasEntryFlameAfterDecision: !!small.entryFlame,
+            });
+        }
+    }
+}
+
+/**
+ * Finds the closest atmosphere-bearing planet to `ship` (within 5x its atmosphere radius)
+ * and returns the ship's true closing speed relative to it, in km/s — the same quantity
+ * `EntryFlameEffect` uses to decide how bright the flame is. Used to drive the HUD's "REL"
+ * readout so it's visible on-screen alongside the ship's own forward-speed reading, which
+ * can read very differently when the ship shares velocity with the planet's orbital motion.
+ * Returns null when no atmosphere-bearing planet is nearby.
+ */
+function findRelativeSpeedInfo(
+    ship: Body,
+    bodies: Body[]
+): { planetName: string; speedKmPerSec: number } | null {
+    let closest: CelestialBody | null = null;
+    let closestDist = Infinity;
+    for (const body of bodies) {
+        if (!(body instanceof CelestialBody) || body.atmosphereRadius == null) continue;
+        const dist = ship.mesh.position.distanceTo(body.mesh.position);
+        if (dist < closestDist) {
+            closestDist = dist;
+            closest = body;
+        }
+    }
+    if (!closest || closestDist > closest.atmosphereRadius! * 5) return null;
+
+    return {
+        planetName: closest.name,
+        speedKmPerSec: ship.velocity.distanceTo(closest.velocity) * DIST_SCALE,
+    };
 }
 
 /**
@@ -503,6 +606,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 if (b1 instanceof CelestialBody) b1.updateVisuals(dtTotal, ctx.camera.position);
                 if (b1 instanceof Comet) b1.updateTail(dtTotal, ctx.camera.position);
                 if (b1 instanceof Wormhole) b1.funnelEffect.update(dtTotal);
+                if (b1.entryFlame) b1.entryFlame.update(dtTotal, ctx.camera.position);
 
                 if (b1._isDisposed || !b1.mesh) continue;
 
@@ -513,6 +617,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     // Wormholes are indestructible and never take collision damage —
                     // entrance/teleport is handled by a dedicated pass below.
                     if (b1 instanceof Wormhole || b2 instanceof Wormhole) continue;
+
+                    checkAtmosphericEntry(b1, b2, ctx.scene, ctx);
 
                     const dx = b1.mesh.position.x - b2.mesh.position.x;
                     const dy = b1.mesh.position.y - b2.mesh.position.y;
@@ -734,6 +840,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             _flightHoverCtx
         );
         ctx.healthBarIndicator.update(ctx.camera);
+        ctx.threatIndicator.update(ctx.camera);
 
         // ── E-key autopilot charge accumulation ──────────────────────────
         if (isFlightModeActive) {
@@ -979,9 +1086,11 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         // ── Render ──────────────────────────────────────────────────────────
-        // The screen flash is advanced by simulation time (dtTotal) so it scales
-        // with the time-warp setting and freezes while the simulation is paused.
+        // The screen flash and scenario message banner are advanced by simulation time
+        // (dtTotal) so they scale with the time-warp setting and freeze while the
+        // simulation is paused.
         ctx.screenFlash.update(dtTotal);
+        ctx.scenarioMessageHud.update(dtTotal);
 
         ctx.lensingEffect.beginCapture(ctx.renderer);
         try {
@@ -1065,6 +1174,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     return 0;
                 })();
                 const gRate = ship?.tempAcc?.length() ?? 0;
+                const relativeSpeedInfo = ship
+                    ? findRelativeSpeedInfo(ship, ctx.simulationState.bodies)
+                    : null;
                 spd.material.map?.dispose();
                 spd.material.map = createSpeedTexture(
                     ctx.flightState.currentSpeed,
@@ -1074,7 +1186,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     hWarp,
                     hBrake,
                     thrustRate,
-                    gRate
+                    gRate,
+                    relativeSpeedInfo
                 );
                 spd.material.needsUpdate = true;
             }

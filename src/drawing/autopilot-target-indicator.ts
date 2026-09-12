@@ -54,7 +54,12 @@ function ensureCanvas(w: number, h: number): boolean {
     return true;
 }
 
-function drawInfoPanel(name: string, distLabel: string, etaLabel: string): boolean {
+function drawInfoPanel(
+    name: string,
+    distLabel: string,
+    etaLabel: string,
+    isThreat = false
+): boolean {
     // ── 1. Measure all text ──────────────────────────────────────────────
     const measureCtx = infoCtx || document.createElement('canvas').getContext('2d')!;
 
@@ -88,16 +93,21 @@ function drawInfoPanel(name: string, distLabel: string, etaLabel: string): boole
     ctx.clearRect(0, 0, currentCanvasW, currentCanvasH);
 
     // ── 3. Background panel ──────────────────────────────────────────────
-    ctx.fillStyle = 'rgba(0, 8, 16, 0.50)';
+    const accentColor = isThreat ? '#ff3c3c' : '#00ffcc';
+    const borderColor = isThreat ? 'rgba(255, 60, 60, 0.35)' : 'rgba(0, 255, 204, 0.35)';
+    const glowColor = isThreat ? 'rgba(255, 60, 60, 0.9)' : 'rgba(0, 255, 204, 0.9)';
+    const bgColor = isThreat ? 'rgba(40, 6, 6, 0.55)' : 'rgba(0, 8, 16, 0.50)';
+
+    ctx.fillStyle = bgColor;
     ctx.fillRect(PAD, PAD, fullW - PAD * 2, fullH - PAD * 2);
 
-    // Outer border (dim cyan)
-    ctx.strokeStyle = 'rgba(0, 255, 204, 0.35)';
+    // Outer border (dim cyan, or red when the target is a threat)
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(PAD, PAD, fullW - PAD * 2, fullH - PAD * 2);
 
     // ── 4. Corner accent brackets ────────────────────────────────────────
-    ctx.strokeStyle = '#00ffcc';
+    ctx.strokeStyle = accentColor;
     ctx.lineWidth = 2;
     // top-left
     ctx.beginPath();
@@ -133,8 +143,8 @@ function drawInfoPanel(name: string, distLabel: string, etaLabel: string): boole
     // Name
     ctx.font = 'bold 38px monospace';
     ctx.shadowBlur = 14;
-    ctx.shadowColor = 'rgba(0, 255, 204, 0.9)';
-    ctx.fillStyle = '#00ffcc';
+    ctx.shadowColor = glowColor;
+    ctx.fillStyle = accentColor;
     ctx.fillText(name, cx, NAME_Y);
 
     // Distance
@@ -323,7 +333,7 @@ export class AutopilotTargetIndicator {
             etaLabel = closingSpeed > 0.001 ? formatETA(distToOrbit / closingSpeed) : 'ETA: ∞';
         }
 
-        const canvasResized = drawInfoPanel(target.name, distLabel, etaLabel);
+        const canvasResized = drawInfoPanel(target.name, distLabel, etaLabel, target.isThreat);
 
         // When the canvas is resized, the old Three.js texture may cache stale
         // backing-store data. Recreate the texture to guarantee clean output.

@@ -238,6 +238,7 @@ export function createMoonBodyFromProceduralCreation(params: {
         const tintColor = new THREE.Color(tint);
         const shift = (tintRng.next() - 0.5) * 0.08;
         tintColor.offsetHSL(shift, 0, 0);
+        body.atmosphereRadius = safeRadius * 1.07;
         body.atmosphereShell = createAtmosphereShell(
             params.scene,
             safeRadius * 1.07,

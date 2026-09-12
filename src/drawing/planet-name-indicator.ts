@@ -278,7 +278,13 @@ export class PlanetNameIndicator {
 
             // Pass ring fill only for the hovered body
             const ringFill = isFlightHoverActive && v.body === hoveredBody ? computedRingFill : -1;
-            const canvasResized = this.drawPanel(entry, v.body.name, distLabel, ringFill);
+            const canvasResized = this.drawPanel(
+                entry,
+                v.body.name,
+                distLabel,
+                ringFill,
+                v.body.isThreat
+            );
             this._applyTexture(entry, canvasResized);
             this.updateSprite(entry, uiX, uiY);
         }
@@ -300,7 +306,8 @@ export class PlanetNameIndicator {
                     this._hoverEntry,
                     hoveredBody.name,
                     distLabel,
-                    computedRingFill
+                    computedRingFill,
+                    hoveredBody.isThreat
                 );
                 this._applyTexture(this._hoverEntry, canvasResized);
                 this.updateSprite(this._hoverEntry, uiX, uiY);
@@ -428,7 +435,13 @@ export class PlanetNameIndicator {
      * @param ringFill  -1 = no ring section; 0–1 = ring visible with that fill progress.
      * Returns true if the canvas was resized (texture must be recreated).
      */
-    private drawPanel(entry: PoolEntry, name: string, distLabel: string, ringFill = -1): boolean {
+    private drawPanel(
+        entry: PoolEntry,
+        name: string,
+        distLabel: string,
+        ringFill = -1,
+        isThreat = false
+    ): boolean {
         const ctx = entry.ctx;
         const RING_SECTION_H = 60;
         const hasRing = ringFill >= 0;
@@ -470,15 +483,20 @@ export class PlanetNameIndicator {
         }
 
         // ── Background panel ──────────────────────────────────────────────
-        ctx.fillStyle = 'rgba(0, 8, 16, 0.50)';
+        const accentColor = isThreat ? '#ff3c3c' : '#00ffcc';
+        const borderColor = isThreat ? 'rgba(255, 60, 60, 0.35)' : 'rgba(0, 255, 204, 0.35)';
+        const glowColor = isThreat ? 'rgba(255, 60, 60, 0.9)' : 'rgba(0, 255, 204, 0.9)';
+        const bgColor = isThreat ? 'rgba(40, 6, 6, 0.55)' : 'rgba(0, 8, 16, 0.50)';
+
+        ctx.fillStyle = bgColor;
         ctx.fillRect(PAD, PAD, fullW - PAD * 2, totalH - PAD * 2);
 
-        ctx.strokeStyle = 'rgba(0, 255, 204, 0.35)';
+        ctx.strokeStyle = borderColor;
         ctx.lineWidth = 1.5;
         ctx.strokeRect(PAD, PAD, fullW - PAD * 2, totalH - PAD * 2);
 
         // ── Corner accent brackets ────────────────────────────────────────
-        ctx.strokeStyle = '#00ffcc';
+        ctx.strokeStyle = accentColor;
         ctx.lineWidth = 2;
         // top-left
         ctx.beginPath();
@@ -511,8 +529,8 @@ export class PlanetNameIndicator {
         ctx.textBaseline = 'middle';
         ctx.font = 'bold 32px monospace';
         ctx.shadowBlur = 12;
-        ctx.shadowColor = 'rgba(0, 255, 204, 0.9)';
-        ctx.fillStyle = '#00ffcc';
+        ctx.shadowColor = glowColor;
+        ctx.fillStyle = accentColor;
         ctx.fillText(name, cx, NAME_Y);
 
         // ── Distance — dim white ──────────────────────────────────────────

@@ -4,6 +4,7 @@ import { BodyTypeEnum } from './body-enums.js';
 import { HP_MASS_MULTIPLIER } from '../utilities/consts.js';
 import { SoundEffect, playSoundEffect } from '../utilities/audio.js';
 import { IDeathOptions } from '../interfaces.js';
+import { EntryFlameEffect } from '../effects/entry-flame.js';
 
 /**
  * This class represents the basic body that has gravitational properties, update, and die methods.
@@ -20,6 +21,8 @@ export class Body {
     label: THREE.Sprite;
     labelLine: THREE.Line | null = null;
     bodyType: BodyTypeEnum;
+    /** When true, UI overlays (name panels, off-screen markers) render this body in red to flag it as a threat. */
+    isThreat = false;
     /** Current hit-points.  Initialised from mass × HP_MASS_MULTIPLIER.
      *  Reduced by weapon impacts and collisions; reaching ≤ 0 triggers body.die(). */
     healthPoints: number;
@@ -28,6 +31,8 @@ export class Body {
     readonly maxHealthPoints: number;
     protected labelHeight = 0;
     tempAcc?: THREE.Vector3;
+    /** Backward-streaming atmospheric-entry flame, or null when this body isn't currently inside an atmosphere. */
+    entryFlame: EntryFlameEffect | null = null;
 
     /**
      * Constructs a new Body with physical and visual properties.
@@ -159,6 +164,11 @@ export class Body {
         if (this._isDisposed) return;
 
         this._isDisposed = true;
+
+        if (this.entryFlame) {
+            this.entryFlame.dispose();
+            this.entryFlame = null;
+        }
 
         // Dispose of the mesh and its resources
         if (this.mesh) {

@@ -22,6 +22,11 @@ import { C } from '../utilities/consts';
  * @param isBraking - Whether the spacecraft is actively decelerating (boost decel, warp decel, autopilot brake, or S-key braking).
  * @param shipThrustRate - The ship's effective accel/decel rate in u/s² (0 = coasting or warp-active).
  * @param gravRate - Total gravitational acceleration magnitude on the ship in u/s².
+ * @param relativeSpeedInfo - Optional { planetName, speedKmPerSec } for the nearest
+ *   atmosphere-bearing planet the ship is near — the true closing speed used by the
+ *   atmospheric-entry flame effect, which can differ substantially from `speed` (the
+ *   ship's own forward-facing absolute speed) when the ship shares velocity with the
+ *   planet's own orbital motion.
  * @returns A THREE.js texture representing the speed HUD.
  */
 export function createSpeedTexture(
@@ -32,7 +37,8 @@ export function createSpeedTexture(
     isWarp = false,
     isBraking = false,
     shipThrustRate = 0,
-    gravRate = 0
+    gravRate = 0,
+    relativeSpeedInfo?: { planetName: string; speedKmPerSec: number } | null
 ) {
     const hasExtra = !!(pos && vel);
     // Canvas is sized so that sprite scale = canvas × 0.625 matches the FPS counter pixel density.
@@ -114,11 +120,26 @@ export function createSpeedTexture(
     const useWarp = isWarp || isBoosting || Math.abs(speed) >= C;
     ctx.fillText(formatSpeed(Math.abs(speed), useWarp), W - 24, hasExtra ? 140 : 172);
 
+    // ── Relative speed to nearest atmosphere-bearing planet (debug/info readout) ──
+    let afterSpeedY = hasExtra ? 172 : 204;
+    if (relativeSpeedInfo) {
+        ctx.font = '24px monospace';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.shadowColor = 'rgba(255,255,255,0.5)';
+        ctx.fillText(
+            `REL ${relativeSpeedInfo.planetName}: ${relativeSpeedInfo.speedKmPerSec.toFixed(1)} km/s`,
+            W - 24,
+            afterSpeedY
+        );
+        afterSpeedY += 34;
+    }
+
     if (hasExtra) {
         const lh = 56; // canvas-pixel line height for data rows
 
         // ── Position ──────────────────────────────────────────────────────────
-        let y = 214;
+        let y = afterSpeedY + 10;
         ctx.shadowBlur = 8;
         ctx.font = '32px monospace';
         ctx.fillStyle = dim;

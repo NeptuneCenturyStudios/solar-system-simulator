@@ -53,6 +53,8 @@ export class CelestialBody extends Body {
     clouds: THREE.Mesh | null = null;
     cloudRotationSpeed: number = 0;
     atmosphereShell: AtmosphereShellHandle | null = null;
+    /** Radius of this body's atmosphere in scene units, or null when it has none. */
+    atmosphereRadius: number | null = null;
 
     /**
      * Polar aurora curtains, or null when this body doesn't qualify for them.
@@ -144,6 +146,7 @@ export class CelestialBody extends Body {
 
         // Create the atmosphere shell if atmosphere options were provided
         if (options.atmosphere) {
+            this.atmosphereRadius = options.atmosphere.radius * 1.2;
             this.atmosphereShell = createAtmosphereShell(
                 scene,
                 options.atmosphere.radius,
