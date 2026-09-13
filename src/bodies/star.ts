@@ -118,8 +118,14 @@ export class Star extends CelestialBody {
         // TODO: Move mesh creation to MainSequenceStar and other derived classes.
         if (!options.mesh) {
             const geometry = buildBodySphereGeometry(options.radius);
+            // No `map`/diffuse color: the surface is driven entirely by `emissiveMap`, which
+            // isn't affected by scene lighting. Binding the same texture to `map` used to let
+            // the scene's ambient lights add an extra texture-shaped contribution on top of the
+            // emissive term, pushing already-bright texture pixels (solar flare highlights) past
+            // 1.0 while leaving darker pixels untouched — producing a hard clipped edge around
+            // those highlights instead of the soft, feathered look they have in the source
+            // texture. Emissive-only rendering reproduces the texture as authored.
             const starMaterial = new THREE.MeshPhongMaterial({
-                map: textures.sunTexture,
                 color: 0xffffff,
                 emissive: 0xffffff,
                 emissiveMap: textures.sunTexture,
@@ -286,7 +292,10 @@ export class Star extends CelestialBody {
             intensity = midTempIntensity - progress * (midTempIntensity - highTempIntensity);
         }
 
-        return Math.max(0, Math.min(2.0, intensity));
+        // Capped at 1.0 so the emissive multiply never amplifies the surface texture past its
+        // own source brightness. The renderer has no tone mapping, so any value above 1.0 here
+        // hard-clips bright texture pixels to solid white instead of rolling off smoothly.
+        return Math.max(0, Math.min(1.0, intensity));
     }
 
     createLight(pos: THREE.Vector3, intensity: number, distance: number) {

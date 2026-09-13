@@ -19,6 +19,7 @@ import { SolarFlare, SolarFlareType } from '../effects/solar-flare';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { Corona } from '../effects/corona';
 import { StarGlow } from '../effects/star-glow';
+import { GlowDisk } from '../effects/glow-disk';
 import { StarLensflare } from '../effects/star-lensflare';
 import { BodyTypeEnum } from './body-enums';
 import { settingsStore } from '../settings/settings-store';
@@ -53,6 +54,7 @@ export class MainSequenceStar extends Star {
     _nextFlareInterval: number;
     corona: Corona | null;
     sunGlow: StarGlow | null;
+    glowDisk: GlowDisk | null;
 
     constructor(
         dependencies: IStateDependencies,
@@ -72,6 +74,13 @@ export class MainSequenceStar extends Star {
 
         this.corona = new Corona(dependencies, scene, options.radius + 1, this.baseColor.getHex());
         this.sunGlow = new StarGlow(
+            dependencies,
+            scene,
+            options.radius,
+            this.baseColor.getHex(),
+            this.mesh.position
+        );
+        this.glowDisk = new GlowDisk(
             dependencies,
             scene,
             options.radius,
@@ -182,6 +191,11 @@ export class MainSequenceStar extends Star {
             this.sunGlow.update(dtTotal);
         }
 
+        if (this.glowDisk) {
+            this.glowDisk.setPosition(this.mesh.position);
+            this.glowDisk.update(dtTotal);
+        }
+
         // Solar flare timer
         if (!(this.bodyType & BodyTypeEnum.BrownDwarf) && !this._isDisposed) {
             this._solarFlareTimer += dtTotal;
@@ -210,6 +224,9 @@ export class MainSequenceStar extends Star {
         if (this.sunGlow) {
             this.sunGlow.setRadius(newRadius);
         }
+        if (this.glowDisk) {
+            this.glowDisk.setRadius(newRadius);
+        }
         this._syncBaselineRadiusIfStable();
     }
 
@@ -218,6 +235,15 @@ export class MainSequenceStar extends Star {
             if (this.sunGlow) {
                 this.sunGlow.dispose();
                 this.sunGlow = null;
+            }
+        } catch {
+            // ignore
+        }
+
+        try {
+            if (this.glowDisk) {
+                this.glowDisk.dispose();
+                this.glowDisk = null;
             }
         } catch {
             // ignore
@@ -259,7 +285,6 @@ export class MainSequenceStar extends Star {
 
         if (map) {
             const material = this.mesh.material as THREE.MeshPhongMaterial;
-            material.map = map;
             material.emissiveMap = map;
             material.needsUpdate = true;
         }
@@ -274,6 +299,14 @@ export class MainSequenceStar extends Star {
         if (this.sunGlow) {
             try {
                 this.sunGlow.setColor(glowHex);
+            } catch {
+                // ignore
+            }
+        }
+
+        if (this.glowDisk) {
+            try {
+                this.glowDisk.setColor(glowHex);
             } catch {
                 // ignore
             }
@@ -490,6 +523,11 @@ export class MainSequenceStar extends Star {
             this.sunGlow = null;
         }
 
+        if (this.glowDisk) {
+            this.glowDisk.dispose();
+            this.glowDisk = null;
+        }
+
         if (this.lensflare) {
             this.lensflare.dispose();
             this.lensflare = null;
@@ -533,6 +571,17 @@ export class MainSequenceStar extends Star {
         // Restore glow.
         if (!this.sunGlow) {
             this.sunGlow = new StarGlow(
+                this.dependencies,
+                this.scene,
+                this.radius,
+                this.baseColor.getHex(),
+                this.mesh.position
+            );
+        }
+
+        // Restore glow disk.
+        if (!this.glowDisk) {
+            this.glowDisk = new GlowDisk(
                 this.dependencies,
                 this.scene,
                 this.radius,
