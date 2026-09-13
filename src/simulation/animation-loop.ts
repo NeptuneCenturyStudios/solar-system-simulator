@@ -55,11 +55,9 @@ import {
     FREE_CAM_BOOST_SPEED,
     FLIGHT_AUTOPILOT_CHARGE_TIME,
 } from '../utilities/consts';
-import {
-    createFPSTexture,
-    createSpeedTexture,
-    createStatsTexture,
-} from '../drawing/text-rendering';
+import { paintFPS, type SpeedHudParams } from '../drawing/text-rendering';
+import type { HudSprite } from '../drawing/hud/hud-sprite';
+import type { ScreenProjector } from '../drawing/hud/screen-projection';
 import { interactionState, simulationState, cameraState } from './simulation';
 import { exitFlightMode, updateFlightControls } from './flight-controllers';
 import { stepNpcShips } from './ai/npc-manager';
@@ -116,10 +114,14 @@ export interface AnimationContext {
     screenFlash: ScreenFlashEffect;
     scenarioMessageHud: ScenarioMessageHud;
 
-    // Sprites
-    fpsSprite: { value: THREE.Sprite | null };
-    statsSprite: { value: THREE.Sprite | null };
-    speedSprite: { value: THREE.Sprite | null };
+    // Overlay HUD
+    /** Shared body→screen projector for the overlay indicators; primed once per frame. */
+    screenProjector: ScreenProjector;
+    fpsSprite: HudSprite;
+    statsSprite: HudSprite;
+    refreshStatsSprite: (body: Body) => void;
+    speedSprite: HudSprite;
+    refreshSpeedSprite: (params: SpeedHudParams) => void;
 
     // Keyboard state (from cameraState.keys)
     keys: {
@@ -257,6 +259,16 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
     const _cameraVel = new THREE.Vector3();
     // Pre-substep position snapshot, used for the swept wormhole-entrance test.
     const _wormholePrevPositions = new Map<string, THREE.Vector3>();
+    // Flight hover context for the name indicator; fields are overwritten each frame.
+    const _flightHoverCtx: IPlanetNameFlightContext = {
+        isActive: true,
+        steeringLineVisible: false,
+        steeringTipX: 0,
+        steeringTipY: 0,
+        autopilotCharge: 0,
+        chargeTime: FLIGHT_AUTOPILOT_CHARGE_TIME,
+        activeShip: null,
+    };
 
     let fpsLastUpdate = 0;
     let lastT = performance.now();
@@ -778,26 +790,22 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         // ── Planet name indicators (replaces old text labels) ───────────
-        const _flightHoverCtx: IPlanetNameFlightContext | undefined = isFlightModeActive
-            ? {
-                  isActive: true,
-                  steeringLineVisible: ctx.flightSteeringLine.visible,
-                  steeringTipX: ctx.steeringLinePositions[3],
-                  steeringTipY: ctx.steeringLinePositions[4],
-                  autopilotCharge: ctx.flightState.autopilotCharge,
-                  chargeTime: FLIGHT_AUTOPILOT_CHARGE_TIME,
-                  activeShip: ctx.flightState.activeShip,
-              }
-            : undefined;
-        ctx.planetNameIndicator.update(
-            ctx.camera,
-            _cameraVel,
-            false,
-            ctx.autopilotState,
-            _flightHoverCtx
-        );
-        ctx.healthBarIndicator.update(ctx.camera);
-        ctx.threatIndicator.update(ctx.camera);
+        // One reused context object instead of a fresh literal every frame.
+        let flightHoverCtx: IPlanetNameFlightContext | undefined;
+        if (isFlightModeActive) {
+            _flightHoverCtx.steeringLineVisible = ctx.flightSteeringLine.visible;
+            _flightHoverCtx.steeringTipX = ctx.steeringLinePositions[3];
+            _flightHoverCtx.steeringTipY = ctx.steeringLinePositions[4];
+            _flightHoverCtx.autopilotCharge = ctx.flightState.autopilotCharge;
+            _flightHoverCtx.activeShip = ctx.flightState.activeShip;
+            flightHoverCtx = _flightHoverCtx;
+        }
+
+        // Tan(fov/2) and the viewport half-sizes are computed once here for all indicators.
+        ctx.screenProjector.beginFrame(ctx.camera);
+        ctx.planetNameIndicator.update(ctx.screenProjector, ctx.autopilotState, flightHoverCtx);
+        ctx.healthBarIndicator.update(ctx.screenProjector);
+        ctx.threatIndicator.update(ctx.screenProjector);
 
         // ── E-key autopilot charge accumulation ──────────────────────────
         if (isFlightModeActive) {
@@ -1049,36 +1057,15 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.screenFlash.update(dtTotal);
         ctx.scenarioMessageHud.update(dtTotal);
 
-        ctx.lensingEffect.beginCapture(ctx.renderer);
-        try {
-            ctx.renderer.render(ctx.scene, ctx.camera);
-        } catch (e) {
-            console.error('Error during rendering:', e);
-        }
-        const activeBHs = ctx.simulationState.bodies.filter(
-            (b) => !b._isDisposed && !!(b.bodyType & BodyTypeEnum.BlackHole)
-        );
-        ctx.lensingEffect.applyLensing(
-            ctx.renderer,
-            ctx.camera,
-            activeBHs.map((b) => ({ position: b.mesh.position, radius: b.radius }))
-        );
-        ctx.renderer.autoClear = false;
-        ctx.renderer.clearDepth();
-        ctx.renderer.render(ctx.uiScene, ctx.uiCamera);
-        ctx.renderer.autoClear = true;
-
         // ── HUD sprites (FPS / stats / speed) ──────────────────────────────
+        // Updated BEFORE the overlay render below. This block used to run after it,
+        // so every HUD readout showed the previous frame's values.
         if (now - fpsLastUpdate > 100) {
             const fps = Math.round(1000 / (now - lastT));
-            if (ctx.fpsSprite.value) {
-                ctx.fpsSprite.value.material.map?.dispose();
-                ctx.fpsSprite.value.material.map = createFPSTexture(fps);
-                ctx.fpsSprite.value.material.needsUpdate = true;
-            }
+            ctx.fpsSprite.draw(String(fps), (c) => paintFPS(c, fps));
 
-            const spd = ctx.speedSprite.value;
-            if (spd && spd.visible && ctx.flightState.isActive) {
+            const spd = ctx.speedSprite;
+            if (spd.visible && ctx.flightState.isActive) {
                 const ship = ctx.flightState.activeShip;
                 const h = ship?.handling;
                 const hWarp =
@@ -1132,34 +1119,25 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 })();
 
                 const gRate = ship?.tempAcc?.length() ?? 0;
-                
-                spd.material.map?.dispose();
-                spd.material.map = createSpeedTexture(
-                    ctx.flightState.currentSpeed,
-                    hBoost,
-                    ship?.mesh?.position,
-                    ship?.velocity,
-                    hWarp,
-                    hBrake,
-                    thrustRate,
-                    gRate
-                );
-                spd.material.needsUpdate = true;
+
+                ctx.refreshSpeedSprite({
+                    speed: ctx.flightState.currentSpeed,
+                    isBoosting: hBoost,
+                    pos: ship?.mesh?.position,
+                    vel: ship?.velocity,
+                    isWarp: !!hWarp,
+                    isBraking: !!hBrake,
+                    shipThrustRate: thrustRate,
+                    gravRate: gRate,
+                });
             }
 
             const sel = ctx.selectedBody.value;
-            if (
-                sel &&
-                ctx.simulationState.bodies.includes(sel) &&
-                !sel._isDisposed &&
-                ctx.statsSprite.value
-            ) {
-                ctx.statsSprite.value.material.map?.dispose();
-                ctx.statsSprite.value.material.map = createStatsTexture(sel);
-                ctx.statsSprite.value.material.needsUpdate = true;
-                ctx.statsSprite.value.visible = true;
-            } else if (ctx.statsSprite.value) {
-                ctx.statsSprite.value.visible = false;
+            if (sel && ctx.simulationState.bodies.includes(sel) && !sel._isDisposed) {
+                ctx.refreshStatsSprite(sel);
+                ctx.statsSprite.visible = true;
+            } else {
+                ctx.statsSprite.visible = false;
             }
 
             ctx.flightHUD.updateAutopilotHUD((now - lastT) / 1000);
@@ -1167,8 +1145,32 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             fpsLastUpdate = now;
         }
 
-        // Updates done per frame (for certain indicators that track objects or for other reasons)
-        ctx.targetIndicator.update(ctx.camera);
+        // Per-frame target tracking, also moved ahead of the overlay render. The camera may
+        // have moved since the indicators were projected earlier in the frame (flight camera,
+        // orbit controls), so refresh its matrices and re-prime the projector first.
+        ctx.camera.updateMatrixWorld();
+        ctx.screenProjector.beginFrame(ctx.camera);
+        ctx.targetIndicator.update(ctx.screenProjector);
+
+        // ── Render ──────────────────────────────────────────────────────────
+        ctx.lensingEffect.beginCapture(ctx.renderer);
+        try {
+            ctx.renderer.render(ctx.scene, ctx.camera);
+        } catch (e) {
+            console.error('Error during rendering:', e);
+        }
+        const activeBHs = ctx.simulationState.bodies.filter(
+            (b) => !b._isDisposed && !!(b.bodyType & BodyTypeEnum.BlackHole)
+        );
+        ctx.lensingEffect.applyLensing(
+            ctx.renderer,
+            ctx.camera,
+            activeBHs.map((b) => ({ position: b.mesh.position, radius: b.radius }))
+        );
+        ctx.renderer.autoClear = false;
+        ctx.renderer.clearDepth();
+        ctx.renderer.render(ctx.uiScene, ctx.uiCamera);
+        ctx.renderer.autoClear = true;
 
         lastT = now;
     }

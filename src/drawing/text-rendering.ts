@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { getBodyTypeLabel } from '../utilities/utilities';
 import { Body } from '../bodies/body';
-// import { CelestialBody } from '../bodies/celestial-body';
 import { Star } from '../bodies/star';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { Moon } from '../bodies/moon';
@@ -12,38 +11,53 @@ import { environmentState } from '../simulation/environment-state';
 import { formatMass, formatRadius, formatSpeed } from '../utilities/display-format';
 import { C } from '../utilities/consts';
 
+// These are painters for persistent HudSprite canvases, not texture factories. Each used to
+// build a new canvas and CanvasTexture on every call — ten times a second for all three.
+
+// ── Canvas sizes ─────────────────────────────────────────────────────────────
+
+// Speed canvas is sized so that sprite scale = canvas × 0.625 matches the FPS counter pixel
+// density: 640×640 canvas → 400×400 sprite pixels on screen.
+export const SPEED_CANVAS_W = 640;
+export const FPS_CANVAS_W = 256;
+export const FPS_CANVAS_H = 64;
+export const STATS_CANVAS_W = 700;
+export const STATS_CANVAS_H = 700;
+
+/** Speed canvas height — taller when the position/velocity rows are shown. */
+export function speedCanvasHeight(hasExtra: boolean): number {
+    return hasExtra ? 640 : 240;
+}
+
+export interface SpeedHudParams {
+    /** The current speed of the spacecraft. */
+    speed: number;
+    /** Whether the spacecraft is currently boosting. */
+    isBoosting: boolean;
+    /** Optional position vector of the spacecraft. */
+    pos?: THREE.Vector3;
+    /** Optional velocity vector of the spacecraft. */
+    vel?: THREE.Vector3;
+    /** Whether the spacecraft is in warp mode. */
+    isWarp: boolean;
+    /** Whether the spacecraft is actively decelerating (boost decel, warp decel, autopilot brake, or S-key braking). */
+    isBraking: boolean;
+    /** The ship's effective accel/decel rate in u/s² (0 = coasting or warp-active). */
+    shipThrustRate: number;
+    /** Total gravitational acceleration magnitude on the ship in u/s². */
+    gravRate: number;
+}
+
 /**
- * Flight speed HUD texture — drawn in the same style as the FPS counter
- * @param speed - The current speed of the spacecraft.
- * @param isBoosting - Whether the spacecraft is currently boosting.
- * @param pos - Optional position vector of the spacecraft.
- * @param vel - Optional velocity vector of the spacecraft.
- * @param isWarp - Whether the spacecraft is in warp mode.
- * @param isBraking - Whether the spacecraft is actively decelerating (boost decel, warp decel, autopilot brake, or S-key braking).
- * @param shipThrustRate - The ship's effective accel/decel rate in u/s² (0 = coasting or warp-active).
- * @param gravRate - Total gravitational acceleration magnitude on the ship in u/s².
- * @returns A THREE.js texture representing the speed HUD.
+ * Flight speed HUD — drawn in the same style as the FPS counter.
+ * The canvas must already be sized to `SPEED_CANVAS_W × speedCanvasHeight(hasExtra)`.
  */
-export function createSpeedTexture(
-    speed: number,
-    isBoosting: boolean,
-    pos?: THREE.Vector3,
-    vel?: THREE.Vector3,
-    isWarp = false,
-    isBraking = false,
-    shipThrustRate = 0,
-    gravRate = 0
-) {
+export function paintSpeed(ctx: CanvasRenderingContext2D, params: SpeedHudParams): void {
+    const { speed, isBoosting, pos, vel, isWarp, isBraking, shipThrustRate, gravRate } = params;
     const hasExtra = !!(pos && vel);
-    // Canvas is sized so that sprite scale = canvas × 0.625 matches the FPS counter pixel density.
-    // 640×640 canvas → 400×400 sprite pixels on screen.
-    const W = 640;
-    const H = hasExtra ? 640 : 240;
-    const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    const W = SPEED_CANVAS_W;
+    const H = speedCanvasHeight(hasExtra);
+    ctx.clearRect(0, 0, W, H);
 
     const color = isWarp ? '#ff4488' : isBraking ? '#ff6644' : isBoosting ? '#ff9944' : '#00ffcc';
     const glow = isWarp
@@ -82,7 +96,7 @@ export function createSpeedTexture(
         ctx.shadowBlur = 0;
 
         const thrustStr = shipThrustRate.toFixed(1);
-        const sepStr = '  \u2014  '; // em-dash separator
+        const sepStr = '  —  '; // em-dash separator
         const gravStr = gravRate.toFixed(1);
 
         const gravColor = gravRate > shipThrustRate + 0.001 ? '#ff4444' : 'rgba(200,200,200,0.45)';
@@ -114,7 +128,7 @@ export function createSpeedTexture(
     const useWarp = isWarp || isBoosting || Math.abs(speed) >= C;
     ctx.fillText(formatSpeed(Math.abs(speed), useWarp), W - 24, hasExtra ? 140 : 172);
 
-    if (hasExtra) {
+    if (pos && vel) {
         const lh = 56; // canvas-pixel line height for data rows
 
         // ── Position ──────────────────────────────────────────────────────────
@@ -130,11 +144,11 @@ export function createSpeedTexture(
         ctx.font = '34px monospace';
         ctx.fillStyle = color;
         ctx.shadowColor = glow;
-        ctx.fillText(`X  ${pos!.x.toFixed(1)}`, W - 24, y);
+        ctx.fillText(`X  ${pos.x.toFixed(1)}`, W - 24, y);
         y += lh;
-        ctx.fillText(`Y  ${pos!.y.toFixed(1)}`, W - 24, y);
+        ctx.fillText(`Y  ${pos.y.toFixed(1)}`, W - 24, y);
         y += lh;
-        ctx.fillText(`Z  ${pos!.z.toFixed(1)}`, W - 24, y);
+        ctx.fillText(`Z  ${pos.z.toFixed(1)}`, W - 24, y);
         y += lh + 12;
 
         // ── Velocity ──────────────────────────────────────────────────────────
@@ -149,31 +163,17 @@ export function createSpeedTexture(
         ctx.font = '34px monospace';
         ctx.fillStyle = color;
         ctx.shadowColor = glow;
-        ctx.fillText(`X  ${vel!.x.toFixed(2)}`, W - 24, y);
+        ctx.fillText(`X  ${vel.x.toFixed(2)}`, W - 24, y);
         y += lh;
-        ctx.fillText(`Y  ${vel!.y.toFixed(2)}`, W - 24, y);
+        ctx.fillText(`Y  ${vel.y.toFixed(2)}`, W - 24, y);
         y += lh;
-        ctx.fillText(`Z  ${vel!.z.toFixed(2)}`, W - 24, y);
+        ctx.fillText(`Z  ${vel.z.toFixed(2)}`, W - 24, y);
     }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    return texture;
 }
 
-/**
- * Creates a texture displaying the current FPS.
- * @param fps - The current frames per second.
- * @returns A THREE.js texture representing the FPS.
- */
-export function createFPSTexture(fps: number) {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) return null;
-
-    // Set canvas size
-    canvas.width = 256;
-    canvas.height = 64;
+/** Draw the current FPS. The canvas must already be `FPS_CANVAS_W × FPS_CANVAS_H`. */
+export function paintFPS(context: CanvasRenderingContext2D, fps: number): void {
+    context.clearRect(0, 0, FPS_CANVAS_W, FPS_CANVAS_H);
 
     // Setup text style (monospace for numbers)
     context.font = '27px monospace';
@@ -185,228 +185,167 @@ export function createFPSTexture(fps: number) {
     context.shadowColor = 'rgba(0, 255, 204, 0.8)';
     context.shadowBlur = 8;
 
-    // Draw text
-    context.fillText(`FPS: ${fps}`, canvas.width - 10, canvas.height / 2);
+    context.fillText(`FPS: ${fps}`, FPS_CANVAS_W - 10, FPS_CANVAS_H / 2);
+}
 
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
+// ── Stats panel ──────────────────────────────────────────────────────────────
 
-    return texture;
+const STATS_LINE_HEIGHT = 40;
+const STATS_RIGHT_PADDING = 10;
+
+/** Intl formatters are expensive to construct, so one is kept per fraction-digit combination. */
+const numberFormatters = new Map<string, Intl.NumberFormat>();
+
+function getNumberFormatter(minimumFractionDigits: number, maximumFractionDigits: number) {
+    const key = `${minimumFractionDigits}|${maximumFractionDigits}`;
+    let formatter = numberFormatters.get(key);
+    if (!formatter) {
+        formatter = new Intl.NumberFormat(undefined, {
+            minimumFractionDigits,
+            maximumFractionDigits,
+        });
+        numberFormatters.set(key, formatter);
+    }
+    return formatter;
+}
+
+/** Format numbers with locale separators, and scientific notation for very small values. */
+function formatNumber(
+    num: number,
+    options: { minimumFractionDigits?: number; maximumFractionDigits?: number } = {}
+): string {
+    const { minimumFractionDigits = 2, maximumFractionDigits = 2 } = options;
+
+    if (!Number.isFinite(num)) return '—';
+    // The original formatted zero with a default Intl.NumberFormat, which is (0, 3) digits.
+    if (num === 0) return getNumberFormatter(0, 3).format(0);
+
+    if (Math.abs(num) < 0.01) {
+        return num.toExponential(2);
+    }
+
+    return getNumberFormatter(minimumFractionDigits, maximumFractionDigits).format(num);
+}
+
+/** Draw label + value right-aligned (normal font weight). */
+function drawStat(ctx: CanvasRenderingContext2D, label: string, value: string, y: number): void {
+    ctx.font = '27px monospace';
+    ctx.fillText(label + value, STATS_CANVAS_W - STATS_RIGHT_PADDING, y);
+}
+
+function planetSubTypeLabel(planetType: PlanetTypeEnum): string {
+    switch (planetType) {
+        case PlanetTypeEnum.GasGiant:
+            return 'Gas Giant';
+        case PlanetTypeEnum.IceGiant:
+            return 'Ice Giant';
+        case PlanetTypeEnum.Terrestrial:
+            return 'Terrestrial';
+        case PlanetTypeEnum.Volcanic:
+            return 'Volcanic';
+        case PlanetTypeEnum.Ocean:
+            return 'Ocean';
+        case PlanetTypeEnum.Frozen:
+            return 'Frozen';
+        case PlanetTypeEnum.Desert:
+            return 'Desert';
+        case PlanetTypeEnum.Temperate:
+            return 'Temperate';
+        default:
+            return 'Unknown';
+    }
+}
+
+function moonSubTypeLabel(moonType: MoonTypeEnum): string {
+    switch (moonType) {
+        case MoonTypeEnum.Terrestrial:
+            return 'Terrestrial';
+        case MoonTypeEnum.Temperate:
+            return 'Temperate';
+        case MoonTypeEnum.Volcanic:
+            return 'Volcanic';
+        case MoonTypeEnum.Ocean:
+            return 'Ocean';
+        case MoonTypeEnum.Frozen:
+            return 'Frozen';
+        case MoonTypeEnum.Desert:
+            return 'Desert';
+        default:
+            return 'Unknown';
+    }
 }
 
 /**
- * Creates a texture displaying detailed stats about a celestial body, such as mass, radius, velocity, etc.
- * @param body - The celestial body for which to create the stats texture.
- * @returns A THREE.js texture representing the stats of the body.
+ * Draw detailed stats about a celestial body, such as mass, radius, velocity, etc.
+ * The canvas must already be `STATS_CANVAS_W × STATS_CANVAS_H`.
  */
-export function createStatsTexture(body: Body) {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) return null;
-
-    // Set canvas size
-    canvas.width = 700;
-    // Increased height to fit Planet Type stat if needed
-    canvas.height = 700;
+export function paintStats(context: CanvasRenderingContext2D, body: Body): void {
+    context.clearRect(0, 0, STATS_CANVAS_W, STATS_CANVAS_H);
 
     // Setup text style
     context.fillStyle = '#aaaaaa'; // Light gray
     context.textAlign = 'right';
     context.textBaseline = 'top';
+    // A fresh canvas started with no shadow; a reused one must be told explicitly.
+    context.shadowBlur = 0;
 
-    const lineHeight = 40;
-    const rightPadding = 10;
     let y = 5;
+    const row = (label: string, value: string): void => {
+        drawStat(context, label, value, y);
+        y += STATS_LINE_HEIGHT;
+    };
 
-    // Helper function to format numbers with locale separators and scientific notation for very small values
-    function formatNumber(
-        num: number,
-        options: { minimumFractionDigits?: number; maximumFractionDigits?: number } = {}
-    ) {
-        const { minimumFractionDigits = 2, maximumFractionDigits = 2 } = options;
-
-        if (!Number.isFinite(num)) return '—';
-        if (num === 0) return new Intl.NumberFormat().format(0);
-
-        const absNum = Math.abs(num);
-        if (absNum < 0.01) {
-            return num.toExponential(2);
-        }
-
-        return new Intl.NumberFormat(undefined, {
-            minimumFractionDigits,
-            maximumFractionDigits,
-        }).format(num);
-    }
-
-    // Helper function to draw label + value right-aligned (normal font weight)
-    function drawStat(label: string, value: string | number, yPos: number) {
-        if (!context) return;
-        context.font = '27px monospace';
-        const text = label + value;
-        context.fillText(text, canvas.width - rightPadding, yPos);
-    }
-
-    // (duplicate getBodyTypeLabel removed; use the shared version below)
-
-    // Name
-    drawStat('Name: ', body.name, y);
-    y += lineHeight;
-
-    // Body Type
-    drawStat('Type: ', getBodyTypeLabel(body), y);
-    y += lineHeight;
+    row('Name: ', body.name);
+    row('Type: ', getBodyTypeLabel(body));
 
     // Planet / Moon Type (shows the "sub type" like planets already do)
     if (body instanceof Planet || body instanceof DwarfPlanet) {
-        // Map enum/string to display label
-        let planetTypeLabel: string;
-
-        switch (body.planetType) {
-            case PlanetTypeEnum.GasGiant:
-                planetTypeLabel = 'Gas Giant';
-                break;
-            case PlanetTypeEnum.IceGiant:
-                planetTypeLabel = 'Ice Giant';
-                break;
-            case PlanetTypeEnum.Terrestrial:
-                planetTypeLabel = 'Terrestrial';
-                break;
-            case PlanetTypeEnum.Volcanic:
-                planetTypeLabel = 'Volcanic';
-                break;
-            case PlanetTypeEnum.Ocean:
-                planetTypeLabel = 'Ocean';
-                break;
-            case PlanetTypeEnum.Frozen:
-                planetTypeLabel = 'Frozen';
-                break;
-            case PlanetTypeEnum.Desert:
-                planetTypeLabel = 'Desert';
-                break;
-            case PlanetTypeEnum.Temperate:
-                planetTypeLabel = 'Temperate';
-                break;
-            default:
-                planetTypeLabel = 'Unknown';
-        }
-
-        drawStat('Sub Type: ', planetTypeLabel, y);
-        y += lineHeight;
+        row('Sub Type: ', planetSubTypeLabel(body.planetType));
     } else if (body instanceof Moon) {
-        let moonTypeLabel: string;
-        switch (body.moonType) {
-            case MoonTypeEnum.Terrestrial:
-                moonTypeLabel = 'Terrestrial';
-                break;
-            case MoonTypeEnum.Temperate:
-                moonTypeLabel = 'Temperate';
-                break;
-            case MoonTypeEnum.Volcanic:
-                moonTypeLabel = 'Volcanic';
-                break;
-            case MoonTypeEnum.Ocean:
-                moonTypeLabel = 'Ocean';
-                break;
-            case MoonTypeEnum.Frozen:
-                moonTypeLabel = 'Frozen';
-                break;
-            case MoonTypeEnum.Desert:
-                moonTypeLabel = 'Desert';
-                break;
-            default:
-                moonTypeLabel = 'Unknown';
-        }
-
-        drawStat('Sub Type: ', moonTypeLabel, y);
-        y += lineHeight;
+        row('Sub Type: ', moonSubTypeLabel(body.moonType));
     }
 
-    // Mass
-    drawStat('Mass: ', formatMass(body.mass), y);
-    y += lineHeight;
-
-    // Radius
-    if (body instanceof Body) {
-        drawStat('Radius: ', formatRadius(body.radius), y);
-        y += lineHeight;
-    }
+    row('Mass: ', formatMass(body.mass));
+    row('Radius: ', formatRadius(body.radius));
 
     // Temperature (for stars and stellar remnants)
     if (body instanceof Star) {
-        drawStat(
+        row(
             'Temperature: ',
             formatNumber(body.temperature, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-                'K',
-            y
+                'K'
         );
-        y += lineHeight;
     }
 
     // Fuel (for stars with fuel system, only if star death is enabled)
-    const starDeathEnabled = environmentState.starDeathEnabled;
     if (
-        starDeathEnabled &&
+        environmentState.starDeathEnabled &&
         body instanceof MainSequenceStar &&
         body.fuel !== null &&
         body.maxFuel !== null
     ) {
-        const fuelPercent = ((body.fuel / body.maxFuel) * 100).toFixed(1);
-        drawStat('Fuel: ', `${fuelPercent}%`, y);
-        y += lineHeight;
+        row('Fuel: ', `${((body.fuel / body.maxFuel) * 100).toFixed(1)}%`);
     }
 
-    // Position
     const pos = body.mesh.position;
-    drawStat('Position: ', `(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})`, y);
-    y += lineHeight;
+    row('Position: ', `(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})`);
 
-    // Velocity
     const vel = body.velocity;
-    drawStat('Velocity: ', `(${vel.x.toFixed(2)}, ${vel.y.toFixed(2)}, ${vel.z.toFixed(2)})`, y);
-    y += lineHeight;
+    row('Velocity: ', `(${vel.x.toFixed(2)}, ${vel.y.toFixed(2)}, ${vel.z.toFixed(2)})`);
 
     // Speed (velocity magnitude)
     const speed = vel.length();
-    drawStat('Speed: ', formatSpeed(speed, speed >= C), y);
-    y += lineHeight;
+    row('Speed: ', formatSpeed(speed, speed >= C));
 
     // Net gravitational force (force experienced FROM other bodies, F = m * a)
     if (body.tempAcc) {
-        const netForce = body.tempAcc.length() * body.mass;
-        drawStat('Net Force: ', formatNumber(netForce), y);
-        y += lineHeight;
+        row('Net Force: ', formatNumber(body.tempAcc.length() * body.mass));
     }
-
-    // // Total gravitational force exerted ON other bodies
-    // let totalForceExerted = 0;
-    // for (const other of bodiesArray) {
-    //     if (other !== body && !other?._isDisposed && other.mesh) {
-    //         const diff = new THREE.Vector3().subVectors(other.mesh.position, body.mesh.position);
-    //         const r = diff.length();
-    //         if (r > 0.01) {
-    //             const force = (G * simulationState.gMultiplier * body.mass * other.mass) / (r * r);
-    //             totalForceExerted += force;
-    //         }
-    //     }
-    // }
-    // drawStat('Grav Output: ', formatNumber(totalForceExerted), y);
-    // y += lineHeight;
 
     // Orbital inclination (angle of velocity from xy-plane, in degrees)
     const velXY = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
-    const inclination = Math.atan2(vel.z, velXY) * (180 / Math.PI);
-    drawStat('Inclination: ', inclination.toFixed(1) + '°', y);
-    y += lineHeight;
+    row('Inclination: ', (Math.atan2(vel.z, velXY) * (180 / Math.PI)).toFixed(1) + '°');
 
     // Longitude (angle in xy-plane, in degrees)
-    const longitude = Math.atan2(pos.y, pos.x) * (180 / Math.PI);
-    drawStat('Longitude: ', longitude.toFixed(1) + '°', y);
-
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-
-    return texture;
+    row('Longitude: ', (Math.atan2(pos.y, pos.x) * (180 / Math.PI)).toFixed(1) + '°');
 }

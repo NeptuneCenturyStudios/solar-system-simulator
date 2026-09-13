@@ -3,10 +3,11 @@ import { Body } from '../bodies/body';
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
-    TEXT_SPRITE_Z,
 } from '../utilities/consts';
 import { formatDistance } from '../utilities/display-format';
 import { IAutopilotState } from '../interfaces';
+import { HudSprite } from './hud/hud-sprite';
+import { drawGaugeTrack } from './hud/hud-paint';
 
 export type AutopilotHudState =
     | 'ALIGN'
@@ -23,16 +24,29 @@ export type AutopilotHudState =
 // Fixed pixel offset to the right of the gray steering-origin ring (radius ~120-124px).
 const THERMAL_GAUGE_OFFSET_X = 160;
 
-// ── Private texture-creator helpers ──────────────────────────────────────────
+// ── Canvas sizes ─────────────────────────────────────────────────────────────
+const WARP_CHARGE_W = 512;
+const WARP_CHARGE_H = 128;
+const WARP_ACTIVE_W = 512;
+const WARP_ACTIVE_H = 96;
+const THERMAL_W = 90;
+const THERMAL_H = 170;
+const PHASE_W = 900;
+const PHASE_H = 100;
+const HINT_W = 2200;
+const HINT_H = 140;
+
+// ── Private painters ─────────────────────────────────────────────────────────
+//
+// Each painter draws onto a persistent HudSprite canvas that has already been sized.
+// They used to be texture factories that built a fresh canvas and CanvasTexture on every
+// call — up to every frame for the warp bar and thermal gauge.
 
 /** Renders the charging progress bar (fill = 0..1) with label above. */
-function createWarpChargeTexture(fill: number): THREE.CanvasTexture {
-    const W = 512,
-        H = 128;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
+function paintWarpCharge(ctx: CanvasRenderingContext2D, fill: number): void {
+    const W = WARP_CHARGE_W,
+        H = WARP_CHARGE_H;
+    ctx.clearRect(0, 0, W, H);
 
     // Label
     ctx.textAlign = 'center';
@@ -48,12 +62,7 @@ function createWarpChargeTexture(fill: number): THREE.CanvasTexture {
         barY = 68,
         barW = W - 80,
         barH = 28;
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(0,255,204,0.12)';
-    ctx.strokeStyle = 'rgba(0,255,204,0.5)';
-    ctx.lineWidth = 2;
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.strokeRect(barX, barY, barW, barH);
+    drawGaugeTrack(ctx, barX, barY, barW, barH);
 
     // Bar fill — gradient cyan→white at tip
     if (fill > 0) {
@@ -74,20 +83,13 @@ function createWarpChargeTexture(fill: number): THREE.CanvasTexture {
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.shadowBlur = 0;
     ctx.fillText(`${Math.round(fill * 100)}%`, W / 2, barY + barH / 2);
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
 }
 
 /** Renders the pulsing "WARP ACTIVE" text (pulse = 0..1 sine wave). */
-function createWarpActiveTexture(pulse: number): THREE.CanvasTexture {
-    const W = 512,
-        H = 96;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
+function paintWarpActive(ctx: CanvasRenderingContext2D, pulse: number): void {
+    const W = WARP_ACTIVE_W,
+        H = WARP_ACTIVE_H;
+    ctx.clearRect(0, 0, W, H);
 
     const alpha = 0.55 + 0.45 * pulse; // 0.55–1.0
     ctx.textAlign = 'center';
@@ -97,20 +99,21 @@ function createWarpActiveTexture(pulse: number): THREE.CanvasTexture {
     ctx.shadowColor = `rgba(255,120,0,${alpha})`;
     ctx.fillStyle = `rgba(255,${Math.round(180 + 75 * pulse)},0,${alpha})`;
     ctx.fillText('WARP ACTIVE', W / 2, H / 2);
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
 }
 
-/** Renders the vertical thermal-load gauge (fill = 0..1), with an overheat flash state. */
-function createThermalGaugeTexture(fill: number, overheated: boolean): THREE.CanvasTexture {
-    const W = 90,
-        H = 170;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
+/**
+ * Renders the vertical thermal-load gauge (fill = 0..1), with an overheat flash state.
+ * @param flashPulse 0..1 phase of the overheat flash; only used while `overheated`.
+ */
+function paintThermalGauge(
+    ctx: CanvasRenderingContext2D,
+    fill: number,
+    overheated: boolean,
+    flashPulse: number
+): void {
+    const W = THERMAL_W,
+        H = THERMAL_H;
+    ctx.clearRect(0, 0, W, H);
 
     // Label
     ctx.textAlign = 'center';
@@ -126,12 +129,7 @@ function createThermalGaugeTexture(fill: number, overheated: boolean): THREE.Can
         barY = 28,
         barW = W - 40,
         barH = H - 44;
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(0,255,204,0.12)';
-    ctx.strokeStyle = 'rgba(0,255,204,0.5)';
-    ctx.lineWidth = 2;
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.strokeRect(barX, barY, barW, barH);
+    drawGaugeTrack(ctx, barX, barY, barW, barH);
 
     // Bar fill — gradient cyan (cool) → orange → red (hot), growing from the bottom
     const clampedFill = Math.max(0, Math.min(1, fill));
@@ -151,7 +149,7 @@ function createThermalGaugeTexture(fill: number, overheated: boolean): THREE.Can
 
     // Overheat flash overlay + label
     if (overheated) {
-        const pulse = (Math.sin(Date.now() * 0.012) + 1) * 0.5; // 0..1
+        const pulse = flashPulse;
         ctx.fillStyle = `rgba(255,40,40,${0.25 + 0.35 * pulse})`;
         ctx.fillRect(barX, barY, barW, barH);
         ctx.font = 'bold 13px monospace';
@@ -160,24 +158,18 @@ function createThermalGaugeTexture(fill: number, overheated: boolean): THREE.Can
         ctx.fillStyle = `rgba(255,80,80,${0.7 + 0.3 * pulse})`;
         ctx.fillText('OVERHEAT', W / 2, H - 10);
     }
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
 }
 
-function createAutopilotPhaseTexture(
+function paintAutopilotPhase(
+    ctx: CanvasRenderingContext2D,
     state: AutopilotHudState,
     distanceLabel = ''
-): THREE.CanvasTexture {
-    // Canvas is deliberately wide (800px) so no label ever clips.
+): void {
+    // Canvas is deliberately wide so no label ever clips.
     // Two rows: phase label on top, distance on the bottom.
-    const W = 900,
-        H = 100;
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const ctx = c.getContext('2d')!;
+    const W = PHASE_W,
+        H = PHASE_H;
+    ctx.clearRect(0, 0, W, H);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
@@ -251,59 +243,38 @@ function createAutopilotPhaseTexture(
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.fillText(distanceLabel, W / 2, 72);
     }
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
 }
 
-function createHintTexture({ lines }: { lines: string[] }): THREE.CanvasTexture {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Failed to create canvas context for hint texture');
-
-    canvas.width = 2200;
-    canvas.height = 140;
-
-    context.clearRect(0, 0, canvas.width, canvas.height);
+function paintHint(context: CanvasRenderingContext2D, lines: string[]): void {
+    context.clearRect(0, 0, HINT_W, HINT_H);
 
     // 28pt hint text (slightly smaller to avoid clipping)
     context.font = '28px monospace';
     context.fillStyle = '#aaaaaa';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
+    // A fresh canvas started with no shadow; a reused one must be told explicitly.
+    context.shadowBlur = 0;
 
     const safeLines = Array.isArray(lines) ? lines.filter(Boolean) : [];
-    if (safeLines.length === 0) {
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.needsUpdate = true;
-        return texture;
-    }
+    if (safeLines.length === 0) return;
 
     const lineY = safeLines.length > 1 ? [50, 100] : [75];
     for (let i = 0; i < Math.min(safeLines.length, 2); i++) {
-        context.fillText(safeLines[i], canvas.width / 2, lineY[i]);
+        context.fillText(safeLines[i], HINT_W / 2, lineY[i]);
     }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    return texture;
 }
 
 // ── FlightHUD class ──────────────────────────────────────────────────────────
 
 export class FlightHUD {
     // Public — accessed directly from index.ts flight logic
-    warpSprite: THREE.Sprite | null = null;
-    orbitNotifySprite: THREE.Sprite | null = null;
-    hintSprite: THREE.Sprite | null = null;
-    thermalSprite: THREE.Sprite | null = null;
+    warpSprite: HudSprite | null = null;
+    orbitNotifySprite: HudSprite | null = null;
+    hintSprite: HudSprite | null = null;
+    thermalSprite: HudSprite | null = null;
     autopilotBlockedNotifyTimer = 0;
     autopilotBlockedByName = '';
-
-    // Private internal state
-    private hintLastText = '';
-    private _lastAutopilotHudState: AutopilotHudState = 'NONE';
 
     private uiScene: THREE.Scene;
     private autopilotState: IAutopilotState;
@@ -360,65 +331,44 @@ export class FlightHUD {
     }
 
     private _initWarp(): void {
-        const texture = createWarpChargeTexture(0);
-        const material = new THREE.SpriteMaterial({
-            map: texture,
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        });
-        this.warpSprite = new THREE.Sprite(material);
-        // 512×128 canvas at 0.625 ratio → 320×80 screen pixels; center at bottom
-        this.warpSprite.scale.set(320, 80, 1);
-        this.warpSprite.position.set(0, -(window.innerHeight / 2 - 50), TEXT_SPRITE_Z);
-        this.warpSprite.visible = false;
-        this.uiScene.add(this.warpSprite);
+        this.warpSprite = new HudSprite(this.uiScene);
+        this.setWarpChargeContent(0);
+        // Bottom-center of the screen
+        this.warpSprite.setAnchor({ corner: 'bottom-center', offsetX: 0, offsetY: 50 });
     }
 
     private _initOrbitNotify(): void {
-        const material = new THREE.SpriteMaterial({
-            map: createAutopilotPhaseTexture('NONE'),
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        });
-        this.orbitNotifySprite = new THREE.Sprite(material);
+        this.orbitNotifySprite = new HudSprite(this.uiScene);
+        this.orbitNotifySprite.setCanvasSize(PHASE_W, PHASE_H);
+        this.orbitNotifySprite.draw('NONE|', (ctx) => paintAutopilotPhase(ctx, 'NONE'));
         // 900×100 canvas → 800×80 screen-pixel sprite (two-line display).
-        this.orbitNotifySprite.scale.set(800, 80, 1);
-        this.orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), TEXT_SPRITE_Z);
-        this.orbitNotifySprite.visible = false;
-        this.uiScene.add(this.orbitNotifySprite);
+        this.orbitNotifySprite.setScale(800, 80);
+        // Bottom-center, above the warp bar
+        this.orbitNotifySprite.setAnchor({ corner: 'bottom-center', offsetX: 0, offsetY: 120 });
     }
 
     private _initHint(): void {
-        const texture = createHintTexture({ lines: [] });
-        const material = new THREE.SpriteMaterial({
-            map: texture,
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        });
-        this.hintSprite = new THREE.Sprite(material);
-        this.hintSprite.scale.set(1100, 95, 1); // allow 1-2 lines (wider to avoid clipping)
-        this.hintSprite.visible = false;
+        this.hintSprite = new HudSprite(this.uiScene);
+        this.hintSprite.setCanvasSize(HINT_W, HINT_H);
+        this.hintSprite.draw('', (ctx) => paintHint(ctx, []));
+        this.hintSprite.setScale(1100, 95); // allow 1-2 lines (wider to avoid clipping)
         // Top-center of the screen (slightly below top edge)
-        this.hintSprite.position.set(0, window.innerHeight / 2 - 55, TEXT_SPRITE_Z);
-        this.uiScene.add(this.hintSprite);
+        this.hintSprite.setAnchor({ corner: 'top-center', offsetX: 0, offsetY: -55 });
     }
 
     private _initThermal(): void {
-        const texture = createThermalGaugeTexture(0, false);
-        const material = new THREE.SpriteMaterial({
-            map: texture,
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        });
-        this.thermalSprite = new THREE.Sprite(material);
+        this.thermalSprite = new HudSprite(this.uiScene);
+        this.thermalSprite.setCanvasSize(THERMAL_W, THERMAL_H);
+        this.thermalSprite.draw('0.000|false', (ctx) => paintThermalGauge(ctx, 0, false, 0));
         // 90×170 canvas → 48×90 screen pixels; positioned each frame beside the gray steering ring
-        this.thermalSprite.scale.set(48, 90, 1);
-        this.thermalSprite.visible = false;
-        this.uiScene.add(this.thermalSprite);
+        this.thermalSprite.setScale(48, 90);
+    }
+
+    /** Reposition the screen-anchored HUD sprites for a new viewport size. */
+    layout(width: number, height: number): void {
+        this.warpSprite?.layout(width, height);
+        this.orbitNotifySprite?.layout(width, height);
+        this.hintSprite?.layout(width, height);
     }
 
     /** Show the orbit-notify sprite and reset its timer. */
@@ -431,21 +381,18 @@ export class FlightHUD {
     /** Update warp sprite to show charge-bar state; makes it visible. */
     setWarpCharge(fill: number): void {
         if (!this.warpSprite) return;
-        this.warpSprite.material.map?.dispose();
-        this.warpSprite.material.map = createWarpChargeTexture(fill);
-        this.warpSprite.material.needsUpdate = true;
-        this.warpSprite.scale.set(320, 80, 1);
+        this.setWarpChargeContent(fill);
         this.warpSprite.visible = true;
     }
 
     /** Update warp sprite to show "WARP ACTIVE" pulse; makes it visible. */
     setWarpActive(pulse: number): void {
-        if (!this.warpSprite) return;
-        this.warpSprite.material.map?.dispose();
-        this.warpSprite.material.map = createWarpActiveTexture(pulse);
-        this.warpSprite.material.needsUpdate = true;
-        this.warpSprite.scale.set(320, 60, 1);
-        this.warpSprite.visible = true;
+        const sprite = this.warpSprite;
+        if (!sprite) return;
+        sprite.setCanvasSize(WARP_ACTIVE_W, WARP_ACTIVE_H);
+        sprite.draw(`active|${pulse.toFixed(3)}`, (ctx) => paintWarpActive(ctx, pulse));
+        sprite.setScale(320, 60);
+        sprite.visible = true;
     }
 
     /** Hide the warp sprite. */
@@ -453,18 +400,27 @@ export class FlightHUD {
         if (this.warpSprite) this.warpSprite.visible = false;
     }
 
+    private setWarpChargeContent(fill: number): void {
+        const sprite = this.warpSprite!;
+        sprite.setCanvasSize(WARP_CHARGE_W, WARP_CHARGE_H);
+        // Keyed at 3 decimals — the bar is ~432 px wide, so this is sub-pixel.
+        sprite.draw(`charge|${fill.toFixed(3)}`, (ctx) => paintWarpCharge(ctx, fill));
+        // 512×128 canvas at 0.625 ratio → 320×80 screen pixels
+        sprite.setScale(320, 80);
+    }
+
     /** Update the thermal gauge fill/overheat state and anchor it beside `anchorPos` (the gray steering ring). */
     updateThermalHUD(heat: number, overheated: boolean, anchorPos: THREE.Vector3): void {
-        if (!this.thermalSprite) return;
-        this.thermalSprite.position.set(
-            anchorPos.x + THERMAL_GAUGE_OFFSET_X,
-            anchorPos.y,
-            TEXT_SPRITE_Z
-        );
-        this.thermalSprite.material.map?.dispose();
-        this.thermalSprite.material.map = createThermalGaugeTexture(heat, overheated);
-        this.thermalSprite.material.needsUpdate = true;
-        this.thermalSprite.visible = true;
+        const sprite = this.thermalSprite;
+        if (!sprite) return;
+        sprite.setScreenPos(anchorPos.x + THERMAL_GAUGE_OFFSET_X, anchorPos.y);
+
+        const fill = Math.max(0, Math.min(1, heat));
+        // The overheat flash animates on wall-clock time, so it must be part of the key.
+        const flashPulse = overheated ? (Math.sin(Date.now() * 0.012) + 1) * 0.5 : 0;
+        const key = `${fill.toFixed(3)}|${overheated}|${flashPulse.toFixed(3)}`;
+        sprite.draw(key, (ctx) => paintThermalGauge(ctx, heat, overheated, flashPulse));
+        sprite.visible = true;
     }
 
     /** Hide the thermal gauge. */
@@ -527,7 +483,6 @@ export class FlightHUD {
 
         if (desiredHud === 'NONE') {
             this.orbitNotifySprite.visible = false;
-            this._lastAutopilotHudState = 'NONE';
         } else {
             this.orbitNotifySprite.visible = true;
 
@@ -550,21 +505,10 @@ export class FlightHUD {
                 }
             }
 
-            // Re-render canvas every frame while active (distance changes continuously),
-            // but only on phase changes when the stable-orbit message is showing.
-            const needsRedraw = this.autopilotState.isActive
-                ? true // distance always changes
-                : desiredHud !== this._lastAutopilotHudState;
-
-            if (needsRedraw) {
-                this.orbitNotifySprite.material.map?.dispose();
-                this.orbitNotifySprite.material.map = createAutopilotPhaseTexture(
-                    desiredHud,
-                    distLabel
-                );
-                this.orbitNotifySprite.material.needsUpdate = true;
-                this._lastAutopilotHudState = desiredHud;
-            }
+            // Repainted only when the phase or the formatted distance actually changes.
+            this.orbitNotifySprite.draw(`${desiredHud}|${distLabel}`, (ctx) =>
+                paintAutopilotPhase(ctx, desiredHud, distLabel)
+            );
 
             // Tick down the autopilot HUD timers
             if (desiredHud === 'ORBIT') {
@@ -587,20 +531,13 @@ export class FlightHUD {
         this.hintSprite.visible = hint.visible;
         if (!hint.visible) return;
 
-        const textKey = hint.lines.join('\n');
-        if (textKey === this.hintLastText) return;
-        this.hintLastText = textKey;
-
-        if (this.hintSprite.material.map) this.hintSprite.material.map.dispose();
-        this.hintSprite.material.map = createHintTexture({ lines: hint.lines });
-        this.hintSprite.material.needsUpdate = true;
+        const lines = hint.lines;
+        this.hintSprite.draw(lines.join('\n'), (ctx) => paintHint(ctx, lines));
     }
 
     /** Force an immediate re-render of the hint sprite (call after camera/selection changes). */
     forceHintRefresh(): void {
         try {
-            this.hintLastText = '';
-
             // Always recompute the hint, and force-apply both visibility and texture.
             // This avoids "stuck" hint sprites when switching camera modes.
             if (!this.hintSprite) return;
@@ -608,22 +545,12 @@ export class FlightHUD {
             const hint = this._getActiveContextHint();
             this.hintSprite.visible = hint.visible;
 
-            // Dispose old texture (if any)
-            if (this.hintSprite.material?.map) this.hintSprite.material.map.dispose();
-
-            if (!hint.visible) {
-                // Ensure we don't keep stale text around
-                this.hintLastText = '';
-                this.hintSprite.material.map = createHintTexture({ lines: [] });
-                this.hintSprite.material.needsUpdate = true;
-                return;
-            }
-
-            this.hintLastText = hint.lines.join('\n');
-            this.hintSprite.material.map = createHintTexture({ lines: hint.lines });
-            this.hintSprite.material.needsUpdate = true;
+            // Ensure we don't keep stale text around when hidden
+            const lines = hint.visible ? hint.lines : [];
+            this.hintSprite.invalidate();
+            this.hintSprite.draw(lines.join('\n'), (ctx) => paintHint(ctx, lines));
         } catch (e) {
-            console.error('Error dispatching body:added event for preset body:', e);
+            console.error('Error refreshing flight HUD hint:', e);
         }
     }
 

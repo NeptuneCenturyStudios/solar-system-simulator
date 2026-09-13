@@ -13,6 +13,7 @@ import { EffectiveCSpeed, EffectiveGForce } from './types';
 import { Spaceship } from './bodies/ships/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { FlightHUD } from './drawing/flight-hud';
+import type { HudSprite } from './drawing/hud/hud-sprite';
 import { Weapon } from './ship-effects/weapons/weapon';
 
 /**
@@ -530,7 +531,7 @@ export interface IFlightControlContext {
     steeringLineGeo: THREE.BufferGeometry;
     flightCrosshair: THREE.LineSegments;
     flightHUD: FlightHUD;
-    speedSprite: THREE.Sprite | null;
+    speedSprite: HudSprite | null;
 
     addEvent: (event: { message: string; notificationType: NotificationType }) => void;
 }

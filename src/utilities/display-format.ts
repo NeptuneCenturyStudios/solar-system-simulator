@@ -86,6 +86,27 @@ export function formatSpeed(simSpeed: number, useWarp = false): string {
     return `${trimNumber(simSpeedToKmS(simSpeed), 2)} km/s`;
 }
 
+/**
+ * Format a duration in seconds as a compact two-unit estimate, e.g. "2d 5h", "5h 12m",
+ * "12m 30s", "30s". Non-finite or non-positive durations (not closing on the target,
+ * or already arrived) format as "∞".
+ *
+ * Returns the bare value with no prefix; callers that show a label add their own.
+ */
+export function formatETA(seconds: number): string {
+    if (!Number.isFinite(seconds) || seconds <= 0) return '∞';
+
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+}
+
 /** Round to `maxDecimals` and strip trailing zeros (e.g. "0.50" → "0.5", "100.00" → "100"). */
 function trimNumber(value: number, maxDecimals: number): string {
     if (!Number.isFinite(value)) return '—';

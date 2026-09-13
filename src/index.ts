@@ -250,7 +250,20 @@ uiCamera.position.z = 10;
 
 import Noty from 'noty';
 import 'noty/lib/noty.css';
-import { createFPSTexture, createSpeedTexture, createStatsTexture } from './drawing/text-rendering';
+import {
+    FPS_CANVAS_H,
+    FPS_CANVAS_W,
+    paintFPS,
+    paintSpeed,
+    paintStats,
+    SPEED_CANVAS_W,
+    speedCanvasHeight,
+    STATS_CANVAS_H,
+    STATS_CANVAS_W,
+    type SpeedHudParams,
+} from './drawing/text-rendering';
+import { HudSprite } from './drawing/hud/hud-sprite';
+import { ScreenProjector } from './drawing/hud/screen-projection';
 import { ProceduralGenerator } from './procedural/procedural-generator';
 import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
 import { BlackHoleSystemGenerator } from './procedural/black-hole-system-generator';
@@ -652,87 +665,42 @@ const velArc = new VelocityArcManager(scene, gizmo, interactionState);
 const orbitPrediction = new OrbitPredictionManager(scene);
 orbitPrediction.resize(window.innerWidth, window.innerHeight);
 
-// Create FPS counter sprite
-let fpsSprite: THREE.Sprite | null = null;
+// FPS counter sprite — upper-right corner
+const fpsSprite = new HudSprite(uiScene);
+fpsSprite.setCanvasSize(FPS_CANVAS_W, FPS_CANVAS_H);
+fpsSprite.draw('60', (ctx) => paintFPS(ctx, 60));
+fpsSprite.setScale(160, 40);
+// Right side minus (sprite half-width + padding), top minus padding
+fpsSprite.setAnchor({ corner: 'top-right', offsetX: -110, offsetY: -30 });
+fpsSprite.visible = true;
 
-function createFPSSprite() {
-    const texture = createFPSTexture(60);
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    fpsSprite = new THREE.Sprite(material);
-    fpsSprite.scale.set(160, 40, 1);
+// Body stats sprite — below the FPS counter, hidden until a body is selected
+const statsSprite = new HudSprite(uiScene);
+statsSprite.setCanvasSize(STATS_CANVAS_W, STATS_CANVAS_H);
+statsSprite.setScale(450, 400);
+statsSprite.setAnchor({ corner: 'top-right', offsetX: -255, offsetY: -270 });
 
-    // Position in screen space (upper-right corner)
-    // Orthographic camera uses screen coordinates
-    // Account for sprite width (160) and add padding to match top spacing
-    fpsSprite.position.set(
-        window.innerWidth / 2 - 110, // Right side minus (sprite half-width + padding)
-        window.innerHeight / 2 - 30, // Top minus padding
-        TEXT_SPRITE_Z
-    );
-
-    uiScene.add(fpsSprite);
+/** Repaint the stats panel for `body`. Its values change continuously, so it is never key-skipped. */
+function refreshStatsSprite(body: Body): void {
+    statsSprite.invalidate();
+    statsSprite.draw('', (ctx) => paintStats(ctx, body));
 }
-createFPSSprite();
-
-// Create body stats sprite
-let statsSprite: THREE.Sprite | null = null;
-function createStatsSprite() {
-    const texture = createStatsTexture({
-        name: '',
-        mass: 0,
-        radius: 0,
-        mesh: { position: new THREE.Vector3() },
-        velocity: new THREE.Vector3(),
-    } as unknown as Body);
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    statsSprite = new THREE.Sprite(material);
-    statsSprite.scale.set(450, 400, 1);
-    statsSprite.visible = false; // Hidden by default
-
-    // Position below FPS counter
-    statsSprite.position.set(
-        window.innerWidth / 2 - 255, // Right aligned
-        window.innerHeight / 2 - 270, // Below FPS counter (slightly lower to fit extra line)
-        TEXT_SPRITE_Z
-    );
-
-    uiScene.add(statsSprite);
-}
-createStatsSprite();
 
 // Flight speed indicator — bottom-right corner, shown only while in flight mode
-let speedSprite: THREE.Sprite | null = null;
-function createSpeedSprite() {
-    const texture = createSpeedTexture(0, false);
-    if (!texture) return;
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    });
-    speedSprite = new THREE.Sprite(material);
-    speedSprite.scale.set(400, 400, 1);
-    // Bottom-right corner: sprite center is 200px from right/bottom edges + 10px margin
-    speedSprite.position.set(
-        window.innerWidth / 2 - 210,
-        -(window.innerHeight / 2 - 210),
-        TEXT_SPRITE_Z
-    );
-    speedSprite.visible = false;
-    uiScene.add(speedSprite);
+const speedSprite = new HudSprite(uiScene);
+// Bottom-right corner: sprite center is 200px from right/bottom edges + 10px margin
+speedSprite.setScale(400, 400);
+speedSprite.setAnchor({ corner: 'bottom-right', offsetX: -210, offsetY: 210 });
+
+/** Repaint the speed readout. Resizes the canvas when the position/velocity rows toggle. */
+function refreshSpeedSprite(params: SpeedHudParams): void {
+    speedSprite.setCanvasSize(SPEED_CANVAS_W, speedCanvasHeight(!!(params.pos && params.vel)));
+    speedSprite.invalidate();
+    speedSprite.draw('', (ctx) => paintSpeed(ctx, params));
 }
-createSpeedSprite();
+
+/** Every HUD sprite pinned to a viewport corner, re-laid-out on window resize. */
+const anchoredHudSprites: HudSprite[] = [fpsSprite, statsSprite, speedSprite];
 
 const ambientMusic = new AmbientSoundManager();
 // Start ambient music immediately. If the browser blocks autoplay,
@@ -771,6 +739,8 @@ const planetNameIndicator = new PlanetNameIndicator(uiScene, simulationState);
 const healthBarIndicator = new HealthBarIndicator(uiScene, simulationState);
 
 const threatIndicator = new ThreatIndicator(uiScene, simulationState);
+// Shared by every overlay indicator; primed once per frame by the animation loop.
+const screenProjector = new ScreenProjector();
 
 // Full-screen white flash overlay (explosions, supernova, warp engage, wormhole transit).
 // Rendered as a screen-space quad in uiScene; advanced each frame by the animation loop.
@@ -3079,11 +3049,7 @@ registerVueSimHooks({
         const el = document.getElementById('enableStarDeath') as HTMLInputElement | null;
         if (el) el.checked = checked;
         // Refresh the stats display if a body is selected (parity with the old checkbox listener).
-        if (selectedBody && statsSprite && statsSprite.visible) {
-            statsSprite.material.map?.dispose();
-            statsSprite.material.map = createStatsTexture(selectedBody);
-            statsSprite.material.needsUpdate = true;
-        }
+        if (selectedBody && statsSprite.visible) refreshStatsSprite(selectedBody);
     },
     // getSurfaceCameraState is registered later, once `surfaceCam` exists (see below).
 });
@@ -3746,12 +3712,15 @@ function enterFlightMode(ship: Spaceship) {
     ship.trail.init();
 
     // Show flight speed sprite
-    if (speedSprite) {
-        speedSprite.material.map?.dispose();
-        speedSprite.material.map = createSpeedTexture(0, false);
-        speedSprite.material.needsUpdate = true;
-        speedSprite.visible = true;
-    }
+    refreshSpeedSprite({
+        speed: 0,
+        isBoosting: false,
+        isWarp: false,
+        isBraking: false,
+        shipThrustRate: 0,
+        gravRate: 0,
+    });
+    speedSprite.visible = true;
 
     // Release DOM focus from whichever UI element triggered entry (e.g. the
     // System Explorer "Enter Ship" icon button) so focus doesn't linger inside
@@ -4034,11 +4003,7 @@ if (starDeathCheckbox) {
         environmentState.starDeathEnabled = (starDeathCheckbox as HTMLInputElement).checked;
 
         // Update stats display if a body is currently selected
-        if (selectedBody && statsSprite && statsSprite.visible) {
-            statsSprite.material.map?.dispose();
-            statsSprite.material.map = createStatsTexture(selectedBody);
-            statsSprite.material.needsUpdate = true;
-        }
+        if (selectedBody && statsSprite.visible) refreshStatsSprite(selectedBody);
     });
 }
 
@@ -4392,47 +4357,9 @@ window.addEventListener('resize', () => {
     velArc.resize(window.innerWidth, window.innerHeight);
     orbitPrediction.resize(window.innerWidth, window.innerHeight);
 
-    // Reposition FPS counter
-    if (fpsSprite) {
-        fpsSprite.position.set(
-            window.innerWidth / 2 - 110,
-            window.innerHeight / 2 - 30,
-            TEXT_SPRITE_Z
-        );
-    }
-
-    // Reposition stats display
-    if (statsSprite) {
-        statsSprite.position.set(
-            window.innerWidth / 2 - 255,
-            window.innerHeight / 2 - 270,
-            TEXT_SPRITE_Z
-        );
-    }
-
-    // Reposition hint display (top-center)
-    if (flightHUD.hintSprite) {
-        flightHUD.hintSprite.position.set(0, window.innerHeight / 2 - 55, TEXT_SPRITE_Z);
-    }
-
-    // Reposition warp charge / warp active sprite (bottom-center)
-    if (flightHUD.warpSprite) {
-        flightHUD.warpSprite.position.set(0, -(window.innerHeight / 2 - 50), TEXT_SPRITE_Z);
-    }
-
-    // Reposition orbit notify sprite (bottom-center, above warp)
-    if (flightHUD.orbitNotifySprite) {
-        flightHUD.orbitNotifySprite.position.set(0, -(window.innerHeight / 2 - 120), TEXT_SPRITE_Z);
-    }
-
-    // Reposition speed indicator (bottom-right)
-    if (speedSprite) {
-        speedSprite.position.set(
-            window.innerWidth / 2 - 210,
-            -(window.innerHeight / 2 - 210),
-            TEXT_SPRITE_Z
-        );
-    }
+    // Reposition screen-anchored HUD sprites (offsets are declared once, at construction)
+    for (const sprite of anchoredHudSprites) sprite.layout(window.innerWidth, window.innerHeight);
+    flightHUD.layout(window.innerWidth, window.innerHeight);
 
     lensingEffect.resize(window.innerWidth, window.innerHeight);
     screenFlash.resize(window.innerWidth, window.innerHeight);
@@ -4926,9 +4853,12 @@ const animCtx: AnimationContext = {
     surfaceCam,
     screenFlash,
     scenarioMessageHud,
-    fpsSprite: { value: fpsSprite },
-    statsSprite: { value: statsSprite },
-    speedSprite: { value: speedSprite },
+    screenProjector,
+    fpsSprite,
+    statsSprite,
+    refreshStatsSprite,
+    speedSprite,
+    refreshSpeedSprite,
     keys,
     flightSteeringLine,
     steeringLinePositions,

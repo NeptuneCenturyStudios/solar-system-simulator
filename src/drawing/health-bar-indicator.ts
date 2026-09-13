@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { Body } from '../bodies/body';
 import { ISimulationState } from '../interfaces';
-import { TEXT_SPRITE_Z } from '../utilities/consts';
+import { HudSprite } from './hud/hud-sprite';
+import { HudSpritePool } from './hud/hud-sprite-pool';
+import { ProjectionBuffer, ScreenProjector } from './hud/screen-projection';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 const CANVAS_W = 140;
@@ -13,12 +14,30 @@ const BAR_PAD = 3;
 /** Floor for apparent on-screen radius so distant/tiny bodies still get a bar just above them. */
 const MIN_APPARENT_R = 20;
 
-interface PoolEntry {
-    sprite: THREE.Sprite;
-    material: THREE.SpriteMaterial;
-    canvas: HTMLCanvasElement;
-    ctx: CanvasRenderingContext2D;
-    texture: THREE.CanvasTexture;
+/** Draw the background panel and health fill onto a bar canvas. */
+function drawBar(ctx: CanvasRenderingContext2D, fraction: number): void {
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Background panel
+    ctx.fillStyle = 'rgba(0, 8, 16, 0.55)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.strokeStyle = 'rgba(0, 255, 204, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(0.75, 0.75, CANVAS_W - 1.5, CANVAS_H - 1.5);
+
+    // Health fill — green / amber / red by severity
+    const innerX = BAR_PAD;
+    const innerY = BAR_PAD;
+    const innerW = CANVAS_W - BAR_PAD * 2;
+    const innerH = CANVAS_H - BAR_PAD * 2;
+    const fillW = innerW * fraction;
+
+    const color = fraction > 0.6 ? '#4caf50' : fraction > 0.3 ? '#ffb300' : '#ff4d4d';
+    ctx.fillStyle = color;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = color;
+    ctx.fillRect(innerX, innerY, fillW, innerH);
+    ctx.shadowBlur = 0;
 }
 
 /**
@@ -26,134 +45,68 @@ interface PoolEntry {
  * dropped below maxHealthPoints. Undamaged and fully-destroyed bodies show
  * nothing. Uses the same pooled-sprite-in-uiScene approach as
  * PlanetNameIndicator / AutopilotTargetIndicator.
+ *
+ * The canvas is only repainted when a body's health fraction actually changes, so a
+ * damaged-but-stable body costs nothing beyond repositioning its sprite.
  */
 export class HealthBarIndicator {
-    private uiScene: THREE.Scene;
-    private simulationState: ISimulationState;
-    private pool: PoolEntry[] = [];
-    private _scratch = new THREE.Vector3();
+    private readonly uiScene: THREE.Scene;
+    private readonly simulationState: ISimulationState;
+    private readonly pool: HudSpritePool<HudSprite>;
+
+    /** Reused per-frame projection buffer — no object literals allocated per body. */
+    private readonly visible = new ProjectionBuffer();
 
     constructor(uiScene: THREE.Scene, simulationState: ISimulationState) {
         this.uiScene = uiScene;
         this.simulationState = simulationState;
+        this.pool = new HudSpritePool(() => this.createBarSprite());
     }
 
-    update(camera: THREE.PerspectiveCamera): void {
+    /** @param projector Shared projector, already primed for this frame via `beginFrame`. */
+    update(projector: ScreenProjector): void {
         const bodies = this.simulationState.bodies;
-        const visible: { body: Body; uiX: number; uiY: number; apparentR: number }[] = [];
 
-        if (bodies.length > 0) {
-            const halfW = window.innerWidth / 2;
-            const halfH = window.innerHeight / 2;
-            const tanHalfFovY = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+        this.visible.reset();
 
-            for (let i = 0; i < bodies.length; i++) {
-                const body = bodies[i];
-                if (!body || body._isDisposed || !body.mesh) continue;
-                if (body.healthPoints <= 0 || body.healthPoints >= body.maxHealthPoints) continue;
+        for (let i = 0; i < bodies.length; i++) {
+            const body = bodies[i];
+            if (!body) continue;
+            if (body.healthPoints <= 0 || body.healthPoints >= body.maxHealthPoints) continue;
 
-                body.mesh.getWorldPosition(this._scratch);
-                this._scratch.project(camera);
-                const nx = this._scratch.x;
-                const ny = this._scratch.y;
-                const nz = this._scratch.z;
-                if (nz >= 1 || Math.abs(nx) > 1 || Math.abs(ny) > 1) continue;
-
-                const camDist = camera.position.distanceTo(body.mesh.position);
-                const apparentR = Math.max(
-                    MIN_APPARENT_R,
-                    (body.radius / camDist) * (halfH / tanHalfFovY)
-                );
-
-                visible.push({ body, uiX: nx * halfW, uiY: ny * halfH, apparentR });
+            const slot = this.visible.next();
+            if (!projector.project(body, slot) || !slot.onScreen) {
+                this.visible.rollback();
             }
         }
 
-        this.syncPool(visible.length);
+        const sprites = this.pool.acquire(this.visible.length);
 
-        for (let i = 0; i < visible.length; i++) {
-            const v = visible[i];
-            const entry = this.pool[i];
-            const fraction = Math.max(0, Math.min(1, v.body.healthPoints / v.body.maxHealthPoints));
+        for (let i = 0; i < this.visible.length; i++) {
+            const p = this.visible.at(i);
+            const sprite = sprites[i];
 
-            this.drawBar(entry, fraction);
-            entry.texture.needsUpdate = true;
+            const fraction = Math.max(0, Math.min(1, p.body.healthPoints / p.body.maxHealthPoints));
 
-            entry.sprite.scale.set(SPRITE_W, SPRITE_H, 1);
-            entry.sprite.position.set(v.uiX, v.uiY + v.apparentR + SPRITE_H / 2 + 6, TEXT_SPRITE_Z);
-            entry.sprite.visible = true;
+            sprite.draw(fraction.toFixed(3), (ctx) => drawBar(ctx, fraction));
+
+            const apparentR = projector.apparentRadius(p.body.radius, p.camDist, MIN_APPARENT_R);
+            sprite.setScale(SPRITE_W, SPRITE_H);
+            sprite.setScreenPos(p.uiX, p.uiY + apparentR + SPRITE_H / 2 + 6);
+            sprite.visible = true;
         }
     }
 
     /** Free all GPU resources. */
     dispose(): void {
-        for (const entry of this.pool) {
-            entry.texture.dispose();
-            entry.material.dispose();
-            this.uiScene.remove(entry.sprite);
-        }
-        this.pool = [];
+        this.pool.dispose();
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private syncPool(desired: number): void {
-        while (this.pool.length > desired) {
-            const entry = this.pool.pop()!;
-            entry.sprite.visible = false;
-        }
-        while (this.pool.length < desired) {
-            this.pool.push(this.createPoolEntry());
-        }
-    }
-
-    private createPoolEntry(): PoolEntry {
-        const canvas = document.createElement('canvas');
-        canvas.width = CANVAS_W;
-        canvas.height = CANVAS_H;
-        const ctx = canvas.getContext('2d')!;
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.needsUpdate = true;
-
-        const material = new THREE.SpriteMaterial({
-            map: texture,
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        });
-
-        const sprite = new THREE.Sprite(material);
-        sprite.visible = false;
-        this.uiScene.add(sprite);
-
-        return { sprite, material, canvas, ctx, texture };
-    }
-
-    /** Draw the background panel and health fill onto the sprite's canvas. */
-    private drawBar(entry: PoolEntry, fraction: number): void {
-        const ctx = entry.ctx;
-        ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-
-        // Background panel
-        ctx.fillStyle = 'rgba(0, 8, 16, 0.55)';
-        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-        ctx.strokeStyle = 'rgba(0, 255, 204, 0.35)';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(0.75, 0.75, CANVAS_W - 1.5, CANVAS_H - 1.5);
-
-        // Health fill — green / amber / red by severity
-        const innerX = BAR_PAD;
-        const innerY = BAR_PAD;
-        const innerW = CANVAS_W - BAR_PAD * 2;
-        const innerH = CANVAS_H - BAR_PAD * 2;
-        const fillW = innerW * fraction;
-
-        const color = fraction > 0.6 ? '#4caf50' : fraction > 0.3 ? '#ffb300' : '#ff4d4d';
-        ctx.fillStyle = color;
-        ctx.shadowBlur = 6;
-        ctx.shadowColor = color;
-        ctx.fillRect(innerX, innerY, fillW, innerH);
-        ctx.shadowBlur = 0;
+    private createBarSprite(): HudSprite {
+        const sprite = new HudSprite(this.uiScene);
+        sprite.setCanvasSize(CANVAS_W, CANVAS_H);
+        return sprite;
     }
 }

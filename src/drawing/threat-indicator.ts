@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import { ISimulationState } from '../interfaces';
-import { TEXT_SPRITE_Z } from '../utilities/consts';
-
-interface PoolEntry {
-    sprite: THREE.Sprite;
-    material: THREE.SpriteMaterial;
-}
+import { SharedTextureSprite } from './hud/hud-sprite';
+import { HudSpritePool } from './hud/hud-sprite-pool';
+import {
+    createEdgeMarker,
+    ProjectionBuffer,
+    ScreenProjector,
+    type EdgeMarker,
+} from './hud/screen-projection';
+import { createChevronTexture } from './hud/hud-paint';
 
 /** Floor for apparent on-screen radius so distant/tiny threats still get a visible ring. */
 const MIN_APPARENT_R = 24;
@@ -13,34 +16,8 @@ const MIN_APPARENT_R = 24;
 const RING_PADDING_FACTOR = 1.35;
 /** Seconds per pulse cycle. */
 const PULSE_PERIOD = 1.2;
-
-/** Red chevron texture, shared by every pooled off-screen sprite (built once, never mutated). */
-function createRedChevronTexture(): THREE.CanvasTexture {
-    const S = 64;
-    const c = document.createElement('canvas');
-    c.width = S;
-    c.height = S;
-    const ctx = c.getContext('2d')!;
-
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = 'rgba(255, 60, 60, 0.95)';
-    ctx.strokeStyle = '#ff3c3c';
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    const cx = S / 2;
-    const cy = S / 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 11, cy - 15);
-    ctx.lineTo(cx + 15, cy);
-    ctx.lineTo(cx - 11, cy + 15);
-    ctx.stroke();
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.needsUpdate = true;
-    return tex;
-}
+/** Pixels of clearance kept between an edge chevron and the viewport edge. */
+const EDGE_MARGIN_PX = 30;
 
 /** Red ring texture, shared by every pooled on-screen sprite (pulsed via scale/opacity, not redrawn). */
 function createRedRingTexture(): THREE.CanvasTexture {
@@ -73,82 +50,74 @@ function createRedRingTexture(): THREE.CanvasTexture {
  * - Off-screen threats get a red edge chevron pointing at them (same mechanism as the autopilot
  *   off-screen indicator).
  * - On-screen threats get a pulsing red ring drawn around the body.
+ *
+ * Both artworks are static textures built once and shared by every pooled sprite; the pulse is
+ * driven purely through sprite scale and material opacity, so no canvas is repainted per frame.
  */
 export class ThreatIndicator {
-    private uiScene: THREE.Scene;
-    private simulationState: ISimulationState;
-    private offScreenPool: PoolEntry[] = [];
-    private onScreenPool: PoolEntry[] = [];
+    private readonly uiScene: THREE.Scene;
+    private readonly simulationState: ISimulationState;
+
+    private readonly offScreenPool: HudSpritePool<SharedTextureSprite>;
+    private readonly onScreenPool: HudSpritePool<SharedTextureSprite>;
+
     private chevronTexture: THREE.CanvasTexture | null = null;
     private ringTexture: THREE.CanvasTexture | null = null;
-    private _scratch = new THREE.Vector3();
+
+    /** Reused per-frame projection buffers — no object literals allocated per body. */
+    private readonly onScreen = new ProjectionBuffer();
+    private readonly offScreen = new ProjectionBuffer();
+    private readonly edge: EdgeMarker = createEdgeMarker();
 
     constructor(uiScene: THREE.Scene, simulationState: ISimulationState) {
         this.uiScene = uiScene;
         this.simulationState = simulationState;
+
+        this.offScreenPool = new HudSpritePool(() => this.createChevronSprite());
+        this.onScreenPool = new HudSpritePool(() => this.createRingSprite());
     }
 
-    update(camera: THREE.PerspectiveCamera): void {
+    /** @param projector Shared projector, already primed for this frame via `beginFrame`. */
+    update(projector: ScreenProjector): void {
         const bodies = this.simulationState.bodies;
-        const offScreen: { dx: number; dy: number }[] = [];
-        const onScreen: { uiX: number; uiY: number; apparentR: number }[] = [];
 
-        if (bodies.length > 0) {
-            const halfW = window.innerWidth / 2;
-            const halfH = window.innerHeight / 2;
-            const tanHalfFovY = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+        this.onScreen.reset();
+        this.offScreen.reset();
 
-            for (let i = 0; i < bodies.length; i++) {
-                const body = bodies[i];
-                if (!body || body._isDisposed || !body.mesh || !body.isThreat) continue;
+        for (let i = 0; i < bodies.length; i++) {
+            const body = bodies[i];
+            if (!body || !body.isThreat) continue;
 
-                body.mesh.getWorldPosition(this._scratch);
-                this._scratch.project(camera);
-
-                const nx = this._scratch.x;
-                const ny = this._scratch.y;
-                const nz = this._scratch.z;
-
-                if (nz < 1 && Math.abs(nx) <= 1 && Math.abs(ny) <= 1) {
-                    const camDist = camera.position.distanceTo(body.mesh.position);
-                    const apparentR = Math.max(
-                        MIN_APPARENT_R,
-                        (body.radius / camDist) * (halfH / tanHalfFovY)
-                    );
-                    onScreen.push({ uiX: nx * halfW, uiY: ny * halfH, apparentR });
-                    continue;
-                }
-
-                let dx = nz >= 1 ? -nx : nx;
-                const dy = nz >= 1 ? -ny : ny;
-                if (dx === 0 && dy === 0) dx = 1;
-
-                offScreen.push({ dx, dy });
+            // Fill straight into whichever buffer the projection turns out to belong in,
+            // rolling back the borrowed slot if the body can't be projected at all.
+            const slot = this.onScreen.next();
+            if (!projector.project(body, slot)) {
+                this.onScreen.rollback();
+                continue;
             }
+
+            if (slot.onScreen) continue;
+
+            // Off screen after all — move it across to the other buffer.
+            this.onScreen.rollback();
+            const offSlot = this.offScreen.next();
+            offSlot.body = slot.body;
+            offSlot.nx = slot.nx;
+            offSlot.ny = slot.ny;
+            offSlot.nz = slot.nz;
         }
 
-        this.syncPool(this.offScreenPool, offScreen.length, () => this.createChevronEntry());
-        this.syncPool(this.onScreenPool, onScreen.length, () => this.createRingEntry());
+        const chevrons = this.offScreenPool.acquire(this.offScreen.length);
+        const rings = this.onScreenPool.acquire(this.onScreen.length);
 
-        const marginX = 30 / (window.innerWidth / 2);
-        const marginY = 30 / (window.innerHeight / 2);
-        const maxX = 1 - marginX;
-        const maxY = 1 - marginY;
+        for (let i = 0; i < this.offScreen.length; i++) {
+            const p = this.offScreen.at(i);
+            const sprite = chevrons[i];
 
-        for (let i = 0; i < offScreen.length; i++) {
-            const { dx, dy } = offScreen[i];
-            const entry = this.offScreenPool[i];
-
-            const scale = Math.min(maxX / Math.abs(dx), maxY / Math.abs(dy));
-            const clampedNdcX = dx * scale;
-            const clampedNdcY = dy * scale;
-
-            const uiX = clampedNdcX * (window.innerWidth / 2);
-            const uiY = clampedNdcY * (window.innerHeight / 2);
-
-            entry.sprite.position.set(uiX, uiY, TEXT_SPRITE_Z);
-            entry.material.rotation = Math.atan2(dy, dx);
-            entry.sprite.visible = true;
+            projector.clampToEdge(p.nx, p.ny, p.nz, EDGE_MARGIN_PX, this.edge);
+            sprite.setScreenPos(this.edge.uiX, this.edge.uiY);
+            sprite.rotation = this.edge.rotation;
+            sprite.visible = true;
         }
 
         // Pulse phase shared by every on-screen ring, driven by wall-clock time so it keeps
@@ -156,26 +125,24 @@ export class ThreatIndicator {
         const pulsePhase = (performance.now() / 1000 / PULSE_PERIOD) % 1;
         const pulse = 0.5 - 0.5 * Math.cos(pulsePhase * Math.PI * 2); // 0 → 1 → 0
 
-        for (let i = 0; i < onScreen.length; i++) {
-            const { uiX, uiY, apparentR } = onScreen[i];
-            const entry = this.onScreenPool[i];
+        for (let i = 0; i < this.onScreen.length; i++) {
+            const p = this.onScreen.at(i);
+            const sprite = rings[i];
 
+            const apparentR = projector.apparentRadius(p.body.radius, p.camDist, MIN_APPARENT_R);
             const diameter = apparentR * 2 * RING_PADDING_FACTOR * (1 + pulse * 0.15);
-            entry.sprite.scale.set(diameter, diameter, 1);
-            entry.material.opacity = 0.4 + pulse * 0.6;
-            entry.sprite.position.set(uiX, uiY, TEXT_SPRITE_Z);
-            entry.sprite.visible = true;
+
+            sprite.setScale(diameter, diameter);
+            sprite.opacity = 0.4 + pulse * 0.6;
+            sprite.setScreenPos(p.uiX, p.uiY);
+            sprite.visible = true;
         }
     }
 
     /** Free all GPU resources. */
     dispose(): void {
-        for (const entry of [...this.offScreenPool, ...this.onScreenPool]) {
-            entry.material.dispose();
-            this.uiScene.remove(entry.sprite);
-        }
-        this.offScreenPool = [];
-        this.onScreenPool = [];
+        this.offScreenPool.dispose();
+        this.onScreenPool.dispose();
         this.chevronTexture?.dispose();
         this.chevronTexture = null;
         this.ringTexture?.dispose();
@@ -184,48 +151,17 @@ export class ThreatIndicator {
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private syncPool(pool: PoolEntry[], desired: number, createEntry: () => PoolEntry): void {
-        while (pool.length > desired) {
-            const entry = pool.pop()!;
-            entry.sprite.visible = false;
+    private createChevronSprite(): SharedTextureSprite {
+        if (!this.chevronTexture) {
+            this.chevronTexture = createChevronTexture('#ff3c3c', 'rgba(255, 60, 60, 0.95)');
         }
-        while (pool.length < desired) {
-            pool.push(createEntry());
-        }
+        const sprite = new SharedTextureSprite(this.uiScene, this.chevronTexture);
+        sprite.setScale(44, 44);
+        return sprite;
     }
 
-    private createChevronEntry(): PoolEntry {
-        if (!this.chevronTexture) this.chevronTexture = createRedChevronTexture();
-
-        const material = new THREE.SpriteMaterial({
-            map: this.chevronTexture,
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        });
-
-        const sprite = new THREE.Sprite(material);
-        sprite.scale.set(44, 44, 1);
-        sprite.visible = false;
-        this.uiScene.add(sprite);
-
-        return { sprite, material };
-    }
-
-    private createRingEntry(): PoolEntry {
+    private createRingSprite(): SharedTextureSprite {
         if (!this.ringTexture) this.ringTexture = createRedRingTexture();
-
-        const material = new THREE.SpriteMaterial({
-            map: this.ringTexture,
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        });
-
-        const sprite = new THREE.Sprite(material);
-        sprite.visible = false;
-        this.uiScene.add(sprite);
-
-        return { sprite, material };
+        return new SharedTextureSprite(this.uiScene, this.ringTexture);
     }
 }
