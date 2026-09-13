@@ -3832,7 +3832,6 @@ interface IApplyBodyEditParams {
     velocity: number | null;
     orbitalAngle: number | null;
     inclination: number | null;
-    color: string | null;
     tailColor: string | null;
     editTilt: number | null;
     editAzimuth: number | null;
@@ -3852,7 +3851,6 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         velocity,
         orbitalAngle,
         inclination,
-        color,
         tailColor,
         editTilt,
         editAzimuth,
@@ -3942,20 +3940,6 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         body.velocity.x = horizontalSpeed * Math.cos(angleRad);
         body.velocity.y = verticalSpeed;
         body.velocity.z = horizontalSpeed * Math.sin(angleRad);
-    }
-
-    // Apply color change if provided and if body is not a star
-    if (color && !isBodyType(body, BodyTypeEnum.Star)) {
-        try {
-            // Convert hex string to THREE.Color
-            const col = new THREE.Color(color);
-            if (body.mesh && body.mesh.material) {
-                (body.mesh.material as THREE.MeshStandardMaterial).color?.set(col);
-            }
-            if (body instanceof CelestialBody) body.baseColor.set(col);
-        } catch (e) {
-            console.error('Error applying body color edit:', e);
-        }
     }
 
     // Apply comet tail main color if provided and the body is a comet

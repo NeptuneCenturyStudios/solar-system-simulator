@@ -321,11 +321,6 @@
                         />
                     </div>
 
-                    <div v-if="snapshot.isAsteroid || snapshot.isComet" class="control-group">
-                        <label>Color</label>
-                        <input v-model="editColor" type="color" />
-                    </div>
-
                     <div v-if="snapshot.isComet" class="control-group">
                         <label>Tail Color</label>
                         <input v-model="editTailColor" type="color" />
@@ -764,7 +759,6 @@ function randomCometTailColorHex(): string {
 
 // ── Edit-mode form state ──────────────────────────────────────────────────
 const editName = ref('');
-const editColor = ref('#ffffff');
 const editTailColor = ref('#7ab8ff');
 const editMass = ref(0);
 const editRadius = ref(0);
@@ -799,7 +793,6 @@ function syncEditFormFromSnapshot(): void {
     const snap = bodyEditorStore.snapshot;
     if (!snap) return;
     editName.value = snap.name;
-    editColor.value = snap.colorHex ?? '#ffffff';
     editTailColor.value = snap.tailColorHex ?? '#7ab8ff';
     editMass.value = snap.mass;
     editRadius.value = snap.radius;
@@ -901,7 +894,6 @@ function onApply(): void {
         velocity: editVelocity.value,
         orbitalAngle: editOrbitalAngle.value,
         inclination: editInclination.value,
-        color: snap.isAsteroid || snap.isComet ? editColor.value : null,
         tailColor: snap.isComet ? editTailColor.value : null,
         isStarBody: snap.isStar,
         editTilt: snap.hasTilt ? editTilt.value : null,
