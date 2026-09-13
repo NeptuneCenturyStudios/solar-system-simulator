@@ -8,6 +8,67 @@
         <div class="modal-body whats-new-body">
             <p class="whats-new-intro">Here's what's new in this update:</p>
 
+            <h3>Version 1.2.0 - Major Update</h3>
+            <ul class="whats-new-list">
+                <li>
+                    <span class="material-symbols-outlined whats-new-icon">interests</span>
+                    <div>
+                        <strong>Introducing: Scenarios</strong>
+                        <p>
+                            Explore and play through different scenarios from wormhole shortcuts to
+                            saving the earth from asteroids. More scenarios coming soon!
+                        </p>
+
+                        <p>
+                            <strong>Other new features:</strong>
+                        </p>
+                        <ul>
+                            <li>
+                                Added new atmospheric entry effects (asteroids, comets, ships,
+                                satellites).
+                            </li>
+                            <li>Added magnetic field planetary attributes and aurora effects.</li>
+
+                            <li>
+                                Added new gravity solvers to choose from to optimize performance for
+                                larger simulations.
+                            </li>
+                            <li>Added a scenario to test the ship AI work-in-progress.</li>
+                        </ul>
+                    </div>
+                </li>
+                <li>
+                    <span class="material-symbols-outlined whats-new-icon">bug_report</span>
+                    <div>
+                        <strong>Bug fixes and improvements:</strong>
+                        <ul>
+                            <li>Improved the particle explosion effect more.</li>
+                            <li>Adjusted ship handling for Zenith and Osiris.</li>
+                            <li>
+                                Collisions no longer result in instant destruction, but cause damage
+                                depending on impact velocity.
+                            </li>
+                            <li>Comets now get procedurally random tail colors.</li>
+
+                            <li>
+                                Removed old naming conventions for custom created objects. They now
+                                use procedurally generated names.
+                            </li>
+                            <li>Object names are now editable before creating the object.</li>
+                            <li>Removed an unused color picker from edit mode.</li>
+                            <li>Fixed an issue that caused right clicking to exit flight mode.</li>
+                            <li>UI HUD overhaul for better performance.</li>
+                            <li>
+                                Fixed certain effects updating per substep instead of frame,
+                                improving performance.
+                            </li>
+                            <li>Pluto's orbit is now more accurately represented.</li>
+                            <li>Minor UI adjustments.</li>
+                        </ul>
+                    </div>
+                </li>
+            </ul>
+
             <h3>Version 1.1.2 - Maintenance Update</h3>
             <ul class="whats-new-list">
                 <li>
@@ -27,7 +88,7 @@
                                 Fixed issue where main UI was visible even before the system was
                                 fully loaded.
                             </li>
-                            <li>Improved the particle explosion effect</li>
+                            <li>Improved the particle explosion effect.</li>
                         </ul>
                     </div>
                 </li>

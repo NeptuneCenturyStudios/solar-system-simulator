@@ -5,7 +5,7 @@
     --scrollbar-thumb-hover: rgba(69, 171, 255, 0.75);
     --scrollbar-border: #224466;
     --new-ui-bg: rgba(0, 0, 10, 0.8);
-    --new-ui-backdrop-filter: blur(20px);
+    --new-ui-backdrop-filter: blur(15px);
     --new-ui-border: rgba(34, 68, 102, 1);
     --new-ui-border-radius: 0.5rem;
     --new-ui-color: #fff;
@@ -144,6 +144,11 @@ h2,
 h3 {
     margin: 0;
     color: var(--new-ui-btn-warning-color);
+}
+
+p {
+    margin-top: 0;
+    margin-bottom: var(--new-ui-gap-3);
 }
 
 /* --- Modals --- */
@@ -1218,18 +1223,17 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 
 /* ── Modal variants ─────────────────────────────────────────────────────────
    The overlay already covers the whole canvas, so tinting it reads as a
-   scene-wide backdrop wash. 'danger' and 'success' colour that wash red/green
-   and soften the blur so the tinted scene stays visible behind the card;
+   scene-wide backdrop wash. 'danger' and 'success' colour that wash red/green;
    'default' and 'info' keep the normal UI colours untouched. */
 
 .vue-modal-overlay--danger {
     background: rgba(120, 0, 0, 0.5);
-    backdrop-filter: blur(3px);
+    backdrop-filter: var(--new-ui-backdrop-filter);
 }
 
 .vue-modal-overlay--success {
     background: rgba(0, 90, 25, 0.5);
-    backdrop-filter: blur(3px);
+    backdrop-filter: var(--new-ui-backdrop-filter);
 }
 
 .vue-modal-card--danger {
