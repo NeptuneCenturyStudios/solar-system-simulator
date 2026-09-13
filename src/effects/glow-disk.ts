@@ -33,7 +33,7 @@ export class GlowDisk implements IEffect {
         colorHex: number,
         position: THREE.Vector3,
         pulseAmplitude = 0.05,
-        scaleMultiplier = 2.4
+        scaleMultiplier = 2.24
     ) {
         this.dependencies = dependencies;
         this.scene = scene;
@@ -83,8 +83,8 @@ export class GlowDisk implements IEffect {
         const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
         grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
         grad.addColorStop(edge, `rgba(${r}, ${g}, ${b}, 0)`);
-        grad.addColorStop(edge + bandWidth * 0.15, 'rgba(255, 241, 180, 0.95)');
-        grad.addColorStop(edge + bandWidth * 0.7, `rgba(${r}, ${g}, ${b}, 0.9)`);
+        grad.addColorStop(edge + bandWidth * 0.15, 'rgba(255, 255, 255, 0.75)');
+        grad.addColorStop(edge + bandWidth * 0.7, `rgba(${r}, ${g}, ${b}, 0.5)`);
         grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 256, 256);
@@ -110,18 +110,18 @@ export class GlowDisk implements IEffect {
 
     // ─── IEffect ───────────────────────────────────────────────────────────────
 
-    update(dt: number): void {
+    update(_dt: number): void {
         if (!this.active || !this._sprite) return;
 
-        this._visualTime += dt;
+        // this._visualTime += dt;
 
-        const baseScale = this._radius * this._scaleMultiplier;
-        const pulse =
-            this._pulseAmplitude > 0
-                ? Math.sin(this._visualTime * 0.0015 * 60) * (this._radius * this._pulseAmplitude)
-                : 0;
+        // const baseScale = this._radius * this._scaleMultiplier;
+        // const pulse =
+        //     this._pulseAmplitude > 0
+        //         ? Math.sin(this._visualTime * 0.0015 * 60) * (this._radius * this._pulseAmplitude)
+        //         : 0;
 
-        this._sprite.scale.setScalar(baseScale + pulse);
+        // this._sprite.scale.setScalar(baseScale + pulse);
         this._sprite.position.copy(this._position);
     }
 
