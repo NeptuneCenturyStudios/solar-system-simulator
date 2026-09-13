@@ -21,6 +21,7 @@
                 </div>
 
                 <template v-else>
+
                     <div class="control-group">
                         <label for="vueBodyTypeSelect">Body Type</label>
                         <select
@@ -36,6 +37,17 @@
                             <option value="black_hole">Black Hole</option>
                             <option value="wormhole">Wormhole</option>
                         </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="vueBodyNameInput">Name</label>
+                        <input
+                            id="vueBodyNameInput"
+                            v-model="bodyName"
+                            type="text"
+                            class="text-input"
+                            placeholder="Body name"
+                        />
                     </div>
 
                     <div v-if="showMass" class="control-group">
@@ -571,6 +583,7 @@ import {
     createPresetBodyByKey,
     deleteBodyById,
     formatNumber,
+    generateAddFormBodyName,
     getRandomizedCreateDefaults,
     loadBodyEditSnapshot,
     resolveOrbitParentId,
@@ -602,6 +615,8 @@ const addMode = ref<'preset' | 'custom'>('preset');
 const addTailColor = ref('#7ab8ff');
 const presetKey = ref('sun');
 const bodyType = ref('sun');
+/** Name shown in the add form; pre-filled procedurally and editable before CREATE. */
+const bodyName = ref('');
 const planetType = ref('solid');
 const moonType = ref('solid');
 const orbitType = ref<'circular' | 'elliptical'>('circular');
@@ -682,6 +697,7 @@ function resetAddForm(): void {
     addTailColor.value = '#7ab8ff';
     presetKey.value = 'sun';
     bodyType.value = 'sun';
+    bodyName.value = '';
     planetType.value = 'solid';
     moonType.value = 'solid';
     orbitType.value = 'circular';
@@ -699,6 +715,10 @@ function resetAddForm(): void {
 }
 
 function applyRandomDefaults(): void {
+    // Re-roll the name alongside the other preview values, so the Name box always shows a
+    // procedural name the user can accept or edit before creating.
+    bodyName.value = generateAddFormBodyName(bodyType.value);
+
     const defaults = getRandomizedCreateDefaults(bodyType.value);
     if (!defaults) return;
     if (defaults.mass !== null) mass.value = defaults.mass;
@@ -850,6 +870,8 @@ function onCreate(): void {
         const hidesRadius = bodyType.value === 'asteroid' || bodyType.value === 'comet';
         const payload: CreateBodyPayload = {
             bodyType: bodyType.value,
+            // Empty means "let the sim generate one procedurally".
+            customName: bodyName.value.trim() || null,
             planetType: bodyType.value === 'moon' ? moonType.value : planetType.value,
             orbitType: orbitType.value,
             inclination: inclination.value,

@@ -3,6 +3,7 @@ import { reactive } from 'vue';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { Body } from '../bodies/body';
 import { SHIP_TYPES } from '../bodies/ships/ship-registry';
+import { generateRandomCustomBodyName } from '../procedural/custom-body-naming';
 import {
     autopilotState,
     cameraState,
@@ -80,6 +81,11 @@ export interface BodyEditSnapshot {
  *  management panel's `createBody` event exactly. */
 export interface CreateBodyPayload {
     bodyType: string;
+    /**
+     * Name typed/edited in the add form. Null/empty means "generate one procedurally"
+     * (the sim falls back to a deterministic name seeded by the new body's id).
+     */
+    customName?: string | null;
     planetType: string;
     orbitType: string;
     inclination: number;
@@ -708,6 +714,39 @@ export function deleteBodyById(bodyId: string): void {
 /** Get freshly-randomized preview values for the add-custom form. */
 export function getRandomizedCreateDefaults(bodyType: string): RandomizedCreateDefaults | null {
     return hookRegistry.getRandomizedCreateDefaults?.(bodyType) ?? null;
+}
+
+/**
+ * Next Roman-numeral ordinal for a new moon, derived from how many existing bodies already
+ * carry the parent's name as their first token. Returns undefined when the parent is unknown,
+ * which lets the name generator fall back to its own deterministic ordinal.
+ */
+function resolveMoonSequenceNumber(parentName: string): number | undefined {
+    if (!parentName) return undefined;
+    const prefix = `${parentName} `;
+    const existing = simulationState.bodies.filter(
+        (b) => b && !b._isDisposed && typeof b.name === 'string' && b.name.startsWith(prefix)
+    ).length;
+    return existing + 1;
+}
+
+/**
+ * Fresh procedural name for the add form's Name box. Moons are named relative to their
+ * orbit parent (the current selection), matching how the sim names them at creation.
+ */
+export function generateAddFormBodyName(bodyType: string): string {
+    if (bodyType !== 'moon') return generateRandomCustomBodyName(bodyType);
+
+    const parentId = resolveOrbitParentId(state.selectedId);
+    const parent = parentId
+        ? simulationState.bodies.find((b) => b && b.id === parentId && !b._isDisposed)
+        : undefined;
+    const parentName = parent?.name;
+
+    return generateRandomCustomBodyName(bodyType, {
+        parentName,
+        sequenceNumber: parentName ? resolveMoonSequenceNumber(parentName) : undefined,
+    });
 }
 
 // ── Solar System Management actions ──────────────────────────────────────

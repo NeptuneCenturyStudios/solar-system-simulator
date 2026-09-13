@@ -73,10 +73,10 @@ import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
     isBodyType,
     createUniqueId,
-    generateIAUName,
     getBodyTypeLabel,
     buildBodySphereGeometry,
 } from './utilities/utilities';
+import { generateCustomBodyName } from './procedural/custom-body-naming';
 import { SeededRandom } from './utilities/prng';
 import { generateSeedString } from './procedural/seed-utils';
 import { resetPhysicsState, setBodyRadius } from './physics/physics';
@@ -1137,7 +1137,10 @@ function createNewBody(
     //
     // Undefined (the default, for callers that omit it) means "roll one procedurally";
     // an explicit null from the panel means "this body has no field".
-    magneticField: IMagneticFieldOptions | null | undefined = undefined
+    magneticField: IMagneticFieldOptions | null | undefined = undefined,
+    // Optional name supplied by the add form. Null/empty means "generate one procedurally
+    // from the new body's id" (kept last so existing positional callers are unaffected).
+    customName: string | null = null
 ) {
     let newBody;
     let moonCreationParent: Body | null = null; // tracked so post-creation can re-focus the parent
@@ -1163,7 +1166,7 @@ function createNewBody(
         const { rotationTilt, rotationSpeed } = starParams;
 
         const id = createUniqueId('star');
-        const name = generateIAUName(BodyTypeEnum.Star, null, simulationState.bodies);
+        const name = customName ?? generateCustomBodyName('sun', id);
 
         newBody = createMainSequenceStarFromParams(dependencies, scene, starParams, {
             id,
@@ -1239,7 +1242,7 @@ function createNewBody(
 
         newBody = createPlanetBodyFromProceduralCreation(dependencies, scene, {
             id: planetId,
-            name: generateIAUName(BodyTypeEnum.Planet, null, simulationState.bodies),
+            name: customName ?? generateCustomBodyName('planet', planetId),
             pos: spawnPos,
             vel: spawnVel,
             bodyType: BodyTypeEnum.Planet,
@@ -1371,11 +1374,10 @@ function createNewBody(
             const moonSpawnVel = parentVel.clone().addScaledVector(orbitDir, orbitSpeed);
 
             const moonId = createUniqueId('moon');
-            const moonName = generateIAUName(
-                BodyTypeEnum.Moon,
-                focusedBody,
-                simulationState.bodies
-            );
+            // Moons are named relative to their parent: "<Parent> <Roman numeral>".
+            const moonName =
+                customName ??
+                generateCustomBodyName('moon', moonId, { parentName: focusedBody.name });
 
             const geometry = buildBodySphereGeometry(moonRadius);
 
@@ -1521,13 +1523,14 @@ function createNewBody(
             radius: customRadius,
         });
 
+        const asteroidId = createUniqueId('asteroid');
         newBody = new Asteroid(dependencies, scene, {
             pos: asteroidSpawnPos,
             vel: asteroidVel,
             mass: asteroidMass,
             radius: asteroidRadius,
-            id: createUniqueId('asteroid'),
-            name: generateIAUName(BodyTypeEnum.Asteroid, null, simulationState.bodies),
+            id: asteroidId,
+            name: customName ?? generateCustomBodyName('asteroid', asteroidId),
         });
     } else if (bodyType === 'comet') {
         // Create a comet near the camera with appropriate orbital velocity
@@ -1552,13 +1555,14 @@ function createNewBody(
             radius: customRadius,
         });
 
+        const cometId = createUniqueId('comet');
         newBody = new GenericComet(dependencies, scene, {
             radius: cometRadius,
             pos: cometSpawnPos,
             vel: cometOrbitVel,
             mass: cometMass,
-            id: createUniqueId('comet'),
-            name: generateIAUName(BodyTypeEnum.Comet, null, simulationState.bodies),
+            id: cometId,
+            name: customName ?? generateCustomBodyName('comet', cometId),
             rotation: { tilt: 0, speed: 0.05 },
             tailColor:
                 typeof tailColor === 'string' && tailColor.startsWith('#')
@@ -1569,13 +1573,14 @@ function createNewBody(
         const bhSpawnPos = getNearCameraSpawnPos();
         const { mass: bhMass } = randomBlackHoleParams({ mass: customMass });
 
+        const blackHoleId = createUniqueId('black_hole');
         newBody = new BlackHole(
             dependencies,
             scene,
             bhSpawnPos,
             bhMass,
-            createUniqueId('black_hole'),
-            generateIAUName(BodyTypeEnum.BlackHole, null, simulationState.bodies),
+            blackHoleId,
+            customName ?? generateCustomBodyName('black_hole', blackHoleId),
             { tilt: 0, speed: 0 }
         );
 
@@ -1590,13 +1595,14 @@ function createNewBody(
                 ? customRadius
                 : WORMHOLE_DEFAULT_RADIUS;
 
+        const wormholeId = createUniqueId('wormhole');
         const wormhole = new Wormhole(
             dependencies,
             scene,
             wormholeSpawnPos,
             wormholeRadius,
-            createUniqueId('wormhole'),
-            generateIAUName(BodyTypeEnum.Wormhole, null, simulationState.bodies),
+            wormholeId,
+            customName ?? generateCustomBodyName('wormhole', wormholeId),
             { tilt: 0, speed: 0 }
         );
         newBody = wormhole;
@@ -3359,7 +3365,8 @@ registerVueSimHooks({
             payload.createTilt,
             payload.createAzimuth,
             payload.tailColor,
-            payload.magneticField
+            payload.magneticField,
+            payload.customName ?? null
         );
         return body && !body._isDisposed ? body.id : null;
     },

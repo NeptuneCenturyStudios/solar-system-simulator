@@ -4,7 +4,8 @@ import { Sun } from '../bodies/sun';
 import { Earth } from '../bodies/earth';
 import { Wormhole } from '../bodies/wormhole';
 import { createBridgeForPair } from '../effects/wormhole-link-bridge';
-import { createUniqueId, generateIAUName } from '../utilities/utilities';
+import { createUniqueId } from '../utilities/utilities';
+import { generateProceduralBodyName } from './body-naming';
 import {
     WORMHOLE_SHORTCUT_GATE_RADIUS,
     WORMHOLE_SHORTCUT_ORBIT_RADIUS,
@@ -92,9 +93,9 @@ export class WormholeShortcutGenerator extends SolarSystemGenerator {
      * mouth — not its tail tip — is the face Earth meets.
      * @param theta Orbital angle in radians (0 = +X axis, π/2 = +Z axis).
      * @param facing Which way the flare opens relative to Earth's CCW direction of travel.
-     * @param bodies Bodies created so far, used only to keep the generated IAU name unique.
+     * @param gateIndex 1-based gate ordinal; seeds the procedural name and its Roman suffix.
      */
-    private createGate(theta: number, facing: GateFacing, bodies: Body[]): Wormhole {
+    private createGate(theta: number, facing: GateFacing, gateIndex: number): Wormhole {
         const pos = new THREE.Vector3(
             WORMHOLE_SHORTCUT_ORBIT_RADIUS * Math.cos(theta),
             0,
@@ -107,7 +108,10 @@ export class WormholeShortcutGenerator extends SolarSystemGenerator {
             pos,
             WORMHOLE_SHORTCUT_GATE_RADIUS,
             createUniqueId('wormhole'),
-            generateIAUName(BodyTypeEnum.Wormhole, null, bodies),
+            generateProceduralBodyName(BodyTypeEnum.Wormhole, {
+                seed: `${this.masterSeed}|wormhole:${gateIndex}`,
+                sequenceNumber: gateIndex,
+            }),
             {
                 tilt: 90,
                 speed: 0,
@@ -150,7 +154,7 @@ export class WormholeShortcutGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // ── Wormhole A (intake: +Z "top", flare turned back at oncoming Earth) ──
-        const gateA = this.createGate(WormholeShortcutGenerator.THETA_A, 'oncoming', bodies);
+        const gateA = this.createGate(WormholeShortcutGenerator.THETA_A, 'oncoming', 1);
         bodies.push(gateA);
         reporter?.report({
             completed: 3,
@@ -160,7 +164,7 @@ export class WormholeShortcutGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // ── Wormhole B (outlet: opposite side of the Sun, flare aimed downstream) ──
-        const gateB = this.createGate(WormholeShortcutGenerator.THETA_B, 'downstream', bodies);
+        const gateB = this.createGate(WormholeShortcutGenerator.THETA_B, 'downstream', 2);
         bodies.push(gateB);
         reporter?.report({
             completed: 4,
