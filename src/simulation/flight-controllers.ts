@@ -332,7 +332,10 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     ctx.steeringEndMarker.position.set(noseScreenX + displayOffX, noseScreenY - displayOffY, 0);
     ctx.steeringEndMarker.visible = true;
 
+    // Hidden while the autopilot is flying (the player isn't steering), during ALT-orbit,
+    // and while shedding speed in a warp/boost/stop-brake deceleration.
     if (
+        autopilotState.isActive ||
         flightState.altOrbitActive ||
         flightState.altOrbitYaw !== 0 ||
         flightState.altOrbitPitch !== 0

@@ -20,10 +20,6 @@ export class GlowDisk implements IEffect {
     private _radius: number;
     private _colorHex: number;
     private _position: THREE.Vector3;
-    private _visualTime: number = 0;
-
-    /** The pulse offset is ±(pulseAmplitude * radius). 0 = no pulse. */
-    private _pulseAmplitude: number;
     private _scaleMultiplier: number;
 
     constructor(
@@ -32,7 +28,6 @@ export class GlowDisk implements IEffect {
         radius: number,
         colorHex: number,
         position: THREE.Vector3,
-        pulseAmplitude = 0.05,
         scaleMultiplier = 2.24
     ) {
         this.dependencies = dependencies;
@@ -40,7 +35,6 @@ export class GlowDisk implements IEffect {
         this._radius = radius;
         this._colorHex = colorHex;
         this._position = position.clone();
-        this._pulseAmplitude = pulseAmplitude;
         this._scaleMultiplier = scaleMultiplier;
 
         this._buildSprite();

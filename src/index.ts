@@ -3798,6 +3798,8 @@ function refreshSelectionVisuals() {
     // Recompute gizmo scale immediately when selected body properties change (e.g., star mass -> radius)
     if (!selectedBody || !simulationState.bodies.includes(selectedBody) || selectedBody._isDisposed)
         return;
+    // The gizmo is only ever shown while Target mode is on, so never attach it when Target is off.
+    if (!cameraState.isTargetMode) return;
     gizmo.attach(selectedBody);
 }
 
@@ -3983,7 +3985,7 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
             body.rings.position.copy(body.mesh.position);
             body.rings.quaternion.copy(body.mesh.quaternion);
         }
-        if (body === selectedBody) gizmo.attach(body);
+        if (body === selectedBody && cameraState.isTargetMode) gizmo.attach(body);
     }
 }
 
