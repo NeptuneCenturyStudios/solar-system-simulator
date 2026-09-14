@@ -66,6 +66,11 @@ export class GenericComet extends Comet {
                 scaledBbox.getCenter(center);
                 group.position.sub(center);
 
+                // Tag every loaded sub-mesh so click-picking resolves to this body.
+                // The base Body tags only the placeholder mesh; without this the
+                // raycaster hits an untagged OBJ child and selection silently fails.
+                group.traverse((child) => (child.userData.parentBody = this));
+
                 this.mesh.add(group);
             })
             .catch((e) => {

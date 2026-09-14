@@ -606,6 +606,25 @@ document.addEventListener('touchcancel', endTouch, { passive: true });
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+/**
+ * Resolve the owning Body for a raycast hit.
+ *
+ * The base `Body` tags only its top-level mesh with `userData.parentBody`, but
+ * bodies like asteroids/comets load an OBJ whose sub-meshes are added as
+ * children of that mesh. Raycasting is recursive, so the first hit is often an
+ * untagged child. Walk up the parent chain until a tagged node is found so the
+ * click resolves to the correct body regardless of which sub-mesh was hit.
+ */
+function resolveParentBody(object: THREE.Object3D): Body | null {
+    let node: THREE.Object3D | null = object;
+    while (node) {
+        const body = node.userData.parentBody as Body | undefined;
+        if (body) return body;
+        node = node.parent;
+    }
+    return null;
+}
+
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
 
@@ -2250,7 +2269,7 @@ function onMouseDown(event: MouseEvent) {
     );
 
     if (bodyIntersects.length > 0) {
-        const clickedBody = bodyIntersects[0].object.userData.parentBody;
+        const clickedBody = resolveParentBody(bodyIntersects[0].object);
         if (clickedBody) {
             // Click-to-zoom rules:
             // - If nothing is selected: selecting any body should zoom.
@@ -2389,12 +2408,14 @@ function onMouseMove(event: MouseEvent) {
 
         if (bodyIntersects.length > 0) {
             // Snap to the target body
-            const targetBody = bodyIntersects[0].object.userData.parentBody;
-            const newVel = new THREE.Vector3().subVectors(
-                targetBody.mesh.position,
-                gizmo.target.mesh.position
-            );
-            gizmo.target.velocity.copy(newVel.divideScalar(VEL_SCALE));
+            const targetBody = resolveParentBody(bodyIntersects[0].object);
+            if (targetBody && gizmo.target) {
+                const newVel = new THREE.Vector3().subVectors(
+                    targetBody.mesh.position,
+                    gizmo.target.mesh.position
+                );
+                gizmo.target.velocity.copy(newVel.divideScalar(VEL_SCALE));
+            }
         } else {
             // Use drag plane intersection, then constrain by current edit mode
             const intersection = new THREE.Vector3();
