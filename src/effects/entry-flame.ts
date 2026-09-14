@@ -3,20 +3,209 @@ import { Body } from '../bodies/body.js';
 import { settingsStore } from '../settings/settings-store.js';
 import { DIST_SCALE } from '../utilities/consts.js';
 
+// ── Shape tuning ──────────────────────────────────────────────────────────
+/** Flame length, as a multiple of the body radius. */
+const CONE_LENGTH_FACTOR = 9;
+/** Peak flame radius, as a multiple of the body radius (the widest ring, at the body centre). */
+const CONE_RADIUS_FACTOR = 1.25;
+/** Radius of the blunt ring at the very front (the leading edge), as a multiple of the body radius.
+ *  Non-zero so the cone can wrap the sphere's steeply-curving front hemisphere without the body
+ *  poking through it — a zero-radius nose apex can never stay outside a sphere near the tangent point. */
+const CONE_NOSE_RADIUS_FACTOR = 0.45;
+/** Lateral wander of the flame's tail, as a multiple of the body radius. */
+const CONE_BEND_FACTOR = 0.9;
+/** Travelling-wave ripple amplitude along the tail, as a multiple of the body radius. */
+const CONE_RIPPLE_FACTOR = 0.12;
+/** Number of vertices around the cone's circumference. */
+const RADIAL_SEGMENTS = 28;
+/** Number of rings along the cone's length. */
+const LENGTH_SEGMENTS = 20;
+
+// ── Animation tuning ──────────────────────────────────────────────────────
+/** How fast the flame's tail wanders (rad/s). */
+const BEND_WOBBLE_SPEED = 0.9;
+/** How fast the ripple travels down the tail (rad/s). */
+const RIPPLE_SPEED = 4.0;
+/** Number of ripple wavelengths along the flame. */
+const RIPPLE_WAVELENGTHS = 2.5;
+/** How fast the fire sprite scrolls around the flame (uv units/second). */
+const SPRITE_SCROLL_SPEED = 0.22;
+
+// ── Lifecycle tuning ──────────────────────────────────────────────────────
+/** Fade-in time (sim-seconds) from the moment the flame first appears. */
+const FADE_IN_SECONDS = 1.0;
+/** Fade-out time (sim-seconds) after the body leaves the atmosphere before the flame is gone. */
+const FADE_OUT_SECONDS = 1.0;
+
+// ── Intensity tuning ──────────────────────────────────────────────────────
 /**
- * Renders a backward-streaming plasma trail that engulfs an asteroid/comet while it's
- * inside a planet's atmosphere — a smaller, always-on relative of the ship exhaust
- * effect (`src/ship-effects/ship-flame.ts`), oriented by the body's own velocity
- * instead of a nozzle/exhaust direction fed in from outside.
+ * Relative-speed thresholds that drive the flame's intensity, given directly in km/s and
+ * converted to the engine's scaled velocity units via DIST_SCALE — the same convention used
+ * everywhere else a speed constant is declared (e.g. ASTEROID_DEFENSE_APPROACH_SPEED, ship
+ * FLIGHT_MAX_SPEED). `body.velocity` is already expressed in km/s ÷ DIST_SCALE, so a desired
+ * km/s threshold must be divided by DIST_SCALE too — comparing it to the raw km/s number would
+ * be off by a factor of DIST_SCALE (100).
  *
- * The effect keeps a live reference to `body` and reads its `mesh.position`/`velocity`
- * fresh every frame, so it tracks a moving body without needing to be re-parented or
- * fed transform data externally (same pattern as `src/effects/solar-flare.ts`).
+ * Below MIN_SPEED_FOR_EFFECT the flame is fully suppressed (0 intensity); at/above
+ * FULL_INTENSITY_SPEED it's fully lit (1); it ramps smoothly in between. Both are tuned for ship
+ * flight speeds (normal cruise ~75 km/s, boost a large fraction of light speed) rather than the
+ * asteroid-defense scenario's ~1200 km/s scripted impacts — those sail straight past
+ * FULL_INTENSITY_SPEED and stay fully lit no matter where this is tuned, since intensity clamps
+ * at 1 once past it.
+ */
+const MIN_SPEED_FOR_EFFECT = 50 / DIST_SCALE; // ~10 km/s — flame starts appearing
+const FULL_INTENSITY_SPEED = 150 / DIST_SCALE; // ~150 km/s — fully ablaze
+
+/** Flame length scale at zero intensity (1 at full intensity). */
+const LENGTH_SCALE_MIN = 0.35;
+/** Flame radius scale at zero intensity (1 at full intensity). */
+const RADIUS_SCALE_MIN = 0.85;
+
+// ── Sprite ────────────────────────────────────────────────────────────────
+const SPRITE_WIDTH = 256;
+const SPRITE_HEIGHT = 256;
+
+/** Vertical position of the sprite's hot base, as a fraction of the flame's length — the flame
+ *  fades in over this short distance so the open front ring never shows a hard cut-off edge. */
+const BASE_FADE_FRACTION = 0.02;
+
+// Reusable scratch objects — the update loop runs every frame and must not allocate.
+const _UP = new THREE.Vector3(0, 1, 0);
+const _FLIP_AXIS = new THREE.Vector3(1, 0, 0);
+const _TWO_PI = Math.PI * 2;
+
+/**
+ * Colour ramp for the fire sprite, from the hot base of the flame (v = 0) to its cool tip (v = 1).
+ * Each stop is [position, r, g, b] with components in [0, 1].
+ */
+const FLAME_RAMP: ReadonlyArray<readonly [number, number, number, number]> = [
+    [0.0, 1.0, 0.97, 0.85], // white-hot
+    [0.22, 1.0, 0.82, 0.35], // yellow
+    [0.5, 1.0, 0.5, 0.1], // orange
+    [0.78, 0.85, 0.2, 0.03], // deep orange-red
+    [1.0, 0.4, 0.05, 0.01], // cooling red
+];
+
+/** Lerps the flame colour ramp at `v` ∈ [0, 1], returning [r, g, b] in [0, 1]. */
+function flameColor(v: number): [number, number, number] {
+    const clamped = v < 0 ? 0 : v > 1 ? 1 : v;
+    let lower = FLAME_RAMP[0];
+    for (let i = 1; i < FLAME_RAMP.length; i++) {
+        const upper = FLAME_RAMP[i];
+        if (clamped <= upper[0]) {
+            const span = Math.max(upper[0] - lower[0], 1e-6);
+            const k = (clamped - lower[0]) / span;
+            return [
+                lower[1] + (upper[1] - lower[1]) * k,
+                lower[2] + (upper[2] - lower[2]) * k,
+                lower[3] + (upper[3] - lower[3]) * k,
+            ];
+        }
+        lower = upper;
+    }
+    const last = FLAME_RAMP[FLAME_RAMP.length - 1];
+    return [last[1], last[2], last[3]];
+}
+
+/**
+ * Horizontally tileable plasma-streak mask for the fire sprite. Every term is an integer multiple
+ * of `u`, so the pattern wraps seamlessly where the cone's uv seam meets itself.
+ */
+function flameStreak(u: number, v: number): number {
+    const s =
+        0.62 +
+        0.2 * Math.sin(_TWO_PI * 3 * u + v * 7.0) +
+        0.12 * Math.sin(_TWO_PI * 7 * u - v * 13.0) +
+        0.08 * Math.sin(_TWO_PI * 13 * u + v * 23.0);
+    return s < 0 ? 0 : s > 1 ? 1 : s;
+}
+
+/**
+ * Builds the flame's colour + alpha sprite: a hot core at the bottom fading to nothing at the top,
+ * overlaid with tileable streaks. Sampled once across the cone's circumference and length.
+ */
+function buildFlameSprite(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = SPRITE_WIDTH;
+    canvas.height = SPRITE_HEIGHT;
+    const ctx = canvas.getContext('2d')!;
+    const image = ctx.createImageData(SPRITE_WIDTH, SPRITE_HEIGHT);
+    const data = image.data;
+
+    for (let y = 0; y < SPRITE_HEIGHT; y++) {
+        // flameV: 0 at the bottom of the sprite (the hot base / leading edge) → 1 at the top (tip).
+        const flameV = 1 - y / (SPRITE_HEIGHT - 1);
+        const color = flameColor(flameV);
+        // Vertical falloff plus the short base fade that hides the open front ring's edge.
+        const vertical =
+            Math.pow(1 - flameV, 1.2) * THREE.MathUtils.smoothstep(flameV, 0, BASE_FADE_FRACTION);
+        for (let x = 0; x < SPRITE_WIDTH; x++) {
+            const u = x / SPRITE_WIDTH;
+            const alpha = vertical * flameStreak(u, flameV);
+            const i = (y * SPRITE_WIDTH + x) * 4;
+            data[i] = color[0] * 255;
+            data[i + 1] = color[1] * 255;
+            data[i + 2] = color[2] * 255;
+            data[i + 3] = Math.min(1, Math.max(0, alpha)) * 255;
+        }
+    }
+
+    ctx.putImageData(image, 0, 0);
+    const texture = new THREE.CanvasTexture(canvas);
+    // Repeat horizontally (the seam is a real uv wrap) but clamp vertically so scrolling cannot
+    // smear the gradient past the base or tip.
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    return texture;
+}
+
+/**
+ * Radius of the flame's cross-section at normalised length `t` ∈ [0, 1]. The profile bulges out to
+ * `rMax` where the body's centre sits, then tapers to a point at the tail, so the cone hugs the
+ * body's front hemisphere and streams away into a wake behind it.
  *
- * Particles spawn from the body's leading surface point (in the direction of travel)
- * and drift backward relative to the body's motion, producing a meteor-style plasma
- * trail. Float64 world-space positions avoid float32 precision loss far from the
- * origin; the Points objects are rendered camera-relative like ShipFlame.
+ * @param t      Normalised distance from the leading edge (0) to the flame tip (1).
+ * @param bodyT  Normalised position of the body's centre along the flame.
+ * @param rNose  Radius of the blunt ring at the leading edge.
+ * @param rMax   Peak radius, at the body's centre.
+ */
+function radiusProfile(t: number, bodyT: number, rNose: number, rMax: number): number {
+    if (t <= bodyT) {
+        // Front half: blunt nose growing out to the widest ring at the body's centre. The sqrt
+        // keeps pace with the sphere's own sqrt(2ry − y²) silhouette so the flame stays outside it.
+        const k = bodyT > 0 ? t / bodyT : 1;
+        return rNose + (rMax - rNose) * Math.sqrt(k);
+    }
+    // Rear half: taper from the widest ring to a point.
+    const k = (t - bodyT) / Math.max(1 - bodyT, 1e-6);
+    return rMax * Math.pow(1 - k, 0.9);
+}
+
+/**
+ * Renders the atmospheric-entry flame as a single curved cone ("spindle plume") mesh that trails
+ * behind a body moving through a planet's atmosphere.
+ *
+ * Replaces the earlier particle-spray implementation, which scattered points across a very wide
+ * (~109° half-angle) cone and read as noise rather than a flame. This version is one cohesive
+ * `THREE.Mesh`:
+ *
+ *  - The geometry is a swept cone built once in the constructor, with its blunt wide end at the
+ *    body's leading edge and its tip tapering away behind it. The spine bends and ripples, rewritten
+ *    every frame, so the flame visibly curves and shifts instead of sitting as a rigid triangle.
+ *  - The mesh is re-oriented each frame so its axis follows the body's instantaneous velocity — the
+ *    flame always streams directly behind the body's current direction of travel.
+ *  - A procedurally generated fire sprite (hot core → orange → transparent, with plasma streaks)
+ *    scrolls around the surface for a flickering, alive look.
+ *  - Intensity is driven by the body's speed *relative to the planet* (not its heliocentric speed):
+ *    the flame grows, brightens and stretches from MIN_SPEED_FOR_EFFECT up to FULL_INTENSITY_SPEED.
+ *  - The flame eases in when it first appears and dissolves out when the body leaves the
+ *    atmosphere: `stop()` begins the fade-out, and `active` flips to false once it finishes, at
+ *    which point the owner disposes the effect (see `checkAtmosphericEntry`).
+ *
+ * The effect keeps a live reference to `body` and reads `mesh.position`/`velocity` fresh every frame,
+ * so it tracks a moving body without needing to be re-parented or fed transform data externally
+ * (same pattern as `src/effects/solar-flare.ts`).
  */
 export class EntryFlameEffect {
     private readonly scene: THREE.Scene;
@@ -27,60 +216,46 @@ export class EntryFlameEffect {
      *  inside some other, unrelated atmosphere-bearing planet it's compared against. */
     readonly planet: Body;
 
-    private readonly px: Float64Array;
-    private readonly py: Float64Array;
-    private readonly pz: Float64Array;
-    private readonly vx: Float32Array;
-    private readonly vy: Float32Array;
-    private readonly vz: Float32Array;
-    private readonly life: Float32Array;
-    private readonly lifeIncrement: Float32Array;
+    private readonly geometry: THREE.BufferGeometry;
+    private readonly material: THREE.MeshBasicMaterial;
+    private readonly texture: THREE.CanvasTexture;
+    private readonly mesh: THREE.Mesh;
+    private readonly positionAttribute: THREE.BufferAttribute;
 
-    private readonly gpuPos: Float32Array;
-    private readonly gpuColorInner: Float32Array;
-    private readonly gpuColorOuter: Float32Array;
+    /** Live vertex buffer, rewritten each frame by `_writeSpine`. */
+    private readonly positions: Float32Array;
+    /** Unit ring direction per radial vertex (the +X / +Z components of each ring vertex). */
+    private readonly cosTheta: Float32Array;
+    private readonly sinTheta: Float32Array;
+    /** Local-space Y of each ring along the cone's length. */
+    private readonly ringY: Float32Array;
+    /** Cross-section radius of each ring (fixed; intensity scaling is applied via the mesh transform). */
+    private readonly ringRadius: Float32Array;
 
-    private readonly innerGeo: THREE.BufferGeometry;
-    private readonly outerGeo: THREE.BufferGeometry;
-    private readonly innerMat: THREE.PointsMaterial;
-    private readonly outerMat: THREE.PointsMaterial;
+    private readonly coneLength: number;
+    private readonly bodyT: number;
+    private readonly bendAmplitude: number;
+    private readonly rippleAmplitude: number;
 
-    private readonly glowInner: THREE.Points;
-    private readonly glowOuter: THREE.Points;
-
-    private readonly LIFETIME_BASE: number;
-    private readonly DRIFT_SPEED: number;
-
-    /** Fractional particle count carried over between frames so low-dt frames (e.g. at
-     *  low timewarp) still accumulate toward an emission instead of always rounding to 0. */
-    private emitAccumulator = 0;
-
-    private readonly MAX_PARTICLES = 250;
-    /** Half-angle (radians) of the surface patch particles spawn from, measured from the
-     *  direction of travel. > PI/2 so the flame wraps past the equator and reads as
-     *  "engulfing" the body rather than a narrow directional jet. */
-    private readonly SPREAD = 1.9;
-    private readonly EMIT_PER_SECOND = 1000;
-    private readonly DEAD = -1;
+    /** Seconds of simulated time accumulated since construction, driving the spine animation. */
+    private time = 0;
 
     /**
-     * Relative-speed thresholds that drive the flame's intensity, given directly in km/s
-     * and converted to the engine's scaled velocity units via DIST_SCALE — the same
-     * convention used everywhere else a speed constant is declared (e.g.
-     * ASTEROID_DEFENSE_APPROACH_SPEED, ship FLIGHT_MAX_SPEED). `body.velocity` is already
-     * expressed in km/s ÷ DIST_SCALE, so a desired km/s threshold must be divided by
-     * DIST_SCALE too — comparing it to the raw km/s number would be off by a factor of
-     * DIST_SCALE (100).
-     *
-     * Below MIN_SPEED_FOR_EFFECT the flame is fully suppressed (0 intensity); at/above
-     * FULL_INTENSITY_SPEED it's fully lit (1); it ramps smoothly in between. Both are tuned
-     * for ship flight speeds (normal cruise ~75 km/s, boost a large fraction of light
-     * speed) rather than the asteroid-defense scenario's ~1200 km/s scripted impacts —
-     * those sail straight past FULL_INTENSITY_SPEED and stay fully lit no matter where
-     * this is tuned, since intensity clamps at 1 once past it.
+     * False once the flame has fully faded out and may be disposed. Mirrors the
+     * `IPipelineFeedEffect` contract (`stopSpawning()` / `active`): the owner calls `stop()` when
+     * the body leaves the atmosphere, keeps updating the effect each frame, and disposes it once
+     * this reads false.
      */
-    private readonly MIN_SPEED_FOR_EFFECT = 10 / DIST_SCALE; // ~10 km/s — flame starts appearing
-    private readonly FULL_INTENSITY_SPEED = 150 / DIST_SCALE; // ~150 km/s — fully ablaze
+    active = true;
+    /** 0→1 fade envelope: ramps up from first appearing, then back down after `stop()`. */
+    private envelope = 0;
+    /** True once `stop()` has been called and the flame is dissolving. */
+    private stopping = false;
+
+    // Scratch objects reused every frame.
+    private readonly _dir = new THREE.Vector3();
+    private readonly _backward = new THREE.Vector3();
+    private readonly _quat = new THREE.Quaternion();
 
     constructor(scene: THREE.Scene, body: Body, planet: Body) {
         this.scene = scene;
@@ -88,231 +263,241 @@ export class EntryFlameEffect {
         this.planet = planet;
 
         const radius = body.radius;
-        this.LIFETIME_BASE = 96 * radius;
-        this.DRIFT_SPEED = 14 * radius;
+        this.coneLength = CONE_LENGTH_FACTOR * radius;
+        this.bodyT = radius / this.coneLength;
+        this.bendAmplitude = CONE_BEND_FACTOR * radius;
+        this.rippleAmplitude = CONE_RIPPLE_FACTOR * radius;
 
-        this.px = new Float64Array(this.MAX_PARTICLES);
-        this.py = new Float64Array(this.MAX_PARTICLES);
-        this.pz = new Float64Array(this.MAX_PARTICLES);
-        this.vx = new Float32Array(this.MAX_PARTICLES);
-        this.vy = new Float32Array(this.MAX_PARTICLES);
-        this.vz = new Float32Array(this.MAX_PARTICLES);
-        this.life = new Float32Array(this.MAX_PARTICLES).fill(this.DEAD);
-        this.lifeIncrement = new Float32Array(this.MAX_PARTICLES);
+        const rMax = CONE_RADIUS_FACTOR * radius;
+        const rNose = CONE_NOSE_RADIUS_FACTOR * radius;
 
-        this.gpuPos = new Float32Array(this.MAX_PARTICLES * 3);
-        this.gpuColorInner = new Float32Array(this.MAX_PARTICLES * 3);
-        this.gpuColorOuter = new Float32Array(this.MAX_PARTICLES * 3);
+        const ringCount = LENGTH_SEGMENTS + 1;
+        // One extra vertex per ring duplicates the uv seam so the surface can wrap cleanly; with a
+        // horizontally-tileable sprite and RepeatWrapping the duplicate samples the same texel.
+        const ringVertices = RADIAL_SEGMENTS + 1;
+        const vertexCount = ringCount * ringVertices;
 
-        const tc = document.createElement('canvas');
-        const GS = 128;
-        tc.width = GS;
-        tc.height = GS;
-        const ctx = tc.getContext('2d')!;
-        const grad = ctx.createRadialGradient(GS / 2, GS / 2, 0, GS / 2, GS / 2, GS / 2);
-        grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-        grad.addColorStop(0.25, 'rgba(255, 255, 255, 0.8)');
-        grad.addColorStop(0.6, 'rgba(255, 255, 255, 0.3)');
-        grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, GS, GS);
-        const flameTex = new THREE.CanvasTexture(tc);
+        this.positions = new Float32Array(vertexCount * 3);
+        const uvs = new Float32Array(vertexCount * 2);
+        const indices = new Uint32Array(LENGTH_SEGMENTS * RADIAL_SEGMENTS * 6);
 
-        this.innerGeo = new THREE.BufferGeometry();
-        this.innerGeo.setAttribute('position', new THREE.BufferAttribute(this.gpuPos, 3));
-        this.innerGeo.setAttribute('color', new THREE.BufferAttribute(this.gpuColorInner, 3));
-        this.innerGeo.setDrawRange(0, 0);
+        this.cosTheta = new Float32Array(ringVertices);
+        this.sinTheta = new Float32Array(ringVertices);
+        for (let j = 0; j < ringVertices; j++) {
+            const theta = (j / RADIAL_SEGMENTS) * _TWO_PI;
+            this.cosTheta[j] = Math.cos(theta);
+            this.sinTheta[j] = Math.sin(theta);
+        }
 
-        this.innerMat = new THREE.PointsMaterial({
-            vertexColors: true,
-            size: radius * 1.01,
+        this.ringY = new Float32Array(ringCount);
+        this.ringRadius = new Float32Array(ringCount);
+        for (let i = 0; i < ringCount; i++) {
+            const t = i / LENGTH_SEGMENTS;
+            this.ringY[i] = t * this.coneLength;
+            this.ringRadius[i] = radiusProfile(t, this.bodyT, rNose, rMax);
+        }
+
+        for (let i = 0; i < ringCount; i++) {
+            const v = i / LENGTH_SEGMENTS;
+            for (let j = 0; j < ringVertices; j++) {
+                const vertex = i * ringVertices + j;
+                uvs[vertex * 2] = j / RADIAL_SEGMENTS;
+                uvs[vertex * 2 + 1] = v;
+            }
+        }
+
+        let ptr = 0;
+        for (let i = 0; i < LENGTH_SEGMENTS; i++) {
+            for (let j = 0; j < RADIAL_SEGMENTS; j++) {
+                const a = i * ringVertices + j;
+                const b = a + 1;
+                const c = a + ringVertices;
+                const d = c + 1;
+                indices[ptr++] = a;
+                indices[ptr++] = c;
+                indices[ptr++] = b;
+                indices[ptr++] = b;
+                indices[ptr++] = c;
+                indices[ptr++] = d;
+            }
+        }
+
+        this.geometry = new THREE.BufferGeometry();
+        this.positionAttribute = new THREE.BufferAttribute(this.positions, 3);
+        this.positionAttribute.setUsage(THREE.DynamicDrawUsage);
+        this.geometry.setAttribute('position', this.positionAttribute);
+        this.geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        this.geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+
+        this.texture = buildFlameSprite();
+        this.material = new THREE.MeshBasicMaterial({
+            map: this.texture,
+            color: 0xffffff,
             transparent: true,
-            opacity: 1.0,
+            opacity: 0,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            sizeAttenuation: true,
-            map: flameTex,
-            alphaTest: 0.001,
+            side: THREE.DoubleSide,
         });
 
-        this.glowInner = new THREE.Points(this.innerGeo, this.innerMat);
-        this.glowInner.frustumCulled = false;
-        this.glowInner.renderOrder = 2;
-        scene.add(this.glowInner);
+        this.mesh = new THREE.Mesh(this.geometry, this.material);
+        this.mesh.frustumCulled = false;
+        this.mesh.renderOrder = 2;
+        this.mesh.visible = false;
+        scene.add(this.mesh);
 
-        this.outerGeo = new THREE.BufferGeometry();
-        this.outerGeo.setAttribute('position', new THREE.BufferAttribute(this.gpuPos, 3));
-        this.outerGeo.setAttribute('color', new THREE.BufferAttribute(this.gpuColorOuter, 3));
-        this.outerGeo.setDrawRange(0, 0);
+        // Seed the vertex buffer so the very first rendered frame has valid geometry.
+        this._writeSpine(0);
+        this.positionAttribute.needsUpdate = true;
+    }
 
-        this.outerMat = new THREE.PointsMaterial({
-            vertexColors: true,
-            size: radius * 1.01,
-            transparent: true,
-            opacity: 1.0,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            sizeAttenuation: true,
-            map: flameTex,
-            alphaTest: 0.001,
-        });
+    /**
+     * Rewrites the cone's vertices for the current time: the tail wanders in a slow circle while a
+     * travelling ripple runs down its length, giving the flame a curved, shifting silhouette.
+     */
+    private _writeSpine(time: number): void {
+        const ringCount = this.ringY.length;
+        const ringVertices = this.cosTheta.length;
+        const positions = this.positions;
 
-        this.glowOuter = new THREE.Points(this.outerGeo, this.outerMat);
-        this.glowOuter.frustumCulled = false;
-        this.glowOuter.renderOrder = 2;
-        scene.add(this.glowOuter);
+        const wobbleX = Math.sin(time * BEND_WOBBLE_SPEED);
+        const wobbleZ = Math.cos(time * BEND_WOBBLE_SPEED * 0.61 + 1.1);
+
+        for (let i = 0; i < ringCount; i++) {
+            const t = i / (ringCount - 1);
+            // Bend only the tail — the base ring stays pinned to the body's leading edge.
+            const taper = Math.pow(t, 1.5);
+            const ripple = Math.sin(t * _TWO_PI * RIPPLE_WAVELENGTHS - time * RIPPLE_SPEED);
+            const bendX = this.bendAmplitude * wobbleX * taper + this.rippleAmplitude * ripple * t;
+            const bendZ =
+                this.bendAmplitude * wobbleZ * taper + this.rippleAmplitude * ripple * t * 0.6;
+
+            const y = this.ringY[i];
+            const r = this.ringRadius[i];
+            const base = i * ringVertices;
+
+            for (let j = 0; j < ringVertices; j++) {
+                const index = (base + j) * 3;
+                positions[index] = this.cosTheta[j] * r + bendX;
+                positions[index + 1] = y;
+                positions[index + 2] = this.sinTheta[j] * r + bendZ;
+            }
+        }
+    }
+
+    /**
+     * Begins the fade-out. The flame keeps rendering (and dimming) until `active` flips to false,
+     * at which point the owner should dispose it. Safe to call every frame.
+     */
+    stop(): void {
+        this.stopping = true;
+    }
+
+    /**
+     * Cancels a pending fade-out and fades the flame back in — called while the body is (still, or
+     * once again) inside the atmosphere it spawned for. Safe to call every frame.
+     */
+    start(): void {
+        this.stopping = false;
     }
 
     /**
      * Update per frame (call once per render frame, not per physics substep).
      * @param dt Frame delta-time in seconds.
-     * @param cameraPos World-space camera position, used to render particles camera-relative.
+     * @param _cameraPos World-space camera position (unused — the mesh is placed in world space).
      */
-    update(dt: number, cameraPos: THREE.Vector3): void {
+    update(dt: number, _cameraPos: THREE.Vector3): void {
         if (!settingsStore.settings.particleEffectsEnabled) {
-            this.glowInner.visible = false;
-            this.glowOuter.visible = false;
+            this.mesh.visible = false;
             return;
         }
 
         const absDt = Math.abs(dt);
+        this.time += absDt;
 
-        // ── 1. Age live particles ──────────────────────────────────────────
-        for (let i = 0; i < this.MAX_PARTICLES; i++) {
-            if (this.life[i] < 0) continue;
-            this.life[i] += this.lifeIncrement[i] * absDt * 32;
-            if (this.life[i] >= 1.0) this.life[i] = this.DEAD;
+        // ── Fade envelope ──────────────────────────────────────────────────────
+        // Eases the flame in from nothing when it first appears, and dissolves it out once the
+        // body leaves the atmosphere (stop()), rather than popping in or vanishing instantly.
+        if (this.stopping) {
+            this.envelope -= absDt / FADE_OUT_SECONDS;
+        } else {
+            this.envelope += absDt / FADE_IN_SECONDS;
         }
+        this.envelope = Math.min(1, Math.max(0, this.envelope));
 
-        // ── 2. Move live particles ─────────────────────────────────────────
-        if (absDt > 0) {
-            for (let i = 0; i < this.MAX_PARTICLES; i++) {
-                if (this.life[i] < 0) continue;
-                this.px[i] += this.vx[i] * absDt * 32;
-                this.py[i] += this.vy[i] * absDt * 32;
-                this.pz[i] += this.vz[i] * absDt * 32;
-            }
+        if (this.stopping && this.envelope <= 0) {
+            // Fully dissolved — flag inactive so the owner disposes this effect.
+            this.active = false;
+            this.mesh.visible = false;
+            return;
         }
 
         // Amplify with closing/relative speed against the planet (not heliocentric speed —
         // a ship co-moving with its planet has near-zero speed relative to it even though
         // its absolute velocity is large). Ramps smoothly from dark at MIN_SPEED_FOR_EFFECT
-        // to full brightness/density at FULL_INTENSITY_SPEED.
+        // to full brightness at FULL_INTENSITY_SPEED.
         const relativeSpeed = this.body.velocity.distanceTo(this.planet.velocity);
-        const intensity = THREE.MathUtils.smoothstep(
+        const speedIntensity = THREE.MathUtils.smoothstep(
             relativeSpeed,
-            this.MIN_SPEED_FOR_EFFECT,
-            this.FULL_INTENSITY_SPEED
+            MIN_SPEED_FOR_EFFECT,
+            FULL_INTENSITY_SPEED
         );
+        // The fade envelope multiplies the speed intensity, so the flame both eases in/out and
+        // still brightens/dims with how hard the body is entering the atmosphere.
+        const intensity = speedIntensity * this.envelope;
 
-        // ── 3. Emit new particles from the leading surface point ──────────
-        const bodyPos = this.body.mesh.position;
-        const bodyVel = this.body.velocity;
-        const speed = bodyVel.length();
-        const dir =
-            speed > 1e-6 ? bodyVel.clone().multiplyScalar(1 / speed) : new THREE.Vector3(0, 0, 1);
-
-        const upRef =
-            Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-        const perp1 = new THREE.Vector3().crossVectors(dir, upRef).normalize();
-        const perp2 = new THREE.Vector3().crossVectors(dir, perp1);
-
-        // Accumulate fractional emission count across frames — at low timewarp/dt the
-        // per-frame rate can be well under 1, and rounding it per-frame would always
-        // truncate to 0, silently suppressing the effect entirely below some dt threshold.
-        this.emitAccumulator += this.EMIT_PER_SECOND * intensity * absDt;
-        const nEmit = Math.floor(this.emitAccumulator);
-        this.emitAccumulator -= nEmit;
-        const adjustedLifetime = Math.min(
-            this.LIFETIME_BASE,
-            (this.MAX_PARTICLES * 0.5) / Math.max(this.EMIT_PER_SECOND, 1)
-        );
-
-        let emitted = 0;
-        for (let i = 0; i < this.MAX_PARTICLES && emitted < nEmit; i++) {
-            if (this.life[i] >= 0) continue;
-
-            const phi = Math.random() * Math.PI * 2;
-            const theta = Math.random() * this.SPREAD;
-            const cosT = Math.cos(theta);
-            const sinT = Math.sin(theta);
-            const sx = dir.x * cosT + (perp1.x * Math.cos(phi) + perp2.x * Math.sin(phi)) * sinT;
-            const sy = dir.y * cosT + (perp1.y * Math.cos(phi) + perp2.y * Math.sin(phi)) * sinT;
-            const sz = dir.z * cosT + (perp1.z * Math.cos(phi) + perp2.z * Math.sin(phi)) * sinT;
-
-            this.px[i] = bodyPos.x + sx * this.body.radius;
-            this.py[i] = bodyPos.y + sy * this.body.radius;
-            this.pz[i] = bodyPos.z + sz * this.body.radius;
-
-            // Trail backward relative to the body's own motion.
-            const drift = this.DRIFT_SPEED * (0.85 + Math.random() * 0.3);
-            this.vx[i] = bodyVel.x - dir.x * drift;
-            this.vy[i] = bodyVel.y - dir.y * drift;
-            this.vz[i] = bodyVel.z - dir.z * drift;
-
-            this.lifeIncrement[i] = (1 / adjustedLifetime) * (0.7 + Math.random() * 0.6);
-            this.life[i] = 0;
-            emitted++;
+        if (intensity <= 0.001) {
+            this.mesh.visible = false;
+            return;
         }
 
-        // ── 4. Compact live particles into GPU buffers (camera-relative) ──
-        this.glowInner.position.copy(cameraPos);
-        this.glowOuter.position.copy(cameraPos);
-        const cpx = cameraPos.x,
-            cpy = cameraPos.y,
-            cpz = cameraPos.z;
-        let n = 0;
-        for (let i = 0; i < this.MAX_PARTICLES; i++) {
-            if (this.life[i] < 0) continue;
-            const t = this.life[i];
-            const alive = 1 - t;
+        // Trail directly behind the body's instantaneous direction of travel.
+        const speed = this.body.velocity.length();
+        if (speed > 1e-6) {
+            this._dir.copy(this.body.velocity).multiplyScalar(1 / speed);
+        } else {
+            this._dir.set(0, 0, 1);
+        }
+        this._backward.copy(this._dir).negate();
 
-            this.gpuPos[n * 3] = this.px[i] - cpx;
-            this.gpuPos[n * 3 + 1] = this.py[i] - cpy;
-            this.gpuPos[n * 3 + 2] = this.pz[i] - cpz;
-
-            // Inner core: white-hot at birth → yellow → orange → dim red at death.
-            this.gpuColorInner[n * 3] = alive; // R: full
-            this.gpuColorInner[n * 3 + 1] = alive * (0.55 + 0.45 * alive); // G: high when young, low when old
-            this.gpuColorInner[n * 3 + 2] = alive * 0.2 * alive; // B: slight white tint only at birth
-
-            // Outer glow: warm orange halo, fades faster than the core.
-            const warm = alive * alive;
-            this.gpuColorOuter[n * 3] = warm;
-            this.gpuColorOuter[n * 3 + 1] = warm * 0.3;
-            this.gpuColorOuter[n * 3 + 2] = 0;
-
-            n++;
+        // Orient the cone (local +Y) along -velocity. The antipode guard mirrors BlackHoleJetEffect:
+        // setFromUnitVectors is undefined for exactly-opposite vectors.
+        const alignment = this._backward.dot(_UP);
+        if (alignment < -0.9999) {
+            this._quat.setFromAxisAngle(_FLIP_AXIS, Math.PI);
+        } else if (alignment < 0.9999) {
+            this._quat.setFromUnitVectors(_UP, this._backward);
+        } else {
+            this._quat.identity();
         }
 
-        this.innerGeo.attributes.position.needsUpdate = true;
-        this.innerGeo.attributes.color.needsUpdate = true;
-        this.outerGeo.attributes.position.needsUpdate = true;
-        this.outerGeo.attributes.color.needsUpdate = true;
-        this.innerGeo.setDrawRange(0, n);
-        this.outerGeo.setDrawRange(0, n);
+        // Anchor the blunt front ring at the body's leading edge so the flame wraps the front.
+        this.mesh.position.copy(this.body.mesh.position).addScaledVector(this._dir, this.body.radius);
+        this.mesh.quaternion.copy(this._quat);
 
-        // Fade existing particles immediately as speed drops, on top of the emission-rate
-        // throttling above — the two together give a smooth brighten/dim as speed changes
-        // rather than an abrupt on/off switch.
-        this.innerMat.opacity = intensity;
-        this.outerMat.opacity = intensity;
+        // Grow the flame with intensity: longer and slightly fatter as it ramps up.
+        const lengthScale = LENGTH_SCALE_MIN + (1 - LENGTH_SCALE_MIN) * intensity;
+        const radiusScale = RADIUS_SCALE_MIN + (1 - RADIUS_SCALE_MIN) * intensity;
+        this.mesh.scale.set(radiusScale, lengthScale, radiusScale);
 
-        const showing = n > 0 && intensity > 0;
-        this.glowInner.visible = showing;
-        this.glowOuter.visible = showing;
+        this._writeSpine(this.time);
+        this.positionAttribute.needsUpdate = true;
+
+        // Scroll the fire sprite around the flame for a flickering, shifting surface. Kept bounded
+        // so the offset stays precise during long atmospheric passes.
+        this.texture.offset.x += absDt * SPRITE_SCROLL_SPEED * (0.5 + intensity);
+        this.texture.offset.x -= Math.floor(this.texture.offset.x);
+
+        this.material.opacity = intensity;
+        this.mesh.visible = true;
     }
 
     /** Remove from scene and free GPU resources. */
     dispose(): void {
-        this.scene.remove(this.glowInner);
-        this.innerGeo.dispose();
-        this.innerMat.map?.dispose();
-        this.innerMat.dispose();
-
-        this.scene.remove(this.glowOuter);
-        this.outerGeo.dispose();
-        this.outerMat.map?.dispose();
-        this.outerMat.dispose();
+        this.active = false;
+        this.scene.remove(this.mesh);
+        this.geometry.dispose();
+        this.texture.dispose();
+        this.material.dispose();
     }
 }

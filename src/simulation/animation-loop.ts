@@ -192,9 +192,12 @@ function updateShipTrail(
 }
 
 /**
- * Checks one body pair for atmospheric-entry containment and creates/clears an
+ * Checks one body pair for atmospheric-entry containment and creates / fades out an
  * `EntryFlameEffect` on the asteroid/comet accordingly. A no-op unless one side is an
  * Asteroid/Comet and the other is a `CelestialBody` with an atmosphere.
+ *
+ * Leaving the atmosphere calls `stop()` rather than `dispose()` so the flame can fade out; the
+ * per-frame update in the collision pass disposes the effect once it reports `active === false`.
  */
 function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene): void {
     const isSmallBody = (body: Body) =>
@@ -228,15 +231,22 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene): void {
     const leadingEdgeDistance = distance - small.radius;
 
     if (leadingEdgeDistance < planet.atmosphereRadius) {
-        if (!small.entryFlame) small.entryFlame = new EntryFlameEffect(scene, small, planet);
+        if (!small.entryFlame) {
+            small.entryFlame = new EntryFlameEffect(scene, small, planet);
+        } else if (small.entryFlame.planet === planet) {
+            // Still inside (or back inside) — cancel any pending fade-out.
+            small.entryFlame.start();
+        }
     } else if (small.entryFlame && small.entryFlame.planet === planet) {
-        // Only clear the flame when leaving the specific planet it was created for — this
+        // Only stop the flame when leaving the specific planet it was created for — this
         // function runs once per (small body, atmosphere-bearing planet) pair every frame,
         // so a small body near Earth would otherwise have its just-created flame immediately
-        // disposed again by the very next pair checked against some unrelated planet (e.g.
-        // Mars, Jupiter) that it obviously isn't inside.
-        small.entryFlame.dispose();
-        small.entryFlame = null;
+        // torn down by the very next pair checked against some unrelated planet (e.g. Mars,
+        // Jupiter) that it obviously isn't inside.
+        //
+        // stop() only begins the fade-out: the flame keeps rendering (and dimming) and the
+        // per-frame update below disposes it once it reports itself inactive.
+        small.entryFlame.stop();
     }
 }
 
@@ -571,7 +581,16 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 if (b1 instanceof CelestialBody) b1.updateVisuals(dtTotal, ctx.camera.position);
                 if (b1 instanceof Comet) b1.updateTail(dtTotal, ctx.camera.position);
                 if (b1 instanceof Wormhole) b1.funnelEffect.update(dtTotal);
-                if (b1.entryFlame) b1.entryFlame.update(dtTotal, ctx.camera.position);
+                const entryFlame = b1.entryFlame;
+                if (entryFlame) {
+                    entryFlame.update(dtTotal, ctx.camera.position);
+                    // A stopped flame keeps rendering while it fades out; once it's fully
+                    // dissolved it reports inactive and is safe to dispose.
+                    if (!entryFlame.active) {
+                        entryFlame.dispose();
+                        b1.entryFlame = null;
+                    }
+                }
 
                 if (b1._isDisposed || !b1.mesh) continue;
 
