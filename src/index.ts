@@ -737,6 +737,13 @@ document.addEventListener('pointerdown', _retryMusic);
 document.addEventListener('touchstart', _retryMusic);
 document.addEventListener('keydown', _retryMusic);
 
+// Scenario music: let the scenario manager replace the ambient playlist with a
+// scenario's own track (see IScenario.music) for as long as the scenario runs.
+scenarioManager.setAudio({
+    playOverride: (url: string, loop = false) => ambientMusic.playOverride(url, loop),
+    releaseOverride: () => ambientMusic.releaseOverride(),
+});
+
 // (warp effect is now created per-ship inside the Spaceship constructor)
 
 const flightHUD = new FlightHUD(

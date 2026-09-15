@@ -42,12 +42,13 @@
                 GENERATE
             </button>
             <button
-                class="old-ui btn-dark btn-with-icon"
+                class="old-ui btn-dark btn-with-icon badge-anchor"
                 type="button"
                 @click="launch('scenarios')"
             >
                 <span class="material-symbols-outlined">interests</span>
                 SCENARIOS
+                <span class="badge badge--left badge--new" aria-hidden="true">New!</span>
             </button>
             <button
                 v-show="allowCancel"

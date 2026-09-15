@@ -11,6 +11,7 @@ import { generateProceduralBodyName } from '../procedural/body-naming';
 import { rngFor } from '../procedural/seed-utils';
 import { flightState } from '../simulation/simulation';
 import type { SeededRandom } from '../utilities/prng';
+import { scenarioMusic } from '../utilities/scenario-music';
 import { createUniqueId } from '../utilities/utilities';
 import { reportScenarioOutcome } from './scenario-outcome';
 import {
@@ -60,6 +61,14 @@ import {
  */
 export class AsteroidDefenseScenario implements IScenario {
     readonly name = 'Asteroid Defense';
+    /**
+     * Looping tension underscore played for the whole scenario. The scenario manager
+     * replaces the ambient playlist with it on start and restores ambient on stop.
+     */
+    readonly music = scenarioMusic(
+        'musinova-minimal-underscore-piano-pulse-loop-edit-518250.mp3',
+        true
+    );
 
     /** Asteroid bulk density anchored to Ceres, so mass and radius stay consistent. */
     private static readonly ASTEROID_DENSITY = CERES_MASS / Math.pow(CERES_RADIUS, 3);

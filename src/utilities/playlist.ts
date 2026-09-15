@@ -51,4 +51,5 @@ export const PLAYLIST_FILENAMES: string[] = [
     'databend-peaceful-ambient-for-studying-589449.mp3',
     'leberch-riser-590947.mp3',
     'strawberry_candy-chill-minimal-warm-atmosphere-591183.mp3',
+    'musinova-minimal-underscore-piano-pulse-518251.mp3',
 ];

@@ -116,6 +116,39 @@
     width: 100% !important;
 }
 
+/* Generic corner badge. Add `badge-anchor` to the element you want to
+   decorate, then drop in a `.badge` child. Compose placement and look with
+   modifiers (e.g. `badge--left`, `badge--new`). */
+.badge-anchor {
+    position: relative;
+}
+
+.badge {
+    position: absolute;
+    font-size: 0.72rem;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Placement modifiers */
+.badge--left {
+    left: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%) rotate(-45deg);
+}
+
+/* Colour/appearance modifiers */
+.badge--new {
+    color: var(--new-ui-btn-warning-color);
+    text-shadow:
+        0 0 6px rgba(255, 208, 0, 0.8),
+        0 0 14px rgba(255, 208, 0, 0.45);
+}
+
 /* Reset default styles and set up base styles */
 * {
     box-sizing: border-box;

@@ -14,6 +14,15 @@
  * Volume is controlled by `setVolume()` (0–1). When volume is 0 the current
  * track stops and the delay timer is cancelled; when set back > 0 playback
  * resumes with a new track.
+ *
+ * Scenario overrides
+ * ------------------
+ * A scenario can temporarily replace the ambient playlist with a track of its
+ * own via `playOverride(url, loop)`.  While an override is active the ambient
+ * playlist never advances (no inter-track delay, `startPlayback()` is a no-op),
+ * and a looping override repeats forever.  `releaseOverride()` drops the
+ * override and fades back into the ambient rotation.  Overrides play at the same
+ * `musicVolume` as the ambient tracks and honour the 0-volume mute.
  */
 
 import { settingsStore } from '../settings/settings-store';
@@ -46,6 +55,11 @@ export class AmbientSoundManager {
     /** Array of track entries (shuffled at init), initialized once. */
     private playlist: PlaylistEntry[] = [];
 
+    /** URL of the active scenario override track, or null when none is running. */
+    private overrideUrl: string | null = null;
+    /** Whether the active override loops (false = play once, then return to ambient). */
+    private overrideLoop = false;
+
     // ── Public API ──────────────────────────────────────────────────────────
 
     /**
@@ -65,9 +79,13 @@ export class AmbientSoundManager {
      * If nothing is currently playing or we're in the inter-track delay,
      * a new track starts right away.  If a track is already playing, it
      * continues uninterrupted.
+     *
+     * A scenario override owns the output while it is active, so this is a
+     * no-op until the override is released.
      */
     startPlayback(): void {
         if (!this.initialized) return;
+        if (this.overrideUrl !== null) return;
         if (this.state === 'idle') {
             this.playNextTrack();
         } else if (this.state === 'delaying') {
@@ -84,7 +102,7 @@ export class AmbientSoundManager {
     /**
      * Set the user volume (0–1).  When set to 0 the current track stops
      * and the inter-track delay is cancelled.  When set from 0 back to
-     * a positive value a new track starts immediately.
+     * a positive value playback resumes immediately with a new track.
      */
     setVolume(vol: number): void {
         const clamped = Math.max(0, Math.min(1, vol));
@@ -104,9 +122,14 @@ export class AmbientSoundManager {
             return;
         }
 
-        // If we were stopped (idle) because volume was 0, start the next track
+        // If we were stopped (idle) because volume was 0, restart playback —
+        // the scenario override if one is active, otherwise the next ambient track.
         if (this.state === 'idle') {
-            this.playNextTrack();
+            if (this.overrideUrl !== null) {
+                this.startAudio(this.overrideUrl, this.overrideLoop, true);
+            } else {
+                this.playNextTrack();
+            }
             return;
         }
 
@@ -153,9 +176,11 @@ export class AmbientSoundManager {
 
     /**
      * Skip to the next track immediately, cancelling any inter-track delay.
+     * Picking an ambient track drops any active scenario override.
      */
     skipToNext(): void {
         if (!this.initialized) return;
+        this.clearOverrideState();
         if (this.delayTimer) {
             clearTimeout(this.delayTimer);
             this.delayTimer = null;
@@ -168,9 +193,11 @@ export class AmbientSoundManager {
 
     /**
      * Skip to the previous track (wrapping around to the end), cancelling any delay.
+     * Picking an ambient track drops any active scenario override.
      */
     skipToPrev(): void {
         if (!this.initialized) return;
+        this.clearOverrideState();
         if (this.delayTimer) {
             clearTimeout(this.delayTimer);
             this.delayTimer = null;
@@ -189,9 +216,11 @@ export class AmbientSoundManager {
     /**
      * Immediately play the track at the given index in the shuffled playlist.
      * Subsequent tracks will play in sequential order from that position.
+     * Picking a track drops any active scenario override.
      */
     playTrackAt(index: number): void {
         if (!this.initialized || index < 0 || index >= this.playlist.length) return;
+        this.clearOverrideState();
         if (this.delayTimer) {
             clearTimeout(this.delayTimer);
             this.delayTimer = null;
@@ -202,6 +231,71 @@ export class AmbientSoundManager {
         // Set index one behind so pickTrackIndex() returns the requested index
         this.currentTrackIndex = index - 1;
         this.playNextTrack();
+    }
+
+    // ── Scenario override API ────────────────────────────────────────────────
+
+    /**
+     * Replace the current track with a scenario-provided track.
+     *
+     * While the override is active the ambient playlist never advances, so the
+     * track keeps playing (or repeating, when `loop` is true).  Respects
+     * `musicVolume`: if muted, the override is remembered and starts as soon as
+     * the volume is raised.  A non-looping override hands control back to the
+     * ambient playlist when it finishes.
+     *
+     * @param url  Audio URL to play.
+     * @param loop When true the track repeats forever (the inter-track delay is
+     *             never scheduled because a looping track never fires 'ended').
+     */
+    playOverride(url: string, loop = false): void {
+        if (!this.initialized) return;
+
+        this.setupAudioContext();
+        if (!this.ctx || !this.gainNode) return;
+
+        // Cancel any pending inter-track delay so it cannot fire over the override.
+        if (this.delayTimer) {
+            clearTimeout(this.delayTimer);
+            this.delayTimer = null;
+        }
+        this.state = 'idle';
+        this.overrideUrl = url;
+        this.overrideLoop = loop;
+        this.isPaused = false;
+
+        console.log(`Playing scenario track: ${url} (loop: ${loop})`);
+
+        // Muted: remember the override; setVolume(>0) will start it.
+        if (settingsStore.settings.musicVolume <= 0) {
+            this.stopCurrentAudio();
+            return;
+        }
+
+        this.startAudio(url, loop, true);
+    }
+
+    /**
+     * Drop the active scenario override and fade back into the ambient playlist.
+     * No-op when no override is active.
+     */
+    releaseOverride(): void {
+        if (this.overrideUrl === null) return;
+        this.clearOverrideState();
+
+        if (!this.initialized) return;
+
+        this.stopCurrentAudio();
+        this.state = 'idle';
+
+        if (settingsStore.settings.musicVolume > 0) {
+            this.playNextTrack();
+        }
+    }
+
+    /** True while a scenario override track is active. */
+    get hasOverride(): boolean {
+        return this.overrideUrl !== null;
     }
 
     /** Returns a shallow copy of the shuffled playlist. Only valid after init(). */
@@ -217,6 +311,7 @@ export class AmbientSoundManager {
     /** Clean up all resources. */
     dispose(): void {
         if (this.delayTimer) clearTimeout(this.delayTimer);
+        this.clearOverrideState();
         this.stopCurrentAudio();
         if (this.gainNode) this.gainNode.disconnect();
         if (this.ctx) this.ctx.close();
@@ -266,32 +361,29 @@ export class AmbientSoundManager {
         return nextIndex;
     }
 
-    /**
-     * Return the URL of the track at the given index in the shuffled playlist.
-     */
-    private trackUrl(index: number): string {
-        return this.playlist[index].url;
+    /** Forget the scenario override without touching playback. */
+    private clearOverrideState(): void {
+        this.overrideUrl = null;
+        this.overrideLoop = false;
     }
 
     /**
-     * Play a random track.
+     * Create the audio element for `url`, wire it into the gain graph and fade it in.
+     * Shared by the ambient playlist and scenario overrides.
+     *
+     * @param isOverride True when this track is a scenario override — such a
+     *   non-looping track returns control to the ambient playlist when it ends
+     *   instead of scheduling the normal inter-track delay.
      */
-    public playNextTrack(): void {
-        if (!this.ctx || !this.gainNode || settingsStore.settings.musicVolume === 0) return;
-
-        const index = this.pickTrackIndex();
-        if (index === -1) return; // no tracks available
-        this.currentTrackIndex = index;
-
-        const url = this.trackUrl(index);
-        console.log(`Playing track: ${url}`);
+    private startAudio(url: string, loop: boolean, isOverride: boolean): void {
+        if (!this.ctx || !this.gainNode) return;
 
         // Stop any leftover audio element
         this.stopCurrentAudio();
 
         const audio = new Audio(url);
         audio.volume = 1; // we control volume via the gain node
-        audio.loop = false;
+        audio.loop = loop;
 
         // Wire into the audio graph for fade control
         const source = this.ctx.createMediaElementSource(audio);
@@ -310,15 +402,19 @@ export class AmbientSoundManager {
         this.state = 'playing';
         this.isPaused = false;
 
-        // Notify listeners that a new track has started
-        this.onTrackChange?.(index);
-
-        // When the track ends naturally, start the inter-track delay
+        // When the track ends naturally, advance. A looping track never fires this.
         audio.addEventListener('ended', () => {
             if (this.state !== 'playing') return;
             this.state = 'idle';
             this.currentAudio = null;
             this.sourceNode = null;
+
+            if (isOverride) {
+                // A non-looping override finishes → hand control back to the ambient playlist.
+                this.clearOverrideState();
+                if (settingsStore.settings.musicVolume > 0) this.playNextTrack();
+                return;
+            }
 
             this.startDelay(() => this.playNextTrack());
         });
@@ -328,6 +424,29 @@ export class AmbientSoundManager {
             console.error('Failed to play audio track:', err);
             this.dispose();
         });
+    }
+
+    /**
+     * Play the next track in the shuffled playlist, unless a scenario override
+     * currently owns the output.  Extracted from the old inline body so both the
+     * normal rotation and the override hand-back share one code path.
+     */
+    public playNextTrack(): void {
+        if (!this.ctx || !this.gainNode || settingsStore.settings.musicVolume === 0) return;
+        // A scenario override owns the output until it is released.
+        if (this.overrideUrl !== null) return;
+
+        const index = this.pickTrackIndex();
+        if (index === -1) return; // no tracks available
+        this.currentTrackIndex = index;
+
+        const entry = this.playlist[index];
+        console.log(`Playing track: ${entry.url}`);
+
+        this.startAudio(entry.url, false, false);
+
+        // Notify listeners that a new track has started
+        this.onTrackChange?.(index);
     }
 
     /**

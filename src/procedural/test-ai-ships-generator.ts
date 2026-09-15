@@ -91,6 +91,8 @@ export class TestAiShipsGenerator extends SolarSystemGenerator {
             ship.mesh.quaternion.setFromRotationMatrix(m);
         }
         ship.controlFrameQuat.copy(ship.mesh.quaternion);
+        // Set ship as threat
+        ship.isThreat = true;
 
         bodies.push(ship);
         reporter?.report({

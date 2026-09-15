@@ -1,4 +1,4 @@
-import type { IScenario } from '../interfaces';
+import type { IScenario, IScenarioAudio } from '../interfaces';
 
 /**
  * Owns the scenario (if any) that the live system's generator returned, and drives it once
@@ -8,13 +8,24 @@ import type { IScenario } from '../interfaces';
  * and cleanUpSolarSystem() calls `stop()` before tearing the old system down, so a scenario
  * never outlives the system it was built for. A scenario that throws is stopped rather than
  * allowed to break the render loop.
+ *
+ * Scenario music: a scenario may declare {@link IScenario}.music. When it does, the manager
+ * plays it through the registered {@link IScenarioAudio} hook (replacing the ambient playlist)
+ * while the scenario runs, and releases it on stop so ambient playback resumes.
  */
 class ScenarioManager {
     private active: IScenario | null = null;
+    /** Optional music hook, registered once from index.ts. Null until then / in headless use. */
+    private audio: IScenarioAudio | null = null;
 
     /** The scenario currently running, or null when the live system has none. */
     get activeScenario(): IScenario | null {
         return this.active;
+    }
+
+    /** Register the music hook used to play a scenario's declared track. */
+    setAudio(audio: IScenarioAudio): void {
+        this.audio = audio;
     }
 
     /** Stop the current scenario (if any), then start `scenario`. Passing null just stops. */
@@ -29,6 +40,12 @@ class ScenarioManager {
         } catch (e) {
             console.error(`[scenario] ${scenario.name} failed to start:`, e);
             this.stop();
+            return;
+        }
+
+        // Replace the ambient playlist with the scenario's own track, if it declared one.
+        if (scenario.music) {
+            this.audio?.playOverride(scenario.music.url, scenario.music.loop);
         }
     }
 
@@ -60,6 +77,9 @@ class ScenarioManager {
         } catch (e) {
             console.error(`[scenario] ${scenario.name} failed to dispose:`, e);
         }
+
+        // Scenario music overrides the ambient playlist; release it once the scenario ends.
+        if (scenario.music) this.audio?.releaseOverride();
     }
 }
 

@@ -86,12 +86,47 @@ export interface ISystemLaunchOptions {
 }
 
 /**
+ * A track a scenario wants played while it is running.
+ *
+ * Declared by the scenario itself so any scenario can supply its own music
+ * without the audio layer knowing about it. The scenario manager hands this to
+ * the registered {@link IScenarioAudio} hook when the scenario starts.
+ */
+export interface IScenarioMusic {
+    /** Resolved asset URL of the track. */
+    url: string;
+    /** When true the track repeats for as long as the scenario runs. */
+    loop: boolean;
+}
+
+/**
+ * Music control surface a scenario manager uses to start/stop a scenario's track.
+ * Implemented in index.ts on top of the AmbientSoundManager, so scenarios and the
+ * manager stay decoupled from the concrete audio implementation.
+ */
+export interface IScenarioAudio {
+    /**
+     * Replace the currently playing ambient track with the given scenario track.
+     * While active, the ambient playlist does not advance.
+     * @param loop When true the track repeats forever.
+     */
+    playOverride(url: string, loop?: boolean): void;
+    /** Drop the active scenario track and fade back into ambient playback. */
+    releaseOverride(): void;
+}
+
+/**
  * Per-frame scenario logic, driven by the scenario manager for as long as the
  * generated system is live.
  */
 export interface IScenario {
     /** Display name, used for logging. */
     readonly name: string;
+    /**
+     * Optional track to play while this scenario runs. Omitted/null leaves the
+     * ambient music untouched. Handled by the scenario manager, not the scenario.
+     */
+    readonly music?: IScenarioMusic | null;
     /** Called once, after the generated bodies are live in the simulation. */
     start(): void;
     /**
