@@ -34,6 +34,7 @@
                                 larger simulations.
                             </li>
                             <li>Added a scenario to test the ship AI work-in-progress.</li>
+                            <li>Added new music track.</li>
                         </ul>
                     </div>
                 </li>
@@ -57,6 +58,8 @@
                             <li>Object names are now editable before creating the object.</li>
                             <li>Removed an unused color picker from edit mode.</li>
                             <li>Fixed an issue that caused right clicking to exit flight mode.</li>
+                            <li>Fixed an issue where the edit gizmo would show on an object after editing even if Target was turned off.</li>
+                            <li>Fixed an issue where asteroids and comets could not by selected by clicking on them in space.</li>
                             <li>UI HUD overhaul for better performance.</li>
                             <li>
                                 Fixed certain effects updating per substep instead of frame,
