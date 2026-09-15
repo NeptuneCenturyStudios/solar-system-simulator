@@ -33,23 +33,12 @@ import { ProceduralGenerationReporter } from './procedural-generation-progress';
 export class AsteroidDefenseGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
     private readonly scene: THREE.Scene;
-    private readonly shipTypeId: string;
     private readonly masterSeed: string;
 
-    /**
-     * @param shipTypeId Ship type (from ship-registry.ts) to give the player — index.ts passes
-     *   the Flight Controls dropdown selection. Unknown ids fall back to the first type.
-     */
-    constructor(
-        dependencies: IStateDependencies,
-        scene: THREE.Scene,
-        shipTypeId: string,
-        seed?: string
-    ) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, seed?: string) {
         super();
         this.dependencies = dependencies;
         this.scene = scene;
-        this.shipTypeId = shipTypeId;
         const inputSeed = (seed ?? '').trim();
         // Seeds the skydome and the asteroid waves; the body layout itself is fixed.
         this.masterSeed = inputSeed.length > 0 ? inputSeed : generateSeedString();
@@ -81,7 +70,7 @@ export class AsteroidDefenseGenerator extends SolarSystemGenerator {
         );
         const velocity = earth.velocity.clone().addScaledVector(tangent, orbitSpeed);
 
-        const ship = getShipTypeById(this.shipTypeId).create(
+        const ship = getShipTypeById('zenith').create(
             this.dependencies,
             this.scene,
             position,

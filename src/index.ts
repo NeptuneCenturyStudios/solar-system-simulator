@@ -1844,14 +1844,9 @@ async function spawn(
         // counter-orbiting asteroid band on its own orbit.
         generator = new AsteroidFieldGenerator(dependencies, scene, proceduralResult?.seed);
     } else if (mode === SimulationStartMode.AsteroidDefense) {
-        // Asteroid defense scenario: the player flies the ship picked in Flight Controls
-        // and shoots down waves of asteroids thrown at Earth.
-        generator = new AsteroidDefenseGenerator(
-            dependencies,
-            scene,
-            simStore.selectedShipTypeId,
-            proceduralResult?.seed
-        );
+        // Asteroid defense scenario: the player always flies the Zenith, regardless of
+        // whatever ship is selected in Normal Mode's Flight Controls dropdown.
+        generator = new AsteroidDefenseGenerator(dependencies, scene, proceduralResult?.seed);
     } else {
         // Empty system generator
         generator = new EmptySystemGenerator(dependencies, scene);
