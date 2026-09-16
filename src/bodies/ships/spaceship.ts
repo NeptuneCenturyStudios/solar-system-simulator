@@ -248,7 +248,8 @@ export class Spaceship extends Body {
             options.mesh,
             options.id,
             'Spaceship',
-            BodyTypeEnum.SpaceShip
+            BodyTypeEnum.SpaceShip,
+            options.healthPoints
         );
 
         // Store the handling characteristics for use in flight control calculations.

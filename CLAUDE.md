@@ -73,7 +73,7 @@ src/
 - **Phase 1**
 - [x] Phase 1.1: Add atmospheric drag
 - [x] Phase 1.2: Tweak visual appearance of entry flame effect to accomodate new atmospheric drag 
-- [ ] Phase 1.3: Add new shield layer of HP to ships which will gradually recharge over a fixed time for each ship (different shield hp amount and recharge rate per ship type)
+- [x] Phase 1.3: Add new shield layer of HP to ships which will gradually recharge over a fixed time for each ship (different shield hp amount and recharge rate per ship type)
 - **Phase 2**
 - [x] Phase 2: Add satellite station keeping to counter drag
 - **Phase 3: Add satellite/probe missions**

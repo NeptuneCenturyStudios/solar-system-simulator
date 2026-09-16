@@ -16,6 +16,9 @@ export class Zenith extends Spaceship {
         // Ship radius
         const SPACESHIP_MASS = 75000 / MASS_SCALE;
         const SPACESHIP_RADIUS = 0.037 / RADIUS_SCALE;
+        // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
+        // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
+        const SPACESHIP_HEALTH_POINTS = 20;
 
         // Camera placement (ship-local space; +Z = forward, +Y = up). Tune these to
         // adjust how the chase cam frames the fighter.
@@ -104,6 +107,7 @@ export class Zenith extends Spaceship {
             name: 'Zenith',
             handling: fighterHandling,
             weapons: [new BoltWeapon(scene, SPACESHIP_RADIUS)],
+            healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 2, rechargeTime: 30 },
             shipTypeId: 'zenith',
             thirdPersonOffset: THIRD_PERSON_OFFSET,

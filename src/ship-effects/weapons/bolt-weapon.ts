@@ -13,8 +13,6 @@ export interface IBoltWeaponConfig {
     baseSpeed: number;
     /** Seconds before a bolt fizzles. */
     particleLifetime: number;
-    /** World-space length of each bolt line segment. */
-    boltLength: number;
     /** Hex colour for bolts and the glow point. */
     boltColor: number;
     /** World-space size of the glowing head sprite (perspective-correct). */
@@ -44,22 +42,18 @@ interface Projectile {
     position: THREE.Vector3;
     /** World-space velocity (aim direction × relativeSpeed + shipVelocity). */
     velocity: THREE.Vector3;
-    /**
-     * Normalised velocity direction — pre-computed once so we can cheaply
-     * place the bolt tail exactly boltLength behind the head.
-     */
-    velDir: THREE.Vector3;
+    /** Normalised world-space travel direction — cached once in tryFire() since
+     *  velocity (and therefore direction) is constant for the bolt's lifetime. */
+    direction: THREE.Vector3;
+    /** World-space speed (velocity.length()) — cached once alongside direction. */
+    speed: number;
     /** Seconds until fizzle. */
     timeRemaining: number;
 }
 
 /**
- * Bolt weapon system — rapid-fire energy bolts rendered as camera-relative
- * line segments with a glowing head point.
- *
- * Each bolt is a short line: tail (behind) → head (front).
- * The tail is clamped to the muzzle position for the first few frames so the
- * bolt always visually originates from the ship hull.
+ * Bolt weapon system — rapid-fire energy bolts rendered as a camera-relative
+ * glowing point per bolt (no tail: bolts move too fast for one to ever be seen).
  *
  * Camera-relative rendering keeps float32 GPU positions small and precise
  * regardless of the simulation distance from the world origin, matching the
@@ -72,12 +66,7 @@ export class BoltWeapon extends Weapon {
     private readonly config: IBoltWeaponConfig;
     private projectiles: Projectile[] = [];
     private readonly maxProjectiles: number;
-    /** Flat float32 buffer: 2 vertices × 3 coords per projectile [tail, head]. */
-    private positions: Float32Array;
-    private geometry: THREE.BufferGeometry;
-    private material: THREE.LineBasicMaterial;
-    private lines: THREE.LineSegments;
-    /** Glowing point at each bolt head — same camera-relative origin as `lines`. */
+    /** Glowing point at each bolt head. */
     private headPositions: Float32Array;
     private headGeometry: THREE.BufferGeometry;
     private headMaterial: THREE.PointsMaterial;
@@ -93,7 +82,6 @@ export class BoltWeapon extends Weapon {
         const DEFAULT_BOLT_CONFIG: IBoltWeaponConfig = {
             baseSpeed: 16000 / DIST_SCALE, // 16,000 km/s
             particleLifetime: 8.0,
-            boltLength: 0,
             boltColor: 0x00eeff,
             boltHeadSize: 100 / RADIUS_SCALE,
             fireRate: 12,
@@ -111,26 +99,6 @@ export class BoltWeapon extends Weapon {
             fire: this.config.fireSound ?? (() => playSoundEffect(SoundEffect.WeaponFire)),
         };
         this.weaponSound = weaponSound;
-
-        // 2 vertices per bolt (tail + head), 3 floats each.
-        this.positions = new Float32Array(this.maxProjectiles * 2 * 3).fill(0);
-        this.geometry = new THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-        this.geometry.setDrawRange(0, 0);
-
-        this.material = new THREE.LineBasicMaterial({
-            color: this.config.boltColor,
-            transparent: true,
-            opacity: 1.0,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-        });
-
-        this.lines = new THREE.LineSegments(this.geometry, this.material);
-        this.lines.frustumCulled = false;
-        this.lines.renderOrder = 2;
-        this.lines.visible = false;
-        scene.add(this.lines);
 
         // ── Glowing head points ───────────────────────────────────────────────
         this.headPositions = new Float32Array(this.maxProjectiles * 3).fill(0);
@@ -205,12 +173,16 @@ export class BoltWeapon extends Weapon {
 
         // Speed is base + ship speed (Galilean relativity)
         const velocity = direction.clone().multiplyScalar(this.config.baseSpeed).add(shipVelocity);
+        const speed = velocity.length();
+        // normalize() safely yields (0,0,0) when speed is 0 — no NaN risk.
+        const boltDirection = velocity.clone().normalize();
 
         this.beginSound();
         this.projectiles.push({
             position: origin.clone(),
             velocity,
-            velDir: velocity.clone().normalize(),
+            direction: boltDirection,
+            speed,
             timeRemaining: this.config.particleLifetime,
         });
     }
@@ -254,25 +226,62 @@ export class BoltWeapon extends Weapon {
                 continue;
             }
 
-            p.position.addScaledVector(p.velocity, simDt);
+            // ── Swept ray-sphere hit test along this frame's travel segment ──
+            // A bolt moves ~1000s of world-units per frame vs. ship radii of
+            // ~1e-4..1e-2 units, so a discrete end-of-frame point check would
+            // tunnel through targets almost every frame (see laser-weapon.ts's
+            // identical technique for the continuous beam). Origin is this
+            // bolt's PRE-move position; maxT is the distance it travels this frame.
+            const originX = p.position.x;
+            const originY = p.position.y;
+            const originZ = p.position.z;
+            const dirX = p.direction.x;
+            const dirY = p.direction.y;
+            const dirZ = p.direction.z;
+            const maxT = p.speed * simDt;
 
-            // Sphere–sphere hit test.
+            let hitT = maxT;
+            let hitBody: Body | null = null;
+
             for (const body of bodies) {
                 if (body === owner) continue;
                 if (!body.mesh || body._isDisposed) continue;
-                if (p.position.distanceTo(body.mesh.position) <= body.radius) {
-                    window.dispatchEvent(
-                        new CustomEvent('weapon:hit', {
-                            detail: {
-                                body,
-                                position: p.position.clone(),
-                                damage: this.config.damage,
-                            },
-                        })
-                    );
-                    toRemove.add(i);
-                    break;
+
+                const ocX = body.mesh.position.x - originX;
+                const ocY = body.mesh.position.y - originY;
+                const ocZ = body.mesh.position.z - originZ;
+                const tca = ocX * dirX + ocY * dirY + ocZ * dirZ;
+                if (tca < 0 || tca > hitT) continue;
+
+                const d2 = ocX * ocX + ocY * ocY + ocZ * ocZ - tca * tca;
+                const r = body.radius;
+                if (d2 <= r * r) {
+                    const tHit = tca - Math.sqrt(r * r - d2);
+                    if (tHit >= 0 && tHit < hitT) {
+                        hitT = tHit;
+                        hitBody = body;
+                    }
                 }
+            }
+
+            if (hitBody) {
+                p.position.set(
+                    originX + dirX * hitT,
+                    originY + dirY * hitT,
+                    originZ + dirZ * hitT
+                );
+                window.dispatchEvent(
+                    new CustomEvent('weapon:hit', {
+                        detail: {
+                            body: hitBody,
+                            position: p.position.clone(),
+                            damage: this.config.damage,
+                        },
+                    })
+                );
+                toRemove.add(i);
+            } else {
+                p.position.addScaledVector(p.velocity, simDt);
             }
         }
 
@@ -284,38 +293,15 @@ export class BoltWeapon extends Weapon {
         }
 
         // ── Camera-relative GPU upload ────────────────────────────────────────
-        // The LineSegments object is placed at cameraPosition; all vertex
-        // positions are written relative to cameraPosition so float32 values
-        // stay small and precise at any distance from the world origin.
+        // The Points object is placed at cameraPosition; all vertex positions
+        // are written relative to cameraPosition so float32 values stay small
+        // and precise at any distance from the world origin.
         const count = this.projectiles.length;
         const cpx = cameraPosition.x;
         const cpy = cameraPosition.y;
         const cpz = cameraPosition.z;
 
-        for (let i = 0; i < count; i++) {
-            const p = this.projectiles[i];
-
-            // Fixed-length bolt: tail always sits exactly boltLength behind the head.
-            const tailX = p.position.x - p.velDir.x * this.config.boltLength;
-            const tailY = p.position.y - p.velDir.y * this.config.boltLength;
-            const tailZ = p.position.z - p.velDir.z * this.config.boltLength;
-
-            const base = i * 6;
-            // Tail vertex (relative to camera)
-            this.positions[base] = tailX - cpx;
-            this.positions[base + 1] = tailY - cpy;
-            this.positions[base + 2] = tailZ - cpz;
-            // Head vertex (relative to camera)
-            this.positions[base + 3] = p.position.x - cpx;
-            this.positions[base + 4] = p.position.y - cpy;
-            this.positions[base + 5] = p.position.z - cpz;
-        }
-
-        this.geometry.attributes.position.needsUpdate = true;
-        // Each segment needs 2 vertices in the draw call.
-        this.geometry.setDrawRange(0, count * 2);
-
-        // ── Head points (same camera-relative origin) ────────────────────────
+        // ── Head points ────────────────────────────────────────────────────
         for (let i = 0; i < count; i++) {
             const p = this.projectiles[i];
             this.headPositions[i * 3] = p.position.x - cpx;
@@ -325,28 +311,21 @@ export class BoltWeapon extends Weapon {
         this.headGeometry.attributes.position.needsUpdate = true;
         this.headGeometry.setDrawRange(0, count);
 
-        // Place both objects at the camera so relative positions render correctly.
-        this.lines.position.copy(cameraPosition);
+        // Place the object at the camera so relative positions render correctly.
         this.headPoints.position.copy(cameraPosition);
-        this.lines.visible = count > 0;
         this.headPoints.visible = count > 0;
     }
 
     /** Clear all live bolts and reset cooldown (called on flight exit). */
     reset(): void {
         this.projectiles = [];
-        this.geometry.setDrawRange(0, 0);
         this.headGeometry.setDrawRange(0, 0);
-        this.lines.visible = false;
         this.headPoints.visible = false;
         this.fireCooldown = 0;
     }
 
     dispose(): void {
-        this.scene.remove(this.lines);
         this.scene.remove(this.headPoints);
-        this.geometry.dispose();
-        this.material.dispose();
         this.headGeometry.dispose();
         this.headMaterial.dispose();
         this.projectiles = [];

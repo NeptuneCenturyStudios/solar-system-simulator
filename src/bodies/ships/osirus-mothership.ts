@@ -17,7 +17,10 @@ export class OsirisMothership extends Spaceship {
         id: string
     ) {
         const SPACESHIP_MASS = 80_000_000 / MASS_SCALE;
-        const SPACESHIP_RADIUS = 4 / RADIUS_SCALE;
+        const SPACESHIP_RADIUS = 0.5 / RADIUS_SCALE;
+        // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
+        // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
+        const SPACESHIP_HEALTH_POINTS = 250;
 
         // Camera placement (ship-local space; +Z = forward, +Y = up). Tune these to
         // adjust how the chase cam frames the destroyer.
@@ -121,6 +124,7 @@ export class OsirisMothership extends Spaceship {
             name: 'Osiris Mothership',
             handling: destroyerHandling,
             weapons: [new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)],
+            healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 4, rechargeTime: 90 },
             shipTypeId: 'osiris_mothership',
             thirdPersonOffset: THIRD_PERSON_OFFSET,

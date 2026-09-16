@@ -339,6 +339,11 @@ export interface ISpaceshipCreationOptions extends IBodyCreationOptions {
     mesh: THREE.Mesh;
     handling: ISpaceshipHandling;
     weapons: Weapon[];
+    /** Hull HP, set explicitly per ship type instead of derived from mass. Ship
+     *  masses are real-world kg scaled by the same MASS_SCALE used for planetary
+     *  masses, so mass * HP_MASS_MULTIPLIER (Body's default) would land many
+     *  orders of magnitude below 1 HP — any hit would instantly destroy the ship. */
+    healthPoints: number;
     /** Shield layer that absorbs damage before the hull. */
     shield: IShipShieldConfig;
 

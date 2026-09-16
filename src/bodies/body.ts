@@ -52,6 +52,9 @@ export class Body {
      * @param id Unique identifier for the body.
      * @param name Name of the body.
      * @param bodyType The type of the body (enum).
+     * @param healthPointsOverride Explicit max HP, bypassing mass * HP_MASS_MULTIPLIER.
+     *   Used by ships, whose real-world masses (scaled by the same MASS_SCALE as
+     *   planetary bodies) would otherwise yield a vanishingly small HP pool.
      */
     constructor(
         _dependencies: object,
@@ -63,7 +66,8 @@ export class Body {
         mesh: THREE.Mesh,
         id: string,
         name: string,
-        bodyType: BodyTypeEnum
+        bodyType: BodyTypeEnum,
+        healthPointsOverride?: number
     ) {
         this.scene = scene;
         this.mass = mass;
@@ -72,7 +76,7 @@ export class Body {
         this.id = id;
         this.name = name;
         this.bodyType = bodyType;
-        this._healthPoints = mass * HP_MASS_MULTIPLIER;
+        this._healthPoints = healthPointsOverride ?? mass * HP_MASS_MULTIPLIER;
         this.maxHealthPoints = this._healthPoints;
         this.mesh = mesh;
 
