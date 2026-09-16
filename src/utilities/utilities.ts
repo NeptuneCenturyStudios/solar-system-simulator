@@ -80,6 +80,9 @@ export function createSatellite(
         name: config.name,
         mass: config.mass,
         radius: config.radius,
+        // Primary for station-keeping. Passed explicitly rather than relying on the tidal-lock
+        // target below, which happens to be the same body here but means something different.
+        orbitParent: parent,
         pos: new THREE.Vector3(posX, posY, posZ),
         vel: new THREE.Vector3(velX, velY, velZ),
         angle: angle,
@@ -140,14 +143,14 @@ export function buildBodySphereGeometry(
     if (!widthSegments) {
         widthSegments = Math.max(
             minSegments,
-            Math.min(maxSegments, Math.floor((radius * segmentFactor)))
+            Math.min(maxSegments, Math.floor(radius * segmentFactor))
         );
     }
 
     if (!heightSegments) {
         heightSegments = Math.max(
             minSegments,
-            Math.min(maxSegments, Math.floor((radius * segmentFactor) * 2))
+            Math.min(maxSegments, Math.floor(radius * segmentFactor * 2))
         );
     }
 

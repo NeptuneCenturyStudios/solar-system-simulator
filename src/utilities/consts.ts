@@ -543,6 +543,101 @@ export const ATMOSPHERE_DRAG_COEFFICIENT = 1.5e-12;
  */
 export const ATMOSPHERE_DAMAGE_COEFFICIENT = 1.4e-10;
 
+// === Satellite station-keeping ===
+// The counterpart to atmospheric drag above: a satellite in a low orbit is continuously slowed by
+// the residual atmosphere and spirals inward, exactly as the real ISS does. Real orbital vehicles
+// answer that with periodic reboost burns, and these constants tune the equivalent autopilot on the
+// Satellite base class. See src/physics/station-keeping.ts.
+//
+// Reference numbers for the ISS, the body these are tuned against. Its radius²/mass ratio is
+// ≈1.44×10¹¹ (ISS_RADIUS²/ISS_MASS); local atmospheric density at its 410 km orbit is
+// exp(−4.1 / (EARTH_RADIUS × ATMOSPHERE_DENSITY_SCALE_HEIGHT_FRACTION)) ≈ 1.6×10⁻³ of Earth's
+// surface value; its speed relative to Earth is v = sqrt(G·EARTH_MASS / 67.81) ≈ 0.0767 u/s
+// (7.67 km/s). Feeding those through ATMOSPHERE_DRAG_COEFFICIENT gives k0 ≈ 3.45×10⁻⁴ and a drag
+// deceleration of k0·v² ≈ 2.03×10⁻⁶ u/s² — the figure every thrust constant below is sized against.
+//
+// Worth stating plainly, because it is counter-intuitive and because the ATMOSPHERE_DRAG_COEFFICIENT
+// docstring's "slow, background decay" refers only to the *speed* halving time (≈10.5 h): orbital
+// altitude decays far faster than speed does. For a near-circular orbit da/dt = −2·a_drag·a / v =
+// −3.6×10⁻³ u/s, i.e. the ISS sheds ~360 m of altitude per second of simulated time and would fall
+// out of its 410 km orbit in about 19 minutes at 1× if nothing corrected it. So this autopilot is
+// load-bearing rather than cosmetic, and because the decay tolerance below is re-crossed within a
+// fraction of a second of each correction finishing, a low satellite runs its thrusters almost
+// continuously. Do not attach a "burn started" notification to that.
+//
+// These are game-balance values, not physical ones, in the same spirit as the atmosphere block
+// above. Real ISS reboost acceleration is ~7×10⁻³ m/s² (≈1×10⁻⁷ u/s²) — twenty times *weaker* than
+// this simulation's deliberately exaggerated drag — so real figures simply cannot hold the orbit.
+/**
+ * How far a satellite's orbital radius may fall below the radius it was created at before the
+ * station-keeping autopilot engages.
+ */
+export const SATELLITE_ORBIT_DECAY_TOLERANCE = 0.1 / DIST_SCALE;
+/**
+ * Hysteresis band: once engaged, the autopilot keeps thrusting until the radius error is inside
+ * this much tighter tolerance. Without a disengage threshold narrower than
+ * SATELLITE_ORBIT_DECAY_TOLERANCE the controller would shut off the instant it re-entered the
+ * trigger threshold and immediately re-engage, chattering every frame.
+ */
+export const SATELLITE_ORBIT_HOLD_TOLERANCE = 0.01 / DIST_SCALE;
+/**
+ * Maximum acceleration the autopilot may add to the satellite's speed, in u/s² — the analogue of a
+ * ship's flightThrustAccel. At 5×10⁻⁴ u/s² this is ≈246× the 2.03×10⁻⁶ u/s² of drag it has to
+ * cancel at the ISS's nominal altitude. The generous margin exists because density climbs
+ * exponentially as a satellite sags: the same thrust is only ≈27× drag one scale height down and
+ * ≈2× at 50 km altitude, so a satellite knocked into a deep dive progressively loses the ability to
+ * save itself. That cliff is intended.
+ */
+export const SATELLITE_MAX_THRUST_ACCEL = 0.05 / DIST_SCALE;
+/**
+ * Maximum deceleration when the autopilot needs to shed speed rather than add it, in u/s². Larger
+ * than the acceleration, following the convention the ships use (see Zenith's FLIGHT_THRUST_DECEL
+ * vs FLIGHT_THRUST_ACCEL): overshooting a target orbit should be correctable faster than it was
+ * created.
+ */
+export const SATELLITE_THRUST_DECEL = 0.2 / DIST_SCALE;
+/**
+ * Maximum rate, in radians/second, at which the autopilot may rotate the satellite's velocity
+ * vector toward the direction it wants — the velocity-space analogue of a ship's flightMaxTurnRate,
+ * and what stops a correction from snapping the velocity onto a new heading in a single frame.
+ *
+ * This constant is not free to choose independently: rotating a velocity of magnitude v at ω rad/s
+ * *is* a lateral acceleration of v·ω, so the turn rate is a second thrust budget hiding behind an
+ * angular name. Keeping the two consistent means ω ≈ SATELLITE_MAX_THRUST_ACCEL / v_circ =
+ * 5×10⁻⁴ / 0.0767 ≈ 6.5×10⁻³, rounded to 0.01 here for ≈1.5× the linear authority. A ship-like
+ * value such as Zenith's 1.58 rad/s would give 242× the linear thrust, rendering
+ * SATELLITE_MAX_THRUST_ACCEL decorative and letting the controller rebuild the velocity vector in
+ * one frame. If you retune the thrust, retune this with it.
+ */
+export const SATELLITE_MAX_TURN_RATE = 0.01;
+/**
+ * Cap on the outward radial speed the autopilot commands while climbing back to its target radius,
+ * in u/s. 5×10⁻⁴ u/s is 50 m/s, and it only binds outside a deficit of
+ * SATELLITE_MAX_CLIMB_RATE / SATELLITE_CLIMB_GAIN = 250 m — inside that the proportional gain
+ * governs, so the cap exists to keep recovery from a large displacement sane rather than to shape
+ * an ordinary correction.
+ */
+export const SATELLITE_MAX_CLIMB_RATE = 0.05 / DIST_SCALE;
+/**
+ * Proportional gain, in 1/s, mapping the current altitude deficit to a commanded radial climb speed.
+ * The taper this produces is the most important part of the controller: climb speed falls off with
+ * the deficit (τ = 1 / gain = 5 s), so a correction arrives at its target radius already nearly
+ * radial-free, and recovers the 100 m trigger down to the 10 m hold band in ≈11.5 s of simulated
+ * time. A fixed-rate climb would instead reach the target still carrying its full 20 m/s of radial
+ * velocity and coast tens of kilometres past it, oscillating wildly around a 100 m tolerance.
+ */
+export const SATELLITE_CLIMB_GAIN = 0.2;
+/**
+ * Radius error beyond which the autopilot stops treating the discrepancy as drag decay and simply
+ * re-baselines onto whatever orbit the satellite is now in. Something other than drag moved it — a
+ * collision bounce, a wormhole transit, a gravity-multiplier change — and without this gate the
+ * controller would force a circular orbit at any radius, which is indistinguishable from
+ * anti-gravity: a satellite blasted onto an escape trajectory would be dragged back by its own
+ * thrusters. 2 u (200 km) sits well above the ~0.23 u a satellite can lose in a single frame at
+ * maximum time warp, so ordinary decay never trips it.
+ */
+export const SATELLITE_MAX_STATION_KEEPING_DEVIATION = 200 / DIST_SCALE;
+
 // === Explosion speed scaling ===
 // ParticleExplosion scales its outward particle/debris speed by the relative impact speed that
 // caused the death, so a gentle bump and a hypervelocity impact no longer look identical.

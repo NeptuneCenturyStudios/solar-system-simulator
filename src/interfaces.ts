@@ -8,6 +8,7 @@ import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { IPipelineFeedEffect } from './effects/effect-base';
 import { LogMethods, NotificationType } from './event-log/event-log';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
+import type { CelestialBody } from './bodies/celestial-body';
 import { ITidalLockOptions } from './bodies/celestial-body';
 import { EffectiveCSpeed, EffectiveGForce } from './types';
 import { Spaceship } from './bodies/ships/spaceship';
@@ -264,11 +265,48 @@ export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptio
     seed?: string;
 }
 
+/**
+ * Station-keeping tuning for a satellite, grouped the same way ISpaceshipHandling groups a ship's
+ * flight characteristics so a vehicle's feel lives in one object rather than scattered across the
+ * class. Accelerations are u/s², speeds u/s, radii u, the turn rate rad/s and the gain 1/s.
+ */
+export interface ISatelliteHandling {
+    /** Maximum acceleration available when the autopilot needs to gain speed (u/s²). */
+    maxThrustAccel: number;
+    /** Maximum deceleration available when the autopilot needs to shed speed (u/s²). */
+    thrustDecel: number;
+    /**
+     * Maximum rate the autopilot may rotate the velocity vector by (rad/s). Rotating a velocity of
+     * magnitude v at this rate is a lateral acceleration of v·ω, so this is effectively a second
+     * thrust budget and should stay within the same order as `maxThrustAccel / orbitalSpeed` — see
+     * SATELLITE_MAX_TURN_RATE in consts.ts.
+     */
+    maxTurnRate: number;
+    /** Altitude loss below the target radius that triggers a correction (u). */
+    orbitDecayTolerance: number;
+    /** Radius error the correction must reach before it disengages again (u). */
+    orbitHoldTolerance: number;
+    /** Cap on the commanded outward radial speed while climbing (u/s). */
+    maxClimbRate: number;
+    /** Proportional gain mapping altitude deficit to commanded climb speed (1/s). */
+    climbGain: number;
+    /** Radius error past which the autopilot re-baselines instead of correcting (u). */
+    maxStationKeepingDeviation: number;
+}
+
 export interface ISatelliteCreationOptions extends ICelestialBodyCreationOptions {
     distance: number;
     angle?: number;
     inclinationDeg?: number;
     yVariation?: number;
+    /**
+     * Body this satellite orbits, used as the reference frame for station-keeping. Supplying it
+     * enables the autopilot; when omitted, the satellite falls back to `tidalLock.target` and, if
+     * that is absent too, simply never station-keeps.
+     */
+    orbitParent?: CelestialBody;
+    /** Station-keeping tuning. Defaults to DEFAULT_SATELLITE_HANDLING when omitted. */
+    handling?: ISatelliteHandling;
 }
 
 export interface IMoonCreationOptions extends ISatelliteCreationOptions {
