@@ -57,6 +57,27 @@ const LENGTH_SCALE_MIN = 0.35;
 /** Flame radius scale at zero intensity (1 at full intensity). */
 const RADIUS_SCALE_MIN = 0.85;
 
+/**
+ * Fraction of a planet's surface density at which the flame reaches full brightness.
+ *
+ * Physical density falls off with a scale height of ATMOSPHERE_DENSITY_SCALE_HEIGHT_FRACTION
+ * (1% of the planet's radius — see physics/atmosphere-density.ts), which makes it decay
+ * brutally fast: for Earth it is still only ~0.002 at 400 km altitude and ~0.00008 at 600 km.
+ * Feeding that raw ratio straight into the flame's opacity left the flame invisible until the
+ * body was nearly at the surface. Dividing it by this small fraction first re-sensitises the
+ * response, so the flame ramps in over the top of the descent and is fully lit well before
+ * the surface. Lower = more sensitive.
+ *
+ * Earth figures at the current value (altitude where the flame reaches 10% / 50% / 100% of
+ * its density-limited brightness): 372 km / 260 km / 223 km. For comparison, the old raw
+ * ratio reached 10% only at 147 km and was fully lit only at the surface itself.
+ *
+ * The ratio is measured against ATMOSPHERE_DEFAULT_SURFACE_DENSITY rather than the planet's
+ * own surface density, so a planet with a genuinely thinner atmosphere still reads fainter at
+ * the same altitude — the "thin atmosphere is dimmer" intent survives.
+ */
+const DENSITY_FULL_FRACTION = 0.03;
+
 // ── Sprite ────────────────────────────────────────────────────────────────
 const SPRITE_WIDTH = 256;
 const SPRITE_HEIGHT = 256;
@@ -195,6 +216,9 @@ function radiusProfile(t: number, bodyT: number, rNose: number, rMax: number): n
  *    scrolls around the surface for a flickering, alive look.
  *  - Intensity is driven by the body's speed *relative to the planet* (not its heliocentric speed):
  *    the flame grows, brightens and stretches from MIN_SPEED_FOR_EFFECT up to FULL_INTENSITY_SPEED.
+ *  - A second intensity factor comes from the local atmospheric density, so the flame is dimmer
+ *    high in a thin atmosphere and bright near a thick planet's surface — see
+ *    `setAtmosphereDensity` and DENSITY_FULL_FRACTION.
  *  - The flame eases in when it first appears and dissolves out when the body leaves the
  *    atmosphere: `stop()` begins the fade-out, and `active` flips to false once it finishes, at
  *    which point the owner disposes the effect (see `checkAtmosphericEntry`).
@@ -248,8 +272,10 @@ export class EntryFlameEffect {
     /** True once `stop()` has been called and the flame is dissolving. */
     private stopping = false;
     /** 0..1 density factor from the last `setAtmosphereDensity` call; multiplies intensity
-     *  alongside speed. Defaults to 1 (full) so a flame not yet fed a density behaves like it
-     *  did before density-awareness existed. */
+     *  alongside speed. Reaches 1 once local density passes DENSITY_FULL_FRACTION of the
+     *  surface value, so it saturates well above the ground rather than only near it.
+     *  Defaults to 1 (full) so a flame not yet fed a density behaves like it did before
+     *  density-awareness existed. */
     private densityFactor = 1;
 
     // Scratch objects reused every frame.
@@ -402,17 +428,25 @@ export class EntryFlameEffect {
     }
 
     /**
-     * Sets this frame's atmosphere-density sample, normalised against
-     * ATMOSPHERE_DEFAULT_SURFACE_DENSITY. Called once per frame by `checkAtmosphericEntry`,
-     * which holds the strongly-typed `CelestialBody` this effect's `planet: Body` field
-     * deliberately doesn't. Safe to call every frame.
+     * Sets this frame's atmosphere-density sample, mapped to the flame's 0..1 density
+     * brightness factor.
+     *
+     * The mapping is deliberately NOT the raw density ratio. Atmospheric density decays with a
+     * scale height of 1% of the planet's radius, so across the great majority of the atmosphere
+     * shell the raw ratio is indistinguishable from zero — multiplying the flame by it made the
+     * flame appear only in the last few kilometres before impact. Dividing by
+     * DENSITY_FULL_FRACTION instead lets the flame saturate at a small fraction of the surface
+     * density, so it ramps in high up and is fully lit long before the surface. The physical
+     * density itself is untouched: drag and heat damage (physics/atmospheric-drag.ts) keep
+     * consuming the raw value.
+     *
+     * Called once per frame by `checkAtmosphericEntry`, which holds the strongly-typed
+     * `CelestialBody` this effect's `planet: Body` field deliberately doesn't. Safe to call
+     * every frame.
      */
     setAtmosphereDensity(density: number): void {
-        this.densityFactor = THREE.MathUtils.clamp(
-            density / ATMOSPHERE_DEFAULT_SURFACE_DENSITY,
-            0,
-            1
-        );
+        const surfaceRatio = density / ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
+        this.densityFactor = THREE.MathUtils.clamp(surfaceRatio / DENSITY_FULL_FRACTION, 0, 1);
     }
 
     /**
@@ -456,9 +490,10 @@ export class EntryFlameEffect {
             ATMOSPHERE_MIN_SPEED_FOR_EFFECT,
             ATMOSPHERE_FULL_INTENSITY_SPEED
         );
-        // The fade envelope and atmosphere density both multiply the speed intensity, so the
+        // The fade envelope and the density factor both multiply the speed intensity, so the
         // flame eases in/out, brightens/dims with entry speed, and is fainter in a thin
-        // atmosphere than a thick one.
+        // atmosphere than a thick one. densityFactor is already a saturating ramp over the
+        // atmosphere rather than the raw density ratio — see setAtmosphereDensity.
         const intensity = speedIntensity * this.densityFactor * this.envelope;
 
         if (intensity <= 0.001) {
