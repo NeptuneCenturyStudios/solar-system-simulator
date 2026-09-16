@@ -718,16 +718,16 @@ export const ASTEROID_FIELD_ARC_DEG = 60;
  * while the band travels retrograde, so this is how long the user watches Earth approach
  * before the first strike — larger values give a longer, calmer run-up.
  */
-export const ASTEROID_FIELD_EARTH_LEAD_DEG = 12;
+export const ASTEROID_FIELD_EARTH_LEAD_DEG = 8;
 /** Per-asteroid radial jitter (±, sim units) for visual variety. Kept tiny so the orbital
  *  speed spread stays negligible and the swarm never self-collides. */
 export const ASTEROID_FIELD_RADIAL_JITTER = 8;
 /** Half-height of the band above/below the ecliptic (sim units). Must stay below the
  *  collision capture radius so every asteroid in the band is actually reachable. */
-export const ASTEROID_FIELD_VERTICAL_HALF_HEIGHT = 22;
+export const ASTEROID_FIELD_VERTICAL_HALF_HEIGHT = 80;
 /** Asteroid model radius range (sim units). Big enough to read as rocks; collision damage to
  *  Earth scales with their mass. */
-export const ASTEROID_FIELD_RADIUS_MIN = 0.1 / RADIUS_SCALE;
+export const ASTEROID_FIELD_RADIUS_MIN = 0.01 / RADIUS_SCALE;
 export const ASTEROID_FIELD_RADIUS_MAX = 200 / RADIUS_SCALE;
 /** Short trails per asteroid keep the 150-strong swarm legible instead of smeared. */
 export const ASTEROID_FIELD_TRAIL_LENGTH = 50;
