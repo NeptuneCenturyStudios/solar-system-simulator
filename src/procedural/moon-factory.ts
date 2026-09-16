@@ -18,6 +18,7 @@ import { MoonTypeEnum } from '../bodies/body-enums';
 import { SeededRandom } from '../utilities/prng';
 import { addCloudLayer } from './planet-factory';
 import { createAtmosphereShell } from '../effects/atmosphere-shell';
+import { ATMOSPHERE_DEFAULT_SURFACE_DENSITY } from '../utilities/consts';
 import { rollMagneticField } from './magnetic-field';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 
@@ -240,6 +241,7 @@ export function createMoonBodyFromProceduralCreation(params: {
         const shift = (tintRng.next() - 0.5) * 0.08;
         tintColor.offsetHSL(shift, 0, 0);
         body.atmosphereRadius = safeRadius * 1.07;
+        body.atmosphereSurfaceDensity = ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
         body.atmosphereShell = createAtmosphereShell(
             params.scene,
             safeRadius * 1.07,

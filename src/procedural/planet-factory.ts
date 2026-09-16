@@ -21,6 +21,7 @@ import {
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import type { CelestialBody } from '../bodies/celestial-body';
 import { createAtmosphereShell } from '../effects/atmosphere-shell';
+import { ATMOSPHERE_DEFAULT_SURFACE_DENSITY } from '../utilities/consts';
 import { rollMagneticField, type MagneticFieldKind } from './magnetic-field';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 
@@ -358,6 +359,7 @@ export function createPlanetBodyFromProceduralCreation(
         const shift = (tintRng.next() - 0.5) * 0.08;
         tintColor.offsetHSL(shift, 0, 0);
         body.atmosphereRadius = creation.radius * 1.07;
+        body.atmosphereSurfaceDensity = ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
         body.atmosphereShell = createAtmosphereShell(
             scene,
             creation.radius * 1.07,

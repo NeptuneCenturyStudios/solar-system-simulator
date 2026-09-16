@@ -470,6 +470,79 @@ export const COLLISION_RESTITUTION = 0.3;
 /** Surviving bodies are pushed apart to (r₁ + r₂) × this factor so they don't re-contact next frame. */
 export const COLLISION_SEPARATION_FACTOR = 1.001;
 
+// === Atmospheric drag & damage ===
+// A small/light body (satellite, ship, asteroid fragment) passing through a planet's
+// atmosphere is continuously slowed and, if moving fast enough, damaged; a large/massive one
+// (Ceres-class asteroid, a comet nucleus) is barely affected by either — punching straight
+// through to the surface, where the existing collision system takes over. See
+// src/physics/atmosphere-density.ts and src/physics/atmospheric-drag.ts.
+/** Atmosphere density at a body's surface when IAtmosphereOptions.density is omitted.
+ *  Abstract game-balance units, not kg/m³ — 1.0 is the "Earth-like" reference the constants
+ *  below are tuned against. */
+export const ATMOSPHERE_DEFAULT_SURFACE_DENSITY = 1.0;
+/**
+ * Atmosphere density falls off exponentially with altitude above the surface (the standard
+ * barometric-formula shape real atmospheres follow), not linearly with distance to
+ * `atmosphereRadius`: density(h) = surfaceDensity × exp(−h / (planet.radius × this)), h =
+ * altitude above the surface. `atmosphereRadius` itself (tuned per-planet for the visual
+ * shell/glow, and already fairly generous — e.g. Earth's is ~28% of its own radius above the
+ * surface) still acts as the hard outer cutoff for containment and the visual shell, but this
+ * fraction controls how quickly density itself becomes negligible *within* that shell.
+ * At 0.01 (1% of planet radius as the scale height), the ISS's real ~410 km orbit — deep
+ * inside Earth's current (generous) atmosphereRadius by distance alone — sees density fall to
+ * roughly 0.15% of the surface value, matching how the ISS sits in a near-vacuum exosphere in
+ * reality despite technically orbiting "inside" a broadly-drawn atmosphere boundary.
+ */
+export const ATMOSPHERE_DENSITY_SCALE_HEIGHT_FRACTION = 0.01;
+/**
+ * Relative speed (to the planet) below which atmospheric heat damage is exactly zero, and
+ * above which it ramps to full strength at ATMOSPHERE_FULL_INTENSITY_SPEED. Shared with
+ * EntryFlameEffect, which uses the same thresholds to drive the visual flame's brightness —
+ * "not generating a visible flame" and "not generating meaningful heat damage" are the same
+ * condition. This is what makes a low, slow orbiter like the ISS (~7.66 km/s relative to
+ * Earth, far under this threshold) immune to heat damage regardless of density or tuning,
+ * while still being subject to (slow) drag below.
+ */
+export const ATMOSPHERE_MIN_SPEED_FOR_EFFECT = 10 / DIST_SCALE;
+/** Relative speed at which atmospheric heat damage (and the entry flame) reaches full strength. */
+export const ATMOSPHERE_FULL_INTENSITY_SPEED = 150 / DIST_SCALE;
+/**
+ * Drag strength: a = −ATMOSPHERE_DRAG_COEFFICIENT × density × relSpeed² × (radius² / mass).
+ * Applied via the closed-form v(t) = v0 / (1 + k0·v0·t) (see resolveAtmosphericPassage in
+ * atmospheric-drag.ts), exact and unconditionally stable for any dt, and unable to reverse
+ * relative velocity by construction — no clamping needed. Not gated by speed, unlike damage:
+ * even the faint residual density above should sap a little speed continuously, which is what
+ * lets a body like the ISS experience a slow, ongoing orbital decay (as it does in reality)
+ * rather than either "no drag at all" or a sudden, unrealistic deorbit.
+ *
+ * Tuned so a ship-scale body (radius²/mass ≈ 1.1×10¹¹ in sim units, from Zenith's
+ * SPACESHIP_RADIUS/SPACESHIP_MASS) at ATMOSPHERE_DEFAULT_SURFACE_DENSITY and
+ * ATMOSPHERE_FULL_INTENSITY_SPEED (150 km/s) has its relative speed halved after ~4s of
+ * continuous exposure — long enough that thrust can still fight it, short enough that diving
+ * into a dense atmosphere is clearly costly. A Ceres-class asteroid's ratio (≈1.4×10³) is ~8
+ * orders of magnitude smaller, so it's barely slowed — expected, since this is why massive
+ * bodies punch through and ships don't. The ISS's ratio is similar to a ship's, but its very
+ * low relative speed and (per ATMOSPHERE_DENSITY_SCALE_HEIGHT_FRACTION) very low local density
+ * combine to give it a multi-hour halving time at 1× time scale — a slow, background decay
+ * rather than a dramatic one. Retune at runtime alongside the other manually-balanced constants.
+ */
+export const ATMOSPHERE_DRAG_COEFFICIENT = 1.5e-12;
+/**
+ * Heat/ablation damage rate: HP/s = ATMOSPHERE_DAMAGE_COEFFICIENT × 0.5 × density ×
+ * relSpeed³ × radius² × speedIntensity — kinetic-energy flux through the cross-section (real
+ * re-entry heating scales the same way, ∝ ρv³A), gated to zero below
+ * ATMOSPHERE_MIN_SPEED_FOR_EFFECT. Deliberately mass-independent: for bodies of similar
+ * material density, time-to-destroy = maxHP / damageRate ∝ radius, so burn-through time scales
+ * with how "thick" the body is — a big asteroid/comet takes years of sim time to lose
+ * meaningful HP this way; a small satellite/fragment/ship burns through its (mass-scaled,
+ * hence also tiny) maxHealthPoints in a few seconds at full density and full speed.
+ *
+ * Derived so an ISS-scale body (were it ever moving fast enough to clear the speed gate, which
+ * in normal orbit it is not) would lose its full maxHealthPoints in ~3s at
+ * ATMOSPHERE_DEFAULT_SURFACE_DENSITY and ATMOSPHERE_FULL_INTENSITY_SPEED. Retune at runtime.
+ */
+export const ATMOSPHERE_DAMAGE_COEFFICIENT = 1.4e-10;
+
 // === Explosion speed scaling ===
 // ParticleExplosion scales its outward particle/debris speed by the relative impact speed that
 // caused the death, so a gentle bump and a hypervelocity impact no longer look identical.

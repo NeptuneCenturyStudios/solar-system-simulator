@@ -22,6 +22,11 @@ import { Weapon } from './ship-effects/weapons/weapon';
 export interface IAtmosphereOptions {
     radius: number;
     tint: number;
+    /** Density at the surface, on the abstract scale documented at
+     *  ATMOSPHERE_DEFAULT_SURFACE_DENSITY (1.0 = "Earth-like" reference). Falls off toward 0
+     *  with altitude — see computeAtmosphericDensity in src/physics/atmosphere-density.ts.
+     *  Omitted → ATMOSPHERE_DEFAULT_SURFACE_DENSITY. */
+    density?: number;
 }
 
 /**

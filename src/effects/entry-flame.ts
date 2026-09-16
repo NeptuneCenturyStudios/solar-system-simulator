@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body.js';
 import { settingsStore } from '../settings/settings-store.js';
-import { DIST_SCALE } from '../utilities/consts.js';
+import {
+    ATMOSPHERE_DEFAULT_SURFACE_DENSITY,
+    ATMOSPHERE_FULL_INTENSITY_SPEED,
+    ATMOSPHERE_MIN_SPEED_FOR_EFFECT,
+} from '../utilities/consts.js';
 
 // ── Shape tuning ──────────────────────────────────────────────────────────
 /** Flame length, as a multiple of the body radius. */
@@ -38,23 +42,15 @@ const FADE_IN_SECONDS = 1.0;
 const FADE_OUT_SECONDS = 1.0;
 
 // ── Intensity tuning ──────────────────────────────────────────────────────
-/**
- * Relative-speed thresholds that drive the flame's intensity, given directly in km/s and
- * converted to the engine's scaled velocity units via DIST_SCALE — the same convention used
- * everywhere else a speed constant is declared (e.g. ASTEROID_DEFENSE_APPROACH_SPEED, ship
- * FLIGHT_MAX_SPEED). `body.velocity` is already expressed in km/s ÷ DIST_SCALE, so a desired
- * km/s threshold must be divided by DIST_SCALE too — comparing it to the raw km/s number would
- * be off by a factor of DIST_SCALE (100).
- *
- * Below MIN_SPEED_FOR_EFFECT the flame is fully suppressed (0 intensity); at/above
- * FULL_INTENSITY_SPEED it's fully lit (1); it ramps smoothly in between. Both are tuned for ship
- * flight speeds (normal cruise ~75 km/s, boost a large fraction of light speed) rather than the
- * asteroid-defense scenario's ~1200 km/s scripted impacts — those sail straight past
- * FULL_INTENSITY_SPEED and stay fully lit no matter where this is tuned, since intensity clamps
- * at 1 once past it.
- */
-const MIN_SPEED_FOR_EFFECT = 50 / DIST_SCALE; // ~10 km/s — flame starts appearing
-const FULL_INTENSITY_SPEED = 150 / DIST_SCALE; // ~150 km/s — fully ablaze
+// Relative-speed thresholds (ATMOSPHERE_MIN_SPEED_FOR_EFFECT / ATMOSPHERE_FULL_INTENSITY_SPEED,
+// from utilities/consts.ts) drive the flame's intensity: below MIN it's fully suppressed
+// (0 intensity), at/above FULL it's fully lit (1), ramping smoothly in between. They're shared
+// with the atmospheric heat-damage gate in physics/atmospheric-drag.ts — a body too slow to
+// show a visible flame here takes no heat damage there either. Both are tuned for ship flight
+// speeds (normal cruise ~75 km/s, boost a large fraction of light speed) rather than the
+// asteroid-defense scenario's ~1200 km/s scripted impacts — those sail straight past
+// ATMOSPHERE_FULL_INTENSITY_SPEED and stay fully lit no matter where this is tuned, since
+// intensity clamps at 1 once past it.
 
 /** Flame length scale at zero intensity (1 at full intensity). */
 const LENGTH_SCALE_MIN = 0.35;
@@ -251,6 +247,10 @@ export class EntryFlameEffect {
     private envelope = 0;
     /** True once `stop()` has been called and the flame is dissolving. */
     private stopping = false;
+    /** 0..1 density factor from the last `setAtmosphereDensity` call; multiplies intensity
+     *  alongside speed. Defaults to 1 (full) so a flame not yet fed a density behaves like it
+     *  did before density-awareness existed. */
+    private densityFactor = 1;
 
     // Scratch objects reused every frame.
     private readonly _dir = new THREE.Vector3();
@@ -402,6 +402,20 @@ export class EntryFlameEffect {
     }
 
     /**
+     * Sets this frame's atmosphere-density sample, normalised against
+     * ATMOSPHERE_DEFAULT_SURFACE_DENSITY. Called once per frame by `checkAtmosphericEntry`,
+     * which holds the strongly-typed `CelestialBody` this effect's `planet: Body` field
+     * deliberately doesn't. Safe to call every frame.
+     */
+    setAtmosphereDensity(density: number): void {
+        this.densityFactor = THREE.MathUtils.clamp(
+            density / ATMOSPHERE_DEFAULT_SURFACE_DENSITY,
+            0,
+            1
+        );
+    }
+
+    /**
      * Update per frame (call once per render frame, not per physics substep).
      * @param dt Frame delta-time in seconds.
      * @param _cameraPos World-space camera position (unused — the mesh is placed in world space).
@@ -439,12 +453,13 @@ export class EntryFlameEffect {
         const relativeSpeed = this.body.velocity.distanceTo(this.planet.velocity);
         const speedIntensity = THREE.MathUtils.smoothstep(
             relativeSpeed,
-            MIN_SPEED_FOR_EFFECT,
-            FULL_INTENSITY_SPEED
+            ATMOSPHERE_MIN_SPEED_FOR_EFFECT,
+            ATMOSPHERE_FULL_INTENSITY_SPEED
         );
-        // The fade envelope multiplies the speed intensity, so the flame both eases in/out and
-        // still brightens/dims with how hard the body is entering the atmosphere.
-        const intensity = speedIntensity * this.envelope;
+        // The fade envelope and atmosphere density both multiply the speed intensity, so the
+        // flame eases in/out, brightens/dims with entry speed, and is fainter in a thin
+        // atmosphere than a thick one.
+        const intensity = speedIntensity * this.densityFactor * this.envelope;
 
         if (intensity <= 0.001) {
             this.mesh.visible = false;

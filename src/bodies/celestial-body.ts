@@ -8,7 +8,7 @@ import {
 } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
-import { DIST_SCALE } from '../utilities/consts';
+import { ATMOSPHERE_DEFAULT_SURFACE_DENSITY, DIST_SCALE } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
@@ -56,6 +56,12 @@ export class CelestialBody extends Body {
     atmosphereShell: AtmosphereShellHandle | null = null;
     /** Radius of this body's atmosphere in scene units, or null when it has none. */
     atmosphereRadius: number | null = null;
+    /** Density at this body's surface, on the abstract scale documented at
+     *  ATMOSPHERE_DEFAULT_SURFACE_DENSITY. Only meaningful while atmosphereRadius is non-null.
+     *  Defaulted here so every CelestialBody has a usable value even when the procedural
+     *  factories set atmosphereRadius/atmosphereShell directly and bypass this constructor's
+     *  `options.atmosphere` branch entirely. */
+    atmosphereSurfaceDensity: number = ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
 
     /**
      * Polar aurora curtains, or null when this body doesn't qualify for them.
@@ -148,6 +154,8 @@ export class CelestialBody extends Body {
         // Create the atmosphere shell if atmosphere options were provided
         if (options.atmosphere) {
             this.atmosphereRadius = options.atmosphere.radius * 1.2;
+            this.atmosphereSurfaceDensity =
+                options.atmosphere.density ?? ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
             this.atmosphereShell = createAtmosphereShell(
                 scene,
                 options.atmosphere.radius,

@@ -28,6 +28,8 @@ import { BodyTypeEnum } from '../bodies/body-enums';
 import { settingsStore } from '../settings/settings-store';
 import { absorbBody, destroyBody, updateSimulation } from '../physics/physics';
 import { resolveCollision } from '../physics/collision';
+import { computeAtmosphericDensity } from '../physics/atmosphere-density';
+import { resolveAtmosphericPassage } from '../physics/atmospheric-drag';
 import { isBodyType } from '../utilities/utilities';
 import { EntryFlameEffect } from '../effects/entry-flame';
 
@@ -192,14 +194,21 @@ function updateShipTrail(
 }
 
 /**
- * Checks one body pair for atmospheric-entry containment and creates / fades out an
- * `EntryFlameEffect` on the asteroid/comet accordingly. A no-op unless one side is an
- * Asteroid/Comet and the other is a `CelestialBody` with an atmosphere.
+ * Checks one body pair for atmospheric-entry containment: creates / fades out an
+ * `EntryFlameEffect` on the small body, and applies one frame's worth of atmospheric drag and
+ * heat damage. A no-op unless one side is an Asteroid/Comet/Satellite/SpaceShip and the other
+ * is a `CelestialBody` with an atmosphere.
  *
  * Leaving the atmosphere calls `stop()` rather than `dispose()` so the flame can fade out; the
  * per-frame update in the collision pass disposes the effect once it reports `active === false`.
+ *
+ * @param dtTotal This frame's total sim-time, used to apply drag/damage at the same
+ *   once-per-frame cadence `EntryFlameEffect.update()` and collision damage already use.
+ * @returns The small body, if atmospheric heat damage destroyed it this frame — the caller is
+ *   responsible for `destroyBody()`/`.die()`/bodies-array cleanup, mirroring how this function
+ *   never calls `.die()` itself, same as `resolveCollision`.
  */
-function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene): void {
+function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene, dtTotal: number): Body | null {
     const isSmallBody = (body: Body) =>
         isBodyType(
             body,
@@ -218,8 +227,8 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene): void {
         small = b;
         planet = a;
     }
-    if (!small || !planet) return;
-    if (!(planet instanceof CelestialBody) || planet.atmosphereRadius == null) return;
+    if (!small || !planet) return null;
+    if (!(planet instanceof CelestialBody) || planet.atmosphereRadius == null) return null;
 
     // Compare the asteroid/comet's *leading edge* (not its center) against the
     // atmosphere shell, so the entry window is the shell's actual thickness
@@ -237,6 +246,17 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene): void {
             // Still inside (or back inside) — cancel any pending fade-out.
             small.entryFlame.start();
         }
+
+        const density = computeAtmosphericDensity(distance, planet);
+        if (small.entryFlame && small.entryFlame.planet === planet) {
+            small.entryFlame.setAtmosphereDensity(density);
+        }
+
+        // Continuous drag + heat/ablation damage, applied at the same once-per-frame (dtTotal)
+        // cadence as the flame's intensity update and collision damage.
+        if (resolveAtmosphericPassage(small, planet, density, dtTotal)) {
+            return small;
+        }
     } else if (small.entryFlame && small.entryFlame.planet === planet) {
         // Only stop the flame when leaving the specific planet it was created for — this
         // function runs once per (small body, atmosphere-bearing planet) pair every frame,
@@ -248,6 +268,8 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene): void {
         // per-frame update below disposes it once it reports itself inactive.
         small.entryFlame.stop();
     }
+
+    return null;
 }
 
 /**
@@ -602,7 +624,24 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     // entrance/teleport is handled by a dedicated pass below.
                     if (b1 instanceof Wormhole || b2 instanceof Wormhole) continue;
 
-                    checkAtmosphericEntry(b1, b2, ctx.scene);
+                    const atmosphereVictim = checkAtmosphericEntry(b1, b2, ctx.scene, dtTotal);
+                    if (atmosphereVictim) {
+                        const other = atmosphereVictim === b1 ? b2 : b1;
+                        destroyBody(other, [atmosphereVictim]);
+
+                        const impactSpeed = atmosphereVictim.velocity.distanceTo(other.velocity);
+                        atmosphereVictim.die({ impactSpeed });
+                        ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
+                            (body) => body !== atmosphereVictim
+                        );
+
+                        // small could be either b1 or b2 — if b1 burned up, stop colliding it
+                        // against the rest of the row (mirrors the `if (b1._isDisposed) break;`
+                        // pattern below); if only b2 burned up, this pair is done but b1
+                        // survives to check against the remaining bodies.
+                        if (atmosphereVictim === b1) break;
+                        continue;
+                    }
 
                     const dx = b1.mesh.position.x - b2.mesh.position.x;
                     const dy = b1.mesh.position.y - b2.mesh.position.y;
