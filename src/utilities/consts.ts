@@ -441,6 +441,12 @@ export const SCENARIO_MESSAGE_FADE_OUT_SECONDS = 0.8;
  */
 export const HP_MASS_MULTIPLIER = 100;
 
+/**
+ * Fraction of a ship's maxShieldPoints below which a shield is treated as fully depleted.
+ * Absorbs floating-point residue so a shield left at ~0 after a hit snaps to exactly 0.
+ */
+export const SHIELD_DEPLETED_EPSILON = 1e-6;
+
 // === Collision damage ===
 // Two colliding bodies each lose the same HP: the kinetic energy of their relative motion in
 // the centre-of-mass frame (½·μ·v_rel², μ = m₁m₂ / (m₁ + m₂)) × COLLISION_DAMAGE_PER_ENERGY.

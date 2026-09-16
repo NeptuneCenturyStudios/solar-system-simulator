@@ -89,7 +89,7 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         // Wormholes are indestructible — weapons can hit them but never damage them.
         if (body instanceof Wormhole) return;
 
-        body.healthPoints -= e.detail.damage;
+        body.takeDamage(e.detail.damage);
         if (body.healthPoints <= 0) {
             body.die();
         }

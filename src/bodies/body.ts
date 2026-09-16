@@ -23,9 +23,14 @@ export class Body {
     bodyType: BodyTypeEnum;
     /** When true, UI overlays (name panels, off-screen markers) render this body in red to flag it as a threat. */
     isThreat = false;
+    /** Backing store for healthPoints. Only reduced through takeDamage(). */
+    protected _healthPoints: number;
     /** Current hit-points.  Initialised from mass × HP_MASS_MULTIPLIER.
-     *  Reduced by weapon impacts and collisions; reaching ≤ 0 triggers body.die(). */
-    healthPoints: number;
+     *  Reduced by weapon impacts, collisions and atmospheric heating via takeDamage();
+     *  reaching ≤ 0 triggers body.die(). */
+    get healthPoints(): number {
+        return this._healthPoints;
+    }
     /** Maximum hit-points at spawn (same initial value as healthPoints).
      *  Use healthPoints / maxHealthPoints for a [0–1] health percentage. */
     readonly maxHealthPoints: number;
@@ -67,8 +72,8 @@ export class Body {
         this.id = id;
         this.name = name;
         this.bodyType = bodyType;
-        this.healthPoints = mass * HP_MASS_MULTIPLIER;
-        this.maxHealthPoints = this.healthPoints;
+        this._healthPoints = mass * HP_MASS_MULTIPLIER;
+        this.maxHealthPoints = this._healthPoints;
         this.mesh = mesh;
 
         if (position instanceof THREE.Vector3) {
@@ -154,6 +159,17 @@ export class Body {
             this.label.material.map = labelTexture;
             this.label.material.needsUpdate = true;
         }
+    }
+
+    /**
+     * Apply `damage` HP of damage to this body. Every damage source (weapons, collisions,
+     * atmospheric heating) must go through here. Subclasses override to add damage layers
+     * (e.g. ship shields). Does NOT call die() — callers check healthPoints and decide.
+     * @param damage HP to remove. Non-positive and NaN values are ignored.
+     */
+    takeDamage(damage: number): void {
+        if (!(damage > 0)) return;
+        this._healthPoints -= damage;
     }
 
     setMass(mass: number) {

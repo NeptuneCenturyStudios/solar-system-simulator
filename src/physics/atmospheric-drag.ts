@@ -83,7 +83,7 @@ function applyAtmosphericDrag(
 
 /**
  * Applies one frame's worth of atmospheric drag and heat damage to `body`. Mutates
- * `body.velocity` and `body.healthPoints` directly; does NOT call `.die()` or touch the bodies
+ * `body.velocity` directly and applies heat damage via `body.takeDamage()`; does NOT call `.die()` or touch the bodies
  * array — the caller (checkAtmosphericEntry in animation-loop.ts) does that, mirroring
  * resolveCollision's contract.
  *
@@ -96,7 +96,7 @@ export function resolveAtmosphericPassage(
     dt: number
 ): boolean {
     const damage = computeAtmosphericDamage(body, planet, density, dt);
-    if (damage > 0) body.healthPoints -= damage;
+    if (damage > 0) body.takeDamage(damage);
 
     applyAtmosphericDrag(body, planet, density, dt);
 

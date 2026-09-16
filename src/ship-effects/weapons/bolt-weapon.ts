@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Body } from '../../bodies/body';
 import { SoundEffect, playSoundEffect } from '../../utilities/audio.js';
 import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
+import { DIST_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 
 /**
  * Per-instance tuning for BoltWeapon.  Ships may pass a partial config to
@@ -85,20 +86,20 @@ export class BoltWeapon extends Weapon {
     /** True while the trigger is held (drives thermal cooldown gating). */
     private active = false;
 
-    constructor(scene: THREE.Scene, shipRadius: number, config: Partial<IBoltWeaponConfig> = {}) {
+    constructor(scene: THREE.Scene, _shipRadius: number, config: Partial<IBoltWeaponConfig> = {}) {
         super(scene);
 
         /** Class-level defaults — a ship wanting different behaviour passes a partial IBoltWeaponConfig. */
         const DEFAULT_BOLT_CONFIG: IBoltWeaponConfig = {
-            baseSpeed: 100, //C * 0.2, // fast bolts relative to top speeds
-            particleLifetime: 4.0,
-            boltLength: shipRadius * 40,
+            baseSpeed: 16000 / DIST_SCALE, // 16,000 km/s
+            particleLifetime: 8.0,
+            boltLength: 0,
             boltColor: 0x00eeff,
-            boltHeadSize: shipRadius * 2400,
-            fireRate: 10.56,
+            boltHeadSize: 100 / RADIUS_SCALE,
+            fireRate: 12,
             maxProjectiles: 800,
             damage: 1,
-            heatPerSecond: 0.2,
+            heatPerSecond: 0.1,
             coolPerSecond: 0.8,
             fireSound: () => playSoundEffect(SoundEffect.WeaponFire),
         };
@@ -147,7 +148,7 @@ export class BoltWeapon extends Weapon {
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
-            depthWrite: false,
+            depthWrite: false
         });
 
         // Round, glowing point sprite via fragment shader injection.

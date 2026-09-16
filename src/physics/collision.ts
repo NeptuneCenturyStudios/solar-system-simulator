@@ -204,8 +204,8 @@ export function resolveCollision(b1: Body, b2: Body): CollisionOutcome {
     }
 
     const damage = computeCollisionDamage(b1, b2);
-    b1.healthPoints -= damage;
-    b2.healthPoints -= damage;
+    b1.takeDamage(damage);
+    b2.takeDamage(damage);
     console.info('[body:collision]', `${b1.name} ↔ ${b2.name}: ${damage.toFixed(2)} HP each`);
 
     const alive1 = b1.healthPoints > 0;

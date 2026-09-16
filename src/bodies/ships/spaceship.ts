@@ -16,7 +16,7 @@ import {
 import type { ShipAI } from '../../simulation/ai/ship-ai';
 import { Weapon } from '../../ship-effects/weapons/weapon';
 import { autopilotState, flightState, simulationState } from '../../simulation/simulation';
-import { G } from '../../utilities/consts';
+import { G, SHIELD_DEPLETED_EPSILON } from '../../utilities/consts';
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_BRAKE_PAD,
@@ -57,6 +57,21 @@ export class Spaceship extends Body {
     handling: ISpaceshipHandling;
     /** Weapon systems mounted on this ship. Empty for unarmed ships. Subclasses mount a loadout of Weapon classes. */
     weapons: Weapon[] = [];
+
+    // ── Shields ──────────────────────────────────────────────────────────────
+    /** Shield capacity (HP). Absorbs damage before the hull's healthPoints. */
+    readonly maxShieldPoints: number;
+    /** Sim-seconds for the shield to refill to full after the last hit. */
+    readonly shieldRechargeTime: number;
+    private _shieldPoints: number;
+    /** Current recharge rate (HP per sim-second), recomputed on every hit so the
+     *  shield always refills in shieldRechargeTime regardless of how much was lost. */
+    private _shieldRechargeRate: number = 0;
+
+    /** Current shield hit-points. */
+    get shieldPoints(): number {
+        return this._shieldPoints;
+    }
 
     /** True when the subclass supplied an explicit cockpitOffset; the bbox-derived
      *  value is then skipped in applyModelOffsets(). */
@@ -241,6 +256,11 @@ export class Spaceship extends Body {
 
         this.weapons = options.weapons;
 
+        // Shield starts full.
+        this.maxShieldPoints = options.shield.hullMultiplier * this.maxHealthPoints;
+        this.shieldRechargeTime = options.shield.rechargeTime;
+        this._shieldPoints = this.maxShieldPoints;
+
         // Registry id of this ship type (used for spawn/re-enter type matching).
         this.shipTypeId = options.shipTypeId;
 
@@ -275,6 +295,40 @@ export class Spaceship extends Body {
         // Keep default label (shows in bodies table) but hide it during flight
         if (this.label) this.label.visible = false;
         if (this.labelLine) this.labelLine.visible = false;
+    }
+
+    /**
+     * Shields absorb damage first; only damage beyond the remaining shield reaches the hull.
+     * Every hit restarts the recharge so the shield refills to full over shieldRechargeTime.
+     */
+    override takeDamage(damage: number): void {
+        if (!(damage > 0)) return;
+
+        const absorbed = Math.min(this._shieldPoints, damage);
+        this._shieldPoints -= absorbed;
+        if (this._shieldPoints <= this.maxShieldPoints * SHIELD_DEPLETED_EPSILON) {
+            this._shieldPoints = 0;
+        }
+
+        if (this.shieldRechargeTime > 0) {
+            this._shieldRechargeRate =
+                (this.maxShieldPoints - this._shieldPoints) / this.shieldRechargeTime;
+        }
+
+        const overflow = damage - absorbed;
+        if (overflow > 0) super.takeDamage(overflow);
+    }
+
+    /**
+     * Advance shield recharge by one frame.
+     * @param dt Sim-seconds advanced this frame (0 while paused).
+     */
+    updateShields(dt: number): void {
+        if (this._isDisposed || this._shieldPoints >= this.maxShieldPoints) return;
+        this._shieldPoints = Math.min(
+            this.maxShieldPoints,
+            this._shieldPoints + this._shieldRechargeRate * dt
+        );
     }
 
     /** Fire all mounted weapons toward `aimDir`. No-op if this ship is unarmed. */

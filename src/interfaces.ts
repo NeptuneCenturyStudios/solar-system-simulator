@@ -322,6 +322,14 @@ export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {
 /**
  * Options for creating a spaceship, including its physical properties, position, velocity, and handling characteristics.
  */
+/** Per-ship-type shield tuning. */
+export interface IShipShieldConfig {
+    /** Max shield HP as a multiple of the hull's maxHealthPoints. */
+    hullMultiplier: number;
+    /** Sim-seconds for the shield to refill to full after the last hit, regardless of how much was lost. */
+    rechargeTime: number;
+}
+
 export interface ISpaceshipCreationOptions extends IBodyCreationOptions {
     radius: number;
     mass: number;
@@ -331,6 +339,8 @@ export interface ISpaceshipCreationOptions extends IBodyCreationOptions {
     mesh: THREE.Mesh;
     handling: ISpaceshipHandling;
     weapons: Weapon[];
+    /** Shield layer that absorbs damage before the hull. */
+    shield: IShipShieldConfig;
 
     /** Registry id of the ship type (must match IShipType.id in ship-registry.ts).
      *  Used to detect when the user selects a different ship class than the one

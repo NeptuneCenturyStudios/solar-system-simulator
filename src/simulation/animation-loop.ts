@@ -603,6 +603,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 if (b1 instanceof CelestialBody) b1.updateVisuals(dtTotal, ctx.camera.position);
                 if (b1 instanceof Comet) b1.updateTail(dtTotal, ctx.camera.position);
                 if (b1 instanceof Wormhole) b1.funnelEffect.update(dtTotal);
+                // Shield recharge runs on sim time, so it halts while paused.
+                if (b1.bodyType === BodyTypeEnum.SpaceShip)
+                    (b1 as Spaceship).updateShields(dtTotal);
                 const entryFlame = b1.entryFlame;
                 if (entryFlame) {
                     entryFlame.update(dtTotal, ctx.camera.position);

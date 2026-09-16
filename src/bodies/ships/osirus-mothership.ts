@@ -121,6 +121,7 @@ export class OsirisMothership extends Spaceship {
             name: 'Osiris Mothership',
             handling: destroyerHandling,
             weapons: [new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)],
+            shield: { hullMultiplier: 4, rechargeTime: 90 },
             shipTypeId: 'osiris_mothership',
             thirdPersonOffset: THIRD_PERSON_OFFSET,
         });
