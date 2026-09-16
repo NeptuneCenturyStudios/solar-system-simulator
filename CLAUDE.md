@@ -84,8 +84,10 @@ src/
 - [ ] Phase 4: Scenario updates. Add ability for a scenario to disable certain UI features like System Explorer or Flight Control panel or disable operations like delete a body while the scenario is running.
 - **Phase 5**
 - [ ] Phase 5: New scenario. Defend Earth from an onslaught of ~100 (to be adjusted) ELEs comprised of asteroids and comets. User will get to use the Osiris to take them all down before Earth is destroyed.
-- **Phase 6**
-- [ ] Phase 6: Adjust Neptune's orbit to match real orbit (like we did for Pluto)
+- **Phase 6 - Fixes and adjustments**
+- [ ] Phase 6.1: Adjust Neptune's orbit to match real orbit (like we did for Pluto)
+- [ ] Phase 6.1: Ability to leave weapon fire in scene if paused even when user exits flight mode. Bolts will freeze in space and not tick down their lifetime, and laser will remain persistent in space.
+- [ ] Phase 6.2: Smooth camera zoom (ease-in-out)
 
 ## UI (Vue)
 
