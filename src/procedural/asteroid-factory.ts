@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { IStateDependencies } from '../interfaces';
 import { Asteroid } from '../bodies/asteroid';
+import type { IPlanetaryAttributes } from '../bodies/body-attributes';
 
 export type ProceduralAsteroidCreation = {
     id: string;
@@ -13,6 +14,12 @@ export type ProceduralAsteroidCreation = {
     rotationSpeed: number;
     rotationTilt: number;
     rotationAzimuth: number;
+
+    /** Index into the system's star array this asteroid orbits, or -1 for a P-type orbit. */
+    hostStarIndex: number;
+
+    /** Hidden/discoverable science data. */
+    attributes: IPlanetaryAttributes;
 };
 
 /**
@@ -26,8 +33,18 @@ export function createAsteroidBodyFromProceduralCreation(
     scene: THREE.Scene,
     creation: ProceduralAsteroidCreation
 ): Asteroid {
-    const { id, name, pos, vel, radius, mass, rotationSpeed, rotationTilt, rotationAzimuth } =
-        creation;
+    const {
+        id,
+        name,
+        pos,
+        vel,
+        radius,
+        mass,
+        rotationSpeed,
+        rotationTilt,
+        rotationAzimuth,
+        attributes,
+    } = creation;
 
     return new Asteroid(dependencies, scene, {
         id,
@@ -37,5 +54,6 @@ export function createAsteroidBodyFromProceduralCreation(
         radius,
         mass,
         rotation: { tilt: rotationTilt, speed: rotationSpeed, azimuth: rotationAzimuth },
+        attributes,
     });
 }

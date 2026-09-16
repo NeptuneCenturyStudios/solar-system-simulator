@@ -55,6 +55,14 @@ import {
 } from '../utilities/consts';
 import { MoonTypeEnum } from '../bodies/body-enums';
 import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    LiquidCompositionEnum,
+    SoilCompositionEnum,
+    VegetationEnum,
+} from '../bodies/body-attributes';
+import {
     callistoTexture,
     europaTexture,
     ganymedeTexture,
@@ -109,13 +117,17 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Mercury
-        bodies.push(new Mercury(this.dependencies, this.scene, randomAngle()));
+        const mercury = new Mercury(this.dependencies, this.scene, randomAngle());
+        mercury.orbitParent = sun;
+        bodies.push(mercury);
         completed++;
         report({ phase: 'planets', label: `Mercury ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Venus
-        bodies.push(new Venus(this.dependencies, this.scene, randomAngle()));
+        const venus = new Venus(this.dependencies, this.scene, randomAngle());
+        venus.orbitParent = sun;
+        bodies.push(venus);
         completed++;
         report({ phase: 'planets', label: `Venus ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
@@ -123,6 +135,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         // Earth (+ Moon)
         const earthAngle = randomAngle();
         const earth = new Earth(this.dependencies, this.scene, earthAngle);
+        earth.orbitParent = sun;
         bodies.push(earth);
         completed++;
         report({ phase: 'planets', label: `Earth ${completed}/${totalBodies}` });
@@ -143,6 +156,24 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: moonTexture,
                 moonType: MoonTypeEnum.Terrestrial,
                 angle: randomAngle(),
+                attributes: {
+                    coreType: { value: CoreTypeEnum.Solid, discovered: true },
+                    atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
+                    soilComposition: {
+                        value:
+                            SoilCompositionEnum.Silicates |
+                            SoilCompositionEnum.Iron |
+                            SoilCompositionEnum.Regolith,
+                        discovered: true,
+                    },
+                    liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                    averageTemperatureKelvin: { value: 220, discovered: true },
+                    vegetation: { value: VegetationEnum.None, discovered: true },
+                    sentientLife: { value: false, discovered: true },
+                    lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                    orbitalPeriod: { discovered: true },
+                    rotationPeriod: { discovered: true },
+                },
             })
         );
         completed++;
@@ -170,14 +201,18 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Mars
-        bodies.push(new Mars(this.dependencies, this.scene, randomAngle()));
+        const mars = new Mars(this.dependencies, this.scene, randomAngle());
+        mars.orbitParent = sun;
+        bodies.push(mars);
         completed++;
         report({ phase: 'planets', label: `Mars ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Ceres (~2.77 AU)
         const ceresAngle = randomAngle();
-        bodies.push(new Ceres(this.dependencies, this.scene, ceresAngle));
+        const ceres = new Ceres(this.dependencies, this.scene, ceresAngle);
+        ceres.orbitParent = sun;
+        bodies.push(ceres);
         completed++;
         report({ phase: 'planets', label: `Ceres ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
@@ -203,6 +238,25 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             name: 'Vesta',
             trailColor: 0xc9b89a,
             maxTrail: 1500,
+            orbitParent: sun,
+            attributes: {
+                coreType: { value: CoreTypeEnum.Metallic, discovered: true },
+                atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
+                soilComposition: {
+                    value:
+                        SoilCompositionEnum.Basalt |
+                        SoilCompositionEnum.Silicates |
+                        SoilCompositionEnum.Iron,
+                    discovered: true,
+                },
+                liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                averageTemperatureKelvin: { value: 180, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
+            },
         });
         bodies.push(vesta);
         completed++;
@@ -230,6 +284,25 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             name: 'Pallas',
             trailColor: 0x999999,
             maxTrail: 1500,
+            orbitParent: sun,
+            attributes: {
+                coreType: { value: CoreTypeEnum.RubblePile, discovered: true },
+                atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
+                soilComposition: {
+                    value:
+                        SoilCompositionEnum.Carbon |
+                        SoilCompositionEnum.Silicates |
+                        SoilCompositionEnum.WaterIce,
+                    discovered: true,
+                },
+                liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                averageTemperatureKelvin: { value: 164, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
+            },
         });
         bodies.push(pallas);
         completed++;
@@ -257,6 +330,25 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             name: 'Hygiea',
             trailColor: 0x888888,
             maxTrail: 1500,
+            orbitParent: sun,
+            attributes: {
+                coreType: { value: CoreTypeEnum.RubblePile, discovered: true },
+                atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
+                soilComposition: {
+                    value:
+                        SoilCompositionEnum.Carbon |
+                        SoilCompositionEnum.Silicates |
+                        SoilCompositionEnum.WaterIce,
+                    discovered: true,
+                },
+                liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                averageTemperatureKelvin: { value: 164, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
+            },
         });
         bodies.push(hygiea);
         completed++;
@@ -266,6 +358,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         // Jupiter (+ 4 Galilean moons)
         const jupiterAngle = randomAngle();
         const jupiter = new Jupiter(this.dependencies, this.scene, jupiterAngle);
+        jupiter.orbitParent = sun;
         bodies.push(jupiter);
         completed++;
         report({ phase: 'planets', label: `Jupiter ${completed}/${totalBodies}` });
@@ -287,6 +380,30 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 yVariation: 109,
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: ioTexture,
+                attributes: {
+                    coreType: { value: CoreTypeEnum.Molten, discovered: true },
+                    atmosphericComposition: {
+                        value: AtmosphericGasEnum.SulfurDioxide,
+                        discovered: true,
+                    },
+                    soilComposition: {
+                        value:
+                            SoilCompositionEnum.Sulfur |
+                            SoilCompositionEnum.Silicates |
+                            SoilCompositionEnum.Basalt,
+                        discovered: true,
+                    },
+                    liquidComposition: {
+                        value: LiquidCompositionEnum.LiquidSulfur,
+                        discovered: true,
+                    },
+                    averageTemperatureKelvin: { value: 130, discovered: true },
+                    vegetation: { value: VegetationEnum.None, discovered: true },
+                    sentientLife: { value: false, discovered: true },
+                    lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                    orbitalPeriod: { discovered: true },
+                    rotationPeriod: { discovered: true },
+                },
             })
         );
         completed++;
@@ -308,6 +425,21 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 yVariation: 164,
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: europaTexture,
+                attributes: {
+                    coreType: { value: CoreTypeEnum.Metallic, discovered: true },
+                    atmosphericComposition: { value: AtmosphericGasEnum.Oxygen, discovered: true },
+                    soilComposition: {
+                        value: SoilCompositionEnum.WaterIce | SoilCompositionEnum.Silicates,
+                        discovered: true,
+                    },
+                    liquidComposition: { value: LiquidCompositionEnum.Water, discovered: true },
+                    averageTemperatureKelvin: { value: 102, discovered: true },
+                    vegetation: { value: VegetationEnum.None, discovered: true },
+                    sentientLife: { value: false, discovered: true },
+                    lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                    orbitalPeriod: { discovered: true },
+                    rotationPeriod: { discovered: true },
+                },
             })
         );
         completed++;
@@ -329,6 +461,24 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 yVariation: 219,
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: ganymedeTexture,
+                attributes: {
+                    coreType: { value: CoreTypeEnum.Metallic, discovered: true },
+                    atmosphericComposition: { value: AtmosphericGasEnum.Oxygen, discovered: true },
+                    soilComposition: {
+                        value: SoilCompositionEnum.WaterIce | SoilCompositionEnum.Silicates,
+                        discovered: true,
+                    },
+                    liquidComposition: {
+                        value: LiquidCompositionEnum.Water | LiquidCompositionEnum.Brine,
+                        discovered: true,
+                    },
+                    averageTemperatureKelvin: { value: 110, discovered: true },
+                    vegetation: { value: VegetationEnum.None, discovered: true },
+                    sentientLife: { value: false, discovered: true },
+                    lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                    orbitalPeriod: { discovered: true },
+                    rotationPeriod: { discovered: true },
+                },
             })
         );
         completed++;
@@ -350,6 +500,27 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 yVariation: 273,
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: callistoTexture,
+                attributes: {
+                    coreType: { value: CoreTypeEnum.Icy, discovered: true },
+                    atmosphericComposition: {
+                        value: AtmosphericGasEnum.CarbonDioxide,
+                        discovered: true,
+                    },
+                    soilComposition: {
+                        value:
+                            SoilCompositionEnum.WaterIce |
+                            SoilCompositionEnum.Silicates |
+                            SoilCompositionEnum.Carbon,
+                        discovered: true,
+                    },
+                    liquidComposition: { value: LiquidCompositionEnum.Water, discovered: true },
+                    averageTemperatureKelvin: { value: 134, discovered: true },
+                    vegetation: { value: VegetationEnum.None, discovered: true },
+                    sentientLife: { value: false, discovered: true },
+                    lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                    orbitalPeriod: { discovered: true },
+                    rotationPeriod: { discovered: true },
+                },
             })
         );
         completed++;
@@ -357,31 +528,41 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Saturn
-        bodies.push(new Saturn(this.dependencies, this.scene, randomAngle()));
+        const saturn = new Saturn(this.dependencies, this.scene, randomAngle());
+        saturn.orbitParent = sun;
+        bodies.push(saturn);
         completed++;
         report({ phase: 'planets', label: `Saturn ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Uranus
-        bodies.push(new Uranus(this.dependencies, this.scene, randomAngle()));
+        const uranus = new Uranus(this.dependencies, this.scene, randomAngle());
+        uranus.orbitParent = sun;
+        bodies.push(uranus);
         completed++;
         report({ phase: 'planets', label: `Uranus ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Neptune
-        bodies.push(new Neptune(this.dependencies, this.scene, randomAngle()));
+        const neptune = new Neptune(this.dependencies, this.scene, randomAngle());
+        neptune.orbitParent = sun;
+        bodies.push(neptune);
         completed++;
         report({ phase: 'planets', label: `Neptune ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Pluto — random true anomaly preserves the eccentric, inclined orbit shape
-        bodies.push(new Pluto(this.dependencies, this.scene, randomAngle()));
+        const pluto = new Pluto(this.dependencies, this.scene, randomAngle());
+        pluto.orbitParent = sun;
+        bodies.push(pluto);
         completed++;
         report({ phase: 'planets', label: `Pluto ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Comet (Halley) — random orbital angle preserves elliptical orbit shape
-        bodies.push(new Halley(this.dependencies, this.scene, randomAngle()));
+        const halley = new Halley(this.dependencies, this.scene, randomAngle());
+        halley.orbitParent = sun;
+        bodies.push(halley);
         completed++;
         report({ phase: 'comets', label: `Halley's Comet ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();

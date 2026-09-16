@@ -42,6 +42,9 @@ export class GenericComet extends Comet {
             maxTrail: options.maxTrail,
             tailColor: options.tailColor,
             mesh: placeholderMesh,
+            attributes: options.attributes,
+            orbitParent: options.orbitParent,
+            orbitBarycenterMass: options.orbitBarycenterMass,
         });
 
         // Async OBJ + MTL load for Comet model

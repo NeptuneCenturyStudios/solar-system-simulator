@@ -24,6 +24,8 @@ import { createAtmosphereShell } from '../effects/atmosphere-shell';
 import { ATMOSPHERE_DEFAULT_SURFACE_DENSITY } from '../utilities/consts';
 import { rollMagneticField, type MagneticFieldKind } from './magnetic-field';
 import { buildBodySphereGeometry } from '../utilities/utilities';
+import type { IPlanetaryAttributes } from '../bodies/body-attributes';
+import { computePlanetaryAttributes } from './planet-attributes';
 
 export type ProceduralPlanetSubtype =
     | 'solid'
@@ -69,6 +71,26 @@ export type ProceduralPlanetCreation = {
      * Generated in planet-generator.ts and kept stable across runs.
      */
     textureSeed?: string;
+
+    /**
+     * Normalized 0..1 position within the system's planet distance ordering (0=near star).
+     * Omitted by the custom Add/Edit panel creation path — defaults to mid-range (0.5).
+     */
+    distanceT01?: number;
+
+    /**
+     * Index into the system's star array this planet orbits, or -1 for a P-type
+     * (circumbinary/barycentric) orbit with no single host star. Omitted by the custom
+     * Add/Edit panel creation path, which doesn't track a host star index.
+     */
+    hostStarIndex?: number;
+
+    /**
+     * Hidden/discoverable science data. Undefined means "roll for one" (rolled here from
+     * bodySubtype/distanceT01, mirroring how computeMagneticField resolves an absent field);
+     * generated explicitly in planet-generator.ts for the main procedural pipeline.
+     */
+    attributes?: IPlanetaryAttributes;
 };
 
 function computeRingPresence(creation: ProceduralPlanetCreation): { hasRings: boolean } {
@@ -114,6 +136,22 @@ function computeMagneticField(creation: ProceduralPlanetCreation): IMagneticFiel
                 : 'solid';
 
     return rollMagneticField(new SeededRandom(`${id}|magnetic-field`), kind);
+}
+
+/**
+ * Resolves a planet's hidden attributes: an explicit value from the generator wins,
+ * otherwise they're rolled here (mirroring how computeMagneticField resolves an absent
+ * field) — covers the custom Add/Edit panel creation path, which doesn't pre-compute one.
+ */
+function computeAttributes(creation: ProceduralPlanetCreation): IPlanetaryAttributes {
+    if (creation.attributes) return creation.attributes;
+
+    return computePlanetaryAttributes({
+        id: creation.id,
+        subtype: creation.bodySubtype,
+        isDwarf: creation.bodyType === BodyTypeEnum.DwarfPlanet,
+        distanceT01: creation.distanceT01 ?? 0.5,
+    });
 }
 
 /**
@@ -221,6 +259,8 @@ function createCommonPlanetOptions(
         textureSeed,
     } = creation;
 
+    const attributes = computeAttributes(creation);
+
     const commonOptions = {
         radius,
         pos,
@@ -236,6 +276,7 @@ function createCommonPlanetOptions(
         mesh,
         seed: textureSeed,
         magneticField,
+        attributes,
     };
 
     if (bodyType === BodyTypeEnum.DwarfPlanet) {

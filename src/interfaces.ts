@@ -16,6 +16,7 @@ import { ImpactShockwave } from './effects/impact-shockwave';
 import { FlightHUD } from './drawing/flight-hud';
 import type { HudSprite } from './drawing/hud/hud-sprite';
 import { Weapon } from './ship-effects/weapons/weapon';
+import type { IPlanetaryAttributes } from './bodies/body-attributes';
 
 /**
  * Options for configuring an atmosphere on a celestial body, including its radius and tint color.
@@ -263,6 +264,23 @@ export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptio
     magneticField?: IMagneticFieldOptions | null;
     /** Deterministic seed used to derive procedural textures and other procedural features at runtime. */
     seed?: string;
+    /** Hidden/discoverable planetary science data. Omitted entirely for subtypes where none
+     *  of this applies (ships, satellites, wormholes, black holes). */
+    attributes?: IPlanetaryAttributes;
+    /**
+     * Body this orbits, used as the reference frame for CelestialBody.getOrbitalPeriod().
+     * When omitted, falls back to `tidalLock.target` (so moons/satellites need no extra
+     * wiring), and finally to null (no derivable orbital period).
+     */
+    orbitParent?: CelestialBody | null;
+    /**
+     * Mass of the system barycenter, for bodies on a P-type (circumbinary) orbit with no
+     * single physical parent body. Used by getOrbitalPeriod() only when `orbitParent` is
+     * omitted/null; the barycenter itself is treated as fixed at the world origin with zero
+     * velocity, matching the existing "P-type orbits use the system barycenter (always at
+     * origin)" convention already used for orbital-speed calculation in planet-generator.ts.
+     */
+    orbitBarycenterMass?: number;
 }
 
 /**

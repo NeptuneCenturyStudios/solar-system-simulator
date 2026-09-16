@@ -11,6 +11,14 @@ import {
 import { Comet } from './comet';
 import { IStateDependencies } from '../interfaces.js';
 import { MTLLoader, OBJLoader } from 'three/examples/jsm/Addons.js';
+import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    LiquidCompositionEnum,
+    SoilCompositionEnum,
+    VegetationEnum,
+} from './body-attributes.js';
 
 /**
  * Represents Halley's Comet in the simulation, with a realistic elliptical orbit and physical properties.
@@ -85,6 +93,30 @@ export class Halley extends Comet {
             trailColor: 0xaaaaaa,
             maxTrail: 2000,
             mesh: placeholderMesh,
+            attributes: {
+                coreType: { value: CoreTypeEnum.Icy, discovered: true },
+                atmosphericComposition: {
+                    value:
+                        AtmosphericGasEnum.WaterVapor |
+                        AtmosphericGasEnum.CarbonDioxide |
+                        AtmosphericGasEnum.CarbonMonoxide,
+                    discovered: true,
+                },
+                soilComposition: {
+                    value:
+                        SoilCompositionEnum.WaterIce |
+                        SoilCompositionEnum.Carbon |
+                        SoilCompositionEnum.Silicates,
+                    discovered: true,
+                },
+                liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                averageTemperatureKelvin: { value: 200, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
+            },
         });
 
         // Async OBJ + MTL load for Comet model

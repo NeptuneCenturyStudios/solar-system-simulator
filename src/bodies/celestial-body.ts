@@ -16,9 +16,13 @@ import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/atmosph
 import { AuroraHandle, createAurora } from '../effects/aurora';
 import { BodyTypeEnum } from './body-enums';
 import { buildBodySphereGeometry } from '../utilities/utilities';
+import { IPlanetaryAttributes } from './body-attributes';
 
 // Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
 const _Y_AXIS = new THREE.Vector3(0, 1, 0);
+// Shared, never-mutated scratch values for the P-type (barycentric) branch of getOrbitalPeriod.
+const _ORIGIN = new THREE.Vector3(0, 0, 0);
+const _ZERO_VELOCITY = new THREE.Vector3(0, 0, 0);
 
 /**
  * Tidal locking options
@@ -75,6 +79,23 @@ export class CelestialBody extends Body {
      * so the visuals follow.
      */
     magneticField: IMagneticFieldOptions | null = null;
+
+    /** Hidden/discoverable planetary science data, or undefined when none applies. */
+    attributes?: IPlanetaryAttributes;
+
+    /**
+     * Body this orbits, used as the reference frame for getOrbitalPeriod(). Falls back to
+     * `tidalLockTarget` at construction when not supplied, so moons/satellites need no extra
+     * wiring — see the constructor.
+     */
+    orbitParent: CelestialBody | null = null;
+
+    /**
+     * Mass of the system barycenter, used by getOrbitalPeriod() only when `orbitParent` is
+     * null (P-type/circumbinary orbits with no single physical parent). The barycenter itself
+     * is treated as fixed at the world origin with zero velocity.
+     */
+    orbitBarycenterMass?: number;
 
     // Tidal lock properties
     tidalLockEnabled: boolean;
@@ -201,6 +222,10 @@ export class CelestialBody extends Body {
             this.tidalLockAngularSpeed = options.tidalLock.angularSpeed;
             this._tidalLockConfigured = true;
         }
+
+        this.attributes = options.attributes;
+        this.orbitBarycenterMass = options.orbitBarycenterMass;
+        this.orbitParent = options.orbitParent ?? this.tidalLockTarget ?? null;
 
         this.baseColor = new THREE.Color(this.color);
 
@@ -693,6 +718,67 @@ export class CelestialBody extends Body {
             this.label.material.map = labelTexture;
             this.label.material.needsUpdate = true;
         }
+    }
+
+    /**
+     * Orbital period derived live from the current position/velocity relative to
+     * `orbitParent` (or `orbitBarycenterMass` at the world origin for P-type/circumbinary
+     * orbits), via the vis-viva equation. Returns simulation seconds — not real-world
+     * seconds — and null when there's no usable reference or the orbit isn't bound
+     * (parabolic/hyperbolic). Never cached: recomputed fresh from current physics state
+     * on every call, since this is an n-body sim where orbits can drift over time.
+     */
+    getOrbitalPeriod(): number | null {
+        let parentMass: number;
+        let parentPos: THREE.Vector3;
+        let parentVel: THREE.Vector3;
+
+        if (this.orbitParent && !this.orbitParent._isDisposed) {
+            parentMass = this.orbitParent.mass;
+            parentPos = this.orbitParent.mesh.position;
+            parentVel = this.orbitParent.velocity;
+        } else if (typeof this.orbitBarycenterMass === 'number') {
+            parentMass = this.orbitBarycenterMass;
+            parentPos = _ORIGIN;
+            parentVel = _ZERO_VELOCITY;
+        } else {
+            return null;
+        }
+
+        if (!(parentMass > 0)) return null;
+
+        const mu = this.dependencies.getG() * parentMass;
+        if (!(mu > 0) || !Number.isFinite(mu)) return null;
+
+        const relPos = this.mesh.position.clone().sub(parentPos);
+        const relVel = this.velocity.clone().sub(parentVel);
+        const r = relPos.length();
+        if (!(r > 0)) return null;
+
+        const specificEnergy = relVel.lengthSq() / 2 - mu / r;
+        if (!(specificEnergy < 0)) return null; // unbound (parabolic/hyperbolic)
+
+        const semiMajorAxis = -mu / (2 * specificEnergy);
+        return 2 * Math.PI * Math.sqrt(Math.pow(semiMajorAxis, 3) / mu);
+    }
+
+    /**
+     * Rotation (day/night) period derived live from `rotationSpeed`. Returns simulation
+     * seconds — not real-world seconds — and null for a non-rotating body.
+     */
+    getRotationPeriod(): number | null {
+        if (!Number.isFinite(this.rotationSpeed) || this.rotationSpeed === 0) return null;
+        return (2 * Math.PI) / Math.abs(this.rotationSpeed);
+    }
+
+    /** getOrbitalPeriod(), gated by this body's orbitalPeriod discovery flag. */
+    getDiscoveredOrbitalPeriod(): number | null {
+        return this.attributes?.orbitalPeriod?.discovered ? this.getOrbitalPeriod() : null;
+    }
+
+    /** getRotationPeriod(), gated by this body's rotationPeriod discovery flag. */
+    getDiscoveredRotationPeriod(): number | null {
+        return this.attributes?.rotationPeriod?.discovered ? this.getRotationPeriod() : null;
     }
 
     temperatureToColor(temp: number) {

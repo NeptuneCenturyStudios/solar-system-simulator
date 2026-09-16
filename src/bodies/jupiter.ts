@@ -20,6 +20,12 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
+import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    VegetationEnum,
+} from './body-attributes.js';
 
 /**
  * Represents the planet Jupiter in the simulation, including its texture and orbital properties.
@@ -72,6 +78,23 @@ export class Jupiter extends Planet {
                 azimuth: JUPITER_MAG_AZIMUTH,
                 offset: JUPITER_MAG_OFFSET,
                 reversed: JUPITER_MAG_REVERSED,
+            },
+            attributes: {
+                coreType: { value: CoreTypeEnum.GasFluid, discovered: true },
+                atmosphericComposition: {
+                    value:
+                        AtmosphericGasEnum.Hydrogen |
+                        AtmosphericGasEnum.Helium |
+                        AtmosphericGasEnum.Methane |
+                        AtmosphericGasEnum.Ammonia,
+                    discovered: true,
+                },
+                averageTemperatureKelvin: { value: 165, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
             },
         });
     }

@@ -82,6 +82,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         // Downstream generators need raw StarParams and placement arrays.
         const starParams = starCreations.map((c) => c.starParams);
         const placements = starCreations.map((c) => ({ pos: c.pos, vel: c.vel }));
+        const totalStarMass = starParams.reduce((sum, s) => sum + s.mass, 0);
 
         // Precompute creation descriptors so total can be set before bodies are instantiated.
         const planetCreations = generateProceduralPlanets({
@@ -144,16 +145,30 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         };
 
         // Stars
+        const starBodies: CelestialBody[] = [];
         for (let i = 0; i < starCreations.length; i++) {
             const creation = starCreations[i]!;
-            bodies.push(
-                createStarBodyFromProceduralCreation(this.dependencies, this.scene, creation)
+            const starBody = createStarBodyFromProceduralCreation(
+                this.dependencies,
+                this.scene,
+                creation
             );
+            starBodies.push(starBody);
+            bodies.push(starBody);
 
             completed++;
             report({ phase: 'stars', label: `Stars: ${completed}/${totalBodies}` });
             await this.yieldToEventLoop();
         }
+
+        /** Resolves a planet/asteroid/comet's orbit reference frame from its hostStarIndex. */
+        const assignOrbitParent = (body: CelestialBody, hostStarIndex: number | undefined) => {
+            if (hostStarIndex !== undefined && hostStarIndex >= 0 && starBodies[hostStarIndex]) {
+                body.orbitParent = starBodies[hostStarIndex]!;
+            } else {
+                body.orbitBarycenterMass = totalStarMass;
+            }
+        };
 
         // Planets (instant — JPG textures)
         const planetBodies: Body[] = [];
@@ -165,6 +180,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 this.scene,
                 creation
             );
+            assignOrbitParent(planetBody, creation.hostStarIndex);
 
             // Kick off background procedural texture upgrade
             upgradeProceduralTexture(planetBody as unknown as CelestialBody);
@@ -222,6 +238,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 this.scene,
                 creation
             );
+            assignOrbitParent(asteroidBody, creation.hostStarIndex);
             bodies.push(asteroidBody);
 
             completed++;
@@ -268,6 +285,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 this.scene,
                 creation
             );
+            assignOrbitParent(cometBody, creation.hostStarIndex);
             bodies.push(cometBody);
 
             completed++;

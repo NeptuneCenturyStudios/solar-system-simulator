@@ -79,5 +79,6 @@ export function createMoon(
         rotation: { tilt: 0, speed: 0.15 + Math.random() * 0.35 },
         mesh: moonMesh,
         moonType: resolvedMoonType,
+        attributes: config.attributes,
     });
 }

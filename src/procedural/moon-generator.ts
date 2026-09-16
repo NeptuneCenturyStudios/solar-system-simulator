@@ -8,6 +8,8 @@ import type { ProceduralPlanetCreation } from './planet-factory';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { pickWeighted } from './seed-utils';
 import { clamp01 } from './noise-utils';
+import { computePlanetaryAttributes } from './planet-attributes';
+import type { IPlanetaryAttributes } from '../bodies/body-attributes';
 
 export type ProceduralMoonCreation = {
     id: string;
@@ -44,6 +46,9 @@ export type ProceduralMoonCreation = {
     magneticField?: IMagneticFieldOptions | null;
 
     parentIndex: number;
+
+    /** Hidden/discoverable science data. */
+    attributes: IPlanetaryAttributes;
 };
 
 function pickMoonCount(subtype: PlanetTypeEnum, rng: SeededRandom): number {
@@ -256,6 +261,13 @@ export function generateProceduralMoons(params: {
             })();
 
             const moonType = pickWeighted(typeRng, moonTypeWeights);
+
+            const attributes = computePlanetaryAttributes({
+                id,
+                subtype: moonType,
+                isDwarf: false,
+                distanceT01: planet.distanceT01 ?? 0.5,
+            });
             const textureSeed =
                 moonType === MoonTypeEnum.Terrestrial
                     ? `${moonSeed}|terrestrial-texture-seed`
@@ -291,6 +303,7 @@ export function generateProceduralMoons(params: {
                 textureSeed,
 
                 parentIndex: planetIndex,
+                attributes,
             });
 
             // advance the system rng slightly so it doesn't get stuck unused in future expansions

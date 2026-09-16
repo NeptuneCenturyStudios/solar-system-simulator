@@ -20,6 +20,14 @@ import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
+import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    LiquidCompositionEnum,
+    SoilCompositionEnum,
+    VegetationEnum,
+} from './body-attributes.js';
 
 /**
  * Represents the planet Mercury in the simulation, including its texture and orbital properties.
@@ -72,6 +80,24 @@ export class Mercury extends Planet {
                 azimuth: MERCURY_MAG_AZIMUTH,
                 offset: MERCURY_MAG_OFFSET,
                 reversed: MERCURY_MAG_REVERSED,
+            },
+            attributes: {
+                coreType: { value: CoreTypeEnum.Metallic, discovered: true },
+                atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
+                soilComposition: {
+                    value:
+                        SoilCompositionEnum.Silicates |
+                        SoilCompositionEnum.Iron |
+                        SoilCompositionEnum.Regolith,
+                    discovered: true,
+                },
+                liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                averageTemperatureKelvin: { value: 340, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
             },
         });
     }

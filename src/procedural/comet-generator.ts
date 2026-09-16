@@ -18,6 +18,7 @@ import {
     safeUnitCross,
 } from './orbital-math';
 import { rngFor } from './seed-utils';
+import { computeCometAttributes } from './small-body-attributes';
 
 export function generateProceduralComets(params: {
     dependencies: IStateDependencies;
@@ -158,6 +159,8 @@ export function generateProceduralComets(params: {
                 Math.floor(tailColorRng.next() * COMET_TAIL_COLOR_PALETTE.length)
             ];
 
+        const attributes = computeCometAttributes({ id });
+
         creations.push({
             id,
             name,
@@ -169,6 +172,8 @@ export function generateProceduralComets(params: {
             rotationTilt,
             rotationAzimuth,
             tailColor,
+            hostStarIndex: isSType ? hostStarIndex : -1,
+            attributes,
         });
     }
 

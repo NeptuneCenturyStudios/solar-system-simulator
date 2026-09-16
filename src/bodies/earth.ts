@@ -20,6 +20,14 @@ import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { BodyTypeEnum, PlanetTypeEnum } from './body-enums.js';
+import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    LiquidCompositionEnum,
+    SoilCompositionEnum,
+    VegetationEnum,
+} from './body-attributes.js';
 
 // Maximum number of stars supported by the day/night shader.
 const MAX_STARS = 8;
@@ -195,6 +203,45 @@ export class Earth extends Planet {
                 azimuth: EARTH_MAG_AZIMUTH,
                 offset: EARTH_MAG_OFFSET,
                 reversed: EARTH_MAG_REVERSED,
+            },
+            attributes: {
+                coreType: { value: CoreTypeEnum.Molten, discovered: true },
+                atmosphericComposition: {
+                    value:
+                        AtmosphericGasEnum.Nitrogen |
+                        AtmosphericGasEnum.Oxygen |
+                        AtmosphericGasEnum.Argon |
+                        AtmosphericGasEnum.CarbonDioxide |
+                        AtmosphericGasEnum.Ozone |
+                        AtmosphericGasEnum.WaterVapor,
+                    discovered: true,
+                },
+                soilComposition: {
+                    value:
+                        SoilCompositionEnum.Silicates |
+                        SoilCompositionEnum.Iron |
+                        SoilCompositionEnum.IronOxide |
+                        SoilCompositionEnum.Carbon,
+                    discovered: true,
+                },
+                liquidComposition: { value: LiquidCompositionEnum.Water, discovered: true },
+                averageTemperatureKelvin: { value: 288, discovered: true },
+                vegetation: {
+                    value:
+                        VegetationEnum.Grass |
+                        VegetationEnum.Trees |
+                        VegetationEnum.Cacti |
+                        VegetationEnum.Algae |
+                        VegetationEnum.Fungus |
+                        VegetationEnum.Moss |
+                        VegetationEnum.Shrubs |
+                        VegetationEnum.Kelp,
+                    discovered: true,
+                },
+                sentientLife: { value: true, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.CarbonBased, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
             },
         });
 

@@ -19,6 +19,7 @@ import {
 } from './orbital-math';
 import { pickWeighted, rngFor } from './seed-utils';
 import { clamp01 } from './noise-utils';
+import { computePlanetaryAttributes } from './planet-attributes';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -249,6 +250,13 @@ export function generateProceduralPlanets(params: {
             planetSubtype: subtype,
         });
 
+        const attributes = computePlanetaryAttributes({
+            id,
+            subtype,
+            isDwarf,
+            distanceT01,
+        });
+
         planetCreations.push({
             id,
             name,
@@ -262,6 +270,9 @@ export function generateProceduralPlanets(params: {
             rotationTilt: planetParams.rotationTilt,
             rotationAzimuth: planetParams.rotationAzimuth,
             textureSeed: subSeed,
+            distanceT01,
+            hostStarIndex,
+            attributes,
         });
     }
 

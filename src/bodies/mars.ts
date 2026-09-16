@@ -15,6 +15,14 @@ import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
+import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    LiquidCompositionEnum,
+    SoilCompositionEnum,
+    VegetationEnum,
+} from './body-attributes.js';
 
 /**
  * Represents the planet Mars in the simulation, including its texture and orbital properties.
@@ -60,6 +68,27 @@ export class Mars extends Planet {
             atmosphere: {
                 radius: MARS_RADIUS * 1.05,
                 tint: 0xff8866,
+            },
+            attributes: {
+                coreType: { value: CoreTypeEnum.Solid, discovered: true },
+                atmosphericComposition: {
+                    value:
+                        AtmosphericGasEnum.CarbonDioxide |
+                        AtmosphericGasEnum.Nitrogen |
+                        AtmosphericGasEnum.Argon,
+                    discovered: true,
+                },
+                soilComposition: {
+                    value: SoilCompositionEnum.IronOxide | SoilCompositionEnum.Silicates,
+                    discovered: true,
+                },
+                liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                averageTemperatureKelvin: { value: 210, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
             },
         });
     }

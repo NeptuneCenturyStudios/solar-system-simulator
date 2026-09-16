@@ -33,6 +33,9 @@ export class Planet extends CelestialBody {
                 seed: options.seed,
                 atmosphere: options.atmosphere,
                 magneticField: options.magneticField,
+                attributes: options.attributes,
+                orbitParent: options.orbitParent,
+                orbitBarycenterMass: options.orbitBarycenterMass,
             },
             BodyTypeEnum.Planet
         );

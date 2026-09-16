@@ -129,6 +129,7 @@ function buildProceduralMoon(params: {
         moonType,
         textureSeed,
         magneticField,
+        attributes,
     } = creation;
 
     const safeRadius = Number.isFinite(radius) && radius > 0 ? radius : 1;
@@ -177,6 +178,7 @@ function buildProceduralMoon(params: {
             magneticField !== undefined
                 ? magneticField
                 : rollMagneticField(new SeededRandom(`${id}|magnetic-field`), 'moon'),
+        attributes,
     });
 }
 

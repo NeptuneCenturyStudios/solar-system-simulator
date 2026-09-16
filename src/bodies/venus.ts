@@ -15,6 +15,14 @@ import { loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
+import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    LiquidCompositionEnum,
+    SoilCompositionEnum,
+    VegetationEnum,
+} from './body-attributes.js';
 
 /**
  * Represents the planet Venus in the simulation, including its surface and cloud layer.
@@ -61,6 +69,30 @@ export class Venus extends Planet {
                 radius: VENUS_RADIUS * 1.07,
                 tint: 0xffdd88,
             },
+            attributes: {
+                coreType: { value: CoreTypeEnum.Molten, discovered: true },
+                atmosphericComposition: {
+                    value:
+                        AtmosphericGasEnum.CarbonDioxide |
+                        AtmosphericGasEnum.Nitrogen |
+                        AtmosphericGasEnum.SulfurDioxide,
+                    discovered: true,
+                },
+                soilComposition: {
+                    value:
+                        SoilCompositionEnum.Basalt |
+                        SoilCompositionEnum.Silicates |
+                        SoilCompositionEnum.Sulfur,
+                    discovered: true,
+                },
+                liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                averageTemperatureKelvin: { value: 737, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
+            },
         });
 
         const venusAtmosphereTexture = loadSrgbTexture(
@@ -76,7 +108,7 @@ export class Venus extends Planet {
             metalness: 0.0,
         });
 
-        const cloudsGeo =buildBodySphereGeometry(this.radius * 1.03);
+        const cloudsGeo = buildBodySphereGeometry(this.radius * 1.03);
         this.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
         this.clouds.renderOrder = 2;
         this.clouds.userData = { parentBody: this };

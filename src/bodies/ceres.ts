@@ -17,6 +17,14 @@ import { IStateDependencies } from '../interfaces.js';
 import { DwarfPlanet } from './dwarf-planet';
 import { PlanetTypeEnum } from './body-enums.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
+import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    LiquidCompositionEnum,
+    SoilCompositionEnum,
+    VegetationEnum,
+} from './body-attributes.js';
 
 /**
  * Represents the dwarf planet Ceres in the simulation.
@@ -59,6 +67,27 @@ export class Ceres extends DwarfPlanet {
             hasRings: false,
             rotation: { tilt: CERES_AXIS, speed: rotSpeed, azimuth: CERES_AZIMUTH },
             mesh: mesh,
+            attributes: {
+                coreType: { value: CoreTypeEnum.Icy, discovered: true },
+                atmosphericComposition: { value: AtmosphericGasEnum.WaterVapor, discovered: true },
+                soilComposition: {
+                    value:
+                        SoilCompositionEnum.WaterIce |
+                        SoilCompositionEnum.Silicates |
+                        SoilCompositionEnum.Carbon,
+                    discovered: true,
+                },
+                liquidComposition: {
+                    value: LiquidCompositionEnum.Water | LiquidCompositionEnum.Brine,
+                    discovered: true,
+                },
+                averageTemperatureKelvin: { value: 168, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
+            },
         });
     }
 }

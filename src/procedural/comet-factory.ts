@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { IStateDependencies } from '../interfaces';
 import { GenericComet } from '../bodies/generic-comet';
+import type { IPlanetaryAttributes } from '../bodies/body-attributes';
 
 export type ProceduralCometCreation = {
     id: string;
@@ -13,6 +14,12 @@ export type ProceduralCometCreation = {
     rotationTilt: number;
     rotationAzimuth: number;
     tailColor: number;
+
+    /** Index into the system's star array this comet orbits, or -1 for a P-type orbit. */
+    hostStarIndex: number;
+
+    /** Hidden/discoverable science data. */
+    attributes: IPlanetaryAttributes;
 };
 
 /**
@@ -34,6 +41,7 @@ export function createCometBodyFromProceduralCreation(
         rotationTilt,
         rotationAzimuth,
         tailColor,
+        attributes,
     } = creation;
 
     return new GenericComet(dependencies, scene, {
@@ -45,5 +53,6 @@ export function createCometBodyFromProceduralCreation(
         mass,
         rotation: { tilt: rotationTilt, speed: rotationSpeed, azimuth: rotationAzimuth },
         tailColor,
+        attributes,
     });
 }

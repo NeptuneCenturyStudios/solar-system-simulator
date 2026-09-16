@@ -19,6 +19,7 @@ import {
     safeUnitCross,
 } from './orbital-math';
 import { rngFor } from './seed-utils';
+import { computeAsteroidAttributes } from './small-body-attributes';
 
 export function generateProceduralAsteroids(params: {
     dependencies: IStateDependencies;
@@ -145,6 +146,9 @@ export function generateProceduralAsteroids(params: {
         const massFactor = Math.max(0.5, 2.0 / Math.max(0.1, asteroidParams.mass));
         const rotationSpeed = Math.min(4.0, Math.max(0.2, speedRng.range(0.3, 1.0) * massFactor));
 
+        const distanceAU = distance / EARTH_DIST;
+        const attributes = computeAsteroidAttributes({ id, distanceAU });
+
         creations.push({
             id,
             name,
@@ -155,6 +159,8 @@ export function generateProceduralAsteroids(params: {
             rotationSpeed,
             rotationTilt,
             rotationAzimuth,
+            hostStarIndex: isSType ? hostStarIndex : -1,
+            attributes,
         });
     }
 

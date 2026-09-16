@@ -20,6 +20,12 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
+import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    VegetationEnum,
+} from './body-attributes.js';
 
 /**
  * Represents the planet Uranus in the simulation, including its texture and orbital properties.
@@ -72,6 +78,22 @@ export class Uranus extends Planet {
                 azimuth: URANUS_MAG_AZIMUTH,
                 offset: URANUS_MAG_OFFSET,
                 reversed: URANUS_MAG_REVERSED,
+            },
+            attributes: {
+                coreType: { value: CoreTypeEnum.GasFluid, discovered: true },
+                atmosphericComposition: {
+                    value:
+                        AtmosphericGasEnum.Hydrogen |
+                        AtmosphericGasEnum.Helium |
+                        AtmosphericGasEnum.Methane,
+                    discovered: true,
+                },
+                averageTemperatureKelvin: { value: 76, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
             },
         });
     }

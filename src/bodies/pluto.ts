@@ -20,6 +20,14 @@ import { IStateDependencies } from '../interfaces.js';
 import { DwarfPlanet } from './dwarf-planet';
 import { PlanetTypeEnum } from './body-enums.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
+import {
+    AtmosphericGasEnum,
+    CoreTypeEnum,
+    LifeformBaseEnum,
+    LiquidCompositionEnum,
+    SoilCompositionEnum,
+    VegetationEnum,
+} from './body-attributes.js';
 
 /**
  * Represents the dwarf planet Pluto in the simulation, including its texture and orbital properties.
@@ -84,6 +92,27 @@ export class Pluto extends DwarfPlanet {
             hasRings: false,
             rotation: { tilt: PLUTO_AXIS, speed: rotSpeed, azimuth: PLUTO_AZIMUTH },
             mesh: mesh,
+            attributes: {
+                coreType: { value: CoreTypeEnum.Icy, discovered: true },
+                atmosphericComposition: {
+                    value:
+                        AtmosphericGasEnum.Nitrogen |
+                        AtmosphericGasEnum.Methane |
+                        AtmosphericGasEnum.CarbonMonoxide,
+                    discovered: true,
+                },
+                soilComposition: {
+                    value: SoilCompositionEnum.WaterIce | SoilCompositionEnum.Regolith,
+                    discovered: true,
+                },
+                liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                averageTemperatureKelvin: { value: 44, discovered: true },
+                vegetation: { value: VegetationEnum.None, discovered: true },
+                sentientLife: { value: false, discovered: true },
+                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                orbitalPeriod: { discovered: true },
+                rotationPeriod: { discovered: true },
+            },
         });
     }
 }

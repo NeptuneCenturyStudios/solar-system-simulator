@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { CelestialBody } from './celestial-body';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
-import { IOrbitalBodyCreationOptions, IStateDependencies } from '../interfaces.js';
+import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces.js';
 import { BodyTypeEnum } from './body-enums';
 import { applyModelFit, measureModelFit, type IModelFit } from './model-fit';
 
@@ -20,7 +20,7 @@ export class Asteroid extends CelestialBody {
     constructor(
         deps: IStateDependencies,
         scene: THREE.Scene,
-        options: IOrbitalBodyCreationOptions
+        options: ICelestialBodyCreationOptions
     ) {
         // Geometry factory returns a placeholder geometry until OBJ loads
         const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
@@ -42,6 +42,9 @@ export class Asteroid extends CelestialBody {
                 maxTrail: options.maxTrail,
                 rotation: options.rotation,
                 mesh: placeholderMesh,
+                attributes: options.attributes,
+                orbitParent: options.orbitParent,
+                orbitBarycenterMass: options.orbitBarycenterMass,
             },
             BodyTypeEnum.Asteroid
         );
