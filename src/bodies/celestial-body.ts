@@ -432,16 +432,25 @@ export class CelestialBody extends Body {
         this.rotationSpeed = speed;
     }
 
+    /**
+     * Rebuilds the body's own mesh geometry at the new radius. Bodies whose visible
+     * shape comes from a loaded model rather than the sphere mesh (asteroids, comets)
+     * override this so their invisible placeholder proxy is left alone.
+     */
+    protected rebuildMeshGeometry(newRadius: number): void {
+        if (this.mesh && this.mesh.geometry) {
+            this.mesh.geometry.dispose();
+            this.mesh.geometry = buildBodySphereGeometry(newRadius);
+        }
+    }
+
     setRadius(newRadius: number) {
         const oldRadius = this.radius || 1;
 
         this.radius = newRadius;
 
         try {
-            if (this.mesh && this.mesh.geometry) {
-                this.mesh.geometry.dispose();
-                this.mesh.geometry = buildBodySphereGeometry(newRadius);
-            }
+            this.rebuildMeshGeometry(newRadius);
         } catch (e) {
             console.error('Error updating body geometry radius:', e);
         }

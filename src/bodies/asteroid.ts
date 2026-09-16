@@ -5,8 +5,14 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { IOrbitalBodyCreationOptions, IStateDependencies } from '../interfaces.js';
 import { BodyTypeEnum } from './body-enums';
+import { applyModelFit, measureModelFit, type IModelFit } from './model-fit';
 
 export class Asteroid extends CelestialBody {
+    /** Loaded OBJ model, re-fitted whenever the radius changes. Null until the load resolves. */
+    private modelGroup: THREE.Object3D | null = null;
+    /** Measurement of the unscaled model, cached at load time. */
+    private modelFit: IModelFit | null = null;
+
     /**
      * Represents an asteroid in the simulation, inheriting from CelestialBody.
      * Randomizes shape, color, and physical properties if not provided.
@@ -52,21 +58,11 @@ export class Asteroid extends CelestialBody {
                 return objLoader.loadAsync('./assets/models/Asteroid.obj');
             })
             .then((group) => {
-                // Compute bounding box of the unscaled model
-                const bbox = new THREE.Box3().setFromObject(group);
-                const size = new THREE.Vector3();
-                bbox.getSize(size);
-                const longestDim = Math.max(size.x, size.y, size.z);
-                // Use this.radius to match the instance's radius
-                const scale = this.radius / (longestDim * 0.5);
-                group.scale.setScalar(scale);
-
-                // Re-compute bbox after scaling to find the center
-                group.updateMatrixWorld(true);
-                const scaledBbox = new THREE.Box3().setFromObject(group);
-                const center = new THREE.Vector3();
-                scaledBbox.getCenter(center);
-                group.position.sub(center);
+                // Measure while still detached, then fit to the instance's current radius.
+                // Keeping the measurement lets setRadius re-fit the model later.
+                this.modelGroup = group;
+                this.modelFit = measureModelFit(group);
+                applyModelFit(group, this.modelFit, this.radius);
 
                 // Tag every loaded sub-mesh so click-picking resolves to this body.
                 // The base Body tags only the placeholder mesh; without this the
@@ -90,6 +86,24 @@ export class Asteroid extends CelestialBody {
             const rotationSpeed = 0.6 + Math.random() * 1.2;
 
             this.updateRotation(rotationAxis, rotationSpeed);
+        }
+    }
+
+    /**
+     * The asteroid's own mesh is a tiny invisible proxy for the loaded OBJ — turning it
+     * into a full-size sphere would add an invisible click/pick target around the rock.
+     */
+    protected override rebuildMeshGeometry(): void {
+        // Intentionally empty: the visible shape is the OBJ model, rescaled in setRadius.
+    }
+
+    override setRadius(newRadius: number) {
+        super.setRadius(newRadius);
+
+        // When the model hasn't loaded yet the loader reads this.radius on resolve,
+        // so it picks up the new size on its own.
+        if (this.modelGroup && this.modelFit) {
+            applyModelFit(this.modelGroup, this.modelFit, newRadius);
         }
     }
 }

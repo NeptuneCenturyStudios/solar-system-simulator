@@ -21,7 +21,6 @@
                 </div>
 
                 <template v-else>
-
                     <div class="control-group">
                         <label for="vueBodyTypeSelect">Body Type</label>
                         <select
@@ -58,7 +57,7 @@
                             v-model.number="mass"
                             type="number"
                             class="text-input"
-                            min="0.001"
+                            :min="massMin"
                             step="any"
                         />
                     </div>
@@ -102,8 +101,8 @@
                             v-model.number="radius"
                             type="number"
                             class="text-input"
-                            min="0.01"
-                            step="1"
+                            :min="radiusMin"
+                            :step="radiusStep"
                         />
                     </div>
 
@@ -347,7 +346,7 @@
                             v-model.number="editMass"
                             type="number"
                             class="text-input"
-                            min="0.001"
+                            :min="editMassMin"
                             step="any"
                         />
                     </div>
@@ -393,8 +392,8 @@
                             v-model.number="editRadius"
                             type="number"
                             class="text-input"
-                            min="0.01"
-                            step="1"
+                            :min="editRadiusMin"
+                            :step="editRadiusStep"
                         />
                     </div>
 
@@ -593,6 +592,9 @@ import type { ApplyBodyEditPayload, CreateBodyPayload } from '../sim-bridge';
 import type { IMagneticFieldOptions } from '../../interfaces';
 import PanelBase from './PanelBase.vue';
 
+/** Floor for asteroid/comet mass and radius inputs, which run far below planetary scale. */
+const SMALL_BODY_MIN = '0.000001';
+
 const PRESET_BODIES = [
     { value: 'sun', label: 'Sun' },
     { value: 'mercury', label: 'Mercury' },
@@ -641,10 +643,22 @@ const showMassRadius = computed(
         bodyType.value === 'sun' ||
         bodyType.value === 'planet' ||
         bodyType.value === 'moon' ||
-        bodyType.value === 'black_hole'
+        bodyType.value === 'black_hole' ||
+        bodyType.value === 'asteroid' ||
+        bodyType.value === 'comet'
 );
 const showMass = computed(() => showMassRadius.value);
 const showRadius = computed(() => showMassRadius.value || bodyType.value === 'wormhole');
+
+/**
+ * Asteroids and comets live orders of magnitude below planetary scale (asteroid mass runs
+ * from ~1e-6, radius from ~0.005), so the planet-scale input bounds would reject or
+ * stomp on legitimate values.
+ */
+const isSmallBodyType = computed(() => bodyType.value === 'asteroid' || bodyType.value === 'comet');
+const massMin = computed(() => (isSmallBodyType.value ? SMALL_BODY_MIN : '0.001'));
+const radiusMin = computed(() => (isSmallBodyType.value ? SMALL_BODY_MIN : '0.01'));
+const radiusStep = computed(() => (isSmallBodyType.value ? 'any' : '1'));
 const showOrbitControls = computed(
     () => bodyType.value !== 'black_hole' && bodyType.value !== 'wormhole'
 );
@@ -796,6 +810,14 @@ const editMagAzimuth = ref(0);
 const editMagOffset = ref(0);
 const editMagReversed = ref(false);
 
+/** Same small-body bounds as the add form, driven off the selected body's snapshot. */
+const isSmallBodySnapshot = computed(
+    () => !!snapshot.value?.isAsteroid || !!snapshot.value?.isComet
+);
+const editMassMin = computed(() => (isSmallBodySnapshot.value ? SMALL_BODY_MIN : '0.001'));
+const editRadiusMin = computed(() => (isSmallBodySnapshot.value ? SMALL_BODY_MIN : '0.01'));
+const editRadiusStep = computed(() => (isSmallBodySnapshot.value ? 'any' : '1'));
+
 /** Builds the IMagneticFieldOptions payload from a set of form refs, or null when unchecked. */
 function buildMagneticFieldPayload(
     enabled: boolean,
@@ -863,11 +885,7 @@ function onCreate(): void {
         newId = createPresetBodyByKey(presetKey.value);
     } else {
         if (bodyType.value === 'moon' && !canCreateMoon.value) return;
-        const hidesMass =
-            bodyType.value === 'asteroid' ||
-            bodyType.value === 'comet' ||
-            bodyType.value === 'wormhole';
-        const hidesRadius = bodyType.value === 'asteroid' || bodyType.value === 'comet';
+        const hidesMass = bodyType.value === 'wormhole';
         const payload: CreateBodyPayload = {
             bodyType: bodyType.value,
             // Empty means "let the sim generate one procedurally".
@@ -880,7 +898,7 @@ function onCreate(): void {
             customMass: hidesMass ? null : mass.value,
             customTemperature: bodyType.value === 'sun' ? temperature.value : null,
             customLightIntensity: bodyType.value === 'sun' ? lightIntensity.value : null,
-            customRadius: hidesRadius ? null : radius.value,
+            customRadius: radius.value,
             orbitParentId: resolveOrbitParentId(simStore.selectedId),
             createTilt: showTilt.value ? tilt.value : null,
             createAzimuth: showTilt.value ? azimuth.value : null,

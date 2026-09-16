@@ -3540,11 +3540,12 @@ registerVueSimHooks({
             };
         }
 
-        // Asteroid/comet: no mass/radius/tilt preview (hidden in the old UI; randomized at
-        // actual creation time by createNewBody itself).
+        // Asteroid/comet: no tilt preview, but mass/radius are editable in the add form, so
+        // preview the same roll createNewBody would have made.
+        const smallBody = bodyType === 'comet' ? randomCometParams() : randomAsteroidParams();
         return {
-            mass: null,
-            radius: null,
+            mass: smallBody.mass,
+            radius: smallBody.radius,
             temperature: null,
             lightIntensity: null,
             tilt: null,
@@ -3919,27 +3920,14 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         }
     }
 
-    // Apply radius change for ALL body types if radius input present
-    // Preserve special non-spherical asteroid geometry when editing low-mass asteroids.
+    // Apply radius change for ALL body types if radius input present. Asteroids and comets
+    // rescale their loaded OBJ model from their own setRadius override, so they no longer
+    // need to be excluded here to keep their non-spherical shape.
     try {
-        const isLowMassAsteroid =
-            isBodyType(body, BodyTypeEnum.Asteroid) &&
-            typeof body.mass === 'number' &&
-            body.mass < 1;
-
-        if (radius !== null && isFinite(radius)) {
+        if (radius !== null && isFinite(radius) && body instanceof CelestialBody) {
             const oldRadiusAll = body.radius || 1;
-            const newRadiusAll = radius;
-            if (isLowMassAsteroid) {
-                body.mass = mass;
-                if (body === selectedBody) refreshSelectionVisuals();
-            } else {
-                if (body instanceof CelestialBody) setBodyRadius(body, newRadiusAll);
-                keepCameraDistanceOnBodyScaleChange(body, oldRadiusAll, newRadiusAll);
-                if (body === selectedBody) refreshSelectionVisuals();
-            }
-        } else if (isLowMassAsteroid) {
-            body.mass = mass;
+            setBodyRadius(body, radius);
+            keepCameraDistanceOnBodyScaleChange(body, oldRadiusAll, radius);
             if (body === selectedBody) refreshSelectionVisuals();
         }
     } catch (e) {

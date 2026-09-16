@@ -2,12 +2,18 @@ import * as THREE from 'three';
 import { Comet } from './comet';
 import { ICometCreationOptions, IStateDependencies } from '../interfaces.js';
 import { MTLLoader, OBJLoader } from 'three/examples/jsm/Addons.js';
+import { applyModelFit, measureModelFit, type IModelFit } from './model-fit';
 
 /**
  * Represents a generic comet in the simulation, with a realistic elliptical orbit and physical properties.
  * Inherits from Comet and sets up comet-specific trajectory and material.
  */
 export class GenericComet extends Comet {
+    /** Loaded OBJ model, re-fitted whenever the radius changes. Null until the load resolves. */
+    private modelGroup: THREE.Object3D | null = null;
+    /** Measurement of the unscaled model, cached at load time. */
+    private modelFit: IModelFit | null = null;
+
     /**
      * Constructs a new GenericComet object with its unique elliptical orbit and properties.
      * @param dependencies State dependencies for the simulation.
@@ -50,21 +56,11 @@ export class GenericComet extends Comet {
                 return objLoader.loadAsync('./assets/models/Asteroid.obj');
             })
             .then((group) => {
-                // Compute bounding box of the unscaled model
-                const bbox = new THREE.Box3().setFromObject(group);
-                const size = new THREE.Vector3();
-                bbox.getSize(size);
-                const longestDim = Math.max(size.x, size.y, size.z);
-                // Use this.radius to match the instance's radius
-                const scale = this.radius / (longestDim * 0.5);
-                group.scale.setScalar(scale);
-
-                // Re-compute bbox after scaling to find the center
-                group.updateMatrixWorld(true);
-                const scaledBbox = new THREE.Box3().setFromObject(group);
-                const center = new THREE.Vector3();
-                scaledBbox.getCenter(center);
-                group.position.sub(center);
+                // Measure while still detached, then fit to the instance's current radius.
+                // Keeping the measurement lets setRadius re-fit the model later.
+                this.modelGroup = group;
+                this.modelFit = measureModelFit(group);
+                applyModelFit(group, this.modelFit, this.radius);
 
                 // Tag every loaded sub-mesh so click-picking resolves to this body.
                 // The base Body tags only the placeholder mesh; without this the
@@ -76,5 +72,23 @@ export class GenericComet extends Comet {
             .catch((e) => {
                 console.warn('asteroid1 OBJ/MTL load failed — using placeholder mesh', e);
             });
+    }
+
+    /**
+     * The comet's own mesh is a tiny invisible proxy for the loaded OBJ — turning it
+     * into a full-size sphere would add an invisible click/pick target around the nucleus.
+     */
+    protected override rebuildMeshGeometry(): void {
+        // Intentionally empty: the visible shape is the OBJ model, rescaled in setRadius.
+    }
+
+    override setRadius(newRadius: number) {
+        super.setRadius(newRadius);
+
+        // When the model hasn't loaded yet the loader reads this.radius on resolve,
+        // so it picks up the new size on its own.
+        if (this.modelGroup && this.modelFit) {
+            applyModelFit(this.modelGroup, this.modelFit, newRadius);
+        }
     }
 }
