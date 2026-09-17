@@ -768,10 +768,23 @@ export class CelestialBody extends Body {
     }
 
     /**
-     * Rotation (day/night) period derived live from `rotationSpeed`. Returns simulation
-     * seconds — not real-world seconds — and null for a non-rotating body.
+     * Rotation (day/night) period. For a tidally-locked body this is its orbital period around
+     * the tidal-lock target — synchronous rotation is what tidal locking means, and
+     * `advanceRotation()` never reads `rotationSpeed` once locked (it servos orientation
+     * directly), so `rotationSpeed` is just an arbitrary construction-time seed in that case.
+     * Otherwise derived live from `rotationSpeed`. Returns simulation seconds — not real-world
+     * seconds — and null for a non-rotating body.
      */
     getRotationPeriod(): number | null {
+        if (
+            this.tidalLockEnabled &&
+            this._tidalLockConfigured &&
+            this.tidalLockTarget &&
+            !this.tidalLockTarget._isDisposed
+        ) {
+            return this.getOrbitalPeriod();
+        }
+
         if (!Number.isFinite(this.rotationSpeed) || this.rotationSpeed === 0) return null;
         return (2 * Math.PI) / Math.abs(this.rotationSpeed);
     }
