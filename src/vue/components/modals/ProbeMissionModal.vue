@@ -7,11 +7,9 @@
     >
         <div class="d-flex flex-column gap-3">
             <div class="scenario-description">
-                Send a probe to a celestial body to unlock its hidden science data. Scanning
+                Send a probe to a celestial object to unlock its hidden science data. Scanning
                 begins automatically once the probe comes within
-                {{ scanRangeKm.toLocaleString() }} km of the surface — it doesn't need to be in a
-                stable orbit yet, though the requested altitude below is still where it will try
-                to park itself afterward.
+                {{ scanRangeKm.toLocaleString() }} km of the surface.
             </div>
 
             <div v-if="targets.length === 0" class="scenario-description">
@@ -52,7 +50,7 @@
                 LAUNCH
             </button>
             <button class="old-ui btn-with-icon btn-danger" type="button" @click="onCancel">
-                <span class="material-symbols-outlined">arrow_back</span>
+                <span class="material-symbols-outlined">close</span>
                 CANCEL
             </button>
         </div>
