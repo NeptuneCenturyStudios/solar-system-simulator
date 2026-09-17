@@ -78,7 +78,7 @@ src/
 - [x] Phase 2: Add satellite station keeping to counter drag
 - **Phase 3: Add satellite/probe missions**
 - [x] Phase 3.1: Add hidden planetary attributes (such as average temp, atmospheric composition if any, body composition (soild, rock, minerals, types of metal like iron, gold, uranium, etc), liquid composition if any (water, liquid methane, etc), orbital period, etc...) that will be discoverable by satellites/probes
-- [ ] Phase 3.2: Add new probe mission UI modal to select a celestial target where the probe will fly to and gather data. This will mostly be benificial for procedural systems but will work for any system.
+- [x] Phase 3.2: Add new probe mission UI modal to select a celestial target where the probe will fly to and gather data. This will mostly be benificial for procedural systems but will work for any system.
 - [ ] Phase 3.3: Add a new UI scene display (or use the name box) to display planetary attributes that are discovered by probes, or ones that are known already in the normal solar system
 - **Phase 4**
 - [ ] Phase 4: Scenario updates. Add ability for a scenario to disable certain UI features like System Explorer or Flight Control panel or disable operations like delete a body while the scenario is running.
