@@ -9,7 +9,8 @@
     --new-ui-border: rgba(34, 68, 102, 1);
     --new-ui-border-radius: 0.5rem;
     --new-ui-color: #fff;
-    --new-ui-label-color: rgb(92, 181, 255);
+    --new-ui-label-color: rgba(92, 181, 255, 0.9);
+    --new-ui-label-shadow-color: rgba(91, 181, 255, 0.35); 
     --new-ui-panel-header-color: rgb(183, 223, 255);
     --new-ui-shadow: 0 18px 50px rgba(0, 0, 0, 0.65), 0 0 22px rgba(0, 255, 204, 0.18);
     --new-ui-button-bg: rgba(6, 27, 47, 0.6);
@@ -1032,6 +1033,21 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     display: flex;
     gap: var(--new-ui-gap-3);
     flex-wrap: wrap;
+}
+
+/* Probe scan status line in the System Explorer body list, shown below the stats.
+   Cyan matches the HUD name panel's scan countdown (planet-name-indicator.ts). */
+.vue-ui-body-scan {
+    margin: 0;
+    /* The row is a `align-items: baseline` flex column, which would leave a
+       shrink-to-fit block off the left edge; stretch it so the text lines up
+       with the stats line above. */
+    align-self: stretch;
+    color: var(--new-ui-label-color);
+    font-family: monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.3px;
+    text-shadow: 0 0 6px var(--new-ui-label-shadow-color);
 }
 
 .vue-ui-empty {

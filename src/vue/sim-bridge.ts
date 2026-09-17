@@ -2,6 +2,7 @@ import { reactive } from 'vue';
 
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { Body } from '../bodies/body';
+import { probeScanStatusLabel } from '../bodies/probe-scan-status';
 import { SHIP_TYPES } from '../bodies/ships/ship-registry';
 import { generateRandomCustomBodyName } from '../procedural/custom-body-naming';
 import {
@@ -38,6 +39,10 @@ export interface BodySnapshot {
     /** True for "real" celestial bodies — excludes ships, satellites, and probes. Used to
      *  filter the probe-mission target dropdown. */
     isProbeTarget: boolean;
+    /** Probe scan status — "Scanning… 12s", "Scan complete", or "Out of scan range" — or
+     *  null for every non-probe body. Drives the System Explorer status line, and is derived
+     *  from the same helper as the HUD name panel so the two can never disagree. */
+    scanStatusLabel: string | null;
 }
 
 export interface SurfaceCameraSnapshot {
@@ -440,6 +445,7 @@ function snapshotBodies(): void {
                 b.bodyType &
                 (BodyTypeEnum.SpaceShip | BodyTypeEnum.Satellite | BodyTypeEnum.Probe)
             ),
+            scanStatusLabel: probeScanStatusLabel(b),
         }));
 }
 

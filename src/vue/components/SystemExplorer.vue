@@ -128,6 +128,12 @@
                         </button>
                     </span>
                 </div>
+
+                <!-- Probe scan status — for probes only; null for every other body type.
+                     Mirrors the HUD name panel's scan line (see probe-scan-status.ts). -->
+                <p v-if="body.scanStatusLabel" class="vue-ui-body-scan">
+                    {{ body.scanStatusLabel }}
+                </p>
             </div>
         </div>
 

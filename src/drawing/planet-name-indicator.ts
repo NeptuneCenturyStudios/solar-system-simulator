@@ -19,7 +19,7 @@ import {
     HUD_RING_THEME,
     panelThemeFor,
 } from './hud/hud-paint';
-import { Probe } from '../bodies/probe';
+import { probeScanStatusLabel } from '../bodies/probe-scan-status';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 const PAD = 12;
@@ -427,18 +427,11 @@ export class PlanetNameIndicator {
         const distLabel = formatDistance(camDist);
         const isThreat = body.isThreat;
         const hasRing = ringFill >= 0;
-        
-        // Set the current probe scan status
-        let scanLabel = null;
-        if (body instanceof Probe) {
-            if (body.activeScan) {
-                scanLabel = `Scanning… ${Math.ceil(body.activeScan.remainingSeconds)}s`;
-            } else if (body.scanComplete) {
-                scanLabel = `Scan complete`;
-            } else {
-                scanLabel = `Out of scan range`;
-            }
-        }
+
+        // Probe scan status ("Scanning… 12s" / "Scan complete" / "Out of scan range"),
+        // or null for any non-probe body. Shared with the System Explorer body list so
+        // this panel's countdown and that list's status line always agree.
+        const scanLabel = probeScanStatusLabel(body);
 
         const [fullW, totalH] = measureNamePanel(name, distLabel, hasRing, scanLabel);
         sprite.setCanvasSize(fullW, totalH);
