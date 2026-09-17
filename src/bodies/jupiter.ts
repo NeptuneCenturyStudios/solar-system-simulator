@@ -89,7 +89,7 @@ export class Jupiter extends Planet {
                         AtmosphericGasEnum.Ammonia,
                     discovered: true,
                 },
-                averageTemperatureKelvin: { value: 165, discovered: true },
+                averageTemperatureKelvin: { value: 163, discovered: true },
                 vegetation: { value: VegetationEnum.None, discovered: true },
                 sentientLife: { value: false, discovered: true },
                 lifeformBase: { value: LifeformBaseEnum.None, discovered: true },

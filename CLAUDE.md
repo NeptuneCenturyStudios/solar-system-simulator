@@ -27,12 +27,49 @@ npm run lint         # ESLint
 
 ## Tooling
 
-- **ripgrep (`rg`)** is installed via Chocolatey at `C:\ProgramData\chocolatey\bin\rg.exe` and is on the machine PATH.
-    - If the Sixth extension's built-in `search_files` tool reports "Could not find ripgrep binary", fix it:
-        1. Open VSCode Settings (`Ctrl+,`)
-        2. Search for `ripgrep`
-        3. Set **Search: Rg Path** to: `C:\ProgramData\chocolatey\bin\rg.exe`
+- **ripgrep (`rg`)** is installed via a package manager, and each install places its binary on that machine's PATH. The absolute path differs per machine:
+    - **Chocolatey machine:** `C:\ProgramData\chocolatey\bin\rg.exe` (added to the *machine* PATH by Chocolatey)
+    - **WinGet machine:** `C:\Users\ebutler\AppData\Local\Microsoft\WinGet\Packages\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe\ripgrep-15.2.0-x86_64-pc-windows-msvc\rg.exe` (added to the *user* PATH by WinGet)
+        - This path is version-pinned: the `ripgrep-<version>-x86_64-pc-windows-msvc` folder name changes on `winget upgrade`.
+        - WinGet's stable, version-independent shim is `C:\Users\ebutler\AppData\Local\Microsoft\WinGet\Links\rg.exe`. It exists only when Developer Mode is enabled (WinGet creates it as a symlink), and that folder is not on PATH by default.
+    - A terminal opened *before* the install will not see `rg` — open a new terminal to pick up the PATH change.
     - CLI example: `rg "class.*Body" src/bodies/` or `rg "TODO|FIXME" src/`
+    - Note: `choco install ripgrep` requires an elevated (Administrator) shell; without one it fails with `Access to the path 'C:\ProgramData\chocolatey\lib\ripgrep\tools' is denied`.
+
+### `search_files` reports "Could not find ripgrep binary"
+
+**Setting `Search: Rg Path` does not fix this.** Verified against `sixth.sixth-ai-0.3.2`: the string `rgPath` appears nowhere in `dist/extension.js`, and the extension contributes no ripgrep setting (its only `contributes.configuration` keys are `sixth.telegram.*`). Its resolver looks *only* inside the VS Code install directory — never at `PATH`, and never at `search.rgPath`:
+
+```
+<vscode.env.appRoot>/node_modules/@vscode/ripgrep/bin/rg.exe
+<vscode.env.appRoot>/node_modules/vscode-ripgrep/bin/rg.exe
+<vscode.env.appRoot>/node_modules.asar.unpacked/vscode-ripgrep/bin/rg.exe
+<vscode.env.appRoot>/node_modules.asar.unpacked/@vscode/ripgrep/bin/rg.exe
+```
+
+The cause is VS Code layout drift — recent VS Code ships ripgrep under a different package name and a nested platform folder:
+
+- expected by the extension: `<appRoot>\node_modules.asar.unpacked\@vscode\ripgrep\bin\rg.exe`
+- shipped by VS Code: `<appRoot>\node_modules.asar.unpacked\@vscode\ripgrep-universal\bin\win32-x64\rg.exe`
+
+`appRoot` is versioned and not user-writable — on this machine it is `C:\Program Files\Microsoft VS Code\645f29cc31\resources\app` — so the fix needs an **elevated (Administrator) shell** and must be redone after every VS Code update (the `<build-id>` folder changes). This fix has been verified working: once the binary is in place, `search_files` returns results.
+
+Run in an Administrator PowerShell:
+
+```powershell
+$root  = 'C:\Program Files\Microsoft VS Code'
+$build = Get-ChildItem $root -Directory |
+         Where-Object { $_.Name -match '^[0-9a-f]{10}$' } |
+         Sort-Object Name -Descending | Select-Object -First 1
+$app = Join-Path $build.FullName 'resources\app'
+$dst = Join-Path $app 'node_modules.asar.unpacked\@vscode\ripgrep\bin'
+New-Item -ItemType Directory -Force -Path $dst | Out-Null
+Copy-Item -Force -Path (Join-Path $app 'node_modules.asar.unpacked\@vscode\ripgrep-universal\bin\win32-x64\rg.exe') -Destination (Join-Path $dst 'rg.exe')
+```
+
+No VS Code restart is required — the extension resolves the binary on every call, so search works immediately.
+
+The durable fix belongs upstream: the extension should also probe `@vscode/ripgrep-universal/bin/<platform>/`, and ideally fall back to `rg` on `PATH`.
 
 ## Architecture
 

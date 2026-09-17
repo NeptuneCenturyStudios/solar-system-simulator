@@ -89,7 +89,7 @@ export class Saturn extends Planet {
                         AtmosphericGasEnum.Ammonia,
                     discovered: true,
                 },
-                averageTemperatureKelvin: { value: 134, discovered: true },
+                averageTemperatureKelvin: { value: 133, discovered: true },
                 vegetation: { value: VegetationEnum.None, discovered: true },
                 sentientLife: { value: false, discovered: true },
                 lifeformBase: { value: LifeformBaseEnum.None, discovered: true },

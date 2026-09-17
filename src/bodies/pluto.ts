@@ -106,7 +106,7 @@ export class Pluto extends DwarfPlanet {
                     discovered: true,
                 },
                 liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
-                averageTemperatureKelvin: { value: 44, discovered: true },
+                averageTemperatureKelvin: { value: 47, discovered: true },
                 vegetation: { value: VegetationEnum.None, discovered: true },
                 sentientLife: { value: false, discovered: true },
                 lifeformBase: { value: LifeformBaseEnum.None, discovered: true },

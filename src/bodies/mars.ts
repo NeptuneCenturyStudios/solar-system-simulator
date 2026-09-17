@@ -83,7 +83,7 @@ export class Mars extends Planet {
                     discovered: true,
                 },
                 liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
-                averageTemperatureKelvin: { value: 210, discovered: true },
+                averageTemperatureKelvin: { value: 208, discovered: true },
                 vegetation: { value: VegetationEnum.None, discovered: true },
                 sentientLife: { value: false, discovered: true },
                 lifeformBase: { value: LifeformBaseEnum.None, discovered: true },

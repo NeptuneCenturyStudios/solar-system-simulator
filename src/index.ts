@@ -123,6 +123,10 @@ import { CelestialBody } from './bodies/celestial-body';
 import { Probe } from './bodies/probe';
 import { Moon } from './bodies/moon';
 import { createMoon } from './bodies/create-moon';
+import { Planet } from './bodies/planet';
+import { DwarfPlanet } from './bodies/dwarf-planet';
+import { buildBasicRows, buildScienceRows, hasScienceData } from './bodies/body-attribute-display';
+import { moonSubTypeLabel, planetSubTypeLabel } from './bodies/body-attribute-labels';
 import { Mercury } from './bodies/mercury';
 import { Venus } from './bodies/venus';
 import { Earth } from './bodies/earth';
@@ -3387,6 +3391,47 @@ registerVueSimHooks({
             tailColorHex: isCometBody ? toHexColor((body as unknown as Comet).tailColor) : null,
         };
     },
+
+    // ── Body Attributes: bridge for the Phase 3.3 attributes modal ────────
+    getBodyAttributesSnapshot: (bodyId: string) => {
+        const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);
+        if (!body) return null;
+
+        const typeLabel = getBodyTypeLabel(body);
+
+        // Sub type comes from the concrete class, mirroring the canvas stats panel
+        // (drawing/text-rendering.ts) so the two displays read identically.
+        const subTypeLabel =
+            body instanceof Planet || body instanceof DwarfPlanet
+                ? planetSubTypeLabel(body.planetType)
+                : body instanceof Moon
+                  ? moonSubTypeLabel(body.moonType)
+                  : null;
+
+        // Only CelestialBody-derived bodies carry science data and orbital periods. Asteroids
+        // and comets are CelestialBody too, so this covers every scannable body type.
+        const celestial = body instanceof CelestialBody ? body : null;
+        const attributes = celestial?.attributes;
+
+        return {
+            bodyId: body.id,
+            bodyName: body.name || 'Unnamed',
+            typeLabel,
+            basicRows: buildBasicRows({
+                typeLabel,
+                subTypeLabel,
+                mass: body.mass,
+                radius: body.radius,
+                temperatureKelvin: body instanceof Star ? body.temperature : null,
+            }),
+            scienceRows: buildScienceRows(attributes, {
+                orbitalPeriod: celestial?.getDiscoveredOrbitalPeriod() ?? null,
+                rotationPeriod: celestial?.getDiscoveredRotationPeriod() ?? null,
+            }),
+            hasScienceData: hasScienceData(attributes),
+        };
+    },
+
     createBody: (payload) => {
         const orbitParent = payload.orbitParentId
             ? (simulationState.bodies.find(

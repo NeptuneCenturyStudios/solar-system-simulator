@@ -84,8 +84,21 @@
                 @click="onSelect(body)"
                 @keydown.enter="onSelect(body)"
             >
-                <div class="d-flex w-100">
+                <div class="d-flex w-100 vue-ui-body-name-row">
                     <span class="vue-ui-body-name" :title="body.name">{{ body.name }}</span>
+                    <!-- Object-data (info) button — shown for every scannable body, which is
+                         exactly the probe-mission target set: ships, satellites, and probes
+                         cannot be scanned and get no button. -->
+                    <button
+                        v-if="body.isProbeTarget"
+                        class="icon-button vue-ui-body-info"
+                        type="button"
+                        title="Object data"
+                        aria-label="Show object data"
+                        @click.stop="openBodyAttributes(body.id)"
+                    >
+                        <span class="material-symbols-outlined">info</span>
+                    </button>
                     <span class="vue-ui-body-type">{{ body.typeLabel }}</span>
                 </div>
 
@@ -196,6 +209,7 @@ import {
     enterShipById,
     flyToBody,
     launchProbeMission,
+    openBodyAttributes,
     selectBodyById,
     setLockToSun,
     setShowNames,
@@ -254,5 +268,22 @@ function onSelect(body: BodySnapshot): void {
     padding: 2px 6px;
     font-size: 0.8em;
     align-self: center;
+}
+
+/* Object-data icon sits immediately after the body name; the type label keeps its
+   own margin-left:auto so it stays flush right. */
+.vue-ui-body-name-row {
+    align-items: center;
+}
+
+.vue-ui-body-info {
+    flex: 0 0 auto;
+    margin-left: 6px;
+    padding: 0;
+    line-height: 1;
+}
+
+.vue-ui-body-info .material-symbols-outlined {
+    font-size: 1rem;
 }
 </style>
