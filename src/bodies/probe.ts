@@ -17,6 +17,7 @@ import {
     PROBE_DECEL,
     PROBE_INSERT_DONE_SPEED,
     PROBE_INSERT_ORBIT_PAD,
+    PROBE_INSERT_RADIAL_TIME_CONSTANT,
     PROBE_MAX_SPEED,
     PROBE_SCAN_BASE_SECONDS,
     PROBE_SCAN_RADIUS_SCALE_SECONDS,
@@ -34,6 +35,10 @@ const _desiredRelVel = new THREE.Vector3();
 const _velDelta = new THREE.Vector3();
 const _turnAxis = new THREE.Vector3();
 const _angularMomentum = new THREE.Vector3();
+const _facingDir = new THREE.Vector3();
+const _facingMatrix = new THREE.Matrix4();
+const _facingQuat = new THREE.Quaternion();
+const ORIGIN = new THREE.Vector3(0, 0, 0);
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const WORLD_FORWARD = new THREE.Vector3(0, 0, 1);
 
@@ -169,7 +174,7 @@ export class Probe extends Satellite {
         // Correct model orientation so that the rear is facing the camera and not the front
         const MODEL_ROTATION = new THREE.Euler(
             THREE.MathUtils.degToRad(0),
-            THREE.MathUtils.degToRad(10),
+            THREE.MathUtils.degToRad(90),
             THREE.MathUtils.degToRad(90)
         );
 
@@ -198,6 +203,11 @@ export class Probe extends Satellite {
         }
         if (this._isDisposed) return;
 
+        // Once in orbit, tidal lock owns the mesh orientation.
+        if (this.probePhase !== 'DONE') {
+            this.faceVelocity(dtTotal);
+        }
+
         // Independent of flight phase — see the class doc comment.
         this.updateScan(dtTotal);
     }
@@ -208,6 +218,31 @@ export class Probe extends Satellite {
             this.activeScan = null;
         }
         super.die(deathOptions);
+    }
+
+    /**
+     * Smoothly rotates the mesh's +Z axis toward the probe's velocity relative to its mission
+     * target, rate-limited by probeHandling.turnRate. Relative rather than absolute velocity: the
+     * target's own orbital motion usually dwarfs the probe's, so absolute velocity would point the
+     * probe along the planet's orbit instead of along its own approach. Same look-at technique as
+     * SpaceShip.steerToward, duplicated here for the reasons given on rotateTowards above.
+     */
+    private faceVelocity(dt: number): void {
+        const target = this.missionTarget;
+        if (target && !target._isDisposed) {
+            _facingDir.subVectors(this.velocity, target.velocity);
+        } else {
+            _facingDir.copy(this.velocity);
+        }
+        if (_facingDir.lengthSq() < DIRECTION_EPSILON_SQ) return;
+        _facingDir.normalize();
+
+        // lookAt(eye, target, up) points +Z from target toward eye. Fall back to a different up
+        // vector when heading nearly straight along world up, where the basis would degenerate.
+        const up = Math.abs(_facingDir.dot(WORLD_UP)) > 0.999 ? WORLD_FORWARD : WORLD_UP;
+        _facingMatrix.lookAt(_facingDir, ORIGIN, up);
+        _facingQuat.setFromRotationMatrix(_facingMatrix);
+        this.mesh.quaternion.rotateTowards(_facingQuat, this.probeHandling.turnRate * Math.abs(dt));
     }
 
     /**
@@ -323,10 +358,16 @@ export class Probe extends Satellite {
             this.probeHandling.maxSpeed,
             Math.sqrt(2 * decelRate * Math.abs(signedRemaining))
         );
-        const radialCommand = signedRemaining >= 0 ? -vSafeApproach : vSafeApproach;
+        // Linear terminal zone: the stopping curve alone has unbounded gain as signedRemaining → 0,
+        // so it would chatter across the goal instead of letting the radial speed settle to zero.
+        const radialSpeed = Math.min(
+            vSafeApproach,
+            Math.abs(signedRemaining) / PROBE_INSERT_RADIAL_TIME_CONSTANT
+        );
+        const radialCommand = signedRemaining >= 0 ? -radialSpeed : radialSpeed;
         const alpha =
             this.probeHandling.maxSpeed > DIRECTION_EPSILON
-                ? 1 - vSafeApproach / this.probeHandling.maxSpeed
+                ? 1 - radialSpeed / this.probeHandling.maxSpeed
                 : 1;
 
         // Tangential target is evaluated at the FIXED goal radius, not the probe's current r —
@@ -356,18 +397,24 @@ export class Probe extends Satellite {
         _velDelta.subVectors(_desiredRelVel, _relVel);
         const deltaLen = _velDelta.length();
 
-        // Completion requires BOTH velocity match AND actually having reached the goal radius.
-        // Velocity alone isn't enough: this controller is designed to closely track its own
-        // continuously-recalculated desiredRelVel throughout the whole descent (that's what the
-        // safety-curve fixes above rely on), so deltaLen can dip below tolerance well before r
-        // reaches insertGoalRadius — handing off to station-keeping mid-descent, with the orbit
-        // baselined from wherever it happened to be rather than a clean circular orbit at the
-        // requested altitude. A gas giant's huge margin absorbs that slop invisibly; a small,
-        // tightly-orbited body doesn't — the residual eccentricity swings its much shorter-period
-        // orbit's periapsis into the surface within a few laps.
+        // Completion requires BOTH having reached the goal radius AND actually flying a circular
+        // orbit there: no radial motion, tangential speed matching vOrbit at the current r.
+        // Deliberately NOT "velocity matches desiredRelVel": that's the approach command, which
+        // this controller tracks closely the whole way (so it matched mid-maneuver), and inside
+        // the pad it can still carry a radial component several times the target's escape speed.
+        // Climbing back out from an overshoot, the old check passed the instant the probe entered
+        // the pad, snapped velocity to that outward command and handed off to station-keeping —
+        // which just adopts whatever orbit it's given — so the probe flew away, never corrected.
         const positionConverged = Math.abs(signedRemaining) < PROBE_INSERT_ORBIT_PAD;
-        if (deltaLen < PROBE_INSERT_DONE_SPEED && positionConverged) {
-            this.velocity.copy(target.velocity).add(_desiredRelVel);
+        const radialSpeedNow = _relVel.dot(_radial);
+        const tangentialSpeedNow = _relVel.dot(_tangential);
+        if (
+            positionConverged &&
+            Math.abs(radialSpeedNow) < PROBE_INSERT_DONE_SPEED &&
+            Math.abs(tangentialSpeedNow - vOrbit) < PROBE_INSERT_DONE_SPEED
+        ) {
+            // Clean circular orbit at the current r; removes at most the done tolerance.
+            this.velocity.copy(target.velocity).addScaledVector(_tangential, vOrbit);
             this.completeInsertion();
             return;
         }

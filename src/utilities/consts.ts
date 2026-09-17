@@ -664,6 +664,12 @@ export const PROBE_DECEL = PROBE_ACCEL * 3;
 export const PROBE_INSERT_ORBIT_PAD = 2.0;
 /** Velocity error below which orbit insertion is considered complete, u/s. */
 export const PROBE_INSERT_DONE_SPEED = 0.5 / DIST_SCALE;
+/**
+ * Time constant of the linear zone INSERT's radial command blends into near the goal radius, s.
+ * Commanded radial speed is min(stopping-curve speed, |distance to goal| / this), so it falls
+ * smoothly to zero at the goal instead of the stopping curve's infinite gain making it chatter.
+ */
+export const PROBE_INSERT_RADIAL_TIME_CONSTANT = 20;
 /** Flat scan duration, seconds. */
 export const PROBE_SCAN_BASE_SECONDS = 60;
 /** Additional scan seconds per Earth-radius of target body size. */
