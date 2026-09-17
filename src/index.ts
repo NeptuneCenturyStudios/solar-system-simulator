@@ -68,6 +68,8 @@ import {
     ASTEROID_FIELD_G_MULTIPLIER,
     ASTEROID_DEFENSE_G_MULTIPLIER,
     SCENARIO_OUTCOME_MODAL_DELAY_MS,
+    PROBE_MASS,
+    PROBE_RADIUS,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -118,6 +120,7 @@ import { OrbitPredictionManager } from './drawing/orbit-prediction';
 import { SurfaceCameraManager } from './camera/surface-camera';
 import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
+import { Probe } from './bodies/probe';
 import { Moon } from './bodies/moon';
 import { createMoon } from './bodies/create-moon';
 import { Mercury } from './bodies/mercury';
@@ -973,6 +976,24 @@ function getNearCameraSpawnPos(offset = 500): THREE.Vector3 {
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     return camera.position.clone().add(dir.multiplyScalar(offset));
+}
+
+/**
+ * Spawn point/velocity for a newly launched probe: near the player's active ship when in flight
+ * mode (so the launch reads as coming from the player), otherwise near the free camera.
+ */
+function computeProbeSpawn(): { pos: THREE.Vector3; vel: THREE.Vector3 } {
+    if (flightState.isActive && flightState.activeShip && !flightState.activeShip._isDisposed) {
+        const ship = flightState.activeShip;
+        const shipForward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
+        return {
+            pos: ship.mesh.position
+                .clone()
+                .addScaledVector(shipForward, ship.radius * 4 + PROBE_RADIUS * 4),
+            vel: ship.velocity.clone(),
+        };
+    }
+    return { pos: getNearCameraSpawnPos(), vel: new THREE.Vector3() };
 }
 
 function computeOrbitVelocityAtPos(
@@ -3396,6 +3417,44 @@ registerVueSimHooks({
     createPresetBody: (presetKey) => {
         const body = createPresetBody(presetKey);
         return body && !body._isDisposed ? body.id : null;
+    },
+    launchProbeMission: (targetId, altitudeKm) => {
+        const target = simulationState.bodies.find(
+            (b) => b && b.id === targetId && !b._isDisposed
+        );
+        if (!target || !(target instanceof CelestialBody)) return null;
+
+        const { pos, vel } = computeProbeSpawn();
+        const probe = new Probe(dependencies, scene, {
+            id: createUniqueId('probe'),
+            name: `Probe (${target.name})`,
+            mass: PROBE_MASS,
+            radius: PROBE_RADIUS,
+            pos,
+            vel,
+            distance: 0,
+            trailColor: 0x33ccff,
+            maxTrail: 1500,
+            missionTarget: target,
+            altitudeKm,
+        });
+
+        simulationState.bodies.push(probe);
+
+        // Focus the camera on the new probe
+        setFocusBody(probe);
+        triggerZoomToBody(probe);
+
+        try {
+            window.dispatchEvent(
+                new CustomEvent('body:added', {
+                    detail: { body: probe, id: probe.id, name: probe.name },
+                })
+            );
+        } catch (e) {
+            console.error('Error dispatching body:added event after probe launch:', e);
+        }
+        return probe.id;
     },
     applyBodyEdit: (bodyId, payload) => {
         const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);

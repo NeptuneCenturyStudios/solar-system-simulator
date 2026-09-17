@@ -141,6 +141,15 @@
                 ADD NEW OBJECT
             </button>
 
+            <button
+                class="old-ui btn-with-icon mb-3"
+                type="button"
+                @click="onLaunchProbe"
+            >
+                <span class="material-symbols-outlined">satellite_alt</span>
+                LAUNCH PROBE
+            </button>
+
             <label class="checkbox-row">
                 <input
                     type="checkbox"
@@ -180,6 +189,7 @@ import { C } from '../../utilities/consts';
 import {
     enterShipById,
     flyToBody,
+    launchProbeMission,
     selectBodyById,
     setLockToSun,
     setShowNames,
@@ -195,6 +205,7 @@ import {
 } from '../sim-bridge';
 import type { BodySnapshot } from '../sim-bridge';
 import { openBodyEditor } from '../ui-store';
+import { showProbeMissionModal } from '../probe-mission-modal-service';
 import PanelBase from './PanelBase.vue';
 
 const searchQuery = ref('');
@@ -208,6 +219,12 @@ const filteredBodies = computed<BodySnapshot[]>(() => {
 });
 
 const hasShip = computed(() => simStore.bodies.some((b) => b.isShip));
+
+async function onLaunchProbe(): Promise<void> {
+    const result = await showProbeMissionModal();
+    if (!result) return;
+    launchProbeMission(result.targetId, result.altitudeKm);
+}
 
 function onSelect(body: BodySnapshot): void {
     selectBodyById(body.id);

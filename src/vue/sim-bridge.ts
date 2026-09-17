@@ -35,6 +35,9 @@ export interface BodySnapshot {
     radius: number;
     speed: number;
     isShip: boolean;
+    /** True for "real" celestial bodies — excludes ships, satellites, and probes. Used to
+     *  filter the probe-mission target dropdown. */
+    isProbeTarget: boolean;
 }
 
 export interface SurfaceCameraSnapshot {
@@ -192,6 +195,8 @@ export interface VueSimHooks {
     createBody?: (payload: CreateBodyPayload) => string | null;
     /** Create a preset body (presets like Sun/Mercury/Earth); resolves to the new body id. */
     createPresetBody?: (presetKey: string) => string | null;
+    /** Launch a probe mission toward targetId at the given altitude (km); resolves to the new probe's id. */
+    launchProbeMission?: (targetId: string, altitudeKm: number) => string | null;
     /** Apply an edit to an existing body (same behavior as the old Apply button). */
     applyBodyEdit?: (bodyId: string, payload: ApplyBodyEditPayload) => void;
     /** Delete a body by id (same behavior as the old Delete button). */
@@ -431,6 +436,10 @@ function snapshotBodies(): void {
             radius: b.radius,
             speed: b.velocity ? b.velocity.length() : 0,
             isShip: b.bodyType === BodyTypeEnum.SpaceShip,
+            isProbeTarget: !(
+                b.bodyType &
+                (BodyTypeEnum.SpaceShip | BodyTypeEnum.Satellite | BodyTypeEnum.Probe)
+            ),
         }));
 }
 
@@ -699,6 +708,11 @@ export function createCustomBody(payload: CreateBodyPayload): string | null {
 /** Create a preset body; returns the new body's id (null on failure). */
 export function createPresetBodyByKey(presetKey: string): string | null {
     return hookRegistry.createPresetBody?.(presetKey) ?? null;
+}
+
+/** Launch a probe mission toward targetId at the given altitude (km); returns the new probe's id. */
+export function launchProbeMission(targetId: string, altitudeKm: number): string | null {
+    return hookRegistry.launchProbeMission?.(targetId, altitudeKm) ?? null;
 }
 
 /** Apply an edit to an existing body. */

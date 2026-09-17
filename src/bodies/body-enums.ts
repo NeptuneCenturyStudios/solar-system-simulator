@@ -19,6 +19,7 @@ export enum BodyTypeEnum {
     Pulsar = 1 << 12,
     Satellite = 1 << 13,
     Wormhole = 1 << 14,
+    Probe = 1 << 15,
 }
 
 /**

@@ -83,6 +83,11 @@ export class CelestialBody extends Body {
     /** Hidden/discoverable planetary science data, or undefined when none applies. */
     attributes?: IPlanetaryAttributes;
 
+    /** Non-null while this body is actively scanning (only meaningful for Probe); drives the
+     *  countdown shown on its own HUD name panel by planet-name-indicator.ts. Set/cleared by
+     *  Probe itself (see bodies/probe.ts). */
+    activeScan: { remainingSeconds: number; totalSeconds: number } | null = null;
+
     /**
      * Body this orbits, used as the reference frame for getOrbitalPeriod(). Falls back to
      * `tidalLockTarget` at construction when not supplied, so moons/satellites need no extra
@@ -779,6 +784,26 @@ export class CelestialBody extends Body {
     /** getRotationPeriod(), gated by this body's rotationPeriod discovery flag. */
     getDiscoveredRotationPeriod(): number | null {
         return this.attributes?.rotationPeriod?.discovered ? this.getRotationPeriod() : null;
+    }
+
+    /**
+     * Flips `discovered` on every present IPlanetaryAttributes field. No-op if the body carries
+     * no attributes. Called once a probe's scan timer completes. Idempotent — safe on bodies
+     * that are already fully discovered (e.g. the hard-coded real solar-system bodies).
+     */
+    discoverAllAttributes(): void {
+        const a = this.attributes;
+        if (!a) return;
+        if (a.coreType) a.coreType.discovered = true;
+        if (a.atmosphericComposition) a.atmosphericComposition.discovered = true;
+        if (a.soilComposition) a.soilComposition.discovered = true;
+        if (a.liquidComposition) a.liquidComposition.discovered = true;
+        if (a.averageTemperatureKelvin) a.averageTemperatureKelvin.discovered = true;
+        if (a.vegetation) a.vegetation.discovered = true;
+        if (a.sentientLife) a.sentientLife.discovered = true;
+        if (a.lifeformBase) a.lifeformBase.discovered = true;
+        if (a.orbitalPeriod) a.orbitalPeriod.discovered = true;
+        if (a.rotationPeriod) a.rotationPeriod.discovered = true;
     }
 
     temperatureToColor(temp: number) {

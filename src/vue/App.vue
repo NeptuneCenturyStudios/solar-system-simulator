@@ -13,6 +13,7 @@
     <ScenariosModal />
     <ScenarioOutcomeModal />
     <AboutModal />
+    <ProbeMissionModal />
 </template>
 
 <script setup lang="ts">
@@ -24,6 +25,7 @@ import ProceduralModal from './components/modals/ProceduralModal.vue';
 import ScenariosModal from './components/modals/ScenariosModal.vue';
 import ScenarioOutcomeModal from './components/modals/ScenarioOutcomeModal.vue';
 import AboutModal from './components/modals/AboutModal.vue';
+import ProbeMissionModal from './components/modals/ProbeMissionModal.vue';
 
 import { vueUiState } from './ui-store';
 </script>

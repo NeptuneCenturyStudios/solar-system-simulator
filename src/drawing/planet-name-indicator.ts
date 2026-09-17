@@ -19,6 +19,7 @@ import {
     HUD_RING_THEME,
     panelThemeFor,
 } from './hud/hud-paint';
+import { Probe } from '../bodies/probe';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 const PAD = 12;
@@ -34,6 +35,10 @@ const MIN_CONTENT_W = 80;
 const BASE_PANEL_H = DIST_Y + 20 + BOTTOM_PAD;
 /** Extra height added when the ring section is shown. */
 const RING_SECTION_H = 60;
+/** Y position of the probe-scan countdown line, when shown. */
+const SCAN_Y = DIST_Y + 34;
+/** Extra height added when the probe-scan countdown line is shown. */
+const SCAN_LINE_H = 34;
 
 const RING_RADIUS = 20;
 /** Ring is left-anchored inside the panel. */
@@ -79,7 +84,12 @@ export interface IPlanetNameFlightContext {
 // ── Panel painting ───────────────────────────────────────────────────────────
 
 /** Canvas dimensions needed to fit a name/distance panel, with or without the ring section. */
-function measureNamePanel(name: string, distLabel: string, hasRing: boolean): [number, number] {
+function measureNamePanel(
+    name: string,
+    distLabel: string,
+    hasRing: boolean,
+    scanLabel: string | null = null
+): [number, number] {
     const ctx = getMeasureContext();
 
     ctx.font = 'bold 32px monospace';
@@ -88,19 +98,22 @@ function measureNamePanel(name: string, distLabel: string, hasRing: boolean): [n
     ctx.font = '22px monospace';
     const distW = ctx.measureText(distLabel).width;
 
+    ctx.font = '20px monospace';
+    const scanW = scanLabel ? ctx.measureText(scanLabel).width : 0;
+
     // Ensure the canvas is wide enough for the ring label when active
     let minContentW = MIN_CONTENT_W;
     if (hasRing) {
-        ctx.font = '20px monospace';
         const ringLabelW = ctx.measureText(AUTOPILOT_LABEL).width;
         // circleLeftMargin(30) + diameter(40) + gap(8) + labelW + rightPad
         minContentW = Math.max(minContentW, 30 + 40 + 8 + ringLabelW + PAD);
     }
 
-    const contentW = Math.max(nameW, distW, minContentW);
+    const contentW = Math.max(nameW, distW, scanW, minContentW);
     const innerW = contentW + PAD * 2;
     const fullW = innerW + ACCENT_LEN * 2 + 4;
-    const totalH = hasRing ? BASE_PANEL_H + RING_SECTION_H : BASE_PANEL_H;
+    const baseH = scanLabel ? BASE_PANEL_H + SCAN_LINE_H : BASE_PANEL_H;
+    const totalH = hasRing ? baseH + RING_SECTION_H : baseH;
 
     return [fullW, totalH];
 }
@@ -116,7 +129,8 @@ function paintNamePanel(
     name: string,
     distLabel: string,
     ringFill: number,
-    isThreat: boolean
+    isThreat: boolean,
+    scanLabel: string | null = null
 ): void {
     ctx.clearRect(0, 0, width, height);
 
@@ -141,10 +155,21 @@ function paintNamePanel(
     ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.fillText(distLabel, cx, DIST_Y);
 
+    // Probe scan countdown — cyan, below the distance line
+    let contentBaseH = BASE_PANEL_H;
+    if (scanLabel) {
+        ctx.font = '20px monospace';
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.fillStyle = 'rgba(0, 255, 204, 0.9)';
+        ctx.fillText(scanLabel, cx, SCAN_Y);
+        contentBaseH = BASE_PANEL_H + SCAN_LINE_H;
+    }
+
     if (ringFill < 0) return;
 
     // Separator line between the name/dist area and the ring row
-    const sepY = BASE_PANEL_H - BOTTOM_PAD / 2;
+    const sepY = contentBaseH - BOTTOM_PAD / 2;
     ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(0, 255, 204, 0.25)';
     ctx.lineWidth = 1;
@@ -155,7 +180,7 @@ function paintNamePanel(
 
     drawKeyPromptRing(ctx, {
         cx: RING_CX,
-        cy: BASE_PANEL_H + RING_SECTION_H / 2,
+        cy: contentBaseH + RING_SECTION_H / 2,
         radius: RING_RADIUS,
         fill: ringFill,
         key: 'E',
@@ -402,11 +427,24 @@ export class PlanetNameIndicator {
         const distLabel = formatDistance(camDist);
         const isThreat = body.isThreat;
         const hasRing = ringFill >= 0;
+        
+        // Set the current probe scan status
+        let scanLabel = null;
+        if (body instanceof Probe) {
+            if (body.activeScan) {
+                scanLabel = `Scanning… ${Math.ceil(body.activeScan.remainingSeconds)}s`;
+            } else if (body.scanComplete) {
+                scanLabel = `Scan complete`;
+            } else {
+                scanLabel = `Out of scan range`;
+            }
+        }
 
-        const [fullW, totalH] = measureNamePanel(name, distLabel, hasRing);
+        const [fullW, totalH] = measureNamePanel(name, distLabel, hasRing, scanLabel);
         sprite.setCanvasSize(fullW, totalH);
-        sprite.draw(`${name}|${distLabel}|${ringFill.toFixed(3)}|${isThreat}`, (ctx, w, h) =>
-            paintNamePanel(ctx, w, h, name, distLabel, ringFill, isThreat)
+        sprite.draw(
+            `${name}|${distLabel}|${ringFill.toFixed(3)}|${isThreat}|${scanLabel}`,
+            (ctx, w, h) => paintNamePanel(ctx, w, h, name, distLabel, ringFill, isThreat, scanLabel)
         );
 
         const spriteW = (fullW / REF_CANVAS_W) * REF_SPRITE_W;

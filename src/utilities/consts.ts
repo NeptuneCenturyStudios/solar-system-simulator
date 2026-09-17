@@ -644,6 +644,37 @@ export const SATELLITE_CLIMB_GAIN = 0.2;
  */
 export const SATELLITE_MAX_STATION_KEEPING_DEVIATION = 200 / DIST_SCALE;
 
+// === Probe autopilot tuning ===
+// Fresh, isolated travel-phase tuning for Probe's TRAVEL/INSERT controller — deliberately not
+// shared with the ship autopilot (spaceship.ts) or the satellite station-keeping constants above.
+// A probe's post-insertion station-keeping reuses DEFAULT_SATELLITE_HANDLING unmodified instead.
+/** Placeholder probe body radius, u. Tune once the model is loaded and its proportions are known. */
+export const PROBE_RADIUS = 0.05 / RADIUS_SCALE;
+/** Placeholder probe mass, kg-equivalent scaled — small enough it never "wins" a collision. */
+export const PROBE_MASS = 500 / MASS_SCALE;
+/** Cruise speed during the TRAVEL phase, u/s (20 km/s). Playtest and retune for pacing. */
+export const PROBE_MAX_SPEED = 400 / DIST_SCALE;
+/** Maximum rate the TRAVEL/INSERT controller may rotate the probe's heading, rad/s. */
+export const PROBE_TURN_RATE = 0.5;
+/** Acceleration toward cruise speed, u/s² — reaches PROBE_MAX_SPEED in ~120s from rest. */
+export const PROBE_ACCEL = PROBE_MAX_SPEED / 120;
+/** Deceleration when shedding speed, u/s² — sheds speed 3x faster than it builds it. */
+export const PROBE_DECEL = PROBE_ACCEL * 3;
+/** Extra margin added to the TRAVEL→INSERT stopping-distance trigger, u. */
+export const PROBE_INSERT_ORBIT_PAD = 2.0;
+/** Velocity error below which orbit insertion is considered complete, u/s. */
+export const PROBE_INSERT_DONE_SPEED = 0.5 / DIST_SCALE;
+/** Flat scan duration, seconds. */
+export const PROBE_SCAN_BASE_SECONDS = 60;
+/** Additional scan seconds per Earth-radius of target body size. */
+export const PROBE_SCAN_RADIUS_SCALE_SECONDS = 120;
+/**
+ * Altitude above a target's surface within which a probe begins scanning, in km — independent of
+ * whether it has achieved a stable orbit yet. Shown to the player in the launch modal so they know
+ * how close a mission needs to get.
+ */
+export const PROBE_SCAN_RANGE_KM = 100_000 / DIST_SCALE;
+
 // === Explosion speed scaling ===
 // ParticleExplosion scales its outward particle/debris speed by the relative impact speed that
 // caused the death, so a gentle bump and a hypervelocity impact no longer look identical.

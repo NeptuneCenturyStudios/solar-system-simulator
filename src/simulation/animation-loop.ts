@@ -215,7 +215,8 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene, dtTotal: nu
             BodyTypeEnum.Asteroid |
                 BodyTypeEnum.Comet |
                 BodyTypeEnum.Satellite |
-                BodyTypeEnum.SpaceShip
+                BodyTypeEnum.SpaceShip |
+                BodyTypeEnum.Probe
         );
 
     let small: Body | null = null;

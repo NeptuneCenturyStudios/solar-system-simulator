@@ -327,6 +327,28 @@ export interface ISatelliteCreationOptions extends ICelestialBodyCreationOptions
     handling?: ISatelliteHandling;
 }
 
+/**
+ * Fresh, isolated travel-phase tuning for a Probe's own TRAVEL/INSERT autopilot. Deliberately
+ * unrelated to ISatelliteHandling (which a Probe still uses, unmodified, once it reaches orbit
+ * for station-keeping) or ISpaceshipHandling — a probe has no boost/warp tier, just these four
+ * numbers. Speeds are u/s, accelerations u/s², the turn rate rad/s.
+ */
+export interface IProbeHandling {
+    maxSpeed: number;
+    turnRate: number;
+    accel: number;
+    decel: number;
+}
+
+export interface IProbeCreationOptions extends ISatelliteCreationOptions {
+    /** Travel-phase tuning. Defaults to DEFAULT_PROBE_HANDLING when omitted. */
+    probeHandling?: IProbeHandling;
+    /** The body this probe is dispatched to orbit and scan. */
+    missionTarget: CelestialBody;
+    /** Desired circular-orbit altitude above missionTarget's surface, in km. */
+    altitudeKm: number;
+}
+
 export interface IMoonCreationOptions extends ISatelliteCreationOptions {
     moonType: MoonTypeEnum;
     texture?: THREE.Texture;
