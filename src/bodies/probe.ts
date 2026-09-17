@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 
-import { IDeathOptions, IProbeCreationOptions, IProbeHandling, IStateDependencies } from '../interfaces';
+import {
+    IDeathOptions,
+    IProbeCreationOptions,
+    IProbeHandling,
+    IStateDependencies,
+} from '../interfaces';
 import { CelestialBody } from './celestial-body';
 import { Satellite, DEFAULT_SATELLITE_HANDLING } from './satellite';
 import { BodyTypeEnum } from './body-enums';
@@ -126,8 +131,6 @@ export class Probe extends Satellite {
     readonly insertGoalRadius: number;
 
     probePhase: ProbePhase = 'TRAVEL';
-    /** Distance to target captured at the TRAVEL→INSERT transition; denominator for the INSERT smoothstep blend. */
-    private insertEntryDistance = 0;
     /** Persistent unit normal of the orbital plane INSERT is converging into — see computeTangential. */
     private readonly insertOrbitNormal = new THREE.Vector3();
 
@@ -138,7 +141,11 @@ export class Probe extends Satellite {
     scanTotalSeconds = 0;
     scanRemainingSeconds = 0;
 
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, options: IProbeCreationOptions) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        options: IProbeCreationOptions
+    ) {
         const containerMesh = createShipContainerMesh();
         // Destructure out the probe-only fields so the object passed to Satellite's constructor
         // has exactly ISatelliteCreationOptions's shape (avoids a TS excess-property error).
@@ -159,9 +166,18 @@ export class Probe extends Satellite {
         this.missionTarget = missionTarget;
         this.insertGoalRadius = missionTarget.radius + altitudeKm / DIST_SCALE;
 
-        loadShipModelInto(containerMesh, 'probe/SpaceProbe', options.radius).catch((e) => {
-            console.warn('Probe model load failed — using placeholder mesh', e);
-        });
+        // Correct model orientation so that the rear is facing the camera and not the front
+        const MODEL_ROTATION = new THREE.Euler(
+            THREE.MathUtils.degToRad(0),
+            THREE.MathUtils.degToRad(10),
+            THREE.MathUtils.degToRad(90)
+        );
+
+        loadShipModelInto(containerMesh, 'probe/SpaceProbe', options.radius, MODEL_ROTATION).catch(
+            (e) => {
+                console.warn('Probe model load failed — using placeholder mesh', e);
+            }
+        );
     }
 
     override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3): void {
@@ -212,7 +228,6 @@ export class Probe extends Satellite {
         const distance = _toTarget.length();
         if (distance < DIRECTION_EPSILON) {
             this.probePhase = 'INSERT';
-            this.insertEntryDistance = distance;
             return;
         }
         _toTarget.divideScalar(distance);
@@ -238,11 +253,11 @@ export class Probe extends Satellite {
 
         this.velocity.copy(target.velocity).addScaledVector(_currentDir, newSpeed);
 
-        const stoppingDistance = (newSpeed * newSpeed) / (2 * Math.max(this.probeHandling.decel, DIRECTION_EPSILON));
+        const stoppingDistance =
+            (newSpeed * newSpeed) / (2 * Math.max(this.probeHandling.decel, DIRECTION_EPSILON));
         const insertTrigger = this.insertGoalRadius + stoppingDistance + PROBE_INSERT_ORBIT_PAD;
         if (distance <= insertTrigger) {
             this.probePhase = 'INSERT';
-            this.insertEntryDistance = distance;
         }
     }
 
@@ -294,16 +309,34 @@ export class Probe extends Satellite {
         }
 
         const vOrbit = Math.sqrt((gEff * target.mass) / r);
+        const decelRate = Math.max(this.probeHandling.decel, DIRECTION_EPSILON);
 
-        const span = Math.max(this.insertEntryDistance - this.insertGoalRadius, DIRECTION_EPSILON);
-        const rawT = 1 - (r - this.insertGoalRadius) / span;
-        const t = Math.max(0, Math.min(1, rawT));
-        const alpha = t * t * (3 - 2 * t); // smoothstep
+        // Signed distance to the goal: positive while still outside it (need to close in),
+        // negative if gravity/thrust interplay ever overshoots inside it (need to climb back
+        // out). Symmetric around insertGoalRadius, rather than clamping to 0 once inside it —
+        // clamping meant any circular orbit at ANY r < insertGoalRadius would satisfy the
+        // completion check below (vOrbit(r) is always exactly correct for wherever the probe
+        // happens to be), so an overshoot would silently settle for a smaller orbit than
+        // requested instead of correcting back out to the real target altitude.
+        const signedRemaining = r - this.insertGoalRadius;
+        const vSafeApproach = Math.min(
+            this.probeHandling.maxSpeed,
+            Math.sqrt(2 * decelRate * Math.abs(signedRemaining))
+        );
+        const radialCommand = signedRemaining >= 0 ? -vSafeApproach : vSafeApproach;
+        const alpha =
+            this.probeHandling.maxSpeed > DIRECTION_EPSILON
+                ? 1 - vSafeApproach / this.probeHandling.maxSpeed
+                : 1;
+
+        // Tangential target is evaluated at the FIXED goal radius, not the probe's current r —
+        // see the note above on why using vOrbit(r) here was the actual bug.
+        const vOrbitGoal = Math.sqrt((gEff * target.mass) / this.insertGoalRadius);
 
         _desiredRelVel
             .copy(_tangential)
-            .multiplyScalar(vOrbit * alpha)
-            .addScaledVector(_radial, -this.probeHandling.maxSpeed * (1 - alpha));
+            .multiplyScalar(vOrbitGoal * alpha)
+            .addScaledVector(_radial, radialCommand);
 
         const insertCap = Math.max(this.probeHandling.maxSpeed, currentSpeed);
         const desiredLen = _desiredRelVel.length();
@@ -323,7 +356,17 @@ export class Probe extends Satellite {
         _velDelta.subVectors(_desiredRelVel, _relVel);
         const deltaLen = _velDelta.length();
 
-        if (deltaLen < PROBE_INSERT_DONE_SPEED) {
+        // Completion requires BOTH velocity match AND actually having reached the goal radius.
+        // Velocity alone isn't enough: this controller is designed to closely track its own
+        // continuously-recalculated desiredRelVel throughout the whole descent (that's what the
+        // safety-curve fixes above rely on), so deltaLen can dip below tolerance well before r
+        // reaches insertGoalRadius — handing off to station-keeping mid-descent, with the orbit
+        // baselined from wherever it happened to be rather than a clean circular orbit at the
+        // requested altitude. A gas giant's huge margin absorbs that slop invisibly; a small,
+        // tightly-orbited body doesn't — the residual eccentricity swings its much shorter-period
+        // orbit's periapsis into the surface within a few laps.
+        const positionConverged = Math.abs(signedRemaining) < PROBE_INSERT_ORBIT_PAD;
+        if (deltaLen < PROBE_INSERT_DONE_SPEED && positionConverged) {
             this.velocity.copy(target.velocity).add(_desiredRelVel);
             this.completeInsertion();
             return;
@@ -332,6 +375,28 @@ export class Probe extends Satellite {
         const rate = Math.max(this.probeHandling.accel, this.probeHandling.decel);
         const mag = Math.min(rate * Math.abs(dt), deltaLen);
         this.velocity.addScaledVector(_velDelta.divideScalar(deltaLen), mag);
+
+        // Hard safety clamp: the probe's ACTUAL closing speed toward the physical SURFACE must
+        // never exceed what its own decel budget can stop from here, no matter how much of this
+        // frame's rate-limited thrust above went toward the tangential mismatch instead of the
+        // radial one (the two compete for the same shared thrust budget — deltaLen blends both
+        // into one vector — so a probe entering INSERT already carrying a large tangential
+        // velocity difference, e.g. a "chasing from behind" approach, can starve the radial
+        // correction for several frames). Deliberately measured against target.radius, not
+        // insertGoalRadius: this is a collision-avoidance floor, independent of the requested
+        // altitude, and must still hold even while signedRemaining above is negative (climbing
+        // back out from an overshoot) and the probe could otherwise keep sinking toward the
+        // actual surface. Unconditional and NOT rate limited — a steering preference can lag,
+        // a crash cannot.
+        const vSafeSurface = Math.min(
+            this.probeHandling.maxSpeed,
+            Math.sqrt(2 * decelRate * Math.max(r - target.radius, 0))
+        );
+        _relVel.subVectors(this.velocity, target.velocity);
+        const vrAfter = _relVel.dot(_radial);
+        if (vrAfter < -vSafeSurface) {
+            this.velocity.addScaledVector(_radial, -vSafeSurface - vrAfter);
+        }
     }
 
     /**
@@ -351,7 +416,6 @@ export class Probe extends Satellite {
         this.tidalLockEnabled = true;
 
         this.probePhase = 'DONE';
-
     }
 
     /**

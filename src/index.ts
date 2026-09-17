@@ -972,7 +972,7 @@ const dragLine = new THREE.Line(lineGeo, lineMat);
 dragLine.visible = false;
 scene.add(dragLine);
 
-function getNearCameraSpawnPos(offset = 500): THREE.Vector3 {
+function getNearCameraSpawnPos(offset = 0.5/DIST_SCALE): THREE.Vector3 {
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     return camera.position.clone().add(dir.multiplyScalar(offset));

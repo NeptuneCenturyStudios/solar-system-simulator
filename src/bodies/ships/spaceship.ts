@@ -14,6 +14,7 @@ import {
     IShipControlInput,
 } from '../../interfaces';
 import type { ShipAI } from '../../simulation/ai/ship-ai';
+import { brakingSpeedLimit } from '../../simulation/ai/obstacle-avoidance';
 import { Weapon } from '../../ship-effects/weapons/weapon';
 import { autopilotState, flightState, simulationState } from '../../simulation/simulation';
 import { G, SHIELD_DEPLETED_EPSILON } from '../../utilities/consts';
@@ -1167,19 +1168,24 @@ export class Spaceship extends Body {
             }
 
             const vOrbit = Math.sqrt((gEff * target.mass) / r);
-            const brakeSpan = Math.max(this.autopilotBrakeEntryDistance - orbitRadius, 1);
-            const rawT = 1 - (distance - orbitRadius) / brakeSpan;
-            const t = Math.max(0, Math.min(1, rawT));
-            const alpha = t * t * (3 - 2 * t); // smoothstep
 
+            // Commanded closing speed follows the ship's own multi-tier braking curve —
+            // brakingSpeedLimit() is exactly the inverse of stoppingDistanceFrom(), continuously
+            // recomputed from the CURRENT remaining distance to orbitRadius — rather than a
+            // smoothstep blend anchored to the distance BRAKE started at. A smoothstep's
+            // near-zero slope at t=0 defers almost all the speed reduction into the back half of
+            // the approach, so by the time it ramps up, decel can no longer keep pace and the
+            // ship carries too much speed into the target. See the identical fix (and full
+            // reasoning) applied to bodies/probe.ts's stepInsert.
+            const remaining = Math.max(distance - orbitRadius, 0);
+            const vSafeClose = brakingSpeedLimit(remaining, h);
             const brakeApproachSpeed = relVel.length();
             const brakeDecel = this.decelRateForSpeed(brakeApproachSpeed);
-            const maxInwardForSpan = Math.sqrt(2 * brakeDecel * brakeSpan);
-            const inwardSpeed = Math.min(h.flightMaxSpeed, maxInwardForSpan) * (1 - alpha);
+            const alpha = h.flightMaxSpeed > 0 ? 1 - Math.min(1, vSafeClose / h.flightMaxSpeed) : 1;
             const desiredVel = new THREE.Vector3()
                 .copy(target.velocity)
                 .addScaledVector(tangential, vOrbit * alpha)
-                .addScaledVector(toTargetDir, inwardSpeed);
+                .addScaledVector(toTargetDir, vSafeClose);
 
             // Speed-limit guard (same as APPROACH): never command the ship beyond
             // boost max while braking. The vOrbit allowance preserves orbit
@@ -1209,6 +1215,18 @@ export class Spaceship extends Body {
                 flightState.thrustActive = deltaLen > 1;
             } else {
                 flightState.thrustActive = false;
+            }
+
+            // Hard safety clamp: the ship's ACTUAL closing speed must never exceed what its own
+            // decel budget can stop from the current remaining distance, no matter how much of
+            // this frame's thrust above went toward the tangential/circularization correction
+            // instead — the two compete for the same applyThrust() budget above. Unconditional
+            // and not rate limited, because this is a collision-avoidance floor, not a steering
+            // preference. See the identical clamp in bodies/probe.ts's stepInsert.
+            const relVelAfterBrake = new THREE.Vector3().subVectors(this.velocity, target.velocity);
+            const closingAfterBrake = relVelAfterBrake.dot(toTargetDir);
+            if (closingAfterBrake > vSafeClose) {
+                this.velocity.addScaledVector(toTargetDir, vSafeClose - closingAfterBrake);
             }
         } else if (this.autopilotPhase === 'CIRCULARIZE' && gEff > 0) {
             const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
@@ -1261,6 +1279,26 @@ export class Spaceship extends Body {
                 this.applyThrust(thrustDir, mag);
                 this.steerToward(toTargetDir, dt);
                 flightState.thrustActive = true;
+            }
+
+            // Defensive hard safety clamp, same reasoning as BRAKE's: CIRCULARIZE's own
+            // desiredVel is purely tangential (no inward term), but BRAKE's `withinOrbit`
+            // transition check (distance <= orbitRadius * 1.02) doesn't itself verify closing
+            // speed is safe, so a ship could hand off into CIRCULARIZE still carrying excess
+            // closing speed BRAKE hadn't fully shed yet. This guarantees it never exceeds what's
+            // stoppable from here regardless.
+            const remainingCircularize = Math.max(r - orbitRadius, 0);
+            const vSafeCloseCircularize = brakingSpeedLimit(remainingCircularize, h);
+            const relVelAfterCircularize = new THREE.Vector3().subVectors(
+                this.velocity,
+                target.velocity
+            );
+            const closingAfterCircularize = relVelAfterCircularize.dot(toTargetDir);
+            if (closingAfterCircularize > vSafeCloseCircularize) {
+                this.velocity.addScaledVector(
+                    toTargetDir,
+                    vSafeCloseCircularize - closingAfterCircularize
+                );
             }
         } else if (this.autopilotPhase === 'TIDAL_LOCK' && gEff > 0) {
             const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
