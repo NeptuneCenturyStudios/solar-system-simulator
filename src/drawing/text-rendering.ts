@@ -4,8 +4,8 @@ import { Body } from '../bodies/body';
 import { Star } from '../bodies/star';
 import { MainSequenceStar } from '../bodies/main-sequence-star';
 import { Moon } from '../bodies/moon';
-import { MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { Planet } from '../bodies/planet';
+import { moonSubTypeLabel, planetSubTypeLabel } from '../bodies/body-attribute-labels';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { environmentState } from '../simulation/environment-state';
 import { formatMass, formatRadius, formatSpeed } from '../utilities/display-format';
@@ -233,47 +233,8 @@ function drawStat(ctx: CanvasRenderingContext2D, label: string, value: string, y
     ctx.fillText(label + value, STATS_CANVAS_W - STATS_RIGHT_PADDING, y);
 }
 
-function planetSubTypeLabel(planetType: PlanetTypeEnum): string {
-    switch (planetType) {
-        case PlanetTypeEnum.GasGiant:
-            return 'Gas Giant';
-        case PlanetTypeEnum.IceGiant:
-            return 'Ice Giant';
-        case PlanetTypeEnum.Terrestrial:
-            return 'Terrestrial';
-        case PlanetTypeEnum.Volcanic:
-            return 'Volcanic';
-        case PlanetTypeEnum.Ocean:
-            return 'Ocean';
-        case PlanetTypeEnum.Frozen:
-            return 'Frozen';
-        case PlanetTypeEnum.Desert:
-            return 'Desert';
-        case PlanetTypeEnum.Temperate:
-            return 'Temperate';
-        default:
-            return 'Unknown';
-    }
-}
-
-function moonSubTypeLabel(moonType: MoonTypeEnum): string {
-    switch (moonType) {
-        case MoonTypeEnum.Terrestrial:
-            return 'Terrestrial';
-        case MoonTypeEnum.Temperate:
-            return 'Temperate';
-        case MoonTypeEnum.Volcanic:
-            return 'Volcanic';
-        case MoonTypeEnum.Ocean:
-            return 'Ocean';
-        case MoonTypeEnum.Frozen:
-            return 'Frozen';
-        case MoonTypeEnum.Desert:
-            return 'Desert';
-        default:
-            return 'Unknown';
-    }
-}
+// Sub-type labels moved to bodies/body-attribute-labels.ts so the canvas stats panel and the
+// Phase 3.3 attributes modal share one implementation instead of two copies.
 
 /**
  * Draw detailed stats about a celestial body, such as mass, radius, velocity, etc.

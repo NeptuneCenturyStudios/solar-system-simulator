@@ -88,7 +88,7 @@ export class Uranus extends Planet {
                         AtmosphericGasEnum.Methane,
                     discovered: true,
                 },
-                averageTemperatureKelvin: { value: 76, discovered: true },
+                averageTemperatureKelvin: { value: 78, discovered: true },
                 vegetation: { value: VegetationEnum.None, discovered: true },
                 sentientLife: { value: false, discovered: true },
                 lifeformBase: { value: LifeformBaseEnum.None, discovered: true },

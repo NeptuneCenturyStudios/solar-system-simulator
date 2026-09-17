@@ -92,7 +92,7 @@ export class Mercury extends Planet {
                     discovered: true,
                 },
                 liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
-                averageTemperatureKelvin: { value: 340, discovered: true },
+                averageTemperatureKelvin: { value: 440, discovered: true },
                 vegetation: { value: VegetationEnum.None, discovered: true },
                 sentientLife: { value: false, discovered: true },
                 lifeformBase: { value: LifeformBaseEnum.None, discovered: true },

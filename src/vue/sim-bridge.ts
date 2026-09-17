@@ -3,6 +3,7 @@ import { reactive } from 'vue';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { Body } from '../bodies/body';
 import { probeScanStatusLabel } from '../bodies/probe-scan-status';
+import type { IBodyAttributeRow } from '../bodies/body-attribute-display';
 import { SHIP_TYPES } from '../bodies/ships/ship-registry';
 import { generateRandomCustomBodyName } from '../procedural/custom-body-naming';
 import {
@@ -36,8 +37,9 @@ export interface BodySnapshot {
     radius: number;
     speed: number;
     isShip: boolean;
-    /** True for "real" celestial bodies — excludes ships, satellites, and probes. Used to
-     *  filter the probe-mission target dropdown. */
+    /** True for "real" celestial bodies — excludes ships, satellites, and probes. Drives both
+     *  the probe-mission target dropdown and the System Explorer's attributes (info) button,
+     *  since "can be probed" and "can be scanned" are the same set. */
     isProbeTarget: boolean;
     /** Probe scan status — "Scanning… 12s", "Scan complete", or "Out of scan range" — or
      *  null for every non-probe body. Drives the System Explorer status line, and is derived
@@ -83,6 +85,20 @@ export interface BodyEditSnapshot {
     tailColorHex: string | null;
     /** Readable type label e.g. "Planet". */
     typeLabel: string;
+}
+
+/** Rich snapshot backng the Phase 3.3 attributes modal. Built on the sim side (which owns the
+ *  body classes and the live orbital/rotation periods) and handed to Vue as plain rows. */
+export interface BodyAttributesSnapshot {
+    bodyId: string;
+    bodyName: string;
+    typeLabel: string;
+    /** Always-known physical data: type, sub type, mass, radius, star temperature. */
+    basicRows: IBodyAttributeRow[];
+    /** Discoverable science rows; undiscovered entries carry the "???" placeholder. */
+    scienceRows: IBodyAttributeRow[];
+    /** False when the body carries no science payload at all (stars, black holes, wormholes). */
+    hasScienceData: boolean;
 }
 
 /** Payload for creating a custom body from the add form. Mirrors the old
@@ -196,6 +212,8 @@ export interface VueSimHooks {
     // ── Add/Edit Body (same sim paths as the old management panel) ─────────
     /** Load a rich edit snapshot for the given body (used in edit mode). */
     getBodyEditSnapshot?: (bodyId: string) => BodyEditSnapshot | null;
+    /** Resolve a body's basic + discoverable science rows for the attributes modal. */
+    getBodyAttributesSnapshot?: (bodyId: string) => BodyAttributesSnapshot | null;
     /** Create a custom body from the add-form payload; resolves to the new body id. */
     createBody?: (payload: CreateBodyPayload) => string | null;
     /** Create a preset body (presets like Sun/Mercury/Earth); resolves to the new body id. */
@@ -403,6 +421,47 @@ const bodyEditorState = reactive<BodyEditorStore>({
 /** Reactive store consumed by AddEditBodyPanel. */
 export const bodyEditorStore: BodyEditorStore = bodyEditorState;
 
+/** Reactive store backing the Phase 3.3 attributes modal. `snapshot` is re-read on every poll
+ *  tick while the modal is open, so a probe scan completing mid-view flips "???" to real
+ *  values without the user reopening it. */
+export interface BodyAttributesStore {
+    snapshot: BodyAttributesSnapshot | null;
+}
+
+const bodyAttributesState = reactive<BodyAttributesStore>({
+    snapshot: null,
+});
+
+/** Reactive store consumed by BodyAttributesModal. */
+export const bodyAttributesStore: BodyAttributesStore = bodyAttributesState;
+
+/** Id of the body whose attributes modal is open, or null when it is closed. */
+let openAttributesBodyId: string | null = null;
+
+/** Open the attributes modal for `bodyId`, seeding the snapshot immediately so the first
+ *  render is populated rather than waiting up to one poll tick. */
+export function openBodyAttributes(bodyId: string): void {
+    openAttributesBodyId = bodyId;
+    bodyAttributesState.snapshot = hookRegistry.getBodyAttributesSnapshot?.(bodyId) ?? null;
+}
+
+/** Close the attributes modal and stop live-refreshing its snapshot. */
+export function closeBodyAttributes(): void {
+    openAttributesBodyId = null;
+    bodyAttributesState.snapshot = null;
+}
+
+/** Re-read the open modal's snapshot, closing it if the body no longer exists. */
+function refreshAttributesSnapshot(): void {
+    if (!openAttributesBodyId) return;
+    const snapshot = hookRegistry.getBodyAttributesSnapshot?.(openAttributesBodyId) ?? null;
+    if (!snapshot) {
+        closeBodyAttributes();
+        return;
+    }
+    bodyAttributesState.snapshot = snapshot;
+}
+
 /** Reactive store backing the Playlist panel. Mirrors the live
  *  AmbientSoundManager state (shuffled entries + current track + playing). */
 export interface PlaylistStore {
@@ -502,6 +561,7 @@ function refreshAll(): void {
     refreshCameraState();
     refreshEnvironmentState();
     refreshPlaylistState();
+    refreshAttributesSnapshot();
 }
 
 let intervalId: number | null = null;
