@@ -2,7 +2,6 @@ import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces.js';
 import { BodyTypeEnum } from './body-enums';
 import { applyModelFit, measureModelFit, type IModelFit } from './model-fit';

@@ -125,7 +125,7 @@ src/
 - [ ] Phase 6.1: Adjust Neptune's orbit to match real orbit (like we did for Pluto)
 - [ ] Phase 6.2: Ability to leave weapon fire in scene if paused even when user exits flight mode. Bolts will freeze in space and not tick down their lifetime, and laser will remain persistent in space.
 - [ ] Phase 6.3: Smooth camera zoom (ease-in-out)
-- [ ] Phase 6.4: Update the comet/asteroid object assets
+- [x] Phase 6.4: Update the comet/asteroid object assets
 
 ## UI (Vue)
 
