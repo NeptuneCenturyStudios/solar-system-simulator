@@ -21,7 +21,7 @@
                 <h3 class="attribute-section-title">Science Data</h3>
 
                 <p v-if="!snapshot.hasScienceData" class="attribute-note">
-                    This object carries no science payload — no probes required.
+                    None
                 </p>
 
                 <template v-else>
@@ -38,7 +38,7 @@
                     </dl>
 
                     <p v-if="hasUndiscovered" class="attribute-note attribute-note-hint">
-                        Send a probe to this object to reveal the outstanding readings.
+                        Send a probe to this object to discover its properties.
                     </p>
                 </template>
             </section>
