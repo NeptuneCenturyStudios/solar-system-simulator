@@ -1,4 +1,4 @@
-import type { IScenario, IScenarioAudio } from '../interfaces';
+import type { IScenario, IScenarioAudio, ScenarioLock } from '../interfaces';
 
 /**
  * Owns the scenario (if any) that the live system's generator returned, and drives it once
@@ -21,6 +21,16 @@ class ScenarioManager {
     /** The scenario currently running, or null when the live system has none. */
     get activeScenario(): IScenario | null {
         return this.active;
+    }
+
+    /** Whether the active scenario (if any) has locked the given action. */
+    isLocked(lock: ScenarioLock): boolean {
+        return this.active?.locks?.includes(lock) ?? false;
+    }
+
+    /** Actions the active scenario has locked. Empty when no scenario is running. */
+    get activeLocks(): readonly ScenarioLock[] {
+        return this.active?.locks ?? [];
     }
 
     /** Register the music hook used to play a scenario's declared track. */

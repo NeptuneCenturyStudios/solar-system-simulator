@@ -14,6 +14,8 @@ import {
 } from '../simulation/simulation';
 import { getBodyTypeLabel } from '../utilities/utilities';
 import type { IMagneticFieldOptions, ISimStateSnapshot } from '../interfaces';
+import { ScenarioLock } from '../interfaces';
+import { scenarioManager } from '../scenarios/scenario-manager';
 import { environmentState } from '../simulation/environment-state';
 import {
     AuroraDetailMode,
@@ -357,6 +359,9 @@ export interface VueSimStore {
     hasKnownShip: boolean;
     /** Registry id of the known ship's type, or null if none exists. */
     knownShipTypeId: string | null;
+
+    /** Actions the active scenario (if any) has locked. Mirrors scenarioManager.activeLocks. */
+    lockedActions: Set<ScenarioLock>;
 }
 
 const state = reactive<VueSimStore>({
@@ -399,6 +404,7 @@ const state = reactive<VueSimStore>({
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
     knownShipTypeId: null as string | null,
+    lockedActions: new Set<ScenarioLock>(),
 });
 
 /**
@@ -533,6 +539,17 @@ function refreshCameraState(): void {
     state.knownShipTypeId = state.hasKnownShip ? (ship?.shipTypeId ?? null) : null;
 }
 
+/** Mirrors the active scenario's locked actions so components can disable
+ *  buttons without importing scenarioManager directly. */
+function refreshScenarioLockState(): void {
+    state.lockedActions = new Set(scenarioManager.activeLocks);
+}
+
+/** Whether the active scenario (if any) has locked the given action. */
+export function isActionLocked(lock: ScenarioLock): boolean {
+    return state.lockedActions.has(lock);
+}
+
 /** Copy environment settings into the reactive store for the Vue UI. */
 function refreshEnvironmentState(): void {
     state.kuiperBeltVisible = environmentState.kuiperBeltVisible;
@@ -562,6 +579,7 @@ function refreshAll(): void {
     refreshEnvironmentState();
     refreshPlaylistState();
     refreshAttributesSnapshot();
+    refreshScenarioLockState();
 }
 
 let intervalId: number | null = null;

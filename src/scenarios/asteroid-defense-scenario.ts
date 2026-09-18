@@ -6,6 +6,7 @@ import type { Earth } from '../bodies/earth';
 import type { Spaceship } from '../bodies/ships/spaceship';
 import { NotificationType } from '../event-log/event-log';
 import type { IScenario, IStateDependencies } from '../interfaces';
+import { ScenarioLock } from '../interfaces';
 import { triggerScenarioMessage } from '../drawing/scenario-message-hud';
 import { generateProceduralBodyName } from '../procedural/body-naming';
 import { rngFor } from '../procedural/seed-utils';
@@ -17,7 +18,6 @@ import { reportScenarioOutcome } from './scenario-outcome';
 import {
     ASTEROID_DEFENSE_APPROACH_SPEED,
     ASTEROID_DEFENSE_FIRST_WAVE_DELAY,
-    ASTEROID_DEFENSE_FLIGHT_WARNING_HOLD_SECONDS,
     ASTEROID_DEFENSE_IMPACT_MARGIN,
     ASTEROID_DEFENSE_MAX_WAVES,
     ASTEROID_DEFENSE_MAX_ELEVATION_DEG,
@@ -69,6 +69,9 @@ export class AsteroidDefenseScenario implements IScenario {
         'musinova-minimal-underscore-piano-pulse-loop-edit-518250.mp3',
         true
     );
+    /** The panel manager is already hidden for this scenario, but these keep the
+     *  System Explorer's add/edit/delete actions locked out even if it were shown. */
+    readonly locks = [ScenarioLock.AddBody, ScenarioLock.EditBody, ScenarioLock.DeleteBody];
 
     /** Asteroid bulk density anchored to Ceres, so mass and radius stay consistent. */
     private static readonly ASTEROID_DENSITY = CERES_MASS / Math.pow(CERES_RADIUS, 3);
@@ -129,8 +132,8 @@ export class AsteroidDefenseScenario implements IScenario {
             message: 'Defend Earth! The first asteroid is inbound.',
             notificationType: NotificationType.Info,
         });
-        triggerScenarioMessage('WARNING: Exiting flight mode (ESC) will fail this scenario!', {
-            holdSecs: ASTEROID_DEFENSE_FLIGHT_WARNING_HOLD_SECONDS,
+        triggerScenarioMessage('WARNING: Incoming asteroids. Defend earth!', {
+            holdSecs: 6,
             fontSizePx: 32,
         });
     }
@@ -147,14 +150,14 @@ export class AsteroidDefenseScenario implements IScenario {
             this.finishFailed('Your ship has been destroyed.');
             return;
         }
-        if (this.playerShip) {
-            if (flightState.isActive) {
-                this.hasEnteredFlightMode = true;
-            } else if (this.hasEnteredFlightMode) {
-                this.finishFailed('You exited flight mode.');
-                return;
-            }
-        }
+        // if (this.playerShip) {
+        //     if (flightState.isActive) {
+        //         this.hasEnteredFlightMode = true;
+        //     } else if (this.hasEnteredFlightMode) {
+        //         this.finishFailed('You exited flight mode.');
+        //         return;
+        //     }
+        // }
 
         // Paused: hold every timer and leave outcomes for the next running frame.
         if (simDt <= 0) return;

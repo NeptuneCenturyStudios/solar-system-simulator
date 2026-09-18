@@ -123,6 +123,18 @@ export interface IScenarioAudio {
 }
 
 /**
+ * UI actions a scenario can refuse while it is running. Checked at the actual
+ * mutation choke points (body create/edit/delete), not just at the button —
+ * so the keyboard Delete key is covered too. Extend this enum as new lockable
+ * actions are needed (e.g. whole-panel locks).
+ */
+export enum ScenarioLock {
+    AddBody = 'addBody',
+    EditBody = 'editBody',
+    DeleteBody = 'deleteBody',
+}
+
+/**
  * Per-frame scenario logic, driven by the scenario manager for as long as the
  * generated system is live.
  */
@@ -134,6 +146,12 @@ export interface IScenario {
      * ambient music untouched. Handled by the scenario manager, not the scenario.
      */
     readonly music?: IScenarioMusic | null;
+    /**
+     * Actions the UI should refuse while this scenario is running. Omitted/empty
+     * means nothing is locked. A scenario may mutate this array at runtime if it
+     * needs its locks to change mid-run.
+     */
+    locks?: ScenarioLock[];
     /** Called once, after the generated bodies are live in the simulation. */
     start(): void;
     /**

@@ -69,6 +69,7 @@
                     class="btn toolbar-btn"
                     type="button"
                     title="Add New Object"
+                    :disabled="addLocked"
                     @click="openBodyEditor('add', null)"
                 >
                     <span class="material-symbols-outlined">add</span>
@@ -99,7 +100,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ActivePanel, setActivePanel, vueUiState, openBodyEditor } from '../ui-store';
-import { requestRelaunch } from '../sim-bridge';
+import { isActionLocked, requestRelaunch } from '../sim-bridge';
+import { ScenarioLock } from '../../interfaces';
 import { showAboutModal } from '../about-modal-service';
 import SystemExplorer from '../components/SystemExplorer.vue';
 import FlightControls from '../components/FlightControls.vue';
@@ -110,6 +112,7 @@ import PlaylistPanel from '../components/PlaylistPanel.vue';
 import TextureGeneratorPanel from '../components/TextureGeneratorPanel.vue';
 
 const activePanel = computed(() => vueUiState.activePanel);
+const addLocked = computed(() => isActionLocked(ScenarioLock.AddBody));
 
 function openAbout(): void {
     showAboutModal();

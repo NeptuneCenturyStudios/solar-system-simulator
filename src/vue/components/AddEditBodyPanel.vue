@@ -531,13 +531,19 @@
                     </template>
 
                     <div class="button-group">
-                        <button class="old-ui btn-with-icon" type="button" @click="onApply">
+                        <button
+                            class="old-ui btn-with-icon"
+                            type="button"
+                            :disabled="editLocked"
+                            @click="onApply"
+                        >
                             <span class="material-symbols-outlined">save</span>
                             APPLY
                         </button>
                         <button
                             class="old-ui btn-with-icon btn-danger"
                             type="button"
+                            :disabled="deleteLocked"
                             @click="onDelete"
                         >
                             <span class="material-symbols-outlined">delete</span>
@@ -557,6 +563,7 @@
                         <button
                             class="old-ui btn-with-icon mb-3"
                             type="button"
+                            :disabled="addLocked"
                             @click="openBodyEditor('add', null)"
                         >
                             <span class="material-symbols-outlined">add</span>
@@ -588,8 +595,10 @@ import {
     resolveOrbitParentId,
     simStore,
 } from '../sim-bridge';
+import { isActionLocked } from '../sim-bridge';
 import type { ApplyBodyEditPayload, CreateBodyPayload } from '../sim-bridge';
 import type { IMagneticFieldOptions } from '../../interfaces';
+import { ScenarioLock } from '../../interfaces';
 import PanelBase from './PanelBase.vue';
 
 /** Floor for asteroid/comet mass and radius inputs, which run far below planetary scale. */
@@ -689,7 +698,12 @@ const orbitParentName = computed(() => {
 const canCreateMoon = computed(
     () => bodyType.value !== 'moon' || !!resolveOrbitParentId(simStore.selectedId)
 );
-const canCreate = computed(() => addMode.value === 'preset' || canCreateMoon.value);
+const canCreate = computed(
+    () => !isActionLocked(ScenarioLock.AddBody) && (addMode.value === 'preset' || canCreateMoon.value)
+);
+const addLocked = computed(() => isActionLocked(ScenarioLock.AddBody));
+const editLocked = computed(() => isActionLocked(ScenarioLock.EditBody));
+const deleteLocked = computed(() => isActionLocked(ScenarioLock.DeleteBody));
 
 // Hidden fields shouldn't silently keep a stale "on" value (mirrors the old panel forcing
 // these off when their row is hidden).

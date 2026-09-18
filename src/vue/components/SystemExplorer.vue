@@ -112,6 +112,7 @@
                         <button
                             class="icon-button"
                             title="Edit"
+                            :disabled="editLocked"
                             @click.stop="openBodyEditor('edit', body.id)"
                         >
                             <span class="material-symbols-outlined">edit</span>
@@ -154,6 +155,7 @@
             <button
                 class="old-ui btn-with-icon mb-3"
                 type="button"
+                :disabled="addLocked"
                 @click="openBodyEditor('add', null)"
             >
                 <span class="material-symbols-outlined">add</span>
@@ -208,6 +210,7 @@ import { C } from '../../utilities/consts';
 import {
     enterShipById,
     flyToBody,
+    isActionLocked,
     launchProbeMission,
     openBodyAttributes,
     selectBodyById,
@@ -224,6 +227,7 @@ import {
     zoomCameraOut,
 } from '../sim-bridge';
 import type { BodySnapshot } from '../sim-bridge';
+import { ScenarioLock } from '../../interfaces';
 import { openBodyEditor } from '../ui-store';
 import { showProbeMissionModal } from '../probe-mission-modal-service';
 import PanelBase from './PanelBase.vue';
@@ -239,6 +243,9 @@ const filteredBodies = computed<BodySnapshot[]>(() => {
 });
 
 const hasShip = computed(() => simStore.bodies.some((b) => b.isShip));
+
+const addLocked = computed(() => isActionLocked(ScenarioLock.AddBody));
+const editLocked = computed(() => isActionLocked(ScenarioLock.EditBody));
 
 async function onLaunchProbe(): Promise<void> {
     const result = await showProbeMissionModal();

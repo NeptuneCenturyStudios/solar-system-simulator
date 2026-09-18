@@ -163,6 +163,7 @@ import {
     ISolarSystemGenerationResult,
     IStateDependencies,
     ISystemLaunchOptions,
+    ScenarioLock,
 } from './interfaces';
 import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simulation/autopilot';
 import { Sun } from './bodies/sun';
@@ -3435,6 +3436,7 @@ registerVueSimHooks({
     },
 
     createBody: (payload) => {
+        if (scenarioManager.isLocked(ScenarioLock.AddBody)) return null;
         const orbitParent = payload.orbitParentId
             ? (simulationState.bodies.find(
                   (b) => b && b.id === payload.orbitParentId && !b._isDisposed
@@ -3462,6 +3464,7 @@ registerVueSimHooks({
         return body && !body._isDisposed ? body.id : null;
     },
     createPresetBody: (presetKey) => {
+        if (scenarioManager.isLocked(ScenarioLock.AddBody)) return null;
         const body = createPresetBody(presetKey);
         return body && !body._isDisposed ? body.id : null;
     },
@@ -3504,6 +3507,7 @@ registerVueSimHooks({
         return probe.id;
     },
     applyBodyEdit: (bodyId, payload) => {
+        if (scenarioManager.isLocked(ScenarioLock.EditBody)) return;
         const body = simulationState.bodies.find((b) => b && b.id === bodyId && !b._isDisposed);
         if (!body) return;
         applyBodyEditToBody(body, payload);
@@ -4120,6 +4124,7 @@ if (starDeathCheckbox) {
 function deleteSelectedBody() {
     if (!selectedBody || !simulationState.bodies.includes(selectedBody) || selectedBody._isDisposed)
         return false;
+    if (scenarioManager.isLocked(ScenarioLock.DeleteBody)) return false;
     const bodyToDelete = selectedBody;
 
     // For stars: delete immediately with NO supernova / black hole.
