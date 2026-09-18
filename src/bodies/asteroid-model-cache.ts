@@ -10,7 +10,7 @@ export interface IAsteroidModelTemplate {
     fit: IModelFit;
 }
 
-let _templatePromise: Promise<IAsteroidModelTemplate> | null = null;
+let _asteroidRockTemplatePromise: Promise<IAsteroidModelTemplate> | null = null;
 
 /**
  * Loads the shared asteroid OBJ model and its PBR textures exactly once per process and
@@ -20,10 +20,10 @@ let _templatePromise: Promise<IAsteroidModelTemplate> | null = null;
  * texture data. Every instance now clones this cached template instead.
  */
 export function loadAsteroidModelTemplate(): Promise<IAsteroidModelTemplate> {
-    if (_templatePromise) return _templatePromise;
+    if (_asteroidRockTemplatePromise) return _asteroidRockTemplatePromise;
 
     const objLoader = new OBJLoader();
-    _templatePromise = objLoader
+    _asteroidRockTemplatePromise = objLoader
         .loadAsync('./assets/models/asteroid-1/source/LPP.obj')
         .then((group) => {
             const texLoader = new THREE.TextureLoader();
@@ -70,5 +70,59 @@ export function loadAsteroidModelTemplate(): Promise<IAsteroidModelTemplate> {
             return { template: group, fit };
         });
 
-    return _templatePromise;
+    return _asteroidRockTemplatePromise;
+}
+
+let _asteroidRedTemplatePromise: Promise<IAsteroidModelTemplate> | null = null;
+
+/**
+ * Loads the red asteroid model and PBR textures anc creates a reusable template
+ */
+export function loadAsteroidRedModelTemplate(): Promise<IAsteroidModelTemplate> {
+    if (_asteroidRedTemplatePromise) return _asteroidRedTemplatePromise;
+
+    const objLoader = new OBJLoader();
+    _asteroidRedTemplatePromise = objLoader
+        .loadAsync('./assets/models/asteroid-red/source/Asteroit.obj')
+        .then((group) => {
+            const texLoader = new THREE.TextureLoader();
+            const baseColor = texLoader.load(
+                './assets/models/asteroid-red/textures/LPP_1001_BaseColor.png'
+            );
+            const roughness = texLoader.load(
+                './assets/models/asteroid-red/textures/LPP_1001_Roughness.png'
+            );
+            const normal = texLoader.load(
+                './assets/models/asteroid-red/textures/LPP_1001_Normal.png'
+            );
+
+            // Apply the shared PBR material to every sub-mesh of the template. Instances
+            // that clone this group all reference the same Material/Texture instances.
+            group.traverse((child) => {
+                if ((child as THREE.Mesh).isMesh) {
+                    const mesh = child as THREE.Mesh;
+
+                    mesh.material = new THREE.MeshStandardMaterial({
+                        map: baseColor,
+                        roughnessMap: roughness,
+                        normalMap: normal,
+                        metalness: 0.01,
+                        roughness: 1.0,
+                    });
+
+                    const mat = mesh.material as THREE.MeshStandardMaterial;
+
+                    // Correct color spaces
+                    mat.map!.colorSpace = THREE.SRGBColorSpace;
+                    mat.roughnessMap!.colorSpace = THREE.LinearSRGBColorSpace;
+                }
+            });
+
+            // Measure once, while still at identity transform and detached from any parent.
+            const fit = measureModelFit(group);
+
+            return { template: group, fit };
+        });
+
+    return _asteroidRedTemplatePromise;
 }

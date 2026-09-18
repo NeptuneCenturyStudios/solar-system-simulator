@@ -20,6 +20,7 @@
                 alx_flameniro is licensed under Creative Commons Attribution
                 <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank">CC-BY</a>.
             </div>
+            
             <div>
                 International Space Station by Poly by Google
                 <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank">CC-BY</a>
@@ -27,6 +28,20 @@
                 <a href="https://poly.pizza/m/d3Fq5H6ne8E" target="_blank"
                     >https://poly.pizza/m/d3Fq5H6ne8E</a
                 >
+            </div>
+
+            <div>
+                "Asteroid"
+                <a href="https://skfb.ly/6SzzJ" target="_blank">https://skfb.ly/6SzzJ</a> by kayra23
+                is licensed under Creative Commons Attribution-ShareAlike
+                <a href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">CC-BY</a>.
+            </div>
+
+            <div>
+                "Asteroit"
+                <a href="https://skfb.ly/6S8nG" target="_blank">https://skfb.ly/6S8nG</a> by kayra23
+                is licensed under Creative Commons Attribution-ShareAlike
+                <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank">CC-BY</a>.
             </div>
 
             <div>

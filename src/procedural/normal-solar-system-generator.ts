@@ -74,6 +74,7 @@ import type {
     ProceduralGenerationReporter,
     ProceduralGenerationWorkUnit,
 } from './procedural-generation-progress';
+import { AsteroidRed } from '../bodies/asteroid-red';
 
 export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
@@ -317,7 +318,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             SUN_MASS,
             hygieaAngle
         );
-        const hygiea = new Asteroid(this.dependencies, this.scene, {
+        const hygiea = new AsteroidRed(this.dependencies, this.scene, {
             radius: HYGIEA_RADIUS,
             pos: new THREE.Vector3(
                 hygieaTrajectory.pos.x,
@@ -337,7 +338,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 soilComposition: {
                     value:
                         SoilCompositionEnum.Carbon |
-                        SoilCompositionEnum.Silicates |
+                        SoilCompositionEnum.Iron |
+                        SoilCompositionEnum.IronOxide | 
                         SoilCompositionEnum.WaterIce,
                     discovered: true,
                 },
