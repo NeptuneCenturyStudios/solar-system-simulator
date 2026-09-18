@@ -78,8 +78,7 @@ export class Asteroid extends CelestialBody {
                             metalnessMap: metallic,
                             roughnessMap: roughness,
                             normalMap: normal,
-
-                            metalness: 1.0,
+                            metalness: 0.01,
                             roughness: 1.0,
                         });
 
@@ -88,7 +87,7 @@ export class Asteroid extends CelestialBody {
                         // Correct color spaces
                         mat.map!.colorSpace = THREE.SRGBColorSpace;
                         mat.metalnessMap!.colorSpace = THREE.LinearSRGBColorSpace;
-                        mat.roughnessMap!.colorSpace = THREE.LinearSRGBColorSpace;
+                        mat.roughnessMap!.colorSpace = THREE.LinearSRGBColorSpace;                        
 
                         // Raycasting tag
                         mesh.userData.parentBody = this;

@@ -240,6 +240,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuff
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 renderer.domElement.classList.add('webgl-canvas');
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const lensingEffect = new GravitationalLensingEffect(renderer);
 
