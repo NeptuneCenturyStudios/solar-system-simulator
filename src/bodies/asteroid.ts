@@ -49,33 +49,62 @@ export class Asteroid extends CelestialBody {
             BodyTypeEnum.Asteroid
         );
 
-        // Async OBJ + MTL load for Asteroid model
-        const mtlLoader = new MTLLoader();
-        mtlLoader.setPath('./assets/models/');
-        mtlLoader
-            .loadAsync('Asteroid.mtl')
-            .then((materials) => {
-                materials.preload();
-                const objLoader = new OBJLoader();
-                objLoader.setMaterials(materials);
-                return objLoader.loadAsync('./assets/models/Asteroid.obj');
-            })
+        // Async OBJ load for Asteroid model (no MTL — we apply PBR manually)
+        const objLoader = new OBJLoader();
+        objLoader
+            .loadAsync('./assets/models/asteroid-1/source/LPP.obj')
             .then((group) => {
-                // Measure while still detached, then fit to the instance's current radius.
-                // Keeping the measurement lets setRadius re-fit the model later.
+                // Load PBR textures
+                const texLoader = new THREE.TextureLoader();
+                const baseColor = texLoader.load(
+                    './assets/models/asteroid-1/textures/LPP_1001_BaseColor.png'
+                );
+                const metallic = texLoader.load(
+                    './assets/models/asteroid-1/textures/LPP_1001_Metallic.png'
+                );
+                const roughness = texLoader.load(
+                    './assets/models/asteroid-1/textures/LPP_1001_Roughness.png'
+                );
+                const normal = texLoader.load(
+                    './assets/models/asteroid-1/textures/LPP_1001_Normal.png'
+                );
+
+                // Apply PBR material to all meshes
+                group.traverse((child) => {
+                    if ((child as THREE.Mesh).isMesh) {
+                        const mesh = child as THREE.Mesh;
+
+                        mesh.material = new THREE.MeshStandardMaterial({
+                            map: baseColor,
+                            metalnessMap: metallic,
+                            roughnessMap: roughness,
+                            normalMap: normal,
+
+                            metalness: 1.0,
+                            roughness: 1.0,
+                        });
+
+                        const mat = mesh.material as THREE.MeshStandardMaterial;
+
+                        // Correct color spaces
+                        mat.map!.colorSpace = THREE.SRGBColorSpace;
+                        mat.metalnessMap!.colorSpace = THREE.LinearSRGBColorSpace;
+                        mat.roughnessMap!.colorSpace = THREE.LinearSRGBColorSpace;
+
+                        // Raycasting tag
+                        mesh.userData.parentBody = this;
+                    }
+                });
+
+                // Measure & fit model
                 this.modelGroup = group;
                 this.modelFit = measureModelFit(group);
                 applyModelFit(group, this.modelFit, this.radius);
 
-                // Tag every loaded sub-mesh so click-picking resolves to this body.
-                // The base Body tags only the placeholder mesh; without this the
-                // raycaster hits an untagged OBJ child and selection silently fails.
-                group.traverse((child) => (child.userData.parentBody = this));
-
                 this.mesh.add(group);
             })
             .catch((e) => {
-                console.warn('Asteroid OBJ/MTL load failed — using placeholder mesh', e);
+                console.warn('Asteroid OBJ load failed — using placeholder mesh', e);
             });
 
         // When no explicit rotation was provided, randomize a tumbling axis and speed.
