@@ -251,16 +251,31 @@ export class BoltWeapon extends Weapon {
                 const ocY = body.mesh.position.y - originY;
                 const ocZ = body.mesh.position.z - originZ;
                 const tca = ocX * dirX + ocY * dirY + ocZ * dirZ;
-                if (tca < 0 || tca > hitT) continue;
 
+                // Squared distance from the target's centre to the ray itself (not to the
+                // pre-move origin) — valid regardless of where tca falls relative to hitT.
                 const d2 = ocX * ocX + ocY * ocY + ocZ * ocZ - tca * tca;
                 const r = body.radius;
-                if (d2 <= r * r) {
-                    const tHit = tca - Math.sqrt(r * r - d2);
-                    if (tHit >= 0 && tHit < hitT) {
-                        hitT = tHit;
-                        hitBody = body;
-                    }
+                if (d2 > r * r) continue; // ray never comes within r of the centre at any t
+
+                // Entry/exit distances along the ray. For small radii (ships) tEntry ≈ tca,
+                // so gating on tca alone (the old approach) was a harmless approximation —
+                // but for radii comparable to or larger than a frame's travel distance
+                // (planets, moons, most asteroids) tEntry can be well inside [0, hitT] while
+                // tca itself is still far outside it, which silently skipped the body for
+                // several frames until the bolt had already tunnelled past or into it.
+                const thc = Math.sqrt(r * r - d2);
+                const tExit = tca + thc;
+                if (tExit < 0) continue; // sphere is entirely behind the ray origin
+
+                // If the origin is already inside the sphere (tEntry < 0), the segment starts
+                // inside the target — an immediate hit at t = 0 rather than a rejected one.
+                const tEntry = tca - thc;
+                const tHitCandidate = tEntry < 0 ? 0 : tEntry;
+
+                if (tHitCandidate < hitT) {
+                    hitT = tHitCandidate;
+                    hitBody = body;
                 }
             }
 

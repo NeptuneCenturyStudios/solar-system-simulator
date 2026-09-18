@@ -292,16 +292,27 @@ export class LaserWeapon extends Weapon {
             const ocY = body.mesh.position.y - this.curOrigin.y;
             const ocZ = body.mesh.position.z - this.curOrigin.z;
             const tca = ocX * this.direction.x + ocY * this.direction.y + ocZ * this.direction.z;
-            if (tca < 0 || tca > hitT) continue;
 
+            // Squared distance from the target's centre to the ray itself (not to the
+            // origin) — valid regardless of where tca falls relative to hitT. Gating on
+            // tca alone (as before) is only a safe approximation when radius is small next
+            // to the ray's range; for large bodies the true entry point can sit well inside
+            // [0, hitT] while tca reads as out of range, silently skipping the hit.
             const d2 = ocX * ocX + ocY * ocY + ocZ * ocZ - tca * tca;
             const r = body.radius;
-            if (d2 <= r * r) {
-                const tHit = tca - Math.sqrt(r * r - d2);
-                if (tHit >= 0 && tHit < hitT) {
-                    hitT = tHit;
-                    hitBody = body;
-                }
+            if (d2 > r * r) continue; // ray never comes within r of the centre at any t
+
+            const thc = Math.sqrt(r * r - d2);
+            const tExit = tca + thc;
+            if (tExit < 0) continue; // sphere is entirely behind the ray origin
+
+            // Origin already inside the sphere (tEntry < 0) is an immediate hit at t = 0.
+            const tEntry = tca - thc;
+            const tHitCandidate = tEntry < 0 ? 0 : tEntry;
+
+            if (tHitCandidate < hitT) {
+                hitT = tHitCandidate;
+                hitBody = body;
             }
         }
 

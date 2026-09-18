@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
 import { CelestialBody } from './celestial-body';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces.js';
+import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces.js';
 import { BodyTypeEnum } from './body-enums';
-import { applyModelFit, measureModelFit, type IModelFit } from './model-fit';
+import { applyModelFit, type IModelFit } from './model-fit';
+import { loadAsteroidModelTemplate } from './asteroid-model-cache';
 
 export class Asteroid extends CelestialBody {
     /** Loaded OBJ model, re-fitted whenever the radius changes. Null until the load resolves. */
@@ -48,55 +48,25 @@ export class Asteroid extends CelestialBody {
             BodyTypeEnum.Asteroid
         );
 
-        // Async OBJ load for Asteroid model (no MTL — we apply PBR manually)
-        const objLoader = new OBJLoader();
-        objLoader
-            .loadAsync('./assets/models/asteroid-1/source/LPP.obj')
-            .then((group) => {
-                // Load PBR textures
-                const texLoader = new THREE.TextureLoader();
-                const baseColor = texLoader.load(
-                    './assets/models/asteroid-1/textures/LPP_1001_BaseColor.png'
-                );
-                const metallic = texLoader.load(
-                    './assets/models/asteroid-1/textures/LPP_1001_Metallic.png'
-                );
-                const roughness = texLoader.load(
-                    './assets/models/asteroid-1/textures/LPP_1001_Roughness.png'
-                );
-                const normal = texLoader.load(
-                    './assets/models/asteroid-1/textures/LPP_1001_Normal.png'
-                );
+        // Model + PBR textures are loaded once and cached for the process lifetime; every
+        // instance clones the shared template instead of re-downloading/decoding textures.
+        loadAsteroidModelTemplate()
+            .then(({ template, fit }) => {
+                // clone() shares the template's geometry/material/texture GPU resources and
+                // only forks the lightweight transform, so this is cheap per instance.
+                const group = template.clone();
 
-                // Apply PBR material to all meshes
+                // Tag every loaded sub-mesh so click-picking resolves to this body.
+                // The base Body tags only the placeholder mesh; without this the
+                // raycaster hits an untagged OBJ child and selection silently fails.
                 group.traverse((child) => {
                     if ((child as THREE.Mesh).isMesh) {
-                        const mesh = child as THREE.Mesh;
-
-                        mesh.material = new THREE.MeshStandardMaterial({
-                            map: baseColor,
-                            metalnessMap: metallic,
-                            roughnessMap: roughness,
-                            normalMap: normal,
-                            metalness: 0.01,
-                            roughness: 1.0,
-                        });
-
-                        const mat = mesh.material as THREE.MeshStandardMaterial;
-
-                        // Correct color spaces
-                        mat.map!.colorSpace = THREE.SRGBColorSpace;
-                        mat.metalnessMap!.colorSpace = THREE.LinearSRGBColorSpace;
-                        mat.roughnessMap!.colorSpace = THREE.LinearSRGBColorSpace;                        
-
-                        // Raycasting tag
-                        mesh.userData.parentBody = this;
+                        child.userData.parentBody = this;
                     }
                 });
 
-                // Measure & fit model
                 this.modelGroup = group;
-                this.modelFit = measureModelFit(group);
+                this.modelFit = fit;
                 applyModelFit(group, this.modelFit, this.radius);
 
                 this.mesh.add(group);
@@ -135,5 +105,19 @@ export class Asteroid extends CelestialBody {
         if (this.modelGroup && this.modelFit) {
             applyModelFit(this.modelGroup, this.modelFit, newRadius);
         }
+    }
+
+    /**
+     * The OBJ model's geometry/materials/textures are shared (via clone()) across every
+     * Asteroid instance — see asteroid-model-cache.ts. Body.die() disposes every mesh under
+     * this.mesh, which would destroy those shared GPU resources for every other asteroid
+     * still on screen. Detach the clone first so only this asteroid's own (unshared)
+     * placeholder geometry/material gets disposed.
+     */
+    override die(deathOptions?: IDeathOptions): void {
+        if (this.modelGroup) {
+            this.mesh.remove(this.modelGroup);
+        }
+        super.die(deathOptions);
     }
 }
