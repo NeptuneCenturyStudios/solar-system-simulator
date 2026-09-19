@@ -80,10 +80,10 @@ export class BoltWeapon extends Weapon {
 
         /** Class-level defaults — a ship wanting different behaviour passes a partial IBoltWeaponConfig. */
         const DEFAULT_BOLT_CONFIG: IBoltWeaponConfig = {
-            baseSpeed: 16000 / DIST_SCALE, // 16,000 km/s
-            particleLifetime: 8.0,
+            baseSpeed: 6000 / DIST_SCALE, // 8,000 km/s
+            particleLifetime: 4.0,
             boltColor: 0x00eeff,
-            boltHeadSize: 100 / RADIUS_SCALE,
+            boltHeadSize: 60 / RADIUS_SCALE,
             fireRate: 12,
             maxProjectiles: 800,
             damage: 1,
