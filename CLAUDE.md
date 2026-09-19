@@ -118,7 +118,7 @@ src/
 - [x] Phase 3.2: Add new probe mission UI modal to select a celestial target where the probe will fly to and gather data. This will mostly be benificial for procedural systems but will work for any system.
 - [x] Phase 3.3: Add a new UI scene display (or use the name box) to display planetary attributes that are discovered by probes, or ones that are known already in the normal solar system
 - **Phase 4**
-- [ ] Phase 4: Scenario updates. Add ability for a scenario to disable certain UI features like System Explorer or Flight Control panel or disable operations like delete a body while the scenario is running.
+- [x] Phase 4: Scenario updates. Add ability for a scenario to disable certain UI features like System Explorer or Flight Control panel or disable operations like delete a body while the scenario is running.
 - **Phase 5**
 - [ ] Phase 5: New scenario. Defend Earth from an onslaught of ~100 (to be adjusted) ELEs comprised of asteroids and comets. User will get to use the Osiris to take them all down before Earth is destroyed.
 - **Phase 6 - Fixes and adjustments**

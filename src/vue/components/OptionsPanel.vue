@@ -65,6 +65,16 @@
                 />
             </div>
 
+            <div class="vue-ui-card-header">Camera</div>
+            <label class="checkbox-row">
+                <input
+                    type="checkbox"
+                    :checked="simStore.smoothZoomEnabled"
+                    @change="onSmoothZoomChange"
+                />
+                Smooth Zoom
+            </label>
+
             <div class="vue-ui-card-header">Physics</div>
             <div class="control-group">
                 <label>Gravity Solver</label>
@@ -199,6 +209,7 @@ import {
     setPhysicsSolver,
     setSfxVolume,
     setShowAiDebug,
+    setSmoothZoomEnabled,
     setSubsteps,
     simStore,
 } from '../sim-bridge';
@@ -249,6 +260,10 @@ function onAuroraDetailChange(e: Event): void {
 
 function onShowAiDebugChange(e: Event): void {
     setShowAiDebug((e.target as HTMLInputElement).checked);
+}
+
+function onSmoothZoomChange(e: Event): void {
+    setSmoothZoomEnabled((e.target as HTMLInputElement).checked);
 }
 
 function onSubstepsInput(e: Event): void {

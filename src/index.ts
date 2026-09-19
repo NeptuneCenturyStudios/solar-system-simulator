@@ -70,6 +70,9 @@ import {
     SCENARIO_OUTCOME_MODAL_DELAY_MS,
     PROBE_MASS,
     PROBE_RADIUS,
+    SMOOTH_ZOOM_DECAY_RATE,
+    SMOOTH_ZOOM_DIST_EPSILON,
+    SMOOTH_ZOOM_FREE_CAM_STOP_MULT,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -3126,6 +3129,9 @@ registerVueSimHooks({
     setLensflareEnabled: (checked: boolean) => {
         settingsStore.update(SettingKey.LensflareEnabled, checked);
     },
+    setSmoothZoomEnabled: (checked: boolean) => {
+        settingsStore.update(SettingKey.SmoothZoomEnabled, checked);
+    },
     setShowAiDebug: (checked: boolean) => {
         settingsStore.update(SettingKey.ShowAiDebug, checked);
         aiAvoidanceGizmo.setVisible(checked);
@@ -3196,7 +3202,60 @@ if (vueUiRoot) {
 // NOTE: Preset camera buttons were removed from the UI (replaced with toggles + bodies table).
 // The old `cameraChange` event path is intentionally removed to reduce dead code.
 
+// Resolves the world-space pivot a zoom (or the smooth-zoom easing step) operates
+// around: a live Body's position, or the frozen focus / scene center fallback.
+// Shared by zoomRelativeToTarget and stepSmoothZoom so they can't drift apart.
+// Returns a live reference (not a clone) — callers must not mutate it.
+function resolveZoomPivotPosition(target: Body | null): THREE.Vector3 {
+    // target=null means "zoom around scene center" (used when Look At is OFF).
+    // When Look At is ON but the focused body was destroyed, zoom around the
+    // frozen position instead of snapping back to the scene center.
+    return target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
+        ? target.mesh.position
+        : cameraState.isLookAtMode && cameraState.frozenFocusPosition
+          ? cameraState.frozenFocusPosition
+          : NONE_FOCUS_POSITION;
+}
+
+// Computes the [zoomInLimit, zoomOutLimit] distance bounds for orbiting `target`,
+// given `referenceDist` as "current distance" for the don't-push-outward-if-
+// already-closer-than-safe rule. Shared by the instant zoom path and the
+// per-frame smooth-zoom easing step (which recomputes this every eased frame in
+// case the pivot is moving).
+function computeZoomDistanceLimits(target: Body | null, referenceDist: number) {
+    const targetDistance =
+        target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
+            ? target.mesh.position.length()
+            : 0;
+    const zoomOutLimit = Math.min(
+        MAX_CAMERA_VIEW_DISTANCE,
+        Math.max(
+            targetDistance * 2,
+            targetDistance + 5_000_000_000 / DIST_SCALE,
+            MAX_ZOOM_OUT_DISTANCE
+        )
+    );
+
+    // Never let zoom collapse the camera into the pivot. When there's a real
+    // body, keep the camera just outside its surface; when orbiting the scene
+    // center (no target), keep it outside the central star; otherwise fall back
+    // to a small near-plane floor. If the camera is already closer than the
+    // safe floor (e.g. it got there by flying), don't push it outward — just
+    // stop the zoom-in.
+    const primaryStar = getPrimaryStar();
+    const starRadius = primaryStar?.radius || 0;
+    const minSafeDist = Math.max(
+        target && target.radius ? target.radius * 1.5 : starRadius * 1.5,
+        camera.near * 100
+    );
+    const zoomInLimit = Math.min(referenceDist, minSafeDist);
+
+    return { zoomInLimit, zoomOutLimit };
+}
+
 function zoomRelativeToTarget(target: Body | null, factor: number) {
+    const smooth = settingsStore.settings.smoothZoomEnabled;
+
     // Free camera: there is no orbit target, so the wheel should dolly along the
     // camera's own view direction. The step scales with the distance from the
     // camera to the nearest body surface (falling back to the distance to the
@@ -3219,56 +3278,52 @@ function zoomRelativeToTarget(target: Body | null, factor: number) {
             ? nearestSurfaceDist
             : Math.max(camera.position.length(), SUN_RADIUS * 2);
 
-        camera.position.addScaledVector(forward, base * (1 - factor));
+        const delta = forward.multiplyScalar(base * (1 - factor));
+
+        if (!smooth) {
+            camera.position.add(delta);
+            cameraState.pendingFreeCamZoom = null;
+            return;
+        }
+        cameraState.pendingFreeCamZoom = cameraState.pendingFreeCamZoom
+            ? cameraState.pendingFreeCamZoom.add(delta)
+            : delta.clone();
         return;
     }
 
-    // target=null means "zoom around scene center" (used when Look At is OFF).
-    // When Look At is ON but the focused body was destroyed, zoom around the
-    // frozen position instead of snapping back to the scene center.
-    const targetPos =
-        target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
-            ? target.mesh.position
-            : cameraState.isLookAtMode && cameraState.frozenFocusPosition
-              ? cameraState.frozenFocusPosition
-              : NONE_FOCUS_POSITION;
+    const targetPos = resolveZoomPivotPosition(target);
 
     // Direction from target -> camera
     const dir = new THREE.Vector3().subVectors(camera.position, targetPos);
-    const currentDist = dir.length();
-    if (currentDist < 1e-9) return; // camera already at the pivot; nothing to zoom
+    const liveDist = dir.length();
+
+    // Chain off the pending target distance when a new zoom request arrives for
+    // the SAME pivot while a previous one is still easing in, so rapid wheel
+    // notches accumulate responsively instead of each computing against a stale,
+    // not-yet-arrived position.
+    const samePivotPending =
+        smooth && cameraState.targetZoomDistance !== null && cameraState.zoomPivotBody === target;
+
+    if (liveDist < 1e-9 && !samePivotPending) return; // camera already at the pivot; nothing to zoom
     dir.normalize();
 
-    const maxDist = MAX_ZOOM_OUT_DISTANCE;
-    const targetDistance =
-        target && simulationState.bodies.includes(target) && !target._isDisposed && target.mesh
-            ? target.mesh.position.length()
-            : 0;
-    const farLimit = Math.min(
-        MAX_CAMERA_VIEW_DISTANCE,
-        Math.max(targetDistance * 2, targetDistance + 5_000_000_000 / DIST_SCALE, maxDist)
-    );
+    const baseDist = samePivotPending ? (cameraState.targetZoomDistance as number) : liveDist;
+    const { zoomInLimit, zoomOutLimit } = computeZoomDistanceLimits(target, baseDist);
+    const newDist = THREE.MathUtils.clamp(baseDist * factor, zoomInLimit, zoomOutLimit);
 
-    // Never let zoom collapse the camera into the pivot. When there's a real
-    // body, keep the camera just outside its surface; when orbiting the scene
-    // center (no target), keep it outside the central star; otherwise fall back
-    // to a small near-plane floor. If the camera is already closer than the
-    // safe floor (e.g. it got there by flying), don't push it outward — just
-    // stop the zoom-in.
-    const primaryStar = getPrimaryStar();
-    const starRadius = primaryStar?.radius || 0;
-    const minSafeDist = Math.max(
-        target && target.radius ? target.radius * 1.5 : starRadius * 1.5,
-        camera.near * 100
-    );
-    const zoomInLimit = Math.min(currentDist, minSafeDist);
-    const zoomOutLimit = farLimit;
+    if (!smooth) {
+        camera.position.copy(targetPos).add(dir.multiplyScalar(newDist));
+        // When Look At is OFF, keep orbit controls anchored to the center.
+        controls.target.copy(targetPos);
+        cameraState.targetZoomDistance = null;
+        cameraState.zoomPivotBody = null;
+        return;
+    }
 
-    const newDist = THREE.MathUtils.clamp(currentDist * factor, zoomInLimit, zoomOutLimit);
-    camera.position.copy(targetPos).add(dir.multiplyScalar(newDist));
-
-    // When Look At is OFF, keep orbit controls anchored to the center.
-    controls.target.copy(targetPos);
+    cameraState.targetZoomDistance = newDist;
+    cameraState.zoomPivotBody = target;
+    // camera.position/controls.target are deliberately left untouched here —
+    // stepSmoothZoom() eases toward newDist on subsequent frames.
 }
 
 function getZoomTarget() {
@@ -3278,6 +3333,78 @@ function getZoomTarget() {
 
     // Look-at ON: zoom relative to the current focus body
     return getFocusObject();
+}
+
+// Per-frame easing for Smooth Zoom; called once per rendered frame from
+// animation-loop.ts's animate() via AnimationContext.stepSmoothZoom. Free camera,
+// surface mode, and flight mode all own the camera transform outright while
+// active (mirrors the guard on the camera-follow block in animation-loop.ts) —
+// any zoom that arrives while one of them is active is dropped rather than
+// queued, so it can't resume later against a stale pivot.
+function stepSmoothZoom(
+    isSurfaceModeActive: boolean,
+    isFlightModeActive: boolean,
+    wallDt: number
+): void {
+    // Framerate-independent blend factor: the fraction of the remaining distance
+    // covered THIS frame, derived from wall-clock time elapsed rather than a flat
+    // per-frame constant. This keeps the ease's real-world duration constant
+    // whether the frame took 6ms (165fps) or 16ms (60fps) — a flat per-frame
+    // factor would instead converge in a fixed number of frames, so it looked
+    // near-instant at high refresh rates and slow-motion at low ones.
+    const blend = 1 - Math.exp(-SMOOTH_ZOOM_DECAY_RATE * wallDt);
+
+    if (cameraState.targetZoomDistance !== null) {
+        if (cameraState.isFreeCameraMode || isSurfaceModeActive || isFlightModeActive) {
+            cameraState.targetZoomDistance = null;
+            cameraState.zoomPivotBody = null;
+        } else {
+            const targetPos = resolveZoomPivotPosition(cameraState.zoomPivotBody);
+            const dir = new THREE.Vector3().subVectors(camera.position, targetPos);
+            let dist = dir.length();
+            if (dist < 1e-9) {
+                dir.set(0, 0, 1);
+                dist = 0;
+            } else {
+                dir.normalize();
+            }
+
+            const targetDist = cameraState.targetZoomDistance;
+            dist += (targetDist - dist) * blend;
+
+            // Re-clamp every eased frame: the pivot may be a moving body, so the
+            // bounds are cheap to recompute and keep the animation honest even if
+            // the pivot's distance-from-origin changes mid-animation.
+            const { zoomInLimit, zoomOutLimit } = computeZoomDistanceLimits(
+                cameraState.zoomPivotBody,
+                dist
+            );
+            dist = THREE.MathUtils.clamp(dist, zoomInLimit, zoomOutLimit);
+
+            camera.position.copy(targetPos).add(dir.multiplyScalar(dist));
+            controls.target.copy(targetPos);
+
+            if (Math.abs(dist - targetDist) < targetDist * SMOOTH_ZOOM_DIST_EPSILON) {
+                cameraState.targetZoomDistance = null;
+                cameraState.zoomPivotBody = null;
+            }
+        }
+    }
+
+    if (cameraState.pendingFreeCamZoom) {
+        if (!cameraState.isFreeCameraMode) {
+            cameraState.pendingFreeCamZoom = null;
+        } else {
+            const step = cameraState.pendingFreeCamZoom.clone().multiplyScalar(blend);
+            camera.position.add(step);
+            cameraState.pendingFreeCamZoom.sub(step);
+
+            const stopEps = camera.near * SMOOTH_ZOOM_FREE_CAM_STOP_MULT;
+            if (cameraState.pendingFreeCamZoom.lengthSq() < stopEps * stopEps) {
+                cameraState.pendingFreeCamZoom = null;
+            }
+        }
+    }
 }
 
 // --- Surface camera / player rig ---
@@ -5004,6 +5131,7 @@ const animCtx: AnimationContext = {
     cancelAutopilot: (message?: string) => cancelAutopilot(autopilotCtx, message),
     engageAutopilot: (target: Body) => engageAutopilot(autopilotCtx, target),
     triggerZoomToBody,
+    stepSmoothZoom,
 };
 
 runAnimationLoop(animCtx, flightCtx);

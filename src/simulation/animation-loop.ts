@@ -150,6 +150,12 @@ export interface AnimationContext {
     cancelAutopilot: (message?: string) => void;
     engageAutopilot: (target: Body) => void;
     triggerZoomToBody: (body: Body | null) => void;
+    /** Per-frame Smooth Zoom easing step; owns all zoom math (lives in index.ts). */
+    stepSmoothZoom: (
+        isSurfaceModeActive: boolean,
+        isFlightModeActive: boolean,
+        wallDt: number
+    ) => void;
 }
 
 // Scratch vectors for updateShipTrail (called once per ship per frame).
@@ -1050,6 +1056,12 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 ctx.controls.target.copy(ctx.NONE_FOCUS_POSITION);
             }
         }
+        // ── Smooth zoom easing ───────────────────────────────────────────────
+        // Runs after the follow block above (which tracked pivot movement this
+        // frame) and before the controls.update() below, so this frame's eased
+        // position/target is what controls.update() finalizes.
+        ctx.stepSmoothZoom(isSurfaceModeActive, isFlightModeActive, wallDt);
+
         if (!isSurfaceModeActive && !cameraState.isFreeCameraMode && !isFlightModeActive)
             ctx.controls.update();
 

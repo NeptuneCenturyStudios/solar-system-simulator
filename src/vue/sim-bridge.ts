@@ -263,6 +263,8 @@ export interface VueSimHooks {
     setFrameRateLimit?: (value: number) => void;
     /** Toggle the ship-AI obstacle avoidance debug overlay (persisted via settingsStore). */
     setShowAiDebug?: (checked: boolean) => void;
+    /** Toggle eased/smooth camera zoom vs. instant (persisted via settingsStore). */
+    setSmoothZoomEnabled?: (checked: boolean) => void;
 
     // ── Playlist (same sim paths as the old playlist panel) ─────────────────
     /** Snapshot of the shuffled playlist + current playback state. */
@@ -348,6 +350,8 @@ export interface VueSimStore {
     frameRateLimit: number;
     /** Draw the ship-AI obstacle avoidance debug overlay. */
     showAiDebug: boolean;
+    /** Ease camera zoom instead of snapping instantly. */
+    smoothZoomEnabled: boolean;
 
     /** Id of the autopilot target body, or null when autopilot is off. */
     autopilotTargetId: string | null;
@@ -400,6 +404,7 @@ const state = reactive<VueSimStore>({
     musicVolumePercent: Math.round(settingsStore.settings.musicVolume * 100),
     frameRateLimit: settingsStore.settings.frameRateLimit,
     showAiDebug: settingsStore.settings.showAiDebug,
+    smoothZoomEnabled: settingsStore.settings.smoothZoomEnabled,
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
@@ -909,6 +914,16 @@ export function setLensflareEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.LensflareEnabled, checked);
     }
     state.lensflareEnabled = checked;
+}
+
+/** Toggle eased/smooth camera zoom (Options panel). */
+export function setSmoothZoomEnabled(checked: boolean): void {
+    if (hookRegistry.setSmoothZoomEnabled) {
+        hookRegistry.setSmoothZoomEnabled(checked);
+    } else {
+        settingsStore.update(SettingKey.SmoothZoomEnabled, checked);
+    }
+    state.smoothZoomEnabled = checked;
 }
 
 /** Toggle polar aurorae. */

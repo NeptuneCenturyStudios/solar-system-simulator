@@ -13,6 +13,7 @@ export const enum SettingKey {
     ShowAiDebug = 'showAiDebug',
     PhysicsSolver = 'physicsSolver',
     BarnesHutTheta = 'barnesHutTheta',
+    SmoothZoomEnabled = 'smoothZoomEnabled',
 }
 
 /**
@@ -56,6 +57,8 @@ export interface SpaceSimSettings {
     physicsSolver: PhysicsSolverMode;
     /** Barnes-Hut opening angle. Lower is more accurate and slower. Ignored by other solvers. */
     barnesHutTheta: number;
+    /** Ease camera zoom (wheel + System Explorer buttons) instead of snapping instantly. */
+    smoothZoomEnabled: boolean;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -74,6 +77,7 @@ const defaultSettings: SpaceSimSettings = {
     // when every body has comparable mass — so it is safe as the default in any scenario.
     physicsSolver: 'cutoff',
     barnesHutTheta: 0.5,
+    smoothZoomEnabled: true,
 };
 
 class SettingsStore {

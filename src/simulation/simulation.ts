@@ -134,6 +134,9 @@ export const cameraState: ICameraState = {
     },
     arrowKeys: { left: false, right: false, up: false, down: false },
     pendingCollisionFocusBody: null as Body | null,
+    targetZoomDistance: null as number | null,
+    zoomPivotBody: null as Body | null,
+    pendingFreeCamZoom: null as THREE.Vector3 | null,
 };
 
 /**

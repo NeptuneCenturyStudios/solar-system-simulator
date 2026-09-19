@@ -356,6 +356,32 @@ export const BASE_FRAME_DT = 0.016;
 export const MAX_SUBSTEPS_PER_FRAME = 512;
 /** EMA factor (0-1) used to smooth measured frame delta; higher reacts faster but lets more raw rAF jitter through. */
 export const WALL_DT_SMOOTHING = 0.08;
+/**
+ * Exponential decay rate (1/sec) used to ease the camera toward a pending Smooth
+ * Zoom target — either an orbit-mode target distance from the pivot, or a
+ * free-camera dolly delta. Unlike WALL_DT_SMOOTHING, this IS framerate-
+ * independent: each frame's blend factor is `1 - exp(-SMOOTH_ZOOM_DECAY_RATE *
+ * wallDt)`, so the animation covers the same distance over the same wall-clock
+ * time regardless of refresh rate (a fixed per-frame factor would instead finish
+ * in the same number of frames, making it snap almost instantly at high FPS and
+ * crawl in slow motion at low FPS). 8.5 reduces the remaining distance by ~95%
+ * every ~350ms — tuned snappy, not a slow cinematic glide.
+ */
+export const SMOOTH_ZOOM_DECAY_RATE = 8.5;
+/**
+ * Orbit-mode Smooth Zoom: once the live distance is within this fraction of the
+ * pending target distance, snap to it exactly and clear the pending zoom instead
+ * of asymptotically crawling toward it forever.
+ */
+export const SMOOTH_ZOOM_DIST_EPSILON = 0.001;
+/**
+ * Free-camera-mode Smooth Zoom (dolly): once the remaining pending translation's
+ * length drops below `camera.near * SMOOTH_ZOOM_FREE_CAM_STOP_MULT`, snap it to
+ * zero and clear the pending zoom. Expressed as a multiple of camera.near (the
+ * codebase's existing "smallest meaningful distance" unit) so it scales sanely
+ * regardless of DIST_SCALE.
+ */
+export const SMOOTH_ZOOM_FREE_CAM_STOP_MULT = 50;
 
 // === N-body force solver ===
 /**

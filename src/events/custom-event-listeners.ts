@@ -147,6 +147,9 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         manuallySelectedBody.value = null;
         cameraState.focusBody = null;
         cameraState.frozenFocusPosition = null;
+        cameraState.targetZoomDistance = null;
+        cameraState.zoomPivotBody = null;
+        cameraState.pendingFreeCamZoom = null;
         gizmo.attach(null);
     });
 }

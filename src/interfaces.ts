@@ -609,6 +609,24 @@ export interface ICameraState {
     };
 
     pendingCollisionFocusBody: Body | null;
+
+    // Smooth Zoom (orbit mode). Non-null while an eased zoom is in flight; the
+    // per-frame step (index.ts `stepSmoothZoom`, invoked from animation-loop.ts)
+    // eases the camera's distance from the resolved pivot toward this value and
+    // clears both fields once it arrives (or once another system — free camera,
+    // surface mode, flight mode — takes over the camera transform).
+    targetZoomDistance: number | null;
+    // The `target` argument zoomRelativeToTarget was called with when this zoom
+    // began (null = scene center / frozen focus, same semantics as that
+    // parameter). Used both to re-resolve the live pivot position every eased
+    // frame and to detect "same pivot" vs. "pivot changed" on the next zoom
+    // request (same pivot chains off the pending target distance; a changed
+    // pivot restarts from the live camera distance).
+    zoomPivotBody: Body | null;
+
+    // Smooth Zoom (free-camera mode). Remaining dolly translation to apply,
+    // eased in over several frames. Null when no zoom animation is pending.
+    pendingFreeCamZoom: THREE.Vector3 | null;
 }
 
 /**
