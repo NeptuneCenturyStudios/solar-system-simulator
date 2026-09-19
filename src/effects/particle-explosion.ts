@@ -6,6 +6,10 @@ import {
     EXPLOSION_REFERENCE_IMPACT_SPEED,
     EXPLOSION_MIN_SPEED_MULTIPLIER,
     EXPLOSION_MAX_SPEED_MULTIPLIER,
+    EXPLOSION_MIN_PARTICLES,
+    EXPLOSION_MAX_PARTICLES,
+    EXPLOSION_SMALL_BODY_SPEED_CAP,
+    EXPLOSION_SMALL_BODY_SIZE_CAP,
 } from '../utilities/consts';
 
 export class ParticleExplosion implements IEffect {
@@ -44,7 +48,11 @@ export class ParticleExplosion implements IEffect {
         impactSpeed?: number
     ) {
         this.dependencies = dependencies;
-        this.count = Math.min(2000, radius * 50);
+        // Particle count scales with the body, but with a floor: `radius * 50` yields literally
+        // zero particles for a ship-sized hull, so a ship would explode into nothing at all.
+        this.count = Math.round(
+            THREE.MathUtils.clamp(radius * 50, EXPLOSION_MIN_PARTICLES, EXPLOSION_MAX_PARTICLES)
+        );
         this.geometry = new THREE.BufferGeometry();
         this.positions = new Float32Array(this.count * 3);
         this.worldPositions = new Float64Array(this.count * 3);
@@ -71,6 +79,14 @@ export class ParticleExplosion implements IEffect {
                   )
                 : 1;
 
+        // Outward speed of the blast. The 5 u/s floor is tuned for planet-scale bodies; left
+        // uncapped it would fling a destroyed ship's debris outward at 500 km/s, clearing the
+        // screen before the explosion registered. Capping it against the body's own size keeps
+        // small wrecks watchable and leaves anything planet- or asteroid-sized untouched.
+        const spreadScale =
+            Math.min(Math.max(5, radius * 0.004), radius * EXPLOSION_SMALL_BODY_SPEED_CAP) *
+            speedMultiplier;
+
         for (let i = 0; i < this.count; i++) {
             // Spawn particles on the planet's surface
             const dir = new THREE.Vector3(
@@ -92,7 +108,6 @@ export class ParticleExplosion implements IEffect {
             this.worldPositions[i * 3 + 2] = surfacePos.z;
 
             // Outward velocity bias
-            const spreadScale = Math.max(5, radius * 0.004) * speedMultiplier;
             const v = dir.clone().multiplyScalar((Math.random() * 0.8 + 0.2) * spreadScale);
 
             if (v.length() > maxSpeed) {
@@ -113,8 +128,10 @@ export class ParticleExplosion implements IEffect {
         const brightColor = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.75);
         this.material = new THREE.PointsMaterial({
             color: brightColor,
-            // Larger particles so they're visible when zoomed in close.
-            size: Math.max(10, radius * 0.02),
+            // Larger particles so they're visible when zoomed in close. Capped against the body
+            // for the same reason as the speed above — the 10 u floor is a 1,000 km sprite, which
+            // on a ship-sized wreck is a screen-filling blob rather than an explosion.
+            size: Math.min(Math.max(10, radius * 0.02), radius * EXPLOSION_SMALL_BODY_SIZE_CAP),
             transparent: true,
             blending: THREE.AdditiveBlending,
             opacity: 1.5,
@@ -205,7 +222,6 @@ export class ParticleExplosion implements IEffect {
             this.debris.push(chunk);
 
             // Debris velocity (slower than particles)
-            const spreadScale = Math.max(5, radius * 0.004) * speedMultiplier;
             const dv = dir.clone().multiplyScalar((Math.random() * 0.4 + 0.1) * spreadScale);
 
             if (dv.length() > maxSpeed) dv.setLength(maxSpeed);

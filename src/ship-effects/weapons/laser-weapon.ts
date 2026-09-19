@@ -5,7 +5,7 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Body } from '../../bodies/body';
 import { LoopSoundController, SoundEffect, playSoundEffect } from '../../utilities/audio.js';
 import { C } from '../../utilities/consts.js';
-import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
+import { IWeaponOwner, IWeaponSound, Weapon, muzzleWorldPosition } from './weapon';
 
 const LASER_FLICKER_FREQ_A = 9.1; // rad/s — incommensurate with B for non-repeating shimmer
 const LASER_FLICKER_FREQ_B = 17.3;
@@ -99,9 +99,9 @@ export class LaserWeapon extends Weapon {
         const DEFAULT_LASER_CONFIG: ILaserWeaponConfig = {
             maxRange: C * 10.0,
             beamColor: 0xff2244,
-            coreWidth: 2,
-            haloWidth: 8,
-            damage: 1000,
+            coreWidth: 1,
+            haloWidth: 4,
+            damage: 2,
             damageInterval: 0.2,
             heatPerSecond: 0.25,
             coolPerSecond: 0.75,
@@ -285,10 +285,7 @@ export class LaserWeapon extends Weapon {
         // already the post-physics one — read the muzzle straight off the live
         // mesh.  No extrapolation, so the beam stays pinned to the nose under
         // thrust/boost and while steering.
-        this.curOrigin
-            .copy(owner.muzzleOffset)
-            .applyQuaternion(owner.mesh.quaternion)
-            .add(owner.mesh.position);
+        muzzleWorldPosition(owner, this.curOrigin);
 
         // ── Ray-sphere hit test along the beam ───────────────────────────
         const maxT = this.config.maxRange;

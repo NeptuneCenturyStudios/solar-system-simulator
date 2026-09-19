@@ -5,6 +5,8 @@ import { Body } from '../../bodies/body';
 import { createUniqueId } from '../../utilities/utilities';
 import { flightState, simulationState } from '../simulation';
 import { FollowShipAI } from './follow-ship-ai';
+import { applyWeaponInput } from '../ship-weapon-input';
+import type { ShipAI } from './ship-ai';
 import { settingsStore } from '../../settings/settings-store';
 import { NotificationType } from '../../event-log/event-log';
 
@@ -36,6 +38,11 @@ export interface ICreateNpcShipOptions {
     shipTypeId?: string;
     /** Display name. Defaults to the ship type's own name. */
     name?: string;
+    /**
+     * Controller factory for this ship — the pluggable-AI seam. Defaults to {@link FollowShipAI};
+     * pass a different one and the ship flies to different rules with no other change.
+     */
+    ai?: (ship: Spaceship) => ShipAI;
 }
 
 /** Add a ship to the NPC registry. Safe to call twice. */
@@ -86,9 +93,9 @@ export function createNpcShip(options: ICreateNpcShipOptions): Spaceship {
 
     if (options.name) ship.name = options.name;
 
-    // Attach the controller. This is the whole pluggable-AI seam: swap this line
-    // for a different ShipAI subclass and the ship flies to different rules.
-    ship.ai = new FollowShipAI(ship);
+    // Attach the controller. This is the whole pluggable-AI seam: pass a different factory and
+    // the ship flies to different rules, with nothing else in the pipeline aware of the change.
+    ship.ai = options.ai ? options.ai(ship) : new FollowShipAI(ship);
 
     // NPC ships keep their label visible — unlike the player's ship, which hides
     // its label so it doesn't clutter the cockpit view.
@@ -135,13 +142,23 @@ export function registerNpcShipsIn(bodies: Body[]): void {
  *   when the `showAiDebug` setting is on.
  */
 export function stepNpcShips(dt: number, simDt: number, addEvent?: NpcEventSink): void {
+    // Deliberately leaves triggers alone while paused: weapon.update() already freezes thermal
+    // decay and bolt lifetimes behind its own isPaused flag, so a ship paused mid-burst neither
+    // heats up nor cools, and a laser beam stays frozen in space rather than winking out.
     if (simulationState.isPaused || simulationState.timeScale === 0) return;
 
     for (const ship of simulationState.npcShips) {
         if (!ship || ship._isDisposed || !ship.mesh || !ship.ai) continue;
         // If the player has taken this ship over, or the autopilot has it, they
         // own the controls this frame — the AI stands down.
-        if (ship === flightState.activeShip || ship.autopilotActive) continue;
+        if (ship === flightState.activeShip || ship.autopilotActive) {
+            // Nothing will write this ship's trigger while the autopilot holds it, and a weapon
+            // deliberately stops cooling while its trigger is held — so release it here, or an
+            // NPC that autopilots away mid-burst never sheds the heat. The player's own ship is
+            // exempt: updateFlightControls owns its trigger.
+            if (ship !== flightState.activeShip) ship.stopFire();
+            continue;
+        }
 
         const wasWarping = ship.warpActive;
 
@@ -184,6 +201,12 @@ export function stepNpcShips(dt: number, simDt: number, addEvent?: NpcEventSink)
         // already refuses to add any while a warp flag is set — and the controller releases
         // the trigger itself for the duration.
         if (!ship.warpActive) ship.applyFrameOrientation(dt);
+
+        // Turn the controller's trigger intent into actual shots, through the same helper the
+        // player's path uses — so an AI pilot gets no more (and no less) than a human does from
+        // the same weapon. After applyFrameOrientation(), so the muzzle it fires from is this
+        // frame's hull position rather than the previous one's.
+        applyWeaponInput(ship, dt);
 
         if (addEvent && settingsStore.settings.showAiDebug && ship.warpActive !== wasWarping) {
             addEvent({

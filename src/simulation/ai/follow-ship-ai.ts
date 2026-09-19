@@ -52,7 +52,9 @@ const _invFrame = new THREE.Quaternion();
  * side of a star gets tailed around the limb rather than through it.
  */
 export class FollowShipAI extends ShipAI {
-    readonly name = 'Follow';
+    // Annotated rather than inferred: a readonly property keeps its literal type, which would
+    // make a subclass's own name a type error against this one.
+    readonly name: string = 'Follow';
 
     /** Latched boost state, for hysteresis around the engage threshold. */
     private boosting = false;
@@ -64,7 +66,7 @@ export class FollowShipAI extends ShipAI {
      */
     constructor(
         ship: Spaceship,
-        private readonly followDistance: number = NPC_FOLLOW_DISTANCE
+        protected readonly followDistance: number = NPC_FOLLOW_DISTANCE
     ) {
         super(ship);
     }
@@ -74,7 +76,7 @@ export class FollowShipAI extends ShipAI {
      * failing that the last ship they spawned (so the NPC still tails a parked
      * ship the player has stepped out of).
      */
-    private getTarget(): Spaceship | null {
+    protected getTarget(): Spaceship | null {
         const target = flightState.activeShip ?? flightState.knownShip;
         if (!target || target === this.ship) return null;
         if (target._isDisposed || !target.mesh) return null;
@@ -113,6 +115,25 @@ export class FollowShipAI extends ShipAI {
             ? desiredClosing > h.flightMaxSpeed
             : desiredClosing > h.flightMaxSpeed * AI_BOOST_ENGAGE_FACTOR;
         return this.boosting;
+    }
+
+    /**
+     * Width of the dead band around the commanded closing speed, inside which the ship coasts
+     * rather than pulsing thrust or brake.
+     *
+     * Scaled with the command so a band tight enough to be useful at walking pace does not
+     * chatter constantly at boost speed, and floored so it never collapses to zero.
+     *
+     * Overridable because the floor is tied to the ship's normal max speed, which only makes
+     * sense while the hold distance is large enough for the commanded speed to reach that scale.
+     * A controller holding station at close range commands speeds far below it and would read
+     * "on station" at every speed it can actually fly — see CombatShipAI.
+     */
+    protected closingSpeedTolerance(desiredClosing: number, h: ISpaceshipHandling): number {
+        return Math.max(
+            h.flightMaxSpeed * AI_CLOSING_SPEED_TOLERANCE,
+            Math.abs(desiredClosing) * AI_CLOSING_SPEED_TOLERANCE
+        );
     }
 
     /** Release the controls and let the ship coast. */
@@ -376,12 +397,7 @@ export class FollowShipAI extends ShipAI {
         _relVel.subVectors(ship.velocity, target.velocity);
         const closing = _relVel.dot(_dir);
 
-        // Scale the tolerance with the command: a band tight enough to be useful
-        // at walking pace would chatter constantly at boost speed.
-        const tolerance = Math.max(
-            h.flightMaxSpeed * AI_CLOSING_SPEED_TOLERANCE,
-            Math.abs(desiredClosing) * AI_CLOSING_SPEED_TOLERANCE
-        );
+        const tolerance = this.closingSpeedTolerance(desiredClosing, h);
 
         if (!aligned) {
             // Turning to face the target: no forward thrust, but keep shedding

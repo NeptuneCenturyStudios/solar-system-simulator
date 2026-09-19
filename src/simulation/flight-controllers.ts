@@ -9,6 +9,7 @@ import {
     simulationState,
 } from './simulation';
 import { IFlightControlContext } from '../interfaces';
+import { applyWeaponInput } from './ship-weapon-input';
 
 /** Exit flight mode and restore normal camera controls. */
 export function exitFlightMode(ctx: IFlightControlContext) {
@@ -187,7 +188,8 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     playerInput.rollRight = flightState.rollRight;
     playerInput.steerX = rawX;
     playerInput.steerY = rawY;
-    playerInput.fire = flightState.isFiring;
+    // The autopilot flies the ship, so the trigger is dead while it is engaged.
+    playerInput.fire = flightState.isFiring && !autopilotState.isActive;
 
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
 
@@ -352,33 +354,26 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         ctx.steeringOriginMarker.visible = true;
     }
 
-    // ── Weapon firing ────────────────────────────────────────────────────────
-    // While the trigger is held (and the ship is controllable) refresh aim on all
-    // mounted weapons; on release, continuous weapons (e.g. laser) cut their beams.
-    if (!autopilotState.isActive && ship.weapons.length > 0) {
-        if (flightState.isFiring) {
-            const aimNdcX = (noseScreenX + displayOffX) / (window.innerWidth * 0.5);
-            const aimNdcY = (noseScreenY - displayOffY) / (window.innerHeight * 0.5);
-            const halfFovY = THREE.MathUtils.degToRad(ctx.camera.fov * 0.5);
-            const tanHalfFovY = Math.tan(halfFovY);
-            const tanHalfFovX = tanHalfFovY * ctx.camera.aspect;
-            const viewSpaceDir = new THREE.Vector3(
-                aimNdcX * tanHalfFovX,
-                aimNdcY * tanHalfFovY,
-                -1
-            ).normalize();
-            const aimDir = viewSpaceDir.transformDirection(ctx.camera.matrixWorld);
-            // Anchor the muzzle to the loaded model's nose (ship-local +Z), so the
-            // beam/bolts emerge from the hull instead of floating ahead of it.
-            const muzzlePos = ship.muzzleOffset
-                .clone()
-                .applyQuaternion(ship.mesh.quaternion)
-                .add(ship.mesh.position);
-            ship.fireWeapon(dt, muzzlePos, aimDir);
-        } else {
-            ship.stopFire();
-        }
+    // ── Weapon aim ───────────────────────────────────────────────────────────
+    // The player aims with the reticle: cast a ray from the camera through the steering line's
+    // end marker and hand the resulting world bearing to the ship's control input. Clamping the
+    // pointer to flightMaxPointerOffset above is therefore also what limits how far off the nose
+    // the player can shoot — the aim cone an AI pilot has to live inside too.
+    //
+    // Only refreshed while the trigger is held; applyWeaponInput() ignores aimDir otherwise.
+    if (playerInput.fire) {
+        const aimNdcX = (noseScreenX + displayOffX) / (window.innerWidth * 0.5);
+        const aimNdcY = (noseScreenY - displayOffY) / (window.innerHeight * 0.5);
+        const tanHalfFovY = Math.tan(THREE.MathUtils.degToRad(ctx.camera.fov * 0.5));
+        const tanHalfFovX = tanHalfFovY * ctx.camera.aspect;
+        playerInput.aimDir
+            .set(aimNdcX * tanHalfFovX, aimNdcY * tanHalfFovY, -1)
+            .transformDirection(ctx.camera.matrixWorld);
     }
+
+    // Shared with the AI firing path, so muzzle placement, rate of fire, heat and beam
+    // termination stay identical between a player-flown ship and an AI-flown one.
+    applyWeaponInput(ship, dt);
 
     // ── Warp sprite catch-all ──────────────────────────────────────────────
     // When the ship exits warp (e.g. autopilot transitions WARP → APPROACH)

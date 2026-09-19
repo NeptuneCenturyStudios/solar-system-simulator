@@ -12,12 +12,14 @@ import {
     IWarpStepResult,
     ISpaceshipCreationOptions,
     IShipControlInput,
+    IStateDependencies,
 } from '../../interfaces';
+import { ParticleExplosion } from '../../effects/particle-explosion';
 import type { ShipAI } from '../../simulation/ai/ship-ai';
 import { brakingSpeedLimit } from '../../simulation/ai/obstacle-avoidance';
 import { Weapon } from '../../ship-effects/weapons/weapon';
 import { autopilotState, flightState, simulationState } from '../../simulation/simulation';
-import { G, SHIELD_DEPLETED_EPSILON } from '../../utilities/consts';
+import { G, SHIELD_DEPLETED_EPSILON, SHIP_EXPLOSION_COLOR } from '../../utilities/consts';
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_BRAKE_PAD,
@@ -97,6 +99,7 @@ export class Spaceship extends Body {
         steerX: 0,
         steerY: 0,
         fire: false,
+        aimDir: new THREE.Vector3(),
         warp: false,
     };
 
@@ -109,6 +112,9 @@ export class Spaceship extends Body {
 
     /** Pluggable AI controller piloting this ship, or null when player-controlled. */
     ai: ShipAI | null = null;
+
+    /** Shared dependency bag, retained for the explosion sink used on death. */
+    private readonly dependencies: IStateDependencies;
 
     /** True while this ship applied thrust on the current frame. Per-ship
      *  equivalent of flightState.thrustActive; drives the engine trail. */
@@ -252,6 +258,11 @@ export class Spaceship extends Body {
             BodyTypeEnum.SpaceShip,
             options.healthPoints
         );
+
+        // The ship layer passes the dependency bag around as an opaque `object` (see
+        // IShipType.create), so it is narrowed once here. Retained for the explosion sink the
+        // ship needs when it dies — Body, unlike CelestialBody, keeps no reference of its own.
+        this.dependencies = dependencies as IStateDependencies;
 
         // Store the handling characteristics for use in flight control calculations.
         this.handling = options.handling;
@@ -952,6 +963,8 @@ export class Spaceship extends Body {
         input.steerY = 0;
         input.fire = false;
         input.warp = false;
+        // aimDir is deliberately left as-is: it is only meaningful while `fire` is true, and
+        // there is no direction that means "not aiming". Clearing the trigger disarms the ship.
     }
 
     /**
@@ -1471,9 +1484,13 @@ export class Spaceship extends Body {
 
     /**
      * Override die() to clean up the warp sound controller, warp effect, AI
-     * controller, and autopilot state.
+     * controller, and autopilot state, and to blow the ship up on the way out.
      */
     die(deathOptions?: IDeathOptions): void {
+        // Guard before anything is torn down, so the explosion below cannot fire twice on a
+        // double die() — Body.die() makes the same check, but only after this method's cleanup.
+        if (this._isDisposed) return;
+
         if (this.ai) {
             this.ai.dispose();
             this.ai = null;
@@ -1489,6 +1506,29 @@ export class Spaceship extends Body {
         this.weapons = [];
         this.resetAutopilotState();
         this.trail.dispose();
+
+        // Capture the wreck site before super.die() detaches the mesh from the scene.
+        const deathPos = this.mesh.position.clone();
+
         super.die(deathOptions);
+
+        // Ships extend Body directly rather than CelestialBody, which is where every other
+        // destructible body gets its explosion — so until now a destroyed ship simply vanished.
+        if (!deathOptions?.skipExplosion) {
+            try {
+                this.dependencies.addExplosion(
+                    new ParticleExplosion(
+                        this.dependencies,
+                        this.scene,
+                        deathPos,
+                        SHIP_EXPLOSION_COLOR,
+                        this.radius,
+                        deathOptions?.impactSpeed
+                    )
+                );
+            } catch {
+                // A failed explosion must never block the ship's own teardown.
+            }
+        }
     }
 }

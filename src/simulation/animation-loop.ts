@@ -449,18 +449,17 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         // ── Warp effect ──────────────────────────────────────────────────
-        const _warpShip = ctx.flightState.activeShip ?? ctx.flightState.knownShip;
-        if (_warpShip && !_warpShip._isDisposed && _warpShip.mesh) {
-            _warpShip.updateWarpEffect(dtTotal, _warpShip.handling.flightWarpSpeed);
-        }
-
-        // AI ships warp too, so their tunnels need driving as well. The effect is
-        // speed-driven and self-hiding, so this is safe to run on every NPC every frame —
-        // one that isn't warping simply stays invisible. Skips whichever ship the block
-        // above already handled, so a player-owned ship isn't updated twice.
-        for (const npc of ctx.simulationState.npcShips) {
-            if (!npc || npc === _warpShip || npc._isDisposed || !npc.mesh) continue;
-            npc.updateWarpEffect(dtTotal, npc.handling.flightWarpSpeed);
+        // Driven for every ship in the system, not just the player's current one and the NPCs.
+        // A ship belonging to neither group is easy to create — spawn one, leave it, then enter
+        // a different ship — and it used to have nothing advancing or hiding its tunnel, so the
+        // streaks froze in the scene at whatever opacity they last held. The effect is
+        // speed-driven and self-hiding, so running it on everything is safe: a ship that isn't
+        // moving simply stays invisible.
+        for (const body of ctx.simulationState.bodies) {
+            if (!body || body.bodyType !== BodyTypeEnum.SpaceShip) continue;
+            if (body._isDisposed || !body.mesh) continue;
+            const ship = body as Spaceship;
+            ship.updateWarpEffect(dtTotal, ship.handling.flightWarpSpeed);
         }
 
         // ── WASD camera movement ─────────────────────────────────────────
@@ -793,6 +792,30 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
         }
 
+        // AI ships shoot too, and their bolts are the same objects the player's are — without
+        // this they would spawn and then sit still forever, never moving, colliding or
+        // rendering.
+        //
+        // Iterated backwards by index because this loop can shorten the list it is walking: a
+        // weapon:hit dispatched from inside weapon.update() runs body.die() synchronously, whose
+        // body:dead handler splices the victim out of npcShips. Skips whichever ship the block
+        // above already advanced, so no weapon is stepped twice.
+        const npcShips = ctx.simulationState.npcShips;
+        for (let i = npcShips.length - 1; i >= 0; i--) {
+            const npc = npcShips[i];
+            if (!npc || npc === weaponShip || npc._isDisposed) continue;
+            for (const weapon of npc.weapons) {
+                weapon.update(
+                    wallDt,
+                    dtTotal,
+                    ctx.simulationState.bodies,
+                    ctx.camera.position,
+                    npc,
+                    tScale === 0
+                );
+            }
+        }
+
         // ── Thermal load gauge ───────────────────────────────────────────────
         // Anchored beside the gray steering-origin ring; hides together with it.
         if (
@@ -1072,60 +1095,60 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // ── HUD ──────────────────────────────────────────────────────────────
         ctx.flightHUD.updateHintSprite();
 
-        // ── Warp distance fade ─────────────────────────────────────────────
+        // ── Warp tunnel visibility ─────────────────────────────────────────
+        // One rule for every ship in the system:
+        //
+        //   * the ship you are flying always shows its tunnel — it is part of the view out of
+        //     the cockpit;
+        //   * any other ship shows its tunnel only while you are actually *observing* it, i.e.
+        //     it is the look-at focus target and you are zoomed close enough for the distance
+        //     fade to reach it;
+        //   * everything else is hidden outright.
+        //
+        // The focus test is what keeps other ships out of your eyeline: the tunnel is driven by
+        // raw speed, and the opacity curve is steep enough that merely coasting along an orbit
+        // renders a visible streak — so without it, every ship in the system would be streaking
+        // away in the corner of the screen the whole time you were flying.
         const visShip = ctx.flightState.activeShip ?? ctx.flightState.knownShip;
-        let wdf: number;
-        if (visShip && !visShip._isDisposed && visShip.mesh) {
-            if (isFlightModeActive) {
-                wdf = 1;
-                visShip.setWarpEffectOpacity(1);
+        /** Distance fade applied to the player's own ship; also drives its warp sound. */
+        let wdf = 0;
+
+        for (const body of ctx.simulationState.bodies) {
+            if (!body || body.bodyType !== BodyTypeEnum.SpaceShip) continue;
+            if (body._isDisposed || !body.mesh) continue;
+            const ship = body as Spaceship;
+
+            let fade: number;
+            if (isFlightModeActive && ship === ctx.flightState.activeShip) {
+                fade = 1;
+            } else if (
+                !isFlightModeActive &&
+                ctx.cameraState.isLookAtMode &&
+                ctx.cameraState.focusBody === ship
+            ) {
+                const d = ctx.camera.position.distanceTo(ship.mesh.position);
+                const t = THREE.MathUtils.clamp(
+                    (d - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST),
+                    0,
+                    1
+                );
+                fade = 1 - t;
             } else {
-                const isLook =
-                    ctx.cameraState.isLookAtMode && ctx.cameraState.focusBody === visShip;
-                if (isLook) {
-                    const d = ctx.camera.position.distanceTo(visShip.mesh.position);
-                    if (d >= WARP_FADE_DIST) {
-                        wdf = 0;
-                        visShip.setWarpEffectOpacity(0);
-                    } else {
-                        const t = Math.max(
-                            0,
-                            (d - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST)
-                        );
-                        wdf = 1 - t;
-                        visShip.setWarpEffectOpacity(1 - t);
-                    }
-                } else {
-                    wdf = 0;
-                    visShip.setWarpEffectOpacity(0);
-                }
+                fade = 0;
             }
-        } else {
-            wdf = 0;
-            visShip?.setWarpEffectOpacity(0);
+
+            ship.setWarpEffectOpacity(fade);
+            if (ship === visShip) wdf = fade;
         }
 
+        // Warp sound follows the player's own ship alone — several ships warping at once would
+        // stack the loop on top of itself.
         if (visShip && !visShip._isDisposed && visShip.mesh) {
             const vol = Math.min(
                 visShip.velocity.length() / (visShip.handling.flightWarpSpeed / 33.33),
                 1
             );
             visShip.updateWarpSound(vol, wdf);
-        }
-
-        // NPC warp tunnels fade on camera distance alone. The look-at-mode test above exists
-        // only to decide whether the player's own parked ship is actually on screen; an AI
-        // ship is never the flight-mode ship, so distance is the whole question here.
-        // No warp sound: several NPCs warping at once would stack the loop on top of itself.
-        for (const npc of ctx.simulationState.npcShips) {
-            if (!npc || npc === visShip || npc._isDisposed || !npc.mesh) continue;
-            const d = ctx.camera.position.distanceTo(npc.mesh.position);
-            const t = THREE.MathUtils.clamp(
-                (d - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST),
-                0,
-                1
-            );
-            npc.setWarpEffectOpacity(1 - t);
         }
 
         // ── Render ──────────────────────────────────────────────────────────

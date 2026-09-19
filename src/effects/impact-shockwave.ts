@@ -32,7 +32,13 @@ export class ImpactShockwave implements IEffect {
         this.active = true;
         this.scene = scene;
         this.age = 0;
-        this.baseRadius = Math.max(5, bodyRadius * 0.001);
+        // The 5-unit floor is sized for planets and asteroids, where it reads as a compact flash
+        // on a huge surface. On a ship it is catastrophic: a 500 km sphere centred on a 37 m hull
+        // swallows the camera, and because the material is front-faced the viewer then sees
+        // nothing at all — which is why weapon hits on ships appeared to have no effect while the
+        // same code looked right on a planet. Capping the flash to a few hull radii keeps small
+        // targets legible and leaves anything bigger than ~170 km across exactly as it was.
+        this.baseRadius = Math.min(Math.max(5, bodyRadius * 0.001), bodyRadius * 3);
 
         // Place the flash at the impact position on the planet surface.
         // Snap outward so the sphere is visually sitting on the surface.

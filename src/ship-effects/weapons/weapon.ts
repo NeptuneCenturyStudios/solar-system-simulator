@@ -74,6 +74,18 @@ export abstract class Weapon {
         return this.overheated;
     }
 
+    /**
+     * Speed (sim units/s) a projectile leaves the muzzle at, excluding the firing ship's own
+     * velocity — the figure a lead solver needs, since a shot inherits the shooter's motion on
+     * top of this (Galilean relativity, see BoltWeapon.tryFire).
+     *
+     * Infinity for hitscan or near-instant weapons, which correctly degenerates a lead solution
+     * to "aim where the target is right now".
+     */
+    get muzzleSpeed(): number {
+        return Infinity;
+    }
+
     protected constructor(protected readonly scene: THREE.Scene) {}
 
     /** Add thermal load from firing; locks the weapon out once it reaches 1. */
@@ -179,3 +191,23 @@ export abstract class Weapon {
 
 /** Constructor signature for a weapon class — used when mounting loadouts on ships. */
 export type WeaponConstructor = new (scene: THREE.Scene) => Weapon;
+
+/**
+ * World position of `owner`'s muzzle: the model's nose anchor (ship-local +Z), carried out to
+ * world space so beams and bolts emerge from the hull rather than floating ahead of it.
+ *
+ * The single definition of that transform, shared by the player firing path, the AI firing path
+ * and the laser's per-frame origin refresh — three call sites that must not drift apart.
+ *
+ * Deliberately uses `mesh.quaternion` (frame × visual bank) rather than the control frame, so the
+ * muzzle tracks the hull as it banks.
+ *
+ * @param out Destination vector, also returned. Zero-allocation: callers pass a scratch or a
+ *   retained vector rather than receiving a fresh one each frame.
+ */
+export function muzzleWorldPosition(owner: IWeaponOwner, out: THREE.Vector3): THREE.Vector3 {
+    return out
+        .copy(owner.muzzleOffset)
+        .applyQuaternion(owner.mesh.quaternion)
+        .add(owner.mesh.position);
+}

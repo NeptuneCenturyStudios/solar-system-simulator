@@ -717,6 +717,25 @@ export const EXPLOSION_MIN_SPEED_MULTIPLIER = 0.25;
 /** Ceiling on the speed multiplier, so hypervelocity impacts look dramatic without becoming absurd. */
 export const EXPLOSION_MAX_SPEED_MULTIPLIER = 15;
 
+// === Explosion size scaling ===
+// ParticleExplosion's particle count, speed and sprite size were all tuned against planets and
+// asteroids, using absolute floors (5 u/s, 10 u) that are themselves planet-scale. A ship hull is
+// roughly 3.7e-4 u across, so those floors produced an explosion with no particles, travelling at
+// 500 km/s, drawn with 1,000 km sprites. The limits below keep the original look for anything
+// bigger than roughly 250 km across — every planet, moon and asteroid in the game — while letting
+// small wrecks scale down to something proportionate.
+/** Fewest particles an explosion may have, so a small body still visibly bursts. */
+export const EXPLOSION_MIN_PARTICLES = 120;
+/** Most particles an explosion may have, for performance on planet-scale deaths. */
+export const EXPLOSION_MAX_PARTICLES = 2000;
+/** Cap on outward particle/debris speed, as a multiple of the body's own radius per second. */
+export const EXPLOSION_SMALL_BODY_SPEED_CAP = 2;
+/** Cap on rendered particle size, as a multiple of the body's radius. */
+export const EXPLOSION_SMALL_BODY_SIZE_CAP = 4;
+/** Base colour for a destroyed ship's explosion. Celestial bodies explode in their own surface
+ *  colour; a ship has no such colour, so it burns in a hot fuel-fire orange instead. */
+export const SHIP_EXPLOSION_COLOR = 0xffa040;
+
 // === Wormhole tuning ===
 /** Default mouth (gate) radius for a newly created wormhole, in sim units. Used for randomization range */
 export const WORMHOLE_DEFAULT_RADIUS = EARTH_RADIUS * 1.5;
@@ -980,6 +999,47 @@ export const AI_AVOID_RELEASE_ANGLE = Math.PI / 36;
 /** Seconds-to-surface below which an AI abandons whatever it was doing and flies directly away
  *  from the hazard. Braking alone is not enough this late — the ship has to thrust out. */
 export const AI_AVOID_PANIC_TIME = 2;
+
+// === Combat ship AI ===
+/** Station-keeping distance for the combat AI: 500 m expressed in sim units. */
+export const NPC_COMBAT_FOLLOW_DISTANCE = 0.5 / DIST_SCALE;
+/** Closing-speed tolerance floor for the combat AI, as a fraction of its hold distance per
+ *  second. The follow AI's floor (flightMaxSpeed × AI_CLOSING_SPEED_TOLERANCE = 0.015 u/s on a
+ *  Zenith) is six times the speed command at a 500 m hold, so the controller would read "on
+ *  station" for every closing speed up to 1.5 km/s and never touch thrust or brake — the ship
+ *  would sail through its target and yo-yo instead of settling. */
+export const AI_COMBAT_CLOSING_TOLERANCE_RATE = 0.1;
+/** Half-angle (radians) of the combat AI's aiming cone about its nose. Matches the Zenith's
+ *  player cone at 1080p — atan((260/540)·tan 30°) ≈ 15.5° — but is deliberately a fixed angle
+ *  rather than derived from flightMaxPointerOffset and the viewport, so AI accuracy does not
+ *  change with the player's window size. */
+export const AI_AIM_CONE_ANGLE = Math.PI / 12;
+/** Maximum range (sim units) at which the combat AI will pull the trigger: 10 km. */
+export const AI_FIRE_RANGE = 10 / DIST_SCALE;
+/** Peak angular aim error (radians) folded into the combat AI's aim so it is not a perfect
+ *  turret. 0.5° is ~4 m off at the 500 m hold distance (well inside a 37 m hull) and ~87 m off
+ *  at the 10 km fire range — accuracy that falls away with distance for free. */
+export const AI_AIM_JITTER_ANGLE = Math.PI / 360;
+/** Seconds over which the aim jitter drifts to a freshly rolled offset. Drift rather than
+ *  per-frame white noise: at 12 rounds/s, re-rolling every frame reads as a shotgun. */
+export const AI_AIM_JITTER_PERIOD = 0.6;
+/** Trigger discipline: seconds the combat AI holds fire down before resting. Together with
+ *  AI_BURST_REST_TIME this gives the NPC a burst rhythm and keeps it clear of the overheat
+ *  lockout (a bolt weapon gains 0.1 heat/s firing and sheds 0.8 heat/s released). */
+export const AI_BURST_FIRE_TIME = 1.0;
+/** Seconds the combat AI holds fire between bursts. */
+export const AI_BURST_REST_TIME = 0.5;
+
+// === Test AI Ships scenario ===
+/** Fixed time scale for the AI test bed, so runs are comparable to each other. */
+export const TEST_AI_SHIPS_TIME_SCALE = 1;
+/** Offset (sim units) from the player at which the NPC first spawns and later respawns: 25 km.
+ *  Far enough that the NPC has to turn, accelerate and close before it reaches AI_FIRE_RANGE,
+ *  so the pursuit behaviour is visible on every respawn. */
+export const TEST_AI_SHIPS_SPAWN_DISTANCE = 25 / DIST_SCALE;
+/** Sim-seconds between the NPC's destruction and its replacement appearing. */
+export const TEST_AI_SHIPS_RESPAWN_DELAY = 3;
+
 // === Comet tail coloring ===
 /** Default main color for a comet's particle tail (blue — matches the original look). */
 export const DEFAULT_COMET_TAIL_COLOR = 0x7ab8ff;

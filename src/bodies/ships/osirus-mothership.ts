@@ -26,7 +26,7 @@ export class OsirisMothership extends Spaceship {
         // adjust how the chase cam frames the destroyer.
         const THIRD_PERSON_OFFSET = new THREE.Vector3(
             0,
-            SPACESHIP_RADIUS * 0.35,
+            SPACESHIP_RADIUS * 0.25,
             -SPACESHIP_RADIUS * 1
         );
 
@@ -108,10 +108,10 @@ export class OsirisMothership extends Spaceship {
 
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
             beamColor: 0x800080,
-            damage: 250,
-            coreWidth: 5,
-            haloWidth: 15,
-            damageInterval: 0.05,
+            damage: 2,
+            coreWidth: 1,
+            haloWidth: 4,
+            damageInterval: 0.2,
         };
 
         super(dependencies, scene, {

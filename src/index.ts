@@ -3850,7 +3850,10 @@ function spawnShip(targetShip?: Spaceship) {
             // Destroy the old ship.  die() disposes the model, trail, warp
             // effect, weapons, and warp sound; the body:dead listener removes it
             // from simulationState.bodies and clears selection/focus references.
-            existing.die({ skipImpactSound: true });
+            // Silent on both counts: this is a ship swap, not a destruction. Ships now explode
+            // on death, so without skipExplosion picking a different type in the dropdown would
+            // blow the old hull up in the player's face.
+            existing.die({ skipImpactSound: true, skipExplosion: true });
 
             // Spawn the newly selected ship type in the old ship's place.
             const shipType = getShipTypeById(selectedTypeId);

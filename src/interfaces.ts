@@ -213,8 +213,19 @@ export interface IShipControlInput {
     steerX: number;
     /** Vertical steering, already normalised to [-1, 1] AND past the deadzone. */
     steerY: number;
-    /** Trigger held. Not used by AI controllers yet — reserved. */
+    /** Trigger held — the left mouse button for the player. */
     fire: boolean;
+    /**
+     * World-space unit direction the mounted weapons are aimed along — the player's reticle
+     * bearing, or a ShipAI's firing solution.
+     *
+     * Meaningful ONLY while `fire` is true. There is no sentinel "not aiming" direction — a
+     * zeroed or default vector would read as a live aim along world +Z to anything that forgot
+     * to check the trigger — so `resetControlInput()` deliberately leaves this field alone and
+     * disarms the ship by clearing `fire` instead. Consumers gate on `fire` and on
+     * `aimDir.lengthSq() > 0`.
+     */
+    aimDir: THREE.Vector3;
     /**
      * Warp intent — the "Space" key for the player, but held as a *level* rather
      * than an edge: true means "I want warp", false means "I don't".

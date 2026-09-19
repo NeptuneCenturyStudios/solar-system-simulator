@@ -116,7 +116,7 @@ export class BoltWeapon extends Weapon {
             transparent: true,
             opacity: 1.0,
             blending: THREE.AdditiveBlending,
-            depthWrite: false
+            depthWrite: false,
         });
 
         // Round, glowing point sprite via fragment shader injection.
@@ -146,6 +146,11 @@ export class BoltWeapon extends Weapon {
         this.headPoints.renderOrder = 2;
         this.headPoints.visible = false;
         scene.add(this.headPoints);
+    }
+
+    /** Bolts leave the muzzle at their configured base speed, before the ship's own velocity. */
+    override get muzzleSpeed(): number {
+        return this.config.baseSpeed;
     }
 
     /**
@@ -288,11 +293,7 @@ export class BoltWeapon extends Weapon {
             }
 
             if (hitBody) {
-                p.position.set(
-                    originX + dirX * hitT,
-                    originY + dirY * hitT,
-                    originZ + dirZ * hitT
-                );
+                p.position.set(originX + dirX * hitT, originY + dirY * hitT, originZ + dirZ * hitT);
                 window.dispatchEvent(
                     new CustomEvent('weapon:hit', {
                         detail: {
