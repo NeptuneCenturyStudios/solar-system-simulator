@@ -44,8 +44,12 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     flightState.altOrbitActive = false;
     flightState.altOrbitYaw = 0;
     flightState.altOrbitPitch = 0;
+    // Release the trigger, but don't reset() weapons — any live bolts/beam should
+    // stay in the scene and keep decaying naturally (frozen while paused, cleared
+    // once the sim resumes) rather than disappearing as a side effect of exiting
+    // flight mode. See animation-loop.ts's weapon update block, which keeps running
+    // for this ship via flightState.knownShip even after isActive goes false.
     flightState.activeShip?.stopFire();
-    flightState.activeShip?.weapons.forEach((w) => w.reset());
 
     // Clear deceleration and warp flags so on re-entry the ship isn't
     // artificially clamped back to FLIGHT_MAX_SPEED.

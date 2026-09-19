@@ -99,8 +99,6 @@ export class AsteroidDefenseScenario implements IScenario {
     private wavesCleared = 0;
     /** Set once the scenario has ended; every further update is a no-op. */
     private finished = false;
-    /** Set once flight mode is observed active; a later drop to inactive fails the scenario. */
-    private hasEnteredFlightMode = false;
     /** The player's ship, watched so its destruction ends the scenario in failure. */
     private readonly playerShip: Spaceship | null;
 
@@ -124,7 +122,6 @@ export class AsteroidDefenseScenario implements IScenario {
         this.spawnedCount = 0;
         this.wavesCleared = 0;
         this.finished = false;
-        this.hasEnteredFlightMode = false;
         this.nextWaveTimer = ASTEROID_DEFENSE_FIRST_WAVE_DELAY;
         this.dependencies.setPanelManagerVisible(false);
 
@@ -150,14 +147,6 @@ export class AsteroidDefenseScenario implements IScenario {
             this.finishFailed('Your ship has been destroyed.');
             return;
         }
-        // if (this.playerShip) {
-        //     if (flightState.isActive) {
-        //         this.hasEnteredFlightMode = true;
-        //     } else if (this.hasEnteredFlightMode) {
-        //         this.finishFailed('You exited flight mode.');
-        //         return;
-        //     }
-        // }
 
         // Paused: hold every timer and leave outcomes for the next running frame.
         if (simDt <= 0) return;

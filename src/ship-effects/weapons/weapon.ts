@@ -40,9 +40,17 @@ export interface IWeaponSound {
  *     refresh their aim/origin each call.
  *   - stopFire() — called when the trigger is released.  No-op for burst weapons,
  *     terminates beams for continuous weapons.
- *   - update(wallDt, simDt, bodies, cameraPosition, owner) — called once per
- *     frame while the owning ship is in flight mode.
- *   - reset() — clear all active state on flight exit.
+ *   - update(wallDt, simDt, bodies, cameraPosition, owner, isPaused) — called
+ *     once per frame while the owning ship is in flight mode, and continues
+ *     to be called for the last-flown ship even after flight exit so any
+ *     live bolts/beam persist and run to their natural end. `isPaused`
+ *     freezes all wall-clock-driven decay (lifetimes, cooldowns, thermal, and
+ *     the beam's hide-on-release transition) so effects only ever disappear
+ *     once the sim is unpaused — never as a side effect of pausing or of
+ *     leaving flight mode.
+ *   - reset() — clear all active state. Not called automatically on flight
+ *     exit (that would defeat the persistence above); available for other
+ *     lifecycle events such as ship respawn.
  *   - dispose() — release GPU resources on ship destruction.
  */
 export abstract class Weapon {
@@ -148,7 +156,8 @@ export abstract class Weapon {
         simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
-        owner: IWeaponOwner
+        owner: IWeaponOwner,
+        isPaused: boolean
     ): void;
 
     /** Clear active projectiles/beams, stop loop sounds, and reset timers. Called on flight exit. */

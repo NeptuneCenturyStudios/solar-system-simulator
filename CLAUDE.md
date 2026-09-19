@@ -123,9 +123,11 @@ src/
 - [ ] Phase 5: New scenario. Defend Earth from an onslaught of ~100 (to be adjusted) ELEs comprised of asteroids and comets. User will get to use the Osiris to take them all down before Earth is destroyed.
 - **Phase 6 - Fixes and adjustments**
 - [ ] Phase 6.1: Adjust Neptune's orbit to match real orbit (like we did for Pluto)
-- [ ] Phase 6.2: Ability to leave weapon fire in scene if paused even when user exits flight mode. Bolts will freeze in space and not tick down their lifetime, and laser will remain persistent in space.
-- [ ] Phase 6.3: Smooth camera zoom (ease-in-out)
+- [x] Phase 6.2: Ability to leave weapon fire in scene if paused even when user exits flight mode. Bolts will freeze in space and not tick down their lifetime, and laser will remain persistent in space.
+- [x] Phase 6.3: Smooth camera zoom (ease-in-out)
 - [x] Phase 6.4: Update the comet/asteroid object assets
+- **Phase 7 - More ship AI updates**
+- [ ] Phase 7.1: Test AI Ship scenario. Start user in ship (Zenith) like the Asteroid Defense scenario (no lockdowns required). NPC ship should approach player ship. Target distance to player is ~500m or about 0.5km / DIST_SCALE. NPC ship should pursue player ship and fire weapons. NPC ship will need an adaptation to aiming since player uses mouse to aim. NPC ship should have same range of aim that a player has (so it cannot fire behind itself and must steer toward player to get into aiming range.) If the player destroyes the NPC ship, then the NPC ship should respawn a distance from the player. All weapon behaviors should be the same (cooldown, rate of fire, heat, etc.)
 
 ## UI (Vue)
 

@@ -775,16 +775,20 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
         // ── Weapon systems ─────────────────────────────────────────────────
         // Advance every mounted weapon (bolts fly, laser beams cast) while in
-        // flight mode.  Weapons also self-hide when not firing.
-        if (ctx.flightState.isActive && ctx.flightState.activeShip) {
-            const ship = ctx.flightState.activeShip;
-            for (const weapon of ship.weapons) {
+        // flight mode, and keep advancing them via knownShip after flight exit
+        // so any bolts/beam already in flight persist and decay/hide naturally —
+        // they only freeze while the sim is paused, never as a side effect of
+        // pausing or of leaving flight mode. Weapons also self-hide when not firing.
+        const weaponShip = ctx.flightState.activeShip ?? ctx.flightState.knownShip;
+        if (weaponShip && !weaponShip._isDisposed) {
+            for (const weapon of weaponShip.weapons) {
                 weapon.update(
                     wallDt,
                     dtTotal,
                     ctx.simulationState.bodies,
                     ctx.camera.position,
-                    ship
+                    weaponShip,
+                    tScale === 0
                 );
             }
         }

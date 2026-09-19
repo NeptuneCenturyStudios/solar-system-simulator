@@ -205,25 +205,33 @@ export class BoltWeapon extends Weapon {
      * @param bodies         All active simulation bodies for collision testing.
      * @param cameraPosition World-space camera position for camera-relative rendering.
      * @param owner          Ship firing this weapon — skipped in collision checks.
+     * @param isPaused       True while the sim is paused — freezes lifetime/thermal
+     *                       decay so bolts hold their position and don't fizzle out.
      */
     update(
         wallDt: number,
         simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
-        owner: IWeaponOwner
+        owner: IWeaponOwner,
+        isPaused: boolean
     ): void {
-        this.updateThermal(wallDt, this.active, this.config.coolPerSecond);
+        if (!isPaused) {
+            this.updateThermal(wallDt, this.active, this.config.coolPerSecond);
+        }
 
         const toRemove = new Set<number>();
 
         for (let i = 0; i < this.projectiles.length; i++) {
             const p = this.projectiles[i];
-            p.timeRemaining -= wallDt;
 
-            if (p.timeRemaining <= 0) {
-                toRemove.add(i);
-                continue;
+            if (!isPaused) {
+                p.timeRemaining -= wallDt;
+
+                if (p.timeRemaining <= 0) {
+                    toRemove.add(i);
+                    continue;
+                }
             }
 
             // ── Swept ray-sphere hit test along this frame's travel segment ──
@@ -331,7 +339,7 @@ export class BoltWeapon extends Weapon {
         this.headPoints.visible = count > 0;
     }
 
-    /** Clear all live bolts and reset cooldown (called on flight exit). */
+    /** Clear all live bolts and reset cooldown. Not called automatically on flight exit. */
     reset(): void {
         this.projectiles = [];
         this.headGeometry.setDrawRange(0, 0);

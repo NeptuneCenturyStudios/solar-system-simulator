@@ -236,20 +236,31 @@ export class LaserWeapon extends Weapon {
     /**
      * Advance the beam: cast a ray-sphere hit test, position the beam tip,
      * and dispatch throttled 'weapon:hit' events.  Renders camera-relative.
+     *
+     * @param isPaused True while the sim is paused — freezes cooldown/thermal decay,
+     *                 and defers the hide-on-release transition below so a beam that
+     *                 was visible when the sim was paused (e.g. via flight exit)
+     *                 stays on screen until the sim actually resumes.
      */
     update(
         wallDt: number,
         simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
-        owner: IWeaponOwner
+        owner: IWeaponOwner,
+        isPaused: boolean
     ): void {
-        this.hitCooldown -= wallDt;
-        this.updateThermal(wallDt, this.active, this.config.coolPerSecond);
+        if (!isPaused) {
+            this.hitCooldown -= wallDt;
+            this.updateThermal(wallDt, this.active, this.config.coolPerSecond);
+        }
 
         if (!this.active || this.overheated) {
-            // Hide the beam immediately when the trigger is released or the weapon overheats.
-            if (this.prevBeamVisible) {
+            // Hide the beam when the trigger is released or the weapon overheats —
+            // but only once the sim is actually running, so a beam frozen by a pause
+            // (or left active by a flight-mode exit that happened while paused)
+            // stays visible until the sim resumes.
+            if (this.prevBeamVisible && !isPaused) {
                 this.setBeamVisible(false);
                 this.prevBeamVisible = false;
                 this.endLoopSound();
@@ -385,7 +396,7 @@ export class LaserWeapon extends Weapon {
         this.tipPoint.visible = visible;
     }
 
-    /** Cut the beam, stop the loop sound, and reset timers (called on flight exit). */
+    /** Cut the beam, stop the loop sound, and reset timers. Not called automatically on flight exit. */
     reset(): void {
         this.active = false;
         this.prevBeamVisible = false;
