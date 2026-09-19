@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { IStateDependencies } from '../interfaces';
-import { Asteroid } from '../bodies/asteroid';
+import type { AsteroidBase } from '../bodies/asteroid-base';
+import { getAsteroidVariantById } from '../bodies/asteroid-variants';
 import type { IPlanetaryAttributes } from '../bodies/body-attributes';
 
 export type ProceduralAsteroidCreation = {
@@ -15,6 +16,12 @@ export type ProceduralAsteroidCreation = {
     rotationTilt: number;
     rotationAzimuth: number;
 
+    /**
+     * Registry id of the asteroid variant to instantiate (see asteroid-variants.ts).
+     * Chosen procedurally by the generator so the same seed always yields the same mix.
+     */
+    variantId: string;
+
     /** Index into the system's star array this asteroid orbits, or -1 for a P-type orbit. */
     hostStarIndex: number;
 
@@ -23,16 +30,16 @@ export type ProceduralAsteroidCreation = {
 };
 
 /**
- * Instantiates a scene-attached Asteroid from a procedural creation descriptor.
+ * Instantiates a scene-attached asteroid variant from a procedural creation descriptor.
  *
- * Shared by both the procedural generation pipeline and the custom asteroid
- * creation flow so both paths use identical construction logic.
+ * The descriptor names its variant, so the procedural generation pipeline controls the mix
+ * of rock models through the same registry the scenarios use.
  */
 export function createAsteroidBodyFromProceduralCreation(
     dependencies: IStateDependencies,
     scene: THREE.Scene,
     creation: ProceduralAsteroidCreation
-): Asteroid {
+): AsteroidBase {
     const {
         id,
         name,
@@ -43,10 +50,11 @@ export function createAsteroidBodyFromProceduralCreation(
         rotationSpeed,
         rotationTilt,
         rotationAzimuth,
+        variantId,
         attributes,
     } = creation;
 
-    return new Asteroid(dependencies, scene, {
+    return getAsteroidVariantById(variantId).create(dependencies, scene, {
         id,
         name,
         pos,

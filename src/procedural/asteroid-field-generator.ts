@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { SolarSystemGenerator } from './solar-system-generator';
 import { Sun } from '../bodies/sun';
 import { Earth } from '../bodies/earth';
-import { Asteroid } from '../bodies/asteroid';
+import { createRandomAsteroidBody } from '../bodies/asteroid-variants';
 import { createMoon } from '../bodies/create-moon';
 import { calculateOrbitalSpeed } from '../physics/physics';
 import { generateProceduralBodyName } from './body-naming';
@@ -38,6 +38,9 @@ import { ProceduralGenerationReporter } from './procedural-generation-progress';
  * Scenario: Earth (with its Moon) flies a tight circular orbit around the Sun and plows
  * straight through a dense band of asteroids parked in that same orbit.
  *
+ * Every rock in the band is a randomly chosen variant from asteroid-variants.ts (each with
+ * its own model and trail tint), so the swarm reads as a mixed field of asteroids.
+ *
  * Why the band is counter-orbiting
  * --------------------------------
  * The naive layout — asteroids sitting in Earth's orbital path with the same circular
@@ -65,8 +68,6 @@ export class AsteroidFieldGenerator extends SolarSystemGenerator {
     private readonly scene: THREE.Scene;
     private readonly masterSeed: string;
 
-    /** Dusty trail colour so a 150-strong swarm reads as a single field, not a light show. */
-    private static readonly ASTEROID_TRAIL_COLOR = 0xa89a88;
     /** Asteroid bulk density anchored to Ceres, so mass and radius stay consistent. */
     private static readonly ASTEROID_DENSITY = CERES_MASS / Math.pow(CERES_RADIUS, 3);
 
@@ -135,22 +136,30 @@ export class AsteroidFieldGenerator extends SolarSystemGenerator {
             const tiltRng = rngFor(this.masterSeed, 'asteroidTilt', i);
             const azimuthRng = rngFor(this.masterSeed, 'asteroidAzimuth', i);
             const spinRng = rngFor(this.masterSeed, 'asteroidSpin', i);
+            // Dedicated stream for the variant roll, so every stream above keeps producing
+            // exactly the values it produced before variants existed.
+            const variantRng = rngFor(this.masterSeed, 'asteroidVariant', i);
 
-            const asteroid = new Asteroid(this.dependencies, this.scene, {
-                id,
-                name,
-                pos,
-                vel,
-                radius: size,
-                mass: AsteroidFieldGenerator.ASTEROID_DENSITY * Math.pow(size, 3),
-                rotation: {
-                    tilt: tiltRng.range(0, 180),
-                    azimuth: azimuthRng.range(0, 360),
-                    speed: spinRng.range(0.3, 1.0),
+            // Trail colour is owned by the chosen variant, so a mixed band shows both tints.
+            const asteroid = createRandomAsteroidBody(
+                this.dependencies,
+                this.scene,
+                {
+                    id,
+                    name,
+                    pos,
+                    vel,
+                    radius: size,
+                    mass: AsteroidFieldGenerator.ASTEROID_DENSITY * Math.pow(size, 3),
+                    rotation: {
+                        tilt: tiltRng.range(0, 180),
+                        azimuth: azimuthRng.range(0, 360),
+                        speed: spinRng.range(0.3, 1.0),
+                    },
+                    maxTrail: ASTEROID_FIELD_TRAIL_LENGTH,
                 },
-                trailColor: AsteroidFieldGenerator.ASTEROID_TRAIL_COLOR,
-                maxTrail: ASTEROID_FIELD_TRAIL_LENGTH,
-            });
+                variantRng
+            );
 
             bodies.push(asteroid);
         }

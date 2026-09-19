@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-import { Asteroid } from '../bodies/asteroid';
+import type { AsteroidBase } from '../bodies/asteroid-base';
+import { createRandomAsteroidBody } from '../bodies/asteroid-variants';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import type { Earth } from '../bodies/earth';
 import type { Spaceship } from '../bodies/ships/spaceship';
@@ -38,7 +39,8 @@ import {
  *
  * Wave N holds N asteroids, each spawned at its own random angle around Earth. The next wave
  * follows ASTEROID_DEFENSE_WAVE_DELAY sim-seconds after every asteroid in the current one has
- * resolved — hit Earth, been destroyed, or missed.
+ * resolved — hit Earth, been destroyed, or missed. Every asteroid is a randomly chosen variant
+ * from asteroid-variants.ts, so each wave mixes rock models.
  *
  * Collision course
  * ----------------
@@ -75,8 +77,6 @@ export class AsteroidDefenseScenario implements IScenario {
 
     /** Asteroid bulk density anchored to Ceres, so mass and radius stay consistent. */
     private static readonly ASTEROID_DENSITY = CERES_MASS / Math.pow(CERES_RADIUS, 3);
-    /** Warm trail colour so incoming asteroids stand out against the starfield. */
-    private static readonly ASTEROID_TRAIL_COLOR = 0xffaa66;
 
     private readonly dependencies: IStateDependencies;
     private readonly scene: THREE.Scene;
@@ -85,8 +85,8 @@ export class AsteroidDefenseScenario implements IScenario {
 
     /** Number of the wave currently in flight (0 before the first spawns). */
     private wave = 0;
-    /** Asteroids of the current wave that have not resolved yet. */
-    private tracked: Asteroid[] = [];
+    /** Asteroids of the current wave that have not resolved yet, of any variant. */
+    private tracked: AsteroidBase[] = [];
     /** Sim-seconds until the next wave spawns; only counts down while no wave is in flight. */
     private nextWaveTimer = 0;
     /** Total asteroids spawned so far — drives names and per-asteroid seeds. */
@@ -283,10 +283,16 @@ export class AsteroidDefenseScenario implements IScenario {
         triggerScenarioMessage(`Wave ${this.wave} / ${ASTEROID_DEFENSE_MAX_WAVES}`);
     }
 
-    /** Spawn one asteroid on a collision course with Earth and add it to the simulation. */
-    private spawnAsteroid(): Asteroid {
+    /**
+     * Spawn one asteroid (a random variant) on a collision course with Earth and add it to
+     * the simulation.
+     */
+    private spawnAsteroid(): AsteroidBase {
         const index = this.spawnedCount++;
         const rng = rngFor(this.seed, 'asteroidDefense', index);
+        // Dedicated stream for the variant roll, so the stream above keeps producing exactly
+        // the spawn geometry it produced before variants existed.
+        const variantRng = rngFor(this.seed, 'asteroidDefenseVariant', index);
 
         const direction = this.pickSpawnDirection(rng);
         const pos = this.earth.mesh.position
@@ -299,24 +305,29 @@ export class AsteroidDefenseScenario implements IScenario {
 
         const size = rng.range(ASTEROID_DEFENSE_RADIUS_MIN, ASTEROID_DEFENSE_RADIUS_MAX);
 
-        const asteroid = new Asteroid(this.dependencies, this.scene, {
-            id: createUniqueId('defense_asteroid'),
-            name: generateProceduralBodyName(BodyTypeEnum.Asteroid, {
-                seed: `${this.seed}|defenseAsteroid:${index}`,
-                sequenceNumber: index + 1,
-            }),
-            pos,
-            vel,
-            radius: size,
-            mass: AsteroidDefenseScenario.ASTEROID_DENSITY * Math.pow(size, 3),
-            rotation: {
-                tilt: rng.range(0, 180),
-                azimuth: rng.range(0, 360),
-                speed: rng.range(0.3, 1.0),
+        // Trail colour is owned by the chosen variant, so incoming rocks vary visually.
+        const asteroid = createRandomAsteroidBody(
+            this.dependencies,
+            this.scene,
+            {
+                id: createUniqueId('defense_asteroid'),
+                name: generateProceduralBodyName(BodyTypeEnum.Asteroid, {
+                    seed: `${this.seed}|defenseAsteroid:${index}`,
+                    sequenceNumber: index + 1,
+                }),
+                pos,
+                vel,
+                radius: size,
+                mass: AsteroidDefenseScenario.ASTEROID_DENSITY * Math.pow(size, 3),
+                rotation: {
+                    tilt: rng.range(0, 180),
+                    azimuth: rng.range(0, 360),
+                    speed: rng.range(0.3, 1.0),
+                },
+                maxTrail: ASTEROID_DEFENSE_TRAIL_LENGTH,
             },
-            trailColor: AsteroidDefenseScenario.ASTEROID_TRAIL_COLOR,
-            maxTrail: ASTEROID_DEFENSE_TRAIL_LENGTH,
-        });
+            variantRng
+        );
         asteroid.isThreat = true;
 
         this.dependencies.addBody(asteroid);

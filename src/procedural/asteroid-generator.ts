@@ -7,6 +7,7 @@ import { calculateOrbitalSpeed } from '../physics/physics';
 import type { ProceduralAsteroidCreation } from './asteroid-factory';
 import type { IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from '../bodies/body-enums';
+import { pickAsteroidVariant } from '../bodies/asteroid-variants';
 
 import {
     applyInclinationX,
@@ -149,6 +150,11 @@ export function generateProceduralAsteroids(params: {
         const distanceAU = distance / EARTH_DIST;
         const attributes = computeAsteroidAttributes({ id, distanceAU });
 
+        // Which rock model this asteroid uses. Drawn from its own stream so every value
+        // computed above is unchanged from before variants existed.
+        const variantRng = rngFor(masterSeed, 'asteroidVariant', i);
+        const variantId = pickAsteroidVariant(variantRng).id;
+
         creations.push({
             id,
             name,
@@ -159,6 +165,7 @@ export function generateProceduralAsteroids(params: {
             rotationSpeed,
             rotationTilt,
             rotationAzimuth,
+            variantId,
             hostStarIndex: isSType ? hostStarIndex : -1,
             attributes,
         });
