@@ -23,7 +23,7 @@ const COMET_NUCLEUS_SPEC2: IObjModelSpec = {
     mtlUrl: './assets/models/comet-2/comet-2.mtl',
     maps: {
         baseColor: './assets/models/comet-2/textures/ice_col.png',
-        displacement: './assets/models/comet-2/ice_col_d.png',
+        bump: './assets/models/comet-2/ice_col_d.png',
         normal: './assets/models/comet-2/textures/base_nor.png',
         alphaMap: './assets/models/comet-2/textures/ice_col_a.png'
     },
