@@ -2,14 +2,14 @@ import * as THREE from 'three';
 
 import { AsteroidBase, type IAsteroidModelConfig } from './asteroid-base';
 import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces.js';
-import { loadAsteroidVarient5ModelTemplate } from './asteroid-model-cache';
+import { loadAsteroidVariant5ModelTemplate } from './asteroid-model-cache';
 
 /** Warm rust-orange so the red variant reads distinctly against the grey rocks. */
 const ASTEROID_RED_TRAIL_COLOR = 0xff7a4d;
 
 /** Everything variant-specific about the red asteroid: its model and its trail. */
 const ASTEROID_RED_MODEL_CONFIG: IAsteroidModelConfig = {
-    loadTemplate: loadAsteroidVarient5ModelTemplate,
+    loadTemplate: loadAsteroidVariant5ModelTemplate,
     trailColor: ASTEROID_RED_TRAIL_COLOR,
 };
 

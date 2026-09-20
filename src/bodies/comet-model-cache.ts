@@ -7,9 +7,9 @@ import { loadObjModelTemplate, type IModelTemplate, type IObjModelSpec } from '.
  *
  * Texture file names contain spaces; the browser percent-encodes them when the URL resolves.
  */
-const COMET_NUCLEUS_SPEC: IObjModelSpec = {
-    objUrl: './assets/models/comet-1/comet.obj',
-    mtlUrl: './assets/models/comet-1/comet.mtl',
+const COMET_VARIANT_1_SPEC: IObjModelSpec = {
+    objUrl: './assets/models/comet-1/source/comet.obj',
+    mtlUrl: './assets/models/comet-1/source/comet.mtl',
     maps: {
         baseColor: './assets/models/comet-1/textures/Rock_LowPoly BaseColor.jpg',
         metallic: './assets/models/comet-1/textures/Rock_LowPoly Metallic.jpg',
@@ -18,9 +18,9 @@ const COMET_NUCLEUS_SPEC: IObjModelSpec = {
     },
 };
 
-const COMET_NUCLEUS_SPEC2: IObjModelSpec = {
-    objUrl: './assets/models/comet-2/comet-2.obj',
-    mtlUrl: './assets/models/comet-2/comet-2.mtl',
+const COMET_VARIANT_2_SPEC: IObjModelSpec = {
+    objUrl: './assets/models/comet-2/source/comet-2.obj',
+    mtlUrl: './assets/models/comet-2/source/comet-2.mtl',
     maps: {
         baseColor: './assets/models/comet-2/textures/ice_col.png',
         bump: './assets/models/comet-2/ice_col_d.png',
@@ -35,6 +35,16 @@ const COMET_NUCLEUS_SPEC2: IObjModelSpec = {
  * comet in a procedurally generated system. Every comet now clones this cached template —
  * see obj-model-cache.ts for the caching, MTL and material setup.
  */
-export function loadCometNucleusModelTemplate(): Promise<IModelTemplate> {
-    return loadObjModelTemplate(COMET_NUCLEUS_SPEC2);
+export function loadCometVariant1ModelTemplate(): Promise<IModelTemplate> {
+    return loadObjModelTemplate(COMET_VARIANT_1_SPEC);
+}
+
+/**
+ * Shared comet nucleus template. Comets previously created a fresh OBJLoader + MTLLoader per
+ * instance; with this model's ~11MB of textures that would decode a full copy for every
+ * comet in a procedurally generated system. Every comet now clones this cached template —
+ * see obj-model-cache.ts for the caching, MTL and material setup.
+ */
+export function loadCometVariant2ModelTemplate(): Promise<IModelTemplate> {
+    return loadObjModelTemplate(COMET_VARIANT_2_SPEC);
 }

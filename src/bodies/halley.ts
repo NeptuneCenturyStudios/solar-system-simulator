@@ -10,7 +10,7 @@ import {
 
 import { CometBase, type ICometModelConfig } from './comet-base';
 import { IStateDependencies } from '../interfaces.js';
-import { loadCometNucleusModelTemplate } from './comet-model-cache';
+import { loadCometVariant2ModelTemplate } from './comet-model-cache';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -29,7 +29,7 @@ const HALLEY_TRAIL_COLOR = 0xaaaaaa;
  * exist.
  */
 const HALLEY_MODEL_CONFIG: ICometModelConfig = {
-    loadTemplate: loadCometNucleusModelTemplate,
+    loadTemplate: loadCometVariant2ModelTemplate,
     trailColor: HALLEY_TRAIL_COLOR,
 };
 

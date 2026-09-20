@@ -2,14 +2,14 @@ import * as THREE from 'three';
 
 import { AsteroidBase, type IAsteroidModelConfig } from './asteroid-base';
 import { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces.js';
-import { loadAsteroidModelTemplate } from './asteroid-model-cache';
+import { loadAsteroidVariant1ModelTemplate } from './asteroid-model-cache';
 
 /** Dusty grey - muted so a dense belt reads as rock rather than as a light show. */
 const ASTEROID_TRAIL_COLOR = 0xa89a88;
 
 /** Everything variant-specific about the standard grey asteroid: its model and its trail. */
 const ASTEROID_MODEL_CONFIG: IAsteroidModelConfig = {
-    loadTemplate: loadAsteroidModelTemplate,
+    loadTemplate: loadAsteroidVariant1ModelTemplate,
     trailColor: ASTEROID_TRAIL_COLOR,
 };
 

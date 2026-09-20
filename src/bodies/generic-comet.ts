@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import { CometBase, type ICometModelConfig } from './comet-base';
 import { ICometCreationOptions, IStateDependencies } from '../interfaces.js';
-import { loadCometNucleusModelTemplate } from './comet-model-cache';
+import { loadCometVariant1ModelTemplate } from './comet-model-cache';
 
 /** Neutral grey motion trail. */
 const GENERIC_COMET_TRAIL_COLOR = 0xaaaaaa;
@@ -13,7 +13,7 @@ const GENERIC_COMET_TRAIL_COLOR = 0xaaaaaa;
  * where a registry lookup would go).
  */
 const GENERIC_COMET_MODEL_CONFIG: ICometModelConfig = {
-    loadTemplate: loadCometNucleusModelTemplate,
+    loadTemplate: loadCometVariant1ModelTemplate,
     trailColor: GENERIC_COMET_TRAIL_COLOR,
 };
 
