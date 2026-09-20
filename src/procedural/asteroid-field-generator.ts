@@ -33,6 +33,7 @@ import { BodyTypeEnum, MoonTypeEnum } from '../bodies/body-enums';
 import type { Body } from '../bodies/body';
 import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 import { ProceduralGenerationReporter } from './procedural-generation-progress';
+import { AsteroidFieldScenario } from '../scenarios/asteroid-field-scenario';
 
 /**
  * Scenario: Earth (with its Moon) flies a tight circular orbit around the Sun and plows
@@ -249,7 +250,7 @@ export class AsteroidFieldGenerator extends SolarSystemGenerator {
                     viewDirection: new THREE.Vector3(0.35, 0.45, 1),
                 },
             },
-            scenario: null,
+            scenario: new AsteroidFieldScenario(this.dependencies),
         };
     }
 }
