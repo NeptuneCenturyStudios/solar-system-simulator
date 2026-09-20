@@ -6,6 +6,7 @@ import { generateProceduralBodyName } from './body-naming';
 import type { ProceduralCometCreation } from './comet-factory';
 import type { IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from '../bodies/body-enums';
+import { pickCometVariant } from '../bodies/comet-variants';
 
 import {
     applyInclinationX,
@@ -161,6 +162,11 @@ export function generateProceduralComets(params: {
 
         const attributes = computeCometAttributes({ id });
 
+        // Which nucleus model this comet uses. Drawn from its own stream so every value
+        // computed above is unchanged from before variants existed.
+        const variantRng = rngFor(masterSeed, 'cometVariant', i);
+        const variantId = pickCometVariant(variantRng).id;
+
         creations.push({
             id,
             name,
@@ -172,6 +178,7 @@ export function generateProceduralComets(params: {
             rotationTilt,
             rotationAzimuth,
             tailColor,
+            variantId,
             hostStarIndex: isSType ? hostStarIndex : -1,
             attributes,
         });

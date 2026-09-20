@@ -170,7 +170,7 @@ import {
 } from './interfaces';
 import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simulation/autopilot';
 import { Sun } from './bodies/sun';
-import { GenericComet } from './bodies/generic-comet';
+import { createCometBody } from './bodies/comet-variants';
 import { Comet } from './bodies/comet';
 import { runAnimationLoop, AnimationContext } from './simulation/animation-loop';
 import { registerCustomEventListeners } from './events/custom-event-listeners';
@@ -1613,7 +1613,8 @@ function createNewBody(
         });
 
         const cometId = createUniqueId('comet');
-        newBody = new GenericComet(dependencies, scene, {
+        // The manual flow uses the default variant rather than rerolling a nucleus.
+        newBody = createCometBody(dependencies, scene, {
             radius: cometRadius,
             pos: cometSpawnPos,
             vel: cometOrbitVel,

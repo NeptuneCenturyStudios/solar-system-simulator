@@ -23,9 +23,9 @@ const COMET_VARIANT_2_SPEC: IObjModelSpec = {
     mtlUrl: './assets/models/comet-2/source/comet-2.mtl',
     maps: {
         baseColor: './assets/models/comet-2/textures/ice_col.png',
-        bump: './assets/models/comet-2/ice_col_d.png',
+        bump: './assets/models/comet-2/textures/ice_col_d.png',
         normal: './assets/models/comet-2/textures/base_nor.png',
-        alphaMap: './assets/models/comet-2/textures/ice_col_a.png'
+        alphaMap: './assets/models/comet-2/textures/ice_col_a.png',
     },
 };
 
