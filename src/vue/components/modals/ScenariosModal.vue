@@ -49,6 +49,14 @@
                 <span class="material-symbols-outlined">shield</span>
                 ASTEROID DEFENSE
             </button>
+            <button
+                class="old-ui btn-dark btn-with-icon"
+                type="button"
+                @click="selectScenario('extinctionEvent')"
+            >
+                <span class="material-symbols-outlined">crisis_alert</span>
+                EXTINCTION EVENT
+            </button>
             <button class="old-ui btn-with-icon btn-danger" type="button" @click="onCancel">
                 <span class="material-symbols-outlined">arrow_back</span>
                 CANCEL

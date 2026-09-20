@@ -67,6 +67,7 @@ import {
     WORMHOLE_SHORTCUT_G_MULTIPLIER,
     ASTEROID_FIELD_G_MULTIPLIER,
     ASTEROID_DEFENSE_G_MULTIPLIER,
+    EXTINCTION_EVENT_G_MULTIPLIER,
     SCENARIO_OUTCOME_MODAL_DELAY_MS,
     PROBE_MASS,
     PROBE_RADIUS,
@@ -303,6 +304,7 @@ import { TestAiShipsGenerator } from './procedural/test-ai-ships-generator';
 import { WormholeShortcutGenerator } from './procedural/wormhole-shortcut-generator';
 import { AsteroidFieldGenerator } from './procedural/asteroid-field-generator';
 import { AsteroidDefenseGenerator } from './procedural/asteroid-defense-generator';
+import { ExtinctionEventGenerator } from './procedural/extinction-event-generator';
 import { clearNpcShips, registerNpcShipsIn } from './simulation/ai/npc-manager';
 import { scenarioManager } from './scenarios/scenario-manager';
 import {
@@ -1758,7 +1760,8 @@ function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
         mode === SimulationStartMode.TestAiShips ||
         mode === SimulationStartMode.WormholeShortcut ||
         mode === SimulationStartMode.AsteroidField ||
-        mode === SimulationStartMode.AsteroidDefense;
+        mode === SimulationStartMode.AsteroidDefense ||
+        mode === SimulationStartMode.ExtinctionEvent;
 
     if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
         kuiperBeltPoints.visible = !hideKuiper;
@@ -1879,6 +1882,10 @@ async function spawn(
         // Asteroid defense scenario: the player always flies the Zenith, regardless of
         // whatever ship is selected in Normal Mode's Flight Controls dropdown.
         generator = new AsteroidDefenseGenerator(dependencies, scene, proceduralResult?.seed);
+    } else if (mode === SimulationStartMode.ExtinctionEvent) {
+        // Extinction event scenario: the player always flies the Osiris Mothership, regardless
+        // of whatever ship is selected in Normal Mode's Flight Controls dropdown.
+        generator = new ExtinctionEventGenerator(dependencies, scene, proceduralResult?.seed);
     } else {
         // Empty system generator
         generator = new EmptySystemGenerator(dependencies, scene);
@@ -4729,6 +4736,7 @@ const PRESET_G_MULTIPLIERS: Partial<Record<SimulationStartMode, number>> = {
     [SimulationStartMode.WormholeShortcut]: WORMHOLE_SHORTCUT_G_MULTIPLIER,
     [SimulationStartMode.AsteroidField]: ASTEROID_FIELD_G_MULTIPLIER,
     [SimulationStartMode.AsteroidDefense]: ASTEROID_DEFENSE_G_MULTIPLIER,
+    [SimulationStartMode.ExtinctionEvent]: EXTINCTION_EVENT_G_MULTIPLIER,
 };
 
 /**
@@ -4869,6 +4877,9 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
             } else if (scenarioResult.scenario === 'asteroidDefense') {
                 // Asteroid defense scenario — no seed prompt; the player starts in flight mode.
                 await launchSystem(SimulationStartMode.AsteroidDefense);
+            } else if (scenarioResult.scenario === 'extinctionEvent') {
+                // Extinction event scenario — no seed prompt; the player starts in flight mode.
+                await launchSystem(SimulationStartMode.ExtinctionEvent);
             }
             break;
         }

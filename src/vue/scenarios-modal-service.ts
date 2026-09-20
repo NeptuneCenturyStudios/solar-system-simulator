@@ -9,7 +9,8 @@ export type ScenarioAction =
     | 'testAiShips'
     | 'wormholeShortcut'
     | 'asteroidField'
-    | 'asteroidDefense';
+    | 'asteroidDefense'
+    | 'extinctionEvent';
 
 export interface ScenariosModalResult {
     scenario: ScenarioAction;

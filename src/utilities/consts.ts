@@ -11,6 +11,8 @@ export enum SimulationStartMode {
     AsteroidField = 6,
     /** Scenario: the player defends Earth from continuous waves of incoming asteroids. */
     AsteroidDefense = 7,
+    /** Scenario: the player defends Earth from a single onslaught of ~100 asteroids/comets. */
+    ExtinctionEvent = 8,
 }
 
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===
@@ -891,6 +893,59 @@ export const ASTEROID_DEFENSE_SPAWN_ATTEMPTS = 5;
  * distance a fast asteroid closes between its last visible frame and the collision.
  */
 export const ASTEROID_DEFENSE_IMPACT_MARGIN = 1.25;
+
+// === Extinction Event scenario (Phase 5) ===
+// The player, piloting the Osiris Mothership, faces the whole onslaught at once rather than
+// in waves: every threat spawns at scenario start, each with its own randomized spawn distance
+// and approach speed so they still arrive at staggered times instead of all at once.
+
+/** Preset gravity multiplier at scenario launch (real gravity). */
+export const EXTINCTION_EVENT_G_MULTIPLIER = 1;
+/** Real-time pacing, so the flight controls and the incoming threats share one clock. */
+export const EXTINCTION_EVENT_TIME_SCALE = 1;
+/** Total number of asteroids/comets thrown at Earth this scenario. */
+export const EXTINCTION_EVENT_THREAT_COUNT = 100;
+/** Fraction of threats that roll as a comet rather than an asteroid. */
+export const EXTINCTION_EVENT_COMET_CHANCE = 0.2;
+/**
+ * Range of spawn distance from Earth's centre (km / DIST_SCALE). Randomized per-threat
+ * (rather than fixed, as in Asteroid Defense) so 100 simultaneously-spawned threats still
+ * arrive at staggered times.
+ */
+export const EXTINCTION_EVENT_SPAWN_DISTANCE_MIN = 120_000 / DIST_SCALE;
+export const EXTINCTION_EVENT_SPAWN_DISTANCE_MAX = 220_000 / DIST_SCALE;
+/** Range of approach speed relative to Earth (km/s / DIST_SCALE), randomized per-threat. */
+export const EXTINCTION_EVENT_APPROACH_SPEED_MIN = 800 / DIST_SCALE;
+export const EXTINCTION_EVENT_APPROACH_SPEED_MAX = 1_600 / DIST_SCALE;
+/**
+ * Maximum spawn elevation above/below Earth's orbital plane, in degrees. Wider than Asteroid
+ * Defense's 30° so 100 spawn points spread out instead of clustering.
+ */
+export const EXTINCTION_EVENT_MAX_ELEVATION_DEG = 40;
+/** Asteroid radius range, reusing Asteroid Defense's values. */
+export const EXTINCTION_EVENT_ASTEROID_RADIUS_MIN = ASTEROID_DEFENSE_RADIUS_MIN;
+export const EXTINCTION_EVENT_ASTEROID_RADIUS_MAX = ASTEROID_DEFENSE_RADIUS_MAX;
+/** Comet radius range — comets are the rarer, more dangerous variety of threat. */
+export const EXTINCTION_EVENT_COMET_RADIUS_MIN = 400 / RADIUS_SCALE;
+export const EXTINCTION_EVENT_COMET_RADIUS_MAX = 1_000 / RADIUS_SCALE;
+/** Trail length for every threat, so incoming rocks/comets are visible from a distance. */
+export const EXTINCTION_EVENT_TRAIL_LENGTH = 100;
+/**
+ * A threat farther from Earth than its own spawn distance × this factor has missed (e.g. it
+ * was deflected) and is removed, so a stray body can never stall the scenario.
+ */
+export const EXTINCTION_EVENT_MISS_DISTANCE_FACTOR = 1.5;
+/**
+ * A threat that dies within (Earth radius + threat radius) × this factor of Earth's centre is
+ * counted as an impact; anywhere else it was destroyed.
+ */
+export const EXTINCTION_EVENT_IMPACT_MARGIN = 1.25;
+/** The player's Osiris spawns this far from Earth's centre, on the sunward (day) side. */
+export const EXTINCTION_EVENT_SHIP_ALTITUDE = EARTH_RADIUS * 6;
+/** Threats never spawn closer than this to the player's ship (25,000 km / DIST_SCALE). */
+export const EXTINCTION_EVENT_SHIP_CLEARANCE = 25_000 / DIST_SCALE;
+/** Maximum re-rolls of a spawn direction that lands too close to the player's ship. */
+export const EXTINCTION_EVENT_SPAWN_ATTEMPTS = 5;
 
 // === Wormhole link bridge (bezier particle curve between linked funnels) ===
 /** Number of pooled particles flowing along a linked-wormhole bridge curve. */
