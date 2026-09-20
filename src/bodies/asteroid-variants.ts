@@ -6,6 +6,9 @@ import type { AsteroidBase } from './asteroid-base';
 import { pickWeighted } from '../procedural/seed-utils';
 import type { ICelestialBodyCreationOptions, IStateDependencies } from '../interfaces';
 import type { SeededRandom } from '../utilities/prng';
+import { AsteroidMolten } from './asteroid-molten';
+import { AsteroidMineral } from './asteroid-mineral';
+import { Asteroid5 } from './asteroid5';
 
 /**
  * Describes one selectable asteroid variant. Every variant shares the same constructor
@@ -47,8 +50,26 @@ export const ASTEROID_VARIANTS: IAsteroidVariant[] = [
     {
         id: 'red',
         label: 'Red Asteroid',
-        weight: 1,
+        weight: 0.5,
         create: (dependencies, scene, options) => new AsteroidRed(dependencies, scene, options),
+    },
+    {
+        id: 'molten',
+        label: 'Molten Asteroid',
+        weight: 0.25,
+        create: (dependencies, scene, options) => new AsteroidMolten(dependencies, scene, options),
+    },
+    {
+        id: 'mineral',
+        label: 'Mineral Asteroid',
+        weight: 0.1,
+        create: (dependencies, scene, options) => new AsteroidMineral(dependencies, scene, options),
+    },
+    {
+        id: 'asteroid-5',
+        label: 'Asteroid 5',
+        weight: 0.75,
+        create: (dependencies, scene, options) => new Asteroid5(dependencies, scene, options),
     },
 ];
 

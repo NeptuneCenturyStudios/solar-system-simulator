@@ -8,9 +8,9 @@ import {
     COMET_MASS,
 } from '../utilities/consts.js';
 
-import { Comet } from './comet';
+import { CometBase, type ICometModelConfig } from './comet-base';
 import { IStateDependencies } from '../interfaces.js';
-import { MTLLoader, OBJLoader } from 'three/examples/jsm/Addons.js';
+import { loadCometNucleusModelTemplate } from './comet-model-cache';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -20,11 +20,24 @@ import {
     VegetationEnum,
 } from './body-attributes.js';
 
+/** Neutral grey motion trail. */
+const HALLEY_TRAIL_COLOR = 0xaaaaaa;
+
+/**
+ * Halley's nucleus model. Pinned to the shared comet-1 asset: Halley is a specific real
+ * object, so unlike a procedural comet it should not reroll its nucleus once more models
+ * exist.
+ */
+const HALLEY_MODEL_CONFIG: ICometModelConfig = {
+    loadTemplate: loadCometNucleusModelTemplate,
+    trailColor: HALLEY_TRAIL_COLOR,
+};
+
 /**
  * Represents Halley's Comet in the simulation, with a realistic elliptical orbit and physical properties.
- * Inherits from Comet and sets up Halley-specific trajectory and material.
+ * Extends CometBase, which owns the nucleus model, its loading and its disposal.
  */
-export class Halley extends Comet {
+export class Halley extends CometBase {
     /**
      * Constructs a new Halley object with its unique elliptical orbit and properties.
      * @param dependencies State dependencies for the simulation.
@@ -77,80 +90,44 @@ export class Halley extends Comet {
             .addScaledVector(er, -velScale * Math.sin(nu))
             .addScaledVector(et, velScale * (ecc + Math.cos(nu)));
 
-        // Geometry factory returns a placeholder geometry until OBJ loads
-        const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
-        const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
-        const placeholderMesh = new THREE.Mesh(geometryFactory(), placeholderMaterial);
-
-        super(dependencies, scene, {
-            pos,
-            vel,
-            mass: COMET_MASS,
-            id: 'halley',
-            name: 'Halley',
-            radius: COMET_RADIUS,
-            rotation: { tilt: 0, speed: 0.05 },
-            trailColor: 0xaaaaaa,
-            maxTrail: 2000,
-            mesh: placeholderMesh,
-            attributes: {
-                coreType: { value: CoreTypeEnum.Icy, discovered: true },
-                atmosphericComposition: {
-                    value:
-                        AtmosphericGasEnum.WaterVapor |
-                        AtmosphericGasEnum.CarbonDioxide |
-                        AtmosphericGasEnum.CarbonMonoxide,
-                    discovered: true,
+        super(
+            dependencies,
+            scene,
+            {
+                pos,
+                vel,
+                mass: COMET_MASS,
+                id: 'halley',
+                name: 'Halley',
+                radius: COMET_RADIUS,
+                rotation: { tilt: 0, speed: 0.05 },
+                maxTrail: 2000,
+                attributes: {
+                    coreType: { value: CoreTypeEnum.Icy, discovered: true },
+                    atmosphericComposition: {
+                        value:
+                            AtmosphericGasEnum.WaterVapor |
+                            AtmosphericGasEnum.CarbonDioxide |
+                            AtmosphericGasEnum.CarbonMonoxide,
+                        discovered: true,
+                    },
+                    soilComposition: {
+                        value:
+                            SoilCompositionEnum.WaterIce |
+                            SoilCompositionEnum.Carbon |
+                            SoilCompositionEnum.Silicates,
+                        discovered: true,
+                    },
+                    liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                    averageTemperatureKelvin: { value: 200, discovered: true },
+                    vegetation: { value: VegetationEnum.None, discovered: true },
+                    sentientLife: { value: false, discovered: true },
+                    lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                    orbitalPeriod: { discovered: true },
+                    rotationPeriod: { discovered: true },
                 },
-                soilComposition: {
-                    value:
-                        SoilCompositionEnum.WaterIce |
-                        SoilCompositionEnum.Carbon |
-                        SoilCompositionEnum.Silicates,
-                    discovered: true,
-                },
-                liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
-                averageTemperatureKelvin: { value: 200, discovered: true },
-                vegetation: { value: VegetationEnum.None, discovered: true },
-                sentientLife: { value: false, discovered: true },
-                lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
-                orbitalPeriod: { discovered: true },
-                rotationPeriod: { discovered: true },
             },
-        });
-
-        // Async OBJ + MTL load for Comet model
-        const mtlLoader = new MTLLoader();
-        mtlLoader.setPath('./assets/models/');
-        mtlLoader
-            .loadAsync('asteroid1.mtl')
-            .then((materials) => {
-                materials.preload();
-                const objLoader = new OBJLoader();
-                objLoader.setMaterials(materials);
-                return objLoader.loadAsync('./assets/models/Asteroid.obj');
-            })
-            .then((group) => {
-                // Compute bounding box of the unscaled model
-                const bbox = new THREE.Box3().setFromObject(group);
-                const size = new THREE.Vector3();
-                bbox.getSize(size);
-                const longestDim = Math.max(size.x, size.y, size.z);
-                // Use this.radius to match the instance's radius
-                const scale = this.radius / (longestDim * 0.5);
-                group.scale.setScalar(scale);
-
-                // Re-compute bbox after scaling to find the center
-                group.updateMatrixWorld(true);
-                const scaledBbox = new THREE.Box3().setFromObject(group);
-                const center = new THREE.Vector3();
-                scaledBbox.getCenter(center);
-                group.position.sub(center);
-
-                this.mesh.add(group);
-            })
-            .catch((e) => {
-                console.warn('asteroid1 OBJ/MTL load failed — using placeholder mesh', e);
-            });
+            HALLEY_MODEL_CONFIG
+        );
     }
 }

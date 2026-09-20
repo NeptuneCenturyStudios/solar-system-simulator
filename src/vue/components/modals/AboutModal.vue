@@ -20,7 +20,7 @@
                 alx_flameniro is licensed under Creative Commons Attribution
                 <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank">CC-BY</a>.
             </div>
-            
+
             <div>
                 International Space Station by Poly by Google
                 <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank">CC-BY</a>
@@ -45,21 +45,25 @@
             </div>
 
             <div>
-                Asteroid by J-Toastie
-                <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank">CC-BY</a>
-                via Poly Pizza
-                <a href="https://poly.pizza/m/YS1jpm3mNr" target="_blank"
-                    >https://poly.pizza/m/YS1jpm3mNr</a
-                >
+                "Meteor"
+                <a href="https://skfb.ly/6Zx8T" target="_blank">https://skfb.ly/6Zx8T</a> by Maxim
+                Mavrichev is licensed under Creative Commons Attribution
+                <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank">CC-BY</a>.
             </div>
 
             <div>
-                Asteroid 2 by J-Toastie
-                <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank">CC-BY</a>
-                via Poly Pizza
-                <a href="https://poly.pizza/m/yuCzypJ0w4" target="_blank"
-                    >https://poly.pizza/m/yuCzypJ0w4</a
-                >
+                "Asteroid with minerals" (https://skfb.ly/osIZL) by PeterMikielewicz is licensed
+                under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+            </div>
+
+            <div>
+                "MET02 Meteor" (https://skfb.ly/ovyM9) by Hodisfut is licensed under Creative
+                Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+            </div>
+
+            <div>
+                Space probe by Poly by Google [CC-BY] (https://creativecommons.org/licenses/by/3.0/)
+                via Poly Pizza (https://poly.pizza/m/fnFCCFiHbQt)
             </div>
 
             <div>

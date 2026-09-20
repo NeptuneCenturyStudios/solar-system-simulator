@@ -1,19 +1,28 @@
 import * as THREE from 'three';
-import { Comet } from './comet';
+
+import { CometBase, type ICometModelConfig } from './comet-base';
 import { ICometCreationOptions, IStateDependencies } from '../interfaces.js';
-import { MTLLoader, OBJLoader } from 'three/examples/jsm/Addons.js';
-import { applyModelFit, measureModelFit, type IModelFit } from './model-fit';
+import { loadCometNucleusModelTemplate } from './comet-model-cache';
+
+/** Neutral grey motion trail. */
+const GENERIC_COMET_TRAIL_COLOR = 0xaaaaaa;
 
 /**
- * Represents a generic comet in the simulation, with a realistic elliptical orbit and physical properties.
- * Inherits from Comet and sets up comet-specific trajectory and material.
+ * The procedural comet's nucleus. Currently the shared comet-1 model — when a second comet
+ * model lands, only this constant changes (or, if models should vary per spawn, this is
+ * where a registry lookup would go).
  */
-export class GenericComet extends Comet {
-    /** Loaded OBJ model, re-fitted whenever the radius changes. Null until the load resolves. */
-    private modelGroup: THREE.Object3D | null = null;
-    /** Measurement of the unscaled model, cached at load time. */
-    private modelFit: IModelFit | null = null;
+const GENERIC_COMET_MODEL_CONFIG: ICometModelConfig = {
+    loadTemplate: loadCometNucleusModelTemplate,
+    trailColor: GENERIC_COMET_TRAIL_COLOR,
+};
 
+/**
+ * Represents a generic comet in the simulation, with a realistic elliptical orbit and
+ * physical properties. Its nucleus model, loading and disposal all live in
+ * {@link CometBase}; this class only supplies the model it uses.
+ */
+export class GenericComet extends CometBase {
     /**
      * Constructs a new GenericComet object with its unique elliptical orbit and properties.
      * @param dependencies State dependencies for the simulation.
@@ -25,73 +34,6 @@ export class GenericComet extends Comet {
         scene: THREE.Scene,
         options: ICometCreationOptions
     ) {
-        // Geometry factory returns a placeholder geometry until OBJ loads
-        const geometryFactory = () => new THREE.BoxGeometry(0.001, 0.001, 0.001);
-        const placeholderMaterial = new THREE.MeshBasicMaterial({ visible: false });
-        const placeholderMesh = new THREE.Mesh(geometryFactory(), placeholderMaterial);
-
-        super(dependencies, scene, {
-            pos: options.pos,
-            vel: options.vel,
-            mass: options.mass,
-            id: options.id,
-            name: options.name,
-            radius: options.radius,
-            rotation: options.rotation,
-            trailColor: options.trailColor,
-            maxTrail: options.maxTrail,
-            tailColor: options.tailColor,
-            mesh: placeholderMesh,
-            attributes: options.attributes,
-            orbitParent: options.orbitParent,
-            orbitBarycenterMass: options.orbitBarycenterMass,
-        });
-
-        // Async OBJ + MTL load for Comet model
-        const mtlLoader = new MTLLoader();
-        mtlLoader.setPath('./assets/models/');
-        mtlLoader
-            .loadAsync('asteroid1.mtl')
-            .then((materials) => {
-                materials.preload();
-                const objLoader = new OBJLoader();
-                objLoader.setMaterials(materials);
-                return objLoader.loadAsync('./assets/models/Asteroid.obj');
-            })
-            .then((group) => {
-                // Measure while still detached, then fit to the instance's current radius.
-                // Keeping the measurement lets setRadius re-fit the model later.
-                this.modelGroup = group;
-                this.modelFit = measureModelFit(group);
-                applyModelFit(group, this.modelFit, this.radius);
-
-                // Tag every loaded sub-mesh so click-picking resolves to this body.
-                // The base Body tags only the placeholder mesh; without this the
-                // raycaster hits an untagged OBJ child and selection silently fails.
-                group.traverse((child) => (child.userData.parentBody = this));
-
-                this.mesh.add(group);
-            })
-            .catch((e) => {
-                console.warn('asteroid1 OBJ/MTL load failed — using placeholder mesh', e);
-            });
-    }
-
-    /**
-     * The comet's own mesh is a tiny invisible proxy for the loaded OBJ — turning it
-     * into a full-size sphere would add an invisible click/pick target around the nucleus.
-     */
-    protected override rebuildMeshGeometry(): void {
-        // Intentionally empty: the visible shape is the OBJ model, rescaled in setRadius.
-    }
-
-    override setRadius(newRadius: number) {
-        super.setRadius(newRadius);
-
-        // When the model hasn't loaded yet the loader reads this.radius on resolve,
-        // so it picks up the new size on its own.
-        if (this.modelGroup && this.modelFit) {
-            applyModelFit(this.modelGroup, this.modelFit, newRadius);
-        }
+        super(dependencies, scene, options, GENERIC_COMET_MODEL_CONFIG);
     }
 }

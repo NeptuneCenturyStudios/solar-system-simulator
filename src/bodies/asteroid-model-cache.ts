@@ -1,128 +1,107 @@
-import * as THREE from 'three';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { measureModelFit, type IModelFit } from './model-fit';
-
-export interface IAsteroidModelTemplate {
-    /** Unscaled template group at identity transform. Never added to a scene or mutated —
-     *  each Asteroid instance clones it (clone() shares the underlying geometry/material/
-     *  texture GPU resources and only forks the lightweight transform/userData). */
-    template: THREE.Group;
-    fit: IModelFit;
-}
-
-let _asteroidRockTemplatePromise: Promise<IAsteroidModelTemplate> | null = null;
+import { loadObjModelTemplate, type IModelTemplate, type IObjModelSpec } from './obj-model-cache';
 
 /**
- * Loads the shared asteroid OBJ model and its PBR textures exactly once per process and
- * caches the result. Asteroid previously created a new OBJLoader + TextureLoader (and
- * downloaded/decoded ~57MB across 4 PNGs) independently for every instance, which meant a
- * belt of a few hundred asteroids could redundantly load tens of gigabytes of duplicate
- * texture data. Every instance now clones this cached template instead.
+ * The standard grey rock: OBJ plus its four PBR maps (it ships a metallic map; the red
+ * variant does not).
  */
-export function loadAsteroidModelTemplate(): Promise<IAsteroidModelTemplate> {
-    if (_asteroidRockTemplatePromise) return _asteroidRockTemplatePromise;
+const ASTEROID_ROCK_SPEC: IObjModelSpec = {
+    objUrl: './assets/models/asteroid-1/source/LPP.obj',
+    maps: {
+        baseColor: './assets/models/asteroid-1/textures/LPP_1001_BaseColor.png',
+        metallic: './assets/models/asteroid-1/textures/LPP_1001_Metallic.png',
+        roughness: './assets/models/asteroid-1/textures/LPP_1001_Roughness.png',
+        normal: './assets/models/asteroid-1/textures/LPP_1001_Normal.png',
+    },
+};
 
-    const objLoader = new OBJLoader();
-    _asteroidRockTemplatePromise = objLoader
-        .loadAsync('./assets/models/asteroid-1/source/LPP.obj')
-        .then((group) => {
-            const texLoader = new THREE.TextureLoader();
-            const baseColor = texLoader.load(
-                './assets/models/asteroid-1/textures/LPP_1001_BaseColor.png'
-            );
-            const metallic = texLoader.load(
-                './assets/models/asteroid-1/textures/LPP_1001_Metallic.png'
-            );
-            const roughness = texLoader.load(
-                './assets/models/asteroid-1/textures/LPP_1001_Roughness.png'
-            );
-            const normal = texLoader.load(
-                './assets/models/asteroid-1/textures/LPP_1001_Normal.png'
-            );
+/** The red rock: same pipeline, its own OBJ and three maps. */
+const ASTEROID_RED_SPEC: IObjModelSpec = {
+    objUrl: './assets/models/asteroid-red/source/Asteroit.obj',
+    maps: {
+        baseColor: './assets/models/asteroid-red/textures/LPP_1001_BaseColor.png',
+        roughness: './assets/models/asteroid-red/textures/LPP_1001_Roughness.png',
+        normal: './assets/models/asteroid-red/textures/LPP_1001_Normal.png',
+    },
+};
 
-            // Apply the shared PBR material to every sub-mesh of the template. Instances
-            // that clone this group all reference the same Material/Texture instances.
-            group.traverse((child) => {
-                if ((child as THREE.Mesh).isMesh) {
-                    const mesh = child as THREE.Mesh;
+/** The molten asteroid: same pipeline, its own OBJ and maps. */
+const ASTEROID_MOLTEN_SPEC: IObjModelSpec = {
+    objUrl: './assets/models/asteroid-2/source/Meteor_mp.obj',
+    maps: {
+        baseColor: './assets/models/asteroid-2/textures/meteor_Base_Color.png',
+        roughness: './assets/models/asteroid-2/textures/meteor_Roughness.png',
+        normal: './assets/models/asteroid-2/textures/meteor_Normal_OpenGL.png',
+        emissive: './assets/models/asteroid-2/textures/meteor_Emissive.png',
+        ao: './assets/models/asteroid-2/textures/meteor_Mixed_AO.png',
+    },
+};
 
-                    mesh.material = new THREE.MeshStandardMaterial({
-                        map: baseColor,
-                        metalnessMap: metallic,
-                        roughnessMap: roughness,
-                        normalMap: normal,
-                        metalness: 0.01,
-                        roughness: 1.0,
-                    });
+/** The mineralized asteroid: same pipeline, its own OBJ and maps. */
+const ASTEROID_MINERAL_SPEC: IObjModelSpec = {
+    objUrl: './assets/models/asteroid-3/source/A2.obj',
+    maps: {
+        baseColor: './assets/models/asteroid-3/textures/Albedo.jpg',
+        normal: './assets/models/asteroid-3/textures/Normal.jpg',
+        emissive: './assets/models/asteroid-3/textures/Emission.jpg',
+        metallic: './assets/models/asteroid-3/textures/Metalness.jpg',
+        displacement: './assets/models/asteroid-3/textures/Displacement.jpg'
+    },
+};
 
-                    const mat = mesh.material as THREE.MeshStandardMaterial;
+/** The mineralized asteroid: same pipeline, its own OBJ and maps. */
+const ASTEROID_VARIENT_5_SPEC: IObjModelSpec = {
+    objUrl: './assets/models/asteroid-5/source/MET02.obj',
+    maps: {
+        baseColor: './assets/models/asteroid-5/textures/MET02_sphereSG2_BaseColor.1001.png',
+        normal: './assets/models/asteroid-5/textures/MET02_sphereSG2_Normal.1001.png',
+        metallic: './assets/models/asteroid-5/textures/MET02_sphereSG2_Metallic.1001.png',
+        roughness: './assets/models/asteroid-5/textures/MET02_sphereSG2_Roughness.1001.png',
+    }
+};
 
-                    // Correct color spaces
-                    mat.map!.colorSpace = THREE.SRGBColorSpace;
-                    mat.metalnessMap!.colorSpace = THREE.LinearSRGBColorSpace;
-                    mat.roughnessMap!.colorSpace = THREE.LinearSRGBColorSpace;
-                }
-            });
+/** The mineralized asteroid: same pipeline, its own OBJ and maps. */
+const ASTEROID_VESTA_SPEC: IObjModelSpec = {
+    objUrl: './assets/models/asteroid-vesta/source/Vesta_1_100.obj',
+    mtlUrl: './assets/models/asteroid-vesta/source/Vesta_1_100.mtl',
+    maps: {
+        baseColor: './assets/models/asteroid-vesta/textures/vesta_diff.jpg_1.png',
+        normal: './assets/models/asteroid-vesta/textures/vesta_n.png_0.png',
+    }
+};
 
-            // Measure once, while still at identity transform and detached from any parent.
-            const fit = measureModelFit(group);
 
-            return { template: group, fit };
-        });
-
-    return _asteroidRockTemplatePromise;
-}
-
-let _asteroidRedTemplatePromise: Promise<IAsteroidModelTemplate> | null = null;
 
 /**
- * Loads the red asteroid model and PBR textures anc creates a reusable template
+ * Shared asteroid template. Asteroid used to create its own OBJLoader + TextureLoader (and
+ * download/decode ~57MB across 4 PNGs) per instance, so a belt of a few hundred asteroids
+ * could redundantly load tens of gigabytes of duplicate texture data. Every instance now
+ * clones this cached template — see obj-model-cache.ts for the caching and material setup.
  */
-export function loadAsteroidRedModelTemplate(): Promise<IAsteroidModelTemplate> {
-    if (_asteroidRedTemplatePromise) return _asteroidRedTemplatePromise;
+export function loadAsteroidModelTemplate(): Promise<IModelTemplate> {
+    return loadObjModelTemplate(ASTEROID_ROCK_SPEC);
+}
 
-    const objLoader = new OBJLoader();
-    _asteroidRedTemplatePromise = objLoader
-        .loadAsync('./assets/models/asteroid-red/source/Asteroit.obj')
-        .then((group) => {
-            const texLoader = new THREE.TextureLoader();
-            const baseColor = texLoader.load(
-                './assets/models/asteroid-red/textures/LPP_1001_BaseColor.png'
-            );
-            const roughness = texLoader.load(
-                './assets/models/asteroid-red/textures/LPP_1001_Roughness.png'
-            );
-            const normal = texLoader.load(
-                './assets/models/asteroid-red/textures/LPP_1001_Normal.png'
-            );
+/** Shared template for the red asteroid variant. */
+export function loadAsteroid2ModelTemplate(): Promise<IModelTemplate> {
+    return loadObjModelTemplate(ASTEROID_MOLTEN_SPEC);
+}
 
-            // Apply the shared PBR material to every sub-mesh of the template. Instances
-            // that clone this group all reference the same Material/Texture instances.
-            group.traverse((child) => {
-                if ((child as THREE.Mesh).isMesh) {
-                    const mesh = child as THREE.Mesh;
+/** Shared template for the red asteroid variant. */
+export function loadAsteroidRedModelTemplate(): Promise<IModelTemplate> {
+    return loadObjModelTemplate(ASTEROID_RED_SPEC);
+}
 
-                    mesh.material = new THREE.MeshStandardMaterial({
-                        map: baseColor,
-                        roughnessMap: roughness,
-                        normalMap: normal,
-                        metalness: 0.01,
-                        roughness: 1.0,
-                    });
+/** Shared template for the red asteroid variant. */
+export function loadAsteroidMineralModelTemplate(): Promise<IModelTemplate> {
+    return loadObjModelTemplate(ASTEROID_MINERAL_SPEC);
+}
 
-                    const mat = mesh.material as THREE.MeshStandardMaterial;
+/** Shared template for the asteroid variant. */
+export function loadAsteroidVarient5ModelTemplate(): Promise<IModelTemplate> {
+    return loadObjModelTemplate(ASTEROID_VARIENT_5_SPEC);
+}
 
-                    // Correct color spaces
-                    mat.map!.colorSpace = THREE.SRGBColorSpace;
-                    mat.roughnessMap!.colorSpace = THREE.LinearSRGBColorSpace;
-                }
-            });
-
-            // Measure once, while still at identity transform and detached from any parent.
-            const fit = measureModelFit(group);
-
-            return { template: group, fit };
-        });
-
-    return _asteroidRedTemplatePromise;
+/** Shared template for the vesta asteroid. */
+export function loadAsteroidVestaModelTemplate(): Promise<IModelTemplate> {
+    return loadObjModelTemplate(ASTEROID_VESTA_SPEC);
 }

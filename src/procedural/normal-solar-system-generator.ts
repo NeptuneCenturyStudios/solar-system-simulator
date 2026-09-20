@@ -75,6 +75,7 @@ import type {
     ProceduralGenerationWorkUnit,
 } from './procedural-generation-progress';
 import { AsteroidRed } from '../bodies/asteroid-red';
+import { Vesta } from '../bodies/vesta';
 
 export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
@@ -226,7 +227,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             SUN_MASS,
             vestaAngle
         );
-        const vesta = new Asteroid(this.dependencies, this.scene, {
+        const vesta = new Vesta(this.dependencies, this.scene, {
             radius: VESTA_RADIUS,
             pos: new THREE.Vector3(
                 vestaTrajectory.pos.x,

@@ -4,7 +4,7 @@ import { CelestialBody } from './celestial-body';
 import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces.js';
 import { BodyTypeEnum } from './body-enums';
 import { applyModelFit, type IModelFit } from './model-fit';
-import type { IAsteroidModelTemplate } from './asteroid-model-cache';
+import type { IModelTemplate } from './obj-model-cache';
 
 /**
  * The per-variant configuration an asteroid subclass hands to {@link AsteroidBase}.
@@ -19,7 +19,7 @@ export interface IAsteroidModelConfig {
      * Resolves the process-lifetime cached model template this variant clones per instance.
      * Provided by asteroid-model-cache.ts.
      */
-    loadTemplate: () => Promise<IAsteroidModelTemplate>;
+    loadTemplate: () => Promise<IModelTemplate>;
     /**
      * Trail colour for this variant, used when the caller passes no `trailColor`. Lets a
      * 300-rock band read as a mixed field with per-variant trail tints while still allowing
