@@ -639,10 +639,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         destroyBody(other, [atmosphereVictim]);
 
                         const impactSpeed = atmosphereVictim.velocity.distanceTo(other.velocity);
+                        // die() dispatches body:dead synchronously, and its listener already
+                        // removes this body from ctx.simulationState.bodies (same array) before
+                        // this line runs — no need to filter it out again here.
                         atmosphereVictim.die({ impactSpeed });
-                        ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
-                            (body) => body !== atmosphereVictim
-                        );
 
                         // small could be either b1 or b2 — if b1 burned up, stop colliding it
                         // against the rest of the row (mirrors the `if (b1._isDisposed) break;`
@@ -678,11 +678,11 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                             // body:dead event fired inside victim.die()).
                             destroyBody(null, outcome.victims);
 
+                            // die() dispatches body:dead synchronously, and its listener already
+                            // removes each victim from ctx.simulationState.bodies (same array) —
+                            // no need to filter it out again here.
                             for (const victim of outcome.victims) {
                                 victim.die({ impactSpeed });
-                                ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
-                                    (b) => b !== victim
-                                );
                             }
                             // b1 is always destroyed here — stop colliding it against the rest.
                             break;
@@ -700,10 +700,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         // If the camera was focused on the destroyed victim, its focus is
                         // frozen at the victim's last position by handleBodyBecameInvalid
                         // (via the body:dead event fired inside victim.die()).
+                        // die() dispatches body:dead synchronously, and its listener already
+                        // removes this body from ctx.simulationState.bodies (same array) before
+                        // this line runs — no need to filter it out again here.
                         victim.die({ impactSpeed });
-                        ctx.simulationState.bodies = ctx.simulationState.bodies.filter(
-                            (b) => b !== victim
-                        );
 
                         // b1 may be the victim — stop colliding it against remaining bodies.
                         if (b1._isDisposed) break;

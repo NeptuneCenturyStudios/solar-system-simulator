@@ -595,6 +595,22 @@ function ensurePolling(): void {
     intervalId = window.setInterval(refreshAll, SNAPSHOT_INTERVAL_MS);
 }
 
+let refreshScheduled = false;
+
+/**
+ * Coalesces bursts of body:added/removed/dead/reset events (e.g. dozens of asteroids dying in
+ * the same animation frame) into a single refreshAll() per frame, instead of one full — and,
+ * while System Explorer is open, Vue-re-rendering — refresh per individual event.
+ */
+function scheduleRefresh(): void {
+    if (refreshScheduled) return;
+    refreshScheduled = true;
+    requestAnimationFrame(() => {
+        refreshScheduled = false;
+        refreshAll();
+    });
+}
+
 /**
  * Initialise the bridge: start polling and subscribe to the documented window
  * events so the snapshot refreshes instantly on changes (no 100ms lag).
@@ -602,10 +618,10 @@ function ensurePolling(): void {
 export function initSimBridge(): void {
     ensurePolling();
 
-    window.addEventListener('body:added', refreshAll);
-    window.addEventListener('body:removed', refreshAll);
-    window.addEventListener('body:dead', refreshAll);
-    window.addEventListener('bodies:reset', refreshAll);
+    window.addEventListener('body:added', scheduleRefresh);
+    window.addEventListener('body:removed', scheduleRefresh);
+    window.addEventListener('body:dead', scheduleRefresh);
+    window.addEventListener('bodies:reset', scheduleRefresh);
     // Instant scalar sync: index.ts dispatches this on every pause / time-scale
     // / gravity change (P key, old toolbar, auto-pause during drags), so the
     // Vue UI mirrors the sim with zero 100ms poll lag.
