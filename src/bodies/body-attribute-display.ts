@@ -14,7 +14,7 @@ import {
     SOIL_COMPOSITION_FLAGS,
     VEGETATION_FLAGS,
 } from './body-attribute-labels';
-import { formatETA, formatMass, formatRadius } from '../utilities/display-format';
+import { formatAge, formatETA, formatMass, formatRadius } from '../utilities/display-format';
 
 /** Placeholder shown for an attribute the player has not yet discovered. */
 export const UNDISCOVERED_PLACEHOLDER = '???';
@@ -37,6 +37,8 @@ export interface IBodyAttributeRow {
 export interface IBodyPeriods {
     orbitalPeriod: number | null;
     rotationPeriod: number | null;
+    /** Live fuel percentage for a MainSequenceStar, or null when not applicable/undiscovered. */
+    fuelPercentRemaining: number | null;
 }
 
 /** Always-known physical data, shown for every scannable body. */
@@ -127,7 +129,8 @@ export function buildBasicRows(data: IBodyBasicData): IBodyAttributeRow[] {
  */
 export function buildScienceRows(
     attributes: IPlanetaryAttributes | undefined,
-    periods: IBodyPeriods
+    periods: IBodyPeriods,
+    starDeathEnabled: boolean
 ): IBodyAttributeRow[] {
     const rows: IBodyAttributeRow[] = [];
 
@@ -244,23 +247,76 @@ export function buildScienceRows(
         });
     }
 
-    const orbitalDiscovered = !!attributes.orbitalPeriod?.discovered;
-    const rotationDiscovered = !!attributes.rotationPeriod?.discovered;
+    if (attributes.age) {
+        const age = attributes.age;
+        rows.push({
+            key: 'age',
+            label: 'Age',
+            value: age.discovered ? formatAge(age.value) : UNDISCOVERED_PLACEHOLDER,
+            discovered: age.discovered,
+        });
+    }
 
-    rows.push(
-        formatPeriodRow(
-            'orbitalPeriod',
-            'Orbital Period',
-            periods.orbitalPeriod,
-            orbitalDiscovered
-        ),
-        formatPeriodRow(
-            'rotationPeriod',
-            'Rotation Period',
-            periods.rotationPeriod,
-            rotationDiscovered
-        )
-    );
+    // Only shown while Natural Star Death is enabled — fuel never burns otherwise, so the row
+    // would just be a permanent, uninteresting 100%. The discovered flag itself is independent
+    // of the option, so nothing is lost if a probe discovers this before it's turned on.
+    if (attributes.fuelPercentRemaining && starDeathEnabled) {
+        const discovered = attributes.fuelPercentRemaining.discovered;
+        rows.push({
+            key: 'fuelPercentRemaining',
+            label: 'Fuel Remaining',
+            value:
+                discovered && periods.fuelPercentRemaining !== null
+                    ? `${Math.round(periods.fuelPercentRemaining)}%`
+                    : UNDISCOVERED_PLACEHOLDER,
+            discovered,
+        });
+    }
+
+    // Gated on the field's own presence (not just "attributes exists at all") so a body whose
+    // attributes bag doesn't carry orbital/rotation period data (e.g. a star with only
+    // age/fuel) reads as "not recorded" rather than a permanently-undiscoverable "???".
+    if (attributes.orbitalPeriod) {
+        rows.push(
+            formatPeriodRow(
+                'orbitalPeriod',
+                'Orbital Period',
+                periods.orbitalPeriod,
+                attributes.orbitalPeriod.discovered
+            )
+        );
+    } else {
+        rows.push(
+            formatPeriodRow(
+                'orbitalPeriod',
+                'Orbital Period',
+                periods.orbitalPeriod,
+                true,
+                NOT_APPLICABLE_PLACEHOLDER
+            )
+        );
+    }
+
+    if (attributes.rotationPeriod) {
+        rows.push(
+            formatPeriodRow(
+                'rotationPeriod',
+                'Rotation Period',
+                periods.rotationPeriod,
+                attributes.rotationPeriod.discovered
+            )
+        );
+    } else {
+        rows.push(
+            formatPeriodRow(
+                'rotationPeriod',
+                'Rotation Period',
+                periods.rotationPeriod,
+                true,
+                NOT_APPLICABLE_PLACEHOLDER
+            )
+        );
+    }
 
     return rows;
 }
@@ -276,6 +332,8 @@ export function hasScienceData(attributes: IPlanetaryAttributes | undefined): bo
         attributes.averageTemperatureKelvin ||
         attributes.vegetation ||
         attributes.sentientLife ||
-        attributes.lifeformBase
+        attributes.lifeformBase ||
+        attributes.age ||
+        attributes.fuelPercentRemaining
     );
 }

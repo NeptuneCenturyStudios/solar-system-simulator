@@ -66,7 +66,7 @@ import {
     type ProbeMissionModalController,
     type ProbeMissionModalResult,
 } from '../../probe-mission-modal-service';
-import { simStore } from '../../sim-bridge';
+import { BodySnapshot, simStore } from '../../sim-bridge';
 import { simRadiusToKm } from '../../../utilities/display-format';
 import { DIST_SCALE, PROBE_SCAN_RANGE_KM } from '../../../utilities/consts';
 import ModalBase from './ModalBase.vue';
@@ -81,7 +81,7 @@ const altitudeKm = ref<number>(1000);
 
 watch(targetId, (id) => {
     const target = targets.value.find((t) => t.id === id);
-    altitudeKm.value = target ? Math.max(1, Math.round(simRadiusToKm(target.radius))) : 1000;
+    altitudeKm.value = getTargetAltitudeKm(target);
 });
 
 watch(
@@ -91,9 +91,19 @@ watch(
         // Re-seed the default target/altitude each time the modal opens.
         const first = targets.value[0];
         targetId.value = first ? first.id : '';
-        altitudeKm.value = first ? Math.max(1, Math.round(simRadiusToKm(first.radius))) : 1000;
+        altitudeKm.value = getTargetAltitudeKm(first);
     }
 );
+
+/**
+ * Sets a default orbital altitude for the probe based on the radius of the target
+ * @param target The BodySnapshot object
+ */
+function getTargetAltitudeKm(target?: BodySnapshot) {
+    return target
+        ? Math.min(Math.max(1, Math.round(simRadiusToKm(target.radius))), scanRangeKm)
+        : 1000;
+}
 
 function onLaunch(): void {
     if (!targetId.value || altitudeKm.value <= 0) return;

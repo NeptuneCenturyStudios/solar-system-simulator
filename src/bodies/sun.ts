@@ -38,6 +38,11 @@ export class Sun extends MainSequenceStar {
                 offset: SUN_MAG_OFFSET,
                 reversed: SUN_MAG_REVERSED,
             },
+            attributes: {
+                age: { value: 4.6e9, discovered: true },
+                fuelPercentRemaining: { discovered: true },
+                rotationPeriod: { discovered: true },
+            },
         });
     }
 }

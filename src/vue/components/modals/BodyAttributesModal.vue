@@ -68,7 +68,7 @@ const isOpen = computed<boolean>(() => snapshot.value !== null);
 const title = computed<string>(() => {
     const current = snapshot.value;
     if (!current) return 'Object Data';
-    return `${current.bodyName} — ${current.typeLabel}`;
+    return current.bodyName;
 });
 
 /** True when at least one science row is still unscanned, which is what a probe would unlock. */
@@ -124,13 +124,13 @@ function onClose(): void {
     flex: 1 1 auto;
     margin: 0;
     font-size: 0.85rem;
-    color: #00ffcc;
+    color: var(--new-ui-label-value-color);
     overflow-wrap: anywhere;
 }
 
 /* Unscanned readings read as dimmed placeholders rather than data. */
 .attribute-row-unknown .attribute-value {
-    color: rgba(255, 255, 255, 0.35);
+    color: var(--new-ui-label-dim-color);
 }
 
 .attribute-note {
@@ -141,6 +141,6 @@ function onClose(): void {
 
 .attribute-note-hint {
     margin: 8px 0 0;
-    color: rgba(0, 255, 204, 0.7);
+    color: var(--new-ui-label-color)
 }
 </style>

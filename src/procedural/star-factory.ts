@@ -5,6 +5,7 @@ import type { IMagneticFieldOptions, IStateDependencies } from '../interfaces';
 import { STAR_LIGHT_DISTANCE } from '../utilities/consts';
 import { SeededRandom } from '../utilities/prng';
 import { rollMagneticField } from './magnetic-field';
+import { computeStellarAttributes } from './star-attributes';
 
 export type ProceduralStarCreation = {
     id: string;
@@ -18,6 +19,10 @@ export type ProceduralStarCreation = {
      * Undefined means "roll for one"; an explicit null means "no field".
      */
     magneticField?: IMagneticFieldOptions | null;
+    /** True when this star actually orbits something (a companion star or a black hole),
+     *  making its orbital period a meaningful discoverable attribute. Defaults to false — a
+     *  lone star has no orbit. */
+    hasOrbitalPeriod?: boolean;
 };
 
 /**
@@ -38,6 +43,7 @@ export function createMainSequenceStarFromParams(
         vel,
         rotation,
         magneticField,
+        hasOrbitalPeriod,
     }: {
         id: string;
         name: string;
@@ -45,6 +51,7 @@ export function createMainSequenceStarFromParams(
         vel: THREE.Vector3;
         rotation?: { tilt: number; speed: number; azimuth?: number };
         magneticField?: IMagneticFieldOptions | null;
+        hasOrbitalPeriod?: boolean;
     }
 ): MainSequenceStar {
     return new MainSequenceStar(dependencies, scene, {
@@ -69,6 +76,11 @@ export function createMainSequenceStarFromParams(
             magneticField !== undefined
                 ? magneticField
                 : rollMagneticField(new SeededRandom(`${params.seed}|magnetic-field`), 'star'),
+        attributes: computeStellarAttributes({
+            id,
+            mass: params.mass,
+            hasOrbitalPeriod: hasOrbitalPeriod ?? false,
+        }),
     });
 }
 
@@ -89,5 +101,6 @@ export function createStarBodyFromProceduralCreation(
         vel: creation.vel,
         rotation: creation.rotation,
         magneticField: creation.magneticField,
+        hasOrbitalPeriod: creation.hasOrbitalPeriod,
     });
 }

@@ -153,6 +153,13 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 this.scene,
                 creation
             );
+            // Binary/triple members orbit their shared barycentre (world origin, per
+            // generateBinaryPlacements/generateTriplePlacements), matching how planets orbiting
+            // a P-type/circumbinary configuration get their orbitBarycenterMass below.
+            if (starCount > 1) {
+                starBody.orbitBarycenterMass = totalStarMass;
+            }
+
             starBodies.push(starBody);
             bodies.push(starBody);
 
