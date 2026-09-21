@@ -152,24 +152,22 @@
         </div>
 
         <div>
-            <button
-                class="old-ui btn-with-icon mb-3"
-                type="button"
-                :disabled="addLocked"
-                @click="openBodyEditor('add', null)"
-            >
-                <span class="material-symbols-outlined">add</span>
-                ADD NEW OBJECT
-            </button>
+            <div class="btn-row" style="grid-template-columns: 1fr 1fr">
+                <button
+                    class="old-ui btn-with-icon mb-3"
+                    type="button"
+                    :disabled="addLocked"
+                    @click="openBodyEditor('add', null)"
+                >
+                    <span class="material-symbols-outlined">add</span>
+                    ADD NEW OBJECT
+                </button>
 
-            <button
-                class="old-ui btn-with-icon mb-3"
-                type="button"
-                @click="onLaunchProbe"
-            >
-                <span class="material-symbols-outlined">satellite_alt</span>
-                LAUNCH PROBE
-            </button>
+                <button class="old-ui btn-with-icon mb-3" type="button" @click="onLaunchProbe">
+                    <span class="material-symbols-outlined">satellite_alt</span>
+                    LAUNCH PROBE
+                </button>
+            </div>
 
             <label class="checkbox-row">
                 <input

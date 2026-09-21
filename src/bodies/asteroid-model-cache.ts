@@ -39,11 +39,11 @@ const ASTEROID_VARIANT_3_SPEC: IObjModelSpec = {
 
 /** The red rock: same pipeline, its own OBJ and maps. */
 const ASTEROID_VARIANT_4_SPEC: IObjModelSpec = {
-    objUrl: './assets/models/asteroid-red/source/Asteroit.obj',
+    objUrl: './assets/models/asteroid-4/source/Asteroit.obj',
     maps: {
-        baseColor: './assets/models/asteroid-red/textures/LPP_1001_BaseColor.png',
-        roughness: './assets/models/asteroid-red/textures/LPP_1001_Roughness.png',
-        normal: './assets/models/asteroid-red/textures/LPP_1001_Normal.png',
+        baseColor: './assets/models/asteroid-4/textures/LPP_1001_BaseColor.png',
+        roughness: './assets/models/asteroid-4/textures/LPP_1001_Roughness.png',
+        normal: './assets/models/asteroid-4/textures/LPP_1001_Normal.png',
     },
 };
 
