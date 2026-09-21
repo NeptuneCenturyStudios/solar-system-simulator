@@ -538,6 +538,9 @@ export interface IFlightState {
 
     /** Seconds the E key has been held over the current hovered body (0 → FLIGHT_AUTOPILOT_CHARGE_TIME). */
     autopilotCharge: number;
+
+    /** Currently locked threat target, cycled by TAB in flight mode. */
+    selectedTarget: Body | null;
 }
 
 /**
@@ -714,6 +717,13 @@ export interface IFlightControlContext {
     speedSprite: HudSprite | null;
 
     addEvent: (event: { message: string; notificationType: NotificationType }) => void;
+
+    /**
+     * Called once flight mode has fully exited, from every exit path (Esc, ship destroyed,
+     * autopilot teardown). index.ts uses it to undo the UI changes made on entry — currently
+     * restoring the PanelManager that the flight-mode hide took away.
+     */
+    onFlightModeExited: () => void;
 }
 
 export interface IAutopilotContext {

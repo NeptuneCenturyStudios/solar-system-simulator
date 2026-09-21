@@ -67,6 +67,8 @@ export const flightState: IFlightState = {
     steeringHoveredBody: null as Body | null,
     /** Seconds the E key has been held over the current hovered body (0 → FLIGHT_AUTOPILOT_CHARGE_TIME). */
     autopilotCharge: 0,
+    /** Currently locked threat target, cycled by TAB in flight mode. */
+    selectedTarget: null as Body | null,
 };
 
 /**

@@ -2,7 +2,8 @@
     <PanelBase title="Flight Controls">
         <p class="vue-ui-hint">
             W/S — speed &nbsp; A/D — roll &nbsp; Shift — boost<br />
-            C — view &nbsp; Mouse steers &nbsp; Hold space — warp &nbsp; Esc — exit
+            C — view &nbsp; Mouse steers &nbsp; Hold space — warp &nbsp; Esc — exit<br />
+            Tab/Shift+Tab — lock target &nbsp; Hold S — chase (Shift — boost)
         </p>
 
         <div class="control-group">
@@ -35,6 +36,32 @@
             <span class="material-symbols-outlined">logout</span>
             EXIT FLIGHT MODE
         </button>
+
+        <div class="vue-ui-card-header">Interface</div>
+
+        <label
+            class="checkbox-row"
+            title="Closes this panel when you enter a ship and re-opens it when you leave flight mode."
+        >
+            <input
+                type="checkbox"
+                :checked="simStore.hidePanelManagerInFlight"
+                @change="onHidePanelInFlightChange"
+            />
+            Hide Menu In Flight Mode
+        </label>
+
+        <label
+            class="checkbox-row"
+            title="While a target is locked (Tab), holding S pursues it instead of braking. Shift+S pursues at boost speed."
+        >
+            <input
+                type="checkbox"
+                :checked="simStore.chaseModeEnabled"
+                @change="onChaseModeChange"
+            />
+            Chase Mode (Hold S)
+        </label>
     </PanelBase>
 </template>
 
@@ -45,6 +72,8 @@ import { SHIP_TYPES } from '../../bodies/ships/ship-registry';
 import {
     requestExitFlightMode,
     requestSpawnShip,
+    setChaseModeEnabled,
+    setHidePanelManagerInFlight,
     setSelectedShipTypeId,
     simStore,
 } from '../sim-bridge';
@@ -57,6 +86,14 @@ const canReenter = computed(
 
 const spawnIcon = computed(() => (canReenter.value ? 'login' : 'rocket_launch'));
 const spawnLabel = computed(() => (canReenter.value ? 'ENTER SHIP' : 'SPAWN SPACESHIP'));
+
+function onHidePanelInFlightChange(e: Event): void {
+    setHidePanelManagerInFlight((e.target as HTMLInputElement).checked);
+}
+
+function onChaseModeChange(e: Event): void {
+    setChaseModeEnabled((e.target as HTMLInputElement).checked);
+}
 </script>
 
 <style scoped>

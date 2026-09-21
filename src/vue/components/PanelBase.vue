@@ -18,14 +18,16 @@
 </template>
 
 <script setup lang="ts">
-import { ActivePanel, vueUiState } from '../ui-store';
+import { ActivePanel, hidePanelManager, vueUiState } from '../ui-store';
 
 const props = defineProps<{
     title: string;
 }>();
 
 function closePanel() {
-    vueUiState.panelManagerVisible = false;
+    // Go through the store's user-intent hide so flight mode can tell this apart from the
+    // hide it does itself, and won't re-open the panel when the player leaves the cockpit.
+    hidePanelManager();
     // Set the active panel to none
     vueUiState.activePanel = ActivePanel.None;
 }

@@ -265,6 +265,10 @@ export interface VueSimHooks {
     setShowAiDebug?: (checked: boolean) => void;
     /** Toggle eased/smooth camera zoom vs. instant (persisted via settingsStore). */
     setSmoothZoomEnabled?: (checked: boolean) => void;
+    /** Toggle hiding the PanelManager while in flight mode (persisted via settingsStore). */
+    setHidePanelManagerInFlight?: (checked: boolean) => void;
+    /** Toggle S-key chase mode when a target is locked (persisted via settingsStore). */
+    setChaseModeEnabled?: (checked: boolean) => void;
 
     // ── Playlist (same sim paths as the old playlist panel) ─────────────────
     /** Snapshot of the shuffled playlist + current playback state. */
@@ -352,6 +356,10 @@ export interface VueSimStore {
     showAiDebug: boolean;
     /** Ease camera zoom instead of snapping instantly. */
     smoothZoomEnabled: boolean;
+    /** Hide the PanelManager while in flight mode, restoring it on exit. */
+    hidePanelManagerInFlight: boolean;
+    /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
+    chaseModeEnabled: boolean;
 
     /** Id of the autopilot target body, or null when autopilot is off. */
     autopilotTargetId: string | null;
@@ -405,6 +413,8 @@ const state = reactive<VueSimStore>({
     frameRateLimit: settingsStore.settings.frameRateLimit,
     showAiDebug: settingsStore.settings.showAiDebug,
     smoothZoomEnabled: settingsStore.settings.smoothZoomEnabled,
+    hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
+    chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
@@ -940,6 +950,26 @@ export function setSmoothZoomEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.SmoothZoomEnabled, checked);
     }
     state.smoothZoomEnabled = checked;
+}
+
+/** Toggle hiding the PanelManager while in flight mode (Flight Controls panel). */
+export function setHidePanelManagerInFlight(checked: boolean): void {
+    if (hookRegistry.setHidePanelManagerInFlight) {
+        hookRegistry.setHidePanelManagerInFlight(checked);
+    } else {
+        settingsStore.update(SettingKey.HidePanelManagerInFlight, checked);
+    }
+    state.hidePanelManagerInFlight = checked;
+}
+
+/** Toggle S-key chase mode when a target is locked (Flight Controls panel). */
+export function setChaseModeEnabled(checked: boolean): void {
+    if (hookRegistry.setChaseModeEnabled) {
+        hookRegistry.setChaseModeEnabled(checked);
+    } else {
+        settingsStore.update(SettingKey.ChaseModeEnabled, checked);
+    }
+    state.chaseModeEnabled = checked;
 }
 
 /** Toggle polar aurorae. */

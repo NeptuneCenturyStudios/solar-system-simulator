@@ -117,6 +117,8 @@ import { AutopilotTargetIndicator } from './drawing/autopilot-target-indicator';
 import { PlanetNameIndicator } from './drawing/planet-name-indicator';
 import { HealthBarIndicator } from './drawing/health-bar-indicator';
 import { ThreatIndicator } from './drawing/threat-indicator';
+import { TargetLockIndicator } from './drawing/target-lock-indicator';
+import { cycleTargetLock } from './simulation/target-lock';
 import { ScreenFlashEffect, registerScreenFlash } from './effects/screen-flash';
 import { ScenarioMessageHud, registerScenarioMessageHud } from './drawing/scenario-message-hud';
 import { VelocityArcManager } from './drawing/velocity-arc';
@@ -179,7 +181,12 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 // Vue UI overlay (new UI, developed in parallel with the existing UI)
 import { mountVueUi } from './vue/main';
 import { registerVueSimHooks, setDisplayState, simStore } from './vue/sim-bridge';
-import { setPanelManagerVisible, setSystemReady } from './vue/ui-store';
+import {
+    hidePanelManagerForFlight,
+    restorePanelManagerAfterFlight,
+    setPanelManagerVisible,
+    setSystemReady,
+} from './vue/ui-store';
 import { environmentState } from './simulation/environment-state';
 import { SettingKey, settingsStore } from './settings/settings-store';
 import {
@@ -780,6 +787,10 @@ const planetNameIndicator = new PlanetNameIndicator(uiScene, simulationState);
 const healthBarIndicator = new HealthBarIndicator(uiScene, simulationState);
 
 const threatIndicator = new ThreatIndicator(uiScene, simulationState);
+
+const targetLockIndicator = new TargetLockIndicator(uiScene, flightState);
+targetLockIndicator.init();
+
 // Shared by every overlay indicator; primed once per frame by the animation loop.
 const screenProjector = new ScreenProjector();
 
@@ -984,7 +995,7 @@ const dragLine = new THREE.Line(lineGeo, lineMat);
 dragLine.visible = false;
 scene.add(dragLine);
 
-function getNearCameraSpawnPos(offset = 0.5/DIST_SCALE): THREE.Vector3 {
+function getNearCameraSpawnPos(offset = 0.5 / DIST_SCALE): THREE.Vector3 {
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     return camera.position.clone().add(dir.multiplyScalar(offset));
@@ -3140,6 +3151,15 @@ registerVueSimHooks({
     setSmoothZoomEnabled: (checked: boolean) => {
         settingsStore.update(SettingKey.SmoothZoomEnabled, checked);
     },
+    setHidePanelManagerInFlight: (checked: boolean) => {
+        settingsStore.update(SettingKey.HidePanelManagerInFlight, checked);
+        // Turning it off mid-flight should hand the panel back straight away instead of
+        // making the player wait for the next flight-mode exit.
+        if (!checked) restorePanelManagerAfterFlight();
+    },
+    setChaseModeEnabled: (checked: boolean) => {
+        settingsStore.update(SettingKey.ChaseModeEnabled, checked);
+    },
     setShowAiDebug: (checked: boolean) => {
         settingsStore.update(SettingKey.ShowAiDebug, checked);
         aiAvoidanceGizmo.setVisible(checked);
@@ -3604,9 +3624,7 @@ registerVueSimHooks({
         return body && !body._isDisposed ? body.id : null;
     },
     launchProbeMission: (targetId, altitudeKm) => {
-        const target = simulationState.bodies.find(
-            (b) => b && b.id === targetId && !b._isDisposed
-        );
+        const target = simulationState.bodies.find((b) => b && b.id === targetId && !b._isDisposed);
         if (!target || !(target instanceof CelestialBody)) return null;
 
         const { pos, vel } = computeProbeSpawn();
@@ -3820,6 +3838,8 @@ const flightCtx: IFlightControlContext = {
     flightHUD,
     speedSprite,
     addEvent,
+    // Exit hook: every exit path funnels through exitFlightMode(), which calls this last.
+    onFlightModeExited: restorePanelManagerAfterFlight,
 };
 
 const autopilotCtx: IAutopilotContext = {
@@ -4023,6 +4043,12 @@ function enterFlightMode(ship: Spaceship) {
     flightHUD.hideWarpSprite();
 
     ambientMusic.startPlayback();
+
+    // Tuck the menu card away for the duration of the flight — restored by the exit hook —
+    // so it doesn't cover the view the player just entered the cockpit to look at.
+    if (settingsStore.settings.hidePanelManagerInFlight) {
+        hidePanelManagerForFlight();
+    }
 
     addEvent({
         message: 'Entered spaceship.',
@@ -4437,6 +4463,17 @@ window.addEventListener(
                 return;
             }
             keys.c = true;
+        }
+        if (key === 'tab') {
+            // Flight mode: TAB cycles the locked threat target, Shift+TAB reverses.
+            // Left alone (no preventDefault) while focus is inside the Vue UI, so Tab still
+            // moves focus between UI controls there instead of hijacking the scene binding.
+            if (flightState.isActive && !vueUiRoot?.contains(e.target as Node)) {
+                e.preventDefault();
+                if (e.repeat) return;
+                cycleTargetLock(e.shiftKey);
+                return;
+            }
         }
         if (key === 'e' && flightState.isActive) {
             keys.e = true;
@@ -5107,6 +5144,7 @@ const animCtx: AnimationContext = {
     planetNameIndicator,
     healthBarIndicator,
     threatIndicator,
+    targetLockIndicator,
     surfaceCam,
     screenFlash,
     scenarioMessageHud,

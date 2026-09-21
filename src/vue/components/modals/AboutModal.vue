@@ -62,6 +62,10 @@
             </div>
 
             <div>
+                "Vesta" (https://skfb.ly/pMRFG) by Matthew500 is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+            </div>
+
+            <div>
                 Space probe by Poly by Google [CC-BY] (https://creativecommons.org/licenses/by/3.0/)
                 via Poly Pizza (https://poly.pizza/m/fnFCCFiHbQt)
             </div>

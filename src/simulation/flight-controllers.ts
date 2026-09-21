@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { NotificationType } from '../event-log/event-log';
-import { TEXT_SPRITE_Z } from '../utilities/consts';
+import { AI_STEER_FULL_DEFLECTION_ANGLE, TEXT_SPRITE_Z } from '../utilities/consts';
 import {
     autopilotState,
     cameraState,
@@ -10,6 +10,29 @@ import {
 } from './simulation';
 import { IFlightControlContext } from '../interfaces';
 import { applyWeaponInput } from './ship-weapon-input';
+import { settingsStore } from '../settings/settings-store';
+import type { Body } from '../bodies/body';
+
+// Chase-mode scratch — reused every frame so steering toward a locked target allocates nothing.
+const _chaseToTarget = new THREE.Vector3();
+const _chaseDir = new THREE.Vector3();
+const _chaseLocal = new THREE.Vector3();
+const _chaseInvFrame = new THREE.Quaternion();
+
+/** How far ahead (seconds) chase steering predicts the aim error from its current closing
+ *  rate, so it starts easing off before the nose reaches the target instead of only reacting
+ *  once it's there. This is what actually damps the turn-rate "rubberbanding": a pure
+ *  proportional-on-angle controller keeps commanding a large deflection right up until the
+ *  error hits zero, which — combined with the stick smoothing in applySteering() — overshoots
+ *  and swings back. Blending in the predicted error lets it start countering the turn early. */
+const CHASE_STEER_LOOKAHEAD = 0.3;
+/** Chase-mode error tracking, carried between frames to estimate the error's rate of change.
+ *  Reset whenever chase stops or the locked target changes, so a stale derivative from a
+ *  different engagement never leaks into a fresh one. */
+let _chasePrevYawErr = 0;
+let _chasePrevPitchErr = 0;
+let _chaseHasPrevError = false;
+let _chasePrevTarget: Body | null = null;
 
 /** Exit flight mode and restore normal camera controls. */
 export function exitFlightMode(ctx: IFlightControlContext) {
@@ -45,6 +68,7 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     flightState.altOrbitActive = false;
     flightState.altOrbitYaw = 0;
     flightState.altOrbitPitch = 0;
+    flightState.selectedTarget = null;
     // Release the trigger, but don't reset() weapons — any live bolts/beam should
     // stay in the scene and keep decaying naturally (frozen while paused, cleared
     // once the sim resumes) rather than disappearing as a side effect of exiting
@@ -121,6 +145,10 @@ export function exitFlightMode(ctx: IFlightControlContext) {
         message: 'Flight mode exited.',
         notificationType: NotificationType.Info,
     });
+
+    // Undo the UI changes flight mode made on entry. Done last so the camera/HUD have
+    // already been restored and Vue re-reads a settled state.
+    ctx.onFlightModeExited();
 }
 
 /**
@@ -181,13 +209,78 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     const rawY = applyDeadzone(rawYFull);
 
     const playerInput = ship.controlInput;
-    playerInput.thrust = keys.w;
-    playerInput.boost = keys.shift;
-    playerInput.brake = keys.s;
+
+    // ── Chase mode ───────────────────────────────────────────────────────────
+    // With a locked target and the setting enabled, holding S no longer brakes: it pursues
+    // instead — aim the nose at the target (same yaw/pitch-error steering FollowShipAI uses
+    // for NPC pursuit, see ai/follow-ship-ai.ts) and thrust in, boosting if Shift is also
+    // held. The mouse reticle keeps driving weapon aim independently (see the aim block
+    // below), so the player can chase with the nose while aiming the gun elsewhere.
+    const chaseTarget = flightState.selectedTarget;
+    const chaseActive =
+        keys.s &&
+        !!chaseTarget &&
+        !autopilotState.isActive &&
+        settingsStore.settings.chaseModeEnabled;
+
+    if (chaseActive && chaseTarget) {
+        if (chaseTarget !== _chasePrevTarget) {
+            // Switched targets (or just engaged) — the last frame's error belongs to a
+            // different geometry, so don't derive a rate from it.
+            _chaseHasPrevError = false;
+            _chasePrevTarget = chaseTarget;
+        }
+
+        _chaseToTarget.subVectors(chaseTarget.mesh.position, ship.mesh.position);
+        const chaseDist = _chaseToTarget.length();
+        if (chaseDist > 1e-6) {
+            _chaseDir.copy(_chaseToTarget).divideScalar(chaseDist);
+            _chaseInvFrame.copy(ship.controlFrameQuat).invert();
+            _chaseLocal.copy(_chaseDir).applyQuaternion(_chaseInvFrame);
+            const yawErr = Math.atan2(_chaseLocal.x, _chaseLocal.z);
+            const pitchErr = Math.atan2(_chaseLocal.y, Math.hypot(_chaseLocal.x, _chaseLocal.z));
+
+            // Predict where the error will be a short moment ahead, from how fast it's
+            // currently closing, and steer toward that instead of the raw instantaneous
+            // error — the earlier countersteer this buys is what tames the overshoot.
+            let yawTerm = yawErr;
+            let pitchTerm = pitchErr;
+            if (_chaseHasPrevError && dt > 1e-4) {
+                const yawErrRate = (yawErr - _chasePrevYawErr) / dt;
+                const pitchErrRate = (pitchErr - _chasePrevPitchErr) / dt;
+                yawTerm += yawErrRate * CHASE_STEER_LOOKAHEAD;
+                pitchTerm += pitchErrRate * CHASE_STEER_LOOKAHEAD;
+            }
+            _chasePrevYawErr = yawErr;
+            _chasePrevPitchErr = pitchErr;
+            _chaseHasPrevError = true;
+
+            playerInput.steerX = THREE.MathUtils.clamp(
+                -yawTerm / AI_STEER_FULL_DEFLECTION_ANGLE,
+                -1,
+                1
+            );
+            playerInput.steerY = THREE.MathUtils.clamp(
+                -pitchTerm / AI_STEER_FULL_DEFLECTION_ANGLE,
+                -1,
+                1
+            );
+        }
+        playerInput.thrust = true;
+        playerInput.boost = keys.shift;
+        playerInput.brake = false;
+    } else {
+        _chaseHasPrevError = false;
+        _chasePrevTarget = null;
+        playerInput.thrust = keys.w;
+        playerInput.boost = keys.shift;
+        playerInput.brake = keys.s;
+        playerInput.steerX = rawX;
+        playerInput.steerY = rawY;
+    }
+
     playerInput.rollLeft = flightState.rollLeft;
     playerInput.rollRight = flightState.rollRight;
-    playerInput.steerX = rawX;
-    playerInput.steerY = rawY;
     // The autopilot flies the ship, so the trigger is dead while it is engaged.
     playerInput.fire = flightState.isFiring && !autopilotState.isActive;
 

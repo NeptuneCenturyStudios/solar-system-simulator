@@ -19,6 +19,7 @@ import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator'
 import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet-name-indicator';
 import { HealthBarIndicator } from '../drawing/health-bar-indicator';
 import { ThreatIndicator } from '../drawing/threat-indicator';
+import { TargetLockIndicator } from '../drawing/target-lock-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
 import { Wormhole } from '../bodies/wormhole';
@@ -112,6 +113,7 @@ export interface AnimationContext {
     planetNameIndicator: PlanetNameIndicator;
     healthBarIndicator: HealthBarIndicator;
     threatIndicator: ThreatIndicator;
+    targetLockIndicator: TargetLockIndicator;
     surfaceCam: SurfaceCameraManager;
     screenFlash: ScreenFlashEffect;
     scenarioMessageHud: ScenarioMessageHud;
@@ -408,6 +410,18 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             ) {
                 ctx.cancelAutopilot('Autopilot disengaged: target destroyed.');
             }
+        }
+
+        // Guard: the locked target (TAB/Shift+TAB cycling) must still be a live threat.
+        // Covers the target dying or losing isThreat while the sim isn't advancing too.
+        const lockTarget = ctx.flightState.selectedTarget;
+        if (
+            lockTarget &&
+            (lockTarget._isDisposed ||
+                !lockTarget.isThreat ||
+                !ctx.simulationState.bodies.includes(lockTarget))
+        ) {
+            ctx.flightState.selectedTarget = null;
         }
 
         if (isFlightModeActive) {
@@ -1252,6 +1266,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.camera.updateMatrixWorld();
         ctx.screenProjector.beginFrame(ctx.camera);
         ctx.targetIndicator.update(ctx.screenProjector);
+        ctx.targetLockIndicator.update(ctx.screenProjector);
 
         // ── Render ──────────────────────────────────────────────────────────
         ctx.lensingEffect.beginCapture(ctx.renderer);

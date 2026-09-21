@@ -14,6 +14,8 @@ export const enum SettingKey {
     PhysicsSolver = 'physicsSolver',
     BarnesHutTheta = 'barnesHutTheta',
     SmoothZoomEnabled = 'smoothZoomEnabled',
+    HidePanelManagerInFlight = 'hidePanelManagerInFlight',
+    ChaseModeEnabled = 'chaseModeEnabled',
 }
 
 /**
@@ -59,6 +61,13 @@ export interface SpaceSimSettings {
     barnesHutTheta: number;
     /** Ease camera zoom (wheel + System Explorer buttons) instead of snapping instantly. */
     smoothZoomEnabled: boolean;
+    /**
+     * Hide the PanelManager (toolbar card + open panel) while the player is in flight mode,
+     * restoring it on exit. Bookkeeping lives in vue/ui-store.ts, which owns visibility.
+     */
+    hidePanelManagerInFlight: boolean;
+    /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
+    chaseModeEnabled: boolean;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -78,6 +87,10 @@ const defaultSettings: SpaceSimSettings = {
     physicsSolver: 'cutoff',
     barnesHutTheta: 0.5,
     smoothZoomEnabled: true,
+    // Flight mode has its own HUD, and the panel would otherwise cover the view the player
+    // just entered the cockpit to look at.
+    hidePanelManagerInFlight: true,
+    chaseModeEnabled: true,
 };
 
 class SettingsStore {
