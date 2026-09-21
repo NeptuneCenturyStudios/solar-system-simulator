@@ -115,4 +115,11 @@ export interface IPlanetaryAttributes {
     lifeformBase?: IDiscoverableAttribute<LifeformBaseEnum>;
     orbitalPeriod?: { discovered: boolean };
     rotationPeriod?: { discovered: boolean };
+    /** Age in years since formation. */
+    age?: IDiscoverableAttribute<number>;
+    /** % of a main-sequence star's fuel remaining, only meaningful while Natural Star Death is
+     *  enabled. Carries no `value` — the live percentage is derived from MainSequenceStar's
+     *  fuel/maxFuel, mirroring orbitalPeriod/rotationPeriod. `discovered` can be set independently
+     *  of whether Natural Star Death is currently on. */
+    fuelPercentRemaining?: { discovered: boolean };
 }

@@ -162,6 +162,9 @@ export function generateProceduralStars(params: {
             vel: placement.vel,
             starParams,
             rotation,
+            // A lone star has no orbit; binary/triple members orbit the shared barycentre
+            // (see the orbitBarycenterMass assignment in procedural-generator.ts).
+            hasOrbitalPeriod: starCount > 1,
         };
     });
 }

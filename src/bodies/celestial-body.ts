@@ -817,6 +817,8 @@ export class CelestialBody extends Body {
         if (a.lifeformBase) a.lifeformBase.discovered = true;
         if (a.orbitalPeriod) a.orbitalPeriod.discovered = true;
         if (a.rotationPeriod) a.rotationPeriod.discovered = true;
+        if (a.age) a.age.discovered = true;
+        if (a.fuelPercentRemaining) a.fuelPercentRemaining.discovered = true;
     }
 
     temperatureToColor(temp: number) {

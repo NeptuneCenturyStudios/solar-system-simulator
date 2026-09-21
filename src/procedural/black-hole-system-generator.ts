@@ -128,8 +128,12 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
                     speed: primaryStarParams.rotationSpeed,
                     azimuth: primaryStarParams.rotationAzimuth,
                 },
+                hasOrbitalPeriod: true,
             }
         );
+        // True binary orbit with the black hole around their shared barycentre (world origin,
+        // per generateBinaryPlacements), so its orbital period is a real, discoverable value.
+        primaryStar.orbitBarycenterMass = bhParams.mass + primaryStarParams.mass;
         bodies.push(primaryStar);
 
         // Report completion of black hole creation
@@ -180,7 +184,10 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
                     speed: params.rotationSpeed,
                     azimuth: params.rotationAzimuth,
                 },
+                hasOrbitalPeriod: true,
             });
+            // Matches the totalMass used for this star's own trajectory above.
+            star.orbitBarycenterMass = totalMass;
 
             bodies.push(star);
 

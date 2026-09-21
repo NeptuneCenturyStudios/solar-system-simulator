@@ -500,6 +500,10 @@ export class Probe extends Satellite {
         this.scanTotalSeconds =
             PROBE_SCAN_BASE_SECONDS +
             (this.missionTarget.radius / EARTH_RADIUS) * PROBE_SCAN_RADIUS_SCALE_SECONDS;
+
+        // Clamp the remaining seconds to avoid absurd amounts
+        this.scanTotalSeconds = Math.min(this.scanTotalSeconds, 1000);
+            
         this.scanRemainingSeconds = this.scanTotalSeconds;
     }
 }

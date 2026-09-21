@@ -105,6 +105,19 @@ export class MainSequenceStar extends Star {
         this.setMass(this.mass);
     }
 
+    /** Current fuel as a percentage of max, or null when this star has no fuel model. */
+    getFuelPercentRemaining(): number | null {
+        if (this.fuel === null || this.maxFuel === null || this.maxFuel <= 0) return null;
+        return (this.fuel / this.maxFuel) * 100;
+    }
+
+    /** getFuelPercentRemaining(), gated by this star's fuelPercentRemaining discovery flag. */
+    getDiscoveredFuelPercentRemaining(): number | null {
+        return this.attributes?.fuelPercentRemaining?.discovered
+            ? this.getFuelPercentRemaining()
+            : null;
+    }
+
     /**
      * Drives the star's evolution and effects once per rendered frame.
      *

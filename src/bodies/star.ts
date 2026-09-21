@@ -152,6 +152,7 @@ export class Star extends CelestialBody {
                 rotation: options.rotation,
                 mesh: options.mesh,
                 magneticField: options.magneticField,
+                attributes: options.attributes,
             },
             BodyTypeEnum.Star
         );

@@ -35,6 +35,11 @@ export function simSpeedToKmS(simSpeed: number): number {
     return simSpeed * DIST_SCALE;
 }
 
+/** Convert a sim-space speed (u/s) to real m/s. */
+export function simSpeedToMS(simSpeed: number): number {
+    return simSpeedToKmS(simSpeed) * 1000;
+}
+
 /** Convert a sim-space speed (u/s) to a multiple of light speed. */
 export function simSpeedToWarp(simSpeed: number): number {
     return simSpeed / C;
@@ -83,7 +88,13 @@ export function formatSpeed(simSpeed: number, useWarp = false): string {
     if (useWarp) {
         return `${trimNumber(simSpeedToWarp(simSpeed), 2)} WARP`;
     }
-    return `${trimNumber(simSpeedToKmS(simSpeed), 2)} km/s`;
+
+    const speedKmS = simSpeedToKmS(simSpeed);
+    if (speedKmS < 1) {
+        return `${trimNumber(simSpeedToMS(simSpeed), 2)} m/s`;
+    } else {
+        return `${trimNumber(speedKmS, 2)} km/s`;
+    }
 }
 
 /**
@@ -105,6 +116,18 @@ export function formatETA(seconds: number): string {
     if (h > 0) return `${h}h ${m}m`;
     if (m > 0) return `${m}m ${s}s`;
     return `${s}s`;
+}
+
+/**
+ * Format an age in years as a readable figure:
+ *  - at least 1 billion years → "X.XX Gyr"
+ *  - at least 1 million years → "X.XX Myr"
+ *  - otherwise → "X,XXX yr"
+ */
+export function formatAge(years: number): string {
+    if (years >= 1e9) return `${trimNumber(years / 1e9, 2)} Gyr`;
+    if (years >= 1e6) return `${trimNumber(years / 1e6, 2)} Myr`;
+    return `${Math.round(years).toLocaleString()} yr`;
 }
 
 /** Round to `maxDecimals` and strip trailing zeros (e.g. "0.50" → "0.5", "100.00" → "100"). */

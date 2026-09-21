@@ -3582,10 +3582,18 @@ registerVueSimHooks({
                 radius: body.radius,
                 temperatureKelvin: body instanceof Star ? body.temperature : null,
             }),
-            scienceRows: buildScienceRows(attributes, {
-                orbitalPeriod: celestial?.getDiscoveredOrbitalPeriod() ?? null,
-                rotationPeriod: celestial?.getDiscoveredRotationPeriod() ?? null,
-            }),
+            scienceRows: buildScienceRows(
+                attributes,
+                {
+                    orbitalPeriod: celestial?.getDiscoveredOrbitalPeriod() ?? null,
+                    rotationPeriod: celestial?.getDiscoveredRotationPeriod() ?? null,
+                    fuelPercentRemaining:
+                        body instanceof MainSequenceStar
+                            ? body.getDiscoveredFuelPercentRemaining()
+                            : null,
+                },
+                environmentState.starDeathEnabled
+            ),
             hasScienceData: hasScienceData(attributes),
         };
     },
