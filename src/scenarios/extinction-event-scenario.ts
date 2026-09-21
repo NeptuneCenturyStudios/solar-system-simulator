@@ -34,6 +34,7 @@ import {
     EXTINCTION_EVENT_SPAWN_DISTANCE_MAX,
     EXTINCTION_EVENT_SPAWN_DISTANCE_MIN,
     EXTINCTION_EVENT_THREAT_COUNT,
+    EXTINCTION_EVENT_THREAT_DISTANCE,
     EXTINCTION_EVENT_TRAIL_LENGTH,
 } from '../utilities/consts';
 
@@ -163,6 +164,10 @@ export class ExtinctionEventScenario implements IScenario {
         this.tracked = this.tracked.filter(({ body, missDistance }) => {
             const distance = body.mesh.position.distanceTo(earthPos);
 
+            if (!body.isThreat && distance <= EXTINCTION_EVENT_THREAT_DISTANCE) {
+                body.isThreat = true;
+            }
+
             if (body._isDisposed) {
                 const impactDistance =
                     (this.earth.radius + body.radius) * EXTINCTION_EVENT_IMPACT_MARGIN;
@@ -287,7 +292,6 @@ export class ExtinctionEventScenario implements IScenario {
         const body: Body = isComet
             ? createRandomCometBody(this.dependencies, this.scene, options, variantRng)
             : createRandomAsteroidBody(this.dependencies, this.scene, options, variantRng);
-        body.isThreat = true;
 
         this.dependencies.addBody(body);
 

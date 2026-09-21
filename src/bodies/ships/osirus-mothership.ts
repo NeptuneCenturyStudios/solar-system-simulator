@@ -45,12 +45,12 @@ export class OsirisMothership extends Spaceship {
         const FLIGHT_PERP_DECAY = 0.5;
         const FLIGHT_MAX_POINTER_OFFSET = 340;
         const FLIGHT_MAX_TURN_RATE = 0.55;
-        const FLIGHT_STEER_SMOOTH_RATE = 0.28;
+        const FLIGHT_STEER_SMOOTH_RATE = 0.48;
         const FLIGHT_STEER_DEADZONE = 0.08;
         const FLIGHT_ROLL_SPEED = 1.6;
         const FLIGHT_ROLL_ACCEL = 0.32;
         const FLIGHT_ROLL_FRICTION = 0.5;
-        const FLIGHT_BANK_LERP_SPEED = 4.5;
+        const FLIGHT_BANK_LERP_SPEED = 8.5;
         const FLIGHT_MAX_BANK_ANGLE = 0.12;
         const FLIGHT_MAX_BANK_PITCH = 0.07;
         const FLIGHT_WARP_CHARGE_TIME = 5.0;
@@ -108,10 +108,11 @@ export class OsirisMothership extends Spaceship {
 
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
             beamColor: 0x800080,
-            damage: 2,
-            coreWidth: 1,
-            haloWidth: 4,
+            damage: 6,
+            coreWidth: 2,
+            haloWidth: 6,
             damageInterval: 0.2,
+            coolPerSecond: 1.25
         };
 
         super(dependencies, scene, {
