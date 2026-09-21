@@ -62,7 +62,7 @@
             </div>
 
             <div>
-                "Vesta" (https://skfb.ly/pMRFG) by Matthew500 is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+                "Vesta" (https://science.nasa.gov/resource/vesta-3d-model/) by NASA Visualization Technology Applications and Development (VTAD).
             </div>
 
             <div>

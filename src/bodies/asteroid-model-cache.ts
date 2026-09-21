@@ -1,4 +1,5 @@
 import { loadObjModelTemplate, type IModelTemplate, type IObjModelSpec } from './obj-model-cache';
+import { loadGltfModelTemplate, type IGltfModelSpec } from './gltf-model-cache';
 
 /**
  * The standard grey rock: OBJ and its own maps.
@@ -58,14 +59,9 @@ const ASTEROID_VARIANT_5_SPEC: IObjModelSpec = {
     }
 };
 
-/** Vesta: same pipeline, its own OBJ and maps. */
-const ASTEROID_VESTA_SPEC: IObjModelSpec = {
-    objUrl: './assets/models/asteroid-vesta/source/Vesta_1_100.obj',
-    mtlUrl: './assets/models/asteroid-vesta/source/Vesta_1_100.mtl',
-    maps: {
-        baseColor: './assets/models/asteroid-vesta/textures/vesta_diff.jpg_1.png',
-        normal: './assets/models/asteroid-vesta/textures/vesta_n.png_0.png',
-    }
+/** Vesta: GLB with embedded PBR materials/textures — no separate maps needed. */
+const ASTEROID_VESTA_SPEC: IGltfModelSpec = {
+    glbUrl: './assets/models/asteroid-vesta/source/Vesta_1_100.glb',
 };
 
 
@@ -102,5 +98,5 @@ export function loadAsteroidVariant5ModelTemplate(): Promise<IModelTemplate> {
 
 /** Shared template for the vesta asteroid. */
 export function loadAsteroidVestaModelTemplate(): Promise<IModelTemplate> {
-    return loadObjModelTemplate(ASTEROID_VESTA_SPEC);
+    return loadGltfModelTemplate(ASTEROID_VESTA_SPEC);
 }
