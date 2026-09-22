@@ -5,6 +5,12 @@
                 Solar System Simulator is a browser-based space simulation focused on physics,
                 exploration, and interactive body management.
             </p>
+
+<template>
+     "Asteroid with minerals" (https://skfb.ly/osIZL) by PeterMikielewicz is licensed
+                under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+</template>
+
             <div>
                 Spaceship by Liz Reddington
                 <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank">CC-BY</a>
