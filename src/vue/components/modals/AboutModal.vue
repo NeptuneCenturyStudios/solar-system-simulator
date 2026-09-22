@@ -30,7 +30,7 @@
 import { onMounted, ref } from 'vue';
 import { registerAboutModalController, type AboutModalController } from '../../about-modal-service';
 import ModalBase from './ModalBase.vue';
-import { marked } from 'marked';
+import { marked, Renderer } from 'marked';
 
 const visible = ref(false);
 
@@ -38,6 +38,8 @@ const credits = `
 Spaceship by Liz Reddington [CC-BY] (https://creativecommons.org/licenses/by/3.0/) via Poly Pizza (https://poly.pizza/m/5nWeu4IQXVX)
 
 "Osiris Mothership" (https://skfb.ly/6RFKS) by alx_flameniro is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+
+"Asteroid 01" (https://skfb.ly/6yJYI) by exabyte is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
 
 "Asteroid" (https://skfb.ly/6SzzJ) by kayra23 is licensed under Creative Commons Attribution-ShareAlike (http://creativecommons.org/licenses/by-sa/4.0/).
 
@@ -59,7 +61,19 @@ Star Map by NASA's Scientific Visualization Studio (https://svs.gsfc.nasa.gov/48
                 
 `;
 
-const attribution = ref(marked.parse(credits));
+// Override function
+const customRenderer = new Renderer();
+
+// Override only the link method
+customRenderer.link = (tokens) => {
+  const { href, text} = tokens;
+  return `<a href="${href}" target="_blank">${text}</a>`;
+};
+
+marked.use({ renderer: customRenderer });
+marked.use({ renderer: { link: customRenderer.link } });
+
+const attribution = ref(marked.parse(credits, {}));
 
 function show(): void {
     visible.value = true;
