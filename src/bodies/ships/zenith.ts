@@ -95,7 +95,7 @@ export class Zenith extends Spaceship {
         };
 
         const containerMesh = createShipContainerMesh();
-        const MODEL_NAME = 'Lo_poly_Spaceship_01_by_Liz_Reddington';
+        const MODEL_NAME = 'zenith/Lo_poly_Spaceship_01_by_Liz_Reddington';
 
         super(dependencies, scene, {
             position: position,

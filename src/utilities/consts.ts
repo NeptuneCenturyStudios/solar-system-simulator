@@ -89,7 +89,7 @@ export const GANYMEDE_DIST_FROM_JUPITER = 1070400 / DIST_SCALE;
 export const CALLISTO_DIST_FROM_JUPITER = 1882700 / DIST_SCALE;
 export const SATURN_DIST = 1429400000 / DIST_SCALE;
 export const URANUS_DIST = 2870990000 / DIST_SCALE;
-export const NEPTUNE_DIST = 4504000000 / DIST_SCALE;
+export const NEPTUNE_DIST = 4498400000 / DIST_SCALE;
 export const PLUTO_DIST = 5906380000 / DIST_SCALE;
 
 // === Pluto: Orbital Elements (J2000) ===
@@ -103,6 +103,20 @@ export const PLUTO_LONG_ASC_NODE = 110.299; // degrees, longitude of the ascendi
 export const PLUTO_ARG_PERIHELION = 113.834; // degrees, argument of perihelion (ω)
 // Real mean anomaly at epoch is 14.53°, but the generator places Pluto at a random true anomaly
 // instead, matching how the other planets and Halley are seeded.
+
+// === Neptune: Orbital Elements (J2000) ===
+// Neptune's orbit is far less exotic than Pluto's — eccentricity 0.0087 against Pluto's 0.25,
+// and only 1.77° out of the ecliptic — but it is modelled from real orbital elements for the
+// same reason: the flat circular orbit the other planets still use is a simplification, and
+// those two small departures are what make Neptune's path its own rather than a perfect circle.
+// NEPTUNE_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
+export const NEPTUNE_PERIHELION_DIST = 4459500000 / DIST_SCALE; // 29.81 AU
+export const NEPTUNE_APHELION_DIST = 4537300000 / DIST_SCALE; // 30.33 AU
+export const NEPTUNE_INCLINATION = 1.77; // degrees, relative to the ecliptic
+export const NEPTUNE_LONG_ASC_NODE = 131.783; // degrees, longitude of the ascending node (Ω)
+export const NEPTUNE_ARG_PERIHELION = 273.187; // degrees, argument of perihelion (ω)
+// Real mean anomaly at epoch is 259.883°, but the generator places Neptune at a random true
+// anomaly instead, matching how the other planets, Pluto and Halley are seeded.
 
 // === Planetary System: Rotation Axis (degrees) ===
 export const SUN_AXIS = 7.25;

@@ -1088,21 +1088,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     }
 }
 
-/* Responsive adjustments - responsive first design */
-@media (min-width: 576px) {
-    #vue-ui-root {
-        right: unset;
-    }
 
-    .vue-ui-panel-manager {
-        width: 26rem;
-    }
-
-    .toolbar.toolbar-bottom {
-        align-self: flex-start;
-        width: 26rem;
-    }
-}
 
 /* Mobile gesture support:
    Disable browser-native touch scrolling/zooming on the WebGL canvas,
@@ -1202,7 +1188,7 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 }
 
 .vue-modal-card {
-    width: 360px;
+    width: 25rem;
     max-width: calc(100vw - 40px);
     max-height: calc(100vh - 40px);
     overflow-y: auto;
@@ -1365,4 +1351,21 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 .vue-modal-fade-enter-from,
 .vue-modal-fade-leave-to {
     opacity: 0;
+}
+
+/* Keep the media queries last */
+/* Responsive adjustments - responsive first design */
+@media (min-width: 576px) {
+    #vue-ui-root {
+        right: unset;
+    }
+
+    .vue-ui-panel-manager {
+        width: 26rem;
+    }
+
+    .toolbar.toolbar-bottom {
+        align-self: flex-start;
+        width: 26rem;
+    }
 }

@@ -17,6 +17,8 @@ import { Neptune } from '../bodies/neptune';
 import { Pluto } from '../bodies/pluto';
 import { Ceres } from '../bodies/ceres';
 import { Asteroid } from '../bodies/asteroid';
+import { Vesta } from '../bodies/vesta';
+import { AsteroidPocked } from '../bodies/asteroid-pocked';
 
 import { createSatellite } from '../utilities/utilities';
 import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
@@ -74,8 +76,7 @@ import type {
     ProceduralGenerationReporter,
     ProceduralGenerationWorkUnit,
 } from './procedural-generation-progress';
-import { AsteroidRed } from '../bodies/asteroid-red';
-import { Vesta } from '../bodies/vesta';
+
 
 export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
@@ -319,7 +320,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             SUN_MASS,
             hygieaAngle
         );
-        const hygiea = new AsteroidRed(this.dependencies, this.scene, {
+        const hygiea = new AsteroidPocked(this.dependencies, this.scene, {
             radius: HYGIEA_RADIUS,
             pos: new THREE.Vector3(
                 hygieaTrajectory.pos.x,
@@ -546,7 +547,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         report({ phase: 'planets', label: `Uranus ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Neptune
+        // Neptune — random true anomaly preserves the slightly eccentric, inclined orbit shape
         const neptune = new Neptune(this.dependencies, this.scene, randomAngle());
         neptune.orbitParent = sun;
         bodies.push(neptune);

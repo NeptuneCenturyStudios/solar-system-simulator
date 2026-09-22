@@ -45,7 +45,7 @@ const ASTEROID_VARIANT_4_SPEC: IObjModelSpec = {
         baseColor: './assets/models/asteroid-4/textures/LPP_1001_BaseColor.png',
         roughness: './assets/models/asteroid-4/textures/LPP_1001_Roughness.png',
         normal: './assets/models/asteroid-4/textures/LPP_1001_Normal.png',
-    },
+    }
 };
 
 /** A rocky asteroid: same pipeline, its own OBJ and maps. */
@@ -60,10 +60,14 @@ const ASTEROID_VARIANT_5_SPEC: IObjModelSpec = {
 };
 
 /** Vesta: GLB with embedded PBR materials/textures — no separate maps needed. */
+const ASTEROID_VARIANT_6_SPEC: IGltfModelSpec = {
+    glbUrl: './assets/models/asteroid-6/source/asteroid_01.glb',
+};
+
+/** Vesta: GLB with embedded PBR materials/textures — no separate maps needed. */
 const ASTEROID_VESTA_SPEC: IGltfModelSpec = {
     glbUrl: './assets/models/asteroid-vesta/source/Vesta_1_100.glb',
 };
-
 
 
 /**
@@ -94,6 +98,11 @@ export function loadAsteroidVariant4ModelTemplate(): Promise<IModelTemplate> {
 /** Shared template for the rocky asteroid variant. */
 export function loadAsteroidVariant5ModelTemplate(): Promise<IModelTemplate> {
     return loadObjModelTemplate(ASTEROID_VARIANT_5_SPEC);
+}
+
+/** Shared template for the pocked asteroid variant. */
+export function loadAsteroidVariant6ModelTemplate(): Promise<IModelTemplate> {
+    return loadGltfModelTemplate(ASTEROID_VARIANT_6_SPEC);
 }
 
 /** Shared template for the vesta asteroid. */

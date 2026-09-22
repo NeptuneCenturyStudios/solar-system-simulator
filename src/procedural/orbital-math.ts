@@ -108,11 +108,15 @@ export function stateVectorsFromElements(params: {
         Math.sin(raan + argPe + Math.PI / 2)
     );
 
-    // Tilt the orbital plane about the node line. The angle is NEGATED because
-    // applyAxisAngle is right-handed while this simulation's orbit normal is -Y — a positive
-    // right-handed rotation would send the body *descending* through its ascending node.
-    pAxis.applyAxisAngle(nodeDir, -inclinationRad).normalize();
-    qAxis.applyAxisAngle(nodeDir, -inclinationRad).normalize();
+    // Tilt the orbital plane about the node line by +i. The sign matters: this simulation's
+    // prograde orbit normal is -Y (see the convention note above), and a positive right-handed
+    // rotation about the node line is what lifts the body into -Y beyond that node — i.e. it
+    // makes the body *ascend* there, exactly as Ω and ω are defined to mean. A negated angle
+    // mirrors the plane across the ecliptic instead: Ω and ω would both come back 180° out
+    // (their sum, the periapsis direction, is unchanged) and the body would descend through
+    // the node it was told was ascending.
+    pAxis.applyAxisAngle(nodeDir, inclinationRad).normalize();
+    qAxis.applyAxisAngle(nodeDir, inclinationRad).normalize();
 
     // --- Kepler position and velocity at the given true anomaly ---
     const r = p / (1 + ecc * Math.cos(nu));

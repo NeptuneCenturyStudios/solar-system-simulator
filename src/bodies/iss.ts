@@ -32,14 +32,14 @@ export class ISS extends Satellite {
 
         // ── Async OBJ + MTL load ──────────────────────────────────────────────
         const mtlLoader = new MTLLoader();
-        mtlLoader.setPath('./assets/models/');
+        mtlLoader.setPath('./assets/models/iss/');
         mtlLoader
             .loadAsync('InternationalSpaceStation.mtl')
             .then((materials) => {
                 materials.preload();
                 const objLoader = new OBJLoader();
                 objLoader.setMaterials(materials);
-                return objLoader.loadAsync('./assets/models/InternationalSpaceStation.obj');
+                return objLoader.loadAsync('./assets/models/iss/InternationalSpaceStation.obj');
             })
             .then((group) => {
                 // Compute bounding box of the unscaled model (group at world origin, no parent).

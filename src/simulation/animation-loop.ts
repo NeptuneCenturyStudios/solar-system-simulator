@@ -1158,9 +1158,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // Warp sound follows the player's own ship alone — several ships warping at once would
         // stack the loop on top of itself.
         if (visShip && !visShip._isDisposed && visShip.mesh) {
-            const vol = Math.min(
-                visShip.velocity.length() / (visShip.handling.flightWarpSpeed / 33.33),
-                1
+            const vol = visShip.warpEffect.warpOpacity(
+                visShip.velocity.length(),
+                visShip.handling.flightWarpSpeed
             );
             visShip.updateWarpSound(vol, wdf);
         }
