@@ -45,7 +45,7 @@ const ASTEROID_VARIANT_4_SPEC: IObjModelSpec = {
         baseColor: './assets/models/asteroid-4/textures/LPP_1001_BaseColor.png',
         roughness: './assets/models/asteroid-4/textures/LPP_1001_Roughness.png',
         normal: './assets/models/asteroid-4/textures/LPP_1001_Normal.png',
-    },
+    }
 };
 
 /** A rocky asteroid: same pipeline, its own OBJ and maps. */
