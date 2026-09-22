@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { calculateTrajectory } from '../physics/physics.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import {
     NEPTUNE_DIST,
@@ -14,8 +13,14 @@ import {
     NEPTUNE_MAG_STRENGTH,
     NEPTUNE_MAG_TILT,
     NEPTUNE_ORBITAL_PERIOD_REAL,
+    NEPTUNE_PERIHELION_DIST,
+    NEPTUNE_APHELION_DIST,
+    NEPTUNE_INCLINATION,
+    NEPTUNE_LONG_ASC_NODE,
+    NEPTUNE_ARG_PERIHELION,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
+import { stateVectorsFromElements } from '../procedural/orbital-math.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -36,13 +41,36 @@ export class Neptune extends Planet {
      * Constructs a new Neptune object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Neptune belongs.
+     * @param trueAnomaly Position along the orbit in radians, measured from perihelion
+     *                    (0 = perihelion, π = aphelion).
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        trueAnomaly: number = Math.PI
+    ) {
         const gEff = dependencies.getG();
         const timeScale =
             NEPTUNE_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(NEPTUNE_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (16.11 * 3600)) * timeScale;
-        const trajectory = calculateTrajectory(gEff, NEPTUNE_DIST, SUN_MASS, angleRad);
+
+        // Neptune's real orbit is very nearly circular (e ≈ 0.0087) and only 1.77° out of the
+        // ecliptic, but both departures are real, so the orbit is built from its orbital
+        // elements rather than the flat circle the inner planets still use.
+        const semiMajorAxis = (NEPTUNE_PERIHELION_DIST + NEPTUNE_APHELION_DIST) / 2;
+        const ecc =
+            (NEPTUNE_APHELION_DIST - NEPTUNE_PERIHELION_DIST) /
+            (NEPTUNE_APHELION_DIST + NEPTUNE_PERIHELION_DIST); // ≈ 0.008647
+        const trajectory = stateVectorsFromElements({
+            semiMajorAxis,
+            eccentricity: ecc,
+            inclinationRad: THREE.MathUtils.degToRad(NEPTUNE_INCLINATION),
+            longitudeAscendingNodeRad: THREE.MathUtils.degToRad(NEPTUNE_LONG_ASC_NODE),
+            argumentOfPeriapsisRad: THREE.MathUtils.degToRad(NEPTUNE_ARG_PERIHELION),
+            trueAnomalyRad: trueAnomaly,
+            mu: gEff * SUN_MASS,
+        });
+
         const texture = loadSrgbTexture('./assets/textures/bodies/2k/neptune.jpg');
         const geometry = buildBodySphereGeometry(NEPTUNE_RADIUS);
         const material = new THREE.MeshStandardMaterial({

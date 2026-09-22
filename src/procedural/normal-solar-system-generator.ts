@@ -546,7 +546,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         report({ phase: 'planets', label: `Uranus ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Neptune
+        // Neptune — random true anomaly preserves the slightly eccentric, inclined orbit shape
         const neptune = new Neptune(this.dependencies, this.scene, randomAngle());
         neptune.orbitParent = sun;
         bodies.push(neptune);
