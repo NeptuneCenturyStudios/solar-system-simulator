@@ -122,7 +122,7 @@ src/
 - **Phase 5**
 - [x] Phase 5: New scenario. Defend Earth from an onslaught of ~100 (to be adjusted) ELEs comprised of asteroids and comets. User will get to use the Osiris to take them all down before Earth is destroyed.
 - **Phase 6 - Fixes and adjustments**
-- [ ] Phase 6.1: Adjust Neptune's orbit to match real orbit (like we did for Pluto)
+- [x] Phase 6.1: Adjust Neptune's orbit to match real orbit (like we did for Pluto)
 - [x] Phase 6.2: Ability to leave weapon fire in scene if paused even when user exits flight mode. Bolts will freeze in space and not tick down their lifetime, and laser will remain persistent in space.
 - [x] Phase 6.3: Smooth camera zoom (ease-in-out)
 - [x] Phase 6.4: Update the comet/asteroid object assets
