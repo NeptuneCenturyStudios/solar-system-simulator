@@ -9,6 +9,7 @@ import type { SeededRandom } from '../utilities/prng';
 import { AsteroidMolten } from './asteroid-molten';
 import { AsteroidMineral } from './asteroid-mineral';
 import { Asteroid5 } from './asteroid5';
+import { AsteroidPocked } from './asteroid-pocked';
 
 /**
  * Describes one selectable asteroid variant. Every variant shares the same constructor
@@ -29,9 +30,6 @@ export interface IAsteroidVariant {
     ): AsteroidBase;
 }
 
-/** Variant used whenever a caller asks for one that does not exist. */
-export const DEFAULT_ASTEROID_VARIANT_ID = 'rock';
-
 /**
  * Registry of every asteroid variant in the game.
  *
@@ -41,7 +39,7 @@ export const DEFAULT_ASTEROID_VARIANT_ID = 'rock';
  */
 export const ASTEROID_VARIANTS: IAsteroidVariant[] = [
     {
-        id: DEFAULT_ASTEROID_VARIANT_ID,
+        id: 'asteroid-rock',
         label: 'Asteroid',
         // Equal odds with the red variant until someone wants a different mix.
         weight: 1,
@@ -70,6 +68,12 @@ export const ASTEROID_VARIANTS: IAsteroidVariant[] = [
         label: 'Asteroid 5',
         weight: 0.75,
         create: (dependencies, scene, options) => new Asteroid5(dependencies, scene, options),
+    },
+        {
+        id: 'asteroid-6',
+        label: 'Asteroid 6',
+        weight: 0.5,
+        create: (dependencies, scene, options) => new AsteroidPocked(dependencies, scene, options),
     },
 ];
 
