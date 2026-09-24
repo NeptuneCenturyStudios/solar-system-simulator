@@ -101,7 +101,6 @@ import {
     getRoughnessForMoonTexture,
     getMetalnessForMoonTexture,
     moonTexture,
-    cloudTextures,
 } from './drawing/textures';
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
@@ -289,6 +288,16 @@ import { ProceduralGenerator } from './procedural/procedural-generator';
 import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
 import { BlackHoleSystemGenerator } from './procedural/black-hole-system-generator';
 import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
+import { CoreTypeEnum } from './bodies/body-attributes';
+import {
+    type IAtmosphereProfile,
+    resolveAtmosphereProfile,
+    rollAtmosphereProfile,
+    rollAtmosphereValues,
+    sanitizeAtmosphereProfile,
+} from './procedural/atmosphere-profile';
+import { applyAtmosphereToBody } from './procedural/atmosphere-factory';
+import { computePlanetaryAttributes } from './procedural/planet-attributes';
 import { EffectiveCSpeed, EffectiveGForce } from './types';
 import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { EmptySystemGenerator } from './procedural/empty-system-generator';
@@ -1192,7 +1201,9 @@ function createNewBody(
     planetType = 'solid',
     orbitType = 'circular',
     inclination = 0,
-    hasAtmosphere = false,
+    // Undefined rolls one procedurally; null means airless (ignored by subtypes that always
+    // have an atmosphere — Temperate and gas/ice giants).
+    atmosphere: IAtmosphereProfile | null | undefined = undefined,
     hasRings = false,
     customMass: number | null = null,
     customTemperature: number | null = null,
@@ -1302,14 +1313,6 @@ function createNewBody(
             seed: planetSeed,
         });
 
-        const isSolidPlanet =
-            resolvedPlanetType === 'solid' ||
-            resolvedPlanetType === 'volcanic' ||
-            resolvedPlanetType === 'ocean' ||
-            resolvedPlanetType === 'desert' ||
-            resolvedPlanetType === 'frozen' ||
-            resolvedPlanetType === 'temperate';
-
         newBody = createPlanetBodyFromProceduralCreation(dependencies, scene, {
             id: planetId,
             name: customName ?? generateCustomBodyName('planet', planetId),
@@ -1325,56 +1328,8 @@ function createNewBody(
             hasRings,
             magneticField,
             textureSeed: planetSeed,
+            atmosphere,
         });
-
-        // Optional atmosphere/cloud layer (checkbox-driven for custom solid + volcanic planets)
-        // Temperate planets should ALWAYS have an atmosphere.
-        if (
-            (hasAtmosphere || planetBodySubtype === PlanetTypeEnum.Temperate) &&
-            isSolidPlanet &&
-            newBody
-        ) {
-            const atmosphereRng = new SeededRandom(`${newBody.id}|atmosphere|custom-solid`);
-            const atmosphereTex = atmosphereRng.pick(cloudTextures) ?? cloudTextures[0];
-
-            // Cloud layer (UV sphere slightly above surface)
-            const cloudsMat = new THREE.MeshStandardMaterial({
-                map: atmosphereTex,
-                alphaMap: atmosphereTex,
-                transparent: true,
-                opacity: 1.0,
-                depthWrite: false,
-                depthTest: true,
-                color: 0xffffff,
-                roughness: 1.0,
-                metalness: 0.0,
-            });
-
-            const cloudsRadius =
-                Number.isFinite(newBody.radius) && newBody.radius > 0
-                    ? newBody.radius * 1.03
-                    : null;
-
-            if (cloudsRadius !== null) {
-                const cloudsGeo = buildBodySphereGeometry(cloudsRadius);
-                newBody.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
-                newBody.clouds.renderOrder = 2;
-            } else {
-                newBody.clouds = null;
-            }
-
-            // Make cloud sphere selectable (raycaster maps back to owning body)
-            if (newBody.clouds) {
-                newBody.clouds.userData = { parentBody: newBody };
-                newBody.mesh.add(newBody.clouds);
-            }
-
-            // 0.12 + Math.random()*0.12 => [0.12, 0.24)
-            newBody.cloudRotationSpeed = atmosphereRng.range(0.12, 0.24);
-        }
-
-        // The aurora needs the cloud layer above, which only exists now.
-        newBody.refreshAurora();
 
         // Ensure brightness scaling uses a neutral base when texture is present
         newBody.baseColor = new THREE.Color(0xffffff);
@@ -1500,6 +1455,14 @@ function createNewBody(
 
             const moonSeed = `${moonId}|custom|${moonType}`;
 
+            // Resolve the atmosphere first — it decides the atmospheric composition.
+            const moonAtmosphere = resolveAtmosphereProfile(
+                atmosphere,
+                moonId,
+                moonTypeEnum,
+                'moon'
+            );
+
             newBody = new Moon(dependencies, scene, {
                 distance: moonDistance,
                 angle: orbitAngle ?? 0,
@@ -1529,40 +1492,26 @@ function createNewBody(
                     magneticField !== undefined
                         ? magneticField
                         : rollMagneticField(new SeededRandom(`${moonId}|magnetic-field`), 'moon'),
+                attributes: computePlanetaryAttributes({
+                    id: moonId,
+                    subtype: moonTypeEnum,
+                    isDwarf: false,
+                    distanceT01: 0.5,
+                    hasAtmosphere: moonAtmosphere !== null,
+                }),
             });
 
             // Kick off background procedural texture upgrade (desert/ocean/frozen only)
             upgradeProceduralTexture(newBody);
 
-            // Optional atmosphere/cloud layer (checkbox-driven for custom bodies)
-            // Temperate moons should always have atmosphere/clouds (UI checkbox hidden for temperate).
-            if (hasAtmosphere || planetType === 'temperate') {
-                const atmosphereRng = new SeededRandom(`${newBody.id}|atmosphere|custom-moon`);
-                const atmosphereTex = atmosphereRng.pick(cloudTextures) ?? cloudTextures[0];
-
-                const cloudsMat = new THREE.MeshStandardMaterial({
-                    map: atmosphereTex,
-                    color: 0xffffff,
-                    transparent: true,
-                    opacity: 0.25,
-                    depthWrite: false,
-                    roughness: 1.0,
-                    metalness: 0.0,
-                });
-
-                const cloudsGeo = buildBodySphereGeometry(newBody.radius * 1.03);
-                newBody.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
-                newBody.clouds.renderOrder = 2;
-                // Make cloud sphere selectable (raycaster maps back to owning body)
-                newBody.clouds.userData = { parentBody: newBody };
-                newBody.mesh.add(newBody.clouds);
-
-                // 0.12 + Math.random()*0.12 => [0.12, 0.24)
-                newBody.cloudRotationSpeed = atmosphereRng.range(0.12, 0.24);
-            }
-
-            // The aurora needs the cloud layer above, which only exists now.
-            newBody.refreshAurora();
+            // Atmosphere (shell + clouds) from the panel's values, or rolled when unspecified.
+            applyAtmosphereToBody(
+                newBody,
+                moonAtmosphere,
+                moonTypeEnum,
+                moonSeed,
+                moonRotationSpeed
+            );
 
             // Ensure brightness scaling uses a neutral base when texture is present
             newBody.baseColor = new THREE.Color(0xffffff);
@@ -3541,6 +3490,16 @@ registerVueSimHooks({
                     BodyTypeEnum.Moon
             ),
             magneticField: body instanceof CelestialBody ? body.magneticField : null,
+            atmosphere:
+                body instanceof CelestialBody && body.atmosphereRadius !== null
+                    ? {
+                          radiusFactor: body.atmosphereRadius / body.radius,
+                          surfacePressureBar: body.atmosphereSurfaceDensity,
+                      }
+                    : null,
+            atmosphereIsCloudTop:
+                body instanceof CelestialBody &&
+                body.attributes?.coreType?.value === CoreTypeEnum.GasFluid,
             colorHex: toHexColor(colorValue),
             tailColorHex: isCometBody ? toHexColor((body as unknown as Comet).tailColor) : null,
         };
@@ -3587,6 +3546,7 @@ registerVueSimHooks({
                         body instanceof MainSequenceStar
                             ? body.getDiscoveredFuelPercentRemaining()
                             : null,
+                    surfacePressureBar: celestial?.getDiscoveredSurfacePressure() ?? null,
                 },
                 environmentState.starDeathEnabled
             ),
@@ -3607,7 +3567,7 @@ registerVueSimHooks({
             payload.planetType,
             payload.orbitType,
             payload.inclination,
-            payload.hasAtmosphere,
+            payload.atmosphere,
             payload.hasRings,
             payload.customMass,
             payload.customTemperature,
@@ -3710,6 +3670,7 @@ registerVueSimHooks({
                 azimuth: Math.round(star.rotationAzimuth),
                 inclination: tilt,
                 hasAtmosphere: false,
+                atmosphere: null,
                 hasRings: false,
                 magneticField: rollField('star'),
                 planetType: null,
@@ -3732,6 +3693,7 @@ registerVueSimHooks({
                 azimuth: null,
                 inclination,
                 hasAtmosphere: false,
+                atmosphere: null,
                 hasRings: false,
                 magneticField: null,
                 planetType: null,
@@ -3750,6 +3712,7 @@ registerVueSimHooks({
                 azimuth: Math.round(wormhole.rotationAzimuth),
                 inclination,
                 hasAtmosphere: false,
+                atmosphere: null,
                 hasRings: false,
                 magneticField: null,
                 planetType: null,
@@ -3760,12 +3723,11 @@ registerVueSimHooks({
         if (bodyType === 'planet') {
             const planetType = PLANET_TYPES[Math.floor(Math.random() * PLANET_TYPES.length)];
             const params = randomPlanetParams(planetType);
-            const canHaveAtmosphere =
-                planetType === 'solid' ||
-                planetType === 'volcanic' ||
-                planetType === 'ocean' ||
-                planetType === 'frozen' ||
-                planetType === 'desert';
+            // Same odds as procedural generation; the values also pre-fill the controls when the
+            // roll comes up airless, so checking "Has Atmosphere" still starts from sane numbers.
+            const atmosphereRng = new SeededRandom(generateSeedString());
+            const subtype = planetType as PlanetTypeEnum;
+            const rolledAtmosphere = rollAtmosphereProfile(atmosphereRng, subtype, 'planet');
             return {
                 mass: params.mass,
                 radius: params.radius,
@@ -3774,7 +3736,9 @@ registerVueSimHooks({
                 tilt: Math.round(params.rotationTilt),
                 azimuth: Math.round(params.rotationAzimuth),
                 inclination,
-                hasAtmosphere: canHaveAtmosphere ? randBool() : planetType === 'temperate',
+                hasAtmosphere: rolledAtmosphere !== null,
+                atmosphere:
+                    rolledAtmosphere ?? rollAtmosphereValues(atmosphereRng, subtype, 'planet'),
                 hasRings: randBool(),
                 magneticField: rollField(
                     planetType === 'gas_giant'
@@ -3791,6 +3755,9 @@ registerVueSimHooks({
         if (bodyType === 'moon') {
             const moonType = MOON_TYPES[Math.floor(Math.random() * MOON_TYPES.length)];
             const params = randomMoonParams(EARTH_RADIUS);
+            const atmosphereRng = new SeededRandom(generateSeedString());
+            const subtype = moonType as MoonTypeEnum;
+            const rolledAtmosphere = rollAtmosphereProfile(atmosphereRng, subtype, 'moon');
             return {
                 mass: params.mass,
                 radius: params.radius,
@@ -3799,7 +3766,9 @@ registerVueSimHooks({
                 tilt: Math.round(params.rotationTilt),
                 azimuth: Math.round(params.rotationAzimuth),
                 inclination,
-                hasAtmosphere: moonType === 'temperate' ? true : randBool(),
+                hasAtmosphere: rolledAtmosphere !== null,
+                atmosphere:
+                    rolledAtmosphere ?? rollAtmosphereValues(atmosphereRng, subtype, 'moon'),
                 hasRings: false,
                 magneticField: rollField('moon'),
                 planetType: null,
@@ -3819,6 +3788,7 @@ registerVueSimHooks({
             azimuth: null,
             inclination,
             hasAtmosphere: false,
+            atmosphere: null,
             hasRings: false,
             magneticField: null,
             planetType: null,
@@ -4148,6 +4118,8 @@ interface IApplyBodyEditParams {
     editAzimuth: number | null;
     /** Dipole magnetic field, or null to clear it. Undefined leaves it untouched. */
     magneticField?: IMagneticFieldOptions | null;
+    /** New radius/pressure for an existing atmosphere. Undefined leaves it untouched. */
+    atmosphere?: IAtmosphereProfile;
 }
 
 function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
@@ -4166,6 +4138,7 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         editTilt,
         editAzimuth,
         magneticField,
+        atmosphere,
     } = params;
 
     // Update name
@@ -4247,6 +4220,13 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         } catch (e) {
             console.error('Error applying comet tail color edit:', e);
         }
+    }
+
+    // Tune an existing atmosphere. Runs after the radius edit so the factor applies to the new
+    // radius. updateAtmosphere is a no-op for airless bodies — edits never add an atmosphere.
+    if (atmosphere !== undefined && body instanceof CelestialBody) {
+        const sanitized = sanitizeAtmosphereProfile(atmosphere);
+        body.updateAtmosphere(body.radius * sanitized.radiusFactor, sanitized.surfacePressureBar);
     }
 
     // Apply the magnetic field when the panel sent one — undefined means "leave it alone",

@@ -4,7 +4,7 @@
  * strings, the same way sim-bridge.ts snapshots bodies instead of exposing live Body objects.
  */
 
-import type { IPlanetaryAttributes } from './body-attributes';
+import { CoreTypeEnum, type IPlanetaryAttributes } from './body-attributes';
 import {
     ATMOSPHERIC_GAS_FLAGS,
     CORE_TYPE_LABELS,
@@ -14,7 +14,13 @@ import {
     SOIL_COMPOSITION_FLAGS,
     VEGETATION_FLAGS,
 } from './body-attribute-labels';
-import { formatAge, formatETA, formatMass, formatRadius } from '../utilities/display-format';
+import {
+    formatAge,
+    formatETA,
+    formatMass,
+    formatPressure,
+    formatRadius,
+} from '../utilities/display-format';
 
 /** Placeholder shown for an attribute the player has not yet discovered. */
 export const UNDISCOVERED_PLACEHOLDER = '???';
@@ -39,6 +45,8 @@ export interface IBodyPeriods {
     rotationPeriod: number | null;
     /** Live fuel percentage for a MainSequenceStar, or null when not applicable/undiscovered. */
     fuelPercentRemaining: number | null;
+    /** Live surface pressure in bar (0 = airless), or null when undiscovered. */
+    surfacePressureBar: number | null;
 }
 
 /** Always-known physical data, shown for every scannable body. */
@@ -162,7 +170,9 @@ export function buildScienceRows(
         rows.push({
             key: 'coreType',
             label: 'Core Type',
-            value: coreType.discovered ? CORE_TYPE_LABELS[coreType.value] : UNDISCOVERED_PLACEHOLDER,
+            value: coreType.discovered
+                ? CORE_TYPE_LABELS[coreType.value]
+                : UNDISCOVERED_PLACEHOLDER,
             discovered: coreType.discovered,
         });
     }
@@ -179,6 +189,26 @@ export function buildScienceRows(
                   )
                 : UNDISCOVERED_PLACEHOLDER,
             discovered: atmosphericComposition.discovered,
+        });
+    }
+
+    if (attributes.surfacePressure) {
+        const pressure = periods.surfacePressureBar;
+        const known =
+            attributes.surfacePressure.discovered && pressure !== null && Number.isFinite(pressure);
+        rows.push({
+            key: 'surfacePressure',
+            // A gas/ice giant's mesh is its cloud deck, so "surface" there means the cloud tops.
+            label:
+                coreType?.value === CoreTypeEnum.GasFluid
+                    ? 'Cloud-top Pressure'
+                    : 'Surface Pressure',
+            value: known
+                ? pressure > 0
+                    ? formatPressure(pressure)
+                    : 'None (airless)'
+                : UNDISCOVERED_PLACEHOLDER,
+            discovered: known,
         });
     }
 
@@ -327,6 +357,7 @@ export function hasScienceData(attributes: IPlanetaryAttributes | undefined): bo
     return Boolean(
         attributes.coreType ||
         attributes.atmosphericComposition ||
+        attributes.surfacePressure ||
         attributes.soilComposition ||
         attributes.liquidComposition ||
         attributes.averageTemperatureKelvin ||

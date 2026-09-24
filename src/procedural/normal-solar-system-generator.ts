@@ -77,7 +77,6 @@ import type {
     ProceduralGenerationWorkUnit,
 } from './procedural-generation-progress';
 
-
 export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
     private readonly scene: THREE.Scene;
@@ -160,6 +159,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 moonType: MoonTypeEnum.Terrestrial,
                 angle: randomAngle(),
                 attributes: {
+                    surfacePressure: { discovered: true },
                     coreType: { value: CoreTypeEnum.Solid, discovered: true },
                     atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
                     soilComposition: {
@@ -341,7 +341,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                     value:
                         SoilCompositionEnum.Carbon |
                         SoilCompositionEnum.Iron |
-                        SoilCompositionEnum.IronOxide | 
+                        SoilCompositionEnum.IronOxide |
                         SoilCompositionEnum.WaterIce,
                     discovered: true,
                 },
@@ -385,11 +385,9 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: ioTexture,
                 attributes: {
+                    surfacePressure: { discovered: true },
                     coreType: { value: CoreTypeEnum.Molten, discovered: true },
-                    atmosphericComposition: {
-                        value: AtmosphericGasEnum.SulfurDioxide,
-                        discovered: true,
-                    },
+                    atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
                     soilComposition: {
                         value:
                             SoilCompositionEnum.Sulfur |
@@ -430,8 +428,9 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: europaTexture,
                 attributes: {
+                    surfacePressure: { discovered: true },
                     coreType: { value: CoreTypeEnum.Metallic, discovered: true },
-                    atmosphericComposition: { value: AtmosphericGasEnum.Oxygen, discovered: true },
+                    atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
                     soilComposition: {
                         value: SoilCompositionEnum.WaterIce | SoilCompositionEnum.Silicates,
                         discovered: true,
@@ -466,8 +465,9 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: ganymedeTexture,
                 attributes: {
+                    surfacePressure: { discovered: true },
                     coreType: { value: CoreTypeEnum.Metallic, discovered: true },
-                    atmosphericComposition: { value: AtmosphericGasEnum.Oxygen, discovered: true },
+                    atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
                     soilComposition: {
                         value: SoilCompositionEnum.WaterIce | SoilCompositionEnum.Silicates,
                         discovered: true,
@@ -505,11 +505,9 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: callistoTexture,
                 attributes: {
+                    surfacePressure: { discovered: true },
                     coreType: { value: CoreTypeEnum.Icy, discovered: true },
-                    atmosphericComposition: {
-                        value: AtmosphericGasEnum.CarbonDioxide,
-                        discovered: true,
-                    },
+                    atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
                     soilComposition: {
                         value:
                             SoilCompositionEnum.WaterIce |

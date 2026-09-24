@@ -68,8 +68,11 @@ export class Mars extends Planet {
             atmosphere: {
                 radius: MARS_RADIUS * 1.05,
                 tint: 0xff8866,
+                // Surface pressure in bar.
+                density: 0.006,
             },
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.Solid, discovered: true },
                 atmosphericComposition: {
                     value:

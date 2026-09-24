@@ -71,6 +71,8 @@ export class Jupiter extends Planet {
             atmosphere: {
                 radius: JUPITER_RADIUS * 1.07,
                 tint: 0xffcc88,
+                // Surface pressure in bar (cloud tops).
+                density: 0.3,
             },
             magneticField: {
                 strength: JUPITER_MAG_STRENGTH,
@@ -80,6 +82,7 @@ export class Jupiter extends Planet {
                 reversed: JUPITER_MAG_REVERSED,
             },
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.GasFluid, discovered: true },
                 atmosphericComposition: {
                     value:

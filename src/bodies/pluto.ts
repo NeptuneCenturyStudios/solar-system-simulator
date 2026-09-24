@@ -92,7 +92,14 @@ export class Pluto extends DwarfPlanet {
             hasRings: false,
             rotation: { tilt: PLUTO_AXIS, speed: rotSpeed, azimuth: PLUTO_AZIMUTH },
             mesh: mesh,
+            // Thin N₂/CH₄/CO atmosphere (~10 µbar) with a pale blue haze.
+            atmosphere: {
+                radius: PLUTO_RADIUS * 1.07,
+                tint: 0x99bbff,
+                density: 1e-5,
+            },
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.Icy, discovered: true },
                 atmosphericComposition: {
                     value:

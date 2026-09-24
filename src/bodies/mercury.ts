@@ -82,6 +82,7 @@ export class Mercury extends Planet {
                 reversed: MERCURY_MAG_REVERSED,
             },
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.Metallic, discovered: true },
                 atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
                 soilComposition: {

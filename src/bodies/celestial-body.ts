@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Body } from './body';
 import {
+    IAtmosphereOptions,
     ICelestialBodyCreationOptions,
     IDeathOptions,
     IMagneticFieldOptions,
@@ -8,7 +9,7 @@ import {
 } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
 import { SeededRandom } from '../utilities/prng';
-import { ATMOSPHERE_DEFAULT_SURFACE_DENSITY, DIST_SCALE } from '../utilities/consts';
+import { DIST_SCALE } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
@@ -57,15 +58,18 @@ export class CelestialBody extends Body {
     rings: THREE.Points | null = null;
     clouds: THREE.Mesh | null = null;
     cloudRotationSpeed: number = 0;
+    /** Visual haze for the atmosphere. Set only through setAtmosphere(). */
     atmosphereShell: AtmosphereShellHandle | null = null;
-    /** Radius of this body's atmosphere in scene units, or null when it has none. */
+    /**
+     * Outer radius of this body's atmosphere in scene units, or null when it has none. This is
+     * the single source of truth for "has an atmosphere" — set only through setAtmosphere().
+     */
     atmosphereRadius: number | null = null;
-    /** Density at this body's surface, on the abstract scale documented at
-     *  ATMOSPHERE_DEFAULT_SURFACE_DENSITY. Only meaningful while atmosphereRadius is non-null.
-     *  Defaulted here so every CelestialBody has a usable value even when the procedural
-     *  factories set atmosphereRadius/atmosphereShell directly and bypass this constructor's
-     *  `options.atmosphere` branch entirely. */
-    atmosphereSurfaceDensity: number = ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
+    /** Surface pressure in bar, used directly as the surface density for drag/heating. Only
+     *  meaningful while atmosphereRadius is non-null. */
+    atmosphereSurfaceDensity: number = 0;
+    /** Haze tint, kept so updateAtmosphere() can rebuild the shell without re-deriving it. */
+    atmosphereTint: THREE.Color = new THREE.Color(0x5599ff);
 
     /**
      * Polar aurora curtains, or null when this body doesn't qualify for them.
@@ -179,15 +183,7 @@ export class CelestialBody extends Body {
 
         // Create the atmosphere shell if atmosphere options were provided
         if (options.atmosphere) {
-            this.atmosphereRadius = options.atmosphere.radius * 1.2;
-            this.atmosphereSurfaceDensity =
-                options.atmosphere.density ?? ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
-            this.atmosphereShell = createAtmosphereShell(
-                scene,
-                options.atmosphere.radius,
-                options.atmosphere.tint,
-                options.mesh
-            );
+            this.setAtmosphere(options.atmosphere);
         }
 
         this.setRotation(this.rotation);
@@ -297,16 +293,57 @@ export class CelestialBody extends Body {
     }
 
     /**
+     * Gives this body an atmosphere, replacing any existing one. The only way an atmosphere is
+     * set, so `atmosphereRadius`, `atmosphereSurfaceDensity` and the visual shell always agree.
+     * Rebuilds the aurora, which depends on the atmosphere.
+     */
+    setAtmosphere(options: IAtmosphereOptions): void {
+        if (this.atmosphereShell) {
+            try {
+                this.atmosphereShell.dispose();
+            } catch {
+                // ignore cleanup errors
+            }
+            this.atmosphereShell = null;
+        }
+
+        this.atmosphereRadius = Math.max(options.radius, this.radius * 1.001);
+        this.atmosphereSurfaceDensity = Math.max(0, options.density);
+        this.atmosphereTint =
+            options.tint instanceof THREE.Color
+                ? options.tint.clone()
+                : new THREE.Color(options.tint);
+        this.atmosphereShell = createAtmosphereShell(
+            this.scene,
+            this.atmosphereRadius,
+            this.radius,
+            this.atmosphereTint,
+            this.mesh
+        );
+
+        this.refreshAurora();
+    }
+
+    /**
+     * Changes the radius and/or surface density of an existing atmosphere, keeping its tint.
+     * No-op when the body has no atmosphere — this never adds one.
+     */
+    updateAtmosphere(radius: number, density: number): void {
+        if (this.atmosphereRadius === null) return;
+        this.setAtmosphere({ radius, density, tint: this.atmosphereTint });
+    }
+
+    /** Surface pressure in bar (0 when airless), gated by the surfacePressure discovery flag. */
+    getDiscoveredSurfacePressure(): number | null {
+        if (!this.attributes?.surfacePressure?.discovered) return null;
+        return this.atmosphereRadius === null ? 0 : this.atmosphereSurfaceDensity;
+    }
+
+    /**
      * (Re)builds or tears down the aurora so it matches the body's current state.
      *
      * Aurorae need both a magnetic field to funnel charged particles to the poles and an
      * atmosphere for them to excite, so a body qualifies only when it has both.
-     *
-     * "Has an atmosphere" means an atmosphere shell *or* a cloud layer, and the test is on
-     * those runtime objects rather than `options.atmosphere`, because every creation path
-     * except the hand-built planets attaches them *after* construction: the procedural
-     * factories add a shell, and the Add/Edit panel's custom bodies add only clouds. Gating
-     * on the creation option would have excluded all of them.
      *
      * Idempotent, so it doubles as the rebuild path when the Add/Edit panel changes a field
      * at runtime.
@@ -323,7 +360,7 @@ export class CelestialBody extends Body {
 
         if (this._isDisposed) return;
         if (!this.magneticField) return;
-        if (!this.atmosphereShell && !this.clouds) return;
+        if (this.atmosphereRadius === null) return;
 
         this.aurora = createAurora(
             this.radius,
@@ -533,6 +570,16 @@ export class CelestialBody extends Body {
             this.aurora?.setRadius(newRadius);
         } catch (e) {
             console.error('Error updating aurora scale:', e);
+        }
+
+        // Keep the atmosphere at the same multiple of the body's radius.
+        try {
+            if (this.atmosphereRadius !== null) {
+                const factor = this.atmosphereRadius / Math.max(oldRadius, 1e-9);
+                this.updateAtmosphere(newRadius * factor, this.atmosphereSurfaceDensity);
+            }
+        } catch (e) {
+            console.error('Error updating atmosphere radius:', e);
         }
     }
 
@@ -809,6 +856,7 @@ export class CelestialBody extends Body {
         if (!a) return;
         if (a.coreType) a.coreType.discovered = true;
         if (a.atmosphericComposition) a.atmosphericComposition.discovered = true;
+        if (a.surfacePressure) a.surfacePressure.discovered = true;
         if (a.soilComposition) a.soilComposition.discovered = true;
         if (a.liquidComposition) a.liquidComposition.discovered = true;
         if (a.averageTemperatureKelvin) a.averageTemperatureKelvin.discovered = true;

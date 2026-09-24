@@ -107,6 +107,10 @@ export interface IDiscoverableAttribute<T> {
 export interface IPlanetaryAttributes {
     coreType?: IDiscoverableAttribute<CoreTypeEnum>;
     atmosphericComposition?: IDiscoverableAttribute<AtmosphericGasEnum>;
+    /** Surface pressure (cloud-top pressure for gas/ice giants). Carries no `value` — the live
+     *  number is CelestialBody.atmosphereSurfaceDensity (bar), the same value the physics uses,
+     *  so the two can't drift; `discovered` gates CelestialBody.getDiscoveredSurfacePressure(). */
+    surfacePressure?: { discovered: boolean };
     soilComposition?: IDiscoverableAttribute<SoilCompositionEnum>;
     liquidComposition?: IDiscoverableAttribute<LiquidCompositionEnum>;
     averageTemperatureKelvin?: IDiscoverableAttribute<number>;

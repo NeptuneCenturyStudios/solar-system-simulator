@@ -71,6 +71,8 @@ export class Uranus extends Planet {
             atmosphere: {
                 radius: URANUS_RADIUS * 1.07,
                 tint: 0x88ddff,
+                // Surface pressure in bar (cloud tops).
+                density: 0.15,
             },
             magneticField: {
                 strength: URANUS_MAG_STRENGTH,
@@ -80,6 +82,7 @@ export class Uranus extends Planet {
                 reversed: URANUS_MAG_REVERSED,
             },
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.GasFluid, discovered: true },
                 atmosphericComposition: {
                     value:

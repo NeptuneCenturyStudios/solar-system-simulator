@@ -20,22 +20,22 @@ export type AtmosphereShellHandle = {
 export function createAtmosphereShell(
     scene: THREE.Scene,
     radius: number,
+    bodyRadius: number,
     tint: THREE.Color | number = 0x5599ff,
     parent: THREE.Object3D | null = null
 ): AtmosphereShellHandle {
     const color = tint instanceof THREE.Color ? tint.clone() : new THREE.Color(tint);
 
     // How many times larger than `radius` the sprite is on each side.
-    // With this value the planet disc edge sits at ~67 % of the sprite's half-width
-    // (accounting for the atmosphere radius being ~1.07 × planet radius), leaving
-    // ~33 % for the haze ring to bloom and fade.
+    // At the default atmosphere radius (~1.07 × planet radius) the planet disc edge sits at
+    // ~67 % of the sprite's half-width, leaving ~33 % for the haze ring to bloom and fade.
     const SCALE_MULT = 2.8;
     const CANVAS_SIZE = 256;
     const HALF = CANVAS_SIZE / 2;
 
-    // Planet disc edge as a fraction of the sprite's half-width.
-    // radius ≈ 1.07 × planet radius, so:  disc_frac = (1/1.07) × (2/SCALE_MULT) ≈ 0.668
-    const discEdge = (2 / SCALE_MULT) * (1 / 1.07);
+    // Planet disc edge as a fraction of the sprite's half-width:
+    // disc_frac = (bodyRadius / radius) × (2 / SCALE_MULT) — ≈ 0.668 at radius = 1.07 × bodyRadius.
+    const discEdge = (2 / SCALE_MULT) * Math.min(1, bodyRadius / Math.max(radius, 1e-9));
 
     const r = Math.round(color.r * 255);
     const g = Math.round(color.g * 255);

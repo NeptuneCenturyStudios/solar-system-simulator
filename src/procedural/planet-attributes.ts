@@ -108,10 +108,18 @@ const SOLID_ATMOSPHERE_ROLLS: Record<string, GasRoll[]> = {
     ],
 };
 
+/**
+ * Gases for a body's atmosphere. Follows the atmosphere profile (atmosphere-profile.ts): an
+ * airless body is always None, and a body with an atmosphere is never None — if every roll
+ * misses, the subtype's most likely gas is used.
+ */
 export function computeAtmosphericComposition(
     rng: SeededRandom,
-    subtype: SolidSubtype
+    subtype: SolidSubtype,
+    hasAtmosphere: boolean
 ): AtmosphericGasEnum {
+    if (!hasAtmosphere) return AtmosphericGasEnum.None;
+
     if (subtype === PlanetTypeEnum.GasGiant) {
         let gas = AtmosphericGasEnum.Hydrogen | AtmosphericGasEnum.Helium;
         if (rng.chance(0.5)) gas |= AtmosphericGasEnum.Methane;
@@ -130,6 +138,9 @@ export function computeAtmosphericComposition(
     let gas = AtmosphericGasEnum.None;
     for (const roll of rolls) {
         if (rng.chance(roll.chance)) gas |= roll.gas;
+    }
+    if (gas === AtmosphericGasEnum.None) {
+        gas = rolls.reduce((best, roll) => (roll.chance > best.chance ? roll : best)).gas;
     }
     return gas;
 }
@@ -483,19 +494,22 @@ export function computeLifeAttributes(params: {
  * Top-level entry point for procedural planet/dwarf-planet/moon attribute generation.
  * All values are generated regardless of discovery state; every attribute starts
  * undiscovered (discovered: false) since procedural bodies require probe discovery.
+ * `hasAtmosphere` must come from the body's resolved atmosphere profile.
  */
 export function computePlanetaryAttributes(params: {
     id: string;
     subtype: SolidSubtype;
     isDwarf: boolean;
     distanceT01: number;
+    hasAtmosphere: boolean;
 }): IPlanetaryAttributes {
-    const { id, subtype, isDwarf, distanceT01 } = params;
+    const { id, subtype, isDwarf, distanceT01, hasAtmosphere } = params;
 
     const coreType = computeCoreType(new SeededRandom(`${id}|attr-core`), subtype, isDwarf);
     const atmosphericComposition = computeAtmosphericComposition(
         new SeededRandom(`${id}|attr-atmosphere`),
-        subtype
+        subtype,
+        hasAtmosphere
     );
     const soilComposition = computeSoilComposition(
         new SeededRandom(`${id}|attr-soil`),
@@ -524,6 +538,7 @@ export function computePlanetaryAttributes(params: {
     const attributes: IPlanetaryAttributes = {
         coreType: { value: coreType, discovered: false },
         atmosphericComposition: { value: atmosphericComposition, discovered: false },
+        surfacePressure: { discovered: false },
         averageTemperatureKelvin: { value: averageTemperatureKelvin, discovered: false },
         vegetation: { value: life.vegetation, discovered: false },
         sentientLife: { value: life.sentientLife, discovered: false },

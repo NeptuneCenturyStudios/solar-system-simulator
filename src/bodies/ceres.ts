@@ -68,8 +68,10 @@ export class Ceres extends DwarfPlanet {
             rotation: { tilt: CERES_AXIS, speed: rotSpeed, azimuth: CERES_AZIMUTH },
             mesh: mesh,
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.Icy, discovered: true },
-                atmosphericComposition: { value: AtmosphericGasEnum.WaterVapor, discovered: true },
+                // Only a transient water-vapor exosphere — airless for sim purposes (no atmosphere shell).
+                atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
                 soilComposition: {
                     value:
                         SoilCompositionEnum.WaterIce |

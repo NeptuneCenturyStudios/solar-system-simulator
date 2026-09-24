@@ -68,8 +68,11 @@ export class Venus extends Planet {
             atmosphere: {
                 radius: VENUS_RADIUS * 1.07,
                 tint: 0xffdd88,
+                // Surface pressure in bar.
+                density: 92,
             },
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.Molten, discovered: true },
                 atmosphericComposition: {
                     value:

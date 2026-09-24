@@ -196,6 +196,8 @@ export class Earth extends Planet {
             atmosphere: {
                 radius: EARTH_RADIUS * 1.07,
                 tint: 0x5599ff,
+                // Surface pressure in bar.
+                density: 1.0,
             },
             magneticField: {
                 strength: EARTH_MAG_STRENGTH,
@@ -205,6 +207,7 @@ export class Earth extends Planet {
                 reversed: EARTH_MAG_REVERSED,
             },
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.Molten, discovered: true },
                 atmosphericComposition: {
                     value:

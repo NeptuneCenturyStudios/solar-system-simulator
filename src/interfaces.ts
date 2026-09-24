@@ -22,13 +22,15 @@ import type { IPlanetaryAttributes } from './bodies/body-attributes';
  * Options for configuring an atmosphere on a celestial body, including its radius and tint color.
  */
 export interface IAtmosphereOptions {
+    /** Outer radius of the atmosphere in scene units — both the visual shell and the physics
+     *  cutoff. Must exceed the body's radius; its thickness also sets the density fall-off. */
     radius: number;
-    tint: number;
-    /** Density at the surface, on the abstract scale documented at
-     *  ATMOSPHERE_DEFAULT_SURFACE_DENSITY (1.0 = "Earth-like" reference). Falls off toward 0
-     *  with altitude — see computeAtmosphericDensity in src/physics/atmosphere-density.ts.
-     *  Omitted → ATMOSPHERE_DEFAULT_SURFACE_DENSITY. */
-    density?: number;
+    tint: THREE.Color | number;
+    /** Surface pressure in bar (1.0 = Earth at sea level), used directly as the surface density
+     *  for drag/heating. Falls off toward 0 with altitude — see computeAtmosphericDensity in
+     *  src/physics/atmosphere-density.ts. For gas/ice giants this is the cloud-top pressure at the
+     *  mesh surface. */
+    density: number;
 }
 
 /**

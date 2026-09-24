@@ -130,6 +130,19 @@ export function formatAge(years: number): string {
     return `${Math.round(years).toLocaleString()} yr`;
 }
 
+/**
+ * Format a pressure in bar, switching to smaller units for thin atmospheres:
+ *  - at least 1 bar → "92 bar", "1.5 bar"
+ *  - at least 1 mbar → "300 mbar", "6 mbar"
+ *  - otherwise → "10 µbar"
+ */
+export function formatPressure(bar: number): string {
+    if (bar >= 10) return `${Math.round(bar).toLocaleString()} bar`;
+    if (bar >= 1) return `${trimNumber(bar, 2)} bar`;
+    if (bar >= 1e-3) return `${trimNumber(bar * 1e3, bar >= 0.01 ? 0 : 1)} mbar`;
+    return `${trimNumber(bar * 1e6, bar >= 1e-5 ? 0 : 2)} µbar`;
+}
+
 /** Round to `maxDecimals` and strip trailing zeros (e.g. "0.50" → "0.5", "100.00" → "100"). */
 function trimNumber(value: number, maxDecimals: number): string {
     if (!Number.isFinite(value)) return '—';

@@ -524,24 +524,22 @@ export const COLLISION_SEPARATION_FACTOR = 1.001;
 // (Ceres-class asteroid, a comet nucleus) is barely affected by either — punching straight
 // through to the surface, where the existing collision system takes over. See
 // src/physics/atmosphere-density.ts and src/physics/atmospheric-drag.ts.
-/** Atmosphere density at a body's surface when IAtmosphereOptions.density is omitted.
- *  Abstract game-balance units, not kg/m³ — 1.0 is the "Earth-like" reference the constants
- *  below are tuned against. */
-export const ATMOSPHERE_DEFAULT_SURFACE_DENSITY = 1.0;
+/** Reference surface density, in bar, that the drag/damage/flame constants below are tuned
+ *  against. Surface density *is* surface pressure in bar (IAtmosphereOptions.density), so 1.0
+ *  is Earth at sea level. A tuning reference only — every atmosphere sets its own density. */
+export const ATMOSPHERE_REFERENCE_DENSITY_BAR = 1.0;
 /**
  * Atmosphere density falls off exponentially with altitude above the surface (the standard
- * barometric-formula shape real atmospheres follow), not linearly with distance to
- * `atmosphereRadius`: density(h) = surfaceDensity × exp(−h / (planet.radius × this)), h =
- * altitude above the surface. `atmosphereRadius` itself (tuned per-planet for the visual
- * shell/glow, and already fairly generous — e.g. Earth's is ~28% of its own radius above the
- * surface) still acts as the hard outer cutoff for containment and the visual shell, but this
- * fraction controls how quickly density itself becomes negligible *within* that shell.
- * At 0.01 (1% of planet radius as the scale height), the ISS's real ~410 km orbit — deep
- * inside Earth's current (generous) atmosphereRadius by distance alone — sees density fall to
- * roughly 0.15% of the surface value, matching how the ISS sits in a near-vacuum exosphere in
- * reality despite technically orbiting "inside" a broadly-drawn atmosphere boundary.
+ * barometric-formula shape real atmospheres follow): density(h) = surfaceDensity ×
+ * exp(−h / scaleHeight), with scaleHeight = (atmosphereRadius − planet.radius) × this and h =
+ * altitude above the surface. So the atmosphere radius drives the fall-off — a thicker
+ * atmosphere stays dense higher up — as well as acting as the hard outer cutoff for containment
+ * and the visual shell.
  */
 export const ATMOSPHERE_DENSITY_SCALE_HEIGHT_FRACTION = 0.01;
+/** Default atmosphere radius as a multiple of the body's radius (the visual shell and the
+ *  physics cutoff are the same radius). */
+export const ATMOSPHERE_DEFAULT_RADIUS_FACTOR = 1.07;
 /**
  * Relative speed (to the planet) below which atmospheric heat damage is exactly zero, and
  * above which it ramps to full strength at ATMOSPHERE_FULL_INTENSITY_SPEED. Shared with
@@ -564,7 +562,7 @@ export const ATMOSPHERE_FULL_INTENSITY_SPEED = 150 / DIST_SCALE;
  * rather than either "no drag at all" or a sudden, unrealistic deorbit.
  *
  * Tuned so a ship-scale body (radius²/mass ≈ 1.1×10¹¹ in sim units, from Zenith's
- * SPACESHIP_RADIUS/SPACESHIP_MASS) at ATMOSPHERE_DEFAULT_SURFACE_DENSITY and
+ * SPACESHIP_RADIUS/SPACESHIP_MASS) at ATMOSPHERE_REFERENCE_DENSITY_BAR and
  * ATMOSPHERE_FULL_INTENSITY_SPEED (150 km/s) has its relative speed halved after ~4s of
  * continuous exposure — long enough that thrust can still fight it, short enough that diving
  * into a dense atmosphere is clearly costly. A Ceres-class asteroid's ratio (≈1.4×10³) is ~8
@@ -587,7 +585,7 @@ export const ATMOSPHERE_DRAG_COEFFICIENT = 1.5e-12;
  *
  * Derived so an ISS-scale body (were it ever moving fast enough to clear the speed gate, which
  * in normal orbit it is not) would lose its full maxHealthPoints in ~3s at
- * ATMOSPHERE_DEFAULT_SURFACE_DENSITY and ATMOSPHERE_FULL_INTENSITY_SPEED. Retune at runtime.
+ * ATMOSPHERE_REFERENCE_DENSITY_BAR and ATMOSPHERE_FULL_INTENSITY_SPEED. Retune at runtime.
  */
 export const ATMOSPHERE_DAMAGE_COEFFICIENT = 1.4e-10;
 
@@ -598,9 +596,9 @@ export const ATMOSPHERE_DAMAGE_COEFFICIENT = 1.4e-10;
 // Satellite base class. See src/physics/station-keeping.ts.
 //
 // Reference numbers for the ISS, the body these are tuned against. Its radius²/mass ratio is
-// ≈1.44×10¹¹ (ISS_RADIUS²/ISS_MASS); local atmospheric density at its 410 km orbit is
-// exp(−4.1 / (EARTH_RADIUS × ATMOSPHERE_DENSITY_SCALE_HEIGHT_FRACTION)) ≈ 1.6×10⁻³ of Earth's
-// surface value; its speed relative to Earth is v = sqrt(G·EARTH_MASS / 67.81) ≈ 0.0767 u/s
+// ≈1.44×10¹¹ (ISS_RADIUS²/ISS_MASS); local atmospheric density at its 410 km orbit was
+// ≈ 1.6×10⁻³ of Earth's surface value when these were tuned (scale height = 1% of Earth's radius —
+// it is now 1% of the atmosphere's thickness, so re-derive these if the ISS is retuned); its speed relative to Earth is v = sqrt(G·EARTH_MASS / 67.81) ≈ 0.0767 u/s
 // (7.67 km/s). Feeding those through ATMOSPHERE_DRAG_COEFFICIENT gives k0 ≈ 3.45×10⁻⁴ and a drag
 // deceleration of k0·v² ≈ 2.03×10⁻⁶ u/s² — the figure every thrust constant below is sized against.
 //

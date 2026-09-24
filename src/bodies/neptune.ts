@@ -99,6 +99,8 @@ export class Neptune extends Planet {
             atmosphere: {
                 radius: NEPTUNE_RADIUS * 1.07,
                 tint: 0x4488ff,
+                // Surface pressure in bar (cloud tops).
+                density: 0.1,
             },
             magneticField: {
                 strength: NEPTUNE_MAG_STRENGTH,
@@ -108,6 +110,7 @@ export class Neptune extends Planet {
                 reversed: NEPTUNE_MAG_REVERSED,
             },
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.GasFluid, discovered: true },
                 atmosphericComposition: {
                     value:

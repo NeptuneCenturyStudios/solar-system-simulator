@@ -31,6 +31,7 @@ export class DwarfPlanet extends CelestialBody {
                     hasRings: options.hasRings ?? false,
                     rotation: options.rotation,
                     mesh: options.mesh,
+                    atmosphere: options.atmosphere,
                     seed: options.seed,
                     magneticField: options.magneticField,
                     attributes: options.attributes,

@@ -15,17 +15,19 @@ import {
     frozenTextures,
     desertTextures,
     temperateTextures,
-    cloudTextures,
 } from '../drawing/textures';
 
-import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
-import type { CelestialBody } from '../bodies/celestial-body';
-import { createAtmosphereShell } from '../effects/atmosphere-shell';
-import { ATMOSPHERE_DEFAULT_SURFACE_DENSITY } from '../utilities/consts';
+import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { rollMagneticField, type MagneticFieldKind } from './magnetic-field';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 import type { IPlanetaryAttributes } from '../bodies/body-attributes';
 import { computePlanetaryAttributes } from './planet-attributes';
+import {
+    type AtmosphereBodyKind,
+    type IAtmosphereProfile,
+    resolveAtmosphereProfile,
+} from './atmosphere-profile';
+import { applyAtmosphereToBody } from './atmosphere-factory';
 
 export type ProceduralPlanetSubtype =
     | 'solid'
@@ -91,6 +93,13 @@ export type ProceduralPlanetCreation = {
      * generated explicitly in planet-generator.ts for the main procedural pipeline.
      */
     attributes?: IPlanetaryAttributes;
+
+    /**
+     * Atmosphere, or null when airless. Undefined means "roll for one" (seeded by id); the
+     * Add/Edit panel sends an explicit profile or null. Temperate and gas/ice giants always get
+     * one. Must agree with `attributes` when both are given — see atmosphere-profile.ts.
+     */
+    atmosphere?: IAtmosphereProfile | null;
 };
 
 function computeRingPresence(creation: ProceduralPlanetCreation): { hasRings: boolean } {
@@ -143,7 +152,10 @@ function computeMagneticField(creation: ProceduralPlanetCreation): IMagneticFiel
  * otherwise they're rolled here (mirroring how computeMagneticField resolves an absent
  * field) — covers the custom Add/Edit panel creation path, which doesn't pre-compute one.
  */
-function computeAttributes(creation: ProceduralPlanetCreation): IPlanetaryAttributes {
+function computeAttributes(
+    creation: ProceduralPlanetCreation,
+    hasAtmosphere: boolean
+): IPlanetaryAttributes {
     if (creation.attributes) return creation.attributes;
 
     return computePlanetaryAttributes({
@@ -151,6 +163,7 @@ function computeAttributes(creation: ProceduralPlanetCreation): IPlanetaryAttrib
         subtype: creation.bodySubtype,
         isDwarf: creation.bodyType === BodyTypeEnum.DwarfPlanet,
         distanceT01: creation.distanceT01 ?? 0.5,
+        hasAtmosphere,
     });
 }
 
@@ -242,7 +255,8 @@ function createCommonPlanetOptions(
     creation: ProceduralPlanetCreation,
     mesh: THREE.Mesh,
     hasRings: boolean,
-    magneticField: IMagneticFieldOptions | null
+    magneticField: IMagneticFieldOptions | null,
+    hasAtmosphere: boolean
 ): Planet | DwarfPlanet {
     const {
         radius,
@@ -259,7 +273,7 @@ function createCommonPlanetOptions(
         textureSeed,
     } = creation;
 
-    const attributes = computeAttributes(creation);
+    const attributes = computeAttributes(creation, hasAtmosphere);
 
     const commonOptions = {
         radius,
@@ -286,68 +300,6 @@ function createCommonPlanetOptions(
     return new Planet(dependencies, scene, commonOptions);
 }
 
-/** Probability (0–1) that a given planet/moon subtype has a cloud layer. */
-const CLOUD_CHANCE: Record<string, number> = {
-    [PlanetTypeEnum.Temperate]: 1.0,
-    [PlanetTypeEnum.Ocean]: 0.75,
-    [PlanetTypeEnum.Terrestrial]: 0.4,
-    [PlanetTypeEnum.Desert]: 0.2,
-    [PlanetTypeEnum.Frozen]: 0.2,
-    [PlanetTypeEnum.Volcanic]: 0.15,
-};
-
-/**
- * Attaches a procedural cloud layer to the given body if the type and seeded RNG
- * determine that it should have one. Gas giants and ice giants are always skipped.
- *
- * @param body          The CelestialBody to attach clouds to.
- * @param subtype       The planet or moon subtype enum value.
- * @param seed          Deterministic seed string for this body.
- * @param rotationSpeed The body's base rotation speed (clouds rotate at 1.3×).
- */
-export function addCloudLayer(
-    body: CelestialBody,
-    subtype: PlanetTypeEnum | MoonTypeEnum,
-    seed: string,
-    rotationSpeed: number
-): void {
-    // Gas/ice giants never get a cloud layer via this path.
-    if (subtype === PlanetTypeEnum.GasGiant || subtype === PlanetTypeEnum.IceGiant) return;
-
-    const chance = CLOUD_CHANCE[subtype] ?? 0;
-    if (chance <= 0) return;
-
-    const enableRng = new SeededRandom(`${seed}|clouds-enabled`);
-    if (chance < 1.0 && !enableRng.chance(chance)) return;
-
-    if (cloudTextures.length === 0) return;
-
-    const textureRng = new SeededRandom(`${seed}|clouds-texture`);
-    const cloudTexture = textureRng.pick(cloudTextures);
-    if (!cloudTexture) return;
-
-    const cloudsMat = new THREE.MeshStandardMaterial({
-        map: cloudTexture,
-        alphaMap: cloudTexture,
-        transparent: true,
-        opacity: 1.0,
-        depthWrite: false,
-        depthTest: true,
-        color: 0xffffff,
-        roughness: 1.0,
-        metalness: 0.0,
-    });
-
-    const cloudsGeo = buildBodySphereGeometry(body.radius * 1.03);
-    body.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
-    body.clouds.renderOrder = 2;
-    body.clouds.receiveShadow = true;
-    body.clouds.userData = { parentBody: body };
-    body.mesh.add(body.clouds);
-
-    body.cloudRotationSpeed = rotationSpeed * 1.3;
-}
-
 export function createPlanetBodyFromProceduralCreation(
     dependencies: IStateDependencies,
     scene: THREE.Scene,
@@ -359,59 +311,31 @@ export function createPlanetBodyFromProceduralCreation(
 
     const { hasRings } = computeRingPresence(creation);
     const magneticField = computeMagneticField(creation);
+    const kind: AtmosphereBodyKind =
+        creation.bodyType === BodyTypeEnum.DwarfPlanet ? 'dwarf' : 'planet';
+    const atmosphere = resolveAtmosphereProfile(
+        creation.atmosphere,
+        creation.id,
+        creation.bodySubtype,
+        kind
+    );
     const body = createCommonPlanetOptions(
         dependencies,
         scene,
         creation,
         mesh,
         hasRings,
-        magneticField
+        magneticField,
+        atmosphere !== null
     );
 
-    addCloudLayer(body, creation.bodySubtype, creation.textureSeed!, creation.rotationSpeed);
-
-    // Add atmosphere shell for gas/ice giants and for solid planets that got a cloud layer.
-    const isGasOrIce =
-        creation.bodySubtype === PlanetTypeEnum.GasGiant ||
-        creation.bodySubtype === PlanetTypeEnum.IceGiant;
-    if (isGasOrIce || body.clouds) {
-        // Pick a tint based on the subtype — use a seeded hash so it's deterministic.
-        const tintRng = new SeededRandom(`${creation.textureSeed!}|atmosphere-tint`);
-        let tint: number;
-        if (creation.bodySubtype === PlanetTypeEnum.GasGiant) {
-            tint = 0xffcc88; // warm amber
-        } else if (creation.bodySubtype === PlanetTypeEnum.IceGiant) {
-            tint = 0x5599ff; // ice blue
-        } else if (creation.bodySubtype === PlanetTypeEnum.Temperate) {
-            tint = 0x77aaff; // soft blue
-        } else if (creation.bodySubtype === PlanetTypeEnum.Ocean) {
-            tint = 0x4477cc; // deep blue
-        } else if (creation.bodySubtype === PlanetTypeEnum.Desert) {
-            tint = 0xffbb66; // warm tan
-        } else if (creation.bodySubtype === PlanetTypeEnum.Frozen) {
-            tint = 0xaaccee; // pale ice blue
-        } else if (creation.bodySubtype === PlanetTypeEnum.Volcanic) {
-            tint = 0xff8844; // orange haze
-        } else {
-            tint = 0x88aaff; // generic blue (Terrestrial or fallback)
-        }
-        // Slight random tint variation to avoid all planets of the same subtype looking identical.
-        const tintColor = new THREE.Color(tint);
-        const shift = (tintRng.next() - 0.5) * 0.08;
-        tintColor.offsetHSL(shift, 0, 0);
-        body.atmosphereRadius = creation.radius * 1.07;
-        body.atmosphereSurfaceDensity = ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
-        body.atmosphereShell = createAtmosphereShell(
-            scene,
-            creation.radius * 1.07,
-            tintColor,
-            mesh
-        );
-    }
-
-    // Aurorae need the atmosphere shell, which only exists now — the constructor's own
-    // refresh ran before this block and would have found nothing to attach to.
-    body.refreshAurora();
+    applyAtmosphereToBody(
+        body,
+        atmosphere,
+        creation.bodySubtype,
+        creation.textureSeed!,
+        creation.rotationSpeed
+    );
 
     return body;
 }

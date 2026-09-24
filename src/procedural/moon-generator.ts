@@ -9,6 +9,7 @@ import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums
 import { pickWeighted } from './seed-utils';
 import { clamp01 } from './noise-utils';
 import { computePlanetaryAttributes } from './planet-attributes';
+import { type IAtmosphereProfile, rollAtmosphereProfileForId } from './atmosphere-profile';
 import type { IPlanetaryAttributes } from '../bodies/body-attributes';
 
 export type ProceduralMoonCreation = {
@@ -49,6 +50,12 @@ export type ProceduralMoonCreation = {
 
     /** Hidden/discoverable science data. */
     attributes: IPlanetaryAttributes;
+
+    /**
+     * Atmosphere, or null when airless. Undefined means "roll for one" (seeded by id, the same
+     * roll the generator makes). Must agree with `attributes` — see atmosphere-profile.ts.
+     */
+    atmosphere?: IAtmosphereProfile | null;
 };
 
 function pickMoonCount(subtype: PlanetTypeEnum, rng: SeededRandom): number {
@@ -262,11 +269,13 @@ export function generateProceduralMoons(params: {
 
             const moonType = pickWeighted(typeRng, moonTypeWeights);
 
+            const atmosphere = rollAtmosphereProfileForId(id, moonType, 'moon');
             const attributes = computePlanetaryAttributes({
                 id,
                 subtype: moonType,
                 isDwarf: false,
                 distanceT01: planet.distanceT01 ?? 0.5,
+                hasAtmosphere: atmosphere !== null,
             });
             const textureSeed =
                 moonType === MoonTypeEnum.Terrestrial
@@ -304,6 +313,7 @@ export function generateProceduralMoons(params: {
 
                 parentIndex: planetIndex,
                 attributes,
+                atmosphere,
             });
 
             // advance the system rng slightly so it doesn't get stuck unused in future expansions

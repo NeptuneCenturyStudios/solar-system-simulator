@@ -71,6 +71,8 @@ export class Saturn extends Planet {
             atmosphere: {
                 radius: SATURN_RADIUS * 1.07,
                 tint: 0xffeebb,
+                // Surface pressure in bar (cloud tops).
+                density: 0.3,
             },
             magneticField: {
                 strength: SATURN_MAG_STRENGTH,
@@ -80,6 +82,7 @@ export class Saturn extends Planet {
                 reversed: SATURN_MAG_REVERSED,
             },
             attributes: {
+                surfacePressure: { discovered: true },
                 coreType: { value: CoreTypeEnum.GasFluid, discovered: true },
                 atmosphericComposition: {
                     value:

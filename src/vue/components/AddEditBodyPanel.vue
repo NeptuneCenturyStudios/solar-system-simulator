@@ -208,6 +208,36 @@
                         <input v-model="hasAtmosphere" type="checkbox" /> Has Atmosphere
                     </label>
 
+                    <template v-if="willHaveAtmosphere">
+                        <div class="control-group">
+                            <label
+                                >Atmosphere Radius
+                                <span class="val-display">{{ atmRadiusFactor }} R</span></label
+                            >
+                            <input
+                                v-model.number="atmRadiusFactor"
+                                type="range"
+                                :min="ATM_RADIUS_FACTOR_MIN"
+                                :max="ATM_RADIUS_FACTOR_MAX"
+                                step="0.01"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >{{ addIsGiant ? 'Cloud-top Pressure' : 'Surface Pressure' }}
+                                <span class="val-display">{{ atmPressure }} bar</span></label
+                            >
+                            <input
+                                v-model.number="atmPressure"
+                                type="number"
+                                class="text-input"
+                                :min="ATM_PRESSURE_MIN"
+                                step="any"
+                            />
+                        </div>
+                    </template>
+
                     <label v-if="bodyType === 'planet'" class="checkbox-row">
                         <input v-model="hasRings" type="checkbox" /> Has Rings
                     </label>
@@ -464,6 +494,40 @@
                         />
                     </div>
 
+                    <template v-if="snapshot.atmosphere">
+                        <div class="control-group">
+                            <label
+                                >Atmosphere Radius
+                                <span class="val-display">{{ editAtmRadiusFactor }} R</span></label
+                            >
+                            <input
+                                v-model.number="editAtmRadiusFactor"
+                                type="range"
+                                :min="ATM_RADIUS_FACTOR_MIN"
+                                :max="ATM_RADIUS_FACTOR_MAX"
+                                step="0.01"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label
+                                >{{
+                                    snapshot.atmosphereIsCloudTop
+                                        ? 'Cloud-top Pressure'
+                                        : 'Surface Pressure'
+                                }}
+                                <span class="val-display">{{ editAtmPressure }} bar</span></label
+                            >
+                            <input
+                                v-model.number="editAtmPressure"
+                                type="number"
+                                class="text-input"
+                                :min="ATM_PRESSURE_MIN"
+                                step="any"
+                            />
+                        </div>
+                    </template>
+
                     <label v-if="snapshot.canHaveMagneticField" class="checkbox-row">
                         <input v-model="editHasMagneticField" type="checkbox" /> Has Magnetic Field
                     </label>
@@ -598,6 +662,8 @@ import {
 import { isActionLocked } from '../sim-bridge';
 import type { ApplyBodyEditPayload, CreateBodyPayload } from '../sim-bridge';
 import type { IMagneticFieldOptions } from '../../interfaces';
+import type { IAtmosphereProfile } from '../../procedural/atmosphere-profile';
+import { subtypeForcesAtmosphere } from '../../procedural/atmosphere-profile';
 import { ScenarioLock } from '../../interfaces';
 import PanelBase from './PanelBase.vue';
 
@@ -633,6 +699,10 @@ const moonType = ref('solid');
 const orbitType = ref<'circular' | 'elliptical'>('circular');
 const inclination = ref(0);
 const hasAtmosphere = ref(false);
+/** Atmosphere radius as a multiple of the body's radius. */
+const atmRadiusFactor = ref(1.07);
+/** Surface (or cloud-top) pressure in bar. */
+const atmPressure = ref(1);
 const hasRings = ref(false);
 const mass = ref(0);
 const radius = ref(0);
@@ -687,6 +757,22 @@ const canHaveAtmosphere = computed(() => {
     }
     return false;
 });
+/** Subtypes that always have an atmosphere (no checkbox): Temperate and gas/ice giants. */
+const forcesAtmosphere = computed(() => {
+    if (bodyType.value === 'planet') return subtypeForcesAtmosphere(planetType.value);
+    if (bodyType.value === 'moon') return subtypeForcesAtmosphere(moonType.value);
+    return false;
+});
+/** Whether the body being created will have an atmosphere — shows the atmosphere controls. */
+const willHaveAtmosphere = computed(
+    () => forcesAtmosphere.value || (canHaveAtmosphere.value && hasAtmosphere.value)
+);
+/** Gas/ice giants' "surface" is their cloud deck, so the pressure reads as cloud-top pressure. */
+const addIsGiant = computed(
+    () =>
+        bodyType.value === 'planet' &&
+        (planetType.value === 'gas_giant' || planetType.value === 'ice_giant')
+);
 /** Stars, planets, and moons can carry a magnetic field; nothing else can. */
 const showMagneticField = computed(
     () => bodyType.value === 'sun' || bodyType.value === 'planet' || bodyType.value === 'moon'
@@ -699,7 +785,8 @@ const canCreateMoon = computed(
     () => bodyType.value !== 'moon' || !!resolveOrbitParentId(simStore.selectedId)
 );
 const canCreate = computed(
-    () => !isActionLocked(ScenarioLock.AddBody) && (addMode.value === 'preset' || canCreateMoon.value)
+    () =>
+        !isActionLocked(ScenarioLock.AddBody) && (addMode.value === 'preset' || canCreateMoon.value)
 );
 const addLocked = computed(() => isActionLocked(ScenarioLock.AddBody));
 const editLocked = computed(() => isActionLocked(ScenarioLock.EditBody));
@@ -757,6 +844,10 @@ function applyRandomDefaults(): void {
     if (defaults.azimuth !== null) azimuth.value = defaults.azimuth;
     if (defaults.inclination !== null) inclination.value = defaults.inclination;
     hasAtmosphere.value = defaults.hasAtmosphere;
+    if (defaults.atmosphere) {
+        atmRadiusFactor.value = roundRadiusFactor(defaults.atmosphere.radiusFactor);
+        atmPressure.value = roundPressure(defaults.atmosphere.surfacePressureBar);
+    }
     hasRings.value = defaults.hasRings;
 
     // A null field means this body type never has one, so the checkbox comes up unchecked.
@@ -798,6 +889,32 @@ function roundOffset(fraction: number): number {
     return Math.round(fraction * 100) / 100;
 }
 
+// ── Atmosphere helpers ────────────────────────────────────────────────────
+const ATM_RADIUS_FACTOR_MIN = 1.01;
+const ATM_RADIUS_FACTOR_MAX = 2;
+const ATM_PRESSURE_MIN = 0.00001;
+
+/** Radius factor at slider (0.01) resolution, kept inside the slider's range. */
+function roundRadiusFactor(factor: number): number {
+    const clamped = Math.min(ATM_RADIUS_FACTOR_MAX, Math.max(ATM_RADIUS_FACTOR_MIN, factor));
+    return Math.round(clamped * 100) / 100;
+}
+
+/** Pressures span µbar to ~100 bar, so keep significant digits rather than decimals. */
+function roundPressure(bar: number): number {
+    return Number(bar.toPrecision(3));
+}
+
+/** Builds the atmosphere payload from form values, or null when the body will be airless. */
+function buildAtmospherePayload(
+    enabled: boolean,
+    radiusFactor: number,
+    pressureBar: number
+): IAtmosphereProfile | null {
+    if (!enabled) return null;
+    return { radiusFactor, surfacePressureBar: pressureBar };
+}
+
 /** Picks a random comet-tail color from the shared procedural palette, as a hex string. */
 function randomCometTailColorHex(): string {
     const color =
@@ -823,6 +940,8 @@ const editMagTilt = ref(0);
 const editMagAzimuth = ref(0);
 const editMagOffset = ref(0);
 const editMagReversed = ref(false);
+const editAtmRadiusFactor = ref(1.07);
+const editAtmPressure = ref(1);
 
 /** Same small-body bounds as the add form, driven off the selected body's snapshot. */
 const isSmallBodySnapshot = computed(
@@ -859,6 +978,11 @@ function syncEditFormFromSnapshot(): void {
     editInclination.value = Math.round(snap.inclination);
     editTilt.value = Math.round(snap.tilt);
     editAzimuth.value = Math.round(snap.azimuth);
+
+    if (snap.atmosphere) {
+        editAtmRadiusFactor.value = roundRadiusFactor(snap.atmosphere.radiusFactor);
+        editAtmPressure.value = roundPressure(snap.atmosphere.surfacePressureBar);
+    }
 
     editHasMagneticField.value = snap.magneticField !== null;
     if (snap.magneticField) {
@@ -907,7 +1031,11 @@ function onCreate(): void {
             planetType: bodyType.value === 'moon' ? moonType.value : planetType.value,
             orbitType: orbitType.value,
             inclination: inclination.value,
-            hasAtmosphere: hasAtmosphere.value,
+            atmosphere: buildAtmospherePayload(
+                willHaveAtmosphere.value,
+                atmRadiusFactor.value,
+                atmPressure.value
+            ),
             hasRings: hasRings.value,
             customMass: hidesMass ? null : mass.value,
             customTemperature: bodyType.value === 'sun' ? temperature.value : null,
@@ -963,10 +1091,26 @@ function onApply(): void {
                   editMagReversed.value
               )
             : undefined,
+        // Only sent when a control actually moved, so APPLY on an untouched form doesn't snap the
+        // body's exact atmosphere to the controls' rounded values.
+        atmosphere: editedAtmosphere(snap.atmosphere),
     };
 
     applyBodyEdit(bodyId, payload);
     loadBodyEditSnapshot(bodyId);
+}
+
+/** The edited atmosphere, or undefined when the body has none or neither control changed. */
+function editedAtmosphere(original: IAtmosphereProfile | null): IAtmosphereProfile | undefined {
+    if (!original) return undefined;
+    const unchanged =
+        editAtmRadiusFactor.value === roundRadiusFactor(original.radiusFactor) &&
+        editAtmPressure.value === roundPressure(original.surfacePressureBar);
+    if (unchanged) return undefined;
+    return {
+        radiusFactor: editAtmRadiusFactor.value,
+        surfacePressureBar: editAtmPressure.value,
+    };
 }
 
 function onDelete(): void {

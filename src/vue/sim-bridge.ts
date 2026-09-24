@@ -14,6 +14,7 @@ import {
 } from '../simulation/simulation';
 import { getBodyTypeLabel } from '../utilities/utilities';
 import type { IMagneticFieldOptions, ISimStateSnapshot } from '../interfaces';
+import type { IAtmosphereProfile } from '../procedural/atmosphere-profile';
 import { ScenarioLock } from '../interfaces';
 import { scenarioManager } from '../scenarios/scenario-manager';
 import { environmentState } from '../simulation/environment-state';
@@ -83,6 +84,11 @@ export interface BodyEditSnapshot {
     canHaveMagneticField: boolean;
     /** The body's dipole magnetic field, or null when it has none. */
     magneticField: IMagneticFieldOptions | null;
+    /** The body's atmosphere (radius relative to the body, pressure in bar), or null when it
+     *  has none. Edit mode can tune an existing atmosphere but never add or remove one. */
+    atmosphere: IAtmosphereProfile | null;
+    /** True for gas/ice giants, whose "surface" pressure is the cloud-top pressure. */
+    atmosphereIsCloudTop: boolean;
     /** Comet tail main color as a hex string (comets only). */
     tailColorHex: string | null;
     /** Readable type label e.g. "Planet". */
@@ -115,7 +121,9 @@ export interface CreateBodyPayload {
     planetType: string;
     orbitType: string;
     inclination: number;
-    hasAtmosphere: boolean;
+    /** Atmosphere for planets/moons, or null for none. Temperate and gas/ice giants always get
+     *  one (a null is ignored for them). */
+    atmosphere: IAtmosphereProfile | null;
     hasRings: boolean;
     customMass: number | null;
     customTemperature: number | null;
@@ -149,6 +157,9 @@ export interface ApplyBodyEditPayload {
     editAzimuth: number | null;
     /** Dipole magnetic field, or null to clear it. Undefined leaves it untouched. */
     magneticField?: IMagneticFieldOptions | null;
+    /** New radius/pressure for an existing atmosphere. Undefined leaves it untouched; a body
+     *  without an atmosphere ignores it. */
+    atmosphere?: IAtmosphereProfile;
 }
 
 /** Freshly-randomized preview values for the add-custom form, keyed by `bodyType`. Mirrors the
@@ -162,6 +173,10 @@ export interface RandomizedCreateDefaults {
     azimuth: number | null;
     inclination: number | null;
     hasAtmosphere: boolean;
+    /** Rolled atmosphere values, pre-filled into the atmosphere controls (used when
+     *  hasAtmosphere is on, or always for subtypes that force an atmosphere). Null for body
+     *  types that never have one. */
+    atmosphere: IAtmosphereProfile | null;
     hasRings: boolean;
     /** Randomized field, or null when this body type never has one (checkbox comes up unchecked). */
     magneticField: IMagneticFieldOptions | null;

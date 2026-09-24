@@ -16,9 +16,8 @@ import {
 import type { ProceduralMoonCreation } from './moon-generator';
 import { MoonTypeEnum } from '../bodies/body-enums';
 import { SeededRandom } from '../utilities/prng';
-import { addCloudLayer } from './planet-factory';
-import { createAtmosphereShell } from '../effects/atmosphere-shell';
-import { ATMOSPHERE_DEFAULT_SURFACE_DENSITY } from '../utilities/consts';
+import { applyAtmosphereToBody } from './atmosphere-factory';
+import { resolveAtmosphereProfile } from './atmosphere-profile';
 import { rollMagneticField } from './magnetic-field';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 
@@ -221,40 +220,9 @@ export function createMoonBodyFromProceduralCreation(params: {
         mesh,
     });
 
-    addCloudLayer(body, moonType, textureSeed, creation.rotationSpeed);
-
-    if (body.clouds) {
-        const tintRng = new SeededRandom(`${textureSeed}|atmosphere-tint`);
-        let tint: number;
-        if (moonType === MoonTypeEnum.Temperate) {
-            tint = 0x77aaff;
-        } else if (moonType === MoonTypeEnum.Ocean) {
-            tint = 0x4477cc;
-        } else if (moonType === MoonTypeEnum.Desert) {
-            tint = 0xffbb66;
-        } else if (moonType === MoonTypeEnum.Frozen) {
-            tint = 0xaaccee;
-        } else if (moonType === MoonTypeEnum.Volcanic) {
-            tint = 0xff8844;
-        } else {
-            tint = 0x88aaff; // Terrestrial or fallback
-        }
-        const tintColor = new THREE.Color(tint);
-        const shift = (tintRng.next() - 0.5) * 0.08;
-        tintColor.offsetHSL(shift, 0, 0);
-        body.atmosphereRadius = safeRadius * 1.07;
-        body.atmosphereSurfaceDensity = ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
-        body.atmosphereShell = createAtmosphereShell(
-            params.scene,
-            safeRadius * 1.07,
-            tintColor,
-            body.mesh
-        );
-    }
-
-    // Aurorae need the atmosphere shell, which only exists now — the constructor's own
-    // refresh ran before this block and would have found nothing to attach to.
-    body.refreshAurora();
+    // The generator rolled this alongside the attributes (same id-seeded roll when undefined).
+    const atmosphere = resolveAtmosphereProfile(creation.atmosphere, creation.id, moonType, 'moon');
+    applyAtmosphereToBody(body, atmosphere, moonType, textureSeed, creation.rotationSpeed);
 
     return body;
 }

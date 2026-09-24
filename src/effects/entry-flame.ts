@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Body } from '../bodies/body.js';
 import { settingsStore } from '../settings/settings-store.js';
 import {
-    ATMOSPHERE_DEFAULT_SURFACE_DENSITY,
+    ATMOSPHERE_REFERENCE_DENSITY_BAR,
     ATMOSPHERE_FULL_INTENSITY_SPEED,
     ATMOSPHERE_MIN_SPEED_FOR_EFFECT,
 } from '../utilities/consts.js';
@@ -61,18 +61,13 @@ const RADIUS_SCALE_MIN = 0.85;
  * Fraction of a planet's surface density at which the flame reaches full brightness.
  *
  * Physical density falls off with a scale height of ATMOSPHERE_DENSITY_SCALE_HEIGHT_FRACTION
- * (1% of the planet's radius — see physics/atmosphere-density.ts), which makes it decay
- * brutally fast: for Earth it is still only ~0.002 at 400 km altitude and ~0.00008 at 600 km.
- * Feeding that raw ratio straight into the flame's opacity left the flame invisible until the
+ * of the atmosphere's thickness (see physics/atmosphere-density.ts), which makes it decay
+ * brutally fast over most of the shell. Feeding that raw ratio straight into the flame's opacity left the flame invisible until the
  * body was nearly at the surface. Dividing it by this small fraction first re-sensitises the
  * response, so the flame ramps in over the top of the descent and is fully lit well before
  * the surface. Lower = more sensitive.
  *
- * Earth figures at the current value (altitude where the flame reaches 10% / 50% / 100% of
- * its density-limited brightness): 372 km / 260 km / 223 km. For comparison, the old raw
- * ratio reached 10% only at 147 km and was fully lit only at the surface itself.
- *
- * The ratio is measured against ATMOSPHERE_DEFAULT_SURFACE_DENSITY rather than the planet's
+ * The ratio is measured against ATMOSPHERE_REFERENCE_DENSITY_BAR rather than the planet's
  * own surface density, so a planet with a genuinely thinner atmosphere still reads fainter at
  * the same altitude — the "thin atmosphere is dimmer" intent survives.
  */
@@ -432,7 +427,7 @@ export class EntryFlameEffect {
      * brightness factor.
      *
      * The mapping is deliberately NOT the raw density ratio. Atmospheric density decays with a
-     * scale height of 1% of the planet's radius, so across the great majority of the atmosphere
+     * scale height of a small fraction of the atmosphere's thickness, so across the great majority of the atmosphere
      * shell the raw ratio is indistinguishable from zero — multiplying the flame by it made the
      * flame appear only in the last few kilometres before impact. Dividing by
      * DENSITY_FULL_FRACTION instead lets the flame saturate at a small fraction of the surface
@@ -445,7 +440,7 @@ export class EntryFlameEffect {
      * every frame.
      */
     setAtmosphereDensity(density: number): void {
-        const surfaceRatio = density / ATMOSPHERE_DEFAULT_SURFACE_DENSITY;
+        const surfaceRatio = density / ATMOSPHERE_REFERENCE_DENSITY_BAR;
         this.densityFactor = THREE.MathUtils.clamp(surfaceRatio / DENSITY_FULL_FRACTION, 0, 1);
     }
 
@@ -522,7 +517,9 @@ export class EntryFlameEffect {
         }
 
         // Anchor the blunt front ring at the body's leading edge so the flame wraps the front.
-        this.mesh.position.copy(this.body.mesh.position).addScaledVector(this._dir, this.body.radius);
+        this.mesh.position
+            .copy(this.body.mesh.position)
+            .addScaledVector(this._dir, this.body.radius);
         this.mesh.quaternion.copy(this._quat);
 
         // Grow the flame with intensity: longer and slightly fatter as it ramps up.

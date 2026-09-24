@@ -20,6 +20,7 @@ import {
 import { pickWeighted, rngFor } from './seed-utils';
 import { clamp01 } from './noise-utils';
 import { computePlanetaryAttributes } from './planet-attributes';
+import { rollAtmosphereProfileForId } from './atmosphere-profile';
 
 type StarPlacement = {
     pos: THREE.Vector3;
@@ -250,11 +251,13 @@ export function generateProceduralPlanets(params: {
             planetSubtype: subtype,
         });
 
+        const atmosphere = rollAtmosphereProfileForId(id, subtype, isDwarf ? 'dwarf' : 'planet');
         const attributes = computePlanetaryAttributes({
             id,
             subtype,
             isDwarf,
             distanceT01,
+            hasAtmosphere: atmosphere !== null,
         });
 
         planetCreations.push({
@@ -273,6 +276,7 @@ export function generateProceduralPlanets(params: {
             distanceT01,
             hostStarIndex,
             attributes,
+            atmosphere,
         });
     }
 
