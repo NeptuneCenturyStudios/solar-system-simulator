@@ -615,13 +615,6 @@ export interface ICameraState {
         shift: boolean;
     };
 
-    arrowKeys: {
-        left: boolean;
-        right: boolean;
-        up: boolean;
-        down: boolean;
-    };
-
     pendingCollisionFocusBody: Body | null;
 
     // Smooth Zoom (orbit mode). Non-null while an eased zoom is in flight; the

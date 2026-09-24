@@ -66,12 +66,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { formatTimeScale, setTimeScale, simStore, togglePause } from '../sim-bridge';
+import { formatTimeScale, setTimeScale, simStore, stepTimeScale, togglePause } from '../sim-bridge';
 import { ActivePanel, setActivePanel, togglePanelManager, vueUiState } from '../ui-store';
-
-// Same bounds the old bottom toolbar used (ui-manager.ts).
-const MIN_TIME_SCALE = 0.01;
-const MAX_TIME_SCALE = 2 ** 12;
 
 const speedText = computed(() => formatTimeScale(simStore.timeScale));
 const speedTitle = computed(() => {
@@ -85,19 +81,6 @@ const speedTitle = computed(() => {
 
 function onTogglePause(): void {
     togglePause();
-}
-
-/**
- * Halve/double the time scale, mirroring the old toolbar.
- * While paused the sim's active scale is 0, so we operate on `savedTimeScale`
- * (the speed that will be restored on resume) — exactly what the old
- * `timeScaleChange` handler does.
- */
-function stepTimeScale(factor: number): void {
-    const base = simStore.isPaused ? simStore.savedTimeScale : simStore.timeScale;
-    const next = base * factor;
-    const clamped = factor < 1 ? Math.max(MIN_TIME_SCALE, next) : Math.min(MAX_TIME_SCALE, next);
-    setTimeScale(clamped);
 }
 
 function toggleExplorer(): void {

@@ -134,7 +134,6 @@ export const cameraState: ICameraState = {
         space: false,
         shift: false,
     },
-    arrowKeys: { left: false, right: false, up: false, down: false },
     pendingCollisionFocusBody: null as Body | null,
     targetZoomDistance: null as number | null,
     zoomPivotBody: null as Body | null,

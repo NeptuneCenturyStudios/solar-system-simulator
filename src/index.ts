@@ -118,7 +118,7 @@ import { PlanetNameIndicator } from './drawing/planet-name-indicator';
 import { HealthBarIndicator } from './drawing/health-bar-indicator';
 import { ThreatIndicator } from './drawing/threat-indicator';
 import { TargetLockIndicator } from './drawing/target-lock-indicator';
-import { cycleTargetLock } from './simulation/target-lock';
+import { installKeyboardControls } from './simulation/keyboard-controls';
 import { ScreenFlashEffect, registerScreenFlash } from './effects/screen-flash';
 import { ScenarioMessageHud, registerScenarioMessageHud } from './drawing/scenario-message-hud';
 import { VelocityArcManager } from './drawing/velocity-arc';
@@ -180,7 +180,7 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 
 // Vue UI overlay (new UI, developed in parallel with the existing UI)
 import { mountVueUi } from './vue/main';
-import { registerVueSimHooks, setDisplayState, simStore } from './vue/sim-bridge';
+import { registerVueSimHooks, setDisplayState, simStore, stepTimeScale } from './vue/sim-bridge';
 import {
     hidePanelManagerForFlight,
     restorePanelManagerAfterFlight,
@@ -1964,10 +1964,6 @@ function togglePause() {
     }
 
     dispatchSimStateChange();
-}
-
-function handlePauseShortcut() {
-    togglePause();
 }
 
 function onMouseDown(event: MouseEvent) {
@@ -4357,257 +4353,23 @@ function deleteSelectedBody() {
     return true;
 }
 
-// Keyboard controls for free camera / flight mode.
-// Registered in CAPTURE phase so these handlers run BEFORE any UI-level
-// stopPropagation() handlers (Vue overlay, legacy panels): keys reach the sim
-// regardless of which UI element has focus. Typing targets (search box,
-// inputs, selects, contenteditable) are excluded explicitly below instead of
-// relying on events being blocked somewhere in the UI.
-window.addEventListener(
-    'keydown',
-    (e) => {
-        // While a modal is open, let it own the keyboard entirely.
-        if (modalBlocksInput()) return;
-
-        // Never hijack keys while the user is typing in a form control
-        // (System Explorer search box, ship-type dropdown, etc.).
-        if (isEditableTarget(e.target)) return;
-
-        const key = e.key.toLowerCase();
-
-        // Arrow-key movement for selected bodies when the gizmo is visible.
-        if (
-            key === 'arrowleft' ||
-            key === 'arrowright' ||
-            key === 'arrowup' ||
-            key === 'arrowdown'
-        ) {
-            if (moveSelectedBodyRelativeToCamera(key, e.ctrlKey)) {
-                e.preventDefault();
-                return;
-            }
-        }
-
-        // Toggle velocity edit mode while actively editing velocity
-        // G toggles between XZ (horizontal) and Y (vertical).
-        if (
-            (interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity) &&
-            key === 'g'
-        ) {
-            interactionState.velocityEditMode =
-                interactionState.velocityEditMode === 'xz' ? 'y' : 'xz';
-
-            // Update the drag plane to match the active velocity edit mode.
-            // - XZ: horizontal plane through the body (constrains to XZ while still tracking mouse up/down)
-            // - Y: vertical plane containing world-up and the current horizontal heading
-            if (gizmo?.target) {
-                const origin = gizmo.target.mesh.position;
-
-                if (interactionState.velocityEditMode === 'y') {
-                    const v = gizmo.target.velocity.clone();
-                    v.y = 0;
-
-                    const hDir = v.lengthSq() > 1e-10 ? v.normalize() : new THREE.Vector3(1, 0, 0);
-                    const up = new THREE.Vector3(0, 1, 0);
-
-                    const planeNormal = new THREE.Vector3().crossVectors(hDir, up).normalize();
-                    interactionState.dragPlane.setFromNormalAndCoplanarPoint(planeNormal, origin);
-                } else {
-                    // XZ mode: use horizontal plane (not a camera-facing plane)
-                    interactionState.dragPlane.setFromNormalAndCoplanarPoint(
-                        new THREE.Vector3(0, 1, 0),
-                        origin
-                    );
-                }
-            }
-
-            velArc.update();
-            // Prevent the key from doing anything else
-            e.preventDefault();
-            return;
-        }
-
-        if (key === 'w') {
-            // Flight mode: W = hold to thrust forward
-            if (flightState.isActive) {
-                keys.w = true;
-                e.preventDefault();
-                return;
-            }
-            keys.w = true;
-        }
-        if (key === 'a') {
-            // Flight mode: A rolls left
-            if (flightState.isActive) {
-                flightState.rollLeft = true;
-                e.preventDefault();
-                return;
-            }
-            keys.a = true;
-        }
-        if (key === 's') {
-            // Flight mode: S = hold to thrust backward / decelerate
-            if (flightState.isActive) {
-                keys.s = true;
-                e.preventDefault();
-                return;
-            }
-            keys.s = true;
-        }
-        if (key === 'd') {
-            // Flight mode: D rolls right
-            if (flightState.isActive) {
-                flightState.rollRight = true;
-                e.preventDefault();
-                return;
-            }
-            keys.d = true;
-        }
-        if (key === 'c') {
-            // Flight mode: C toggles between cockpit and 3rd-person view
-            if (flightState.isActive) {
-                flightState.isCockpitView = !flightState.isCockpitView;
-                e.preventDefault();
-                return;
-            }
-            keys.c = true;
-        }
-        if (key === 'tab') {
-            // Flight mode: TAB cycles the locked threat target, Shift+TAB reverses.
-            // Left alone (no preventDefault) while focus is inside the Vue UI, so Tab still
-            // moves focus between UI controls there instead of hijacking the scene binding.
-            if (flightState.isActive && !vueUiRoot?.contains(e.target as Node)) {
-                e.preventDefault();
-                if (e.repeat) return;
-                cycleTargetLock(e.shiftKey);
-                return;
-            }
-        }
-        if (key === 'e' && flightState.isActive) {
-            keys.e = true;
-            e.preventDefault();
-            return;
-        }
-        if (key === ' ') {
-            if (flightState.isActive) {
-                e.preventDefault();
-                if (e.repeat) return; // ignore key-repeat; only act on the initial press
-                const ship = flightState.activeShip;
-                if (ship?.warpActive && !autopilotState.isActive) {
-                    // Disengage warp (manual only — autopilot manages its own warp lifecycle)
-                    ship.beginWarpDecel();
-                    ship.cancelWarpCharge();
-                    flightSteeringLine.visible = true;
-                    addEvent({
-                        message: 'Warp disengaged. Decelerating...',
-                        notificationType: NotificationType.Info,
-                    });
-                } else if (ship && !ship.warpDecelerating && !autopilotState.isActive) {
-                    // Only start charging when not already decelerating from a previous warp,
-                    // and not under autopilot control.
-                    ship.startWarpCharge();
-                }
-                return;
-            }
-            keys.space = true;
-        }
-        if (key === 'shift') {
-            keys.shift = true;
-        }
-        if (key === 'alt' && flightState.isActive) {
-            flightState.altOrbitActive = true;
-            // Zero steering offsets so the ship stops turning immediately
-            flightState.pointerOffsetX = 0;
-            flightState.pointerOffsetY = 0;
-            e.preventDefault();
-        }
-
-        // Escape exits flight mode
-        if (key === 'escape' && flightState.isActive) {
-            exitFlightMode(flightCtx);
-            e.preventDefault();
-            return;
-        }
-
-        // Delete key to remove selected body
-        if (key === 'n') {
-            simulationState.showNames = !simulationState.showNames;
-            dispatchSimStateChange();
-        }
-
-        if (key === 'p') {
-            handlePauseShortcut();
-            e.preventDefault();
-            return;
-        }
-
-        if (key === 'delete') {
-            deleteSelectedBody();
-        }
-    },
-    true
-);
-
-// Keyup runs in capture phase with NO guards: held-key flags must ALWAYS be
-// cleared, otherwise a key pressed before focusing a text field (or opening a
-// modal) would get stuck "down" forever.
-window.addEventListener(
-    'keyup',
-    (e) => {
-        const key = e.key.toLowerCase();
-        if (key === 'w') keys.w = false;
-        if (key === 'a') {
-            keys.a = false;
-            if (flightState.isActive) flightState.rollLeft = false;
-        }
-        if (key === 's') keys.s = false;
-        if (key === 'd') {
-            keys.d = false;
-            if (flightState.isActive) flightState.rollRight = false;
-        }
-        if (key === 'c') keys.c = false;
-        if (key === 'e') {
-            keys.e = false;
-            if (flightState.isActive) flightState.autopilotCharge = 0;
-        }
-        if (key === ' ') {
-            keys.space = false;
-            if (flightState.isActive) {
-                // Cancel warp charge if space released before full charge
-                const _spaceShip = flightState.activeShip;
-                if (_spaceShip?.warpCharging) {
-                    _spaceShip.cancelWarpCharge();
-                    flightHUD.hideWarpSprite();
-                }
-            }
-        }
-        if (key === 'shift') keys.shift = false;
-        if (key === 'alt' && flightState.isActive) {
-            flightState.altOrbitActive = false;
-            // Zero steering offsets so the ship doesn't lurch when steering resumes
-            flightState.pointerOffsetX = 0;
-            flightState.pointerOffsetY = 0;
-            e.preventDefault();
-        }
-
-        if (
-            key === 'arrowleft' ||
-            key === 'arrowright' ||
-            key === 'arrowup' ||
-            key === 'arrowdown'
-        ) {
-            if (
-                !interactionState.isChangingVelocity &&
-                !interactionState.isMiddleMouseVelocity &&
-                !interactionState.isRepositioning
-            ) {
-                posIndicator.hide();
-                velArc.hideAll();
-            }
-        }
-    },
-    true
-);
+// Keyboard shortcuts (free camera, flight mode, scene toggles). See simulation/keyboard-controls.ts.
+installKeyboardControls({
+    flightCtx,
+    gizmo,
+    velArc,
+    posIndicator,
+    flightSteeringLine,
+    flightHUD,
+    vueUiRoot,
+    modalBlocksInput,
+    addEvent,
+    moveSelectedBodyRelativeToCamera,
+    deleteSelectedBody,
+    togglePause,
+    stepTimeScale,
+    dispatchSimStateChange,
+});
 
 window.addEventListener('mousedown', onMouseDown);
 window.addEventListener('mousemove', onMouseMove);
@@ -4978,19 +4740,6 @@ function modalBlocksInput() {
     );
 }
 
-/**
- * Whether a keyboard event's target is a text-editing control.
- * Used by the capture-phase window key handlers so WASD / Space / Esc / etc.
- * flow through to the sim, but typing in the System Explorer search box or any
- * other form field is left alone.
- */
-function isEditableTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
-    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return true;
-    if (target instanceof HTMLSelectElement) return true;
-    return target.isContentEditable;
-}
-
 function onMouseDownWrapped(e: MouseEvent) {
     if (modalBlocksInput()) return;
     return _origOnMouseDown(e);
@@ -5018,14 +4767,6 @@ document.addEventListener('pointerlockchange', () => {
         exitFlightMode(flightCtx);
     }
 });
-
-window.addEventListener(
-    'keydown',
-    () => {
-        if (modalBlocksInput()) return;
-    },
-    true
-);
 
 // ── Initialize: check for URL seed or show startup modal ────────────────────
 (async function initializeApp() {

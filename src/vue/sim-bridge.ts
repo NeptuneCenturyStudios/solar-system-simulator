@@ -672,6 +672,21 @@ export function setTimeScale(value: number): void {
     }
 }
 
+// Same bounds the old bottom toolbar used (ui-manager.ts).
+const MIN_TIME_SCALE = 0.01;
+const MAX_TIME_SCALE = 2 ** 12;
+
+/**
+ * Multiply the time scale by `factor` (e.g. 0.5 / 2), clamped to the toolbar's bounds.
+ * While paused the sim's active scale is 0, so this operates on `savedTimeScale` (the speed
+ * that will be restored on resume), and — like every speed change — resumes the sim.
+ */
+export function stepTimeScale(factor: number): void {
+    const base = state.isPaused ? state.savedTimeScale : state.timeScale;
+    const next = base * factor;
+    setTimeScale(factor < 1 ? Math.max(MIN_TIME_SCALE, next) : Math.min(MAX_TIME_SCALE, next));
+}
+
 export function setGMultiplier(value: number): void {
     if (hookRegistry.setGMultiplier) {
         hookRegistry.setGMultiplier(value);
