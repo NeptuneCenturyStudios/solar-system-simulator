@@ -1,6 +1,6 @@
 {
     "name": "solar-system-simulator",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "A solar system simulator built with Vue and Three.js",
     "main": "dist/assets/index.js",
     "scripts": {

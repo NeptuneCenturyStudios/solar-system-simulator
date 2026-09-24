@@ -73,7 +73,7 @@ customRenderer.link = (tokens) => {
 marked.use({ renderer: customRenderer });
 marked.use({ renderer: { link: customRenderer.link } });
 
-const attribution = ref(marked.parse(credits, {}));
+const attribution = ref(marked.parse(credits));
 
 function show(): void {
     visible.value = true;

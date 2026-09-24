@@ -8,130 +8,9 @@
         <div class="modal-body whats-new-body">
             <p class="whats-new-intro">Here's what's new in this update:</p>
 
-            <h3>Version 1.2.0 - Major Update</h3>
-            <ul class="whats-new-list">
-                <li>
-                    <span class="material-symbols-outlined whats-new-icon">interests</span>
-                    <div>
-                        <strong>Introducing: Scenarios</strong>
-                        <p>
-                            Explore and play through different scenarios from wormhole shortcuts to
-                            saving the earth from asteroids. More scenarios coming soon!
-                        </p>
-
-                        <p>
-                            <strong>Other new features:</strong>
-                        </p>
-                        <ul>
-                            <li>
-                                Added new atmospheric entry effects (asteroids, comets, ships,
-                                satellites).
-                            </li>
-                            <li>Added magnetic field planetary attributes and aurora effects.</li>
-
-                            <li>
-                                Added new gravity solvers to choose from to optimize performance for
-                                larger simulations.
-                            </li>
-                            <li>Added a scenario to test the ship AI work-in-progress.</li>
-                            <li>Added new music track.</li>
-                        </ul>
-                    </div>
-                </li>
-                <li>
-                    <span class="material-symbols-outlined whats-new-icon">bug_report</span>
-                    <div>
-                        <strong>Bug fixes and improvements:</strong>
-                        <ul>
-                            <li>Improved the particle explosion effect more.</li>
-                            <li>Adjusted ship handling for Zenith and Osiris.</li>
-                            <li>
-                                Collisions no longer result in instant destruction, but cause damage
-                                depending on impact velocity.
-                            </li>
-                            <li>Comets now get procedurally random tail colors.</li>
-
-                            <li>
-                                Removed old naming conventions for custom created objects. They now
-                                use procedurally generated names.
-                            </li>
-                            <li>Object names are now editable before creating the object.</li>
-                            <li>Removed an unused color picker from edit mode.</li>
-                            <li>Fixed an issue that caused right clicking to exit flight mode.</li>
-                            <li>Fixed an issue where the edit gizmo would show on an object after editing even if Target was turned off.</li>
-                            <li>Fixed an issue where asteroids and comets could not by selected by clicking on them in space.</li>
-                            <li>UI HUD overhaul for better performance.</li>
-                            <li>
-                                Fixed certain effects updating per substep instead of frame,
-                                improving performance.
-                            </li>
-                            <li>Pluto's orbit is now more accurately represented.</li>
-                            <li>Minor UI adjustments.</li>
-                        </ul>
-                    </div>
-                </li>
-            </ul>
-
-            <h3>Version 1.1.2 - Maintenance Update</h3>
-            <ul class="whats-new-list">
-                <li>
-                    <span class="material-symbols-outlined whats-new-icon">bug_report</span>
-                    <div>
-                        <strong>Bug fixes and improvements</strong>
-                        <ul>
-                            <li>
-                                Fixed an issue that caused the camera to focus on scene center and
-                                disabled Look At when an object was destroyed.
-                            </li>
-                            <li>
-                                Fixed an issue where the ship flame would get stuck in scene when
-                                ship was destroyed.
-                            </li>
-                            <li>
-                                Fixed issue where main UI was visible even before the system was
-                                fully loaded.
-                            </li>
-                            <li>Improved the particle explosion effect.</li>
-                        </ul>
-                    </div>
-                </li>
-            </ul>
-
-            <h3>Version 1.1.1 - Major Update</h3>
-            <ul class="whats-new-list">
-                <li>
-                    <span class="material-symbols-outlined whats-new-icon">cyclone</span>
-                    <div>
-                        <strong>Introducing: Wormholes!</strong>
-                        <span
-                            >Link wormholes together to send planets across the system instantly.
-                            Experiment with different sizes. Can you transport a whole star?</span
-                        >
-                    </div>
-                </li>
-                <li>
-                    <span class="material-symbols-outlined whats-new-icon">palette</span>
-                    <div>
-                        <strong>Revamped UI</strong>
-                        <span>Major updates to the UI.</span>
-                    </div>
-                </li>
-                <li>
-                    <span class="material-symbols-outlined whats-new-icon">music_note</span>
-                    <div>
-                        <strong>New Music Tracks</strong>
-                        <span
-                            >Added nine new audio tracks to enjoy while exploring the cosmos.</span
-                        >
-                    </div>
-                </li>
-                <li>
-                    <span class="material-symbols-outlined whats-new-icon">bug_report</span>
-                    <div>
-                        <strong>Bug fixes and improvements</strong>
-                    </div>
-                </li>
-            </ul>
+            <!-- Only displaying content from within the app, not user content -->
+            <!-- eslint-disable vue/no-v-html -->
+            <div v-html="relaseNotesHtml"></div>
         </div>
 
         <template #actions>
@@ -144,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 
 import { useAsyncModal } from '../../composables/useAsyncModal';
 import {
@@ -152,8 +31,39 @@ import {
     type WhatsNewModalController,
 } from '../../whats-new-modal-service';
 import ModalBase from './ModalBase.vue';
+import { marked } from 'marked';
 
 const modal = useAsyncModal<void>();
+
+const releaseNotes = `
+### Version 1.3.0 - Major Update
+
+**Introducing: Probes**
+
+Send probes to celestial objects to unlock hidden attributes.
+
+**Other new features**
+
+-   Added new atmospheric drag. Small objects are now subjected to reduced speed while within the atmosphere of a body.
+-   Added satellite station-keeping to counter drag, especially for low orbital vehicles like the ISS.
+-   Added several new asteroid variants
+-   Added shields to ships.
+-   Added weapons testing for the Ship AI test scenario.
+-   Added new Extinction Event scenario to give the Osirus Mothership a use
+-   Added new target mode and chase mode to ships. Lock onto a threat target to be able to chase it.
+-   Added new keyboard shortcuts for increasing and decreasing time scale (+/-) keys.
+-   Added new option for smooth camera zoom
+
+**Bug fixes and improvements**
+
+-   Improved ship weapon balancing.
+-   Adjusted ship handling for Zenith and Osiris.
+-   Fixed issue where entering flight mode no longer closed the system explorer
+-   Neptune's orbit is now more accurately represented.
+-   Minor UI adjustments.
+`;
+
+const relaseNotesHtml = ref(marked.parse(releaseNotes, {}));
 
 function onClose(): void {
     modal.close(undefined);
