@@ -524,7 +524,7 @@ export const COLLISION_SEPARATION_FACTOR = 1.001;
 // (Ceres-class asteroid, a comet nucleus) is barely affected by either — punching straight
 // through to the surface, where the existing collision system takes over. See
 // src/physics/atmosphere-density.ts and src/physics/atmospheric-drag.ts.
-/** Reference surface density, in bar, that the drag/damage/flame constants below are tuned
+/** Reference surface density, in bar, that the drag/damage constants below are tuned
  *  against. Surface density *is* surface pressure in bar (IAtmosphereOptions.density), so 1.0
  *  is Earth at sea level. A tuning reference only — every atmosphere sets its own density. */
 export const ATMOSPHERE_REFERENCE_DENSITY_BAR = 1.0;

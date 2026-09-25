@@ -3898,7 +3898,7 @@ function spawnShip(targetShip?: Spaceship) {
         // --- Fresh spawn: create the ship and focus the camera on it without entering flight mode ---
         const cameraDir = new THREE.Vector3();
         camera.getWorldDirection(cameraDir);
-        const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(60));
+        const spawnPos = camera.position.clone().add(cameraDir.multiplyScalar(0.5 / DIST_SCALE));
 
         // Create the selected ship type from the registry (falls back to the first type).
         const shipType = getShipTypeById(simStore.selectedShipTypeId);

@@ -258,7 +258,12 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene, dtTotal: nu
 
         const density = computeAtmosphericDensity(distance, planet);
         if (small.entryFlame && small.entryFlame.planet === planet) {
-            small.entryFlame.setAtmosphereDensity(density);
+            // Visual brightness follows depth into the shell (leading edge, matching the entry
+            // test above), not the physical density — see EntryFlameEffect.setAtmosphereDepth.
+            const thickness = planet.atmosphereRadius - planet.radius;
+            const depthFraction =
+                thickness > 0 ? (planet.atmosphereRadius - leadingEdgeDistance) / thickness : 1;
+            small.entryFlame.setAtmosphereDepth(depthFraction, planet.atmosphereSurfaceDensity);
         }
 
         // Continuous drag + heat/ablation damage, applied at the same once-per-frame (dtTotal)
