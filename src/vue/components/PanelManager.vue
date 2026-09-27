@@ -4,6 +4,16 @@
             <div class="toolbar-group">
                 <button
                     class="btn toolbar-btn"
+                    :class="{ active: activePanel === ActivePanel.Help }"
+                    title="Help - keyboard and mouse controls"
+                    aria-label="Help - keyboard and mouse controls"
+                    @click="setActivePanel(ActivePanel.Help)"
+                >
+                    <span class="material-symbols-outlined">help</span>
+                </button>
+
+                <button
+                    class="btn toolbar-btn"
                     title="About this simulator"
                     aria-label="About this simulator"
                     @click="openAbout"
@@ -93,6 +103,7 @@
             <OptionsPanel v-if="activePanel === ActivePanel.Options" />
             <PlaylistPanel v-if="activePanel === ActivePanel.Playlist" />
             <TextureGeneratorPanel v-if="activePanel === ActivePanel.TextureGenerator" />
+            <HelpPanel v-if="activePanel === ActivePanel.Help" />
         </div>
     </div>
 </template>
@@ -110,6 +121,7 @@ import SolarSystemManagement from '../components/SolarSystemManagement.vue';
 import OptionsPanel from '../components/OptionsPanel.vue';
 import PlaylistPanel from '../components/PlaylistPanel.vue';
 import TextureGeneratorPanel from '../components/TextureGeneratorPanel.vue';
+import HelpPanel from '../components/HelpPanel.vue';
 
 const activePanel = computed(() => vueUiState.activePanel);
 const addLocked = computed(() => isActionLocked(ScenarioLock.AddBody));

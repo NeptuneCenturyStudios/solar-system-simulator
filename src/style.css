@@ -1088,8 +1088,6 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     }
 }
 
-
-
 /* Mobile gesture support:
    Disable browser-native touch scrolling/zooming on the WebGL canvas,
    so OrbitControls touch rotate + pinch zoom can work reliably. */
@@ -1351,6 +1349,123 @@ button.btn.toolbar-btn.btn-care:focus-visible {
 .vue-modal-fade-enter-from,
 .vue-modal-fade-leave-to {
     opacity: 0;
+}
+
+/* ── Attribute / definition lists ────────────────────────────────────────────
+   Label/value rows extracted from BodyAttributesModal.vue so other panels can
+   reuse the look. BodyAttributesModal renders object data (unscanned readings
+   are dimmed via `attribute-row-unknown`); HelpPanel.vue lists controls in the
+   same shape. */
+
+.attribute-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 320px;
+}
+
+.attribute-section-title {
+    margin: 0 0 8px;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--new-ui-label-color, rgba(255, 255, 255, 0.6));
+}
+
+.attribute-list {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.attribute-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.attribute-label {
+    flex: 0 0 44%;
+    margin: 0;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.attribute-value {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--new-ui-label-value-color);
+    overflow-wrap: anywhere;
+}
+
+/* Unscanned readings read as dimmed placeholders rather than data. */
+.attribute-row-unknown .attribute-value {
+    color: var(--new-ui-label-dim-color);
+}
+
+.attribute-note {
+    margin: 0 0 8px;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.attribute-note-hint {
+    margin: 8px 0 0;
+    color: var(--new-ui-label-color);
+}
+
+/* ── Help panel ──────────────────────────────────────────────────────────────
+   Control reference (HelpPanel.vue). Reuses the attribute list above; the key
+   side is the bright value column, aligned right, so shortcuts read as the
+   "data" for each action. */
+
+.help-body {
+    /* Fill the panel and scroll its own shortcut list instead of the card. */
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+}
+
+.help-intro {
+    margin: 0;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+/* Let the action text use the spare width and keep the key caps sized to
+   their content, flush right. */
+.help-body .attribute-label {
+    flex: 1 1 auto;
+}
+
+.help-body .attribute-value {
+    flex: 0 0 auto;
+}
+
+.help-keys {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+}
+
+.help-key {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--new-ui-border);
+    border-radius: 4px;
+    background: var(--new-ui-button-bg);
+    color: var(--new-ui-label-value-color);
+    font-family: monospace;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
 /* Keep the media queries last */

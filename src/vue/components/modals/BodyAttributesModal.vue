@@ -20,9 +20,7 @@
             <section class="attribute-section">
                 <h3 class="attribute-section-title">Science Data</h3>
 
-                <p v-if="!snapshot.hasScienceData" class="attribute-note">
-                    None
-                </p>
+                <p v-if="!snapshot.hasScienceData" class="attribute-note">None</p>
 
                 <template v-else>
                     <dl class="attribute-list">
@@ -80,67 +78,3 @@ function onClose(): void {
     closeBodyAttributes();
 }
 </script>
-
-<style scoped>
-.attribute-body {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    min-width: 320px;
-}
-
-.attribute-section-title {
-    margin: 0 0 8px;
-    font-size: 0.75rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--new-ui-label-color, rgba(255, 255, 255, 0.6));
-}
-
-.attribute-list {
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.attribute-row {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.03);
-}
-
-.attribute-label {
-    flex: 0 0 44%;
-    margin: 0;
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.65);
-}
-
-.attribute-value {
-    flex: 1 1 auto;
-    margin: 0;
-    font-size: 0.85rem;
-    color: var(--new-ui-label-value-color);
-    overflow-wrap: anywhere;
-}
-
-/* Unscanned readings read as dimmed placeholders rather than data. */
-.attribute-row-unknown .attribute-value {
-    color: var(--new-ui-label-dim-color);
-}
-
-.attribute-note {
-    margin: 0 0 8px;
-    font-size: 0.78rem;
-    color: rgba(255, 255, 255, 0.55);
-}
-
-.attribute-note-hint {
-    margin: 8px 0 0;
-    color: var(--new-ui-label-color)
-}
-</style>

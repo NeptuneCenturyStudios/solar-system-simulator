@@ -12,6 +12,8 @@ export enum ActivePanel {
     Playlist = 'playlist',
     /** Procedural planet texture generator (dev tool, not part of normal gameplay). */
     TextureGenerator = 'textureGenerator',
+    /** Help panel: keyboard and mouse control reference. */
+    Help = 'help',
 }
 
 export interface BodyEditorState {
