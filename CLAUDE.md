@@ -144,6 +144,9 @@ src/
 - All distances and radius should be stored in km and scaled with DIST_SCALE and RADIUS_SCALE consts.
 - Mass should be expressed in kg and scaled with MASS_SCALE
 
+## Keyboard Shortcuts
+- When adding a keyboard shortcut, the new shortcut shoud be listed in the HelpPanel as well.
+
 ## Code Conventions
 
 - **Strict TypeScript** — no `any`. Use explicit types everywhere.
