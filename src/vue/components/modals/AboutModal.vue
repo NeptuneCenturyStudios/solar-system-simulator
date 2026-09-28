@@ -6,6 +6,8 @@
                 exploration, and interactive body management.
             </p>
 
+            <div class="footer-note">© {{ new Date().getFullYear() }} Neptune Century</div>
+            
             <div class="vue-ui-card-header">Credits</div>
             <!-- Only displaying content from within the app, not user content -->
             <!-- eslint-disable vue/no-v-html -->

@@ -130,8 +130,13 @@ export class AsteroidDefenseScenario implements IScenario {
             notificationType: NotificationType.Info,
         });
         triggerScenarioMessage('WARNING: Incoming asteroids. Defend earth!', {
-            holdSecs: 6,
+            holdSecs: 3,
             fontSizePx: 32,
+        });
+        triggerScenarioMessage('Use \'TAB\' to target an incoming object. Hold \'S\' to chase.', {
+            holdSecs: 3,
+            fontSizePx: 32,
+            queue: true,
         });
     }
 

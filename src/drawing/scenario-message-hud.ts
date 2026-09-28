@@ -40,6 +40,16 @@ export interface ScenarioMessageOptions {
     fadeOutSecs?: number;
     /** Font size in pixels. Defaults to DEFAULT_FONT_SIZE_PX. Shrunk further if it still overflows. */
     fontSizePx?: number;
+    /**
+     * When true, wait for the current (and any already-queued) message to finish instead of
+     * overwriting it. Defaults to false (overwrite the current message immediately).
+     */
+    queue?: boolean;
+}
+
+interface PendingScenarioMessage {
+    text: string;
+    options?: ScenarioMessageOptions;
 }
 
 /**
@@ -99,6 +109,8 @@ export class ScenarioMessageHud {
     private fadeOutSeconds = 0;
     /** Opacity the fade-in starts from, so re-triggering mid-fade blends smoothly. */
     private startOpacity = 0;
+    /** Messages triggered with `queue: true`, shown in order once the current one finishes. */
+    private readonly pending: PendingScenarioMessage[] = [];
 
     constructor(scene: THREE.Scene) {
         this.material = new THREE.SpriteMaterial({
@@ -123,10 +135,28 @@ export class ScenarioMessageHud {
     }
 
     /**
-     * Show `text` as a fading banner. Re-triggering while already active blends smoothly
-     * from the current opacity instead of snapping.
+     * Show `text` as a fading banner. By default, re-triggering while already active
+     * overwrites the current message, blending smoothly from the current opacity instead of
+     * snapping. With `options.queue`, the message instead waits until the current (and any
+     * previously queued) messages have finished. Overwriting does not discard queued messages.
      */
     trigger(text: string, options?: ScenarioMessageOptions): void {
+        if (options?.queue && (this.active || this.pending.length > 0)) {
+            this.pending.push({ text, options });
+            return;
+        }
+        this.show(text, options);
+    }
+
+    /** Hide the banner immediately and drop any queued messages. */
+    clear(): void {
+        this.pending.length = 0;
+        this.active = false;
+        this.material.opacity = 0;
+        this.sprite.visible = false;
+    }
+
+    private show(text: string, options?: ScenarioMessageOptions): void {
         this.material.map?.dispose();
         this.material.map = createBannerTexture(text, options?.fontSizePx ?? DEFAULT_FONT_SIZE_PX);
         this.material.needsUpdate = true;
@@ -171,6 +201,9 @@ export class ScenarioMessageHud {
             this.material.opacity = 0;
             this.active = false;
             this.sprite.visible = false;
+
+            const next = this.pending.shift();
+            if (next) this.show(next.text, next.options);
         }
     }
 
@@ -210,4 +243,9 @@ export function triggerScenarioMessage(text: string, options?: ScenarioMessageOp
         return;
     }
     scenarioMessageHud.trigger(text, options);
+}
+
+/** Hide any scenario message currently showing and drop queued ones. No-op when unregistered. */
+export function clearScenarioMessages(): void {
+    scenarioMessageHud?.clear();
 }

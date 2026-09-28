@@ -114,8 +114,13 @@ export class ExtinctionEventScenario implements IScenario {
             notificationType: NotificationType.Alert,
         });
         triggerScenarioMessage('WARNING: Extinction-level event inbound. Defend Earth!', {
-            holdSecs: 6,
+            holdSecs: 3,
             fontSizePx: 32,
+        });
+        triggerScenarioMessage("Use 'TAB' to target an incoming object. Hold 'S' to chase.", {
+            holdSecs: 10,
+            fontSizePx: 32,
+            queue: true,
         });
     }
 

@@ -195,7 +195,6 @@
                 <span style="margin-left: 8px; color: #aaa" aria-hidden="true">(N)</span>
             </label>
 
-            <div class="footer-note">© {{ new Date().getFullYear() }} Neptune Century</div>
         </div>
     </PanelBase>
 </template>

@@ -1,3 +1,4 @@
+import { clearScenarioMessages } from '../drawing/scenario-message-hud';
 import type { IScenario, IScenarioAudio, ScenarioLock } from '../interfaces';
 
 /**
@@ -90,6 +91,9 @@ class ScenarioManager {
 
         // Scenario music overrides the ambient playlist; release it once the scenario ends.
         if (scenario.music) this.audio?.releaseOverride();
+
+        // Don't let the old scenario's banner (or its queued messages) outlive it.
+        clearScenarioMessages();
     }
 }
 
