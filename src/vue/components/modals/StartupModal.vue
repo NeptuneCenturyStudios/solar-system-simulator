@@ -1,11 +1,11 @@
 <template>
     <ModalBase
         :visible="modal.isVisible.value"
-        title="Launch Control"
-        :allow-close="allowCancel"
+        :title="modalTitle"
+        :allow-close="allowCancel || view === 'options'"
         @cancel="onCancel"
     >
-        <div class="d-flex flex-column gap-3">
+        <div v-if="view === 'launch'" class="d-flex flex-column gap-3">
             <div class="control-group startup-g-control">
                 <label for="vueStartupGMultiplierSlider">
                     Gravity Multiplier (G)
@@ -50,6 +50,10 @@
                 SCENARIOS
                 <span class="badge badge--left badge--new" aria-hidden="true">New!</span>
             </button>
+            <button class="old-ui btn-dark btn-with-icon" type="button" @click="view = 'options'">
+                <span class="material-symbols-outlined">settings</span>
+                OPTIONS
+            </button>
             <button
                 v-show="allowCancel"
                 class="old-ui btn-with-icon btn-danger"
@@ -58,6 +62,13 @@
             >
                 <span class="material-symbols-outlined">close</span>
                 CANCEL
+            </button>
+        </div>
+        <div v-else class="d-flex flex-column gap-3">
+            <OptionsFields />
+            <button class="old-ui btn-with-icon" type="button" @click="view = 'launch'">
+                <span class="material-symbols-outlined">arrow_back</span>
+                BACK
             </button>
         </div>
     </ModalBase>
@@ -73,6 +84,7 @@ import {
     type StartupModalOptions,
     type StartupModalResult,
 } from '../../startup-modal-service';
+import OptionsFields from '../OptionsFields.vue';
 import ModalBase from './ModalBase.vue';
 
 const G_MULTIPLIER_STEPS = [1, 2500000, 5000000, 7500000, 10000000];
@@ -80,6 +92,10 @@ const G_MULTIPLIER_STEPS = [1, 2500000, 5000000, 7500000, 10000000];
 const modal = useAsyncModal<StartupModalResult>();
 const allowCancel = ref(false);
 const gMultiplierIndex = ref(0);
+/** Which page of the modal is showing: the launch buttons or the Options fields. */
+const view = ref<'launch' | 'options'>('launch');
+
+const modalTitle = computed(() => (view.value === 'options' ? 'Options' : 'Launch Control'));
 
 const gMultiplierDisplay = computed(() => {
     const value = G_MULTIPLIER_STEPS[gMultiplierIndex.value] ?? 1;
@@ -92,6 +108,11 @@ function launch(action: StartupModalResult['action']): void {
 }
 
 function onCancel(): void {
+    // Esc / X / backdrop on the Options page returns to the launch page rather than closing.
+    if (view.value === 'options') {
+        view.value = 'launch';
+        return;
+    }
     if (!allowCancel.value) return;
     modal.close(null);
 }
@@ -99,6 +120,7 @@ function onCancel(): void {
 const controller: StartupModalController = {
     show(options: StartupModalOptions = {}): Promise<StartupModalResult | null> {
         allowCancel.value = options.allowCancel ?? false;
+        view.value = 'launch';
         return modal.show();
     },
     hide(): void {
