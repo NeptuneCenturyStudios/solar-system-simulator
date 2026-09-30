@@ -325,7 +325,7 @@
                             type="button"
                             @click="applyRandomDefaults"
                         >
-                            <span class="material-symbols-outlined">shuffle</span>
+                            <svg-icon type="mdi" :path="mdiShuffleVariant"></svg-icon>
                             RANDOMIZE
                         </button>
                     </div>
@@ -338,11 +338,11 @@
                         :disabled="!canCreate"
                         @click="onCreate"
                     >
-                        <span class="material-symbols-outlined">check</span>
+                        <svg-icon type="mdi" :path="mdiCheck"></svg-icon>
                         CREATE
                     </button>
                     <button class="old-ui btn-with-icon btn-danger" type="button" @click="onClose">
-                        <span class="material-symbols-outlined">cancel</span>
+                        <svg-icon type="mdi" :path="mdiCloseCircleOutline"></svg-icon>
                         CLOSE
                     </button>
                 </div>
@@ -601,7 +601,7 @@
                             :disabled="editLocked"
                             @click="onApply"
                         >
-                            <span class="material-symbols-outlined">save</span>
+                            <svg-icon type="mdi" :path="mdiContentSaveOutline"></svg-icon>
                             APPLY
                         </button>
                         <button
@@ -610,7 +610,7 @@
                             :disabled="deleteLocked"
                             @click="onDelete"
                         >
-                            <span class="material-symbols-outlined">delete</span>
+                            <svg-icon type="mdi" :path="mdiDeleteOutline"></svg-icon>
                             DELETE
                         </button>
                         <button
@@ -618,7 +618,7 @@
                             type="button"
                             @click="onClose"
                         >
-                            <span class="material-symbols-outlined">cancel</span>
+                            <svg-icon type="mdi" :path="mdiCloseCircleOutline"></svg-icon>
                             CLOSE
                         </button>
                     </div>
@@ -630,7 +630,7 @@
                             :disabled="addLocked"
                             @click="openBodyEditor('add', null)"
                         >
-                            <span class="material-symbols-outlined">add</span>
+                            <svg-icon type="mdi" :path="mdiPlus"></svg-icon>
                             ADD NEW
                         </button>
                     </div>
@@ -665,6 +665,15 @@ import type { IMagneticFieldOptions } from '../../interfaces';
 import type { IAtmosphereProfile } from '../../procedural/atmosphere-profile';
 import { subtypeForcesAtmosphere } from '../../procedural/atmosphere-profile';
 import { ScenarioLock } from '../../interfaces';
+import SvgIcon from '@jamescoyle/vue-icon';
+import {
+    mdiCheck,
+    mdiCloseCircleOutline,
+    mdiContentSaveOutline,
+    mdiDeleteOutline,
+    mdiPlus,
+    mdiShuffleVariant,
+} from '@mdi/js';
 import PanelBase from './PanelBase.vue';
 
 /** Floor for asteroid/comet mass and radius inputs, which run far below planetary scale. */

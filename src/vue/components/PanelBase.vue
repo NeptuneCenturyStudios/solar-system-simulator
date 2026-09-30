@@ -9,7 +9,7 @@
                 aria-label="Close"
                 @click="closePanel"
             >
-                <span class="material-symbols-outlined">close</span>
+                <svg-icon type="mdi" :path="mdiClose"></svg-icon>
             </button>
         </header>
 
@@ -19,6 +19,8 @@
 
 <script setup lang="ts">
 import { ActivePanel, hidePanelManager, vueUiState } from '../ui-store';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiClose } from '@mdi/js';
 
 const props = defineProps<{
     title: string;

@@ -15,7 +15,7 @@
 
         <template #actions>
             <button class="old-ui btn-with-icon" type="button" @click="onClose">
-                <span class="material-symbols-outlined">check</span>
+                <svg-icon type="mdi" :path="mdiCheck"></svg-icon>
                 GOT IT
             </button>
         </template>
@@ -30,6 +30,8 @@ import {
     registerWhatsNewModalController,
     type WhatsNewModalController,
 } from '../../whats-new-modal-service';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiCheck } from '@mdi/js';
 import ModalBase from './ModalBase.vue';
 import { marked } from 'marked';
 

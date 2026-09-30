@@ -106,7 +106,7 @@
                     title="Reset to default (0.5)"
                     @click="resetBarnesHutTheta"
                 >
-                    <span class="material-symbols-outlined">replay</span>
+                    <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
                 </button>
             </div>
         </div>
@@ -131,7 +131,7 @@
                     title="Reset to default (64)"
                     @click="resetSubsteps"
                 >
-                    <span class="material-symbols-outlined">replay</span>
+                    <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
                 </button>
             </div>
         </div>
@@ -157,7 +157,7 @@
                     title="Reset to 100%"
                     @click="resetSfxVolume"
                 >
-                    <span class="material-symbols-outlined">replay</span>
+                    <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
                 </button>
             </div>
         </div>
@@ -182,7 +182,7 @@
                     title="Reset to 50%"
                     @click="resetMusicVolume"
                 >
-                    <span class="material-symbols-outlined">replay</span>
+                    <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
                 </button>
             </div>
         </div>
@@ -208,6 +208,8 @@ import {
     simStore,
 } from '../sim-bridge';
 import type { AuroraDetailMode, PhysicsSolverMode } from '../../settings/settings-store';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiReplay } from '@mdi/js';
 
 /** Same defaults as the legacy panel's reset buttons. */
 const DEFAULT_SUBSTEPS = 64;

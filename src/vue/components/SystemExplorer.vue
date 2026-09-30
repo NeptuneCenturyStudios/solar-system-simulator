@@ -7,9 +7,10 @@
                 :title="simStore.isTargetMode ? 'Target (On)' : 'Target (Off)'"
                 @click="toggleTargetMode()"
             >
-                <span class="material-symbols-outlined">{{
-                    simStore.isTargetMode ? 'my_location' : 'location_searching'
-                }}</span>
+                <svg-icon
+                    type="mdi"
+                    :path="simStore.isTargetMode ? mdiCrosshairsGps : mdiCrosshairs"
+                ></svg-icon>
             </button>
             <button
                 class="old-ui btn-icon-only"
@@ -17,9 +18,10 @@
                 :title="simStore.isLookAtMode ? 'Look At (On)' : 'Look At (Off)'"
                 @click="toggleLookAtMode()"
             >
-                <span class="material-symbols-outlined">{{
-                    simStore.isLookAtMode ? 'visibility' : 'visibility_off'
-                }}</span>
+                <svg-icon
+                    type="mdi"
+                    :path="simStore.isLookAtMode ? mdiEyeOutline : mdiEyeOffOutline"
+                ></svg-icon>
             </button>
             <button
                 class="old-ui btn-icon-only"
@@ -27,9 +29,10 @@
                 :title="simStore.isFreeCameraMode ? 'Free Camera (On)' : 'Free Camera (Off)'"
                 @click="toggleFreeCameraMode()"
             >
-                <span class="material-symbols-outlined">{{
-                    simStore.isFreeCameraMode ? 'close_fullscreen' : 'videogame_asset'
-                }}</span>
+                <svg-icon
+                    type="mdi"
+                    :path="simStore.isFreeCameraMode ? mdiFullscreenExit : mdiGamepadVariantOutline"
+                ></svg-icon>
             </button>
             <button
                 class="old-ui btn-icon-only"
@@ -38,15 +41,16 @@
                 :disabled="!simStore.surfaceEnabled"
                 @click="toggleSurfaceCamera()"
             >
-                <span class="material-symbols-outlined">{{
-                    simStore.surfaceActive ? 'directions_walk' : 'hiking'
-                }}</span>
+                <svg-icon
+                    type="mdi"
+                    :path="simStore.surfaceActive ? mdiWalk : mdiHiking"
+                ></svg-icon>
             </button>
             <button class="old-ui btn-icon-only" title="Zoom In" @click="zoomCameraIn()">
-                <span class="material-symbols-outlined">zoom_in</span>
+                <svg-icon type="mdi" :path="mdiMagnifyPlusOutline"></svg-icon>
             </button>
             <button class="old-ui btn-icon-only" title="Zoom Out" @click="zoomCameraOut()">
-                <span class="material-symbols-outlined">zoom_out</span>
+                <svg-icon type="mdi" :path="mdiMagnifyMinusOutline"></svg-icon>
             </button>
         </div>
 
@@ -97,7 +101,7 @@
                         aria-label="Show object data"
                         @click.stop="openBodyAttributes(body.id)"
                     >
-                        <span class="material-symbols-outlined">info</span>
+                        <svg-icon type="mdi" :path="mdiInformationOutline" :size="16"></svg-icon>
                     </button>
                     <span class="vue-ui-body-type">{{ body.typeLabel }}</span>
                 </div>
@@ -115,7 +119,7 @@
                             :disabled="editLocked"
                             @click.stop="openBodyEditor('edit', body.id)"
                         >
-                            <span class="material-symbols-outlined">edit</span>
+                            <svg-icon type="mdi" :path="mdiPencilOutline" :size="16"></svg-icon>
                         </button>
                         <button
                             v-if="body.isShip"
@@ -123,7 +127,7 @@
                             title="Enter ship"
                             @click.stop="enterShipById(body.id)"
                         >
-                            <span class="material-symbols-outlined">login</span>
+                            <svg-icon type="mdi" :path="mdiLogin" :size="16"></svg-icon>
                         </button>
                         <button
                             v-else-if="hasShip"
@@ -136,9 +140,13 @@
                             "
                             @click.stop="flyToBody(body.id)"
                         >
-                            <span class="material-symbols-outlined">{{
-                                body.id === simStore.autopilotTargetId ? 'close' : 'flight'
-                            }}</span>
+                            <svg-icon
+                                type="mdi"
+                                :path="
+                                    body.id === simStore.autopilotTargetId ? mdiClose : mdiAirplane
+                                "
+                                :size="16"
+                            ></svg-icon>
                         </button>
                     </span>
                 </div>
@@ -159,12 +167,12 @@
                     :disabled="addLocked"
                     @click="openBodyEditor('add', null)"
                 >
-                    <span class="material-symbols-outlined">add</span>
+                    <svg-icon type="mdi" :path="mdiPlus"></svg-icon>
                     ADD NEW OBJECT
                 </button>
 
                 <button class="old-ui btn-with-icon mb-3" type="button" @click="onLaunchProbe">
-                    <span class="material-symbols-outlined">satellite_alt</span>
+                    <svg-icon type="mdi" :path="mdiSatelliteVariant"></svg-icon>
                     LAUNCH PROBE
                 </button>
             </div>
@@ -194,7 +202,6 @@
                 Show Planet Names
                 <span style="margin-left: 8px; color: #aaa" aria-hidden="true">(N)</span>
             </label>
-
         </div>
     </PanelBase>
 </template>
@@ -227,6 +234,26 @@ import type { BodySnapshot } from '../sim-bridge';
 import { ScenarioLock } from '../../interfaces';
 import { openBodyEditor } from '../ui-store';
 import { showProbeMissionModal } from '../probe-mission-modal-service';
+import SvgIcon from '@jamescoyle/vue-icon';
+import {
+    mdiAirplane,
+    mdiClose,
+    mdiCrosshairs,
+    mdiCrosshairsGps,
+    mdiEyeOffOutline,
+    mdiEyeOutline,
+    mdiFullscreenExit,
+    mdiGamepadVariantOutline,
+    mdiHiking,
+    mdiInformationOutline,
+    mdiLogin,
+    mdiMagnifyMinusOutline,
+    mdiMagnifyPlusOutline,
+    mdiPencilOutline,
+    mdiPlus,
+    mdiSatelliteVariant,
+    mdiWalk,
+} from '@mdi/js';
 import PanelBase from './PanelBase.vue';
 
 const searchQuery = ref('');
@@ -285,9 +312,5 @@ function onSelect(body: BodySnapshot): void {
     margin-left: 6px;
     padding: 0;
     line-height: 1;
-}
-
-.vue-ui-body-info .material-symbols-outlined {
-    font-size: 1rem;
 }
 </style>

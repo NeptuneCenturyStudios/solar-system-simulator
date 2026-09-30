@@ -65,7 +65,7 @@
                         title="Reset to 1x"
                         @click="resetGravity"
                     >
-                        <span class="material-symbols-outlined">replay</span>
+                        <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
                     </button>
                 </div>
             </div>
@@ -83,6 +83,8 @@ import {
     simStore,
 } from '../sim-bridge';
 import { spaceTextures } from '../../drawing/textures';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiReplay } from '@mdi/js';
 import PanelBase from './PanelBase.vue';
 
 /** Space background texture options (same list the legacy panel dropdown used). */

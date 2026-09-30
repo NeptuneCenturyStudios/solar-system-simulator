@@ -42,7 +42,7 @@
             </section>
 
             <button class="old-ui btn-with-icon" type="button" @click="onClose">
-                <span class="material-symbols-outlined">close</span>
+                <svg-icon type="mdi" :path="mdiClose"></svg-icon>
                 CLOSE
             </button>
         </div>
@@ -54,6 +54,8 @@ import { computed } from 'vue';
 
 import { bodyAttributesStore, closeBodyAttributes } from '../../sim-bridge';
 import type { BodyAttributesSnapshot } from '../../sim-bridge';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiClose } from '@mdi/js';
 import ModalBase from './ModalBase.vue';
 
 /** The modal is a pure view over the bridge store: it is open exactly while a snapshot is

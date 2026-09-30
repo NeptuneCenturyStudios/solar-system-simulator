@@ -7,7 +7,7 @@
             aria-label="Toggle Menu"
             @click="togglePanelManager"
         >
-            <span class="material-symbols-outlined">menu</span>
+            <svg-icon type="mdi" :path="mdiMenu"></svg-icon>
         </button>
 
         <!-- Explorer -->
@@ -18,7 +18,7 @@
             aria-label="Open System Explorer"
             @click="toggleExplorer"
         >
-            <span class="material-symbols-outlined">travel_explore</span>
+            <svg-icon type="mdi" :path="mdiMagnifyScan"></svg-icon>
         </button>
 
         <!-- Simulation controls -->
@@ -28,7 +28,7 @@
             aria-label="Halve time scale"
             @click="stepTimeScale(0.5)"
         >
-            <span class="material-symbols-outlined">fast_rewind</span>
+            <svg-icon type="mdi" :path="mdiRewind"></svg-icon>
         </button>
 
         <button
@@ -38,7 +38,7 @@
             aria-label="Toggle pause"
             @click="onTogglePause"
         >
-            <span class="material-symbols-outlined">pause</span>
+            <svg-icon type="mdi" :path="mdiPause"></svg-icon>
         </button>
 
         <button
@@ -47,7 +47,7 @@
             aria-label="Reset time scale to 1x"
             @click="setTimeScale(1)"
         >
-            <span class="material-symbols-outlined">play_arrow</span>
+            <svg-icon type="mdi" :path="mdiPlay"></svg-icon>
         </button>
 
         <button
@@ -56,7 +56,7 @@
             aria-label="Double time scale"
             @click="stepTimeScale(2)"
         >
-            <span class="material-symbols-outlined">fast_forward</span>
+            <svg-icon type="mdi" :path="mdiFastForward"></svg-icon>
         </button>
 
         <span class="vue-ui-speed-val" :title="speedTitle">{{ speedText }}</span>
@@ -68,6 +68,8 @@ import { computed } from 'vue';
 
 import { formatTimeScale, setTimeScale, simStore, stepTimeScale, togglePause } from '../sim-bridge';
 import { ActivePanel, setActivePanel, togglePanelManager, vueUiState } from '../ui-store';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiFastForward, mdiMagnifyScan, mdiMenu, mdiPause, mdiPlay, mdiRewind } from '@mdi/js';
 
 const speedText = computed(() => formatTimeScale(simStore.timeScale));
 const speedTitle = computed(() => {

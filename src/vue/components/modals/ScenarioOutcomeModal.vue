@@ -24,7 +24,7 @@
                     type="button"
                     @click="choose(action.id)"
                 >
-                    <span class="material-symbols-outlined">{{ action.icon }}</span>
+                    <svg-icon type="mdi" :path="action.icon"></svg-icon>
                     {{ action.label }}
                 </button>
             </div>
@@ -43,6 +43,7 @@ import {
     type ScenarioDialogResult,
     type ScenarioOutcomeModalController,
 } from '../../scenario-outcome-modal-service';
+import SvgIcon from '@jamescoyle/vue-icon';
 import ModalBase from './ModalBase.vue';
 
 // The dialog is non-dismissible (no close button, backdrop click is inert): a

@@ -9,7 +9,7 @@
                     height="256"
                 />
                 <div v-if="previewLoading" class="texture-gen-preview-loading">
-                    <span class="material-symbols-outlined loading-icon">progress_activity</span>
+                    <svg-icon type="mdi" :path="mdiLoading" class="loading-icon"></svg-icon>
                     Generating…
                 </div>
             </div>
@@ -37,7 +37,7 @@
                         title="Randomize seed"
                         @click="randomizeSeed"
                     >
-                        <span class="material-symbols-outlined">casino</span>
+                        <svg-icon type="mdi" :path="mdiDiceMultipleOutline"></svg-icon>
                     </button>
                 </div>
             </div>
@@ -265,11 +265,11 @@
                 :disabled="downloading"
                 @click="generateAndDownload"
             >
-                <span class="material-symbols-outlined">download</span>
+                <svg-icon type="mdi" :path="mdiDownloadOutline"></svg-icon>
                 DOWNLOAD
             </button>
             <span v-if="downloading" class="texture-gen-download-status">
-                <span class="material-symbols-outlined loading-icon">progress_activity</span>
+                <svg-icon type="mdi" :path="mdiLoading" class="loading-icon"></svg-icon>
                 Rendering…
             </span>
         </div>
@@ -283,6 +283,8 @@ import {
     GasGiantTextureParams,
     renderGasGiantTexture,
 } from '../../procedural/gas-giant/gas-giant-texture-generator';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiDiceMultipleOutline, mdiDownloadOutline, mdiLoading } from '@mdi/js';
 import PanelBase from './PanelBase.vue';
 
 type ResolutionKey = '2048x1024' | '4096x2048' | '8192x4096';

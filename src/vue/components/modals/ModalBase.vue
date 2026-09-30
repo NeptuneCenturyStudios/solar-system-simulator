@@ -28,7 +28,7 @@
                         aria-label="Close"
                         @click="emitCancel"
                     >
-                        <span class="material-symbols-outlined">close</span>
+                        <svg-icon type="mdi" :path="mdiClose"></svg-icon>
                     </button>
                 </header>
 
@@ -46,6 +46,8 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiClose } from '@mdi/js';
 
 const props = withDefaults(
     defineProps<{

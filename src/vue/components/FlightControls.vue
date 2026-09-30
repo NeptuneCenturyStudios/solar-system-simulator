@@ -24,7 +24,7 @@
             :disabled="simStore.inFlight"
             @click="requestSpawnShip()"
         >
-            <span class="material-symbols-outlined">{{ spawnIcon }}</span>
+            <svg-icon type="mdi" :path="spawnIcon"></svg-icon>
             {{ spawnLabel }}
         </button>
 
@@ -33,7 +33,7 @@
             class="old-ui btn-with-icon mb-3"
             @click="requestExitFlightMode()"
         >
-            <span class="material-symbols-outlined">logout</span>
+            <svg-icon type="mdi" :path="mdiLogout"></svg-icon>
             EXIT FLIGHT MODE
         </button>
 
@@ -77,6 +77,8 @@ import {
     setSelectedShipTypeId,
     simStore,
 } from '../sim-bridge';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiLogin, mdiLogout, mdiRocketLaunchOutline } from '@mdi/js';
 
 import PanelBase from './PanelBase.vue';
 
@@ -84,7 +86,7 @@ const canReenter = computed(
     () => simStore.hasKnownShip && simStore.knownShipTypeId === simStore.selectedShipTypeId
 );
 
-const spawnIcon = computed(() => (canReenter.value ? 'login' : 'rocket_launch'));
+const spawnIcon = computed(() => (canReenter.value ? mdiLogin : mdiRocketLaunchOutline));
 const spawnLabel = computed(() => (canReenter.value ? 'ENTER SHIP' : 'SPAWN SPACESHIP'));
 
 function onHidePanelInFlightChange(e: Event): void {

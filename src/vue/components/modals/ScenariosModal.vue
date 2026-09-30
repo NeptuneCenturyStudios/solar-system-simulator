@@ -14,7 +14,7 @@
                 type="button"
                 @click="selectScenario('blackHole')"
             >
-                <span class="material-symbols-outlined">brightness_1</span>
+                <svg-icon type="mdi" :path="mdiCircle"></svg-icon>
                 BLACK HOLE
             </button>
             <button
@@ -22,7 +22,7 @@
                 type="button"
                 @click="selectScenario('testAiShips')"
             >
-                <span class="material-symbols-outlined">smart_toy</span>
+                <svg-icon type="mdi" :path="mdiRobotOutline"></svg-icon>
                 TEST AI SHIPS
             </button>
             <button
@@ -30,7 +30,7 @@
                 type="button"
                 @click="selectScenario('wormholeShortcut')"
             >
-                <span class="material-symbols-outlined">sync_alt</span>
+                <svg-icon type="mdi" :path="mdiSwapHorizontal"></svg-icon>
                 WORMHOLE SHORTCUT
             </button>
             <button
@@ -38,7 +38,7 @@
                 type="button"
                 @click="selectScenario('asteroidField')"
             >
-                <span class="material-symbols-outlined">grain</span>
+                <svg-icon type="mdi" :path="mdiGrain"></svg-icon>
                 ASTEROID FIELD
             </button>
             <button
@@ -46,7 +46,7 @@
                 type="button"
                 @click="selectScenario('asteroidDefense')"
             >
-                <span class="material-symbols-outlined">shield</span>
+                <svg-icon type="mdi" :path="mdiShieldOutline"></svg-icon>
                 ASTEROID DEFENSE
             </button>
             <button
@@ -54,11 +54,11 @@
                 type="button"
                 @click="selectScenario('extinctionEvent')"
             >
-                <span class="material-symbols-outlined">crisis_alert</span>
+                <svg-icon type="mdi" :path="mdiAlertOutline"></svg-icon>
                 EXTINCTION EVENT
             </button>
             <button class="old-ui btn-with-icon btn-danger" type="button" @click="onCancel">
-                <span class="material-symbols-outlined">arrow_back</span>
+                <svg-icon type="mdi" :path="mdiArrowLeft"></svg-icon>
                 CANCEL
             </button>
         </div>
@@ -74,6 +74,16 @@ import {
     type ScenariosModalController,
     type ScenariosModalResult,
 } from '../../scenarios-modal-service';
+import SvgIcon from '@jamescoyle/vue-icon';
+import {
+    mdiAlertOutline,
+    mdiArrowLeft,
+    mdiCircle,
+    mdiGrain,
+    mdiRobotOutline,
+    mdiShieldOutline,
+    mdiSwapHorizontal,
+} from '@mdi/js';
 import ModalBase from './ModalBase.vue';
 
 const modal = useAsyncModal<ScenariosModalResult>();

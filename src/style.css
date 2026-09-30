@@ -390,6 +390,9 @@ input[type='range'] {
 }
 
 button.old-ui.btn-slider-reset {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: auto;
     flex-shrink: 0;
     padding: 4px 6px;

@@ -46,11 +46,11 @@
                 :disabled="targets.length === 0 || !targetId || altitudeKm <= 0"
                 @click="onLaunch"
             >
-                <span class="material-symbols-outlined">rocket_launch</span>
+                <svg-icon type="mdi" :path="mdiRocketLaunchOutline"></svg-icon>
                 LAUNCH
             </button>
             <button class="old-ui btn-with-icon btn-danger" type="button" @click="onCancel">
-                <span class="material-symbols-outlined">close</span>
+                <svg-icon type="mdi" :path="mdiClose"></svg-icon>
                 CANCEL
             </button>
         </div>
@@ -69,6 +69,8 @@ import {
 import { BodySnapshot, simStore } from '../../sim-bridge';
 import { simRadiusToKm } from '../../../utilities/display-format';
 import { DIST_SCALE, PROBE_SCAN_RANGE_KM } from '../../../utilities/consts';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiClose, mdiRocketLaunchOutline } from '@mdi/js';
 import ModalBase from './ModalBase.vue';
 
 const modal = useAsyncModal<ProbeMissionModalResult>();

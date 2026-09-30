@@ -11,6 +11,8 @@
  * that request so scenario code never has to know about UI wording.
  */
 
+import { mdiCheck, mdiRestart, mdiRocketLaunchOutline } from '@mdi/js';
+
 import type { ScenarioOutcomeReport } from '../scenarios/scenario-outcome';
 
 /** Visual treatment of the dialog. 'info' uses the normal UI colours. */
@@ -30,7 +32,7 @@ export interface ScenarioDialogAction {
     id: ScenarioDialogActionId;
     /** Button text, e.g. "RESTART". */
     label: string;
-    /** Material Symbols icon name, e.g. "restart_alt". */
+    /** MDI icon path (an `@mdi/js` export), e.g. `mdiRestart`. */
     icon: string;
     /** Renders the button with the danger (red) styling. */
     danger?: boolean;
@@ -74,8 +76,8 @@ function requireController(): ScenarioOutcomeModalController | null {
 /** The two actions every scenario end offers: play it again, or pick something else. */
 function outcomeActions(): ScenarioDialogAction[] {
     return [
-        { id: 'restart', label: 'RESTART', icon: 'restart_alt' },
-        { id: 'newScenario', label: 'NEW SCENARIO', icon: 'rocket_launch' },
+        { id: 'restart', label: 'RESTART', icon: mdiRestart },
+        { id: 'newScenario', label: 'NEW SCENARIO', icon: mdiRocketLaunchOutline },
     ];
 }
 
@@ -119,7 +121,7 @@ export function showScenarioInfoModal(options: {
         title: options.title,
         message: options.message,
         stats: options.stats,
-        actions: [{ id: 'ok', label: 'OK', icon: 'check' }],
+        actions: [{ id: 'ok', label: 'OK', icon: mdiCheck }],
     };
     const instance = requireController();
     if (!instance) return Promise.resolve(null);

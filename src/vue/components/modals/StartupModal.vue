@@ -30,15 +30,15 @@
             </div>
 
             <button class="old-ui btn-with-icon" type="button" @click="launch('launchDefault')">
-                <span class="material-symbols-outlined">orbit</span>
+                <svg-icon type="mdi" :path="mdiOrbit"></svg-icon>
                 LAUNCH SOLAR SYSTEM
             </button>
             <button class="old-ui btn-with-icon" type="button" @click="launch('launchEmpty')">
-                <span class="material-symbols-outlined">build</span>
+                <svg-icon type="mdi" :path="mdiWrenchOutline"></svg-icon>
                 BUILD YOUR OWN SYSTEM
             </button>
             <button class="old-ui btn-with-icon" type="button" @click="launch('generate')">
-                <span class="material-symbols-outlined">auto_fix_high</span>
+                <svg-icon type="mdi" :path="mdiAutoFix"></svg-icon>
                 GENERATE
             </button>
             <button
@@ -46,12 +46,12 @@
                 type="button"
                 @click="launch('scenarios')"
             >
-                <span class="material-symbols-outlined">interests</span>
+                <svg-icon type="mdi" :path="mdiGamepadVariantOutline"></svg-icon>
                 SCENARIOS
                 <span class="badge badge--left badge--new" aria-hidden="true">New!</span>
             </button>
             <button class="old-ui btn-dark btn-with-icon" type="button" @click="view = 'options'">
-                <span class="material-symbols-outlined">settings</span>
+                <svg-icon type="mdi" :path="mdiCog"></svg-icon>
                 OPTIONS
             </button>
             <button
@@ -60,14 +60,14 @@
                 type="button"
                 @click="onCancel"
             >
-                <span class="material-symbols-outlined">close</span>
+                <svg-icon type="mdi" :path="mdiClose"></svg-icon>
                 CANCEL
             </button>
         </div>
         <div v-else class="d-flex flex-column gap-3">
             <OptionsFields />
             <button class="old-ui btn-with-icon" type="button" @click="view = 'launch'">
-                <span class="material-symbols-outlined">arrow_back</span>
+                <svg-icon type="mdi" :path="mdiArrowLeft"></svg-icon>
                 BACK
             </button>
         </div>
@@ -85,6 +85,16 @@ import {
     type StartupModalResult,
 } from '../../startup-modal-service';
 import OptionsFields from '../OptionsFields.vue';
+import SvgIcon from '@jamescoyle/vue-icon';
+import {
+    mdiArrowLeft,
+    mdiAutoFix,
+    mdiClose,
+    mdiCog,
+    mdiGamepadVariantOutline,
+    mdiOrbit,
+    mdiWrenchOutline,
+} from '@mdi/js';
 import ModalBase from './ModalBase.vue';
 
 const G_MULTIPLIER_STEPS = [1, 2500000, 5000000, 7500000, 10000000];

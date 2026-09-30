@@ -17,19 +17,20 @@
 
         <div class="playlist-controls mt-auto">
             <button class="old-ui btn-icon-only" title="Previous" @click="playlistPrev()">
-                <span class="material-symbols-outlined">skip_previous</span>
+                <svg-icon type="mdi" :path="mdiSkipPrevious"></svg-icon>
             </button>
             <button
                 class="old-ui btn-icon-only"
                 :title="playlistStore.isPlaying ? 'Pause' : 'Play'"
                 @click="playlistTogglePlayPause()"
             >
-                <span class="material-symbols-outlined">{{
-                    playlistStore.isPlaying ? 'pause' : 'play_arrow'
-                }}</span>
+                <svg-icon
+                    type="mdi"
+                    :path="playlistStore.isPlaying ? mdiPause : mdiPlay"
+                ></svg-icon>
             </button>
             <button class="old-ui btn-icon-only" title="Next" @click="playlistNext()">
-                <span class="material-symbols-outlined">skip_next</span>
+                <svg-icon type="mdi" :path="mdiSkipNext"></svg-icon>
             </button>
         </div>
     </PanelBase>
@@ -44,6 +45,8 @@ import {
     playlistTogglePlayPause,
     playlistStore,
 } from '../sim-bridge';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiPause, mdiPlay, mdiSkipNext, mdiSkipPrevious } from '@mdi/js';
 import PanelBase from './PanelBase.vue';
 
 const trackListEl = ref<HTMLElement | null>(null);

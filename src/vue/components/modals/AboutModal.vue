@@ -7,21 +7,20 @@
             </p>
 
             <div class="footer-note">© {{ new Date().getFullYear() }} Neptune Century</div>
-            
+
             <div class="vue-ui-card-header">Credits</div>
             <!-- Only displaying content from within the app, not user content -->
             <!-- eslint-disable vue/no-v-html -->
             <div v-html="attribution"></div>
-
         </div>
 
         <template #actions>
             <button class="old-ui btn-with-icon" type="button" @click="reportIssues">
-                <span class="material-symbols-outlined">bug_report</span>
+                <svg-icon type="mdi" :path="mdiBugOutline"></svg-icon>
                 REPORT ISSUES
             </button>
             <button class="old-ui btn-with-icon" type="button" @click="hide">
-                <span class="material-symbols-outlined">close</span>
+                <svg-icon type="mdi" :path="mdiClose"></svg-icon>
                 CLOSE
             </button>
         </template>
@@ -31,6 +30,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { registerAboutModalController, type AboutModalController } from '../../about-modal-service';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiBugOutline, mdiClose } from '@mdi/js';
 import ModalBase from './ModalBase.vue';
 import { marked, Renderer } from 'marked';
 
@@ -68,8 +69,8 @@ const customRenderer = new Renderer();
 
 // Override only the link method
 customRenderer.link = (tokens) => {
-  const { href, text} = tokens;
-  return `<a href="${href}" target="_blank">${text}</a>`;
+    const { href, text } = tokens;
+    return `<a href="${href}" target="_blank">${text}</a>`;
 };
 
 marked.use({ renderer: customRenderer });

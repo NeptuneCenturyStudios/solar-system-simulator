@@ -26,7 +26,7 @@
                     :disabled="inputsLocked"
                     @click="onCreate"
                 >
-                    <span class="material-symbols-outlined">auto_fix_high</span>
+                    <svg-icon type="mdi" :path="mdiAutoFix"></svg-icon>
                     CREATE
                 </button>
                 <button
@@ -35,7 +35,7 @@
                     :disabled="inputsLocked"
                     @click="onCancel"
                 >
-                    <span class="material-symbols-outlined">cancel</span>
+                    <svg-icon type="mdi" :path="mdiCloseCircleOutline"></svg-icon>
                     CANCEL
                 </button>
             </div>
@@ -44,7 +44,7 @@
         <!-- Progress section -->
         <div v-if="mode === 'progress'" class="d-flex flex-column gap-2">
             <div style="display: flex; align-items: center" class="mb-1">
-                <span class="material-symbols-outlined loading-icon mr-1">progress_activity</span>
+                <svg-icon type="mdi" :path="mdiLoading" class="loading-icon mr-1"></svg-icon>
                 <div style="font-weight: bold">
                     {{ progressStatus }}
                 </div>
@@ -83,6 +83,8 @@ import type {
     ProceduralGenerationReporter,
     ProceduralGenerationProgress,
 } from '../../../procedural/procedural-generation-progress';
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiAutoFix, mdiCloseCircleOutline, mdiLoading } from '@mdi/js';
 import ModalBase from './ModalBase.vue';
 
 type ModalMode = 'seed-entry' | 'progress';
