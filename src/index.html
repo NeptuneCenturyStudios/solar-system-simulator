@@ -1,8 +1,15 @@
 <!doctype html>
 <html lang="en">
     <head>
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-V5QZ955H29"></script>
+        <!--
+            Google tag (gtag.js).
+
+            Web only: the desktop build runs from a custom scheme, has no
+            reportable page URL, and must not feed the site's analytics
+            property. `gtag` is still defined so any call site keeps working —
+            over any protocol other than http(s) the external script is simply
+            never fetched.
+        -->
         <script>
             window.dataLayer = window.dataLayer || [];
             function gtag() {
@@ -11,16 +18,19 @@
             gtag('js', new Date());
 
             gtag('config', 'G-V5QZ955H29');
+
+            if (location.protocol === 'http:' || location.protocol === 'https:') {
+                const analyticsScript = document.createElement('script');
+                analyticsScript.async = true;
+                analyticsScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-V5QZ955H29';
+                document.head.appendChild(analyticsScript);
+            }
         </script>
 
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Solar System Simulator</title>
         <link rel="icon" href="data:," />
-        <link
-            rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0"
-        />
         <link rel="stylesheet" href="style.css" />
     </head>
 

@@ -1,3 +1,13 @@
 node_modules
+
+# Vite web bundle
 dist
+
+# Compiled Electron main process
+electron-dist
+
+# Packaged installers and unpacked app trees
+release
+
+# Scratch space for generated bundles
 tmp

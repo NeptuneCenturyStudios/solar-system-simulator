@@ -1,0 +1,95 @@
+# Packaging configuration for the desktop builds.
+#
+# Only the Vite output and the compiled main process are shipped. The renderer
+# is fully bundled by Vite (Vue, three.js, marked, noty all end up inside
+# dist/assets/index-*.js), and the main process uses nothing but Electron and
+# Node builtins — so no node_modules tree needs to travel with the app.
+#
+# Nothing is code-signed. macOS picks this up from `identity: null`; Windows
+# signs nothing because no certificate is configured, and the release workflow
+# sets CSC_IDENTITY_AUTO_DISCOVERY=false so electron-builder never goes looking
+# for a certificate in the CI keychain.
+
+appId: com.neptunecenturystudios.solarsystemsimulator
+productName: Solar System Simulator
+copyright: Copyright © 2026 Neptune Century Studios
+
+directories:
+    output: release
+    buildResources: build
+
+files:
+    - electron-dist/**/*
+    - package.json
+    # Production dependencies are already bundled into the renderer, so shipping
+    # a node_modules tree would only add tens of megabytes.
+    - '!node_modules'
+    # The web bundle is shipped through an explicit mapping rather than a
+    # `dist/**/*` glob on purpose.
+    #
+    # electron-builder appends a default `!**/*.{...,obj,...}` exclusion for
+    # every string pattern, because it reads `.obj` as a compiled C/C++ object
+    # file. That silently deletes all 13 Wavefront models the simulator loads
+    # (asteroids, comets, the ISS, ships) while leaving their textures intact,
+    # so the app starts and then fails to render anything model-based.
+    #
+    # A `from`/`to` mapping is handled by a separate matcher that does not get
+    # those defaults, so `dist` ships verbatim.
+    - from: dist
+      to: dist
+
+asar: true
+npmRebuild: false
+
+# --- Windows -----------------------------------------------------------------
+# x64 only: Windows on ARM runs x64 binaries under emulation, so a second
+# architecture would double build time for no practical gain.
+win:
+    target:
+        - target: nsis
+          arch: [x64]
+        - target: portable
+          arch: [x64]
+    artifactName: solar-system-simulator-${version}-win-${arch}.${ext}
+
+nsis:
+    oneClick: false
+    perMachine: false
+    allowToChangeInstallationDirectory: true
+    createDesktopShortcut: true
+    createStartMenuShortcut: true
+    shortcutName: Solar System Simulator
+    artifactName: solar-system-simulator-${version}-win-setup.${ext}
+
+portable:
+    artifactName: solar-system-simulator-${version}-win-portable.${ext}
+
+# --- macOS -------------------------------------------------------------------
+# Both architectures, because Apple Silicon cannot run an x64-only build
+# natively. These artifacts can only be produced on macOS.
+mac:
+    target:
+        - target: dmg
+          arch: [x64, arm64]
+        - target: zip
+          arch: [x64, arm64]
+    category: public.app-category.education
+    # Explicitly unsigned; there is no Developer ID certificate in this project.
+    identity: null
+    notarize: false
+    artifactName: solar-system-simulator-${version}-mac-${arch}.${ext}
+
+dmg:
+    artifactName: solar-system-simulator-${version}-mac-${arch}.${ext}
+
+# --- Linux -------------------------------------------------------------------
+linux:
+    target:
+        - target: AppImage
+          arch: [x64]
+        - target: deb
+          arch: [x64]
+    category: Education
+    synopsis: Interactive 3D solar system simulator
+    maintainer: Neptune Century Studios
+    artifactName: solar-system-simulator-${version}-linux-${arch}.${ext}

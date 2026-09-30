@@ -1,0 +1,82 @@
+# Builds the desktop artifacts for every supported platform.
+#
+# Each platform is built on its own runner because electron-builder cannot
+# cross-build them from one machine: macOS installers require macOS tooling, and
+# the Linux targets need a Linux environment (or Docker). Building the whole
+# matrix here is what makes the macOS and Linux downloads possible at all —
+# a Windows checkout can only ever produce the Windows artifacts.
+#
+# Nothing is signed. CSC_IDENTITY_AUTO_DISCOVERY=false stops electron-builder
+# from hunting for a code-signing identity on the runner; without it, macOS
+# builds abort instead of producing an unsigned (but usable) app.
+
+name: Release
+
+on:
+    push:
+        tags:
+            - 'v*'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    build:
+        name: Build (${{ matrix.name }})
+        runs-on: ${{ matrix.runner }}
+        strategy:
+            # One platform failing should not discard the others' artifacts.
+            fail-fast: false
+            matrix:
+                include:
+                    - name: Windows
+                      runner: windows-latest
+                      script: electron:build:win
+                    - name: macOS
+                      runner: macos-latest
+                      script: electron:build:mac
+                    - name: Linux
+                      runner: ubuntu-latest
+                      script: electron:build:linux
+
+        steps:
+            - name: Check out the repository
+              uses: actions/checkout@v4
+
+            - name: Set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '24'
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            # npm's postinstall scripts are restricted by the `allowScripts`
+            # list in package.json. Running Electron's installer explicitly
+            # guarantees the runtime binary exists; it exits immediately when
+            # the download is already in place.
+            - name: Ensure the Electron binary is installed
+              run: node node_modules/electron/install.js
+
+            - name: Type-check the renderer
+              run: npm run tsc
+
+            - name: Build the ${{ matrix.name }} artifacts
+              run: npm run ${{ matrix.script }}
+              env:
+                  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+            - name: Upload the ${{ matrix.name }} artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: solar-system-simulator-${{ matrix.name }}
+                  # Only the distributables; release/ also holds unpacked trees.
+                  path: |
+                      release/*.exe
+                      release/*.dmg
+                      release/*.zip
+                      release/*.AppImage
+                      release/*.deb
+                  if-no-files-found: error

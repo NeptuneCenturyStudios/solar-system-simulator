@@ -2,6 +2,9 @@
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+// MDI font icons
+import '@mdi/font/css/materialdesignicons.min.css';
+
 // Tell typescript about our custom events that has detail property
 declare global {
     interface WindowEventMap {
@@ -222,12 +225,19 @@ import {
 // Browsers intentionally allow users to always close tabs with Ctrl+W
 // See: https://stackoverflow.com/questions/21695682/is-it-possible-to-catch-ctrlw-shortcut-and-prevent-tab-closing
 
-// Warn user before closing the tab/window
-window.addEventListener('beforeunload', (e) => {
-    e.preventDefault();
-    e.returnValue = ''; // Chrome requires returnValue to be set
-    return ''; // Some browsers use the return value
-});
+// Warn user before closing the tab/window.
+//
+// Browser-only: inside the desktop build the window is closed deliberately, and
+// a returning beforeunload handler would block Electron from ever quitting.
+// (The main process also cancels such a block, so the two can never disagree —
+// but not registering it at all is the honest fix.)
+if (window.desktop === undefined) {
+    window.addEventListener('beforeunload', (e) => {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome requires returnValue to be set
+        return ''; // Some browsers use the return value
+    });
+}
 
 // Create the scene
 const scene = new THREE.Scene();

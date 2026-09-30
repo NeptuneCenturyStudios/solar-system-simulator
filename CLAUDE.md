@@ -19,10 +19,19 @@ An interactive 3D solar system simulator built with Three.js and Vue 3. Features
 ## Commands
 
 ```bash
-npm run dev          # Start Vite dev server
-npm run build        # Production build to dist/
-npm run tsc          # Type-check (vue-tsc --noEmit)
-npm run lint         # ESLint
+# Web (unchanged deploy path)
+npm run dev                  # Start Vite dev server
+npm run build                # Production build to dist/
+npm run tsc                  # Type-check (vue-tsc --noEmit)
+npm run lint                 # ESLint
+
+# Desktop (Electron)
+npm run electron:dev         # Vite dev server + Electron, with HMR
+npm run electron:compile     # Compile electron/ -> electron-dist/
+npm run electron:build       # Build + package for the host platform
+npm run electron:build:win   # ...for Windows (NSIS installer + portable)
+npm run electron:build:mac   # ...for macOS (dmg + zip) - macOS host only
+npm run electron:build:linux # ...for Linux (AppImage + deb)
 ```
 
 ## Tooling
@@ -74,6 +83,15 @@ The durable fix belongs upstream: the extension should also probe `@vscode/ripgr
 ## Architecture
 
 ```
+electron/               # Electron main process (compiled separately to electron-dist/)
+├── main.ts             # App lifecycle: single instance, window, menu
+├── window.ts           # BrowserWindow wiring: load URL, links, close guard
+├── protocol.ts         # Serves the web bundle over the app:// scheme
+├── asset-root.ts       # Resolves the bundle root + guards path traversal
+├── mime-types.ts       # Content types for the served files
+├── menu.ts             # Menu policy (menuless, except macOS / dev)
+└── preload.ts          # Minimal contextBridge surface (window.desktop)
+scripts/                # Node build scripts (compile / dev / package)
 src/
 ├── bodies/           # Celestial body classes (planets, stars, moons, asteroids, ships, etc.)
 │   └── ships/        # Player/AI spacecraft models
@@ -133,6 +151,42 @@ For previous milestone info, see milestones.md
 
 1. Work in `src/vue/` using Vue 3 composition API
 2. Use existing composables and `sim-bridge.ts` to interact with the simulation
+
+## Desktop builds (Electron)
+
+One renderer, two shells. `npm run build` still produces the web deploy; the desktop build runs the *same* `dist/` output inside Electron, so a fix in the web build is a fix in both.
+
+- **Main process:** `electron/` (TypeScript), compiled to `electron-dist/` by `npm run electron:compile`. `tsconfig.electron.json` targets CommonJS; `electron/package.json` marks that folder CommonJS so the `node16` resolver emits `require()` despite the repo's `"type": "module"`.
+- **No code signing** anywhere. macOS uses `identity: null`; CI sets `CSC_IDENTITY_AUTO_DISCOVERY=false`.
+- **Cross-building limits:** Windows artifacts build on Windows. Linux targets need Docker when building from Windows. **macOS artifacts can only be built on macOS** — that is what `.github/workflows/release.yml` is for; it builds all three on their native runners.
+
+### The bundle is served over `app://`, never `file://`
+
+`electron/protocol.ts` registers `app://` as a standard, secure, CORS/fetch-capable scheme and serves `dist/` from it. This is not decoration:
+
+- Chromium **refuses `fetch()` for `file://` URLs**. three.js's `FileLoader` uses `fetch` for every OBJ/MTL/GLTF model, and `src/utilities/audio.ts` fetches audio before decoding it. Under `file://` the sim would load planets but lose every model and every sound effect — a partial failure that is confusing to diagnose.
+- The alternative, disabling `webSecurity`, removes the same-origin policy for the whole app.
+
+`resolveBundleFile` rejects anything that escapes the bundle root, so `app://bundle/../../…` 404s.
+
+### Packaging gotcha: `.obj` models are dropped by default
+
+`electron-builder` appends a default `!**/*.{…,obj,…}` exclusion to every **string** pattern in `files`, because it reads `.obj` as a compiled C/C++ object file. That silently deletes all 13 Wavefront models (asteroids, comets, ISS, ships) while leaving their textures in place.
+
+`electron-builder.yml` therefore ships `dist` through an explicit `from`/`to` mapping, which uses a matcher that does not receive those defaults. **If you ever add another asset type that goes missing from a packaged build, check `excludedExts` in `node_modules/app-builder-lib/out/fileMatcher.js` first** — the same trap applies to `.o`, `.a`, `.mk`, `.cc`, `.iml`, `.pyc` and friends.
+
+To verify a packaged build actually contains what the app loads:
+
+```bash
+node -e "console.log(require('@electron/asar').listPackage('release/win-unpacked/resources/app.asar').filter(e=>e.includes('models')).join('\n'))"
+```
+
+### Renderer differences
+
+- `index.html` only injects the Google Analytics tag over `http(s)`, so the desktop build never reports into the site's property.
+- `src/index.ts` registers its `beforeunload` warning only when `window.desktop` is undefined. In Electron the window must always be closable; `electron/window.ts` additionally cancels any such block via `will-prevent-unload`.
+- Outbound links (`AboutModal` credits, "Report Issues") open in the OS browser — `setWindowOpenHandler` denies in-app child windows.
+- `window.desktop` (typed in `src/global.d.ts`) is the feature-detect for "running in the desktop shell".
 
 ## Distance, radius, and mass calculations
 

@@ -5,9 +5,19 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default tseslint.config(
     {
-        // tmp/ holds generated bundles (e.g. the esbuild output for bench_nbody.ts), which
-        // are build artifacts rather than source and should not be linted.
-        ignores: ['dist/**', 'node_modules/**', 'src/vendors/**', 'tmp/**'],
+        // Build artifacts rather than source, so they are not linted:
+        //   dist/          the Vite web bundle
+        //   electron-dist/ the compiled Electron main process
+        //   release/       packaged installers
+        //   tmp/           generated bundles (e.g. the esbuild output for bench_nbody.ts)
+        ignores: [
+            'dist/**',
+            'electron-dist/**',
+            'release/**',
+            'node_modules/**',
+            'src/vendors/**',
+            'tmp/**',
+        ],
     },
     {
         files: ['**/*.{js,mjs,cjs,ts,mts,cts}'],

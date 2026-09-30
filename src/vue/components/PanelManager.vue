@@ -9,7 +9,7 @@
                     aria-label="Help - keyboard and mouse controls"
                     @click="setActivePanel(ActivePanel.Help)"
                 >
-                    <span class="material-symbols-outlined">help</span>
+                    <svg-icon type="mdi" :path="mdiHelpCircleOutline"></svg-icon>
                 </button>
 
                 <button
@@ -18,7 +18,7 @@
                     aria-label="About this simulator"
                     @click="openAbout"
                 >
-                    <span class="material-symbols-outlined">info</span>
+                    <svg-icon type="mdi" :path="mdiInformationOutline"></svg-icon>
                 </button>
 
                 <button
@@ -26,7 +26,7 @@
                     title="Support Neptune Century on Ko-fi"
                     @click="openDonateWindow"
                 >
-                    <span class="material-symbols-outlined">favorite</span>
+                    <svg-icon type="mdi" :path="mdiHeartOutline"></svg-icon>
                 </button>
 
                 <button
@@ -35,7 +35,7 @@
                     title="Music Playlist"
                     @click="setActivePanel(ActivePanel.Playlist)"
                 >
-                    <span class="material-symbols-outlined">music_note</span>
+                    <svg-icon type="mdi" :path="mdiMusic"></svg-icon>
                 </button>
 
                 <button
@@ -44,7 +44,7 @@
                     title="Options"
                     @click="setActivePanel(ActivePanel.Options)"
                 >
-                    <span class="material-symbols-outlined">settings</span>
+                    <svg-icon type="mdi" :path="mdiCog"></svg-icon>
                 </button>
 
                 <button
@@ -53,7 +53,7 @@
                     title="Edit Solar System"
                     @click="setActivePanel(ActivePanel.SolarManagement)"
                 >
-                    <span class="material-symbols-outlined">edit</span>
+                    <svg-icon type="mdi" :path="mdiTune"></svg-icon>
                 </button>
 
                 <button
@@ -62,7 +62,7 @@
                     title="Flight Controls"
                     @click="setActivePanel(ActivePanel.FlightControls)"
                 >
-                    <span class="material-symbols-outlined">rocket</span>
+                    <svg-icon type="mdi" :path="mdiRocketLaunchOutline"></svg-icon>
                 </button>
 
                 <button
@@ -72,7 +72,7 @@
                     title="Texture Generator"
                     @click="setActivePanel(ActivePanel.TextureGenerator)"
                 >
-                    <span class="material-symbols-outlined">texture</span>
+                    <svg-icon type="mdi" :path="mdiPlus"></svg-icon>
                 </button>
 
                 <button
@@ -82,7 +82,7 @@
                     :disabled="addLocked"
                     @click="openBodyEditor('add', null)"
                 >
-                    <span class="material-symbols-outlined">add</span>
+                    <svg-icon type="mdi" :path="mdiPlus"></svg-icon>
                 </button>
 
                 <button
@@ -90,7 +90,7 @@
                     title="Re-launch System"
                     @click="requestRelaunch()"
                 >
-                    <span class="material-symbols-outlined">refresh</span>
+                    <svg-icon type="mdi" :path="mdiRefresh"></svg-icon>
                 </button>
             </div>
         </div>
@@ -122,6 +122,20 @@ import OptionsPanel from '../components/OptionsPanel.vue';
 import PlaylistPanel from '../components/PlaylistPanel.vue';
 import TextureGeneratorPanel from '../components/TextureGeneratorPanel.vue';
 import HelpPanel from '../components/HelpPanel.vue';
+
+import {
+    mdiRefresh,
+    mdiPlus,
+    mdiRocketLaunchOutline,
+    mdiTune,
+    mdiCog,
+    mdiMusic,
+    mdiHeartOutline,
+    mdiInformationOutline,
+    mdiHelpCircleOutline,
+} from '@mdi/js';
+
+import SvgIcon from '@jamescoyle/vue-icon';
 
 const activePanel = computed(() => vueUiState.activePanel);
 const addLocked = computed(() => isActionLocked(ScenarioLock.AddBody));

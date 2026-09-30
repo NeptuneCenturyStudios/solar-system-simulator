@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["ES2022"],
+        // The main process is CommonJS: Electron's sandboxed preload scripts
+        // cannot be ESM, and the rest of the process may as well match. The
+        // nearest package.json (`electron/package.json`) marks this folder as
+        // CommonJS, so the node16 resolver emits require()-based output despite
+        // the repository's own "type": "module".
+        "module": "node16",
+        "moduleResolution": "node16",
+        "types": ["node"],
+
+        "rootDir": "electron",
+        "outDir": "electron-dist",
+
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "skipLibCheck": true,
+
+        "sourceMap": true,
+        "noEmit": false
+    },
+    "include": ["electron/**/*.ts"],
+    "exclude": ["node_modules", "electron-dist", "dist"]
+}
