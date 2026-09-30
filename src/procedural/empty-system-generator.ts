@@ -29,6 +29,7 @@ export class EmptySystemGenerator extends SolarSystemGenerator {
         return {
             system: {
                 bodies,
+                features: [],
                 spaceTexture: skydomeTexture,
             },
             options: {},

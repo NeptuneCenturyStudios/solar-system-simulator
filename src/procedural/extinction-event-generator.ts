@@ -152,6 +152,7 @@ export class ExtinctionEventGenerator extends SolarSystemGenerator {
         return {
             system: {
                 bodies,
+                features: [],
                 spaceTexture: pickRandomSpaceTexture(this.masterSeed),
             },
             options: {

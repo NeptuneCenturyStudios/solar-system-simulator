@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Body } from './bodies/body';
+import type { SolarSystemFeature } from './features/solar-system-feature';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { Supernova } from './effects/supernova';
 import { PlanetaryNebula } from './effects/planetary-nebula';
@@ -61,10 +62,13 @@ export interface IMagneticFieldOptions {
 }
 
 /**
- * The interface for a solar system, containing an array of celestial bodies and a space texture.
+ * The interface for a solar system, containing an array of celestial bodies, the features
+ * (non-body parts such as a Kuiper belt) and a space texture.
  */
 export interface ISolarSystem {
     bodies: Body[];
+    /** Non-body parts of the system. Empty when the generator has none. */
+    features: SolarSystemFeature[];
     /** The space texture representing the background of the solar system. Can be null if not yet generated. */
     spaceTexture: ISpaceBackground;
 }

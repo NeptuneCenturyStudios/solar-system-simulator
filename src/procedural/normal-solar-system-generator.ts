@@ -23,6 +23,7 @@ import { AsteroidPocked } from '../bodies/asteroid-pocked';
 import { createSatellite } from '../utilities/utilities';
 import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 import { createMoon } from '../bodies/create-moon';
+import { KuiperBelt } from '../features/kuiper-belt';
 
 import {
     SUN_MASS,
@@ -569,12 +570,16 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         report({ phase: 'comets', label: `Halley's Comet ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
+        // Kuiper belt beyond Neptune
+        const kuiperBelt = new KuiperBelt(this.scene);
+
         // Use default space texture
         const spaceTexture = spaceTextures[0];
 
         return {
             system: {
                 bodies,
+                features: [kuiperBelt],
                 spaceTexture: spaceTexture,
             },
             options: {},

@@ -153,6 +153,7 @@ export class TestAiShipsGenerator extends SolarSystemGenerator {
         return {
             system: {
                 bodies,
+                features: [],
                 spaceTexture: pickRandomSpaceTexture(this.masterSeed),
             },
             options: {

@@ -311,6 +311,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         return {
             system: {
                 bodies,
+                features: [],
                 spaceTexture: skydomeTexture,
             },
             options: {},

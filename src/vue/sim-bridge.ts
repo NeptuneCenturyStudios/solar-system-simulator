@@ -245,8 +245,6 @@ export interface VueSimHooks {
     getRandomizedCreateDefaults?: (bodyType: string) => RandomizedCreateDefaults;
 
     // ── Solar System Management (same sim paths as the old management panel) ─
-    /** Toggle Kuiper belt point-cloud visibility. */
-    setKuiperBeltVisible?: (checked: boolean) => void;
     /** Show/hide the skydome background texture. */
     setSpaceBackgroundVisible?: (checked: boolean) => void;
     /** Load & apply a new skydome background texture by filename. */
@@ -344,7 +342,6 @@ export interface VueSimStore {
     showOrbitPrediction: boolean;
 
     // ── Solar System Management (environment settings) ─────────────────────
-    kuiperBeltVisible: boolean;
     spaceBackgroundVisible: boolean;
     spaceTextureFilename: string | null;
     starDeathEnabled: boolean;
@@ -410,7 +407,6 @@ const state = reactive<VueSimStore>({
     showTrails: true,
     showOrbitPrediction: false,
     // Environment defaults mirror environmentState's initial values.
-    kuiperBeltVisible: false,
     spaceBackgroundVisible: true,
     spaceTextureFilename: null as string | null,
     starDeathEnabled: false,
@@ -582,7 +578,6 @@ export function isActionLocked(lock: ScenarioLock): boolean {
 
 /** Copy environment settings into the reactive store for the Vue UI. */
 function refreshEnvironmentState(): void {
-    state.kuiperBeltVisible = environmentState.kuiperBeltVisible;
     state.spaceBackgroundVisible = environmentState.spaceBackgroundVisible;
     state.spaceTextureFilename = environmentState.spaceTextureFilename;
     state.starDeathEnabled = environmentState.starDeathEnabled;
@@ -909,16 +904,6 @@ export function generateAddFormBodyName(bodyType: string): string {
 }
 
 // ── Solar System Management actions ──────────────────────────────────────
-
-/** Toggle Kuiper belt visibility (old panel's kuiperBeltChange event path). */
-export function setKuiperBeltVisible(checked: boolean): void {
-    if (hookRegistry.setKuiperBeltVisible) {
-        hookRegistry.setKuiperBeltVisible(checked);
-    } else {
-        environmentState.kuiperBeltVisible = checked;
-        refreshEnvironmentState();
-    }
-}
 
 /** Show/hide the skydome background texture (old enableSkydome checkbox path). */
 export function setSpaceBackgroundVisible(checked: boolean): void {

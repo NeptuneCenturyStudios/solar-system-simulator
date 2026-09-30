@@ -151,6 +151,7 @@ export class AsteroidDefenseGenerator extends SolarSystemGenerator {
         return {
             system: {
                 bodies,
+                features: [],
                 spaceTexture: pickRandomSpaceTexture(this.masterSeed),
             },
             options: {

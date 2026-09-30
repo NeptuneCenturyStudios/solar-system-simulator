@@ -181,6 +181,7 @@ export class WormholeShortcutGenerator extends SolarSystemGenerator {
         return {
             system: {
                 bodies,
+                features: [],
                 spaceTexture: pickRandomSpaceTexture(this.masterSeed),
             },
             // Modest time scale so the short-cut orbit is watchable without destabilising

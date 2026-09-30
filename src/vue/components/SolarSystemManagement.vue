@@ -4,15 +4,6 @@
             <label class="checkbox-row">
                 <input
                     type="checkbox"
-                    :checked="simStore.kuiperBeltVisible"
-                    @change="onKuiperBeltChange"
-                />
-                Enable Kuiper Belt
-            </label>
-
-            <label class="checkbox-row">
-                <input
-                    type="checkbox"
                     :checked="simStore.spaceBackgroundVisible"
                     @change="onSpaceBackgroundChange"
                 />
@@ -76,7 +67,6 @@
 <script setup lang="ts">
 import {
     setGMultiplier,
-    setKuiperBeltVisible,
     setSpaceBackgroundVisible,
     setSpaceTexture,
     setStarDeathEnabled,
@@ -89,10 +79,6 @@ import PanelBase from './PanelBase.vue';
 
 /** Space background texture options (same list the legacy panel dropdown used). */
 const SPACE_TEXTURES = spaceTextures;
-
-function onKuiperBeltChange(e: Event): void {
-    setKuiperBeltVisible((e.target as HTMLInputElement).checked);
-}
 
 function onSpaceBackgroundChange(e: Event): void {
     setSpaceBackgroundVisible((e.target as HTMLInputElement).checked);

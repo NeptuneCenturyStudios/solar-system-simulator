@@ -208,6 +208,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         return {
             system: {
                 bodies,
+                features: [],
                 spaceTexture: skydomeTexture,
             },
             options: {},

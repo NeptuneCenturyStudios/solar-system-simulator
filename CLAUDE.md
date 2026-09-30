@@ -99,6 +99,7 @@ src/
 ├── drawing/          # HUD rendering, text, orbit prediction, textures
 ├── effects/          # Visual effects (corona, black hole jets, supernova, lensing, etc.)
 ├── event-log/        # In-game event logging
+├── features/         # Solar system features returned by generators (Kuiper belt, etc.; non-body parts of a system)
 ├── events/           # Custom event listeners
 ├── gizmos/           # Debug gizmos (coordinate axes, grid, position indicator)
 ├── physics/          # Orbital mechanics and physics engine
@@ -135,8 +136,9 @@ For previous milestone info, see milestones.md
 - [ ] Phase 2.2: Add option to pick low or high res (if a high res texture exists). Also increases the segement count for sphere meshes. Available only for electron app.
 - [ ] Phase 2.3: Add more skydome textures.
 - ** Phase 3
-- [ ] Phase 3.1: Convert Keiper belt into a solar system "feature" instead of being a static object in all systems. (Also ground work for future solar system features and procedurally generated features)
+- [x] Phase 3.1: Convert Keiper belt into a solar system "feature" instead of being a static object in all systems. (Also ground work for future solar system features and procedurally generated features). Also allow farther zoom out than it currently so full keiper belt can be viewed.
 - [ ] Phase 3.2: Procedural ring systems for planets
+- [ ] Phase 3.3: Graphics option for render distance to help with performance.
 - ** Phase 4
 - [ ] Phase 4.1: Improve gizmo. It currently doesn't scale to body size well and is still a pain to use.
 - [ ] Phase 4.2: Improve orbital data for all other planets. Pluto and Nepture already done.

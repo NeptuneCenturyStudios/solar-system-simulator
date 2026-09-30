@@ -45,10 +45,6 @@ import {
     MOON_DIST_FROM_EARTH,
     MOON_RADIUS,
     GIZMO_TUNING,
-    KUIPER_BELT_COUNT,
-    KUIPER_BELT_INNER_DIST,
-    KUIPER_BELT_OUTER_DIST,
-    KUIPER_BELT_VERTICAL_SPREAD,
     SimulationStartMode,
 
     // HUD / sim constants moved from index.ts
@@ -106,6 +102,7 @@ import {
     moonTexture,
 } from './drawing/textures';
 import { Supernova } from './effects/supernova';
+import type { SolarSystemFeature } from './features/solar-system-feature';
 import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { AmbientSoundManager } from './utilities/ambient-sound';
@@ -247,7 +244,7 @@ const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 scene.add(ambientLight);
 
 // --- Camera and renderer setup ---
-const CAMERA_FAR_PLANE = PLUTO_DIST + 300_000_000 / DIST_SCALE + 2_000_000_000 / DIST_SCALE;
+const CAMERA_FAR_PLANE = PLUTO_DIST + 300_000_000 / DIST_SCALE + 10_000_000_000 / DIST_SCALE;
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
@@ -829,6 +826,7 @@ const NONE_FOCUS_POSITION = new THREE.Vector3(0, 0, 0); // Center of solar syste
 
 const supernovas: Supernova[] = []; // Track all supernova effects
 const planetaryNebulae: PlanetaryNebula[] = []; // Track all planetary nebula effects
+const solarSystemFeatures: SolarSystemFeature[] = []; // Features (e.g. Kuiper belt) of the live system
 
 let isTilting = false;
 let isAzimuthDragging = false;
@@ -966,34 +964,6 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
 
     return true;
 }
-
-// Kuiper Belt - distant icy objects in a donut/disc shape beyond Neptune
-const kuiperBeltCount = KUIPER_BELT_COUNT;
-const kuiperBeltGeo = new THREE.BufferGeometry();
-const kuiperBeltPos = new Float32Array(kuiperBeltCount * 3);
-for (let i = 0; i < kuiperBeltCount; i++) {
-    // Donut shape: from Neptune to beyond Pluto
-    const r =
-        KUIPER_BELT_INNER_DIST + Math.random() * (KUIPER_BELT_OUTER_DIST - KUIPER_BELT_INNER_DIST);
-    const theta = Math.random() * Math.PI * 2;
-    const verticalSpread = (Math.random() - 0.5) * KUIPER_BELT_VERTICAL_SPREAD; // Some thickness to the disc
-
-    kuiperBeltPos[i * 3] = r * Math.cos(theta);
-    kuiperBeltPos[i * 3 + 1] = verticalSpread;
-    kuiperBeltPos[i * 3 + 2] = r * Math.sin(theta);
-}
-kuiperBeltGeo.setAttribute('position', new THREE.BufferAttribute(kuiperBeltPos, 3));
-const kuiperBeltMat = new THREE.PointsMaterial({
-    color: 0x888888,
-    size: 1.3,
-    sizeAttenuation: false,
-    transparent: true,
-    opacity: 0.4,
-    depthTest: true,
-    depthWrite: false,
-});
-const kuiperBeltPoints = new THREE.Points(kuiperBeltGeo, kuiperBeltMat);
-scene.add(kuiperBeltPoints);
 
 // Velocity arrow is now part of CoordinateGizmo (gizmo.velocityArrow)
 
@@ -1721,24 +1691,6 @@ function createNewBody(
     return (newBody && !newBody._isDisposed ? newBody : null) ?? null;
 }
 
-function applyEnvironmentDefaultsForMode(mode: SimulationStartMode) {
-    // Only touches background visuals + management checkboxes (if already initialized).
-    const hideKuiper =
-        mode === SimulationStartMode.Empty ||
-        mode === SimulationStartMode.BlackHole ||
-        mode === SimulationStartMode.Procedural ||
-        mode === SimulationStartMode.TestAiShips ||
-        mode === SimulationStartMode.WormholeShortcut ||
-        mode === SimulationStartMode.AsteroidField ||
-        mode === SimulationStartMode.AsteroidDefense ||
-        mode === SimulationStartMode.ExtinctionEvent;
-
-    if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
-        kuiperBeltPoints.visible = !hideKuiper;
-    }
-    environmentState.kuiperBeltVisible = !hideKuiper;
-}
-
 /**
  * Cleans up the entire solar system, disposing of all celestial bodies, explosions, impacts, supernovas, and planetary nebulae.
  * Resets the simulation state and notifies the UI of the reset.
@@ -1789,6 +1741,12 @@ function cleanUpSolarSystem() {
     }
     planetaryNebulae.length = 0;
 
+    // Clean up the system features (Kuiper belt, etc.) of the outgoing system
+    for (const feature of solarSystemFeatures) {
+        feature.dispose();
+    }
+    solarSystemFeatures.length = 0;
+
     // Reset bodies array depending on mode
     simulationState.bodies = [];
 
@@ -1819,8 +1777,6 @@ async function spawn(
     proceduralResult?: IProceduralGeneratorPromptResult,
     progressReporter?: ProceduralGenerationReporter
 ): Promise<ISolarSystemGenerationResult> {
-    applyEnvironmentDefaultsForMode(mode);
-
     cleanUpSolarSystem();
 
     let generator: SolarSystemGenerator;
@@ -1867,6 +1823,7 @@ async function spawn(
 
     // Set the bodies
     simulationState.bodies = solarSystem.bodies;
+    solarSystemFeatures.push(...solarSystem.features);
     // Scenario generators may include AI-piloted ships; pick them up now that the
     // system is live, so the registry never holds a ship the physics loop can't see.
     registerNpcShipsIn(simulationState.bodies);
@@ -3064,12 +3021,6 @@ registerVueSimHooks({
     },
 
     // ── Solar System Management: environment settings ──
-    setKuiperBeltVisible: (checked: boolean) => {
-        if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) {
-            kuiperBeltPoints.visible = checked;
-        }
-        environmentState.kuiperBeltVisible = checked;
-    },
     setSpaceBackgroundVisible: (checked: boolean) => {
         showSpaceBackground(scene, checked);
         environmentState.spaceBackgroundVisible = checked;
@@ -4415,10 +4366,6 @@ window.addEventListener('resize', () => {
     screenFlash.resize(window.innerWidth, window.innerHeight);
     scenarioMessageHud.resize(window.innerWidth, window.innerHeight);
 });
-
-// Apply initial background visibility (pre-launch view): kuiper off
-if (typeof kuiperBeltPoints !== 'undefined' && kuiperBeltPoints) kuiperBeltPoints.visible = false;
-environmentState.kuiperBeltVisible = false;
 
 function handleBodyBecameInvalid(body: Body | null | undefined) {
     if (!body) return;
