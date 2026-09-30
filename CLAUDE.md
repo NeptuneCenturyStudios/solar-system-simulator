@@ -129,7 +129,7 @@ For previous milestone info, see milestones.md
 ## Current milestone
 - **Version 1.4.0**
 - **Phase 1**
-- [ ] Phase 1.1: Make codebase buildable to web and electron
+- [x] Phase 1.1: Make codebase buildable to web and electron
 - ** Phase 2
 - [ ] Phase 2.1: Add 8k assets
 - [ ] Phase 2.2: Add option to pick low or high res (if a high res texture exists). Also increases the segement count for sphere meshes. Available only for electron app.
