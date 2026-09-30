@@ -1,0 +1,24 @@
+## previous milestones
+- **Version 1.3.0 - COMPLETE**
+- **Phase 1**
+- [x] Phase 1.1: Add atmospheric drag
+- [x] Phase 1.2: Tweak visual appearance of entry flame effect to accomodate new atmospheric drag 
+- [x] Phase 1.3: Add new shield layer of HP to ships which will gradually recharge over a fixed time for each ship (different shield hp amount and recharge rate per ship type)
+- **Phase 2**
+- [x] Phase 2: Add satellite station keeping to counter drag
+- **Phase 3: Add satellite/probe missions**
+- [x] Phase 3.1: Add hidden planetary attributes (such as average temp, atmospheric composition if any, body composition (soild, rock, minerals, types of metal like iron, gold, uranium, etc), liquid composition if any (water, liquid methane, etc), orbital period, etc...) that will be discoverable by satellites/probes
+- [x] Phase 3.2: Add new probe mission UI modal to select a celestial target where the probe will fly to and gather data. This will mostly be benificial for procedural systems but will work for any system.
+- [x] Phase 3.3: Add a new UI scene display (or use the name box) to display planetary attributes that are discovered by probes, or ones that are known already in the normal solar system
+- **Phase 4**
+- [x] Phase 4: Scenario updates. Add ability for a scenario to disable certain UI features like System Explorer or Flight Control panel or disable operations like delete a body while the scenario is running.
+- **Phase 5**
+- [x] Phase 5: New scenario. Defend Earth from an onslaught of ~100 (to be adjusted) ELEs comprised of asteroids and comets. User will get to use the Osiris to take them all down before Earth is destroyed.
+- **Phase 6 - Fixes and adjustments**
+- [x] Phase 6.1: Adjust Neptune's orbit to match real orbit (like we did for Pluto)
+- [x] Phase 6.2: Ability to leave weapon fire in scene if paused even when user exits flight mode. Bolts will freeze in space and not tick down their lifetime, and laser will remain persistent in space.
+- [x] Phase 6.3: Smooth camera zoom (ease-in-out)
+- [x] Phase 6.4: Update the comet/asteroid object assets
+- **Phase 7 - More ship AI updates**
+- [x] Phase 7.1: Test AI Ship scenario. Start user in ship (Zenith) like the Asteroid Defense scenario (no lockdowns required). NPC ship should approach player ship. Target distance to player is ~500m or about 0.5km / DIST_SCALE. NPC ship should pursue player ship and fire weapons. NPC ship will need an adaptation to aiming since player uses mouse to aim. NPC ship should have same range of aim that a player has (so it cannot fire behind itself and must steer toward player to get into aiming range.) If the player destroyes the NPC ship, then the NPC ship should respawn a distance from the player. All weapon behaviors should be the same (cooldown, rate of fire, heat, etc.)
+
