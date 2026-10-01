@@ -64,7 +64,6 @@ export class Ceres extends DwarfPlanet {
             bodySubtype: PlanetTypeEnum.Terrestrial,
             trailColor: 0xcccccc,
             maxTrail: 2000,
-            hasRings: false,
             rotation: { tilt: CERES_AXIS, speed: rotSpeed, azimuth: CERES_AZIMUTH },
             mesh: mesh,
             attributes: {

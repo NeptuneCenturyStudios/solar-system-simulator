@@ -80,7 +80,6 @@ export class Satellite extends CelestialBody {
                 name: options.name,
                 trailColor: options.trailColor,
                 maxTrail: options.maxTrail,
-                hasRings: false,
                 rotation: options.rotation,
                 mesh: options.mesh,
                 tidalLock: options.tidalLock,

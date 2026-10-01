@@ -27,7 +27,7 @@ export class Planet extends CelestialBody {
                 name: options.name,
                 trailColor: options.trailColor ?? 0xffffff,
                 maxTrail: options.maxTrail ?? 500,
-                hasRings: options.hasRings ?? false,
+                rings: options.rings,
                 rotation: options.rotation,
                 mesh: options.mesh,
                 seed: options.seed,

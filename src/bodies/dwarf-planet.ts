@@ -28,7 +28,7 @@ export class DwarfPlanet extends CelestialBody {
                     name: options.name,
                     trailColor: options.trailColor ?? 0xffffff,
                     maxTrail: options.maxTrail ?? 500,
-                    hasRings: options.hasRings ?? false,
+                    rings: options.rings,
                     rotation: options.rotation,
                     mesh: options.mesh,
                     atmosphere: options.atmosphere,

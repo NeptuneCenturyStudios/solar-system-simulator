@@ -20,6 +20,7 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
+import { URANUS_RING_SPEC } from '../procedural/ring-presets.js';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -65,7 +66,7 @@ export class Uranus extends Planet {
             bodySubtype: PlanetTypeEnum.IceGiant,
             trailColor: 0x88ddff,
             maxTrail: 15000,
-            hasRings: false,
+            rings: URANUS_RING_SPEC,
             rotation: { tilt: URANUS_AXIS, speed: rotSpeed, azimuth: URANUS_AZIMUTH },
             mesh: mesh,
             atmosphere: {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { IStateDependencies, type IMagneticFieldOptions } from '../interfaces';
+import { IStateDependencies, type IMagneticFieldOptions, type IRingSpec } from '../interfaces';
 import { Planet } from '../bodies/planet';
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { SeededRandom } from '../utilities/prng';
@@ -19,6 +19,7 @@ import {
 
 import { BodyTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { rollMagneticField, type MagneticFieldKind } from './magnetic-field';
+import { rollRingSpec, type RingKind } from './ring-generator';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 import type { IPlanetaryAttributes } from '../bodies/body-attributes';
 import { computePlanetaryAttributes } from './planet-attributes';
@@ -102,8 +103,13 @@ export type ProceduralPlanetCreation = {
     atmosphere?: IAtmosphereProfile | null;
 };
 
-function computeRingPresence(creation: ProceduralPlanetCreation): { hasRings: boolean } {
-    const { id, bodySubtype, hasRings, bodyType } = creation;
+/**
+ * Resolves a planet's ring system, or null when it has none. Whether it has rings is an
+ * explicit UI override or a seeded roll keyed to the body id; what they look like is rolled
+ * from the body's texture seed, so the same body always gets the same rings.
+ */
+function computeRingSpec(creation: ProceduralPlanetCreation): IRingSpec | null {
+    const { id, bodySubtype, hasRings, bodyType, textureSeed } = creation;
 
     const GAS_GIANT_RINGS_PROB = 0.85;
     const ICE_GIANT_RINGS_PROB = 0.7;
@@ -122,12 +128,23 @@ function computeRingPresence(creation: ProceduralPlanetCreation): { hasRings: bo
             ? hasRings
             : hasRingsProbabilistic;
 
-    return { hasRings: resolved };
+    if (!resolved) return null;
+
+    const kind: RingKind =
+        bodyType === BodyTypeEnum.DwarfPlanet
+            ? 'dwarf'
+            : bodySubtype === PlanetTypeEnum.GasGiant
+              ? 'gasGiant'
+              : bodySubtype === PlanetTypeEnum.IceGiant
+                ? 'iceGiant'
+                : 'solid';
+
+    return rollRingSpec(new SeededRandom(`${textureSeed ?? id}|rings`), kind);
 }
 
 /**
  * Resolves a planet's magnetic field: an explicit override from the UI wins, otherwise
- * a seeded roll keyed to the body id (mirroring how `computeRingPresence` resolves rings).
+ * a seeded roll keyed to the body id (mirroring how `computeRingSpec` resolves rings).
  */
 function computeMagneticField(creation: ProceduralPlanetCreation): IMagneticFieldOptions | null {
     const { id, bodySubtype, bodyType, magneticField } = creation;
@@ -254,7 +271,7 @@ function createCommonPlanetOptions(
     scene: THREE.Scene,
     creation: ProceduralPlanetCreation,
     mesh: THREE.Mesh,
-    hasRings: boolean,
+    rings: IRingSpec | null,
     magneticField: IMagneticFieldOptions | null,
     hasAtmosphere: boolean
 ): Planet | DwarfPlanet {
@@ -285,7 +302,7 @@ function createCommonPlanetOptions(
         bodySubtype,
         trailColor: 0x888888,
         maxTrail: 3000,
-        hasRings,
+        rings,
         rotation: { tilt: rotationTilt, speed: rotationSpeed, azimuth: rotationAzimuth },
         mesh,
         seed: textureSeed,
@@ -309,7 +326,7 @@ export function createPlanetBodyFromProceduralCreation(
     const material = buildMeshMaterial(creation);
     const mesh = new THREE.Mesh(geometry, material);
 
-    const { hasRings } = computeRingPresence(creation);
+    const rings = computeRingSpec(creation);
     const magneticField = computeMagneticField(creation);
     const kind: AtmosphereBodyKind =
         creation.bodyType === BodyTypeEnum.DwarfPlanet ? 'dwarf' : 'planet';
@@ -324,7 +341,7 @@ export function createPlanetBodyFromProceduralCreation(
         scene,
         creation,
         mesh,
-        hasRings,
+        rings,
         magneticField,
         atmosphere !== null
     );

@@ -8,13 +8,12 @@ import {
     IRotation,
 } from '../interfaces';
 import { ParticleExplosion } from '../effects/particle-explosion';
-import { SeededRandom } from '../utilities/prng';
-import { DIST_SCALE } from '../utilities/consts';
 import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/atmosphere-shell';
 import { AuroraHandle, createAurora } from '../effects/aurora';
+import { PlanetRingsHandle, createPlanetRings } from '../effects/planet-rings';
 import { BodyTypeEnum } from './body-enums';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 import { IPlanetaryAttributes } from './body-attributes';
@@ -24,6 +23,13 @@ const _Y_AXIS = new THREE.Vector3(0, 1, 0);
 // Shared, never-mutated scratch values for the P-type (barycentric) branch of getOrbitalPeriod.
 const _ORIGIN = new THREE.Vector3(0, 0, 0);
 const _ZERO_VELOCITY = new THREE.Vector3(0, 0, 0);
+// Scratch vector for the ring lighting direction, reused every frame.
+const _RING_LIGHT_DIR = new THREE.Vector3();
+// Scratch quaternion for the ring lighting direction, reused every frame.
+const _RING_INV_QUAT = new THREE.Quaternion();
+/** Body types that emit light, and so can light and shadow a ring system. */
+const _LIGHT_EMITTER_TYPES =
+    BodyTypeEnum.Star | BodyTypeEnum.BrownDwarf | BodyTypeEnum.WhiteDwarf | BodyTypeEnum.Pulsar;
 
 /**
  * Tidal locking options
@@ -55,7 +61,8 @@ export class CelestialBody extends Body {
     trailGeo: THREE.BufferGeometry;
     trailPositions: Float32Array;
     trail: THREE.Line | null;
-    rings: THREE.Points | null = null;
+    /** Ring system, attached to the body mesh. Null when the body has none. */
+    rings: PlanetRingsHandle | null = null;
     clouds: THREE.Mesh | null = null;
     cloudRotationSpeed: number = 0;
     /** Visual haze for the atmosphere. Set only through setAtmosphere(). */
@@ -136,7 +143,6 @@ export class CelestialBody extends Body {
         // bodyType: BodyTypeEnum,
         // trailColor = 0xffffff,
         // maxTrail = 500,
-        // hasRings = false,
         // rotation: IRotation = { tilt: 0, speed: 0 },
         // mesh?: THREE.Mesh,
         // tidalLock?: ITidalLockOptions,
@@ -254,39 +260,9 @@ export class CelestialBody extends Body {
         this.trail.frustumCulled = false;
         scene.add(this.trail);
 
-        // Deterministic rings (PRNG from body id)
-        if (options.hasRings) {
-            const ringCount = 300000 / DIST_SCALE;
-            const ringRng = new SeededRandom(`${options.name}|rings`);
-
-            const ringGeo = new THREE.BufferGeometry();
-            const ringPos = new Float32Array(ringCount * 3);
-
-            for (let i = 0; i < ringCount; i++) {
-                const r = options.radius * 1.6 + ringRng.next() * options.radius * 1.2;
-                const theta = ringRng.next() * Math.PI * 2;
-
-                ringPos[i * 3] = Math.cos(theta) * r;
-                ringPos[i * 3 + 1] = (ringRng.next() - 0.5) * (options.radius * 0.08);
-                ringPos[i * 3 + 2] = Math.sin(theta) * r;
-            }
-
-            ringGeo.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
-            this.rings = new THREE.Points(
-                ringGeo,
-                new THREE.PointsMaterial({
-                    color: 0xe6cc80,
-                    size: 1.2,
-                    transparent: true,
-                    opacity: 0.3,
-                })
-            );
-
-            // Orient rings to match planet orientation (tilt + azimuth) exactly.
-            // Rings must follow the full mesh quaternion, otherwise the ring plane can drift.
-            this.rings.quaternion.copy(this.mesh.quaternion);
-
-            scene.add(this.rings);
+        // The rings are a child of the mesh, so they follow its position, tilt and azimuth.
+        if (options.rings) {
+            this.rings = createPlanetRings(this.radius, options.rings, this.mesh);
         }
 
         this.refreshAurora();
@@ -444,13 +420,12 @@ export class CelestialBody extends Body {
 
         // Rings
         if (this.rings) {
-            this.scene.remove(this.rings);
-            this.rings.geometry.dispose();
-            if (Array.isArray(this.rings.material)) {
-                this.rings.material.forEach((mat) => mat.dispose());
-            } else {
-                this.rings.material.dispose();
+            try {
+                this.rings.dispose();
+            } catch {
+                // ignore cleanup errors
             }
+            this.rings = null;
         }
 
         // Hide labels
@@ -558,10 +533,7 @@ export class CelestialBody extends Body {
         }
 
         try {
-            if (this.rings) {
-                const scaleFactor = newRadius / Math.max(oldRadius, 1);
-                this.rings.scale.setScalar(scaleFactor);
-            }
+            this.rings?.setRadius(newRadius);
         } catch (e) {
             console.error('Error updating body rings scale:', e);
         }
@@ -686,6 +658,39 @@ export class CelestialBody extends Body {
     }
 
     /**
+     * Points the rings' lighting at the nearest star, or switches it off when there is none.
+     *
+     * The direction is handed over in the mesh's local frame, where the rings live, and
+     * computed here on the CPU because world coordinates are too large for the shader to
+     * resolve a planet-sized shadow edge.
+     */
+    private updateRingLighting() {
+        if (!this.rings) return;
+
+        let nearest: Body | null = null;
+        let nearestDistSq = Infinity;
+        for (const other of this.dependencies.getBodies()) {
+            if (other._isDisposed || !(other.bodyType & _LIGHT_EMITTER_TYPES)) continue;
+            const distSq = other.mesh.position.distanceToSquared(this.mesh.position);
+            if (distSq < nearestDistSq) {
+                nearest = other;
+                nearestDistSq = distSq;
+            }
+        }
+
+        if (!nearest || nearestDistSq === 0) {
+            this.rings.update(null);
+            return;
+        }
+
+        _RING_LIGHT_DIR
+            .subVectors(nearest.mesh.position, this.mesh.position)
+            .normalize()
+            .applyQuaternion(_RING_INV_QUAT.copy(this.mesh.quaternion).invert());
+        this.rings.update(_RING_LIGHT_DIR);
+    }
+
+    /**
      * Update purely visual properties that don't affect physics.
      * Called once per rendered frame (after all substeps) rather than per substep.
      * @param dtTotal Total elapsed simulation time for this frame (sum of all substep dts).
@@ -700,10 +705,7 @@ export class CelestialBody extends Body {
             this.clouds.rotation.y += this.cloudRotationSpeed * dtTotal;
         }
 
-        if (this.rings) {
-            this.rings.position.copy(this.mesh.position);
-            this.rings.quaternion.copy(this.mesh.quaternion);
-        }
+        this.updateRingLighting();
 
         // The aurora is a child of the mesh, so it needs no position sync — only the
         // curtain drift and brightness pulse advanced here.

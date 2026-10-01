@@ -69,7 +69,6 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
                 name: name,
                 trailColor: 0xffffff,
                 maxTrail: 500,
-                hasRings: false,
                 rotation,
                 mesh,
             },

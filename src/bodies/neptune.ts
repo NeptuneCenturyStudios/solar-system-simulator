@@ -25,6 +25,7 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
+import { NEPTUNE_RING_SPEC } from '../procedural/ring-presets.js';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -93,7 +94,7 @@ export class Neptune extends Planet {
             bodySubtype: PlanetTypeEnum.IceGiant,
             trailColor: 0x6688ff,
             maxTrail: 18000,
-            hasRings: false,
+            rings: NEPTUNE_RING_SPEC,
             rotation: { tilt: NEPTUNE_AXIS, speed: rotSpeed, azimuth: NEPTUNE_AZIMUTH },
             mesh: mesh,
             atmosphere: {

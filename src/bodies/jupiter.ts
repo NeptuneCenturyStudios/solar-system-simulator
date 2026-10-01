@@ -20,6 +20,7 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
+import { JUPITER_RING_SPEC } from '../procedural/ring-presets.js';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -65,7 +66,7 @@ export class Jupiter extends Planet {
             bodySubtype: PlanetTypeEnum.GasGiant,
             trailColor: 0xffcc88,
             maxTrail: 5000,
-            hasRings: false,
+            rings: JUPITER_RING_SPEC,
             rotation: { tilt: JUPITER_AXIS, speed: rotSpeed, azimuth: JUPITER_AZIMUTH },
             mesh: mesh,
             atmosphere: {

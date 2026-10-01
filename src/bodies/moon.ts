@@ -28,7 +28,6 @@ export class Moon extends CelestialBody {
                 name: options.name,
                 trailColor: options.trailColor ?? 0xffffff,
                 maxTrail: options.maxTrail ?? 500,
-                hasRings: false,
                 rotation: options.rotation,
                 mesh: options.mesh,
                 tidalLock: options.tidalLock,

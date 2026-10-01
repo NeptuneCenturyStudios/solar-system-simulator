@@ -89,7 +89,6 @@ export class Pluto extends DwarfPlanet {
             bodySubtype: PlanetTypeEnum.Terrestrial,
             trailColor: 0xddbb99,
             maxTrail: 20000,
-            hasRings: false,
             rotation: { tilt: PLUTO_AXIS, speed: rotSpeed, azimuth: PLUTO_AZIMUTH },
             mesh: mesh,
             // Thin N₂/CH₄/CO atmosphere (~10 µbar) with a pale blue haze.

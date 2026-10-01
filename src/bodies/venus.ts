@@ -62,7 +62,6 @@ export class Venus extends Planet {
             bodySubtype: PlanetTypeEnum.Terrestrial,
             trailColor: 0xffdd88,
             maxTrail: 3500,
-            hasRings: false,
             rotation: { tilt: VENUS_AXIS, speed: rotSpeed, azimuth: VENUS_AZIMUTH },
             mesh: mesh,
             atmosphere: {

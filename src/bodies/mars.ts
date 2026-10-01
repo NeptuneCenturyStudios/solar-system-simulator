@@ -62,7 +62,6 @@ export class Mars extends Planet {
             bodySubtype: PlanetTypeEnum.Terrestrial,
             trailColor: 0xff8888,
             maxTrail: 3000,
-            hasRings: false,
             rotation: { tilt: MARS_AXIS, speed: rotSpeed, azimuth: MARS_AZIMUTH },
             mesh: mesh,
             atmosphere: {

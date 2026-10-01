@@ -61,6 +61,34 @@ export interface IMagneticFieldOptions {
     reversed?: boolean;
 }
 
+/** One concentric band of a planetary ring system. */
+export interface IRingBand {
+    /** Inner edge of the band, as a 0–1 fraction across the ring (0 = inner edge of the ring). */
+    start: number;
+    /** Outer edge of the band, as a 0–1 fraction across the ring. */
+    end: number;
+    /** Band colour as 0xRRGGBB. */
+    color: number;
+    /** Band density, 0–1. Near 0 reads as a gap (Saturn's Cassini Division). */
+    opacity: number;
+}
+
+/**
+ * Shape and colouring of a planetary ring system, rendered by `createPlanetRings`.
+ *
+ * Both radii are multiples of the host body's radius, so the rings rescale with the body.
+ * Bands are ordered from the inner edge outward and should tile the 0–1 range without overlap.
+ */
+export interface IRingSpec {
+    /** Inner edge of the ring, in body radii. */
+    innerRatio: number;
+    /** Outer edge of the ring, in body radii. */
+    outerRatio: number;
+    bands: IRingBand[];
+    /** Seeds the fine ringlet detail, so the same spec always renders identically. */
+    seed: string;
+}
+
 /**
  * The interface for a solar system, containing an array of celestial bodies, the features
  * (non-body parts such as a Kuiper belt) and a space texture.
@@ -293,7 +321,8 @@ export interface ICometCreationOptions extends ICelestialBodyCreationOptions {
 
 export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptions {
     mesh?: THREE.Mesh;
-    hasRings?: boolean;
+    /** Ring system, or omitted/null when the body has none. */
+    rings?: IRingSpec | null;
     atmosphere?: IAtmosphereOptions;
     /** Dipole magnetic field, or omitted/null when the body has no global field. */
     magneticField?: IMagneticFieldOptions | null;

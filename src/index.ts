@@ -899,10 +899,6 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
 
     body.mesh.position.add(movement);
 
-    if (body instanceof CelestialBody && body.rings) {
-        body.rings.position.copy(body.mesh.position);
-    }
-
     if (body instanceof CelestialBody && body.clouds) {
         body.clouds.position.set(0, 0, 0);
     }
@@ -1647,10 +1643,6 @@ function createNewBody(
                 azRad
             );
             newBody.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
-            if (newBody.rings) {
-                newBody.rings.position.copy(newBody.mesh.position);
-                newBody.rings.quaternion.copy(newBody.mesh.quaternion);
-            }
         }
 
         simulationState.bodies.push(newBody);
@@ -2510,10 +2502,6 @@ function onMouseMove(event: MouseEvent) {
             );
             gizmo.target.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
             gizmo.target.rotation.tilt = newTiltDeg;
-            if (gizmo.target.rings) {
-                gizmo.target.rings.position.copy(gizmo.target.mesh.position);
-                gizmo.target.rings.quaternion.copy(gizmo.target.mesh.quaternion);
-            }
         }
         if (!cameraState.isFreeCameraMode) return;
     }
@@ -2559,10 +2547,6 @@ function onMouseMove(event: MouseEvent) {
             );
             gizmo.target.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
             gizmo.target.rotation.azimuth = newAzimuthDeg;
-            if (gizmo.target.rings) {
-                gizmo.target.rings.position.copy(gizmo.target.mesh.position);
-                gizmo.target.rings.quaternion.copy(gizmo.target.mesh.quaternion);
-            }
         }
         if (!cameraState.isFreeCameraMode) return;
     }
@@ -2597,10 +2581,6 @@ function onMouseMove(event: MouseEvent) {
         // Camera follow during drag causes unstable interaction / odd body motion.
         // The camera can still be moved manually by the user (RMB / zoom / etc).
 
-        // Sync visuals
-        if (gizmo.target instanceof CelestialBody && gizmo.target.rings) {
-            gizmo.target.rings.position.copy(gizmo.target.mesh.position);
-        }
         // Don't return here - let mouse look still work if in free camera mode
         if (!cameraState.isFreeCameraMode) return;
     }
@@ -4211,10 +4191,6 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         );
         const azQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), azRad);
         body.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
-        if (body.rings) {
-            body.rings.position.copy(body.mesh.position);
-            body.rings.quaternion.copy(body.mesh.quaternion);
-        }
         if (body === selectedBody && cameraState.isTargetMode) gizmo.attach(body);
     }
 }

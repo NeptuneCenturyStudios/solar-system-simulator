@@ -55,7 +55,6 @@ export class Wormhole extends StaticBody {
                 id: id,
                 name: name,
                 maxTrail: 0, // maxTrail — a stationary gate has no orbit trail
-                hasRings: false,
                 rotation: rotation,
                 mesh: mesh,
             },

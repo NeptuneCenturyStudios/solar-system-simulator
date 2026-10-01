@@ -20,6 +20,7 @@ import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
 import { loadSrgbTexture } from '../drawing/textures.js';
+import { SATURN_RING_SPEC } from '../procedural/ring-presets.js';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -65,7 +66,7 @@ export class Saturn extends Planet {
             bodySubtype: PlanetTypeEnum.GasGiant,
             trailColor: 0xffeebb,
             maxTrail: 12000,
-            hasRings: true,
+            rings: SATURN_RING_SPEC,
             rotation: { tilt: SATURN_AXIS, speed: rotSpeed, azimuth: SATURN_AZIMUTH },
             mesh: mesh,
             atmosphere: {

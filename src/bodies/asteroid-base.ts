@@ -70,7 +70,6 @@ export abstract class AsteroidBase extends CelestialBody {
                 name: options.name ?? 'Asteroid',
                 // Caller-supplied colour wins; otherwise the variant's own tint.
                 trailColor: options.trailColor ?? config.trailColor,
-                hasRings: false,
                 maxTrail: options.maxTrail,
                 rotation: options.rotation,
                 mesh: placeholderMesh,

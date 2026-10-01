@@ -148,7 +148,6 @@ export class Star extends CelestialBody {
                 name: options.name,
                 trailColor: 0xffffff,
                 maxTrail: 500,
-                hasRings: false,
                 rotation: options.rotation,
                 mesh: options.mesh,
                 magneticField: options.magneticField,

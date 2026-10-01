@@ -52,7 +52,6 @@ export abstract class Comet extends CelestialBody {
                 name: options.name,
                 trailColor: options.trailColor ?? 0xaaaaaa,
                 maxTrail: options.maxTrail ?? 2000,
-                hasRings: false,
                 rotation: options.rotation,
                 mesh: options.mesh,
                 attributes: options.attributes,
