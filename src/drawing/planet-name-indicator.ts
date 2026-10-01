@@ -396,7 +396,7 @@ export class PlanetNameIndicator {
 
             const p = this.probe;
             if (!projector.project(body, p)) continue;
-            if (p.nz >= 1) continue; // behind camera
+            if (p.nz >= 1) continue; // behind camera or beyond the render distance (not drawn)
 
             const apparentR = projector.apparentRadius(
                 body.radius,

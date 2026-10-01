@@ -133,7 +133,7 @@ export class TargetLockIndicator {
         opacity: number
     ): void {
         const p = this.projection;
-        projector.clampToEdge(p.nx, p.ny, p.nz, EDGE_MARGIN_PX, this.edge);
+        projector.clampToEdge(p.nx, p.ny, p.behind, EDGE_MARGIN_PX, this.edge);
 
         const angle = this.edge.rotation;
         const dirX = Math.cos(angle);

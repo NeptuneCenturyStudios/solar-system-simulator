@@ -92,6 +92,16 @@ export const URANUS_DIST = 2870990000 / DIST_SCALE;
 export const NEPTUNE_DIST = 4498400000 / DIST_SCALE;
 export const PLUTO_DIST = 5906380000 / DIST_SCALE;
 
+/** One astronomical unit in simulation units (same scaling as every other distance). */
+export const AU = EARTH_DIST;
+
+// === Render Distance (Options → Graphics) ===
+// The camera far plane, expressed in AU. The default reaches Saturn from Earth (max separation
+// ~11.1 AU) but not Uranus (min ~17 AU), so outer planets and the Kuiper belt are culled.
+export const RENDER_DISTANCE_MIN_AU = 0.1;
+export const RENDER_DISTANCE_MAX_AU = 100;
+export const RENDER_DISTANCE_DEFAULT_AU = 12;
+
 // === Pluto: Orbital Elements (J2000) ===
 // Pluto's orbit is the most eccentric and most inclined of the major bodies, so it is modelled
 // from real orbital elements rather than the flat circular orbit used for the other planets.

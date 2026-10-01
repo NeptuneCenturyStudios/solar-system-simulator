@@ -236,7 +236,7 @@ export class AutopilotTargetIndicator {
         const sprite = this.edgeSprite!;
         const p = this.projection;
 
-        projector.clampToEdge(p.nx, p.ny, p.nz, EDGE_MARGIN_PX, this.edge);
+        projector.clampToEdge(p.nx, p.ny, p.behind, EDGE_MARGIN_PX, this.edge);
 
         sprite.setScreenPos(this.edge.uiX, this.edge.uiY);
         sprite.rotation = this.edge.rotation;

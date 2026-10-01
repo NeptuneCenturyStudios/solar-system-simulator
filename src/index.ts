@@ -73,6 +73,7 @@ import {
     SMOOTH_ZOOM_DECAY_RATE,
     SMOOTH_ZOOM_DIST_EPSILON,
     SMOOTH_ZOOM_FREE_CAM_STOP_MULT,
+    AU,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -187,7 +188,7 @@ import {
     setSystemReady,
 } from './vue/ui-store';
 import { environmentState } from './simulation/environment-state';
-import { SettingKey, settingsStore } from './settings/settings-store';
+import { clampRenderDistanceAU, SettingKey, settingsStore } from './settings/settings-store';
 import {
     getStartupGMultiplier,
     hideStartupModal,
@@ -244,15 +245,23 @@ const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 scene.add(ambientLight);
 
 // --- Camera and renderer setup ---
-const CAMERA_FAR_PLANE = PLUTO_DIST + 300_000_000 / DIST_SCALE + 10_000_000_000 / DIST_SCALE;
+// Farthest the camera may ever sit from its pivot. This is a fixed limit; the camera's actual far
+// plane is the user's Render Distance setting, so zoom limits do not move with the slider.
+const MAX_VIEW_DISTANCE = PLUTO_DIST + 300_000_000 / DIST_SCALE + 10_000_000_000 / DIST_SCALE;
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
     0.00001,
-    CAMERA_FAR_PLANE
+    clampRenderDistanceAU(settingsStore.settings.renderDistanceAU) * AU
 );
-const MAX_ZOOM_OUT_DISTANCE = camera.far * 0.8;
-const MAX_CAMERA_VIEW_DISTANCE = camera.far * 0.98;
+const MAX_ZOOM_OUT_DISTANCE = MAX_VIEW_DISTANCE * 0.8;
+const MAX_CAMERA_VIEW_DISTANCE = MAX_VIEW_DISTANCE * 0.98;
+
+/** Set the camera far plane from a render distance in AU. Anything beyond it is culled. */
+function applyRenderDistance(au: number): void {
+    camera.far = clampRenderDistanceAU(au) * AU;
+    camera.updateProjectionMatrix();
+}
 const INITIAL_CAMERA_DISTANCE = SUN_RADIUS * 8;
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); // Better depth precision at extreme scales
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -3036,6 +3045,11 @@ registerVueSimHooks({
     },
     setSmoothZoomEnabled: (checked: boolean) => {
         settingsStore.update(SettingKey.SmoothZoomEnabled, checked);
+    },
+    setRenderDistance: (au: number) => {
+        const clamped = clampRenderDistanceAU(au);
+        settingsStore.update(SettingKey.RenderDistanceAU, clamped);
+        applyRenderDistance(clamped);
     },
     setHidePanelManagerInFlight: (checked: boolean) => {
         settingsStore.update(SettingKey.HidePanelManagerInFlight, checked);

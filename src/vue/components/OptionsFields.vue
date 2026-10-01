@@ -60,6 +60,35 @@
             />
         </div>
 
+        <div class="control-group">
+            <label>
+                Render Distance
+                <span class="val-display">{{ renderDistanceLabel }}</span>
+            </label>
+            <div class="slider-row">
+                <input
+                    type="range"
+                    :min="0"
+                    :max="RENDER_DISTANCE_SLIDER_STEPS"
+                    step="1"
+                    :value="renderDistanceSliderPos"
+                    title="How far from the camera objects are drawn, in astronomical units (AU). Lower values improve performance by culling distant planets and belts."
+                    @input="onRenderDistanceInput"
+                />
+                <button
+                    class="old-ui btn-slider-reset"
+                    :title="`Reset to default (${RENDER_DISTANCE_DEFAULT_AU} AU)`"
+                    @click="resetRenderDistance"
+                >
+                    <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
+                </button>
+            </div>
+            <p class="solver-hint">
+                Objects farther than this from the camera are not drawn. The default shows out to
+                Saturn from Earth.
+            </p>
+        </div>
+
         <div class="vue-ui-card-header">Camera</div>
         <label class="checkbox-row">
             <input
@@ -201,6 +230,7 @@ import {
     setMusicVolume,
     setParticleEffectsEnabled,
     setPhysicsSolver,
+    setRenderDistance,
     setSfxVolume,
     setShowAiDebug,
     setSmoothZoomEnabled,
@@ -208,6 +238,11 @@ import {
     simStore,
 } from '../sim-bridge';
 import type { AuroraDetailMode, PhysicsSolverMode } from '../../settings/settings-store';
+import {
+    RENDER_DISTANCE_DEFAULT_AU,
+    RENDER_DISTANCE_MAX_AU,
+    RENDER_DISTANCE_MIN_AU,
+} from '../../utilities/consts';
 import SvgIcon from '@jamescoyle/vue-icon';
 import { mdiReplay } from '@mdi/js';
 
@@ -254,6 +289,39 @@ function onAuroraDetailChange(e: Event): void {
 
 function onShowAiDebugChange(e: Event): void {
     setShowAiDebug((e.target as HTMLInputElement).checked);
+}
+
+/**
+ * The render distance spans three decades (0.1–100 AU) and the useful values sit at the low end,
+ * so the slider is logarithmic: position 0 = min, position STEPS = max.
+ */
+const RENDER_DISTANCE_SLIDER_STEPS = 1000;
+const RENDER_DISTANCE_RATIO = RENDER_DISTANCE_MAX_AU / RENDER_DISTANCE_MIN_AU;
+
+const renderDistanceSliderPos = computed(() =>
+    Math.round(
+        (Math.log(simStore.renderDistanceAU / RENDER_DISTANCE_MIN_AU) /
+            Math.log(RENDER_DISTANCE_RATIO)) *
+            RENDER_DISTANCE_SLIDER_STEPS
+    )
+);
+
+const renderDistanceLabel = computed(() => {
+    const au = simStore.renderDistanceAU;
+    return `${au < 10 ? au.toFixed(2) : au.toFixed(1)} AU`;
+});
+
+function onRenderDistanceInput(e: Event): void {
+    const pos = parseInt((e.target as HTMLInputElement).value, 10);
+    const au =
+        RENDER_DISTANCE_MIN_AU * RENDER_DISTANCE_RATIO ** (pos / RENDER_DISTANCE_SLIDER_STEPS);
+    // Rounded only to keep the stored value tidy; coarser rounding would make the thumb snap
+    // visibly at the low end, where one slider step is well under 0.01 AU.
+    setRenderDistance(Math.round(au * 10_000) / 10_000);
+}
+
+function resetRenderDistance(): void {
+    setRenderDistance(RENDER_DISTANCE_DEFAULT_AU);
 }
 
 function onSmoothZoomChange(e: Event): void {

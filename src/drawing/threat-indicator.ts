@@ -104,7 +104,7 @@ export class ThreatIndicator {
             offSlot.body = slot.body;
             offSlot.nx = slot.nx;
             offSlot.ny = slot.ny;
-            offSlot.nz = slot.nz;
+            offSlot.behind = slot.behind;
         }
 
         const chevrons = this.offScreenPool.acquire(this.offScreen.length);
@@ -114,7 +114,7 @@ export class ThreatIndicator {
             const p = this.offScreen.at(i);
             const sprite = chevrons[i];
 
-            projector.clampToEdge(p.nx, p.ny, p.nz, EDGE_MARGIN_PX, this.edge);
+            projector.clampToEdge(p.nx, p.ny, p.behind, EDGE_MARGIN_PX, this.edge);
             sprite.setScreenPos(this.edge.uiX, this.edge.uiY);
             sprite.rotation = this.edge.rotation;
             sprite.visible = true;

@@ -20,6 +20,7 @@ import { scenarioManager } from '../scenarios/scenario-manager';
 import { environmentState } from '../simulation/environment-state';
 import {
     AuroraDetailMode,
+    clampRenderDistanceAU,
     PhysicsSolverMode,
     SettingKey,
     settingsStore,
@@ -278,6 +279,8 @@ export interface VueSimHooks {
     setShowAiDebug?: (checked: boolean) => void;
     /** Toggle eased/smooth camera zoom vs. instant (persisted via settingsStore). */
     setSmoothZoomEnabled?: (checked: boolean) => void;
+    /** Set the render distance (camera far plane) in AU (persisted via settingsStore). */
+    setRenderDistance?: (au: number) => void;
     /** Toggle hiding the PanelManager while in flight mode (persisted via settingsStore). */
     setHidePanelManagerInFlight?: (checked: boolean) => void;
     /** Toggle S-key chase mode when a target is locked (persisted via settingsStore). */
@@ -368,6 +371,8 @@ export interface VueSimStore {
     showAiDebug: boolean;
     /** Ease camera zoom instead of snapping instantly. */
     smoothZoomEnabled: boolean;
+    /** Render distance (camera far plane) in AU; bodies farther from the camera are not drawn. */
+    renderDistanceAU: number;
     /** Hide the PanelManager while in flight mode, restoring it on exit. */
     hidePanelManagerInFlight: boolean;
     /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
@@ -424,6 +429,7 @@ const state = reactive<VueSimStore>({
     frameRateLimit: settingsStore.settings.frameRateLimit,
     showAiDebug: settingsStore.settings.showAiDebug,
     smoothZoomEnabled: settingsStore.settings.smoothZoomEnabled,
+    renderDistanceAU: settingsStore.settings.renderDistanceAU,
     hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
     chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
     autopilotTargetId: null as string | null,
@@ -965,6 +971,20 @@ export function setSmoothZoomEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.SmoothZoomEnabled, checked);
     }
     state.smoothZoomEnabled = checked;
+}
+
+/**
+ * Set the render distance (camera far plane) in AU (Options panel). Takes effect immediately.
+ * The value is clamped to the supported range, and the store mirrors the clamped value.
+ */
+export function setRenderDistance(au: number): void {
+    const clamped = clampRenderDistanceAU(au);
+    if (hookRegistry.setRenderDistance) {
+        hookRegistry.setRenderDistance(clamped);
+    } else {
+        settingsStore.update(SettingKey.RenderDistanceAU, clamped);
+    }
+    state.renderDistanceAU = clamped;
 }
 
 /** Toggle hiding the PanelManager while in flight mode (Flight Controls panel). */

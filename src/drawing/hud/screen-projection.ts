@@ -19,7 +19,12 @@ export interface ScreenProjection {
     uiY: number;
     /** Distance from the camera to the body, in world units. */
     camDist: number;
-    /** True when the body is in front of the camera and inside the NDC box. */
+    /**
+     * True when the body is behind the camera plane. Distinct from `nz >= 1`, which is also true
+     * for a body in front of the camera but beyond the far plane (the Render Distance setting).
+     */
+    behind: boolean;
+    /** True when the body is inside the view frustum: in front of the camera, within the far plane, inside the NDC box. */
     onScreen: boolean;
 }
 
@@ -79,7 +84,11 @@ export class ScreenProjector {
         if (!body || body._isDisposed || !body.mesh) return false;
 
         body.mesh.getWorldPosition(this.scratch);
-        this.scratch.project(camera);
+        // Same two transforms as Vector3.project, split so the camera-space z is visible: the
+        // camera looks down -Z, so z > 0 means the body is behind it.
+        this.scratch.applyMatrix4(camera.matrixWorldInverse);
+        const behind = this.scratch.z > 0;
+        this.scratch.applyMatrix4(camera.projectionMatrix);
 
         const nx = this.scratch.x;
         const ny = this.scratch.y;
@@ -92,6 +101,7 @@ export class ScreenProjector {
         out.uiX = nx * this.halfW;
         out.uiY = ny * this.halfH;
         out.camDist = camera.position.distanceTo(body.mesh.position);
+        out.behind = behind;
         out.onScreen = nz < 1 && Math.abs(nx) <= 1 && Math.abs(ny) <= 1;
 
         return true;
@@ -106,17 +116,20 @@ export class ScreenProjector {
     }
 
     /**
-     * Place an edge marker for a body that is off screen or behind the camera, filling `out`.
+     * Place an edge marker for a body that is off screen, behind the camera, or beyond the far
+     * plane, filling `out`.
      *
      * A body behind the camera projects to a mirrored NDC position, so its direction is
      * negated before clamping — otherwise the chevron points the wrong way as the target
-     * passes out of view.
+     * passes out of view. A body merely beyond the far plane is not mirrored, so it must not
+     * be negated: pass `ScreenProjection.behind`, not a test on `nz`.
      *
+     * @param behind    Whether the body is behind the camera plane.
      * @param marginPx  Pixels of clearance kept between the marker and the viewport edge.
      */
-    clampToEdge(nx: number, ny: number, nz: number, marginPx: number, out: EdgeMarker): void {
-        let dx = nz >= 1 ? -nx : nx;
-        const dy = nz >= 1 ? -ny : ny;
+    clampToEdge(nx: number, ny: number, behind: boolean, marginPx: number, out: EdgeMarker): void {
+        let dx = behind ? -nx : nx;
+        const dy = behind ? -ny : ny;
         if (dx === 0 && dy === 0) dx = 1;
 
         const maxX = 1 - marginPx / this.halfW;
@@ -140,6 +153,7 @@ export function createScreenProjection(): ScreenProjection {
         uiX: 0,
         uiY: 0,
         camDist: 0,
+        behind: false,
         onScreen: false,
     };
 }

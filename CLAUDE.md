@@ -138,7 +138,7 @@ For previous milestone info, see milestones.md
 - ** Phase 3
 - [x] Phase 3.1: Convert Kuiper belt into a solar system "feature" instead of being a static object in all systems. (Also ground work for future solar system features and procedurally generated features). Also allow farther zoom out than it currently so full kuiper belt can be viewed.
 - [x] Phase 3.2: Procedural ring systems for planets (`procedural/ring-generator.ts` rolls an `IRingSpec`; `effects/planet-rings.ts` renders it as a lit, planet-shadowed banded annulus attached to the body mesh; real giants use `procedural/ring-presets.ts`)
-- [ ] Phase 3.3: Graphics option for render distance to help with performance.
+- [x] Phase 3.3: Graphics option for render distance to help with performance. (Options → Graphics slider, 0.1–100 AU on a log scale, default 12 AU; sets `camera.far` via `applyRenderDistance` in `index.ts`, persisted as `renderDistanceAU`. Zoom limits use the fixed `MAX_VIEW_DISTANCE`, not the slider. `ScreenProjection.behind` separates "behind camera" from "beyond far plane" for the edge markers.)
 - ** Phase 4
 - [ ] Phase 4.1: Improve gizmo. It currently doesn't scale to body size well and is still a pain to use.
 - [ ] Phase 4.2: Improve orbital data for all other planets. Pluto and Nepture already done.

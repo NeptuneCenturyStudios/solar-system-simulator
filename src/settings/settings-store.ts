@@ -1,4 +1,10 @@
 // settingsStore.ts
+import {
+    RENDER_DISTANCE_DEFAULT_AU,
+    RENDER_DISTANCE_MAX_AU,
+    RENDER_DISTANCE_MIN_AU,
+} from '../utilities/consts';
+
 const STORAGE_KEY = 'spaceSimSettings';
 
 export const enum SettingKey {
@@ -16,6 +22,7 @@ export const enum SettingKey {
     SmoothZoomEnabled = 'smoothZoomEnabled',
     HidePanelManagerInFlight = 'hidePanelManagerInFlight',
     ChaseModeEnabled = 'chaseModeEnabled',
+    RenderDistanceAU = 'renderDistanceAU',
 }
 
 /**
@@ -68,6 +75,8 @@ export interface SpaceSimSettings {
     hidePanelManagerInFlight: boolean;
     /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
     chaseModeEnabled: boolean;
+    /** Camera far plane in AU. Anything farther from the camera than this is not drawn. */
+    renderDistanceAU: number;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -91,7 +100,14 @@ const defaultSettings: SpaceSimSettings = {
     // just entered the cockpit to look at.
     hidePanelManagerInFlight: true,
     chaseModeEnabled: true,
+    renderDistanceAU: RENDER_DISTANCE_DEFAULT_AU,
 };
+
+/** Clamp a render distance to the supported range, falling back to the default for non-finite input. */
+export function clampRenderDistanceAU(au: number): number {
+    if (!Number.isFinite(au)) return RENDER_DISTANCE_DEFAULT_AU;
+    return Math.min(Math.max(au, RENDER_DISTANCE_MIN_AU), RENDER_DISTANCE_MAX_AU);
+}
 
 class SettingsStore {
     private data: SpaceSimSettings;
@@ -99,6 +115,8 @@ class SettingsStore {
     constructor() {
         const raw = localStorage.getItem(STORAGE_KEY);
         this.data = raw ? { ...defaultSettings, ...JSON.parse(raw) } : { ...defaultSettings };
+        // A hand-edited or stale save must not be able to put the far plane out of range.
+        this.data.renderDistanceAU = clampRenderDistanceAU(this.data.renderDistanceAU);
     }
 
     get settings(): SpaceSimSettings {
