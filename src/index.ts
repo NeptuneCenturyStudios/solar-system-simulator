@@ -674,6 +674,8 @@ function resolveParentBody(object: THREE.Object3D): Body | null {
 
 let selectedBody: Body | null = null; // Track selected body for stats/management panel
 const gizmo = new CoordinateGizmo(scene); // Single global gizmo instance
+// Give the gizmo the camera so it can size itself to a sane on-screen fraction every frame.
+gizmo.setCamera(camera);
 
 // Grid helper and position indicator managers (depend on scene + gizmo being ready)
 const gridHelperManager = new GridHelperManager(scene);
@@ -1990,6 +1992,10 @@ function onMouseDown(event: MouseEvent) {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
+
+    // Scale the line-pick tolerance to the gizmo so its thin shafts stay grabbable at every
+    // zoom (the default 1-unit threshold is wildly wrong for both tiny and huge gizmos).
+    raycaster.params.Line.threshold = gizmo.getPickTolerance();
 
     // Check for velocity gizmo
     const velIntersects = gizmo.velocityArrow

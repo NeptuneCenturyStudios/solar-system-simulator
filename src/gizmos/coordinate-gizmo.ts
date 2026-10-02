@@ -1,7 +1,43 @@
 import * as THREE from 'three';
-import { GIZMO_TUNING, GRAV_ARROW_SCALE } from '../utilities/consts.js';
+import {
+    GIZMO_TUNING,
+    GRAV_ARROW_SCALE,
+    GRAV_ARROW_MAX_GIZMO_MULTIPLE,
+} from '../utilities/consts.js';
 import { Body } from '../bodies/body.js';
-import { buildBodySphereGeometry } from '../utilities/utilities.js';
+
+// ── Base (scale-1) dimensions ─────────────────────────────────────────────────
+// Every dimension below is expressed for a gizmo scale factor of 1 and multiplied by the
+// per-frame scale factor when the gizmo is applied, so one master number keeps the whole
+// gizmo (arrows, heads, rings, knobs) in proportion.
+/** Axis-arrow length at scale 1. */
+const BASE_ARROW_LENGTH = 60;
+/** Axis-arrow head length at scale 1. */
+const BASE_HEAD_LENGTH = 15;
+/** Axis-arrow head width at scale 1. */
+const BASE_HEAD_WIDTH = 10;
+/** Gravity-arrow head length at scale 1. */
+const GRAVITY_HEAD_LENGTH = 12;
+/** Gravity-arrow head width at scale 1. */
+const GRAVITY_HEAD_WIDTH = 6;
+/** Tilt-ring radius at scale 1 (lies in the YZ plane). */
+const TILT_RING_BASE_RADIUS = 80;
+/** Azimuth-ring radius at scale 1 (lies in the XZ plane). */
+const AZIMUTH_RING_BASE_RADIUS = 70;
+/** Ring tube radius as a fraction of the ring radius; kept small so the ring reads as a wire. */
+const RING_TUBE_FRACTION = 0.022;
+/** Knob radius as a fraction of the ring radius (3.5× the tube radius keeps knobs proud of the ring). */
+const KNOB_RADIUS_FRACTION = RING_TUBE_FRACTION * 3.5;
+/**
+ * Velocity/gravity arrow heads are sized as a fraction of the arrow's own length (not of the
+ * gizmo scale) so the shaft always reads as an arrow no matter how long or short the vector is.
+ */
+const VECTOR_HEAD_LENGTH_FRACTION = 0.18;
+const VECTOR_HEAD_WIDTH_FRACTION = 0.1;
+/** Minimum body radius used when a body reports radius 0, so the body term never collapses to 0. */
+const MIN_BODY_RADIUS = 1e-6;
+/** Gravity-arrow minimum length, as a multiple of the body radius (keeps it clear of the body). */
+const GRAVITY_MIN_RADIUS_MULTIPLE = 2.0;
 
 export class CoordinateGizmo {
     group: THREE.Group;
@@ -9,10 +45,6 @@ export class CoordinateGizmo {
     velocityArrow: THREE.ArrowHelper;
     gravityArrow: THREE.ArrowHelper;
     target: Body | null; // The body this gizmo is attached to
-    velocityHeadLength: number;
-    velocityHeadWidth: number;
-    gravityHeadLength: number;
-    gravityHeadWidth: number;
     tiltRing: THREE.Mesh;
     tiltKnob: THREE.Mesh;
     azimuthRing: THREE.Mesh;
@@ -22,6 +54,11 @@ export class CoordinateGizmo {
     /** Scaled main radius of the azimuth ring; used to position azimuthKnob in update(). */
     _azimuthRingRadius: number;
 
+    /** Camera used to size the gizmo to a sane on-screen fraction; set once by the host app. */
+    private _camera: THREE.PerspectiveCamera | null = null;
+    /** Master scale factor last applied (arrow length = BASE_ARROW_LENGTH × this). */
+    private _scaleFactor = 1;
+
     constructor(scene: THREE.Scene) {
         this.group = new THREE.Group();
         this.arrows = [];
@@ -29,7 +66,7 @@ export class CoordinateGizmo {
         this.target = null;
         scene.add(this.group);
 
-        // Arrow configuration: [direction vector, color, axis name]
+        // Axis-arrow configuration: [direction vector, color, axis name]
         const arrowConfigs = [
             { dir: new THREE.Vector3(1, 0, 0), col: 0xff0000, axis: 'x' }, // +X
             { dir: new THREE.Vector3(-1, 0, 0), col: 0xff0000, axis: 'x' }, // -X
@@ -40,22 +77,14 @@ export class CoordinateGizmo {
         ];
 
         arrowConfigs.forEach((config) => {
-            const arrowLength = 60;
-            const headLength = 15;
-            const headWidth = 10;
-
             const arrow = new THREE.ArrowHelper(
                 config.dir,
                 new THREE.Vector3(0, 0, 0),
-                arrowLength,
+                BASE_ARROW_LENGTH,
                 config.col,
-                headLength,
-                headWidth
+                BASE_HEAD_LENGTH,
+                BASE_HEAD_WIDTH
             );
-
-            // Make the "grab" area easier to hit
-            arrow.line.scale.set(3, 1, 3); // Thicker lines for raycasting
-            arrow.cone.scale.set(2, 2, 2); // Larger heads for raycasting
 
             arrow.line.userData = { isGizmo: true, axis: config.axis, dir: config.dir };
             arrow.cone.userData = { isGizmo: true, axis: config.axis, dir: config.dir };
@@ -64,18 +93,13 @@ export class CoordinateGizmo {
         });
 
         // Velocity arrow (part of the gizmo group so selection visibility is unified)
-        this.velocityHeadLength = 15;
-        this.velocityHeadWidth = 8;
-        this.gravityHeadLength = 12;
-        this.gravityHeadWidth = 6;
-
         this.velocityArrow = new THREE.ArrowHelper(
             new THREE.Vector3(1, 0, 0),
             new THREE.Vector3(0, 0, 0),
             1,
             0xffff00,
-            this.velocityHeadLength,
-            this.velocityHeadWidth
+            VECTOR_HEAD_LENGTH_FRACTION,
+            VECTOR_HEAD_WIDTH_FRACTION
         );
         this.velocityArrow.visible = false;
         this.velocityArrow.line.userData = { isVelocityGizmo: true };
@@ -89,8 +113,8 @@ export class CoordinateGizmo {
             new THREE.Vector3(0, 0, 0),
             1,
             0xaaaaaa,
-            this.gravityHeadLength,
-            this.gravityHeadWidth
+            GRAVITY_HEAD_LENGTH,
+            GRAVITY_HEAD_WIDTH
         );
         this.gravityArrow.visible = false;
         this.gravityArrow.line.userData = { isGravityGizmo: true };
@@ -98,8 +122,10 @@ export class CoordinateGizmo {
         this.group.add(this.gravityArrow);
 
         // --- Gimbal rings ---
-        // Tilt ring — lies in the YZ plane (normal = X-axis). Thin tube for clean look.
-        // Dragging maps the mouse ray onto the YZ plane; atan2(z, y) = axial tilt.
+        // Built once as unit geometry and resized with mesh.scale, so the per-frame rescale is
+        // free (rebuilding TorusGeometry every frame would churn GPU buffers continuously).
+        // Tilt ring — lies in the YZ plane (normal = X-axis). Dragging maps the mouse ray onto
+        // the YZ plane; atan2(z, y) = axial tilt.
         const tiltRingMat = new THREE.MeshPhongMaterial({
             color: 0xff8800,
             emissive: new THREE.Color(0xff8800).multiplyScalar(0.25),
@@ -107,7 +133,10 @@ export class CoordinateGizmo {
             shininess: 80,
             side: THREE.FrontSide,
         });
-        this.tiltRing = new THREE.Mesh(new THREE.TorusGeometry(80, 1.5, 16, 48), tiltRingMat);
+        this.tiltRing = new THREE.Mesh(
+            new THREE.TorusGeometry(1, RING_TUBE_FRACTION, 16, 64),
+            tiltRingMat
+        );
         this.tiltRing.rotation.y = Math.PI / 2; // default XY → YZ plane
         this.tiltRing.userData = { isTiltGizmo: true };
         this.tiltRing.renderOrder = 0;
@@ -116,7 +145,7 @@ export class CoordinateGizmo {
 
         // Tilt knob — small sphere marking the current tilt angle on the ring.
         this.tiltKnob = new THREE.Mesh(
-            buildBodySphereGeometry(6, 16, 16),
+            new THREE.SphereGeometry(1, 16, 16),
             new THREE.MeshPhongMaterial({
                 color: 0xff8800,
                 emissive: new THREE.Color(0xff8800).multiplyScalar(0.25),
@@ -138,7 +167,10 @@ export class CoordinateGizmo {
             shininess: 80,
             side: THREE.FrontSide,
         });
-        this.azimuthRing = new THREE.Mesh(new THREE.TorusGeometry(70, 1.5, 16, 48), azimuthRingMat);
+        this.azimuthRing = new THREE.Mesh(
+            new THREE.TorusGeometry(1, RING_TUBE_FRACTION, 16, 64),
+            azimuthRingMat
+        );
         this.azimuthRing.rotation.x = Math.PI / 2; // default XY → XZ plane
         this.azimuthRing.userData = { isAzimuthGizmo: true };
         this.azimuthRing.renderOrder = 0;
@@ -147,7 +179,7 @@ export class CoordinateGizmo {
 
         // Azimuth knob — small sphere marking the current azimuth direction on the ring.
         this.azimuthKnob = new THREE.Mesh(
-            buildBodySphereGeometry(6, 16, 16),
+            new THREE.SphereGeometry(1, 16, 16),
             new THREE.MeshPhongMaterial({
                 color: 0x00ccff,
                 emissive: new THREE.Color(0x00ccff).multiplyScalar(0.2),
@@ -160,8 +192,84 @@ export class CoordinateGizmo {
         this.azimuthKnob.visible = false;
         this.group.add(this.azimuthKnob);
 
-        this._tiltRingRadius = 80;
-        this._azimuthRingRadius = 70;
+        this._tiltRingRadius = TILT_RING_BASE_RADIUS;
+        this._azimuthRingRadius = AZIMUTH_RING_BASE_RADIUS;
+    }
+
+    /** Provide the camera so the gizmo can size itself to a sane on-screen fraction each frame. */
+    setCamera(camera: THREE.PerspectiveCamera): void {
+        this._camera = camera;
+    }
+
+    /**
+     * Pick tolerance for the thin axis shafts, in world units. The raycaster's default line
+     * threshold is a fixed 1 world unit, which is far larger than a small body's gizmo (making
+     * every click ambiguous) and far smaller than a large body's (making the shaft nearly
+     * unhittable). Scaling it with the current arrow length gives a roughly constant on-screen
+     * grab tube at every zoom.
+     */
+    getPickTolerance(): number {
+        return Math.max(
+            BASE_ARROW_LENGTH * this._scaleFactor * GIZMO_TUNING.PICK_TOLERANCE_FRACTION,
+            GIZMO_TUNING.PICK_TOLERANCE_FLOOR
+        );
+    }
+
+    /** Height (world units) of the view frustum at the given distance from the camera. */
+    private _viewportWorldHeight(distance: number): number {
+        const cam = this._camera;
+        if (!cam) return 0;
+        const fovRad = THREE.MathUtils.degToRad(cam.fov);
+        return 2 * Math.tan(fovRad / 2) * distance;
+    }
+
+    /**
+     * Master gizmo scale for the current target and camera. Proportional to the body radius so
+     * the gizmo wraps a satellite and a star alike, capped to a fraction of the viewport so it
+     * never runs off-screen when zoomed in close, and floored above the body radius so the
+     * arrows always clear the surface. See GIZMO_TUNING.
+     */
+    computeScaleFactor(): number {
+        const body = this.target;
+        if (!body) return 1;
+
+        const radius = Math.max(body.radius || 0, MIN_BODY_RADIUS);
+        const bodyLen = GIZMO_TUNING.BODY_SCALE * radius;
+        const minLen = GIZMO_TUNING.MIN_PROTRUSION * radius;
+
+        let arrowLen = bodyLen;
+        if (this._camera && body.mesh) {
+            const distance = this._camera.position.distanceTo(body.mesh.position);
+            const viewportHeight = this._viewportWorldHeight(distance);
+            arrowLen = Math.min(arrowLen, GIZMO_TUNING.MAX_SCREEN_FRACTION * viewportHeight);
+        }
+        arrowLen = Math.max(arrowLen, minLen);
+
+        return arrowLen / BASE_ARROW_LENGTH;
+    }
+
+    /** Apply a master scale factor to every gizmo dimension. Cheap; safe to call every frame. */
+    private applyScale(scaleFactor: number): void {
+        this._scaleFactor = scaleFactor;
+
+        const headLength = BASE_HEAD_LENGTH * scaleFactor;
+        const headWidth = BASE_HEAD_WIDTH * scaleFactor;
+        const arrowLength = BASE_ARROW_LENGTH * scaleFactor;
+        this.arrows.forEach((arrow) => arrow.setLength(arrowLength, headLength, headWidth));
+
+        // The gravity arrow's length and head are set every frame in updateGravityArrow (which
+        // always runs before render), so there is nothing to apply for it here.
+
+        if (this.tiltRing.visible) {
+            const tiltRadius = TILT_RING_BASE_RADIUS * scaleFactor;
+            const azRadius = AZIMUTH_RING_BASE_RADIUS * scaleFactor;
+            this.tiltRing.scale.setScalar(tiltRadius);
+            this.azimuthRing.scale.setScalar(azRadius);
+            this.tiltKnob.scale.setScalar(tiltRadius * KNOB_RADIUS_FRACTION);
+            this.azimuthKnob.scale.setScalar(azRadius * KNOB_RADIUS_FRACTION);
+            this._tiltRingRadius = tiltRadius;
+            this._azimuthRingRadius = azRadius;
+        }
     }
 
     attach(body: Body | null) {
@@ -182,71 +290,22 @@ export class CoordinateGizmo {
         this.velocityArrow.visible = true;
         this.gravityArrow.visible = true;
 
-        // Scale arrows based on body size (allow scaling DOWN as well)
-        // Keep a small floor so the gizmo doesn't become impossible to click.
-        const scaleFactor = Math.max(body.radius / 10, 0.25);
-        this.arrows.forEach((arrow) => {
-            arrow.setLength(60 * scaleFactor, 15 * scaleFactor, 10 * scaleFactor);
-        });
-
-        // Scale velocity arrow similarly so it's clickable on small bodies
-        this.velocityHeadLength = 15 * scaleFactor;
-        this.velocityHeadWidth = 8 * scaleFactor;
-        this.velocityArrow.setLength(1, this.velocityHeadLength, this.velocityHeadWidth);
-        this.velocityArrow.line.scale.set(3, 1, 3);
-        this.velocityArrow.cone.scale.set(2, 2, 2);
-
-        // Scale gravity arrow similarly for consistency (not for raycasting, just visuals)
-        this.gravityHeadLength = 12 * scaleFactor;
-        this.gravityHeadWidth = 6 * scaleFactor;
-        this.gravityArrow.setLength(1, this.gravityHeadLength, this.gravityHeadWidth);
-        this.gravityArrow.line.scale.set(3, 1, 3);
-        this.gravityArrow.cone.scale.set(2, 2, 2);
-
         // Tilt ring: only shown for bodies that have axial tilt (CelestialBody subclasses).
         // Duck-type check avoids a circular import (gizmo ← celestial-body ← star ← …).
-        if (
+        const hasRotation =
             'rotation' in body &&
-            (body as { rotation: { tilt: number } }).rotation?.tilt !== undefined
-        ) {
-            this.tiltRing.visible = true;
-            this.tiltKnob.visible = true;
-            this.azimuthRing.visible = true;
-            this.azimuthKnob.visible = true;
-            // Rings scale with the body so they clear its surface.
-            // Knobs use a capped scale so they stay small and don't dominate on large bodies.
-            // Rebuild ring geometry with the correct orbit radius. Tube radius is kept at a
-            // fixed ~2% of the ring radius so the ring always looks like a thin wire at any scale.
-            const tiltRadius = 80 * scaleFactor;
-            const azRadius = 70 * scaleFactor;
-            const TUBE_RADIUS = Math.max(tiltRadius * 0.022, 0.5);
-            const AZ_TUBE_RADIUS = Math.max(azRadius * 0.022, 0.5);
-            this.tiltRing.geometry.dispose();
-            this.tiltRing.geometry = new THREE.TorusGeometry(tiltRadius, TUBE_RADIUS, 16, 64);
-            this.tiltRing.scale.setScalar(1);
-            this.azimuthRing.geometry.dispose();
-            this.azimuthRing.geometry = new THREE.TorusGeometry(azRadius, AZ_TUBE_RADIUS, 16, 64);
-            this.azimuthRing.scale.setScalar(1);
-            // Knobs: sized to sit clearly on the tube surface
-            const KNOB_RADIUS = Math.max(TUBE_RADIUS * 3.5, 0.8);
-            const AZ_KNOB_RADIUS = Math.max(AZ_TUBE_RADIUS * 3.5, 0.8);
-            this.tiltKnob.geometry.dispose();
-            this.tiltKnob.geometry = buildBodySphereGeometry(KNOB_RADIUS, 16, 16);
-            this.tiltKnob.scale.setScalar(1);
-            this.azimuthKnob.geometry.dispose();
-            this.azimuthKnob.geometry = buildBodySphereGeometry(AZ_KNOB_RADIUS, 16, 16);
-            this.azimuthKnob.scale.setScalar(1);
-            this._tiltRingRadius = tiltRadius;
-            this._azimuthRingRadius = azRadius;
-        } else {
-            this.tiltRing.visible = false;
-            this.tiltKnob.visible = false;
-            this.azimuthRing.visible = false;
-            this.azimuthKnob.visible = false;
-        }
+            (body as { rotation: { tilt: number } }).rotation?.tilt !== undefined;
+        this.tiltRing.visible = hasRotation;
+        this.tiltKnob.visible = hasRotation;
+        this.azimuthRing.visible = hasRotation;
+        this.azimuthKnob.visible = hasRotation;
+
+        // Size everything for the current body/camera. update() keeps this current as the
+        // camera zooms, but applying here makes the very first frame correct too.
+        this.applyScale(this.computeScaleFactor());
     }
 
-    updateVelocityArrow() {
+    private updateVelocityArrow() {
         if (!this.velocityArrow || !this.target || this.target._isDisposed) return;
 
         const speed = this.target.velocity.length();
@@ -256,15 +315,18 @@ export class CoordinateGizmo {
         const direction =
             speed > 0 ? this.target.velocity.clone().normalize() : new THREE.Vector3(1, 0, 0);
 
+        // The velocity arrow's length encodes speed (shared with the velocity-drag mapping), but
+        // its head is sized from that length so it always looks like an arrow rather than a
+        // vanishing point (small body) or a stub (huge speed).
+        const length = Math.max(speed * arrowScale, 0.1);
+        const headLength = length * VECTOR_HEAD_LENGTH_FRACTION;
+        const headWidth = length * VECTOR_HEAD_WIDTH_FRACTION;
+
         this.velocityArrow.setDirection(direction);
-        this.velocityArrow.setLength(
-            Math.max(speed * arrowScale, 0.1),
-            this.velocityHeadLength,
-            this.velocityHeadWidth
-        );
+        this.velocityArrow.setLength(length, headLength, headWidth);
     }
 
-    updateGravityArrow() {
+    private updateGravityArrow() {
         if (!this.gravityArrow || !this.target || this.target._isDisposed) return;
 
         const acc = this.target.tempAcc;
@@ -278,20 +340,28 @@ export class CoordinateGizmo {
         // Avoid NaNs on zero acceleration
         const direction = accMag > 0 ? acc.clone().normalize() : new THREE.Vector3(1, 0, 0);
 
-        // Scale for visibility; clamp to avoid extreme spikes when very close to a massive body.
-        const minLen = Math.max((this.target.radius || 0) * 2.0, 0.1); // keep visible even far away; extend beyond body
-        const maxLen = 3000;
+        // Keep it visible even far away and clear of the body, but cap it against the gizmo size
+        // rather than the old fixed 3000-unit world cap (which dwarfed small bodies entirely).
+        const radius = Math.max(this.target.radius || 0, MIN_BODY_RADIUS);
+        const minLen = radius * GRAVITY_MIN_RADIUS_MULTIPLE;
+        const maxLen = BASE_ARROW_LENGTH * this._scaleFactor * GRAV_ARROW_MAX_GIZMO_MULTIPLE;
 
         const len = THREE.MathUtils.clamp(accMag * GRAV_ARROW_SCALE, minLen, maxLen);
 
         this.gravityArrow.visible = true;
         this.gravityArrow.setDirection(direction);
-        this.gravityArrow.setLength(len, this.gravityHeadLength, this.gravityHeadWidth);
+        this.gravityArrow.setLength(
+            len,
+            GRAVITY_HEAD_LENGTH * this._scaleFactor,
+            GRAVITY_HEAD_WIDTH * this._scaleFactor
+        );
     }
 
     update() {
         if (this.group.visible && this.target && !this.target._isDisposed) {
             this.group.position.copy(this.target.mesh.position);
+            // Rescale every frame so the gizmo tracks the camera as the user zooms.
+            this.applyScale(this.computeScaleFactor());
             this.updateVelocityArrow();
             this.updateGravityArrow();
             this.updateGimbalKnobs();

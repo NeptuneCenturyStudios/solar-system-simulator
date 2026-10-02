@@ -352,8 +352,43 @@ export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4;
 export const MAX_NEUTRON_STAR_MASS = SUN_MASS * 3;
 export const MIN_BLACK_HOLE_MASS = SUN_MASS * 3;
 export const BLACK_HOLE_RADIUS_PER_SOL = 2.95 / RADIUS_SCALE; // Base radius for a black hole of mass MIN_BLACK_HOLE_MASS
-export const GIZMO_TUNING = Object.freeze({ VELOCITY_ARROW_SCALE: 50 });
+/**
+ * Coordinate-gizmo scaling. The gizmo must look right on a 0.0005 u probe and on a 7,000 u
+ * star, and stay grabbable at any zoom — one world-space size cannot do all three, so the
+ * gizmo size is recomputed every frame from the body radius AND the camera distance.
+ *
+ *   arrowLen = max(GIZMO_MIN_PROTRUSION * radius,
+ *                  min(GIZMO_BODY_SCALE * radius,
+ *                      GIZMO_MAX_SCREEN_FRACTION * viewportWorldHeight))
+ *
+ * where viewportWorldHeight is the height of the view frustum at the body's depth. The body
+ * term keeps the arrows a fixed multiple of the body (so they wrap a satellite and a star
+ * alike); the screen term stops the arrows running off-screen when you zoom in close to a
+ * large body; the protrusion floor stops them sinking inside the body when you zoom into its
+ * surface. All dimensions (axis arrows, gimbal rings, knobs, arrow heads) scale together.
+ */
+export const GIZMO_TUNING = Object.freeze({
+    /** Base velocity-arrow length per u/s of speed. Shared with the velocity-drag mapping. */
+    VELOCITY_ARROW_SCALE: 50,
+    /** Arrow length as a multiple of body radius when the body is framed normally (was the
+     *  implicit 6x from the old `radius / 10` scale on the 60-unit base arrow). */
+    BODY_SCALE: 6,
+    /** Minimum arrow length as a multiple of body radius, so the arrows always clear the
+     *  surface even when the screen-space cap would otherwise shrink them below the body. */
+    MIN_PROTRUSION: 1.2,
+    /** Maximum arrow length as a fraction of the viewport height at the body's depth, so the
+     *  gizmo can never dominate or run off-screen when the camera is very close. */
+    MAX_SCREEN_FRACTION: 0.45,
+    /** Gizmo shaft pick tolerance as a fraction of the arrow length. The raycaster's default
+     *  1-unit line threshold is meaningless at these scales, so it is set from this. */
+    PICK_TOLERANCE_FRACTION: 0.12,
+    /** Lower bound on the shaft pick tolerance, so a very small gizmo is still clickable. */
+    PICK_TOLERANCE_FLOOR: 0.0005,
+});
 export const GRAV_ARROW_SCALE = 15000;
+/** Gravity-arrow length cap as a multiple of the gizmo arrow length, so the (informational)
+ *  gravity arrow can never dwarf the body the way the old fixed 3000-unit cap did. */
+export const GRAV_ARROW_MAX_GIZMO_MULTIPLE = 6;
 
 // === UI / HUD (canvas + helper geometry) ===
 /** FPS sprite + other HUD assets use tuned scale; keep consistent with index.ts. */
