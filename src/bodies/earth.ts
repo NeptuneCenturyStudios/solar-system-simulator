@@ -16,7 +16,7 @@ import {
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId, isBodyType } from '../utilities/utilities.js';
-import { loadSrgbTexture } from '../drawing/textures.js';
+import { loadLinearTexture, loadSrgbTexture } from '../drawing/textures.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { BodyTypeEnum, PlanetTypeEnum } from './body-enums.js';
@@ -34,9 +34,19 @@ const MAX_STARS = 8;
 
 const earthDayTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_day.jpg');
 const earthNightTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_night.jpg');
+const earthNormalTexture = loadLinearTexture('./assets/textures/bodies/2k/earth_normal_map.png');
+const earthSpecularTexture = loadLinearTexture(
+    './assets/textures/bodies/2k/earth_specular_map.png'
+);
+
+// The specular map marks water (bright) vs land (dark). MeshStandardMaterial has no specular map,
+// so it drives roughness instead: water is glossy, land is matte.
+const LAND_ROUGHNESS = 0.9;
+const OCEAN_ROUGHNESS = 0.25;
 
 type EarthUniforms = {
     nightTexture: { value: THREE.Texture };
+    specularTexture: { value: THREE.Texture };
     starPositions: { value: THREE.Vector3[] };
     numStars: { value: number };
     earthPosition: { value: THREE.Vector3 };
@@ -45,6 +55,8 @@ type EarthUniforms = {
 function buildEarthMaterial(customUniforms: EarthUniforms): THREE.MeshStandardMaterial {
     const material = new THREE.MeshStandardMaterial({
         map: earthDayTexture,
+        normalMap: earthNormalTexture,
+        normalScale: new THREE.Vector2(1, 1),
         color: 0xffffff,
         roughness: 0.7,
         metalness: 0.7,
@@ -76,6 +88,7 @@ vEarthWorldNormal = normalize(mat3(modelMatrix) * objectNormal);`
             `#include <common>
 #define MAX_STARS ${MAX_STARS}
 uniform sampler2D nightTexture;
+uniform sampler2D specularTexture;
 uniform vec3 starPositions[MAX_STARS];
 uniform int  numStars;
 uniform vec3 earthPosition;
@@ -109,6 +122,14 @@ varying vec3 vEarthWorldNormal;`
 
     diffuseColor.rgb *= blended;
 }`
+        );
+
+        // Water (bright in the specular map) gets low roughness, land stays matte.
+        // vMapUv is declared by Three.js under USE_MAP (guaranteed since map is set).
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <roughnessmap_fragment>',
+            `#include <roughnessmap_fragment>
+roughnessFactor = mix(${LAND_ROUGHNESS.toFixed(2)}, ${OCEAN_ROUGHNESS.toFixed(2)}, texture2D(specularTexture, vMapUv).r);`
         );
 
         // Add night-side city-light emission to totalEmissiveRadiance.
@@ -169,6 +190,7 @@ export class Earth extends Planet {
 
         const customUniforms: EarthUniforms = {
             nightTexture: { value: earthNightTexture },
+            specularTexture: { value: earthSpecularTexture },
             starPositions: { value: Array.from({ length: MAX_STARS }, () => new THREE.Vector3()) },
             numStars: { value: 0 },
             earthPosition: { value: new THREE.Vector3() },

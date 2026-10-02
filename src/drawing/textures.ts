@@ -18,6 +18,20 @@ export function loadSrgbTexture(url: string): THREE.Texture {
     return tex;
 }
 
+/**
+ * Loads a data map (normal, specular, etc.) from the given URL in linear color space, so the
+ * values are used as-is instead of being decoded as sRGB color.
+ * @param url - The URL of the texture image.
+ * @returns The loaded texture with no color space conversion.
+ */
+export function loadLinearTexture(url: string): THREE.Texture {
+    const tex = textureLoader.load(url);
+    tex.colorSpace = THREE.NoColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    return tex;
+}
+
 export const moonTexture = loadSrgbTexture('./assets/textures/bodies/2k/moon.jpg');
 export const ioTexture = loadSrgbTexture('./assets/textures/bodies/2k/io.jpg');
 export const europaTexture = loadSrgbTexture('./assets/textures/bodies/2k/europa.jpg');
