@@ -405,12 +405,16 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         ship.controlFrameQuat.copy(ship.mesh.quaternion);
         ship.shipBankRoll = 0;
         ship.shipBankPitch = 0;
+        ship.shipBankYaw = 0;
         ship.steerX = 0;
         ship.steerY = 0;
     }
 
     // ── Steering line (uiScene screen-space) ─────────────────────────────────
-    const noseNDC = ship.mesh.position.clone().addScaledVector(forward, 8).project(ctx.camera);
+    // Project the mesh's nose, not the control frame's: the camera is locked to the
+    // control frame, so only the visual bank offset moves the marker on screen.
+    const noseDir = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.mesh.quaternion);
+    const noseNDC = ship.mesh.position.clone().addScaledVector(noseDir, 8).project(ctx.camera);
     const noseScreenX = noseNDC.x * (window.innerWidth * 0.5);
     const noseScreenY = noseNDC.y * (window.innerHeight * 0.5);
 

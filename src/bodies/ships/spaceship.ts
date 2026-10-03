@@ -129,6 +129,8 @@ export class Spaceship extends Body {
     shipBankRoll: number = 0;
     /** Visual pitch offset relative to camera frame (radians). */
     shipBankPitch: number = 0;
+    /** Visual yaw offset relative to camera frame (radians). */
+    shipBankYaw: number = 0;
     /** Whether Shift was held on the previous frame. */
     prevShiftHeld: boolean = false;
     /** Whether warp intent was held on the previous frame. Drives the rising/falling
@@ -805,9 +807,11 @@ export class Spaceship extends Body {
         const bankAlpha = 1 - Math.exp(-h.flightBankLerpSpeed * dt);
         this.shipBankRoll += (this.steerX * h.flightMaxBankAngle - this.shipBankRoll) * bankAlpha;
         this.shipBankPitch += (this.steerY * h.flightMaxBankPitch - this.shipBankPitch) * bankAlpha;
+        // Same sign as yawDelta, so the nose visibly leads into the turn.
+        this.shipBankYaw += (-this.steerX * h.flightMaxBankYaw - this.shipBankYaw) * bankAlpha;
 
         const bankQuat = new THREE.Quaternion().setFromEuler(
-            new THREE.Euler(this.shipBankPitch, 0, this.shipBankRoll, 'XYZ')
+            new THREE.Euler(this.shipBankPitch, this.shipBankYaw, this.shipBankRoll, 'XYZ')
         );
 
         return { yawDelta, pitchDelta, bankQuat };
@@ -977,6 +981,7 @@ export class Spaceship extends Body {
         this.steerY = 0;
         this.shipBankRoll = 0;
         this.shipBankPitch = 0;
+        this.shipBankYaw = 0;
         this.prevShiftHeld = false;
         this.prevWarpHeld = false;
         this.resetControlInput();

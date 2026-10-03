@@ -805,6 +805,7 @@ export interface ISpaceshipHandling {
     flightBankLerpSpeed: number; // exponential-decay rate for banking animation (per second)
     flightMaxBankAngle: number; // max visual roll angle (rad)
     flightMaxBankPitch: number; // max visual pitch angle (rad)
+    flightMaxBankYaw: number; // max visual yaw angle (rad)
 
     // ── Misc ──────────────────────────────────────────────────────────
     flightWarpChargeTime: number; // seconds to hold Space before warp engages

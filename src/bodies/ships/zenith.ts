@@ -51,6 +51,7 @@ export class Zenith extends Spaceship {
         const FLIGHT_BANK_LERP_SPEED = 13.76;
         const FLIGHT_MAX_BANK_ANGLE = 0.35;
         const FLIGHT_MAX_BANK_PITCH = 0.2;
+        const FLIGHT_MAX_BANK_YAW = 0.2;
         const FLIGHT_WARP_CHARGE_TIME = 2.0;
 
         const fighterHandling: ISpaceshipHandling = {
@@ -89,6 +90,7 @@ export class Zenith extends Spaceship {
             flightBankLerpSpeed: FLIGHT_BANK_LERP_SPEED,
             flightMaxBankAngle: FLIGHT_MAX_BANK_ANGLE,
             flightMaxBankPitch: FLIGHT_MAX_BANK_PITCH,
+            flightMaxBankYaw: FLIGHT_MAX_BANK_YAW,
 
             // Misc
             flightWarpChargeTime: FLIGHT_WARP_CHARGE_TIME,

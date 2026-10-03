@@ -26,7 +26,7 @@ export class OsirisMothership extends Spaceship {
         // adjust how the chase cam frames the destroyer.
         const THIRD_PERSON_OFFSET = new THREE.Vector3(
             0,
-            SPACESHIP_RADIUS * 0.25,
+            SPACESHIP_RADIUS * 0.20,
             -SPACESHIP_RADIUS * 1
         );
 
@@ -53,6 +53,7 @@ export class OsirisMothership extends Spaceship {
         const FLIGHT_BANK_LERP_SPEED = 8.5;
         const FLIGHT_MAX_BANK_ANGLE = 0.12;
         const FLIGHT_MAX_BANK_PITCH = 0.07;
+        const FLIGHT_MAX_BANK_YAW = 0.07;
         const FLIGHT_WARP_CHARGE_TIME = 5.0;
 
         const destroyerHandling: ISpaceshipHandling = {
@@ -91,6 +92,7 @@ export class OsirisMothership extends Spaceship {
             flightBankLerpSpeed: FLIGHT_BANK_LERP_SPEED,
             flightMaxBankAngle: FLIGHT_MAX_BANK_ANGLE,
             flightMaxBankPitch: FLIGHT_MAX_BANK_PITCH,
+            flightMaxBankYaw: FLIGHT_MAX_BANK_YAW,
 
             // Misc
             flightWarpChargeTime: FLIGHT_WARP_CHARGE_TIME,
