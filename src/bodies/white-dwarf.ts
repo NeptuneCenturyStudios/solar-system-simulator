@@ -1,6 +1,6 @@
 import { Star } from './star';
 import { IStateDependencies } from '../interfaces';
-import { loadSrgbTexture } from '../drawing/textures';
+import { getBodyTexture } from '../drawing/texture-registry';
 import { SUN_LIGHT_INTENSITY } from '../utilities/consts';
 import { IRotation } from '../interfaces';
 import * as THREE from 'three';
@@ -36,7 +36,7 @@ export class WhiteDwarf extends Star {
         name: string,
         rotation: IRotation
     ) {
-        const whiteDwarfTexture = loadSrgbTexture('./assets/textures/bodies/2k/white_dwarf.jpg');
+        const whiteDwarfTexture = getBodyTexture('white_dwarf.jpg');
 
         // Mass to radius relationship for white dwarfs (no clamping)
         const radius = massToWhiteDwarfRadius(mass);

@@ -19,7 +19,7 @@ import {
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
-import { loadSrgbTexture } from '../drawing/textures.js';
+import { getBodyTexture } from '../drawing/texture-registry.js';
 import { JUPITER_RING_SPEC } from '../procedural/ring-presets.js';
 import {
     AtmosphericGasEnum,
@@ -44,7 +44,7 @@ export class Jupiter extends Planet {
             JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (9.925 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, JUPITER_DIST, SUN_MASS, angleRad);
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/jupiter.jpg');
+        const texture = getBodyTexture('jupiter.jpg');
         const geometry = buildBodySphereGeometry(JUPITER_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,

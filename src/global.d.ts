@@ -10,6 +10,19 @@ declare module '*.vue' {
 }
 
 /**
+ * High-resolution body-texture manifest, generated at build time by
+ * `vite-plugin-texture-manifest.ts`. Each array holds the body-relative paths
+ * (e.g. `earth_day.jpg`, `procedural/terrestrial-7.jpg`) for which a texture
+ * exists in that quality tier. Consumed by `src/drawing/texture-quality.ts`.
+ */
+declare module 'virtual:texture-quality-manifest' {
+    /** Folder-relative paths present in `assets/textures/bodies/8k`. */
+    export const eightKTextures: string[];
+    /** Folder-relative paths present in `assets/textures/bodies/4k`. */
+    export const fourKTextures: string[];
+}
+
+/**
  * @jamescoyle/vue-icon ships a bare `.vue` file as its entry point with no
  * typings, so the `*.vue` wildcard above doesn't cover the package name.
  */

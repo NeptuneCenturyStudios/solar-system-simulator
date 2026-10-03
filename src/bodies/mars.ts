@@ -11,7 +11,7 @@ import {
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
-import { loadSrgbTexture } from '../drawing/textures.js';
+import { getBodyTexture } from '../drawing/texture-registry.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -40,7 +40,7 @@ export class Mars extends Planet {
             MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (24.623 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, MARS_DIST, SUN_MASS, angleRad);
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/mars.jpg');
+        const texture = getBodyTexture('mars.jpg');
         const geometry = buildBodySphereGeometry(MARS_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,

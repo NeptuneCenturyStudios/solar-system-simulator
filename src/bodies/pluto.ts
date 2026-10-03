@@ -19,7 +19,7 @@ import { stateVectorsFromElements } from '../procedural/orbital-math.js';
 import { IStateDependencies } from '../interfaces.js';
 import { DwarfPlanet } from './dwarf-planet';
 import { PlanetTypeEnum } from './body-enums.js';
-import { loadSrgbTexture } from '../drawing/textures.js';
+import { getBodyTexture } from '../drawing/texture-registry.js';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -67,7 +67,7 @@ export class Pluto extends DwarfPlanet {
             mu: gEff * SUN_MASS,
         });
 
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/pluto.jpg');
+        const texture = getBodyTexture('pluto.jpg');
         const geometry = buildBodySphereGeometry(PLUTO_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,

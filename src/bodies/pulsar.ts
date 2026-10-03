@@ -7,7 +7,7 @@ import {
     IDeathOptions,
     IMagneticFieldOptions,
 } from '../interfaces';
-import { loadSrgbTexture } from '../drawing/textures';
+import { getBodyTexture } from '../drawing/texture-registry';
 import { IRotation } from '../interfaces';
 import { SUN_MASS, EARTH_DIST, DIST_SCALE } from '../utilities/consts';
 import { rollMagneticField, computeMagneticAxis } from '../procedural/magnetic-field';
@@ -88,7 +88,7 @@ export class Pulsar extends Star implements IMassTransferBody {
         progenitorRadius: number,
         progenitorMagneticField: IMagneticFieldOptions | null
     ) {
-        const pulsarTexture = loadSrgbTexture('./assets/textures/bodies/2k/pulsar.jpg');
+        const pulsarTexture = getBodyTexture('pulsar.jpg');
         const pulsarRadius = massToNeutronStarRadius(mass);
 
         // Angular momentum conservation: I * ω = const, I ∝ R²

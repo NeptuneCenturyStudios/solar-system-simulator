@@ -23,7 +23,19 @@ export const enum SettingKey {
     HidePanelManagerInFlight = 'hidePanelManagerInFlight',
     ChaseModeEnabled = 'chaseModeEnabled',
     RenderDistanceAU = 'renderDistanceAU',
+    TextureQuality = 'textureQuality',
 }
+
+/**
+ * Body-texture quality tier.
+ *
+ * - `low`  — the 2k assets, always present. The only tier available in a browser.
+ * - `high` — the best asset available per texture: 8k, else 4k, else 2k. Desktop only.
+ *
+ * Declared here rather than in the drawing layer so the settings store stays
+ * dependency-free, matching `PhysicsSolverMode` and `AuroraDetailMode`.
+ */
+export type TextureQuality = 'low' | 'high';
 
 /**
  * Which gravity solver the n-body engine uses.
@@ -77,6 +89,8 @@ export interface SpaceSimSettings {
     chaseModeEnabled: boolean;
     /** Camera far plane in AU. Anything farther from the camera than this is not drawn. */
     renderDistanceAU: number;
+    /** Body-texture quality tier. `high` is only honoured on desktop (see texture-quality.ts). */
+    textureQuality: TextureQuality;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -101,7 +115,15 @@ const defaultSettings: SpaceSimSettings = {
     hidePanelManagerInFlight: true,
     chaseModeEnabled: true,
     renderDistanceAU: RENDER_DISTANCE_DEFAULT_AU,
+    // Low is the safe default: it is the only tier a browser can use, and installing the
+    // desktop build should not silently jump to multi-megabyte textures nobody asked for.
+    textureQuality: 'low',
 };
+
+/** Normalise a stored texture quality, falling back to `low` for anything unrecognised. */
+export function normalizeTextureQuality(value: unknown): TextureQuality {
+    return value === 'high' ? 'high' : 'low';
+}
 
 /** Clamp a render distance to the supported range, falling back to the default for non-finite input. */
 export function clampRenderDistanceAU(au: number): number {
@@ -117,6 +139,7 @@ class SettingsStore {
         this.data = raw ? { ...defaultSettings, ...JSON.parse(raw) } : { ...defaultSettings };
         // A hand-edited or stale save must not be able to put the far plane out of range.
         this.data.renderDistanceAU = clampRenderDistanceAU(this.data.renderDistanceAU);
+        this.data.textureQuality = normalizeTextureQuality(this.data.textureQuality);
     }
 
     get settings(): SpaceSimSettings {

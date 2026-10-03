@@ -102,6 +102,7 @@ import {
     getMetalnessForMoonTexture,
     moonTexture,
 } from './drawing/textures';
+import { reloadBodyTextures } from './drawing/texture-registry';
 import { Supernova } from './effects/supernova';
 import type { SolarSystemFeature } from './features/solar-system-feature';
 import { PlanetaryNebula } from './effects/planetary-nebula';
@@ -3065,6 +3066,11 @@ registerVueSimHooks({
     },
     setChaseModeEnabled: (checked: boolean) => {
         settingsStore.update(SettingKey.ChaseModeEnabled, checked);
+    },
+    setTextureQuality: (mode) => {
+        settingsStore.update(SettingKey.TextureQuality, mode);
+        // Live update: re-fetch every managed body texture at the new quality, in place.
+        void reloadBodyTextures();
     },
     setShowAiDebug: (checked: boolean) => {
         settingsStore.update(SettingKey.ShowAiDebug, checked);

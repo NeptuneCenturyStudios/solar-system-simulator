@@ -19,7 +19,7 @@ import {
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
-import { loadSrgbTexture } from '../drawing/textures.js';
+import { getBodyTexture } from '../drawing/texture-registry.js';
 import { SATURN_RING_SPEC } from '../procedural/ring-presets.js';
 import {
     AtmosphericGasEnum,
@@ -44,7 +44,7 @@ export class Saturn extends Planet {
             SATURN_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(SATURN_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (10.656 * 3600)) * timeScale;
         const trajectory = calculateTrajectory(gEff, SATURN_DIST, SUN_MASS, angleRad);
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/saturn.jpg');
+        const texture = getBodyTexture('saturn.jpg');
         const geometry = buildBodySphereGeometry(SATURN_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,

@@ -252,12 +252,9 @@ function buildMeshMaterial(creation: ProceduralPlanetCreation): THREE.MeshStanda
     // Volcanic planets get a derived emissive map so lava areas actually glow
     if (bodySubtype === PlanetTypeEnum.Volcanic && texture) {
         const texIdx = volcanicTextures.indexOf(texture);
-        const emissiveUrl =
-            texIdx !== -1
-                ? `./assets/textures/bodies/2k/procedural/volcanic-${texIdx + 1}.jpg`
-                : null;
-        if (emissiveUrl) {
-            material.emissiveMap = getVolcanicEmissiveMap(emissiveUrl);
+        const emissivePath = texIdx !== -1 ? `procedural/volcanic-${texIdx + 1}.jpg` : null;
+        if (emissivePath) {
+            material.emissiveMap = getVolcanicEmissiveMap(emissivePath);
             material.emissive = new THREE.Color(0xff3300);
             material.emissiveIntensity = 0.6;
         }

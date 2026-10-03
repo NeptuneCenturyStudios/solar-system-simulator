@@ -2,41 +2,13 @@ import * as THREE from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
 import { ISpaceBackground } from '../interfaces';
+import { getBodyTexture, getDerivedCanvasTexture } from './texture-registry';
 
-const textureLoader = new THREE.TextureLoader();
-
-/**
- * Loads a texture from the given URL and sets it to sRGB color space for accurate color rendering.
- * @param url - The URL of the texture image.
- * @returns The loaded texture with sRGB color space.
- */
-export function loadSrgbTexture(url: string): THREE.Texture {
-    const tex = textureLoader.load(url);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = THREE.ClampToEdgeWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    return tex;
-}
-
-/**
- * Loads a data map (normal, specular, etc.) from the given URL in linear color space, so the
- * values are used as-is instead of being decoded as sRGB color.
- * @param url - The URL of the texture image.
- * @returns The loaded texture with no color space conversion.
- */
-export function loadLinearTexture(url: string): THREE.Texture {
-    const tex = textureLoader.load(url);
-    tex.colorSpace = THREE.NoColorSpace;
-    tex.wrapS = THREE.ClampToEdgeWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    return tex;
-}
-
-export const moonTexture = loadSrgbTexture('./assets/textures/bodies/2k/moon.jpg');
-export const ioTexture = loadSrgbTexture('./assets/textures/bodies/2k/io.jpg');
-export const europaTexture = loadSrgbTexture('./assets/textures/bodies/2k/europa.jpg');
-export const ganymedeTexture = loadSrgbTexture('./assets/textures/bodies/2k/ganymede.jpg');
-export const callistoTexture = loadSrgbTexture('./assets/textures/bodies/2k/callisto.jpg');
+export const moonTexture = getBodyTexture('moon.jpg');
+export const ioTexture = getBodyTexture('io.jpg');
+export const europaTexture = getBodyTexture('europa.jpg');
+export const ganymedeTexture = getBodyTexture('ganymede.jpg');
+export const callistoTexture = getBodyTexture('callisto.jpg');
 
 const SPACE_TEXTURE_COUNT = 13;
 const PROCEDURAL_TEMPORATE_TEXTURES = 5;
@@ -56,7 +28,7 @@ const PROCEDURAL_CLOUD_TEXTURES = 2;
 function getTemperateTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_TEMPORATE_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/temperate-${i}.jpg`));
+        textures.push(getBodyTexture(`procedural/temperate-${i}.jpg`));
     }
     return textures;
 }
@@ -73,7 +45,7 @@ export const temperateTextures = getTemperateTextures();
 function getVolcanicTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_VOLCANIC_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/volcanic-${i}.jpg`));
+        textures.push(getBodyTexture(`procedural/volcanic-${i}.jpg`));
     }
     return textures;
 }
@@ -90,7 +62,7 @@ export const volcanicTextures = getVolcanicTextures();
 function getOceanTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_OCEAN_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/ocean-${i}.jpg`));
+        textures.push(getBodyTexture(`procedural/ocean-${i}.jpg`));
     }
     return textures;
 }
@@ -107,7 +79,7 @@ export const oceanTextures = getOceanTextures();
 function getFrozenTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_FROZEN_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/frozen-${i}.jpg`));
+        textures.push(getBodyTexture(`procedural/frozen-${i}.jpg`));
     }
     return textures;
 }
@@ -124,7 +96,7 @@ export const frozenTextures = getFrozenTextures();
 function getDesertTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_DESERT_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/desert-${i}.jpg`));
+        textures.push(getBodyTexture(`procedural/desert-${i}.jpg`));
     }
     return textures;
 }
@@ -141,9 +113,7 @@ export const desertTextures = getDesertTextures();
 function getTerrestrialTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_TERRESTRIAL_TEXTURES; i++) {
-        textures.push(
-            loadSrgbTexture(`./assets/textures/bodies/2k/procedural/terrestrial-${i}.jpg`)
-        );
+        textures.push(getBodyTexture(`procedural/terrestrial-${i}.jpg`));
     }
     return textures;
 }
@@ -160,7 +130,7 @@ export const terrestrialTextures = getTerrestrialTextures();
 function getGasGiantTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_GAS_GIANT_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/gas-giant-${i}.png`));
+        textures.push(getBodyTexture(`procedural/gas-giant-${i}.png`));
     }
     return textures;
 }
@@ -177,7 +147,7 @@ export const gasGiantTextures = getGasGiantTextures();
 function getIceGiantTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_ICE_GIANT_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/ice-giant-${i}.png`));
+        textures.push(getBodyTexture(`procedural/ice-giant-${i}.png`));
     }
     return textures;
 }
@@ -214,7 +184,7 @@ export const spaceTextures: ISpaceBackground[] = getSpaceTextures();
 function getCloudTextures(): THREE.Texture[] {
     const textures: THREE.Texture[] = [];
     for (let i = 1; i <= PROCEDURAL_CLOUD_TEXTURES; i++) {
-        textures.push(loadSrgbTexture(`./assets/textures/bodies/2k/procedural/clouds-${i}.jpg`));
+        textures.push(getBodyTexture(`procedural/clouds-${i}.jpg`));
     }
     return textures;
 }
@@ -227,18 +197,9 @@ export const cloudTextures = getCloudTextures();
 // =============================================================================
 // Volcanic lava emissive map extraction
 // =============================================================================
-// We load each volcanic JPG via fetch() + createImageBitmap() to guarantee
-// we have pixel data available, independent of the Three.js texture pipeline.
-// The emissive maps are cached by texture URL so they're built once per JPG.
-
-/** Cache mapping volcanic JPG URL -> generated emissive texture. */
-const emissiveMapCache = new Map<string, THREE.CanvasTexture>();
-
-/** URLs for the 5 volcanic JPGs — mirrors the path pattern in getVolcanicTextures(). */
-const VOLCANIC_URLS: string[] = [];
-for (let i = 1; i <= PROCEDURAL_VOLCANIC_TEXTURES; i++) {
-    VOLCANIC_URLS.push(`./assets/textures/bodies/2k/procedural/volcanic-${i}.jpg`);
-}
+// The emissive map (lava glows, rock is black) is derived pixel-by-pixel from a
+// volcanic JPG. It is built and kept up to date through the texture registry, so
+// it reloads in place when the graphics texture quality changes.
 
 /**
  * Given a pixel's RGBA values (each 0-255), determines whether it's lava
@@ -265,192 +226,60 @@ function lavaEmissiveForPixel(
 }
 
 /**
- * Generate an emissive CanvasTexture from raw RGBA pixel data.
+ * Paints `canvas` with the emissive map derived from `image`: lava pixels glow
+ * red-orange, everything else is black. Called by the texture registry on first
+ * build and again whenever the source's quality tier changes.
  */
-function buildEmissiveFromPixels(
-    pixels: Uint8ClampedArray,
-    width: number,
-    height: number
-): THREE.CanvasTexture {
-    const outPixels = new Uint8ClampedArray(pixels.length);
+function buildVolcanicEmissive(image: HTMLImageElement, canvas: HTMLCanvasElement): void {
+    const width = image.naturalWidth;
+    const height = image.naturalHeight;
+    if (width === 0 || height === 0) return;
 
-    for (let i = 0; i < pixels.length; i += 4) {
-        const result = lavaEmissiveForPixel(pixels[i]!, pixels[i + 1]!, pixels[i + 2]!);
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(image, 0, 0, width, height);
+    const source = ctx.getImageData(0, 0, width, height).data;
+
+    const outPixels = new Uint8ClampedArray(source.length);
+    for (let i = 0; i < source.length; i += 4) {
+        const result = lavaEmissiveForPixel(source[i]!, source[i + 1]!, source[i + 2]!);
         if (result) {
             outPixels[i] = result.er;
             outPixels[i + 1] = result.eg;
             outPixels[i + 2] = result.eb;
-        } else {
-            outPixels[i] = 0;
-            outPixels[i + 1] = 0;
-            outPixels[i + 2] = 0;
         }
+        // RGB stays 0 (from the array's initial fill) for rock; alpha is always opaque.
         outPixels[i + 3] = 255;
     }
 
-    const imgData = new ImageData(outPixels, width, height);
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d')!;
-    ctx.putImageData(imgData, 0, 0);
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.generateMipmaps = false;
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    tex.anisotropy = 16;
-    tex.needsUpdate = true;
-    return tex;
+    ctx.putImageData(new ImageData(outPixels, width, height), 0, 0);
 }
 
 /**
- * Asynchronously pre-build all volcanic emissive maps at module init time.
- * Each JPG is fetched, decoded to an ImageBitmap, then scanned pixel-by-pixel
- * to produce the emissive map. Once cached, getVolcanicEmissiveMap() returns
- * the texture instantly.
- */
-async function prebuildAllVolcanicEmissiveMaps(): Promise<void> {
-    for (const url of VOLCANIC_URLS) {
-        // Already cached (e.g. from a synchronous build)?
-        if (emissiveMapCache.has(url)) continue;
-
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const bitmap = await createImageBitmap(blob);
-            const w = bitmap.width;
-            const h = bitmap.height;
-
-            const readCanvas = document.createElement('canvas');
-            readCanvas.width = w;
-            readCanvas.height = h;
-            const readCtx = readCanvas.getContext('2d')!;
-            readCtx.drawImage(bitmap, 0, 0);
-            const imgData = readCtx.getImageData(0, 0, w, h);
-
-            const emissiveTex = buildEmissiveFromPixels(
-                imgData.data as unknown as Uint8ClampedArray,
-                w,
-                h
-            );
-
-            // Does a placeholder already exist for this URL?
-            const existing = emissiveMapCache.get(url);
-            if (existing) {
-                // Mutate the placeholder canvas in-place so existing materials
-                // referencing it automatically pick up the new glow.
-                const existingImg = existing.image;
-                if (existingImg instanceof HTMLCanvasElement) {
-                    existingImg.width = w;
-                    existingImg.height = h;
-                    const ctx = existingImg.getContext('2d')!;
-                    ctx.drawImage(emissiveTex.image, 0, 0);
-                    existing.needsUpdate = true;
-                    continue;
-                }
-            }
-
-            emissiveMapCache.set(url, emissiveTex);
-        } catch (err) {
-            console.warn(`[volcanic emissive] Failed to load ${url}:`, err);
-        }
-    }
-}
-// Kick off async pre-build immediately (doesn't block module init)
-prebuildAllVolcanicEmissiveMaps();
-
-/**
- * Given a URL path to a volcanic JPG (matching the pattern
- * used in the volcanicTextures array), returns an emissive map
- * where red lava pixels glow and rock is black.
+ * Returns the emissive map for a volcanic JPG: lava pixels glow red-orange and
+ * rock is black. Suitable for `MeshStandardMaterial.emissiveMap`. The texture is
+ * owned by the texture registry, so it survives — and reloads in place — when
+ * the graphics texture quality changes.
  *
- * - If the map has already been built (by the async pre-build or a prior
- *   call), it is returned instantly.
- * - If not, a mutable canvas placeholder is returned. The placeholder's
- *   content is filled with emissive data in-place once the image loads,
- *   so the glow appears automatically on any material that already
- *   references the placeholder texture.
- *
- * @param jpgUrl - The asset URL of the volcanic JPG.
- * @returns An emissive texture suitable for MeshStandardMaterial.emissiveMap.
+ * @param relativePath Volcanic JPG path relative to a tier folder, e.g.
+ *   `procedural/volcanic-1.jpg`.
  */
-export function getVolcanicEmissiveMap(jpgUrl: string): THREE.Texture {
-    // Already built and cached?
-    const cached = emissiveMapCache.get(jpgUrl);
-    if (cached) return cached;
-
-    // Create a mutable placeholder that will be filled in-place when
-    // the image finishes loading (either via the onload handler below
-    // or the async prebuildAllVolcanicEmissiveMaps).
-    const placeholderCanvas = document.createElement('canvas');
-    placeholderCanvas.width = 2048;
-    placeholderCanvas.height = 1024;
-    const placeholder = new THREE.CanvasTexture(placeholderCanvas);
-    placeholder.wrapS = THREE.RepeatWrapping;
-    placeholder.wrapT = THREE.ClampToEdgeWrapping;
-    placeholder.needsUpdate = true;
-
-    // Cache the placeholder so all callers share the same texture object.
-    // When the image loads, we mutate its canvas in-place.
-    emissiveMapCache.set(jpgUrl, placeholder);
-
-    // Kick off an async load via Image element.
-    const img = new Image();
-    img.onload = () => {
-        if (!img.complete || img.naturalWidth === 0) return;
-
-        const w = img.naturalWidth;
-        const h = img.naturalHeight;
-
-        // Build the emissive data from the now-loaded image
-        const readCanvas = document.createElement('canvas');
-        readCanvas.width = w;
-        readCanvas.height = h;
-        const readCtx = readCanvas.getContext('2d')!;
-        readCtx.drawImage(img, 0, 0, w, h);
-        const imgData = readCtx.getImageData(0, 0, w, h);
-        const outPixels = new Uint8ClampedArray(imgData.data.length);
-
-        for (let i = 0; i < imgData.data.length; i += 4) {
-            const r = imgData.data[i]!;
-            const g = imgData.data[i + 1]!;
-            const b = imgData.data[i + 2]!;
-            const result = lavaEmissiveForPixel(r, g, b);
-            if (result) {
-                outPixels[i] = result.er;
-                outPixels[i + 1] = result.eg;
-                outPixels[i + 2] = result.eb;
-            } else {
-                outPixels[i] = 0;
-                outPixels[i + 1] = 0;
-                outPixels[i + 2] = 0;
-            }
-            outPixels[i + 3] = 255;
-        }
-
-        const outImgData = new ImageData(outPixels, w, h);
-
-        // Mutate the placeholder canvas in-place.
-        placeholderCanvas.width = w;
-        placeholderCanvas.height = h;
-        const ctx = placeholderCanvas.getContext('2d')!;
-        ctx.putImageData(outImgData, 0, 0);
-        placeholder.needsUpdate = true;
-
-        // Also build the proper texture and cache it for future direct access.
-        const finalTex = buildEmissiveFromPixels(outPixels, w, h);
-        emissiveMapCache.set(jpgUrl, finalTex);
-    };
-    img.onerror = () => {
-        console.warn(`[volcanic emissive] Failed to decode image: ${jpgUrl}`);
-    };
-    img.src = jpgUrl;
-
-    return placeholder;
+export function getVolcanicEmissiveMap(relativePath: string): THREE.Texture {
+    return getDerivedCanvasTexture({
+        key: relativePath,
+        sourcePath: relativePath,
+        build: buildVolcanicEmissive,
+        configure: (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            texture.generateMipmaps = false;
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            texture.anisotropy = 16;
+        },
+    });
 }
 
 /**

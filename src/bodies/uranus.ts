@@ -19,7 +19,7 @@ import {
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
-import { loadSrgbTexture } from '../drawing/textures.js';
+import { getBodyTexture } from '../drawing/texture-registry.js';
 import { URANUS_RING_SPEC } from '../procedural/ring-presets.js';
 import {
     AtmosphericGasEnum,
@@ -44,7 +44,7 @@ export class Uranus extends Planet {
             URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, gEff, SUN_MASS);
         const rotSpeed = ((-2 * Math.PI) / (17.24 * 3600)) * timeScale; // retrograde
         const trajectory = calculateTrajectory(gEff, URANUS_DIST, SUN_MASS, angleRad);
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/uranus.jpg');
+        const texture = getBodyTexture('uranus.jpg');
         const geometry = buildBodySphereGeometry(URANUS_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,

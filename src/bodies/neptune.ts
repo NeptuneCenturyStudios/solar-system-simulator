@@ -24,7 +24,7 @@ import { stateVectorsFromElements } from '../procedural/orbital-math.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
-import { loadSrgbTexture } from '../drawing/textures.js';
+import { getBodyTexture } from '../drawing/texture-registry.js';
 import { NEPTUNE_RING_SPEC } from '../procedural/ring-presets.js';
 import {
     AtmosphericGasEnum,
@@ -72,7 +72,7 @@ export class Neptune extends Planet {
             mu: gEff * SUN_MASS,
         });
 
-        const texture = loadSrgbTexture('./assets/textures/bodies/2k/neptune.jpg');
+        const texture = getBodyTexture('neptune.jpg');
         const geometry = buildBodySphereGeometry(NEPTUNE_RADIUS);
         const material = new THREE.MeshStandardMaterial({
             map: texture,

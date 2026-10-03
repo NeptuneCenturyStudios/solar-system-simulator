@@ -24,6 +24,7 @@ import {
     PhysicsSolverMode,
     SettingKey,
     settingsStore,
+    TextureQuality,
 } from '../settings/settings-store';
 import type { PlaylistEntry } from '../utilities/playlist';
 
@@ -285,6 +286,8 @@ export interface VueSimHooks {
     setHidePanelManagerInFlight?: (checked: boolean) => void;
     /** Toggle S-key chase mode when a target is locked (persisted via settingsStore). */
     setChaseModeEnabled?: (checked: boolean) => void;
+    /** Select the body-texture quality tier (persisted via settingsStore; high is desktop-only). */
+    setTextureQuality?: (mode: TextureQuality) => void;
 
     // ── Playlist (same sim paths as the old playlist panel) ─────────────────
     /** Snapshot of the shuffled playlist + current playback state. */
@@ -377,6 +380,8 @@ export interface VueSimStore {
     hidePanelManagerInFlight: boolean;
     /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
     chaseModeEnabled: boolean;
+    /** Body-texture quality tier. `high` is desktop-only; a browser is always downgraded to `low`. */
+    textureQuality: TextureQuality;
 
     /** Id of the autopilot target body, or null when autopilot is off. */
     autopilotTargetId: string | null;
@@ -432,6 +437,7 @@ const state = reactive<VueSimStore>({
     renderDistanceAU: settingsStore.settings.renderDistanceAU,
     hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
     chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
+    textureQuality: settingsStore.settings.textureQuality,
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
@@ -1005,6 +1011,17 @@ export function setChaseModeEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.ChaseModeEnabled, checked);
     }
     state.chaseModeEnabled = checked;
+}
+
+/** Select the body-texture quality tier. Takes effect live — the registered hook
+ *  re-fetches the managed textures in place, so nothing is rebuilt. */
+export function setTextureQuality(mode: TextureQuality): void {
+    if (hookRegistry.setTextureQuality) {
+        hookRegistry.setTextureQuality(mode);
+    } else {
+        settingsStore.update(SettingKey.TextureQuality, mode);
+    }
+    state.textureQuality = mode;
 }
 
 /** Toggle polar aurorae. */

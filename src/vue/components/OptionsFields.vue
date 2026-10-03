@@ -89,6 +89,22 @@
             </p>
         </div>
 
+        <div class="control-group">
+            <label>Texture Quality</label>
+            <select
+                class="solver-select"
+                :value="simStore.textureQuality"
+                :title="textureQualityTitle"
+                @change="onTextureQualityChange"
+            >
+                <option value="low">Low (standard)</option>
+                <option value="high" :disabled="!highQualityAvailable">
+                    High (up to 8K)
+                </option>
+            </select>
+            <p class="solver-hint">{{ textureQualityHint }}</p>
+        </div>
+
         <div class="vue-ui-card-header">Camera</div>
         <label class="checkbox-row">
             <input
@@ -235,9 +251,15 @@ import {
     setShowAiDebug,
     setSmoothZoomEnabled,
     setSubsteps,
+    setTextureQuality,
     simStore,
 } from '../sim-bridge';
-import type { AuroraDetailMode, PhysicsSolverMode } from '../../settings/settings-store';
+import type {
+    AuroraDetailMode,
+    PhysicsSolverMode,
+    TextureQuality,
+} from '../../settings/settings-store';
+import { isHighQualityTextureAvailable } from '../../drawing/texture-quality';
 import {
     RENDER_DISTANCE_DEFAULT_AU,
     RENDER_DISTANCE_MAX_AU,
@@ -322,6 +344,27 @@ function onRenderDistanceInput(e: Event): void {
 
 function resetRenderDistance(): void {
     setRenderDistance(RENDER_DISTANCE_DEFAULT_AU);
+}
+
+/** True when this platform can use the High tier (desktop build only). */
+const highQualityAvailable = isHighQualityTextureAvailable();
+
+/** Why High is unavailable, or a one-line summary of what each tier loads. */
+const textureQualityHint = computed(() => {
+    if (!highQualityAvailable) {
+        return 'High-quality textures are only available in the desktop app; the browser always uses the standard set.';
+    }
+    return 'High loads the sharpest available asset for each body (8K, else 4K, else standard). Applies immediately.';
+});
+
+const textureQualityTitle = computed(() =>
+    highQualityAvailable
+        ? 'Uses the highest-resolution texture available for each body. Applies immediately without a restart.'
+        : 'High-quality textures require the desktop app.'
+);
+
+function onTextureQualityChange(e: Event): void {
+    setTextureQuality((e.target as HTMLSelectElement).value as TextureQuality);
 }
 
 function onSmoothZoomChange(e: Event): void {

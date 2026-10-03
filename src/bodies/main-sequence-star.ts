@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Star, IStarCreationOptions } from './star';
 import { IDeathOptions, IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
-import { loadSrgbTexture } from '../drawing/textures';
+import { getBodyTexture } from '../drawing/texture-registry';
 import { createUniqueId } from '../utilities/utilities';
 import {
     PLUTO_DIST,
@@ -62,13 +62,13 @@ export class MainSequenceStar extends Star {
         options: IStarCreationOptions
     ) {
         const textures = {
-            sunTexture: loadSrgbTexture('./assets/textures/bodies/2k/sun.jpg'),
-            redStarTexture: loadSrgbTexture('./assets/textures/bodies/2k/red-star.jpg'),
-            orangeStarTexture: loadSrgbTexture('./assets/textures/bodies/2k/orange_star.jpg'),
-            whiteStarTexture: loadSrgbTexture('./assets/textures/bodies/2k/white_star.jpg'),
-            blueStarTexture: loadSrgbTexture('./assets/textures/bodies/2k/blue-star.jpg'),
-            whiteDwarfTexture: loadSrgbTexture('./assets/textures/bodies/2k/white_dwarf.jpg'),
-            brownDwarfTexture: loadSrgbTexture('./assets/textures/bodies/2k/brown_dwarf.jpg'),
+            sunTexture: getBodyTexture('sun.jpg'),
+            redStarTexture: getBodyTexture('red-star.jpg'),
+            orangeStarTexture: getBodyTexture('orange_star.jpg'),
+            whiteStarTexture: getBodyTexture('white_star.jpg'),
+            blueStarTexture: getBodyTexture('blue-star.jpg'),
+            whiteDwarfTexture: getBodyTexture('white_dwarf.jpg'),
+            brownDwarfTexture: getBodyTexture('brown_dwarf.jpg'),
         };
         super(dependencies, scene, options, textures);
 

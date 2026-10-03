@@ -16,7 +16,7 @@ import {
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId, isBodyType } from '../utilities/utilities.js';
-import { loadLinearTexture, loadSrgbTexture } from '../drawing/textures.js';
+import { getBodyTexture } from '../drawing/texture-registry.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { BodyTypeEnum, PlanetTypeEnum } from './body-enums.js';
@@ -32,12 +32,10 @@ import {
 // Maximum number of stars supported by the day/night shader.
 const MAX_STARS = 8;
 
-const earthDayTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_day.jpg');
-const earthNightTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_night.jpg');
-const earthNormalTexture = loadLinearTexture('./assets/textures/bodies/2k/earth_normal_map.png');
-const earthSpecularTexture = loadLinearTexture(
-    './assets/textures/bodies/2k/earth_specular_map.png'
-);
+const earthDayTexture = getBodyTexture('earth_day.jpg');
+const earthNightTexture = getBodyTexture('earth_night.jpg');
+const earthNormalTexture = getBodyTexture('earth_normal_map.png', 'linear');
+const earthSpecularTexture = getBodyTexture('earth_specular_map.png', 'linear');
 
 // The specular map marks water (bright) vs land (dark). MeshStandardMaterial has no specular map,
 // so it drives roughness instead: water is glossy, land is matte.
@@ -272,7 +270,7 @@ export class Earth extends Planet {
 
         this.customUniforms = customUniforms;
 
-        const earthCloudsTexture = loadSrgbTexture('./assets/textures/bodies/2k/earth_clouds.jpg');
+        const earthCloudsTexture = getBodyTexture('earth_clouds.jpg');
         earthCloudsTexture.wrapS = THREE.ClampToEdgeWrapping;
         earthCloudsTexture.wrapT = THREE.ClampToEdgeWrapping;
 
