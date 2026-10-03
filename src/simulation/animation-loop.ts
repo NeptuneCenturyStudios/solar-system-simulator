@@ -165,20 +165,35 @@ const _trailNozzle = new THREE.Vector3();
 const _trailExhaustDir = new THREE.Vector3();
 
 /**
+ * Whether a ship's main engine is firing this frame — the signal that drives the
+ * exhaust plume. Reads the ship's own control surface, so only forward thrust and
+ * boost light it: coasting, drifting, braking and decelerating all leave the nozzle
+ * dark. Because it reads the shared control surface, a player holding W/Shift, a
+ * Chase-mode pilot (where S is forward thrust) and an AI ship all report identically.
+ */
+function isEngineFiring(ship: Spaceship): boolean {
+    return ship.controlInput.thrust || ship.controlInput.boost;
+}
+
+/**
  * Update one ship's engine trail.  Shared by the player's ship and every
  * AI-piloted ship so they render identically.
  *
- * @param ship     The ship whose trail to update.
- * @param speed    Speed to drive the trail intensity with (u/s).
- * @param boosting True when the ship is at or shedding boost speed — selects the
- *                 boost ceiling for intensity normalisation.
- * @param dtTotal  Sim-time seconds advanced this frame.
+ * @param ship      The ship whose trail to update.
+ * @param speed     Speed to drive the trail intensity with (u/s).
+ * @param boosting  True when the ship is at or shedding boost speed — selects the
+ *                  boost ceiling for intensity normalisation.
+ * @param thrusting True while the ship's engine is firing. When false the plume
+ *                  stops emitting and its existing particles fade out over their
+ *                  lifetime instead of being cut off dead.
+ * @param dtTotal   Sim-time seconds advanced this frame.
  * @param cameraPos Camera world position, for distance-based trail detail.
  */
 function updateShipTrail(
     ship: Spaceship,
     speed: number,
     boosting: boolean,
+    thrusting: boolean,
     dtTotal: number,
     cameraPos: THREE.Vector3
 ): void {
@@ -193,7 +208,7 @@ function updateShipTrail(
         speed,
         trailMax,
         boosting,
-        true,
+        thrusting,
         ship.velocity,
         _trailExhaustDir,
         dtTotal,
@@ -1061,7 +1076,24 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 ctx.keys.shift ||
                 playerTrailShip.boostDecelerating ||
                 ctx.autopilotState.isBoostActive;
-            updateShipTrail(playerTrailShip, trailSpd, boosting, dtTotal, ctx.camera.position);
+            // Fire the plume only while the engine is actually working — coasting must stay dark.
+            // Manually that is W (thrust) or Shift (boost), read off the ship's control surface so
+            // Chase mode (where S becomes forward thrust) reports through the same channel. Under
+            // the autopilot the player's keys are ignored, so trust the flag the autopilot's own
+            // phase machine writes each substep — WARP / APPROACH / BRAKE / CIRCULARIZE while it
+            // is thrusting — plus its boost flag, so a steady boost cruise still shows. Aligning,
+            // holding a stable orbit, warp-charging and drifting all leave the nozzle dark.
+            const thrusting = ctx.autopilotState.isActive
+                ? ctx.flightState.thrustActive || ctx.autopilotState.isBoostActive
+                : isEngineFiring(playerTrailShip);
+            updateShipTrail(
+                playerTrailShip,
+                trailSpd,
+                boosting,
+                thrusting,
+                dtTotal,
+                ctx.camera.position
+            );
         }
 
         for (const npc of ctx.simulationState.npcShips) {
@@ -1070,7 +1102,14 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             if (npc === playerTrailShip) continue;
             if (npc.warpActive) continue;
             const boosting = npc.controlInput.boost || npc.boostDecelerating;
-            updateShipTrail(npc, npc.velocity.length(), boosting, dtTotal, ctx.camera.position);
+            updateShipTrail(
+                npc,
+                npc.velocity.length(),
+                boosting,
+                isEngineFiring(npc),
+                dtTotal,
+                ctx.camera.position
+            );
         }
 
         // ── Camera follow (non-flight) ──────────────────────────────────────

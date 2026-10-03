@@ -175,7 +175,8 @@ export class ShipFlame implements IShipEffect {
      * @param nozzle       World-space nozzle position this frame.
      * @param speed        Current ship speed — drives exhaust speed and brightness.
      * @param maxSpeed     Active speed ceiling (normal or boost) — brightness reference.
-     * @param thrusting    True while any thrust key (W/S/Shift) is held.
+     * @param thrusting    True while the ship's engine is firing (thrust or boost). When false
+     *                     no new particles are emitted and the existing plume fades naturally.
      * @param shipVelocity  World-space ship velocity — added to each particle so they
      *                      drift backward in the ship frame at EXHAUST_DRIFT_SPEED, not
      *                      at full ship speed (avoids gaps at boost).
@@ -227,7 +228,9 @@ export class ShipFlame implements IShipEffect {
         }
 
         // ── 3. Emit new particles ─────────────────────────────────────────────
-        if (thrusting) {
+        // Only while the engine is firing; frozen sim time (absDt === 0) emits nothing so a
+        // held thrust key can't pile particles into a stationary clump while paused.
+        if (thrusting && absDt > 0) {
             // Build a tangent basis perpendicular to exhaustDir for cone spread
             const upRef =
                 Math.abs(exhaustDir.y) < 0.9
