@@ -5,7 +5,14 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Body } from '../../bodies/body';
 import { LoopSoundController, SoundEffect, playSoundEffect } from '../../utilities/audio.js';
 import { C } from '../../utilities/consts.js';
-import { IWeaponOwner, IWeaponSound, Weapon, muzzleWorldPosition } from './weapon';
+import {
+    IBodyRayHit,
+    IWeaponOwner,
+    IWeaponSound,
+    Weapon,
+    muzzleWorldPosition,
+    raycastBodies,
+} from './weapon';
 
 const LASER_FLICKER_FREQ_A = 9.1; // rad/s — incommensurate with B for non-repeating shimmer
 const LASER_FLICKER_FREQ_B = 17.3;
@@ -73,6 +80,8 @@ export class LaserWeapon extends Weapon {
     private _flickerTime = 0;
     /** World-space beam tip (impact point or max-range end). */
     private tip = new THREE.Vector3();
+    /** Scratch for the per-frame beam hit test. */
+    private readonly hit: IBodyRayHit = { t: 0, body: null };
     // ── Rendering ────────────────────────────────────────────────────────────
     private readonly coreLineGeo: LineGeometry;
     private readonly coreLineMat: LineMaterial;
@@ -288,41 +297,14 @@ export class LaserWeapon extends Weapon {
         muzzleWorldPosition(owner, this.curOrigin);
 
         // ── Ray-sphere hit test along the beam ───────────────────────────
-        const maxT = this.config.maxRange;
-        let hitT = maxT;
-        let hitBody: Body | null = null;
-
-        for (const body of bodies) {
-            if (body === owner) continue;
-            if (!body.mesh || body._isDisposed) continue;
-
-            const ocX = body.mesh.position.x - this.curOrigin.x;
-            const ocY = body.mesh.position.y - this.curOrigin.y;
-            const ocZ = body.mesh.position.z - this.curOrigin.z;
-            const tca = ocX * this.direction.x + ocY * this.direction.y + ocZ * this.direction.z;
-
-            // Squared distance from the target's centre to the ray itself (not to the
-            // origin) — valid regardless of where tca falls relative to hitT. Gating on
-            // tca alone (as before) is only a safe approximation when radius is small next
-            // to the ray's range; for large bodies the true entry point can sit well inside
-            // [0, hitT] while tca reads as out of range, silently skipping the hit.
-            const d2 = ocX * ocX + ocY * ocY + ocZ * ocZ - tca * tca;
-            const r = body.radius;
-            if (d2 > r * r) continue; // ray never comes within r of the centre at any t
-
-            const thc = Math.sqrt(r * r - d2);
-            const tExit = tca + thc;
-            if (tExit < 0) continue; // sphere is entirely behind the ray origin
-
-            // Origin already inside the sphere (tEntry < 0) is an immediate hit at t = 0.
-            const tEntry = tca - thc;
-            const tHitCandidate = tEntry < 0 ? 0 : tEntry;
-
-            if (tHitCandidate < hitT) {
-                hitT = tHitCandidate;
-                hitBody = body;
-            }
-        }
+        const { t: hitT, body: hitBody } = raycastBodies(
+            this.curOrigin,
+            this.direction,
+            this.config.maxRange,
+            bodies,
+            owner,
+            this.hit
+        );
 
         // ── Beam tip in world space (drifts with the ship between frames) ──
         const renderLength = Math.min(this.beamFront, hitT);

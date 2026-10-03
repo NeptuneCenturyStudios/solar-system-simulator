@@ -110,7 +110,7 @@ export class OsirisMothership extends Spaceship {
 
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
             beamColor: 0x800080,
-            damage: 6,
+            damage: 10,
             coreWidth: 2,
             haloWidth: 6,
             damageInterval: 0.2,

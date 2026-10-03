@@ -211,3 +211,66 @@ export function muzzleWorldPosition(owner: IWeaponOwner, out: THREE.Vector3): TH
         .applyQuaternion(owner.mesh.quaternion)
         .add(owner.mesh.position);
 }
+
+/** Result of raycastBodies(): the nearest hit along the ray, or `body: null` with `t = maxT`. */
+export interface IBodyRayHit {
+    /** Distance along the ray to the hit point (maxT when nothing was hit). */
+    t: number;
+    /** The body hit first, or null. */
+    body: Body | null;
+}
+
+/**
+ * Nearest ray-sphere hit against `bodies`, treating each body as a sphere of `body.radius` around
+ * its mesh. Shared by the laser's beam hit test and the player's reticle convergence, so the
+ * point the player aims at and the point the beam registers a hit on are found the same way.
+ *
+ * @param dir Unit direction.
+ * @param exclude Body to ignore (the shooter itself), or null.
+ * @param out Destination, also returned. Zero-allocation: callers pass a retained scratch.
+ */
+export function raycastBodies(
+    origin: THREE.Vector3,
+    dir: THREE.Vector3,
+    maxT: number,
+    bodies: Body[],
+    exclude: Body | null,
+    out: IBodyRayHit
+): IBodyRayHit {
+    out.t = maxT;
+    out.body = null;
+
+    for (const body of bodies) {
+        if (body === exclude) continue;
+        if (!body.mesh || body._isDisposed) continue;
+
+        const ocX = body.mesh.position.x - origin.x;
+        const ocY = body.mesh.position.y - origin.y;
+        const ocZ = body.mesh.position.z - origin.z;
+        const tca = ocX * dir.x + ocY * dir.y + ocZ * dir.z;
+
+        // Squared distance from the target's centre to the ray itself (not to the
+        // origin) — valid regardless of where tca falls relative to out.t. Gating on
+        // tca alone is only a safe approximation when radius is small next to the
+        // ray's range; for large bodies the true entry point can sit well inside
+        // [0, out.t] while tca reads as out of range, silently skipping the hit.
+        const d2 = ocX * ocX + ocY * ocY + ocZ * ocZ - tca * tca;
+        const r = body.radius;
+        if (d2 > r * r) continue; // ray never comes within r of the centre at any t
+
+        const thc = Math.sqrt(r * r - d2);
+        const tExit = tca + thc;
+        if (tExit < 0) continue; // sphere is entirely behind the ray origin
+
+        // Origin already inside the sphere (tEntry < 0) is an immediate hit at t = 0.
+        const tEntry = tca - thc;
+        const tHitCandidate = tEntry < 0 ? 0 : tEntry;
+
+        if (tHitCandidate < out.t) {
+            out.t = tHitCandidate;
+            out.body = body;
+        }
+    }
+
+    return out;
+}

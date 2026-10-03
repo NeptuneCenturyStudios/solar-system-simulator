@@ -10,6 +10,7 @@ import {
 } from './simulation';
 import { IFlightControlContext } from '../interfaces';
 import { applyWeaponInput } from './ship-weapon-input';
+import { IBodyRayHit, muzzleWorldPosition, raycastBodies } from '../ship-effects/weapons/weapon';
 import { settingsStore } from '../settings/settings-store';
 import type { Body } from '../bodies/body';
 
@@ -18,6 +19,16 @@ const _chaseToTarget = new THREE.Vector3();
 const _chaseDir = new THREE.Vector3();
 const _chaseLocal = new THREE.Vector3();
 const _chaseInvFrame = new THREE.Quaternion();
+
+// Weapon-aim scratch — reused every frame while the trigger is held.
+/** Flight frame at the start of this frame, before steering — the frame the camera still has. */
+const _aimPrevFrameQuat = new THREE.Quaternion();
+/** Rotation the steering applied this frame (new frame × inverse(old frame)). */
+const _aimFrameDelta = new THREE.Quaternion();
+const _aimCamOrigin = new THREE.Vector3();
+const _aimCamDir = new THREE.Vector3();
+const _aimMuzzle = new THREE.Vector3();
+const _aimHit: IBodyRayHit = { t: 0, body: null };
 
 /** How far ahead (seconds) chase steering predicts the aim error from its current closing
  *  rate, so it starts easing off before the nose reaches the target instead of only reacting
@@ -184,6 +195,9 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // and back out after steering, so the ship's own flight-control methods (which
     // read ship.controlFrameQuat) and the camera stay in lockstep.
     ship.controlFrameQuat.copy(flightState.flightCameraQuat);
+    // The camera was placed from this frame last frame and isn't moved again until after
+    // physics — remember it so the weapon aim can carry the camera ray through this frame's turn.
+    _aimPrevFrameQuat.copy(flightState.flightCameraQuat);
 
     const h = ship.handling;
 
@@ -457,15 +471,44 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // pointer to flightMaxPointerOffset above is therefore also what limits how far off the nose
     // the player can shoot — the aim cone an AI pilot has to live inside too.
     //
+    // The shot leaves the muzzle, not the camera, so firing along the camera ray itself would
+    // run parallel to it and miss by the whole camera→muzzle offset (tens of metres on a large
+    // ship — more than a fighter's width). Instead find what the camera ray hits and aim from
+    // the muzzle at that point, so the beam converges on whatever is under the reticle.
+    //
     // Only refreshed while the trigger is held; applyWeaponInput() ignores aimDir otherwise.
     if (playerInput.fire) {
         const aimNdcX = (noseScreenX + displayOffX) / (window.innerWidth * 0.5);
         const aimNdcY = (noseScreenY - displayOffY) / (window.innerHeight * 0.5);
         const tanHalfFovY = Math.tan(THREE.MathUtils.degToRad(ctx.camera.fov * 0.5));
         const tanHalfFovX = tanHalfFovY * ctx.camera.aspect;
-        playerInput.aimDir
+
+        // The camera still holds last frame's orientation (it's re-placed after physics), so
+        // rotate its ray by this frame's steering to match the view that will be rendered.
+        // Rotating about the ship keeps this valid for both the chase and cockpit cameras.
+        _aimFrameDelta.copy(_aimPrevFrameQuat).invert().premultiply(flightState.flightCameraQuat);
+        _aimCamDir
             .set(aimNdcX * tanHalfFovX, aimNdcY * tanHalfFovY, -1)
-            .transformDirection(ctx.camera.matrixWorld);
+            .applyQuaternion(ctx.camera.quaternion)
+            .applyQuaternion(_aimFrameDelta)
+            .normalize();
+        _aimCamOrigin
+            .subVectors(ctx.camera.position, ship.mesh.position)
+            .applyQuaternion(_aimFrameDelta)
+            .add(ship.mesh.position);
+
+        raycastBodies(_aimCamOrigin, _aimCamDir, Infinity, simulationState.bodies, ship, _aimHit);
+        if (_aimHit.body) {
+            // Converge on the point under the reticle.
+            playerInput.aimDir
+                .copy(_aimCamOrigin)
+                .addScaledVector(_aimCamDir, _aimHit.t)
+                .sub(muzzleWorldPosition(ship, _aimMuzzle))
+                .normalize();
+        } else {
+            // Nothing under the reticle: aim at infinity, where parallel rays converge.
+            playerInput.aimDir.copy(_aimCamDir);
+        }
     }
 
     // Shared with the AI firing path, so muzzle placement, rate of fire, heat and beam
