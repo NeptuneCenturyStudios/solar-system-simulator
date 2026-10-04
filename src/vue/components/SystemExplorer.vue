@@ -110,7 +110,7 @@
                     <span class="vue-ui-body-stats">
                         <span>M {{ formatMass(body.mass) }}</span>
                         <span>R {{ formatRadius(body.radius) }}</span>
-                        <span>v {{ formatSpeed(body.speed, body.speed >= C) }}</span>
+                        <span>v {{ formatSpeed(body.speed) }}</span>
                     </span>
                     <span class="ml-auto">
                         <button
@@ -210,7 +210,6 @@
 import { computed, ref } from 'vue';
 
 import { formatMass, formatRadius, formatSpeed } from '../../utilities/display-format';
-import { C } from '../../utilities/consts';
 import {
     enterShipById,
     flyToBody,

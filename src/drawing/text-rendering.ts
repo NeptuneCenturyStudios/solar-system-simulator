@@ -9,7 +9,6 @@ import { moonSubTypeLabel, planetSubTypeLabel } from '../bodies/body-attribute-l
 import { DwarfPlanet } from '../bodies/dwarf-planet';
 import { environmentState } from '../simulation/environment-state';
 import { formatMass, formatRadius, formatSpeed } from '../utilities/display-format';
-import { C } from '../utilities/consts';
 
 // These are painters for persistent HudSprite canvases, not texture factories. Each used to
 // build a new canvas and CanvasTexture on every call — ten times a second for all three.
@@ -125,8 +124,7 @@ export function paintSpeed(ctx: CanvasRenderingContext2D, params: SpeedHudParams
     ctx.shadowColor = glow;
     ctx.shadowBlur = 28;
     ctx.font = 'bold 68px monospace';
-    const useWarp = isWarp || isBoosting || Math.abs(speed) >= C;
-    ctx.fillText(formatSpeed(Math.abs(speed), useWarp), W - 24, hasExtra ? 140 : 172);
+    ctx.fillText(formatSpeed(Math.abs(speed)), W - 24, hasExtra ? 140 : 172);
 
     if (pos && vel) {
         const lh = 56; // canvas-pixel line height for data rows
@@ -296,7 +294,7 @@ export function paintStats(context: CanvasRenderingContext2D, body: Body): void 
 
     // Speed (velocity magnitude)
     const speed = vel.length();
-    row('Speed: ', formatSpeed(speed, speed >= C));
+    row('Speed: ', formatSpeed(speed));
 
     // Net gravitational force (force experienced FROM other bodies, F = m * a)
     if (body.tempAcc) {

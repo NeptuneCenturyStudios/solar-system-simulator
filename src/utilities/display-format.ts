@@ -84,16 +84,14 @@ export function formatMass(simMass: number): string {
  *  - useWarp true → "X WARP" (multiples of light speed), trailing zeros trimmed
  *  - otherwise → "X km/s"
  */
-export function formatSpeed(simSpeed: number, useWarp = false): string {
-    if (useWarp) {
-        return `${trimNumber(simSpeedToWarp(simSpeed), 2)} WARP`;
-    }
-
+export function formatSpeed(simSpeed: number): string {
     const speedKmS = simSpeedToKmS(simSpeed);
     if (speedKmS < 1) {
         return `${trimNumber(simSpeedToMS(simSpeed), 2)} m/s`;
-    } else {
+    } else if (speedKmS < C * 0.1) {
         return `${trimNumber(speedKmS, 2)} km/s`;
+    } else {
+        return `${trimNumber(simSpeedToWarp(simSpeed), 2)}x WARP`;
     }
 }
 
