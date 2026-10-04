@@ -496,8 +496,6 @@ export const AUTOPILOT_BRAKE_PAD = 2.0;
 /** Target orbit altitude expressed as a multiple of the target body's radius. */
 export const AUTOPILOT_ORBIT_ALTITUDE_FACTOR = 1.5;
 
-/** Relative-speed threshold at which BRAKE hands off to CIRCULARIZE (u/s). */
-export const AUTOPILOT_BRAKE_DONE_SPEED = 2;
 /** Duration (seconds) to show the "Stable Orbit" HUD notification. */
 export const AUTOPILOT_ORBIT_NOTIFY_DURATION = 3.0;
 /** Duration (seconds) to show the "Autopilot blocked" HUD notification. */

@@ -23,9 +23,9 @@ import { G, SHIELD_DEPLETED_EPSILON, SHIP_EXPLOSION_COLOR } from '../../utilitie
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_BRAKE_PAD,
-    AUTOPILOT_BRAKE_DONE_SPEED,
     AUTOPILOT_CIRCULARIZE_RATE,
     AUTOPILOT_CIRCULARIZE_GRAVITY_MARGIN,
+    AI_BOOST_ENGAGE_FACTOR,
 } from '../../utilities/consts';
 import { triggerScreenFlash } from '../../effects/screen-flash';
 
@@ -189,14 +189,29 @@ export class Spaceship extends Body {
     }
 
     /**
+     * Relative speed (u/s) below which the autopilot treats an approach as "arrived" — the
+     * residual closing speed at which BRAKE hands off to CIRCULARIZE, and the tolerance that
+     * decides when a phase is matching its target velocity closely enough.
+     *
+     * Derived from the ship's own cruise speed rather than a fixed absolute so the whole phase
+     * machine keeps its proportions at any speed tuning. Replaces the earlier fixed
+     * AUTOPILOT_BRAKE_DONE_SPEED of 2 u/s, which was sized for a ship cruising at ~0.75 u/s
+     * and became meaningless after retuning (1000× the new 0.002 u/s cruise, and larger than
+     * the ship's own 1 u/s boost max).
+     */
+    get autopilotArrivalSpeed(): number {
+        return this.handling.flightMaxSpeed * 3;
+    }
+
+    /**
      * Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop.
      */
     get autopilotApproachMinDistance(): number {
         const h = this.handling;
+        const arrival = this.autopilotArrivalSpeed;
         return (
             AUTOPILOT_BRAKE_PAD *
-            (((h.flightMaxSpeed + AUTOPILOT_BRAKE_DONE_SPEED) *
-                (h.flightMaxSpeed + AUTOPILOT_BRAKE_DONE_SPEED)) /
+            (((h.flightMaxSpeed + arrival) * (h.flightMaxSpeed + arrival)) /
                 (2 * h.flightThrustDecel))
         );
     }
@@ -1055,7 +1070,7 @@ export class Spaceship extends Body {
 
         if (this.autopilotPhase === 'APPROACH') {
             const nearApproachSpeed =
-                approachSpeed <= h.flightMaxSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
+                approachSpeed <= h.flightMaxSpeed + this.autopilotArrivalSpeed;
             const brakeEntryTrigger =
                 orbitRadius + Math.max(brakeDistance, this.autopilotBrakeArcDist);
             if (nearApproachSpeed && distance <= brakeEntryTrigger) {
@@ -1127,23 +1142,36 @@ export class Spaceship extends Body {
             const effectiveBoostThreshold =
                 orbitRadius + this.autopilotApproachMinDistance + boostDecelDist;
 
-            const useBoost = distance > effectiveBoostThreshold;
-            this.autopilotBoostActive = useBoost;
-            const targetSpeed = useBoost ? h.flightBoostMaxSpeed : h.flightMaxSpeed;
+            // Closing-speed schedule: how fast to close on the target. This shapes only the
+            // closing component of the commanded velocity, not the ship's whole speed — near the
+            // target it drops to normal max so the ship creeps in for the final insertion.
+            const closingSpeed =
+                distance > effectiveBoostThreshold ? h.flightBoostMaxSpeed : h.flightMaxSpeed;
 
             const desiredVel = new THREE.Vector3()
                 .copy(target.velocity)
-                .addScaledVector(toTargetDir, targetSpeed);
+                .addScaledVector(toTargetDir, closingSpeed);
 
-            // Speed-limit guard: never command the ship beyond its current phase
-            // cap (boost max or normal max). Without this clamp, a target body
-            // moving faster than the ship can travel (e.g. a fast comet) makes
-            // desiredVel = target.velocity + targetSpeed exceed the ship's limit,
-            // and the controller thrusts the ship past max speed trying to catch
-            // up. Clamping the commanded velocity lets the existing warp→boost→
-            // normal decel sequence still shed speed while ensuring acceleration
-            // can never push the ship beyond the limit.
-            const approachCap = useBoost ? h.flightBoostMaxSpeed : h.flightMaxSpeed;
+            // Boost is decided from the speed the ship actually needs to fly, NOT from the raw
+            // distance. Matching a body in orbit routinely needs more than the ship's manual
+            // cruise cap — a planet's orbital speed is far above it — so gating boost on distance
+            // left the ship unable to keep pace the instant it was "close enough", and it fell
+            // behind while the target ran away. Hysteresis (engage above cruise × factor, hold
+            // until back at cruise) keeps the flag — and the flame / HUD it drives — from
+            // chattering on and off around a single threshold.
+            const requiredSpeed = Math.max(this.velocity.length(), desiredVel.length());
+            this.autopilotBoostActive = this.autopilotBoostActive
+                ? requiredSpeed > h.flightMaxSpeed
+                : requiredSpeed > h.flightMaxSpeed * AI_BOOST_ENGAGE_FACTOR;
+            const useBoost = this.autopilotBoostActive;
+
+            // Speed-limit guard: never command the ship beyond its own boost ceiling. The cap is
+            // the ship's real self-propelled limit (boost max), not its manual cruise cap, so a
+            // target moving within boost speed can always be matched and held. A target faster
+            // than boost max simply cannot be caught, and the ship is held at its limit rather
+            // than thrust past it — its own engines never push it above max. Gravity may still
+            // carry the ship beyond this, which is expected and allowed.
+            const approachCap = h.flightBoostMaxSpeed;
             const desiredLen = desiredVel.length();
             if (desiredLen > approachCap) desiredVel.multiplyScalar(approachCap / desiredLen);
 
@@ -1153,7 +1181,7 @@ export class Spaceship extends Body {
             if (deltaLen > 1e-6) {
                 const accelDir = velDelta.clone().normalize();
                 const relFwd = relVel.dot(toTargetDir);
-                if (relFwd >= targetSpeed) {
+                if (relFwd >= closingSpeed) {
                     const fwdComp = accelDir.dot(toTargetDir);
                     if (fwdComp > 0) {
                         accelDir.addScaledVector(toTargetDir, -fwdComp);
@@ -1161,7 +1189,7 @@ export class Spaceship extends Body {
                         if (len > 1e-6) accelDir.divideScalar(len);
                     }
                 }
-                const needsDecel = approachSpeed > targetSpeed + AUTOPILOT_BRAKE_DONE_SPEED;
+                const needsDecel = approachSpeed > closingSpeed + this.autopilotArrivalSpeed;
                 const rate = needsDecel
                     ? this.decelRateForSpeed(approachSpeed)
                     : useBoost
@@ -1199,6 +1227,10 @@ export class Spaceship extends Body {
             const vSafeClose = brakingSpeedLimit(remaining, h);
             const brakeApproachSpeed = relVel.length();
             const brakeDecel = this.decelRateForSpeed(brakeApproachSpeed);
+            // The ship is thrusting to match an orbital velocity that normally exceeds cruise
+            // speed, so it is flying on its boost engines — reflect that in the flame / HUD
+            // through the same flag the APPROACH phase drives.
+            this.autopilotBoostActive = this.velocity.length() > h.flightMaxSpeed;
             const alpha = h.flightMaxSpeed > 0 ? 1 - Math.min(1, vSafeClose / h.flightMaxSpeed) : 1;
             const desiredVel = new THREE.Vector3()
                 .copy(target.velocity)
@@ -1247,6 +1279,7 @@ export class Spaceship extends Body {
                 this.velocity.addScaledVector(toTargetDir, vSafeClose - closingAfterBrake);
             }
         } else if (this.autopilotPhase === 'CIRCULARIZE' && gEff > 0) {
+            this.autopilotBoostActive = this.velocity.length() > h.flightMaxSpeed;
             const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
             if (radial.lengthSq() < 1e-10) {
                 this.mesh.position.addScaledVector(new THREE.Vector3(1, 0, 0), orbitRadius);
@@ -1282,7 +1315,7 @@ export class Spaceship extends Body {
             const velDelta = new THREE.Vector3().subVectors(desiredVel, this.velocity);
             const deltaLen = velDelta.length();
 
-            if (deltaLen < AUTOPILOT_BRAKE_DONE_SPEED) {
+            if (deltaLen < this.autopilotArrivalSpeed) {
                 // Close enough — snap the residual and complete.
                 this.velocity.copy(desiredVel);
                 flightState.thrustActive = false;
@@ -1319,6 +1352,9 @@ export class Spaceship extends Body {
                 );
             }
         } else if (this.autopilotPhase === 'TIDAL_LOCK' && gEff > 0) {
+            // Tidal lock holds the orbit by coasting, not by thrust — the ship is not using its
+            // boost engines here even when its orbital speed exceeds cruise.
+            this.autopilotBoostActive = false;
             const radial = new THREE.Vector3().subVectors(shipPos, targetPos);
             if (radial.lengthSq() < 1e-10) return;
             radial.normalize();
