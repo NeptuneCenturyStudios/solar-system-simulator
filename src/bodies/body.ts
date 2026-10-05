@@ -38,6 +38,19 @@ export class Body {
     tempAcc?: THREE.Vector3;
     /** Backward-streaming atmospheric-entry flame, or null when this body isn't currently inside an atmosphere. */
     entryFlame: EntryFlameEffect | null = null;
+    /**
+     * Velocity of the co-rotating atmosphere frame at this body's position while it is inside a
+     * planet's atmosphere (`planet.velocity + ω × r`), or null when it is not captured. Set and
+     * cleared once per frame by `checkAtmosphericEntry` — the same containment test that drives
+     * `entryFlame`.
+     *
+     * When non-null a ship measures its speed and applies its thrust relative to this frame, so a
+     * craft co-moving with the air flies in the planet's frame of reference instead of the
+     * inertial one and the surface stops sweeping out from under it. Held as a plain vector (no
+     * CelestialBody reference) so Body carries no import cycle; the owner recomputes it each
+     * frame. Allocated once when first captured and reused in place.
+     */
+    atmosphereFrameVel: THREE.Vector3 | null = null;
 
     /**
      * Constructs a new Body with physical and visual properties.

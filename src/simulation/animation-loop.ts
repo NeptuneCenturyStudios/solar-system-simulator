@@ -31,6 +31,7 @@ import { absorbBody, destroyBody, updateSimulation } from '../physics/physics';
 import { resolveCollision } from '../physics/collision';
 import { computeAtmosphericDensity } from '../physics/atmosphere-density';
 import { resolveAtmosphericPassage } from '../physics/atmospheric-drag';
+import { computeAtmosphereFrameVelocity } from '../physics/atmosphere-frame';
 import { isBodyType } from '../utilities/utilities';
 import { EntryFlameEffect } from '../effects/entry-flame';
 
@@ -271,6 +272,14 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene, dtTotal: nu
             small.entryFlame.start();
         }
 
+        // Capture the body into the planet's co-rotating atmosphere frame. The atmosphere
+        // travels with the planet — its translation *and* its spin — so the frame velocity is
+        // recomputed each frame from the body's current position (ω × r moves as it does). This
+        // is the reference the drag pulls toward, and (for a ship) the frame its flight controls
+        // work in, so a craft co-moving with the air stays put over the ground.
+        if (!small.atmosphereFrameVel) small.atmosphereFrameVel = new THREE.Vector3();
+        computeAtmosphereFrameVelocity(planet, small.mesh.position, small.atmosphereFrameVel);
+
         const density = computeAtmosphericDensity(distance, planet);
         if (small.entryFlame && small.entryFlame.planet === planet) {
             // Visual brightness follows depth into the shell (leading edge, matching the entry
@@ -282,11 +291,15 @@ function checkAtmosphericEntry(a: Body, b: Body, scene: THREE.Scene, dtTotal: nu
         }
 
         // Continuous drag + heat/ablation damage, applied at the same once-per-frame (dtTotal)
-        // cadence as the flame's intensity update and collision damage.
-        if (resolveAtmosphericPassage(small, planet, density, dtTotal)) {
+        // cadence as the flame's intensity update and collision damage. The drag now pulls toward
+        // the co-rotating frame, not just the planet's translation, so a captured body is carried
+        // around by the planet's spin as well.
+        if (resolveAtmosphericPassage(small, small.atmosphereFrameVel, density, dtTotal)) {
             return small;
         }
     } else if (small.entryFlame && small.entryFlame.planet === planet) {
+        // Release the captured frame — the body is no longer in this planet's air.
+        small.atmosphereFrameVel = null;
         // Only stop the flame when leaving the specific planet it was created for — this
         // function runs once per (small body, atmosphere-bearing planet) pair every frame,
         // so a small body near Earth would otherwise have its just-created flame immediately
@@ -469,7 +482,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             if (bgWarpActive || bgWarpDecel || bgBoostDecel || bgStopBrake) {
                 const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
                 bgShip.advanceWarpSpeed(dtTotal, bgFwd);
-                ctx.flightState.currentSpeed = bgShip.velocity.dot(bgFwd);
+                ctx.flightState.currentSpeed = bgShip.forwardSpeedInFrame(bgFwd);
             }
 
             // Background warp HUD — use the unified method for all three states.
@@ -630,7 +643,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             const _forward = new THREE.Vector3(0, 0, 1).applyQuaternion(
                 ctx.flightState.flightCameraQuat
             );
-            ctx.flightState.currentSpeed = _ship?.velocity.dot(_forward) ?? 0;
+            ctx.flightState.currentSpeed = _ship?.forwardSpeedInFrame(_forward) ?? 0;
         }
 
         // ── Collision & post-physics updates ─────────────────────────────

@@ -30,6 +30,16 @@ import {
 import { triggerScreenFlash } from '../../effects/screen-flash';
 
 /**
+ * Scratch vectors for the flight governor. Module-level so the hot flight path — which runs up
+ * to MAX_SUBSTEPS_PER_FRAME times per frame — never allocates. Every governor method below runs
+ * to completion before the next begins (they are never nested), so sharing these across ships
+ * in the same frame is safe.
+ */
+const _govForward = new THREE.Vector3();
+const _govRel = new THREE.Vector3();
+const _govPerp = new THREE.Vector3();
+
+/**
  * Player-controllable spaceship body.
  * Ship local axes: +Z = forward, +Y = up, +X = right.
  * Geometry is assembled from merged primitives scaled by SCALE_FACTOR.
@@ -423,6 +433,44 @@ export class Spaceship extends Body {
     // ─────────────────────────────────────────────────────────────────────────────
 
     /**
+     * This ship's velocity relative to its captured atmosphere frame, written into `out`.
+     *
+     * Inside a planet's atmosphere the ship is "captured" into the planet's co-rotating air
+     * frame (`Body.atmosphereFrameVel`, set by checkAtmosphericEntry). All speed limits and
+     * drift decay then measure *airspeed* rather than the heliocentric velocity, so a craft
+     * that is co-moving with the air flies like a plane in the planet's reference frame instead
+     * of being pinned at its enormous world speed. Outside any atmosphere the frame is absent and
+     * this returns the plain world velocity — behaviour is unchanged there.
+     */
+    private relativeVelocity(out: THREE.Vector3): THREE.Vector3 {
+        out.copy(this.velocity);
+        const frame = this.atmosphereFrameVel;
+        if (frame) out.sub(frame);
+        return out;
+    }
+
+    /**
+     * Writes a frame-relative velocity back into the world-frame `velocity` — the inverse of
+     * `relativeVelocity()`. When no frame is active this simply copies `rel` through.
+     */
+    private setRelativeVelocity(rel: THREE.Vector3): void {
+        const frame = this.atmosphereFrameVel;
+        if (frame) this.velocity.copy(frame).add(rel);
+        else this.velocity.copy(rel);
+    }
+
+    /**
+     * Forward component of this ship's velocity relative to its atmosphere frame (or the plain
+     * world-frame forward speed when not captured). The HUD and the flight governor both use this
+     * so "speed" means airspeed inside an atmosphere and inertial speed otherwise.
+     */
+    forwardSpeedInFrame(forward: THREE.Vector3): number {
+        const dot = this.velocity.dot(forward);
+        const frame = this.atmosphereFrameVel;
+        return frame ? dot - frame.dot(forward) : dot;
+    }
+
+    /**
      * Apply a thrust impulse along a given direction.
      * This is the fundamental "apply force" building block used by both
      * manual flight (via applyFlightThrustSubstep) and the autopilot.
@@ -493,10 +541,16 @@ export class Spaceship extends Body {
             return;
 
         const input = this.controlInput;
-        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.controlFrameQuat);
-        const fwdSpeed = this.velocity.dot(forward);
+        const forward = _govForward.set(0, 0, 1).applyQuaternion(this.controlFrameQuat);
 
-        // While a thrust key is held: forward thrust is ADDED to velocity so
+        // Govern speed relative to the captured atmosphere frame (if any), so the caps and the
+        // drift decay below mean *airspeed* while inside an atmosphere — a craft co-moving with a
+        // planet's air flies like a plane instead of being pinned at its world-heliocentric speed.
+        // Outside any atmosphere the frame is absent and this is exactly the world velocity.
+        const rel = this.relativeVelocity(_govRel);
+        const fwdSpeed = rel.dot(forward);
+
+        // While a thrust key is held: forward thrust is ADDED to the relative velocity so
         // gravity accumulates freely and is never overwritten.
         // Perpendicular drift is always decayed while any thrust key is held.
         const thrustActive = input.boost || input.thrust || input.brake;
@@ -509,13 +563,13 @@ export class Spaceship extends Body {
                     this.handling.flightBoostAccel * dt,
                     this.handling.flightBoostMaxSpeed - fwdSpeed
                 );
-                this.velocity.addScaledVector(forward, delta);
+                rel.addScaledVector(forward, delta);
             } else if (wEffective && !input.boost) {
                 const delta = Math.min(
                     this.handling.flightThrustAccel * dt,
                     this.handling.flightMaxSpeed - fwdSpeed
                 );
-                this.velocity.addScaledVector(forward, delta);
+                rel.addScaledVector(forward, delta);
             } else if (input.brake) {
                 // Decel stops applying when ship reaches 0 speed
                 const ceiling = Math.max(-this.handling.flightMaxSpeed, -fwdSpeed);
@@ -524,15 +578,18 @@ export class Spaceship extends Body {
                         ? this.handling.flightBoostDecel
                         : this.handling.flightThrustDecel;
                 const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
-                this.velocity.addScaledVector(forward, delta);
+                rel.addScaledVector(forward, delta);
             }
 
-            // Decay perpendicular drift when any thrust key is held.
-            const newFwdSpd = this.velocity.dot(forward);
-            const perpVel = this.velocity.clone().addScaledVector(forward, -newFwdSpd);
+            // Decay perpendicular drift (relative to the air, when captured) while any thrust key
+            // is held, then write the corrected relative velocity back into world space.
+            const newFwdSpd = rel.dot(forward);
+            const perpVel = _govPerp.copy(rel).addScaledVector(forward, -newFwdSpd);
             const decay = Math.max(0, 1 - this.handling.flightPerpDecay * dt);
             perpVel.multiplyScalar(decay);
-            this.velocity.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
+            rel.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
+
+            this.setRelativeVelocity(rel);
         }
     }
 
@@ -544,14 +601,17 @@ export class Spaceship extends Body {
      * (caller should then set ship.boostDecelerating = true).
      */
     applyWarpDecelerationStep(simDt: number, forward: THREE.Vector3): boolean {
-        const fwdSpd = this.velocity.dot(forward);
+        const rel = this.relativeVelocity(_govRel);
+        const fwdSpd = rel.dot(forward);
         const unclamped = fwdSpd - this.handling.flightWarpDecel * simDt;
         if (unclamped > this.handling.flightBoostMaxSpeed) {
-            this.velocity.copy(forward).multiplyScalar(unclamped);
+            rel.copy(forward).multiplyScalar(unclamped);
+            this.setRelativeVelocity(rel);
             return true; // still in warp decel
         }
         // Reached boost speed — snap and signal done.
-        this.velocity.copy(forward).multiplyScalar(this.handling.flightBoostMaxSpeed);
+        rel.copy(forward).multiplyScalar(this.handling.flightBoostMaxSpeed);
+        this.setRelativeVelocity(rel);
         return false;
     }
 
@@ -562,14 +622,17 @@ export class Spaceship extends Body {
      * Returns true while still decelerating, false when normal max speed has been reached.
      */
     applyBoostDecelerationStep(simDt: number, forward: THREE.Vector3): boolean {
-        const fwdSpd = this.velocity.dot(forward);
+        const rel = this.relativeVelocity(_govRel);
+        const fwdSpd = rel.dot(forward);
         const unclamped = fwdSpd - this.handling.flightBoostDecel * simDt;
         if (unclamped > this.handling.flightMaxSpeed) {
-            this.velocity.copy(forward).multiplyScalar(unclamped);
+            rel.copy(forward).multiplyScalar(unclamped);
+            this.setRelativeVelocity(rel);
             return true; // still in boost decel
         }
         // Reached normal max — snap and signal done.
-        this.velocity.copy(forward).multiplyScalar(this.handling.flightMaxSpeed);
+        rel.copy(forward).multiplyScalar(this.handling.flightMaxSpeed);
+        this.setRelativeVelocity(rel);
         return false;
     }
 
@@ -646,7 +709,8 @@ export class Spaceship extends Body {
      */
     applyStopBrakeStep(simDt: number, forward: THREE.Vector3): boolean {
         const h = this.handling;
-        const fwdSpd = this.velocity.dot(forward);
+        const rel = this.relativeVelocity(_govRel);
+        const fwdSpd = rel.dot(forward);
         const absFwdSpd = Math.abs(fwdSpd);
         const dir = fwdSpd < 0 ? -1 : 1;
 
@@ -669,16 +733,18 @@ export class Spaceship extends Body {
 
         if (remaining > 1e-6) {
             const nextFwd = dir * remaining;
-            this.velocity.copy(forward).multiplyScalar(nextFwd);
+            rel.copy(forward).multiplyScalar(nextFwd);
             // Decay perpendicular drift so the ship decelerates in a straight line.
-            const perpVel = this.velocity.clone().addScaledVector(forward, -nextFwd);
+            const perpVel = _govPerp.copy(rel).addScaledVector(forward, -nextFwd);
             const decay = Math.max(0, 1 - h.flightPerpDecay * simDt);
             perpVel.multiplyScalar(decay);
-            this.velocity.copy(forward).multiplyScalar(nextFwd).add(perpVel);
+            rel.copy(forward).multiplyScalar(nextFwd).add(perpVel);
+            this.setRelativeVelocity(rel);
             return true;
         }
-        // At rest — stop completely.
-        this.velocity.set(0, 0, 0);
+        // At rest — stop relative to the air when captured (world frame otherwise).
+        rel.set(0, 0, 0);
+        this.setRelativeVelocity(rel);
         return false;
     }
 
@@ -686,16 +752,19 @@ export class Spaceship extends Body {
      * Accelerate toward warp speed for one frame step.
      */
     applyWarpAccelerationStep(simDt: number, forward: THREE.Vector3): void {
-        const fwdSpd = this.velocity.dot(forward);
+        const rel = this.relativeVelocity(_govRel);
+        const fwdSpd = rel.dot(forward);
         if (fwdSpd < this.handling.flightWarpSpeed) {
             const delta = Math.min(
                 this.handling.flightWarpAccel * simDt,
                 this.handling.flightWarpSpeed - fwdSpd
             );
-            this.velocity.addScaledVector(forward, delta);
+            rel.addScaledVector(forward, delta);
+            this.setRelativeVelocity(rel);
         } else {
             // Clamp to warp max just in case gravity accelerates beyond it.
-            this.velocity.copy(forward).multiplyScalar(this.handling.flightWarpSpeed);
+            rel.copy(forward).multiplyScalar(this.handling.flightWarpSpeed);
+            this.setRelativeVelocity(rel);
         }
     }
 
@@ -718,13 +787,13 @@ export class Spaceship extends Body {
     advanceWarpSpeed(simDt: number, forward: THREE.Vector3): IWarpStepResult {
         if (this.warpActive) {
             this.applyWarpAccelerationStep(simDt, forward);
-            const fwdSpd = this.velocity.dot(forward);
+            const fwdSpd = this.forwardSpeedInFrame(forward);
             return { phase: 'warp_active', forwardSpeed: fwdSpd, decelDone: false };
         }
 
         if (this.warpDecelerating) {
             const stillDecel = this.applyWarpDecelerationStep(simDt, forward);
-            const fwdSpd = this.velocity.dot(forward);
+            const fwdSpd = this.forwardSpeedInFrame(forward);
             if (!stillDecel) {
                 // Phase 1 complete: reached boost speed.
                 this.warpDecelerating = false;
@@ -737,7 +806,7 @@ export class Spaceship extends Body {
 
         if (this.boostDecelerating) {
             const stillDecel = this.applyBoostDecelerationStep(simDt, forward);
-            const fwdSpd = this.velocity.dot(forward);
+            const fwdSpd = this.forwardSpeedInFrame(forward);
             if (!stillDecel) {
                 this.boostDecelerating = false;
                 return { phase: 'idle', forwardSpeed: fwdSpd, decelDone: true };
@@ -757,12 +826,12 @@ export class Spaceship extends Body {
                 this.boostDecelerating = false;
                 return { phase: 'idle', forwardSpeed: 0, decelDone: true };
             }
-            const fwdSpd = this.velocity.dot(forward);
+            const fwdSpd = this.forwardSpeedInFrame(forward);
             return { phase: 'stop_brake', forwardSpeed: fwdSpd, decelDone: false };
         }
 
         // Idle — no warp/boost state.
-        const fwdSpd = this.velocity.dot(forward);
+        const fwdSpd = this.forwardSpeedInFrame(forward);
         return { phase: 'idle', forwardSpeed: fwdSpd, decelDone: false };
     }
 
@@ -891,8 +960,8 @@ export class Spaceship extends Body {
      * with its pilot locked out. See stepNpcShips() in simulation/ai/npc-manager.ts.
      */
     updateBoostDecelState(): void {
-        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.controlFrameQuat);
-        const fwdSpeed = this.velocity.dot(forward);
+        const forward = _govForward.set(0, 0, 1).applyQuaternion(this.controlFrameQuat);
+        const fwdSpeed = this.forwardSpeedInFrame(forward);
         const boostHeld = this.controlInput.boost;
         const boostJustReleased = this.prevShiftHeld && !boostHeld;
 

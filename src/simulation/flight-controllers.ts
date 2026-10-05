@@ -378,7 +378,9 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
 
     // ── Thrust state transitions (velocity mutation is in applyFlightThrustSubstep) ──
     const manualInput = !autopilotState.isActive;
-    const fwdSpeed = ship.velocity.dot(forward);
+    // Relative to the captured atmosphere frame when inside one, so the HUD reads airspeed
+    // (see Spaceship.forwardSpeedInFrame) rather than the ship's heliocentric speed.
+    const fwdSpeed = ship.forwardSpeedInFrame(forward);
 
     // Sync thrustActive flag for trail / HUD (key state, not physics).
     const thrustActive =

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body.js';
+import { CelestialBody } from '../bodies/celestial-body.js';
 import { settingsStore } from '../settings/settings-store.js';
+import { computeAtmosphereFrameVelocity } from '../physics/atmosphere-frame.js';
 import {
     ATMOSPHERE_FULL_INTENSITY_SPEED,
     ATMOSPHERE_MIN_SPEED_FOR_EFFECT,
@@ -87,6 +89,8 @@ const BASE_FADE_FRACTION = 0.02;
 
 // Reusable scratch objects — the update loop runs every frame and must not allocate.
 const _UP = new THREE.Vector3(0, 1, 0);
+/** Scratch for the co-rotating atmosphere frame velocity at the body's position. */
+const _frameVel = new THREE.Vector3();
 const _FLIP_AXIS = new THREE.Vector3(1, 0, 0);
 const _TWO_PI = Math.PI * 2;
 
@@ -234,7 +238,7 @@ export class EntryFlameEffect {
      *  containment check (checkAtmosphericEntry) only disposes this effect when *this*
      *  specific planet's atmosphere is exited, not whenever the body doesn't happen to be
      *  inside some other, unrelated atmosphere-bearing planet it's compared against. */
-    readonly planet: Body;
+    readonly planet: CelestialBody;
 
     private readonly geometry: THREE.BufferGeometry;
     private readonly material: THREE.MeshBasicMaterial;
@@ -280,7 +284,7 @@ export class EntryFlameEffect {
     private readonly _backward = new THREE.Vector3();
     private readonly _quat = new THREE.Quaternion();
 
-    constructor(scene: THREE.Scene, body: Body, planet: Body) {
+    constructor(scene: THREE.Scene, body: Body, planet: CelestialBody) {
         this.scene = scene;
         this.body = body;
         this.planet = planet;
@@ -429,9 +433,7 @@ export class EntryFlameEffect {
      * Visual only — drag and heat damage (physics/atmospheric-drag.ts) keep consuming the
      * physical density.
      *
-     * Called once per frame by `checkAtmosphericEntry`, which holds the strongly-typed
-     * `CelestialBody` this effect's `planet: Body` field deliberately doesn't. Safe to call
-     * every frame.
+     * Called once per frame by `checkAtmosphericEntry`. Safe to call every frame.
      *
      * @param depthFraction 0 at the atmosphere's outer edge, 1 at the surface.
      * @param surfacePressureBar The atmosphere's surface pressure.
@@ -481,11 +483,13 @@ export class EntryFlameEffect {
             return;
         }
 
-        // Amplify with closing/relative speed against the planet (not heliocentric speed —
-        // a ship co-moving with its planet has near-zero speed relative to it even though
-        // its absolute velocity is large). Ramps smoothly from dark at MIN_SPEED_FOR_EFFECT
-        // to full brightness at FULL_INTENSITY_SPEED.
-        const relativeSpeed = this.body.velocity.distanceTo(this.planet.velocity);
+        // Amplify with closing/relative speed against the planet's *co-rotating atmosphere*
+        // (not heliocentric speed — a ship co-moving with the air has near-zero speed relative
+        // to it even though its absolute velocity is large, and the air itself moves with the
+        // planet's translation and spin; see physics/atmosphere-frame.ts). Ramps smoothly from
+        // dark at MIN_SPEED_FOR_EFFECT to full brightness at FULL_INTENSITY_SPEED.
+        computeAtmosphereFrameVelocity(this.planet, this.body.mesh.position, _frameVel);
+        const relativeSpeed = this.body.velocity.distanceTo(_frameVel);
         const speedIntensity = THREE.MathUtils.smoothstep(
             relativeSpeed,
             ATMOSPHERE_MIN_SPEED_FOR_EFFECT,

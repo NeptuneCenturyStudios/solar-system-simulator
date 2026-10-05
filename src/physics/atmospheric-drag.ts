@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
-import { CelestialBody } from '../bodies/celestial-body';
 import {
     ATMOSPHERE_DAMAGE_COEFFICIENT,
     ATMOSPHERE_DRAG_COEFFICIENT,
@@ -25,16 +24,24 @@ const _dragRelVel = new THREE.Vector3();
  * = radius — burn-through time scales with the body's own size, matching "small bodies burn up
  * fast, large ones barely notice" without needing to reconcile wildly different mass scales by
  * hand.
+ *
+ * The relative speed is measured against `frameVel` — the velocity of the *co-rotating*
+ * atmosphere at the body's position (planet translation + spin; see physics/atmosphere-frame.ts)
+ * — not the planet's translation alone. So a body travelling with the air is treated as at rest
+ * and takes no heat, exactly as a real craft co-moving with the air mass would not.
+ *
+ * @param frameVel Co-rotating atmosphere velocity at the body's position, from
+ *   `Body.atmosphereFrameVel`.
  */
 export function computeAtmosphericDamage(
     body: Body,
-    planet: CelestialBody,
+    frameVel: THREE.Vector3,
     density: number,
     dt: number
 ): number {
     if (density <= 0 || dt <= 0) return 0;
 
-    const relSpeed = body.velocity.distanceTo(planet.velocity);
+    const relSpeed = _relVel.subVectors(body.velocity, frameVel).length();
     if (relSpeed <= 0) return 0;
 
     const speedIntensity = THREE.MathUtils.smoothstep(
@@ -49,7 +56,8 @@ export function computeAtmosphericDamage(
 }
 
 /**
- * Reduces `body`'s speed relative to `planet`, never reversing its direction.
+ * Reduces `body`'s speed relative to the co-rotating atmosphere (`frameVel`), never reversing
+ * its direction.
  *
  * Real quadratic drag is dv/dt = -k0*v^2, k0 = ATMOSPHERE_DRAG_COEFFICIENT * density *
  * radius^2 / mass (a ballistic-coefficient term — light bodies with proportionally large
@@ -60,16 +68,23 @@ export function computeAtmosphericDamage(
  * construction can never cross zero — no clamping needed. Unlike damage, this is not gated by
  * speed: even faint residual density should sap a little speed every frame, which is what lets
  * a low, slow orbiter keep decaying its orbit gradually rather than seeing no effect at all.
+ *
+ * Because the target is the co-rotating frame, a captured body is dragged not only along the
+ * planet's orbit but *around* it: the air it is embedded in sweeps with the surface, and the
+ * drag bleeds the body's motion relative to that sweeping air. This is what stops a planet's
+ * surface spinning out from under a craft that has entered its atmosphere.
+ *
+ * @param frameVel Co-rotating atmosphere velocity at the body's position.
  */
 function applyAtmosphericDrag(
     body: Body,
-    planet: CelestialBody,
+    frameVel: THREE.Vector3,
     density: number,
     dt: number
 ): void {
     if (density <= 0 || dt <= 0) return;
 
-    _relVel.subVectors(body.velocity, planet.velocity);
+    _relVel.subVectors(body.velocity, frameVel);
     const relSpeed = _relVel.length();
     if (relSpeed <= 1e-9) return;
 
@@ -78,27 +93,29 @@ function applyAtmosphericDrag(
     const newRelSpeed = relSpeed / (1 + k0 * relSpeed * dt);
 
     _dragRelVel.copy(_relVel).multiplyScalar(newRelSpeed / relSpeed);
-    body.velocity.copy(planet.velocity).add(_dragRelVel);
+    body.velocity.copy(frameVel).add(_dragRelVel);
 }
 
 /**
  * Applies one frame's worth of atmospheric drag and heat damage to `body`. Mutates
- * `body.velocity` directly and applies heat damage via `body.takeDamage()`; does NOT call `.die()` or touch the bodies
- * array — the caller (checkAtmosphericEntry in animation-loop.ts) does that, mirroring
- * resolveCollision's contract.
+ * `body.velocity` directly and applies heat damage via `body.takeDamage()`; does NOT call
+ * `.die()` or touch the bodies array — the caller (checkAtmosphericEntry in animation-loop.ts)
+ * does that, mirroring resolveCollision's contract.
  *
+ * @param frameVel Co-rotating atmosphere velocity at the body's position, from
+ *   `Body.atmosphereFrameVel` (see physics/atmosphere-frame.ts).
  * @returns true when this step's damage brought healthPoints to <= 0.
  */
 export function resolveAtmosphericPassage(
     body: Body,
-    planet: CelestialBody,
+    frameVel: THREE.Vector3,
     density: number,
     dt: number
 ): boolean {
-    const damage = computeAtmosphericDamage(body, planet, density, dt);
+    const damage = computeAtmosphericDamage(body, frameVel, density, dt);
     if (damage > 0) body.takeDamage(damage);
 
-    applyAtmosphericDrag(body, planet, density, dt);
+    applyAtmosphericDrag(body, frameVel, density, dt);
 
     return body.healthPoints <= 0;
 }
