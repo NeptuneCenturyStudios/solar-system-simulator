@@ -103,8 +103,13 @@ export class HealthBarIndicator {
         this.pool = new HudSpritePool(() => this.createBarSprite());
     }
 
-    /** @param projector Shared projector, already primed for this frame via `beginFrame`. */
-    update(projector: ScreenProjector): void {
+    /**
+     * @param projector Shared projector, already primed for this frame via `beginFrame`.
+     * @param hiddenBody A body whose bar should be suppressed entirely — the ship the player is
+     *   flying, whose vitals are shown in the flight HUD instead of floating above the hull.
+     *   Pass null (the default) to draw bars for every qualifying body.
+     */
+    update(projector: ScreenProjector, hiddenBody: Body | null = null): void {
         const bodies = this.simulationState.bodies;
 
         this.visible.reset();
@@ -112,6 +117,7 @@ export class HealthBarIndicator {
         for (let i = 0; i < bodies.length; i++) {
             const body = bodies[i];
             if (!body) continue;
+            if (body === hiddenBody) continue;
             if (body.healthPoints <= 0) continue;
             const shield = shieldFractionOf(body);
             const hullDamaged = body.healthPoints < body.maxHealthPoints;

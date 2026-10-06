@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
+import type { Spaceship } from '../bodies/ships/spaceship';
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
@@ -35,6 +36,19 @@ const PHASE_W = 900;
 const PHASE_H = 100;
 const HINT_W = 2200;
 const HINT_H = 140;
+
+// ── Ship vitals panel ────────────────────────────────────────────────────────
+// Shield-over-hull bars, pinned directly above the speed readout (bottom-right).
+const SHIP_STATUS_CANVAS_W = 640;
+const SHIP_STATUS_CANVAS_H = 132;
+/** 640-wide canvas at the speed sprite's 0.625 ratio → 400 screen pixels wide. */
+const SHIP_STATUS_SPRITE_W = 400;
+const SHIP_STATUS_SPRITE_H = (SHIP_STATUS_CANVAS_H / SHIP_STATUS_CANVAS_W) * SHIP_STATUS_SPRITE_W;
+/** Same centre X as the speed sprite, and just above its 400px-tall top edge. */
+const SHIP_STATUS_OFFSET_X = -210;
+const SHIP_STATUS_OFFSET_Y = 465;
+/** Shield bar colour — matches the world-space health bar's shield row. */
+const SHIELD_BAR_COLOR = '#4fc3ff';
 
 // ── Private painters ─────────────────────────────────────────────────────────
 //
@@ -265,6 +279,86 @@ function paintHint(context: CanvasRenderingContext2D, lines: string[]): void {
     }
 }
 
+/** Hull bar colour by severity — the same thresholds the world-space health bar uses. */
+function hullBarColor(fraction: number): string {
+    return fraction > 0.6 ? '#4caf50' : fraction > 0.3 ? '#ffb300' : '#ff4d4d';
+}
+
+/** One labelled fill bar: shared cyan track, coloured fill, centred label. */
+function paintVitalsBar(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    fraction: number,
+    color: string,
+    label: string
+): void {
+    drawGaugeTrack(ctx, x, y, width, height);
+
+    const clamped = Math.max(0, Math.min(1, fraction));
+    if (clamped > 0) {
+        ctx.fillStyle = color;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = color;
+        ctx.fillRect(x, y, width * clamped, height);
+        ctx.shadowBlur = 0;
+    }
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 30px monospace';
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillText(label, x + width / 2, y + height / 2 + 1);
+    ctx.shadowBlur = 0;
+}
+
+/**
+ * Ship vitals panel: a shield bar above a hull bar, each showing its fill and percent.
+ * The canvas must already be `SHIP_STATUS_CANVAS_W × SHIP_STATUS_CANVAS_H`.
+ */
+function paintShipStatus(
+    ctx: CanvasRenderingContext2D,
+    shieldFraction: number,
+    hullFraction: number
+): void {
+    const W = SHIP_STATUS_CANVAS_W;
+    const H = SHIP_STATUS_CANVAS_H;
+    ctx.clearRect(0, 0, W, H);
+
+    const barX = 24;
+    const barW = W - 48;
+    const barH = 44;
+    const shieldY = 18;
+    const hullY = 72;
+    const shieldPct = Math.round(Math.max(0, Math.min(1, shieldFraction)) * 100);
+    const hullPct = Math.round(Math.max(0, Math.min(1, hullFraction)) * 100);
+
+    paintVitalsBar(
+        ctx,
+        barX,
+        shieldY,
+        barW,
+        barH,
+        shieldFraction,
+        SHIELD_BAR_COLOR,
+        `SHIELD  ${shieldPct}%`
+    );
+    paintVitalsBar(
+        ctx,
+        barX,
+        hullY,
+        barW,
+        barH,
+        hullFraction,
+        hullBarColor(hullFraction),
+        `HULL  ${hullPct}%`
+    );
+}
+
 // ── FlightHUD class ──────────────────────────────────────────────────────────
 
 export class FlightHUD {
@@ -273,6 +367,7 @@ export class FlightHUD {
     orbitNotifySprite: HudSprite | null = null;
     hintSprite: HudSprite | null = null;
     thermalSprite: HudSprite | null = null;
+    shipStatusSprite: HudSprite | null = null;
     autopilotBlockedNotifyTimer = 0;
     autopilotBlockedByName = '';
 
@@ -328,6 +423,7 @@ export class FlightHUD {
         this._initOrbitNotify();
         this._initHint();
         this._initThermal();
+        this._initShipStatus();
     }
 
     private _initWarp(): void {
@@ -364,11 +460,25 @@ export class FlightHUD {
         this.thermalSprite.setScale(48, 90);
     }
 
+    private _initShipStatus(): void {
+        this.shipStatusSprite = new HudSprite(this.uiScene);
+        this.shipStatusSprite.setCanvasSize(SHIP_STATUS_CANVAS_W, SHIP_STATUS_CANVAS_H);
+        this.shipStatusSprite.draw('1.000|1.000', (ctx) => paintShipStatus(ctx, 1, 1));
+        this.shipStatusSprite.setScale(SHIP_STATUS_SPRITE_W, SHIP_STATUS_SPRITE_H);
+        // Bottom-right, in the same column as the speed readout and directly above it.
+        this.shipStatusSprite.setAnchor({
+            corner: 'bottom-right',
+            offsetX: SHIP_STATUS_OFFSET_X,
+            offsetY: SHIP_STATUS_OFFSET_Y,
+        });
+    }
+
     /** Reposition the screen-anchored HUD sprites for a new viewport size. */
     layout(width: number, height: number): void {
         this.warpSprite?.layout(width, height);
         this.orbitNotifySprite?.layout(width, height);
         this.hintSprite?.layout(width, height);
+        this.shipStatusSprite?.layout(width, height);
     }
 
     /** Show the orbit-notify sprite and reset its timer. */
@@ -426,6 +536,36 @@ export class FlightHUD {
     /** Hide the thermal gauge. */
     hideThermalSprite(): void {
         if (this.thermalSprite) this.thermalSprite.visible = false;
+    }
+
+    /**
+     * Update the ship vitals panel (shield over hull) from `ship` and make it visible.
+     * The bars are always drawn while flying — a full shield/hull reads as a full bar —
+     * unlike the world-space health bar, which only appears once a body is damaged.
+     */
+    updateShipStatusHUD(ship: Spaceship): void {
+        const sprite = this.shipStatusSprite;
+        if (!sprite) return;
+
+        const shieldFraction =
+            ship.maxShieldPoints > 0
+                ? Math.max(0, Math.min(1, ship.shieldPoints / ship.maxShieldPoints))
+                : 0;
+        const hullFraction =
+            ship.maxHealthPoints > 0
+                ? Math.max(0, Math.min(1, ship.healthPoints / ship.maxHealthPoints))
+                : 0;
+
+        // Keyed at 3 decimals: the bars are ~370px wide, so this is well below one pixel.
+        sprite.draw(`${shieldFraction.toFixed(3)}|${hullFraction.toFixed(3)}`, (ctx) =>
+            paintShipStatus(ctx, shieldFraction, hullFraction)
+        );
+        sprite.visible = true;
+    }
+
+    /** Hide the ship vitals panel (called whenever flight mode is not active). */
+    hideShipStatus(): void {
+        if (this.shipStatusSprite) this.shipStatusSprite.visible = false;
     }
 
     /**

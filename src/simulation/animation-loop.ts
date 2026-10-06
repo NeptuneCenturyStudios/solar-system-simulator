@@ -946,8 +946,22 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // Tan(fov/2) and the viewport half-sizes are computed once here for all indicators.
         ctx.screenProjector.beginFrame(ctx.camera);
         ctx.planetNameIndicator.update(ctx.screenProjector, ctx.autopilotState, flightHoverCtx);
-        ctx.healthBarIndicator.update(ctx.screenProjector);
+        // While flying, the ship's shield/hull are shown in the flight HUD (above the speed
+        // readout), so suppress the world-space bar that would otherwise float over its own hull.
+        // Every other body — including other ships — keeps its bar.
+        ctx.healthBarIndicator.update(
+            ctx.screenProjector,
+            isFlightModeActive ? ctx.flightState.activeShip : null
+        );
         ctx.threatIndicator.update(ctx.screenProjector);
+
+        // Ship vitals panel: shown with the rest of the flight HUD whenever the player is
+        // flying, hidden otherwise (so it disappears the moment flight mode ends).
+        if (isFlightModeActive && ctx.flightState.activeShip) {
+            ctx.flightHUD.updateShipStatusHUD(ctx.flightState.activeShip);
+        } else {
+            ctx.flightHUD.hideShipStatus();
+        }
 
         // ── E-key autopilot charge accumulation ──────────────────────────
         if (isFlightModeActive) {
