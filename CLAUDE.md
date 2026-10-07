@@ -133,8 +133,7 @@ For previous milestone info, see milestones.md
 - [x] Phase 1.1: Make codebase buildable to web and electron
 - ** Phase 2
 - [ ] Phase 2.1: Add 8k assets
-- [ ] Phase 2.2: Add option to pick low or high res (if a high res texture exists). Also increases the segement count for sphere meshes. Available only for electron app.
-- [ ] Phase 2.3: Add more skydome textures.
+- [x] Phase 2.2: Add option to pick low or high res (if a high res texture exists). Also increases the segement count for sphere meshes. Available only for electron app.
 - ** Phase 3
 - [x] Phase 3.1: Convert Kuiper belt into a solar system "feature" instead of being a static object in all systems. (Also ground work for future solar system features and procedurally generated features). Also allow farther zoom out than it currently so full kuiper belt can be viewed.
 - [x] Phase 3.2: Procedural ring systems for planets (`procedural/ring-generator.ts` rolls an `IRingSpec`; `effects/planet-rings.ts` renders it as a lit, planet-shadowed banded annulus attached to the body mesh; real giants use `procedural/ring-presets.ts`)

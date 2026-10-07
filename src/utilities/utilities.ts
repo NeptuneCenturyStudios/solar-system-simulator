@@ -5,6 +5,7 @@ import { CelestialBody } from '../bodies/celestial-body';
 import { ISS } from '../bodies/iss';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { ISatelliteCreationOptions } from '../interfaces';
+import { settingsStore } from '../settings/settings-store';
 
 // Shared body-type helper. Checks bodyType flags only.
 export function isBodyType(body: Body, type: BodyTypeEnum) {
@@ -139,7 +140,7 @@ export function buildBodySphereGeometry(
     // Calculate the number of segments based on radius to maintain visual fidelity
     const minSegments = 64;
     const maxSegments = 128;
-    const segmentFactor = 0.25; // Adjust this factor to control segment density
+    const segmentFactor = settingsStore.settings.textureQuality === 'low' ? 0.25 : 16; // Adjust this factor to control segment density
 
     if (!widthSegments) {
         widthSegments = Math.max(
