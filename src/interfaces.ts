@@ -413,9 +413,39 @@ export interface IProbeCreationOptions extends ISatelliteCreationOptions {
     altitudeKm: number;
 }
 
+/**
+ * Classical Keplerian orbital elements for a moon's orbit about its parent, expressed in the
+ * parent's local frame. Supplied via {@link IMoonCreationOptions.orbitElements} to place a moon
+ * on a real eccentric and/or inclined orbit instead of the default flat circle.
+ *
+ * Angles use the same convention as `stateVectorsFromElements()`: the reference plane is XZ
+ * (the ecliptic), longitude of the ascending node Ω and argument of periapsis ω are measured
+ * from +X toward +Z, and the true anomaly is measured from periapsis.
+ */
+export interface IMoonOrbitElements {
+    /** Semi-major axis a, in simulation distance units. */
+    semiMajorAxis: number;
+    /** Eccentricity e (0 = circular, <1 = elliptical). */
+    eccentricity: number;
+    /** Inclination i to the reference (ecliptic) plane, in radians. */
+    inclinationRad: number;
+    /** Longitude of the ascending node Ω, in radians. */
+    longitudeAscendingNodeRad: number;
+    /** Argument of periapsis ω, in radians. */
+    argumentOfPeriapsisRad: number;
+}
+
 export interface IMoonCreationOptions extends ISatelliteCreationOptions {
     moonType: MoonTypeEnum;
     texture?: THREE.Texture;
+    /**
+     * When set, `createMoon()` places the moon on a real Keplerian orbit about its parent built
+     * from these elements, instead of the default circular orbit at `distance`. In that case
+     * `distance` is ignored (semiMajorAxis governs) and `yVariation` is ignored too (the
+     * inclination supplies the out-of-plane component); `angle` becomes the true anomaly measured
+     * from periapsis rather than the in-plane orbital angle.
+     */
+    orbitElements?: IMoonOrbitElements;
 }
 
 export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {

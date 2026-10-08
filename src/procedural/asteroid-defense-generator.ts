@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { SolarSystemGenerator } from './solar-system-generator';
 import { Sun } from '../bodies/sun';
 import { Earth } from '../bodies/earth';
-import { createMoon } from '../bodies/create-moon';
+import { createMoon, earthMoonOrbitElements } from '../bodies/create-moon';
 import { getShipTypeById } from '../bodies/ships/ship-registry';
 import { calculateOrbitalSpeed } from '../physics/physics';
 import { AsteroidDefenseScenario } from '../scenarios/asteroid-defense-scenario';
@@ -129,6 +129,8 @@ export class AsteroidDefenseGenerator extends SolarSystemGenerator {
             trailColor: 0xffffff,
             maxTrail: 1500,
             angle: 0,
+            // Real J2000 lunar orbit (eccentric, inclined 5.145°), same as the default system.
+            orbitElements: earthMoonOrbitElements(),
         });
         bodies.push(moon);
         reporter?.report({

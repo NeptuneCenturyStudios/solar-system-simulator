@@ -22,7 +22,7 @@ import { AsteroidPocked } from '../bodies/asteroid-pocked';
 
 import { createSatellite } from '../utilities/utilities';
 import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
-import { createMoon } from '../bodies/create-moon';
+import { createMoon, earthMoonOrbitElements } from '../bodies/create-moon';
 import { KuiperBelt } from '../features/kuiper-belt';
 
 import {
@@ -135,16 +135,17 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         report({ phase: 'planets', label: `Venus ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Earth (+ Moon)
-        const earthAngle = randomAngle();
-        const earth = new Earth(this.dependencies, this.scene, earthAngle);
+        // Earth (+ Moon) — random true anomaly preserves the slightly eccentric orbit shape
+        const earthTrueAnomaly = randomAngle();
+        const earth = new Earth(this.dependencies, this.scene, earthTrueAnomaly);
         earth.orbitParent = sun;
         bodies.push(earth);
         completed++;
         report({ phase: 'planets', label: `Earth ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Moon gets its own random angle around Earth
+        // Moon — real J2000 orbital elements (eccentric, inclined 5.145° to the ecliptic) with a
+        // random true anomaly to seed where in the ellipse it starts.
         bodies.push(
             createMoon(earth, this.scene, {
                 distance: MOON_DIST_FROM_EARTH,
@@ -159,6 +160,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 texture: moonTexture,
                 moonType: MoonTypeEnum.Terrestrial,
                 angle: randomAngle(),
+                orbitElements: earthMoonOrbitElements(),
                 attributes: {
                     surfacePressure: { discovered: true },
                     coreType: { value: CoreTypeEnum.Solid, discovered: true },

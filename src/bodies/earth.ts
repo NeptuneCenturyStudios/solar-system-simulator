@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
+import { stateVectorsFromElements } from '../procedural/orbital-math.js';
 import {
     SUN_MASS,
     EARTH_MASS,
@@ -13,6 +14,11 @@ import {
     EARTH_MAG_STRENGTH,
     EARTH_MAG_TILT,
     EARTH_ORBITAL_PERIOD_REAL,
+    EARTH_PERIHELION_DIST,
+    EARTH_APHELION_DIST,
+    EARTH_INCLINATION,
+    EARTH_LONG_ASC_NODE,
+    EARTH_ARG_PERIHELION,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId, isBodyType } from '../utilities/utilities.js';
@@ -166,24 +172,54 @@ export class Earth extends Planet {
      * Constructs a new Earth object with its unique properties, orbit, and cloud layer.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Earth belongs.
-     * @param angleRad Starting orbital angle in radians (0 = +X axis, π/2 = +Z axis).
-     * @param orbitDistance Radius of the circular orbit around the Sun. Defaults to Earth's
-     * real distance; scenarios may place Earth closer.
+     * @param angleRad Position along the orbit in radians. On Earth's real orbit (the default)
+     *                 this is the true anomaly measured from perihelion (0 = perihelion,
+     *                 π = aphelion); when `orbitDistance` is given it is instead the circular
+     *                 orbital angle (0 = +X axis, π/2 = +Z axis), exactly as it was before.
+     * @param orbitDistance Optional radius of a bespoke CIRCULAR orbit around the Sun. Omit it
+     *                 (the normal case) to give Earth its real, slightly eccentric orbit;
+     *                 scenarios that need Earth on a tight circle — the wormhole short-cut and
+     *                 the asteroid field — pass an explicit radius.
      */
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         angleRad: number = 0,
-        orbitDistance: number = EARTH_DIST
+        orbitDistance?: number
     ) {
         const gEff = dependencies.getG();
-        // The spin rate stays keyed to EARTH_DIST even when orbitDistance differs, so a day
+        // The spin rate stays keyed to EARTH_DIST regardless of the orbit actually flown, so a day
         // keeps looking like a day. Deriving it from a much tighter orbit would shorten the
         // sim year and spin Earth into a blur.
         const timeScale =
             EARTH_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(EARTH_DIST, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (23.934 * 3600)) * timeScale;
-        const trajectory = calculateTrajectory(gEff, orbitDistance, SUN_MASS, angleRad);
+
+        // Earth follows its real orbit by default: nearly circular (e ≈ 0.0167) and, by
+        // definition, lying in the ecliptic (inclination ≈ 0), so it is built from its orbital
+        // elements the same way Neptune and Pluto are. The eccentricity makes the Sun distance
+        // vary by ~1.7% over the year and the argument of perihelion points that ellipse the
+        // correct way round the ecliptic. A scenario that needs Earth on a bespoke circular orbit
+        // passes `orbitDistance`, which keeps the old flat-circle placement.
+        let trajectory: { pos: THREE.Vector3; vel: THREE.Vector3 };
+        if (orbitDistance === undefined) {
+            const semiMajorAxis = (EARTH_PERIHELION_DIST + EARTH_APHELION_DIST) / 2;
+            const ecc =
+                (EARTH_APHELION_DIST - EARTH_PERIHELION_DIST) /
+                (EARTH_APHELION_DIST + EARTH_PERIHELION_DIST); // ≈ 0.0167
+            trajectory = stateVectorsFromElements({
+                semiMajorAxis,
+                eccentricity: ecc,
+                inclinationRad: THREE.MathUtils.degToRad(EARTH_INCLINATION),
+                longitudeAscendingNodeRad: THREE.MathUtils.degToRad(EARTH_LONG_ASC_NODE),
+                argumentOfPeriapsisRad: THREE.MathUtils.degToRad(EARTH_ARG_PERIHELION),
+                trueAnomalyRad: angleRad,
+                mu: gEff * SUN_MASS,
+            });
+        } else {
+            trajectory = calculateTrajectory(gEff, orbitDistance, SUN_MASS, angleRad);
+        }
+
         const geometry = buildBodySphereGeometry(EARTH_RADIUS);
 
         const customUniforms: EarthUniforms = {

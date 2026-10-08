@@ -128,6 +128,58 @@ export const NEPTUNE_ARG_PERIHELION = 273.187; // degrees, argument of perihelio
 // Real mean anomaly at epoch is 259.883°, but the generator places Neptune at a random true
 // anomaly instead, matching how the other planets, Pluto and Halley are seeded.
 
+// === Earth: Orbital Elements (J2000) ===
+// Earth's orbit is the least exotic of all: nearly circular (e ≈ 0.0167) and lying in the
+// ecliptic by definition, because Earth's own orbital plane *is* the reference plane that every
+// other inclination here is measured against. It is nonetheless built from real orbital
+// elements like Neptune and Pluto, because the two things a flat circle gets wrong are both
+// real: the small eccentricity makes the Sun distance vary by ~1.7% over the year (perihelion in
+// early January, aphelion in early July), and the argument of perihelion points that ellipse the
+// correct way round the ecliptic.
+// EARTH_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
+export const EARTH_PERIHELION_DIST = 147095000 / DIST_SCALE; // 0.98329 AU
+export const EARTH_APHELION_DIST = 152100000 / DIST_SCALE; // 1.01671 AU
+// Earth defines the ecliptic, so its inclination to it is zero by definition. The fact sheet's
+// J2000 mean elements quote 0.00005°, the residual measured against the J2000 *mean* ecliptic —
+// numerically indistinguishable from zero, and using it would tilt Earth a hair out of the very
+// plane the other planets share.
+export const EARTH_INCLINATION = 0;
+export const EARTH_LONG_ASC_NODE = -11.26064; // degrees, longitude of the ascending node (Ω)
+export const EARTH_ARG_PERIHELION = 114.20783; // degrees, argument of perihelion (ω)
+// Real mean longitude at epoch is 100.464°, but the generator places Earth at a random true
+// anomaly instead, matching how the other planets, Neptune, Pluto and Halley are seeded.
+
+// === Moon: Orbital Elements (J2000, orbit about Earth) ===
+// The Moon is the one natural satellite modelled from real orbital elements, for the same
+// reason Neptune, Pluto and Earth are: a flat circle loses two things that are plainly
+// visible. The first is eccentricity — at e ≈ 0.0549 the Earth–Moon distance swings from
+// 363,300 km at perigee to 405,500 km at apogee, an 11.6% difference that also makes the
+// Moon's orbital speed vary from ≈0.97 to ≈1.08 km/s. The second is the orbital plane: the
+// Moon orbits 5.145° out of the ecliptic, so it spends half of each month north of Earth's
+// orbit plane and half south of it.
+//
+// Note which plane it is inclined to: the *ecliptic*, not Earth's equator. That is unusual
+// among moons — most regular satellites orbit their primary's equatorial plane — and it is
+// convenient here, because this simulation's local Earth frame is already ecliptic-aligned.
+// The elements below therefore drop straight into stateVectorsFromElements() with no frame
+// rotation required. MOON_DIST_FROM_EARTH above is the semi-major axis and equals
+// (perigee + apogee) / 2.
+export const MOON_PERIGEE_DIST = 363300 / DIST_SCALE; // 363,300 km
+export const MOON_APOGEE_DIST = 405500 / DIST_SCALE; // 405,500 km (e ≈ 0.0549)
+export const MOON_INCLINATION = 5.145; // degrees, inclination to the ecliptic
+// J2000 mean longitude of the ascending node (Ω) and argument of perigee (ω). Both precess in
+// reality — the node regresses once per 18.6 years, the line of apsides rotates once per 8.85
+// years — and both are driven by the Sun's perturbation of the Moon's orbit. This simulation
+// integrates full Sun–Earth–Moon n-body gravity, so those precessions emerge from the physics
+// on their own; these values only seed the direction the orbit starts out pointing.
+export const MOON_LONG_ASC_NODE = 125.044; // degrees (Ω)
+export const MOON_ARG_PERIGEE = 318.309; // degrees (ω)
+// The Moon's rotation axis is not perpendicular to its orbital plane: the lunar equator is
+// tilted 6.687° to the orbit (Cassini's laws). Recorded for completeness — the body is tidally
+// locked and the simulation currently spins it about the orbit normal, so this tilt is not
+// applied to the geometry.
+export const MOON_OBLIQUITY = 6.687; // degrees, lunar equator to orbit
+
 // === Planetary System: Rotation Axis (degrees) ===
 export const SUN_AXIS = 7.25;
 export const MERCURY_AXIS = 0.034;

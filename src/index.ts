@@ -129,7 +129,7 @@ import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
 import { Probe } from './bodies/probe';
 import { Moon } from './bodies/moon';
-import { createMoon } from './bodies/create-moon';
+import { createMoon, earthMoonOrbitElements } from './bodies/create-moon';
 import { Planet } from './bodies/planet';
 import { DwarfPlanet } from './bodies/dwarf-planet';
 import { buildBasicRows, buildScienceRows, hasScienceData } from './bodies/body-attribute-display';
@@ -1089,6 +1089,7 @@ function createPresetBody(presetKey: string) {
                 simulationState.bodies.push(earth);
             }
 
+            // Real J2000 lunar orbit (eccentric, inclined 5.145°), matching the default system.
             newBody = createMoon(earth, scene, {
                 distance: MOON_DIST_FROM_EARTH,
                 radius: MOON_RADIUS,
@@ -1101,6 +1102,7 @@ function createPresetBody(presetKey: string) {
                 texture: moonTexture,
                 trailColor: 0xffffff,
                 maxTrail: 1500,
+                orbitElements: earthMoonOrbitElements(),
             });
             break;
         }
