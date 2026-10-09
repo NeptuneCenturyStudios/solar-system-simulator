@@ -4,6 +4,7 @@ import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts'
 import { Spaceship } from './spaceship';
 import { BoltWeapon } from '../../ship-effects/weapons/bolt-weapon';
 import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
+import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
 
 export class Zenith extends Spaceship {
     constructor(
@@ -29,13 +30,13 @@ export class Zenith extends Spaceship {
         );
 
         // Flight tuning constants
-        const FLIGHT_MAX_SPEED = (250 / 1000) / DIST_SCALE;
+        const FLIGHT_MAX_SPEED = 250 / 1000 / DIST_SCALE; // 250 m/s
         const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.005;
         const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.75;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
-        const FLIGHT_BOOST_MAX_SPEED = 250 / DIST_SCALE;
-        const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.1;
-        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED * 0.75;
+        const FLIGHT_BOOST_MAX_SPEED = 480 / DIST_SCALE; // 480 km/s
+        const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.5;
+        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL * 3;
         const FLIGHT_WARP_SPEED = C * 5;
         const FLIGHT_WARP_ACCEL = FLIGHT_WARP_SPEED * 0.1;
         const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 5;
@@ -99,6 +100,17 @@ export class Zenith extends Spaceship {
         const containerMesh = createShipContainerMesh();
         const MODEL_NAME = 'zenith/Lo_poly_Spaceship_01_by_Liz_Reddington';
 
+        // Custom laser weapon config
+        const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
+            beamColor: 0x008020,
+            damage: 1,
+            coreWidth: 1,
+            haloWidth: 4,
+            heatPerSecond: 1,
+            damageInterval: 0.2,
+            coolPerSecond: 1.25,
+        };
+
         super(dependencies, scene, {
             position: position,
             velocity: velocity,
@@ -108,7 +120,10 @@ export class Zenith extends Spaceship {
             id: id,
             name: 'Zenith',
             handling: fighterHandling,
-            weapons: [new BoltWeapon(scene, SPACESHIP_RADIUS)],
+            weapons: [
+                new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig),
+                new BoltWeapon(scene, SPACESHIP_RADIUS),
+            ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 2, rechargeTime: 30 },
             shipTypeId: 'zenith',

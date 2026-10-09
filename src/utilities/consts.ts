@@ -952,9 +952,9 @@ export const ASTEROID_DEFENSE_TIME_SCALE = 1;
  * Well beyond bolt reach (~400 u) so the player has to fly out to meet it, and inside the
  * Moon's orbit so the Moon never lies on an approach path.
  */
-export const ASTEROID_DEFENSE_SPAWN_DISTANCE = 160_000 / DIST_SCALE;
-/** Approach speed relative to Earth (1,200 km/s / DIST_SCALE) — roughly 130 s to impact. */
-export const ASTEROID_DEFENSE_APPROACH_SPEED = 1_200 / DIST_SCALE;
+export const ASTEROID_DEFENSE_SPAWN_DISTANCE = 12_000 / DIST_SCALE;
+/** Approach speed relative to Earth (90 km/s / DIST_SCALE) */
+export const ASTEROID_DEFENSE_APPROACH_SPEED = 90 / DIST_SCALE;
 /** Maximum spawn elevation above/below Earth's orbital plane, in degrees. */
 export const ASTEROID_DEFENSE_MAX_ELEVATION_DEG = 30;
 /**
