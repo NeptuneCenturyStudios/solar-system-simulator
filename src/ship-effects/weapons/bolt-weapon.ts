@@ -273,7 +273,7 @@ export class BoltWeapon extends Weapon {
                 // Squared distance from the target's centre to the ray itself (not to the
                 // pre-move origin) — valid regardless of where tca falls relative to hitT.
                 const d2 = ocX * ocX + ocY * ocY + ocZ * ocZ - tca * tca;
-                const r = body.radius;
+                const r = body.hitRadius;
                 if (d2 > r * r) continue; // ray never comes within r of the centre at any t
 
                 // Entry/exit distances along the ray. For small radii (ships) tEntry ≈ tca,

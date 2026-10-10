@@ -359,7 +359,7 @@ function paintVitalsBar(
     ctx.font = 'bold 30px monospace';
     ctx.shadowBlur = 6;
     ctx.shadowColor = 'rgba(0,0,0,0.85)';
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillStyle = 'rgba(0,0,0,0.92)';
     ctx.fillText(label, x + width / 2, y + height / 2 + 1);
     ctx.shadowBlur = 0;
 }

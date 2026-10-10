@@ -110,6 +110,14 @@ export class Body {
         scene.add(this.mesh);
     }
 
+    /**
+     * Radius weapons test against. Defaults to the body radius; ships override it with a tighter
+     * sphere because their model fills only part of `radius`.
+     */
+    get hitRadius(): number {
+        return this.radius;
+    }
+
     protected getLabelHeight() {
         return this.labelHeight || 10;
     }

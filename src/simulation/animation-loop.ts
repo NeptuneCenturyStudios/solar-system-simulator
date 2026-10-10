@@ -507,6 +507,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             if (body._isDisposed || !body.mesh) continue;
             const ship = body as Spaceship;
             ship.updateWarpEffect(dtTotal, ship.handling.flightWarpSpeed);
+            // Wall-clock so the shield glow fades at the same pace at any time-warp, but held
+            // while paused.
+            ship.updateShieldEffect(simulationState.timeScale === 0 ? 0 : wallDt);
         }
 
         // ── WASD camera movement ─────────────────────────────────────────

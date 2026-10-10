@@ -576,7 +576,7 @@ export const SCENARIO_MESSAGE_FADE_OUT_SECONDS = 0.8;
  *   - Sun      ~3.3 billion HP (practically indestructible)
  * Collisions drain the same pool — see the collision damage constants below.
  */
-export const HP_MASS_MULTIPLIER = 100;
+export const HP_MASS_MULTIPLIER = 1000;
 
 /**
  * Fraction of a ship's maxShieldPoints below which a shield is treated as fully depleted.

@@ -262,7 +262,7 @@ export function raycastBodies(
         // ray's range; for large bodies the true entry point can sit well inside
         // [0, out.t] while tca reads as out of range, silently skipping the hit.
         const d2 = ocX * ocX + ocY * ocY + ocZ * ocZ - tca * tca;
-        const r = body.radius;
+        const r = body.hitRadius;
         if (d2 > r * r) continue; // ray never comes within r of the centre at any t
 
         const thc = Math.sqrt(r * r - d2);

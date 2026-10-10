@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Body } from '../body';
 import { IShipEffect } from '../../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../../ship-effects/ship-flame.js';
+import { ShipShield } from '../../ship-effects/ship-shield.js';
 import { BodyTypeEnum } from '../body-enums';
 import { SoundEffect, WarpSoundController, playSoundEffect } from '../../utilities/audio.js';
 import { WarpEffect } from '../../effects/warp-effect.js';
@@ -38,6 +39,13 @@ import { triggerScreenFlash } from '../../effects/screen-flash';
 const _govForward = new THREE.Vector3();
 const _govRel = new THREE.Vector3();
 const _govPerp = new THREE.Vector3();
+
+/**
+ * Weapon hit sphere (and shield bubble) as a fraction of `radius`. The model is scaled so its
+ * longest dimension equals `radius`, so the hull reaches only ~0.5 from the centre; this leaves
+ * a little clearance for wings and engines.
+ */
+const SHIELD_RADIUS_FRACTION = 0.6;
 
 /**
  * Player-controllable spaceship body.
@@ -84,6 +92,35 @@ export class Spaceship extends Body {
     /** Current shield hit-points. */
     get shieldPoints(): number {
         return this._shieldPoints;
+    }
+
+    /** Glowing bubble that flashes where weapons strike. Idle (and not drawn) between hits. */
+    private readonly shieldEffect: ShipShield;
+
+    /** Weapons collide with the shield bubble, which hugs the hull rather than the full radius. */
+    override get hitRadius(): number {
+        return this.radius * SHIELD_RADIUS_FRACTION;
+    }
+
+    /**
+     * Light up the shield bubble at a weapon impact.
+     * @param worldPos World-space impact point.
+     */
+    onShieldHit(worldPos: THREE.Vector3): void {
+        this.shieldEffect.registerHit(worldPos);
+    }
+
+    /**
+     * Advance the shield-hit glow.
+     * @param dt Wall-clock seconds, or 0 while the simulation is paused.
+     */
+    updateShieldEffect(dt: number): void {
+        // A depleted shield shows nothing, including ripples still fading from earlier hits.
+        if (this._shieldPoints <= 0) {
+            this.shieldEffect.clear();
+            return;
+        }
+        this.shieldEffect.update(dt);
     }
 
     /** True when the subclass supplied an explicit cockpitOffset; the bbox-derived
@@ -327,6 +364,9 @@ export class Spaceship extends Body {
 
         // Warp tunnel effect — visibility is speed-driven (no explicit start/stop needed)
         this.warpEffect = new WarpEffect(scene);
+
+        // Shield bubble sized to the weapon hit sphere, so the glow sits where a shot stops.
+        this.shieldEffect = new ShipShield(this, this.hitRadius);
 
         // Seed the control frame from the mesh's starting orientation so thrust
         // and steering begin from wherever the ship was placed.
@@ -1671,6 +1711,7 @@ export class Spaceship extends Body {
         this.weapons = [];
         this.resetAutopilotState();
         this.trail.dispose();
+        this.shieldEffect.dispose();
 
         // Capture the wreck site before super.die() detaches the mesh from the scene.
         const deathPos = this.mesh.position.clone();

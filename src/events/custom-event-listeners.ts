@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import { Body } from '../bodies/body';
 import { Wormhole } from '../bodies/wormhole';
+import { Spaceship } from '../bodies/ships/spaceship';
 import {
     clearPendingWormholeLink,
     getPendingWormholeLink,
@@ -83,13 +84,20 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
 
         // Spawn impact flash: pass body centre so ImpactShockwave can snap to surface
         simulationState.impacts.push(
-            new ImpactShockwave(dependencies, scene, position, body.mesh.position, body.radius)
+            new ImpactShockwave(dependencies, scene, position, body.mesh.position, body.hitRadius)
         );
 
         // Wormholes are indestructible — weapons can hit them but never damage them.
         if (body instanceof Wormhole) return;
 
         body.takeDamage(e.detail.damage);
+
+        // Ripple the shield only while it still has points left after the hit; once it is down
+        // the impact flash alone marks the strike.
+        if (body instanceof Spaceship && body.shieldPoints > 0) {
+            body.onShieldHit(position);
+        }
+
         if (body.healthPoints <= 0) {
             body.die();
         }
