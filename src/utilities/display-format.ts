@@ -88,7 +88,7 @@ export function formatSpeed(simSpeed: number): string {
     const speedKmS = simSpeedToKmS(simSpeed);
     if (speedKmS < 1) {
         return `${trimNumber(simSpeedToMS(simSpeed), 2)} m/s`;
-    } else if (speedKmS < C * 0.1) {
+    } else if (speedKmS < C * 0.2) {
         return `${trimNumber(speedKmS, 2)} km/s`;
     } else {
         return `${trimNumber(simSpeedToWarp(simSpeed), 2)}x WARP`;

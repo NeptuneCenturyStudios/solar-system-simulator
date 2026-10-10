@@ -26,19 +26,19 @@ export class OsirisMothership extends Spaceship {
         // adjust how the chase cam frames the destroyer.
         const THIRD_PERSON_OFFSET = new THREE.Vector3(
             0,
-            SPACESHIP_RADIUS * 0.20,
+            SPACESHIP_RADIUS * 0.2,
             -SPACESHIP_RADIUS * 1
         );
 
         // Flight tuning constants — deliberately much heavier/sluggish than the Zenith fighter
-        const FLIGHT_MAX_SPEED = 60 / DIST_SCALE;
+        const FLIGHT_MAX_SPEED = 190 / 1000 / DIST_SCALE;
         const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.004;
         const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.6;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
-        const FLIGHT_BOOST_MAX_SPEED = C * 0.09;
+        const FLIGHT_BOOST_MAX_SPEED = 390 / DIST_SCALE; // 480 km/s
         const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.2;
-        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_MAX_SPEED * 0.25;
-        const FLIGHT_WARP_SPEED = C * 100;
+        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL * 3;
+        const FLIGHT_WARP_SPEED = C * 5;
         const FLIGHT_WARP_ACCEL = FLIGHT_WARP_SPEED * 0.04;
         const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 4;
         const FLIGHT_WARP_DECEL_TOLERANCE = FLIGHT_WARP_SPEED * 0.01;
@@ -114,7 +114,7 @@ export class OsirisMothership extends Spaceship {
             coreWidth: 2,
             haloWidth: 6,
             damageInterval: 0.2,
-            coolPerSecond: 1.25
+            coolPerSecond: 1.25,
         };
 
         super(dependencies, scene, {
