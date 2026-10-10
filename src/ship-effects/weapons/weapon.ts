@@ -75,6 +75,13 @@ export abstract class Weapon {
     }
 
     /**
+     * Human-readable name for this weapon, shown on the flight HUD's weapon
+     * selector (see FlightHUD.updateWeaponHUD). Abstract so every concrete weapon
+     * must name itself — a chip the pilot cannot identify is worse than none.
+     */
+    abstract get displayName(): string;
+
+    /**
      * Speed (sim units/s) a projectile leaves the muzzle at, excluding the firing ship's own
      * velocity — the figure a lead solver needs, since a shot inherits the shooter's motion on
      * top of this (Galilean relativity, see BoltWeapon.tryFire).

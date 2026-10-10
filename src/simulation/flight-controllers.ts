@@ -68,6 +68,9 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     const ship = flightState.activeShip ?? flightState.knownShip;
     if (ship && !ship._isDisposed) {
         ship.resetFlightControlState();
+        // Re-entry starts on the ship's primary weapon rather than whatever the
+        // pilot left selected on the last sortie.
+        ship.resetSelectedWeapon();
     }
 
     // Zero pointer/camera-level steering state.

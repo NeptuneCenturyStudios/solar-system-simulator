@@ -371,17 +371,72 @@ export class Spaceship extends Body {
         );
     }
 
-    /** Fire all mounted weapons toward `aimDir`. No-op if this ship is unarmed. */
-    fireWeapon(dt: number, muzzlePos: THREE.Vector3, aimDir: THREE.Vector3): void {
-        for (const weapon of this.weapons) {
-            weapon.tryFire(dt, muzzlePos, aimDir, this.velocity);
+    /**
+     * Index of the weapon currently selected to fire, into `weapons`. Only the
+     * selected weapon responds to the trigger; the others are still advanced each
+     * frame (their bolts fly, their heat drains), so a pilot can overheat one
+     * weapon and cycle to another while the first cools.
+     */
+    activeWeaponIndex = 0;
+
+    /** The weapon currently selected to fire, or null when the ship is unarmed. */
+    get activeWeapon(): Weapon | null {
+        if (this.weapons.length === 0) return null;
+        const index =
+            this.activeWeaponIndex >= 0 && this.activeWeaponIndex < this.weapons.length
+                ? this.activeWeaponIndex
+                : 0;
+        return this.weapons[index] ?? null;
+    }
+
+    /**
+     * Select the weapon at `index`, wrapping into range. Releasing the trigger on
+     * every weapon as part of the switch is deliberate: a continuous weapon left
+     * "active" (a live laser beam, its loop sound) would otherwise keep firing
+     * until the trigger was released, no matter that it is no longer selected.
+     */
+    selectWeapon(index: number): void {
+        const count = this.weapons.length;
+        if (count === 0) {
+            this.activeWeaponIndex = 0;
+            return;
         }
+        const wrapped = ((index % count) + count) % count;
+        if (wrapped === this.activeWeaponIndex) return;
+        this.activeWeaponIndex = wrapped;
+        for (const weapon of this.weapons) weapon.stopFire();
+    }
+
+    /**
+     * Cycle to the next mounted weapon (wrapping). No-op on a single-weapon ship.
+     * @returns The newly selected weapon, or null when the ship is unarmed.
+     */
+    cycleWeapon(): Weapon | null {
+        if (this.weapons.length > 1) this.selectWeapon(this.activeWeaponIndex + 1);
+        return this.activeWeapon;
+    }
+
+    /** Fire the selected weapon toward `aimDir`. No-op if this ship is unarmed. */
+    fireWeapon(dt: number, muzzlePos: THREE.Vector3, aimDir: THREE.Vector3): void {
+        this.activeWeapon?.tryFire(dt, muzzlePos, aimDir, this.velocity);
     }
 
     /** Release the trigger on all mounted weapons (stops continuous beams). */
     stopFire(): void {
         for (const weapon of this.weapons) {
             weapon.stopFire();
+        }
+    }
+
+    /**
+     * Reset the selected weapon to the first mount. Called on flight-mode exit so
+     * a re-entry always sees the ship's primary weapon rather than whatever the
+     * pilot happened to leave selected.
+     */
+    resetSelectedWeapon(): void {
+        if (this.activeWeaponIndex !== 0) {
+            this.activeWeaponIndex = 0;
+            for (const weapon of this.weapons) weapon.stopFire();
         }
     }
 

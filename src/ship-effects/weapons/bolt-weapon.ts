@@ -80,10 +80,10 @@ export class BoltWeapon extends Weapon {
 
         /** Class-level defaults — a ship wanting different behaviour passes a partial IBoltWeaponConfig. */
         const DEFAULT_BOLT_CONFIG: IBoltWeaponConfig = {
-            baseSpeed: 500 / DIST_SCALE, // 500 km/s
+            baseSpeed: 4 / DIST_SCALE, // 500 km/s
             particleLifetime: 4.0,
             boltColor: 0x00eeff,
-            boltHeadSize: 1 / RADIUS_SCALE,
+            boltHeadSize: (15 / 1000) / RADIUS_SCALE,
             fireRate: 12,
             maxProjectiles: 800,
             damage: 1,
@@ -151,6 +151,11 @@ export class BoltWeapon extends Weapon {
     /** Bolts leave the muzzle at their configured base speed, before the ship's own velocity. */
     override get muzzleSpeed(): number {
         return this.config.baseSpeed;
+    }
+
+    /** Name shown on the flight HUD's weapon selector. */
+    override get displayName(): string {
+        return 'Bolt Cannon';
     }
 
     /**

@@ -211,8 +211,32 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         });
     }
 
+    /** G in flight: select the ship's next mounted weapon (only the selected one fires). */
+    const cycleSelectedWeapon = (): void => {
+        const ship = flightState.activeShip;
+        if (!ship || ship._isDisposed || ship.weapons.length <= 1) return;
+        const weapon = ship.cycleWeapon();
+        if (weapon) {
+            ctx.addEvent({
+                message: `Weapon selected: ${weapon.displayName} (${ship.activeWeaponIndex + 1}/${ship.weapons.length})`,
+                notificationType: NotificationType.Info,
+            });
+        }
+    };
+
+    // G: in flight, cycle the selected weapon; while dragging a velocity it toggles the
+    // XZ / Y edit plane instead. The velocity binding keeps its old onDown semantics, so an
+    // already-toggled drag stays untouched.
+    const velocityEditKey = pressOnce(isVelocityEditing, toggleVelocityEditMode);
     bindings.set('g', {
-        onDown: pressOnce(isVelocityEditing, toggleVelocityEditMode),
+        onDown: (e) => {
+            if (flightState.isActive) {
+                // Once per physical press — OS key-repeat must not spin the weapon selector.
+                if (!e.repeat) cycleSelectedWeapon();
+                return true;
+            }
+            return velocityEditKey(e);
+        },
     });
 
     // WASD: thrust / brake in flight, free-cam movement otherwise. In flight A/D roll instead.

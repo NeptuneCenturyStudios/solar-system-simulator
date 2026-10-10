@@ -32,6 +32,18 @@ const WARP_ACTIVE_W = 512;
 const WARP_ACTIVE_H = 96;
 const THERMAL_W = 90;
 const THERMAL_H = 170;
+
+// ── Weapon selector label ─────────────────────────────────────────────────────
+// Sits in the same column as the heat gauge, directly above it, naming whichever
+// mounted weapon is currently selected to fire (cycled with G in flight).
+const WEAPON_LABEL_W = 320;
+const WEAPON_LABEL_H = 72;
+const WEAPON_LABEL_SCALE_W = 200;
+const WEAPON_LABEL_SCALE_H = (WEAPON_LABEL_H / WEAPON_LABEL_W) * WEAPON_LABEL_SCALE_W;
+/** Same column as the heat gauge. */
+const WEAPON_LABEL_OFFSET_X = THERMAL_GAUGE_OFFSET_X;
+/** Vertical gap from the heat gauge centre up to the label centre, clearing the gauge's top. */
+const WEAPON_LABEL_OFFSET_Y = 78;
 const PHASE_W = 900;
 const PHASE_H = 100;
 const HINT_W = 2200;
@@ -172,6 +184,42 @@ function paintThermalGauge(
         ctx.fillStyle = `rgba(255,80,80,${0.7 + 0.3 * pulse})`;
         ctx.fillText('OVERHEAT', W / 2, H - 10);
     }
+}
+
+/**
+ * Renders the weapon-selector label: the selected weapon's name over its slot
+ * index (e.g. "BOLT CANNON" / "2 / 2"). Turns red while that weapon is
+ * overheated, matching the heat gauge beside it.
+ */
+function paintWeaponLabel(
+    ctx: CanvasRenderingContext2D,
+    name: string,
+    index: number,
+    count: number,
+    overheated: boolean
+): void {
+    const W = WEAPON_LABEL_W;
+    const H = WEAPON_LABEL_H;
+    ctx.clearRect(0, 0, W, H);
+
+    const color = overheated ? '#ff3344' : '#7ef0ff';
+    const glow = overheated ? 'rgba(255,51,68,0.9)' : 'rgba(100,220,255,0.75)';
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Weapon name.
+    ctx.font = 'bold 30px monospace';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = glow;
+    ctx.fillStyle = color;
+    ctx.fillText(name.toUpperCase(), W / 2, H / 2 - 8);
+
+    // Slot indicator beneath, so the pilot knows where they are in the loadout.
+    ctx.font = 'bold 20px monospace';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText(`${index} / ${count}`, W / 2, H / 2 + 24);
 }
 
 function paintAutopilotPhase(
@@ -367,6 +415,7 @@ export class FlightHUD {
     orbitNotifySprite: HudSprite | null = null;
     hintSprite: HudSprite | null = null;
     thermalSprite: HudSprite | null = null;
+    weaponSprite: HudSprite | null = null;
     shipStatusSprite: HudSprite | null = null;
     autopilotBlockedNotifyTimer = 0;
     autopilotBlockedByName = '';
@@ -423,6 +472,7 @@ export class FlightHUD {
         this._initOrbitNotify();
         this._initHint();
         this._initThermal();
+        this._initWeapon();
         this._initShipStatus();
     }
 
@@ -458,6 +508,14 @@ export class FlightHUD {
         this.thermalSprite.draw('0.000|false', (ctx) => paintThermalGauge(ctx, 0, false, 0));
         // 90×170 canvas → 48×90 screen pixels; positioned each frame beside the gray steering ring
         this.thermalSprite.setScale(48, 90);
+    }
+
+    private _initWeapon(): void {
+        this.weaponSprite = new HudSprite(this.uiScene);
+        this.weaponSprite.setCanvasSize(WEAPON_LABEL_W, WEAPON_LABEL_H);
+        this.weaponSprite.draw('||false', (ctx) => paintWeaponLabel(ctx, '', 1, 1, false));
+        this.weaponSprite.setScale(WEAPON_LABEL_SCALE_W, WEAPON_LABEL_SCALE_H);
+        // Positioned each frame above the heat gauge, beside the steering ring (setScreenPos).
     }
 
     private _initShipStatus(): void {
@@ -536,6 +594,35 @@ export class FlightHUD {
     /** Hide the thermal gauge. */
     hideThermalSprite(): void {
         if (this.thermalSprite) this.thermalSprite.visible = false;
+    }
+
+    /**
+     * Update the weapon-selector label and position it above the heat gauge (which
+     * shares `anchorPos`, the gray steering ring). `index` is 1-based, matching what
+     * the pilot reads.
+     */
+    updateWeaponHUD(
+        name: string,
+        index: number,
+        count: number,
+        overheated: boolean,
+        anchorPos: THREE.Vector3
+    ): void {
+        const sprite = this.weaponSprite;
+        if (!sprite) return;
+        sprite.setScreenPos(
+            anchorPos.x + WEAPON_LABEL_OFFSET_X,
+            anchorPos.y + WEAPON_LABEL_OFFSET_Y
+        );
+        sprite.draw(`${name}|${index}|${count}|${overheated}`, (ctx) =>
+            paintWeaponLabel(ctx, name, index, count, overheated)
+        );
+        sprite.visible = true;
+    }
+
+    /** Hide the weapon-selector label. */
+    hideWeaponSprite(): void {
+        if (this.weaponSprite) this.weaponSprite.visible = false;
     }
 
     /**
@@ -743,7 +830,7 @@ export class FlightHUD {
                 return {
                     visible: true,
                     lines: [
-                        `W Thrust | S Brake | A/D Roll | Shift Boost | [Space] Warp`,
+                        `W Thrust | S Brake | A/D Roll | Shift Boost | [Space] Warp | [G] Weapon`,
                         `Hold [E] → ${hovered.name} | [C] View | [Esc] Exit | LMB Fire`,
                     ],
                 };
@@ -753,7 +840,7 @@ export class FlightHUD {
             return {
                 visible: true,
                 lines: [
-                    'W Thrust | S Brake | A/D Roll | Shift Boost | [Space] Warp',
+                    'W Thrust | S Brake | A/D Roll | Shift Boost | [Space] Warp | [G] Weapon',
                     `[C] View (${this.flightState.isCockpitView ? 'cockpit' : '3rd person'}) | [E] Autopilot target | [Esc] Exit | LMB Fire`,
                 ],
             };

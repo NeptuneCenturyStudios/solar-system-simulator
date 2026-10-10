@@ -863,22 +863,28 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
         }
 
-        // ── Thermal load gauge ───────────────────────────────────────────────
-        // Anchored beside the gray steering-origin ring; hides together with it.
-        if (
-            ctx.flightState.isActive &&
-            ctx.flightState.activeShip &&
-            ctx.flightState.activeShip.weapons.length > 0 &&
-            ctx.steeringOriginMarker.visible
-        ) {
-            const weapon = ctx.flightState.activeShip.weapons[0];
+        // ── Thermal gauge + weapon selector ──────────────────────────────────
+        // Both anchored beside the gray steering-origin ring and both driven by the
+        // ship's currently selected weapon (cycled with G), so the gauge and the name
+        // always describe the same mount. Hides together with the ring.
+        const hudShip = ctx.flightState.activeShip;
+        const hudWeapon = hudShip?.activeWeapon ?? null;
+        if (ctx.flightState.isActive && hudShip && hudWeapon && ctx.steeringOriginMarker.visible) {
             ctx.flightHUD.updateThermalHUD(
-                weapon.thermalLoad,
-                weapon.isOverheated,
+                hudWeapon.thermalLoad,
+                hudWeapon.isOverheated,
+                ctx.steeringOriginMarker.position
+            );
+            ctx.flightHUD.updateWeaponHUD(
+                hudWeapon.displayName,
+                hudShip.activeWeaponIndex + 1,
+                hudShip.weapons.length,
+                hudWeapon.isOverheated,
                 ctx.steeringOriginMarker.position
             );
         } else {
             ctx.flightHUD.hideThermalSprite();
+            ctx.flightHUD.hideWeaponSprite();
         }
 
         // ── Explosions / impacts / supernovas / nebulae ──────────────────

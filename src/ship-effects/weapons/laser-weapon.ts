@@ -184,6 +184,11 @@ export class LaserWeapon extends Weapon {
         scene.add(this.tipPoint);
     }
 
+    /** Name shown on the flight HUD's weapon selector. */
+    override get displayName(): string {
+        return 'Laser';
+    }
+
     /** Build a round, soft-edged glow sprite that falls off radially. */
     private createGlowPointMaterial(size: number, opacity: number): THREE.PointsMaterial {
         const material = new THREE.PointsMaterial({

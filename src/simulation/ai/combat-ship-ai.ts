@@ -91,17 +91,15 @@ export class CombatShipAI extends FollowShipAI {
     }
 
     /**
-     * Slowest projectile this ship mounts, which is the one needing the most lead.
+     * Muzzle speed of the weapon that will actually fire — the ship's selected mount.
      *
-     * Infinity when every weapon is hitscan, which collapses the intercept solve below to
-     * "aim where the target is now" — the correct answer for a beam.
+     * Only the selected weapon responds to the trigger (see Spaceship.fireWeapon), so the lead
+     * solve must use its speed rather than the loadout's slowest. Infinity for a hitscan weapon
+     * (e.g. the laser), which collapses the intercept solve below to "aim where the target is
+     * now" — the correct answer for a beam.
      */
-    private slowestMuzzleSpeed(): number {
-        let slowest = Infinity;
-        for (const weapon of this.ship.weapons) {
-            if (weapon.muzzleSpeed < slowest) slowest = weapon.muzzleSpeed;
-        }
-        return slowest;
+    private activeMuzzleSpeed(): number {
+        return this.ship.activeWeapon?.muzzleSpeed ?? Infinity;
     }
 
     /**
@@ -209,10 +207,14 @@ export class CombatShipAI extends FollowShipAI {
         // Between bursts.
         if (!this.triggerOpen) return;
 
-        // Let a hot weapon cool rather than holding a trigger that does nothing — the thermal
-        // model deliberately stops cooling while the trigger is held.
-        for (const weapon of ship.weapons) {
-            if (weapon.isOverheated) return;
+        // Thermal management. Only the selected weapon fires, and its heat only drains while its
+        // trigger is released — so if it is hot, switch to a cool mount rather than holding a
+        // trigger that does nothing. With nothing cool left, hold fire and let them all cool.
+        const activeWeapon = ship.activeWeapon;
+        if (activeWeapon?.isOverheated) {
+            const coolIndex = ship.weapons.findIndex((w) => !w.isOverheated);
+            if (coolIndex === -1) return;
+            ship.selectWeapon(coolIndex);
         }
 
         // ── Firing solution ──────────────────────────────────────────────────
@@ -222,7 +224,7 @@ export class CombatShipAI extends FollowShipAI {
         if (dist > AI_FIRE_RANGE || dist < INTERCEPT_EPSILON) return;
 
         _relVel.subVectors(target.velocity, ship.velocity);
-        const flightTime = this.interceptTime(_toTarget, _relVel, this.slowestMuzzleSpeed());
+        const flightTime = this.interceptTime(_toTarget, _relVel, this.activeMuzzleSpeed());
         if (flightTime < 0) return; // target outruns the projectile — no shot exists
 
         // Lead the target to where it will be, then aim at that point from the muzzle.

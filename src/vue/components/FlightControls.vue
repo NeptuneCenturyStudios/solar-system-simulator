@@ -3,7 +3,8 @@
         <p class="vue-ui-hint">
             W/S — speed &nbsp; A/D — roll &nbsp; Shift — boost<br />
             C — view &nbsp; Mouse steers &nbsp; Hold space — warp &nbsp; Esc — exit<br />
-            Tab/Shift+Tab — lock target &nbsp; Hold S — chase (Shift — boost)
+            Tab/Shift+Tab — lock target &nbsp; Hold S — chase (Shift — boost)<br />
+            G — cycle weapon &nbsp; LMB — fire
         </p>
 
         <div class="control-group">
