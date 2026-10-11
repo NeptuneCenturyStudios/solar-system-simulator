@@ -30,8 +30,8 @@ export class Zenith extends Spaceship {
         );
 
         // Flight tuning constants
-        const FLIGHT_MAX_SPEED = 250 / 1000 / DIST_SCALE; // 250 m/s
-        const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.005;
+        const FLIGHT_MAX_SPEED = 500 / 1000 / DIST_SCALE; // 500 m/s
+        const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.1;
         const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.75;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
         const FLIGHT_BOOST_MAX_SPEED = 480 / DIST_SCALE; // 480 km/s
