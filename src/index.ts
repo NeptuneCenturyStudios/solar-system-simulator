@@ -117,6 +117,7 @@ import { FlightHUD } from './drawing/flight-hud';
 import { AutopilotTargetIndicator } from './drawing/autopilot-target-indicator';
 import { PlanetNameIndicator } from './drawing/planet-name-indicator';
 import { HealthBarIndicator } from './drawing/health-bar-indicator';
+import { AiDebugIndicator } from './drawing/ai-debug-indicator';
 import { ThreatIndicator } from './drawing/threat-indicator';
 import { TargetLockIndicator } from './drawing/target-lock-indicator';
 import { installKeyboardControls } from './simulation/keyboard-controls';
@@ -813,6 +814,8 @@ targetIndicator.init();
 const planetNameIndicator = new PlanetNameIndicator(uiScene, simulationState);
 
 const healthBarIndicator = new HealthBarIndicator(uiScene, simulationState);
+
+const aiDebugIndicator = new AiDebugIndicator(uiScene);
 
 const threatIndicator = new ThreatIndicator(uiScene, simulationState);
 
@@ -3069,6 +3072,9 @@ registerVueSimHooks({
     setChaseModeEnabled: (checked: boolean) => {
         settingsStore.update(SettingKey.ChaseModeEnabled, checked);
     },
+    setCoastDriftAlignEnabled: (checked: boolean) => {
+        settingsStore.update(SettingKey.CoastDriftAlignEnabled, checked);
+    },
     setTextureQuality: (mode) => {
         settingsStore.update(SettingKey.TextureQuality, mode);
         // Live update: re-fetch every managed body texture at the new quality, in place.
@@ -4833,6 +4839,7 @@ const animCtx: AnimationContext = {
     targetIndicator,
     planetNameIndicator,
     healthBarIndicator,
+    aiDebugIndicator,
     threatIndicator,
     targetLockIndicator,
     surfaceCam,

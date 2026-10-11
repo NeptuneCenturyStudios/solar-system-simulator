@@ -63,6 +63,20 @@
             />
             Chase Mode (Hold S)
         </label>
+
+        <div class="vue-ui-card-header">Handling</div>
+
+        <label
+            class="checkbox-row"
+            title="While coasting, sideways drift turns to follow the ship's nose. Turn off for free inertial drift (needed to free-fall into an orbit)."
+        >
+            <input
+                type="checkbox"
+                :checked="simStore.coastDriftAlignEnabled"
+                @change="onCoastDriftAlignChange"
+            />
+            Nose-Aligned Drift
+        </label>
     </PanelBase>
 </template>
 
@@ -74,6 +88,7 @@ import {
     requestExitFlightMode,
     requestSpawnShip,
     setChaseModeEnabled,
+    setCoastDriftAlignEnabled,
     setHidePanelManagerInFlight,
     setSelectedShipTypeId,
     simStore,
@@ -96,6 +111,10 @@ function onHidePanelInFlightChange(e: Event): void {
 
 function onChaseModeChange(e: Event): void {
     setChaseModeEnabled((e.target as HTMLInputElement).checked);
+}
+
+function onCoastDriftAlignChange(e: Event): void {
+    setCoastDriftAlignEnabled((e.target as HTMLInputElement).checked);
 }
 </script>
 

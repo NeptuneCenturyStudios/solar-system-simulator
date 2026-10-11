@@ -29,6 +29,7 @@ import {
     AI_BOOST_ENGAGE_FACTOR,
 } from '../../utilities/consts';
 import { triggerScreenFlash } from '../../effects/screen-flash';
+import { settingsStore } from '../../settings/settings-store';
 
 /**
  * Scratch vectors for the flight governor. Module-level so the hot flight path — which runs up
@@ -647,7 +648,9 @@ export class Spaceship extends Body {
 
         // While a thrust key is held: forward thrust is ADDED to the relative velocity so
         // gravity accumulates freely and is never overwritten.
-        // Perpendicular drift is always decayed while any thrust key is held.
+        // Perpendicular drift is always decayed while any thrust key is held. While coasting it
+        // is instead redirected into the nose axis (speed preserved) when the
+        // coastDriftAlignEnabled setting is on, and left untouched otherwise.
         const thrustActive = input.boost || input.thrust || input.brake;
         if (thrustActive) {
             const shiftEffective = input.boost && fwdSpeed < this.handling.flightBoostMaxSpeed;
@@ -666,7 +669,7 @@ export class Spaceship extends Body {
                 );
                 rel.addScaledVector(forward, delta);
             } else if (input.brake) {
-                // Decel stops applying when ship reaches 0 speed
+                // Decelerates through zero into reverse, capped at -flightMaxSpeed
                 const ceiling = Math.max(-this.handling.flightMaxSpeed, -fwdSpeed);
                 const decelRate =
                     fwdSpeed > this.handling.flightMaxSpeed
@@ -685,6 +688,25 @@ export class Spaceship extends Body {
             rel.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
 
             this.setRelativeVelocity(rel);
+        } else if (settingsStore.settings.coastDriftAlignEnabled) {
+            // Coasting: rotate perpendicular drift (relative to the air, when captured) into the
+            // nose axis at the same flightPerpDecay rate, preserving total speed, so the velocity
+            // follows the nose instead of the ship sliding sideways along its old vector.
+            const perpVel = _govPerp.copy(rel).addScaledVector(forward, -fwdSpeed);
+            const perpSq = perpVel.lengthSq();
+            if (perpSq > 1e-20) {
+                const decay = Math.max(0, 1 - this.handling.flightPerpDecay * dt);
+                const speedSq = rel.lengthSq();
+                perpVel.multiplyScalar(decay);
+                // Keep the direction along the axis: a ship sliding backwards keeps sliding
+                // backwards rather than flipping to forward.
+                const axisSign = fwdSpeed < 0 ? -1 : 1;
+                const newFwdSpd =
+                    axisSign * Math.sqrt(Math.max(0, speedSq - perpSq * decay * decay));
+                rel.copy(forward).multiplyScalar(newFwdSpd).add(perpVel);
+
+                this.setRelativeVelocity(rel);
+            }
         }
     }
 

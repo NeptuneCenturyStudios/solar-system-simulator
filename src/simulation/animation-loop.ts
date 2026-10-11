@@ -18,6 +18,7 @@ import { FlightHUD } from '../drawing/flight-hud';
 import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator';
 import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet-name-indicator';
 import { HealthBarIndicator } from '../drawing/health-bar-indicator';
+import { AiDebugIndicator } from '../drawing/ai-debug-indicator';
 import { ThreatIndicator } from '../drawing/threat-indicator';
 import { TargetLockIndicator } from '../drawing/target-lock-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
@@ -113,6 +114,7 @@ export interface AnimationContext {
     targetIndicator: AutopilotTargetIndicator;
     planetNameIndicator: PlanetNameIndicator;
     healthBarIndicator: HealthBarIndicator;
+    aiDebugIndicator: AiDebugIndicator;
     threatIndicator: ThreatIndicator;
     targetLockIndicator: TargetLockIndicator;
     surfaceCam: SurfaceCameraManager;
@@ -963,6 +965,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             isFlightModeActive ? ctx.flightState.activeShip : null
         );
         ctx.threatIndicator.update(ctx.screenProjector);
+        ctx.aiDebugIndicator.update(ctx.screenProjector);
 
         // Ship vitals panel: shown with the rest of the flight HUD whenever the player is
         // flying, hidden otherwise (so it disappears the moment flight mode ends).

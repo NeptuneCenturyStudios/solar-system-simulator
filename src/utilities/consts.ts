@@ -1170,6 +1170,9 @@ export const AI_AVOID_RELEASE_ANGLE = Math.PI / 36;
 export const AI_AVOID_PANIC_TIME = 2;
 
 // === Combat ship AI ===
+// Every distance below (hold, engage, break, extend, fire range) is measured hull to hull — the
+// centre-to-centre distance minus both ships' radii (FollowShipAI.hullGap) — so the same numbers
+// work against a 37 m fighter and a 500 m-radius capital ship.
 /** Station-keeping distance for the combat AI: 500 m expressed in sim units. */
 export const NPC_COMBAT_FOLLOW_DISTANCE = 0.5 / DIST_SCALE;
 /** Closing-speed tolerance floor for the combat AI, as a fraction of its hold distance per
@@ -1198,6 +1201,97 @@ export const AI_AIM_JITTER_PERIOD = 0.6;
 export const AI_BURST_FIRE_TIME = 1.0;
 /** Seconds the combat AI holds fire between bursts. */
 export const AI_BURST_REST_TIME = 0.5;
+/** Range (sim units) inside which the combat AI stops station-keeping and starts dogfighting:
+ *  8 km. Outside it the follow controller flies the approach (boost, warp, braking). */
+export const AI_DOGFIGHT_ENGAGE_RANGE = 8 / DIST_SCALE;
+/** The dogfight is abandoned only beyond AI_DOGFIGHT_ENGAGE_RANGE × this, so a target hovering
+ *  near the boundary can't flip the controller between modes on alternating frames. Has to stay
+ *  comfortably clear of AI_DOGFIGHT_EXTEND_DISTANCE, or an extend would end the dogfight. */
+export const AI_DOGFIGHT_DISENGAGE_FACTOR = 1.5;
+/** How far behind and beside a target that is facing the NPC its attack run aims (sim units):
+ *  600 m. Steering for a point off the target's flank rather than its nose turns a joust into
+ *  an angled pass that swings round toward the tail. Scaled down to zero as the target turns
+ *  away, leaving pure lead pursuit once the NPC is behind it. */
+export const AI_DOGFIGHT_FLANK_OFFSET = 0.6 / DIST_SCALE;
+/** Half-angle (radians) within which two ships pointing at each other count as head-on. */
+export const AI_DOGFIGHT_HEAD_ON_ANGLE = Math.PI / 6;
+/** Time to collision (seconds) at which a head-on merge breaks off — about what a Zenith needs to
+ *  swing 60° off the collision line. Time rather than range, so a slow merge (an NPC that has
+ *  just turned to face a pursuer) gets to shoot before breaking, while a full-speed joust (1 km/s
+ *  combined) still breaks at 1.2 km. */
+export const AI_DOGFIGHT_HEAD_ON_BREAK_TIME = 1.2;
+/** Range (sim units) inside which a target sitting behind the NPC and pointing at it counts as
+ *  an overshoot, and the NPC breaks rather than turning across its guns: 1 km. */
+export const AI_DOGFIGHT_OVERSHOOT_DISTANCE = 1 / DIST_SCALE;
+/** Minimum opening speed (sim units/s) for the overshoot rule: 100 m/s. What separates "I flew
+ *  past my target" from "my target is chasing me" — both put the target behind the NPC with its
+ *  nose on it, but only after an overshoot are the two ships flying apart. Without it a chased
+ *  NPC reads every pursuit as an overshoot and runs instead of fighting. */
+export const AI_DOGFIGHT_OVERSHOOT_OPENING_SPEED = 0.1 / DIST_SCALE;
+/** Half-angle (radians) of the target's nose within which the NPC considers itself tracked.
+ *  An extending NPC still tracked by a target that is keeping pace can't outrun it, so after
+ *  AI_DOGFIGHT_EXTEND_MIN_TIME it turns back in to fight rather than run out the clock. */
+export const AI_DOGFIGHT_THREAT_ANGLE = Math.PI / 6;
+/** Range (sim units) inside which the NPC breaks off whenever it is still closing, whatever the
+ *  geometry: 200 m, a few hull lengths. The last line of defence against ramming. */
+export const AI_DOGFIGHT_COLLISION_DISTANCE = 0.2 / DIST_SCALE;
+/** Angle (radians) off the nose the NPC turns to when it breaks off. */
+export const AI_DOGFIGHT_BREAK_ANGLE = Math.PI / 3;
+/** Separation (sim units) the NPC opens up during an extend before turning back in: 2.5 km —
+ *  enough room to complete the turn and line up a fresh attack. */
+export const AI_DOGFIGHT_EXTEND_DISTANCE = 2.5 / DIST_SCALE;
+/** Minimum sim-seconds spent extending, so a break is a committed manoeuvre and not a twitch. */
+export const AI_DOGFIGHT_EXTEND_MIN_TIME = 1.5;
+/** Half-angle (radians) of the target's nose inside which the NPC considers itself in the line
+ *  of fire and starts evading: 25°. A little wider than the 15.5° aim cone, so it starts sliding
+ *  out before the reticle can reach it rather than once it already has. */
+export const AI_EVADE_CONE_ANGLE = (25 * Math.PI) / 180;
+/** Hull-to-hull range (sim units) inside which the target's guns are treated as a threat: 3 km.
+ *  Beyond it the NPC presses its attack and lets distance do the dodging. */
+export const AI_EVADE_RANGE = 3 / DIST_SCALE;
+/** Largest share of the heading given to evasion (0–1). 0.6 bends the course ~56° off the
+ *  attack line — enough to slide across the target's view at the speeds a Zenith flies. */
+export const AI_EVADE_MAX_WEIGHT = 0.85;
+/** Evasion weight multiplier while the NPC has its own shot lined up. Below 1 makes it trade
+ *  some safety to keep its guns on target; 1 would make it a pure dodger, 0 a pure jouster. */
+export const AI_EVADE_SHOT_WEIGHT_FACTOR = 0.1;
+/** Range of sim-seconds between jinks while evading. Randomised within it, so the timing can't
+ *  be learned. */
+export const AI_EVADE_JINK_MIN_PERIOD = 0.7;
+export const AI_EVADE_JINK_MAX_PERIOD = 1.5;
+/** Smallest / largest swing (radians) of a jink about the "straight out of the cone" direction.
+ *  Each jink alternates side, so the NPC weaves outward instead of drifting predictably. */
+export const AI_EVADE_JINK_MIN_ANGLE = (15 * Math.PI) / 180;
+export const AI_EVADE_JINK_MAX_ANGLE = (60 * Math.PI) / 180;
+/** How far behind the target (hull to hull) the NPC tries to position itself before settling
+ *  into a gun run: 400 m — close enough to hit, far enough to have room to track a turn. */
+export const AI_DOGFIGHT_TAIL_DISTANCE = 0.4 / DIST_SCALE;
+/** Aspect (angle off the target's nose to the NPC, radians) beyond which the NPC counts as on
+ *  the target's tail and switches from positioning to a gun run: 120°. */
+export const AI_DOGFIGHT_TAIL_ENTER_ASPECT = (120 * Math.PI) / 180;
+/** Aspect below which it loses the tail and goes back to positioning: 100°. The gap with
+ *  AI_DOGFIGHT_TAIL_ENTER_ASPECT keeps it from flickering between the two. */
+export const AI_DOGFIGHT_TAIL_EXIT_ASPECT = (100 * Math.PI) / 180;
+/** Longest lead (sim-seconds) applied to the positioning point when steering for it, so a far
+ *  point isn't led so far ahead that the NPC flies off to where the target won't be. */
+export const AI_DOGFIGHT_POSITION_MAX_LEAD = 1.0;
+/** A boost dash only starts with the nose within this angle (radians) of where it wants to go,
+ *  since boost thrust is along the nose and can't be steered much in the fraction of a second a
+ *  dash lasts. Held to twice this once the dash is under way. */
+export const AI_DASH_ALIGN_ANGLE = (15 * Math.PI) / 180;
+/** Shortest run (sim units, along the nose) worth a dash: 300 m. */
+export const AI_DASH_MIN_DISTANCE = 0.3 / DIST_SCALE;
+/** How far an evasive dash carries the NPC across the target's line of fire: 500 m — ~45° of the
+ *  target's view at 500 m range, out of the aim cone in a single move. */
+export const AI_EVADE_DASH_DISTANCE = 1 / DIST_SCALE;
+/** Longest a dash may hold boost (sim-seconds). At Zenith boost acceleration 0.4 s is roughly
+ *  1.5 km — a hard cap in case the release logic never fires. */
+export const AI_DASH_MAX_TIME = 0.4;
+/** Sim-seconds between dashes, so boost is a punctuating move rather than the ship's default. */
+export const AI_DASH_COOLDOWN = 2;
+/** Maximum sim-seconds spent extending, in case neither the separation nor the "still tracked"
+ *  exit fires — e.g. a target that keeps pace but isn't pointing at the NPC. */
+export const AI_DOGFIGHT_EXTEND_MAX_TIME = 4;
 
 // === Test AI Ships scenario ===
 /** Fixed time scale for the AI test bed, so runs are comparable to each other. */

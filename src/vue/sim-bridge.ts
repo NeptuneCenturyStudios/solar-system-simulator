@@ -286,6 +286,8 @@ export interface VueSimHooks {
     setHidePanelManagerInFlight?: (checked: boolean) => void;
     /** Toggle S-key chase mode when a target is locked (persisted via settingsStore). */
     setChaseModeEnabled?: (checked: boolean) => void;
+    /** Toggle coasting drift redirecting into the nose axis (persisted via settingsStore). */
+    setCoastDriftAlignEnabled?: (checked: boolean) => void;
     /** Select the body-texture quality tier (persisted via settingsStore; high is desktop-only). */
     setTextureQuality?: (mode: TextureQuality) => void;
 
@@ -380,6 +382,8 @@ export interface VueSimStore {
     hidePanelManagerInFlight: boolean;
     /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
     chaseModeEnabled: boolean;
+    /** While coasting, sideways drift turns to follow the ship's nose (player and AI ships). */
+    coastDriftAlignEnabled: boolean;
     /** Body-texture quality tier. `high` is desktop-only; a browser is always downgraded to `low`. */
     textureQuality: TextureQuality;
 
@@ -437,6 +441,7 @@ const state = reactive<VueSimStore>({
     renderDistanceAU: settingsStore.settings.renderDistanceAU,
     hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
     chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
+    coastDriftAlignEnabled: settingsStore.settings.coastDriftAlignEnabled,
     textureQuality: settingsStore.settings.textureQuality,
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
@@ -1011,6 +1016,16 @@ export function setChaseModeEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.ChaseModeEnabled, checked);
     }
     state.chaseModeEnabled = checked;
+}
+
+/** Toggle coasting drift redirecting into the nose axis (Flight Controls panel). */
+export function setCoastDriftAlignEnabled(checked: boolean): void {
+    if (hookRegistry.setCoastDriftAlignEnabled) {
+        hookRegistry.setCoastDriftAlignEnabled(checked);
+    } else {
+        settingsStore.update(SettingKey.CoastDriftAlignEnabled, checked);
+    }
+    state.coastDriftAlignEnabled = checked;
 }
 
 /** Select the body-texture quality tier. Takes effect live — the registered hook

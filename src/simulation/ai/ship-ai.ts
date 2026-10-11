@@ -55,6 +55,18 @@ export abstract class ShipAI {
     abstract update(dt: number, simDt: number): void;
 
     /**
+     * Lines of human-readable status for the on-screen AI debug overlay (Options → Show Ship AI
+     * Debug), describing what the controller decided on its most recent `update()`.
+     *
+     * Only called while the overlay is enabled, so implementations may format strings freely —
+     * the per-frame zero-allocation rule applies to `update()`, not to this. Controllers keep
+     * whatever raw telemetry they need as plain fields during `update()` and format it here.
+     */
+    debugLines(): string[] {
+        return [this.name];
+    }
+
+    /**
      * Release any resources this controller holds. Called when the ship dies or
      * the controller is detached. The base implementation does nothing.
      */

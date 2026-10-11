@@ -22,6 +22,7 @@ export const enum SettingKey {
     SmoothZoomEnabled = 'smoothZoomEnabled',
     HidePanelManagerInFlight = 'hidePanelManagerInFlight',
     ChaseModeEnabled = 'chaseModeEnabled',
+    CoastDriftAlignEnabled = 'coastDriftAlignEnabled',
     RenderDistanceAU = 'renderDistanceAU',
     TextureQuality = 'textureQuality',
 }
@@ -87,6 +88,12 @@ export interface SpaceSimSettings {
     hidePanelManagerInFlight: boolean;
     /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
     chaseModeEnabled: boolean;
+    /**
+     * While coasting (no thrust/boost/brake), rotate sideways drift into the nose axis at the
+     * ship's flightPerpDecay rate, preserving speed. Applies to the player and every AI ship.
+     * Off restores free inertial drift (needed to free-fall into an orbit).
+     */
+    coastDriftAlignEnabled: boolean;
     /** Camera far plane in AU. Anything farther from the camera than this is not drawn. */
     renderDistanceAU: number;
     /** Body-texture quality tier. `high` is only honoured on desktop (see texture-quality.ts). */
@@ -114,6 +121,7 @@ const defaultSettings: SpaceSimSettings = {
     // just entered the cockpit to look at.
     hidePanelManagerInFlight: true,
     chaseModeEnabled: true,
+    coastDriftAlignEnabled: true,
     renderDistanceAU: RENDER_DISTANCE_DEFAULT_AU,
     // Low is the safe default: it is the only tier a browser can use, and installing the
     // desktop build should not silently jump to multi-megabyte textures nobody asked for.

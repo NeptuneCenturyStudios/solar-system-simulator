@@ -3,6 +3,7 @@ import { ShipAI } from './ship-ai';
 import { brakingSpeedLimit } from './obstacle-avoidance';
 import { flightState, simulationState } from '../simulation';
 import type { IAvoidanceResult } from './obstacle-avoidance';
+import { formatDistance, formatSpeed, formatThrottle } from './ai-debug-format';
 import {
     AI_APPROACH_SAFETY_PAD,
     AI_AVOID_DECISION_MARGIN,
@@ -33,6 +34,11 @@ const _relVel = new THREE.Vector3();
 const _forward = new THREE.Vector3();
 const _invFrame = new THREE.Quaternion();
 
+/** A ship's collision radius, or 0 when it has none that can be trusted. */
+export function hullRadius(ship: Spaceship): number {
+    return Number.isFinite(ship.radius) && ship.radius > 0 ? ship.radius : 0;
+}
+
 /**
  * The first (and simplest) concrete ship AI: tail the player's ship and hold
  * station at NPC_FOLLOW_DISTANCE.
@@ -59,6 +65,18 @@ export class FollowShipAI extends ShipAI {
     /** Latched boost state, for hysteresis around the engage threshold. */
     private boosting = false;
 
+    // ── Debug telemetry ──────────────────────────────────────────────────────
+    // Plain fields written during update() and only read (and formatted) by debugLines(), so
+    // recording them costs nothing when the overlay is off.
+    /** What the approach controller did on its last update. */
+    protected debugPhase = 'IDLE';
+    /** Range to the target, in sim units. */
+    protected debugRange = 0;
+    /** Measured closing speed (positive = closing), in sim units/s. */
+    protected debugClosing = 0;
+    /** Commanded closing speed, in sim units/s. */
+    protected debugDesiredClosing = 0;
+
     /**
      * @param ship The ship this controller pilots.
      * @param followDistance Station-keeping distance in sim units. Defaults to
@@ -82,6 +100,20 @@ export class FollowShipAI extends ShipAI {
         if (target._isDisposed || !target.mesh) return null;
         if (!simulationState.bodies.includes(target)) return null;
         return target;
+    }
+
+    /**
+     * Clearance between this ship's hull and the target's, given the distance between their
+     * centres. Negative once the hulls overlap.
+     *
+     * Every range decision — hold distance, engage range, break-off distances, fire range — is
+     * measured on this rather than centre to centre. A hold distance is meant as space between
+     * the two ships, and centre-to-centre it quietly shrinks by the target's radius: 500 m from a
+     * 37 m fighter leaves plenty of room, but 500 m from the centre of a 500 m-radius capital ship
+     * is its hull plating, and the follower holds station by ramming it.
+     */
+    protected hullGap(target: Spaceship, centreDistance: number): number {
+        return centreDistance - hullRadius(target) - hullRadius(this.ship);
     }
 
     /**
@@ -134,6 +166,47 @@ export class FollowShipAI extends ShipAI {
             h.flightMaxSpeed * AI_CLOSING_SPEED_TOLERANCE,
             Math.abs(desiredClosing) * AI_CLOSING_SPEED_TOLERANCE
         );
+    }
+
+    /**
+     * Put the stick over toward a world-space heading.
+     *
+     * The heading is expressed in the ship's own control frame and the yaw/pitch error turned
+     * into stick deflection, so the turn is rate-limited and smoothed by the ship's handling
+     * exactly as a human pilot's would be.
+     *
+     * Sign convention: ships are +Z forward / +Y up, which puts the pilot's right at -X.
+     * applySteering() computes yawDelta = -steerX * turnRate and pitchDelta = +steerY * turnRate
+     * and post-multiplies both onto the control frame, so both errors are negated here to steer
+     * *toward* the heading rather than away from it.
+     *
+     * @param heading Unit direction to turn toward, in world space.
+     */
+    protected steerToward(heading: THREE.Vector3): void {
+        const ship = this.ship;
+        const input = ship.controlInput;
+
+        _invFrame.copy(ship.controlFrameQuat).invert();
+        _local.copy(heading).applyQuaternion(_invFrame);
+
+        const yawErr = Math.atan2(_local.x, _local.z);
+        const pitchErr = Math.atan2(_local.y, Math.hypot(_local.x, _local.z));
+
+        input.steerX = THREE.MathUtils.clamp(-yawErr / AI_STEER_FULL_DEFLECTION_ANGLE, -1, 1);
+        input.steerY = THREE.MathUtils.clamp(-pitchErr / AI_STEER_FULL_DEFLECTION_ANGLE, -1, 1);
+
+        // These controllers don't roll — banking is applied visually by applySteering().
+        input.rollLeft = false;
+        input.rollRight = false;
+    }
+
+    override debugLines(): string[] {
+        return [
+            `${this.name} · ${this.debugPhase}`,
+            `Range ${formatDistance(this.debugRange)}  hold ${formatDistance(this.followDistance)}`,
+            `Closing ${formatSpeed(this.debugClosing, true)}  want ${formatSpeed(this.debugDesiredClosing, true)}`,
+            `Throttle ${formatThrottle(this.ship.controlInput)}`,
+        ];
     }
 
     /** Release the controls and let the ship coast. */
@@ -227,7 +300,7 @@ export class FollowShipAI extends ShipAI {
      * same gap — so reading the speed live rather than assuming maximum keeps the drop-out
      * proportionate to how fast the ship actually got going.
      *
-     * @param dist Current distance to the target, in sim units.
+     * @param dist Current hull-to-hull distance to the target, in sim units.
      * @param simDt Sim-time seconds this frame. Load-bearing: the decision runs once per
      *   rendered frame on wall-clock time while the ship moves at sim rate, so at high time
      *   warp it can cross the entire stopping distance between two consecutive checks. The
@@ -301,13 +374,18 @@ export class FollowShipAI extends ShipAI {
         const target = this.getTarget();
         if (!target) {
             // Nobody to follow — release the controls and coast.
+            this.debugPhase = 'NO TARGET';
             this.standDown();
             return;
         }
 
         _toTarget.subVectors(target.mesh.position, ship.mesh.position);
         const dist = _toTarget.length();
+        // Hull-to-hull: what every range decision below is measured on (see hullGap).
+        const range = this.hullGap(target, dist);
+        this.debugRange = range;
         if (dist < 1e-6) {
+            this.debugPhase = 'NO TARGET';
             this.standDown();
             return;
         }
@@ -318,7 +396,8 @@ export class FollowShipAI extends ShipAI {
         // Ahead of avoidance, because avoidance hands back a corrected heading and a speed
         // cap — and at warp the ship can act on neither. The only live control is the drive.
         if (ship.warpActive) {
-            this.updateWarpCruise(dist, simDt);
+            this.debugPhase = 'WARP CRUISE';
+            this.updateWarpCruise(range, simDt);
             return;
         }
 
@@ -329,27 +408,7 @@ export class FollowShipAI extends ShipAI {
         const avoid = this.avoidance.evaluate(_dir, simDt);
         _dir.copy(avoid.heading);
 
-        // ── Steering ─────────────────────────────────────────────────────────
-        // Express the desired heading in the ship's own control frame, then turn
-        // the yaw/pitch error into stick deflection.
-        //
-        // Sign convention: ships are +Z forward / +Y up, which puts the pilot's
-        // right at -X. applySteering() computes yawDelta = -steerX * turnRate and
-        // pitchDelta = +steerY * turnRate and post-multiplies both onto the
-        // control frame, so both errors are negated here to steer *toward* the
-        // target rather than away from it.
-        _invFrame.copy(ship.controlFrameQuat).invert();
-        _local.copy(_dir).applyQuaternion(_invFrame);
-
-        const yawErr = Math.atan2(_local.x, _local.z);
-        const pitchErr = Math.atan2(_local.y, Math.hypot(_local.x, _local.z));
-
-        input.steerX = THREE.MathUtils.clamp(-yawErr / AI_STEER_FULL_DEFLECTION_ANGLE, -1, 1);
-        input.steerY = THREE.MathUtils.clamp(-pitchErr / AI_STEER_FULL_DEFLECTION_ANGLE, -1, 1);
-
-        // This controller doesn't roll — banking is applied visually by applySteering().
-        input.rollLeft = false;
-        input.rollRight = false;
+        this.steerToward(_dir);
         input.fire = false;
 
         // ── Throttle ─────────────────────────────────────────────────────────
@@ -362,6 +421,7 @@ export class FollowShipAI extends ShipAI {
         // clear of the hazard, so get on that heading and run. Braking alone wouldn't do it —
         // a ship shedding speed inside a gravity well is still falling into it.
         if (avoid.flee) {
+            this.debugPhase = 'FLEE';
             input.thrust = aligned;
             input.boost = aligned;
             input.brake = false;
@@ -377,7 +437,7 @@ export class FollowShipAI extends ShipAI {
         // continuous across the boundary — a hard switch there makes the ship
         // drift out, lunge back, and settle into a small permanent oscillation.
         const slack = this.followDistance * NPC_FOLLOW_DEAD_BAND;
-        const rawGap = dist - this.followDistance; // positive = too far away
+        const rawGap = range - this.followDistance; // positive = too far away
         const gap = rawGap > slack ? rawGap - slack : rawGap < -slack ? rawGap + slack : 0;
 
         // ── Warp ─────────────────────────────────────────────────────────────
@@ -398,6 +458,14 @@ export class FollowShipAI extends ShipAI {
         const closing = _relVel.dot(_dir);
 
         const tolerance = this.closingSpeedTolerance(desiredClosing, h);
+
+        this.debugPhase = ship.warpCharging
+            ? 'WARP CHARGE'
+            : aligned
+              ? 'APPROACH'
+              : 'APPROACH · TURNING';
+        this.debugClosing = closing;
+        this.debugDesiredClosing = desiredClosing;
 
         if (!aligned) {
             // Turning to face the target: no forward thrust, but keep shedding
