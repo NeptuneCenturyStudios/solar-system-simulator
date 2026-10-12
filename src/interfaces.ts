@@ -811,6 +811,16 @@ export interface ISpaceshipHandling {
     flightBoostAccel: number;
     flightBoostDecel: number;
 
+    // ── Autopilot ─────────────────────────────────────────────────────
+    // Cruise/boost tier used only while the autopilot is flying. Manual flight and ship AI
+    // keep the flight* values above, which are tuned low for close-quarters combat.
+    autopilotMaxSpeed: number;
+    autopilotThrustAccel: number;
+    autopilotThrustDecel: number;
+    autopilotBoostMaxSpeed: number;
+    autopilotBoostAccel: number;
+    autopilotBoostDecel: number;
+
     // ── Warp ──────────────────────────────────────────────────────────
     flightWarpSpeed: number;
     flightWarpAccel: number;

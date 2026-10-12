@@ -34,7 +34,7 @@ export class Zenith extends Spaceship {
         const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.1;
         const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.75;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
-        const FLIGHT_BOOST_MAX_SPEED = 2.5 / DIST_SCALE; // 250 km/s
+        const FLIGHT_BOOST_MAX_SPEED = 2.5 / DIST_SCALE; // 2.5 km/s
         const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.2;
         const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL * 5;
         const FLIGHT_WARP_SPEED = C * 5;
@@ -54,7 +54,13 @@ export class Zenith extends Spaceship {
         const FLIGHT_MAX_BANK_PITCH = 0.2;
         const FLIGHT_MAX_BANK_YAW = 0.2;
         const FLIGHT_WARP_CHARGE_TIME = 2.0;
-        // TODO: Add autopilot flight and boost max since normal flight and boost is for low-speed scenarios
+        // Autopilot tuning — normal flight and boost are tuned low for dogfights
+        const AUTOPILOT_MAX_SPEED = 500 / DIST_SCALE; // 500 km/s
+        const AUTOPILOT_THRUST_ACCEL = AUTOPILOT_MAX_SPEED * 0.1;
+        const AUTOPILOT_THRUST_DECEL = AUTOPILOT_MAX_SPEED * 0.75;
+        const AUTOPILOT_BOOST_MAX_SPEED = 2500 / DIST_SCALE; // 2500 km/s
+        const AUTOPILOT_BOOST_ACCEL = AUTOPILOT_BOOST_MAX_SPEED * 0.2;
+        const AUTOPILOT_BOOST_DECEL = AUTOPILOT_BOOST_ACCEL * 5;
 
         const fighterHandling: ISpaceshipHandling = {
             // Thrust / speed
@@ -67,6 +73,14 @@ export class Zenith extends Spaceship {
             flightBoostMaxSpeed: FLIGHT_BOOST_MAX_SPEED,
             flightBoostAccel: FLIGHT_BOOST_ACCEL,
             flightBoostDecel: FLIGHT_BOOST_DECEL,
+
+            // Autopilot
+            autopilotMaxSpeed: AUTOPILOT_MAX_SPEED,
+            autopilotThrustAccel: AUTOPILOT_THRUST_ACCEL,
+            autopilotThrustDecel: AUTOPILOT_THRUST_DECEL,
+            autopilotBoostMaxSpeed: AUTOPILOT_BOOST_MAX_SPEED,
+            autopilotBoostAccel: AUTOPILOT_BOOST_ACCEL,
+            autopilotBoostDecel: AUTOPILOT_BOOST_DECEL,
 
             // Warp
             flightWarpSpeed: FLIGHT_WARP_SPEED,

@@ -77,6 +77,12 @@ export class Spaceship extends Body {
     trail: IShipEffect;
     /** Handling characteristics of the spaceship. */
     handling: ISpaceshipHandling;
+    /**
+     * Copy of `handling` with the thrust/boost tier swapped for the autopilot* values. The
+     * autopilot phase machine reads this instead of `handling`, so it can cruise between bodies
+     * while manual flight and ship AI keep the slower dogfight tuning. Warp is unchanged.
+     */
+    readonly autopilotHandling: ISpaceshipHandling;
     /** Weapon systems mounted on this ship. Empty for unarmed ships. Subclasses mount a loadout of Weapon classes. */
     weapons: Weapon[] = [];
 
@@ -227,7 +233,7 @@ export class Spaceship extends Body {
      * Computed from the ship's own handling object, not global constants.
      */
     get autopilotBoostThreshold(): number {
-        const h = this.handling;
+        const h = this.autopilotHandling;
         return (
             1.5 *
             ((h.flightBoostMaxSpeed * h.flightBoostMaxSpeed - h.flightMaxSpeed * h.flightMaxSpeed) /
@@ -248,14 +254,14 @@ export class Spaceship extends Body {
      * the ship's own 1 u/s boost max).
      */
     get autopilotArrivalSpeed(): number {
-        return this.handling.flightMaxSpeed * 3;
+        return this.autopilotHandling.flightMaxSpeed * 3;
     }
 
     /**
      * Minimum runway (u) that APPROACH needs to safely brake from normal speed to a stop.
      */
     get autopilotApproachMinDistance(): number {
-        const h = this.handling;
+        const h = this.autopilotHandling;
         const arrival = this.autopilotArrivalSpeed;
         return (
             AUTOPILOT_BRAKE_PAD *
@@ -268,14 +274,14 @@ export class Spaceship extends Body {
      * Target arc length (u) for the BRAKE blend.
      */
     get autopilotBrakeArcDist(): number {
-        return this.handling.flightMaxSpeed * 10;
+        return this.autopilotHandling.flightMaxSpeed * 10;
     }
 
     /**
      * Distance (u) above which autopilot engages warp for fast transit.
      */
     get autopilotWarpThreshold(): number {
-        const h = this.handling;
+        const h = this.autopilotHandling;
         return (
             1.5 *
                 ((h.flightWarpSpeed * h.flightWarpSpeed -
@@ -331,6 +337,16 @@ export class Spaceship extends Body {
 
         // Store the handling characteristics for use in flight control calculations.
         this.handling = options.handling;
+        const h = options.handling;
+        this.autopilotHandling = {
+            ...h,
+            flightMaxSpeed: h.autopilotMaxSpeed,
+            flightThrustAccel: h.autopilotThrustAccel,
+            flightThrustDecel: h.autopilotThrustDecel,
+            flightBoostMaxSpeed: h.autopilotBoostMaxSpeed,
+            flightBoostAccel: h.autopilotBoostAccel,
+            flightBoostDecel: h.autopilotBoostDecel,
+        };
 
         this.weapons = options.weapons;
 
@@ -759,9 +775,10 @@ export class Spaceship extends Body {
      * otherwise.  Shared by the autopilot APPROACH and autopilot BRAKE paths so
      * every deceleration uses the same band selection.  The stop-brake sheds
      * band-by-band instead (see applyStopBrakeStep).
+     *
+     * @param h Handling to read the bands from — the autopilot passes autopilotHandling.
      */
-    decelRateForSpeed(speed: number): number {
-        const h = this.handling;
+    decelRateForSpeed(speed: number, h: ISpaceshipHandling = this.handling): number {
         const absSpeed = Math.abs(speed);
         return absSpeed > h.flightBoostMaxSpeed
             ? h.flightWarpDecel
@@ -783,9 +800,10 @@ export class Spaceship extends Body {
      * asking the same question of the same curve. See also brakingSpeedLimit() in
      * simulation/ai/obstacle-avoidance.ts, which is this curve's inverse over the
      * lower two bands.
+     *
+     * @param h Handling to read the bands from — the autopilot passes autopilotHandling.
      */
-    stoppingDistanceFrom(speed: number): number {
-        const h = this.handling;
+    stoppingDistanceFrom(speed: number, h: ISpaceshipHandling = this.handling): number {
         if (speed > h.flightBoostMaxSpeed) {
             return (
                 (speed * speed - h.flightBoostMaxSpeed * h.flightBoostMaxSpeed) /
@@ -1232,8 +1250,9 @@ export class Spaceship extends Body {
 
         // Three-phase stopping distance: shed warp→boost at warp decel,
         // boost→normal at boost decel, normal→stop at thrust decel.
-        const h = this.handling;
-        const effectiveStopDist = this.stoppingDistanceFrom(approachSpeed);
+        // The autopilot flies on its own cruise/boost tier, not the manual dogfight tuning.
+        const h = this.autopilotHandling;
+        const effectiveStopDist = this.stoppingDistanceFrom(approachSpeed, h);
         const brakeDistance = effectiveStopDist * AUTOPILOT_BRAKE_PAD;
 
         // Max-warp braking threshold — only used by ALIGN to decide whether to
@@ -1377,7 +1396,7 @@ export class Spaceship extends Body {
                 }
                 const needsDecel = approachSpeed > closingSpeed + this.autopilotArrivalSpeed;
                 const rate = needsDecel
-                    ? this.decelRateForSpeed(approachSpeed)
+                    ? this.decelRateForSpeed(approachSpeed, h)
                     : useBoost
                       ? h.flightBoostAccel
                       : h.flightThrustAccel;
@@ -1412,7 +1431,7 @@ export class Spaceship extends Body {
             const remaining = Math.max(distance - orbitRadius, 0);
             const vSafeClose = brakingSpeedLimit(remaining, h);
             const brakeApproachSpeed = relVel.length();
-            const brakeDecel = this.decelRateForSpeed(brakeApproachSpeed);
+            const brakeDecel = this.decelRateForSpeed(brakeApproachSpeed, h);
             // The ship is thrusting to match an orbital velocity that normally exceeds cruise
             // speed, so it is flying on its boost engines — reflect that in the flame / HUD
             // through the same flag the APPROACH phase drives.

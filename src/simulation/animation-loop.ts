@@ -205,7 +205,8 @@ function updateShipTrail(
         .applyQuaternion(ship.mesh.quaternion)
         .add(ship.mesh.position);
     _trailExhaustDir.set(0, 0, -1).applyQuaternion(ship.mesh.quaternion);
-    const trailMax = boosting ? ship.handling.flightBoostMaxSpeed : ship.handling.flightMaxSpeed;
+    const h = ship.autopilotActive ? ship.autopilotHandling : ship.handling;
+    const trailMax = boosting ? h.flightBoostMaxSpeed : h.flightMaxSpeed;
     ship.trail.update(
         _trailNozzle,
         speed,
@@ -1265,7 +1266,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             const spd = ctx.speedSprite;
             if (spd.visible && ctx.flightState.isActive) {
                 const ship = ctx.flightState.activeShip;
-                const h = ship?.handling;
+                // Report the tier the ship is actually flying on: the autopilot has its own.
+                const h = ctx.autopilotState.isActive ? ship?.autopilotHandling : ship?.handling;
                 const hWarp =
                     ship?.warpActive ||
                     ship?.warpDecelerating ||
