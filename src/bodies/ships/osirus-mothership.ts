@@ -55,6 +55,7 @@ export class OsirisMothership extends Spaceship {
         const FLIGHT_MAX_BANK_PITCH = 0.07;
         const FLIGHT_MAX_BANK_YAW = 0.07;
         const FLIGHT_WARP_CHARGE_TIME = 5.0;
+        // TODO: Add autopilot flight and boost max since normal flight and boost is for low-speed scenarios
 
         const destroyerHandling: ISpaceshipHandling = {
             // Thrust / speed

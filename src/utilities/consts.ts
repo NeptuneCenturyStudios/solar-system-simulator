@@ -1263,6 +1263,18 @@ export const AI_EVADE_JINK_MAX_PERIOD = 1.5;
  *  Each jink alternates side, so the NPC weaves outward instead of drifting predictably. */
 export const AI_EVADE_JINK_MIN_ANGLE = (15 * Math.PI) / 180;
 export const AI_EVADE_JINK_MAX_ANGLE = (60 * Math.PI) / 180;
+/** Aspect (radians) inside which the NPC stops trying to get round a target that is facing it,
+ *  and jousts instead — turns in, trades shots head-on, passes: 40°. */
+export const AI_DOGFIGHT_JOUST_ENTER_ASPECT = (40 * Math.PI) / 180;
+/** Aspect beyond which a joust is abandoned for positioning: 55°. */
+export const AI_DOGFIGHT_JOUST_EXIT_ASPECT = (55 * Math.PI) / 180;
+/** Ceiling on evasion while jousting with the nose on the target (0–1): a light jink, so the
+ *  pass isn't a free shot, without pulling the guns off. */
+export const AI_DOGFIGHT_JOUST_EVADE_WEIGHT = 0.15;
+/** In a dogfight the NPC holds thrust whenever its nose is within this angle of where it wants
+ *  to go: 90°. Much wider than the follow AI's AI_THRUST_ALIGN_ANGLE, because thrust is also
+ *  what swings the velocity onto the nose — coasting through every turn bleeds the fight away. */
+export const AI_DOGFIGHT_THRUST_ALIGN_ANGLE = Math.PI / 2;
 /** How far behind the target (hull to hull) the NPC tries to position itself before settling
  *  into a gun run: 400 m — close enough to hit, far enough to have room to track a turn. */
 export const AI_DOGFIGHT_TAIL_DISTANCE = 0.4 / DIST_SCALE;

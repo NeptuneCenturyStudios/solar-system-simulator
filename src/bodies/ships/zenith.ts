@@ -54,6 +54,7 @@ export class Zenith extends Spaceship {
         const FLIGHT_MAX_BANK_PITCH = 0.2;
         const FLIGHT_MAX_BANK_YAW = 0.2;
         const FLIGHT_WARP_CHARGE_TIME = 2.0;
+        // TODO: Add autopilot flight and boost max since normal flight and boost is for low-speed scenarios
 
         const fighterHandling: ISpaceshipHandling = {
             // Thrust / speed

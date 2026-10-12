@@ -22,6 +22,9 @@ import {
     AI_DOGFIGHT_FLANK_OFFSET,
     AI_DOGFIGHT_HEAD_ON_ANGLE,
     AI_DOGFIGHT_HEAD_ON_BREAK_TIME,
+    AI_DOGFIGHT_JOUST_ENTER_ASPECT,
+    AI_DOGFIGHT_JOUST_EVADE_WEIGHT,
+    AI_DOGFIGHT_JOUST_EXIT_ASPECT,
     AI_DOGFIGHT_OVERSHOOT_DISTANCE,
     AI_DOGFIGHT_OVERSHOOT_OPENING_SPEED,
     AI_DOGFIGHT_POSITION_MAX_LEAD,
@@ -29,6 +32,7 @@ import {
     AI_DOGFIGHT_TAIL_ENTER_ASPECT,
     AI_DOGFIGHT_TAIL_EXIT_ASPECT,
     AI_DOGFIGHT_THREAT_ANGLE,
+    AI_DOGFIGHT_THRUST_ALIGN_ANGLE,
     AI_EVADE_CONE_ANGLE,
     AI_EVADE_DASH_DISTANCE,
     AI_EVADE_JINK_MAX_ANGLE,
@@ -40,7 +44,6 @@ import {
     AI_EVADE_SHOT_WEIGHT_FACTOR,
     AI_FIRE_RANGE,
     AI_FOLLOW_APPROACH_GAIN,
-    AI_THRUST_ALIGN_ANGLE,
     NPC_COMBAT_FOLLOW_DISTANCE,
 } from '../../utilities/consts';
 import { muzzleWorldPosition } from '../../ship-effects/weapons/weapon';
@@ -78,6 +81,16 @@ const INTERCEPT_EPSILON = 1e-12;
  */
 type DogfightState = 'attack' | 'extend';
 
+/**
+ * How the attack state is going about it, chosen by the target's aspect (how far off its nose
+ * this ship is):
+ *
+ * - `joust`: in front of it — turn straight in and trade shots head-on, then pass.
+ * - `position`: off to its side — work round to its tail, dashing to get there.
+ * - `tail`: behind it — lead-pursuit gun run.
+ */
+type AttackMode = 'joust' | 'position' | 'tail';
+
 /** What a boost dash is for. */
 type DashKind = 'reposition' | 'evade';
 
@@ -113,12 +126,13 @@ type GunStatus =
  *   and when the geometry turns bad (head-on merge, overshoot, about to ram) it breaks off at an
  *   angle, extends to a safe distance and turns back in for another pass.
  *
- * While attacking it works for the target's tail rather than its nose: until it is behind the
- * target it steers for a point there, and taps boost in short dashes to jump to it — which is
- * what breaks the endless equal-turn-rate circle. Once on the tail it switches to a lead-pursuit
- * gun run (see attackHeading / updateDash).
+ * How it attacks depends on the target's aspect (see AttackMode): in front of the target's nose
+ * it jousts — turns in and trades shots head-on, then passes; off to its side it works for the
+ * tail, steering for a point there and tapping boost in short dashes to jump to it, which is
+ * what breaks the endless equal-turn-rate circle; once behind it, it flies a lead-pursuit gun
+ * run (see attackHeading / updateDash).
  *
- * In either dogfight state the ship also evades: while it sits in the target's line of fire it
+ * The ship also evades (lightly while jousting, fully otherwise): while it sits in the target's line of fire it
  * bends its course across that line, jinking to alternate sides, so the target has to work to
  * keep it in the reticle, and dashes across that line when lined up to (see evasionWeight /
  * evadeDirection).
@@ -177,9 +191,9 @@ export class CombatShipAI extends FollowShipAI {
     /** Last evasion direction, the fallback when the geometry gives no preferred side. */
     private readonly lastEvade = new THREE.Vector3(1, 0, 0);
 
-    /** True once the ship has worked its way onto the target's tail (latched with hysteresis). */
-    private onTail = false;
-    /** Where the ship is trying to get to while positioning, un-led; valid while !onTail. */
+    /** Current attack approach (latched on aspect with hysteresis — see updateAttackMode). */
+    private attackMode: AttackMode = 'position';
+    /** Where the ship is trying to get to while positioning, un-led; valid in `position` mode. */
     private readonly positionGoal = new THREE.Vector3();
 
     /** True while a boost dash is holding the boost. */
@@ -341,7 +355,7 @@ export class CombatShipAI extends FollowShipAI {
         if (this.dogfighting && !wasDogfighting) {
             this.state = 'attack';
             this.extendTimedOut = false;
-            this.onTail = false;
+            this.attackMode = 'position';
         }
         // Handing the frame back to the follow AI drops any dash; it owns the boost from here.
         if (!this.dogfighting) this.dashing = false;
@@ -457,17 +471,38 @@ export class CombatShipAI extends FollowShipAI {
     }
 
     /**
+     * Pick the attack approach from the target's aspect, with hysteresis on every boundary so
+     * the ship commits to one rather than flickering between them.
+     *
+     * @param facing cos(aspect) — 1 when the target's nose is on us, -1 when we are on its tail.
+     */
+    private updateAttackMode(facing: number): void {
+        // facing is cos(aspect), so "aspect beyond X" is "facing below cos X".
+        switch (this.attackMode) {
+            case 'tail':
+                if (facing > Math.cos(AI_DOGFIGHT_TAIL_EXIT_ASPECT)) this.attackMode = 'position';
+                break;
+            case 'joust':
+                if (facing < Math.cos(AI_DOGFIGHT_JOUST_EXIT_ASPECT)) this.attackMode = 'position';
+                break;
+            case 'position':
+                if (facing < Math.cos(AI_DOGFIGHT_TAIL_ENTER_ASPECT)) this.attackMode = 'tail';
+                else if (facing > Math.cos(AI_DOGFIGHT_JOUST_ENTER_ASPECT))
+                    this.attackMode = 'joust';
+                break;
+        }
+    }
+
+    /**
      * Heading for the attack, written into `out`.
      *
-     * Two phases, latched on the target's aspect with hysteresis:
-     *
-     * - **Positioning** (not yet behind it): steer for a point AI_DOGFIGHT_TAIL_DISTANCE behind
-     *   the target, swung wide round our side of it while we are still in front of its nose.
-     *   Pure pursuit at equal turn rates only ever chases the target round a circle; going for
-     *   its tail instead is what wins the position, and the point is also what a reposition
-     *   dash aims at (see updateDash).
-     * - **Tail** (aspect past AI_DOGFIGHT_TAIL_ENTER_ASPECT): lead pursuit — steer for where the
-     *   gun solution says the target will be, so turning in also brings it into the aim cone.
+     * - **Joust** / **tail**: lead pursuit — steer for where the gun solution says the target
+     *   will be, so turning in also brings it into the aim cone. Head-on, that is a joust: the
+     *   head-on break rule (shouldBreak) turns it into a pass before the two ships meet.
+     * - **Position**: steer for a point AI_DOGFIGHT_TAIL_DISTANCE behind the target, swung wide
+     *   round our side of it. Pure pursuit at equal turn rates only ever chases the target
+     *   round a circle; going for its tail instead is what wins the position, and the point is
+     *   also what a reposition dash aims at (see updateDash).
      *
      * Expects `_toTarget`, `_relVel` (target relative to us) and `_targetFwd` to be current.
      */
@@ -477,12 +512,9 @@ export class CombatShipAI extends FollowShipAI {
         facing: number,
         out: THREE.Vector3
     ): THREE.Vector3 {
-        // facing is cos(aspect), so "aspect beyond X" is "facing below cos X".
-        this.onTail = this.onTail
-            ? facing < Math.cos(AI_DOGFIGHT_TAIL_EXIT_ASPECT)
-            : facing < Math.cos(AI_DOGFIGHT_TAIL_ENTER_ASPECT);
+        this.updateAttackMode(facing);
 
-        if (this.onTail) {
+        if (this.attackMode !== 'position') {
             const flightTime = this.interceptTime(_toTarget, _relVel, this.activeMuzzleSpeed());
             out.copy(_toTarget);
             if (flightTime > 0) out.addScaledVector(_relVel, flightTime);
@@ -600,10 +632,12 @@ export class CombatShipAI extends FollowShipAI {
         if (_forward.dot(heading) < Math.cos(AI_DASH_ALIGN_ANGLE)) return false;
 
         let kind: DashKind;
-        if (this.state === 'attack' && !this.onTail) {
+        if (this.state === 'attack' && this.attackMode === 'position') {
             kind = 'reposition';
             _goal.copy(this.positionGoal);
-        } else if (evading) {
+        } else if (evading && !(this.state === 'attack' && this.attackMode === 'joust')) {
+            // Not mid-joust: there, "evading" is a light jink on a nose that is on the target,
+            // and a dash along it would be a dash at the target.
             kind = 'evade';
             _goal.copy(ship.mesh.position).addScaledVector(_forward, AI_EVADE_DASH_DISTANCE);
         } else {
@@ -763,7 +797,14 @@ export class CombatShipAI extends FollowShipAI {
         // ── Evasion ──────────────────────────────────────────────────────────
         // In the target's line of fire: bend whatever we were about to fly across it. Applied
         // before avoidance, so the evasive heading is still filtered for hazards like any other.
-        const evadeWeight = this.evasionWeight(range, facing, noseOnTarget);
+        let evadeWeight = this.evasionWeight(range, facing, noseOnTarget);
+        if (this.state === 'attack' && this.attackMode === 'joust') {
+            // Jousting means turning *into* the line of fire to shoot back. No evasion until the
+            // nose is on the target — it would only slow the turn in — and then just a light
+            // jink so the pass isn't a free shot.
+            const hasShot = noseOnTarget > Math.cos(AI_AIM_CONE_ANGLE);
+            evadeWeight = hasShot ? Math.min(evadeWeight, AI_DOGFIGHT_JOUST_EVADE_WEIGHT) : 0;
+        }
         this.debugEvadeWeight = evadeWeight;
         if (evadeWeight > 0) {
             this.evadeDirection(target, simDt, _evade);
@@ -787,11 +828,7 @@ export class CombatShipAI extends FollowShipAI {
         this.steerToward(avoid.heading);
 
         this.debugPhase =
-            this.state === 'extend'
-                ? 'EXTEND'
-                : this.onTail
-                  ? 'ATTACK · TAIL'
-                  : 'ATTACK · POSITION';
+            this.state === 'extend' ? 'EXTEND' : `ATTACK · ${this.attackMode.toUpperCase()}`;
         this.debugRange = range;
         this.debugClosing = closing;
 
@@ -819,7 +856,10 @@ export class CombatShipAI extends FollowShipAI {
         }
         input.boost = false;
 
-        const aligned = _forward.dot(avoid.heading) > Math.cos(AI_THRUST_ALIGN_ANGLE);
+        // Wide on purpose. Holding thrust is also what swings the velocity round onto the nose
+        // (drift decays only under thrust), so thrusting through a turn tightens it; a narrow
+        // gate left the ship coasting, slowing, through every jink and turn.
+        const aligned = _forward.dot(avoid.heading) > Math.cos(AI_DOGFIGHT_THRUST_ALIGN_ANGLE);
 
         // Brake only ever slows forward flight; it never runs on into reverse. Backing away
         // nose-on from a target that is closing in is exactly the behaviour this replaces.
@@ -832,9 +872,9 @@ export class CombatShipAI extends FollowShipAI {
             // Run for it once on the break heading.
             thrust = aligned;
             this.debugDesiredClosing = 0;
-        } else if (!this.onTail) {
-            // Working round to its tail: the positioning point moves with the target, so get
-            // there as fast as normal flight allows.
+        } else if (this.attackMode !== 'tail') {
+            // Jousting, or working round to its tail: either way, as fast as normal flight
+            // allows — a joust is won on closure, and the positioning point moves with the target.
             thrust = aligned;
             this.debugDesiredClosing = h.flightMaxSpeed;
         } else {
@@ -992,7 +1032,12 @@ export class CombatShipAI extends FollowShipAI {
         }
 
         let throttle = `Speed ${formatSpeed(ship.forwardSpeedInFrame(fwd))}  ${formatThrottle(ship.controlInput)}`;
-        if (this.dogfighting && this.state === 'attack' && this.onTail && !this.dashing) {
+        if (
+            this.dogfighting &&
+            this.state === 'attack' &&
+            this.attackMode === 'tail' &&
+            !this.dashing
+        ) {
             throttle += `  want ${formatSpeed(this.debugDesiredClosing, true)}`;
         }
         lines.push(throttle);
