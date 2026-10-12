@@ -3,6 +3,7 @@ import { Spaceship } from './spaceship';
 import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
+import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
 import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
 
 /**
@@ -56,12 +57,12 @@ export class OsirisMothership extends Spaceship {
         const FLIGHT_MAX_BANK_YAW = 0.07;
         const FLIGHT_WARP_CHARGE_TIME = 5.0;
         // Autopilot tuning — slightly slower than the Zenith to reflect the mothership's mass
-        const AUTOPILOT_MAX_SPEED = 400 / DIST_SCALE; // 400 km/s
-        const AUTOPILOT_THRUST_ACCEL = AUTOPILOT_MAX_SPEED * 0.004;
-        const AUTOPILOT_THRUST_DECEL = AUTOPILOT_MAX_SPEED * 0.6;
-        const AUTOPILOT_BOOST_MAX_SPEED = 2000 / DIST_SCALE; // 2000 km/s
-        const AUTOPILOT_BOOST_ACCEL = AUTOPILOT_BOOST_MAX_SPEED * 0.2;
-        const AUTOPILOT_BOOST_DECEL = AUTOPILOT_BOOST_ACCEL * 3;
+        const PERFORMANCE_MAX_SPEED = 400 / DIST_SCALE; // 400 km/s
+        const PERFORMANCE_THRUST_ACCEL = PERFORMANCE_MAX_SPEED * 0.004;
+        const PERFORMANCE_THRUST_DECEL = PERFORMANCE_MAX_SPEED * 0.6;
+        const PERFORMANCE_BOOST_MAX_SPEED = 2000 / DIST_SCALE; // 2000 km/s
+        const PERFORMANCE_BOOST_ACCEL = PERFORMANCE_BOOST_MAX_SPEED * 0.2;
+        const PERFORMANCE_BOOST_DECEL = PERFORMANCE_BOOST_ACCEL * 3;
 
         const destroyerHandling: ISpaceshipHandling = {
             // Thrust / speed
@@ -76,12 +77,12 @@ export class OsirisMothership extends Spaceship {
             flightBoostDecel: FLIGHT_BOOST_DECEL,
 
             // Autopilot
-            autopilotMaxSpeed: AUTOPILOT_MAX_SPEED,
-            autopilotThrustAccel: AUTOPILOT_THRUST_ACCEL,
-            autopilotThrustDecel: AUTOPILOT_THRUST_DECEL,
-            autopilotBoostMaxSpeed: AUTOPILOT_BOOST_MAX_SPEED,
-            autopilotBoostAccel: AUTOPILOT_BOOST_ACCEL,
-            autopilotBoostDecel: AUTOPILOT_BOOST_DECEL,
+            autopilotMaxSpeed: PERFORMANCE_MAX_SPEED,
+            autopilotThrustAccel: PERFORMANCE_THRUST_ACCEL,
+            autopilotThrustDecel: PERFORMANCE_THRUST_DECEL,
+            autopilotBoostMaxSpeed: PERFORMANCE_BOOST_MAX_SPEED,
+            autopilotBoostAccel: PERFORMANCE_BOOST_ACCEL,
+            autopilotBoostDecel: PERFORMANCE_BOOST_DECEL,
 
             // Warp
             flightWarpSpeed: FLIGHT_WARP_SPEED,
@@ -141,7 +142,13 @@ export class OsirisMothership extends Spaceship {
             id: id,
             name: 'Osiris Mothership',
             handling: destroyerHandling,
-            weapons: [new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)],
+            weapons: [
+                new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig),
+                new MissileWeapon(scene, SPACESHIP_RADIUS, {
+                    salvoSize: 3,
+                    missileLength: 0.012 / RADIUS_SCALE, // 12 m
+                }),
+            ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 4, rechargeTime: 90 },
             shipTypeId: 'osiris_mothership',

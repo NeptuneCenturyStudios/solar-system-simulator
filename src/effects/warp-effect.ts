@@ -46,7 +46,7 @@ const BOOST_LEVEL = 0.25;
 // scaled down. There is no drift flow constant: at or below cruise speed the dust is
 // treated as stationary in space, so it passes the ship at the ship's own speed.
 const FLOW_MUL_BOOST = 1;
-const FLOW_MUL_WARP = 6;
+const FLOW_MUL_WARP = 10;
 const LEN_MUL_DRIFT = 0;
 const LEN_MUL_BOOST = 0.4;
 const LEN_MUL_WARP = 8;

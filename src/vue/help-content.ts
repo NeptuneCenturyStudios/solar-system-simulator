@@ -65,6 +65,7 @@ export const HELP_SECTIONS: HelpSection[] = [
             { action: 'Thrust / brake', keys: ['W', 'S'] },
             { action: 'Roll left / right', keys: ['A', 'D'] },
             { action: 'Boost', keys: ['Shift'] },
+            { action: 'Toggle speed mode (low / high)', keys: ['R'] },
             { action: 'Steer', keys: ['Mouse'] },
             { action: 'Toggle cockpit / third-person view', keys: ['C'] },
             {

@@ -1735,6 +1735,10 @@ function cleanUpSolarSystem() {
     for (const impact of simulationState.impacts) impact.dispose();
     simulationState.impacts = [];
 
+    // Rounds still in flight from destroyed ships (orphaned above by the body teardown, too)
+    for (const orphan of simulationState.orphanedWeapons) orphan.weapon.dispose();
+    simulationState.orphanedWeapons = [];
+
     // Clean up all supernova effects
     for (const supernova of supernovas) {
         supernova.dispose();
@@ -3967,6 +3971,7 @@ function enterFlightMode(ship: Spaceship) {
         isBraking: false,
         shipThrustRate: 0,
         gravRate: 0,
+        speedMode: ship.highSpeedMode ? 'HIGH' : 'LOW',
     });
     speedSprite.visible = true;
 

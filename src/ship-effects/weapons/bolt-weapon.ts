@@ -80,7 +80,7 @@ export class BoltWeapon extends Weapon {
 
         /** Class-level defaults — a ship wanting different behaviour passes a partial IBoltWeaponConfig. */
         const DEFAULT_BOLT_CONFIG: IBoltWeaponConfig = {
-            baseSpeed: 4 / DIST_SCALE, // 500 km/s
+            baseSpeed: 4 / DIST_SCALE, // 4 km/s
             particleLifetime: 4.0,
             boltColor: 0x00eeff,
             boltHeadSize: (15 / 1000) / RADIUS_SCALE,
@@ -156,6 +156,11 @@ export class BoltWeapon extends Weapon {
     /** Name shown on the flight HUD's weapon selector. */
     override get displayName(): string {
         return 'Bolt Cannon';
+    }
+
+    /** Bolts in flight outlive a destroyed owner until they hit or fizzle. */
+    override get hasLiveProjectiles(): boolean {
+        return this.projectiles.length > 0;
     }
 
     /**

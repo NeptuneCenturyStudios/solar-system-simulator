@@ -192,6 +192,23 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         }
     };
 
+    /** R in flight: switch between the low-speed (dogfight) and high-speed flight tiers. */
+    const toggleSpeedMode = (): void => {
+        const ship = flightState.activeShip;
+        if (!ship || ship._isDisposed) return;
+        if (ship.setHighSpeedMode(!ship.highSpeedMode)) {
+            ctx.addEvent({
+                message: `Flight mode: ${ship.highSpeedMode ? 'High' : 'Low'} speed`,
+                notificationType: NotificationType.Info,
+            });
+        } else {
+            ctx.addEvent({
+                message: 'Cannot change flight mode during warp or autopilot',
+                notificationType: NotificationType.Info,
+            });
+        }
+    };
+
     const isVelocityEditing = (): boolean =>
         interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity;
 
@@ -319,6 +336,9 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
             return false;
         },
     });
+
+    // R: flight-only — toggle low / high speed mode.
+    bindings.set('r', { onDown: pressOnce(inFlight, toggleSpeedMode) });
 
     bindings.set('shift', {
         onDown: () => {

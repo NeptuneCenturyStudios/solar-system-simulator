@@ -995,6 +995,7 @@ export class CombatShipAI extends FollowShipAI {
         if (this.debugAimCos < Math.cos(AI_AIM_CONE_ANGLE)) return 'outside cone';
 
         ship.controlInput.aimDir.copy(_aim);
+        ship.controlInput.target = target;
         ship.controlInput.fire = true;
         return 'FIRING';
     }

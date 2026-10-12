@@ -16,7 +16,7 @@ import { Spaceship } from './bodies/ships/spaceship';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { FlightHUD } from './drawing/flight-hud';
 import type { HudSprite } from './drawing/hud/hud-sprite';
-import { Weapon } from './ship-effects/weapons/weapon';
+import { IWeaponOwner, Weapon } from './ship-effects/weapons/weapon';
 import type { IPlanetaryAttributes } from './bodies/body-attributes';
 
 /**
@@ -223,6 +223,18 @@ export interface ISimulationState {
     /** AI-piloted (non-player) ships currently in the simulation.
      *  Maintained by simulation/ai/npc-manager.ts; always a subset of `bodies`. */
     npcShips: Spaceship[];
+    /**
+     * Weapons whose ship was destroyed while they still had rounds in flight. Updated by the
+     * animation loop until the last round hits or expires, then disposed.
+     */
+    orphanedWeapons: IOrphanedWeapon[];
+}
+
+/** A weapon kept alive after its ship died, so its in-flight rounds can finish. */
+export interface IOrphanedWeapon {
+    weapon: Weapon;
+    /** The destroyed ship — still passed to update() so rounds never hit their own shooter. */
+    owner: IWeaponOwner;
 }
 
 /**
@@ -260,6 +272,13 @@ export interface IShipControlInput {
      * `aimDir.lengthSq() > 0`.
      */
     aimDir: THREE.Vector3;
+    /**
+     * Locked target handed to homing weapons — the player's Tab lock, or a ShipAI's current
+     * target. A homing weapon captures it once at launch, so changing it later never redirects
+     * a missile already in flight. Ignored by unguided weapons; meaningful only while `fire` is
+     * true. Null fires homing weapons unguided.
+     */
+    target: Body | null;
     /**
      * Warp intent — the "Space" key for the player, but held as a *level* rather
      * than an edge: true means "I want warp", false means "I don't".

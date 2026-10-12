@@ -863,6 +863,27 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
         }
 
+        // Weapons whose ship died with rounds still in flight (see Spaceship.die): keep their
+        // bolts/missiles flying until the last one hits or expires, then release them.
+        // Backwards for the same reason as above — a hit can kill another ship mid-loop, which
+        // appends to this list; appended entries sit past `i` and wait for next frame.
+        const orphans = ctx.simulationState.orphanedWeapons;
+        for (let i = orphans.length - 1; i >= 0; i--) {
+            const { weapon, owner } = orphans[i];
+            weapon.update(
+                wallDt,
+                dtTotal,
+                ctx.simulationState.bodies,
+                ctx.camera.position,
+                owner,
+                tScale === 0
+            );
+            if (!weapon.hasLiveProjectiles) {
+                weapon.dispose();
+                orphans.splice(i, 1);
+            }
+        }
+
         // ── Thermal gauge + weapon selector ──────────────────────────────────
         // Both anchored beside the gray steering-origin ring and both driven by the
         // ship's currently selected weapon (cycled with G), so the gauge and the name
@@ -1303,7 +1324,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 const thrustRate: number = (() => {
                     if (!h) return 0;
                     if (ship?.warpDecelerating) return h.flightWarpDecel;
-                    if (ship?.boostDecelerating) return h.flightBoostDecel;
+                    if (ship?.boostDecelerating)
+                        return ship.boostDecelRateAt(ctx.flightState.currentSpeed);
                     if (ship?.stopBraking)
                         return ctx.flightState.currentSpeed > h.flightBoostMaxSpeed
                             ? h.flightWarpDecel
@@ -1340,6 +1362,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     isBraking: !!hBrake,
                     shipThrustRate: thrustRate,
                     gravRate: gRate,
+                    speedMode: ship?.autopilotActive || ship?.highSpeedMode ? 'HIGH' : 'LOW',
                 });
             }
 

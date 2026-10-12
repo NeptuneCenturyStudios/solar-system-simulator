@@ -25,6 +25,7 @@ export const simulationState: ISimulationState = {
     showNames: false,
     gMultiplier: 1,
     npcShips: [] as Spaceship[],
+    orphanedWeapons: [],
 };
 
 /**

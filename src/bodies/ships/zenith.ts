@@ -5,6 +5,7 @@ import { Spaceship } from './spaceship';
 import { BoltWeapon } from '../../ship-effects/weapons/bolt-weapon';
 import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
+import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
 
 export class Zenith extends Spaceship {
     constructor(
@@ -54,13 +55,13 @@ export class Zenith extends Spaceship {
         const FLIGHT_MAX_BANK_PITCH = 0.2;
         const FLIGHT_MAX_BANK_YAW = 0.2;
         const FLIGHT_WARP_CHARGE_TIME = 2.0;
-        // Autopilot tuning — normal flight and boost are tuned low for dogfights
-        const AUTOPILOT_MAX_SPEED = 500 / DIST_SCALE; // 500 km/s
-        const AUTOPILOT_THRUST_ACCEL = AUTOPILOT_MAX_SPEED * 0.1;
-        const AUTOPILOT_THRUST_DECEL = AUTOPILOT_MAX_SPEED * 0.75;
-        const AUTOPILOT_BOOST_MAX_SPEED = 2500 / DIST_SCALE; // 2500 km/s
-        const AUTOPILOT_BOOST_ACCEL = AUTOPILOT_BOOST_MAX_SPEED * 0.2;
-        const AUTOPILOT_BOOST_DECEL = AUTOPILOT_BOOST_ACCEL * 5;
+        // High speed tuning — normal flight and boost are tuned low for dogfights
+        const PERFORMANCE_MAX_SPEED = 500 / DIST_SCALE; // 500 km/s
+        const PERFORMANCE_THRUST_ACCEL = PERFORMANCE_MAX_SPEED * 0.1;
+        const PERFORMANCE_THRUST_DECEL = PERFORMANCE_MAX_SPEED * 0.75;
+        const PERFORMANCE_BOOST_MAX_SPEED = 2500 / DIST_SCALE; // 2500 km/s
+        const PERFORMANCE_BOOST_ACCEL = PERFORMANCE_BOOST_MAX_SPEED * 0.2;
+        const PERFORMANCE_BOOST_DECEL = PERFORMANCE_BOOST_ACCEL * 5;
 
         const fighterHandling: ISpaceshipHandling = {
             // Thrust / speed
@@ -75,12 +76,12 @@ export class Zenith extends Spaceship {
             flightBoostDecel: FLIGHT_BOOST_DECEL,
 
             // Autopilot
-            autopilotMaxSpeed: AUTOPILOT_MAX_SPEED,
-            autopilotThrustAccel: AUTOPILOT_THRUST_ACCEL,
-            autopilotThrustDecel: AUTOPILOT_THRUST_DECEL,
-            autopilotBoostMaxSpeed: AUTOPILOT_BOOST_MAX_SPEED,
-            autopilotBoostAccel: AUTOPILOT_BOOST_ACCEL,
-            autopilotBoostDecel: AUTOPILOT_BOOST_DECEL,
+            autopilotMaxSpeed: PERFORMANCE_MAX_SPEED,
+            autopilotThrustAccel: PERFORMANCE_THRUST_ACCEL,
+            autopilotThrustDecel: PERFORMANCE_THRUST_DECEL,
+            autopilotBoostMaxSpeed: PERFORMANCE_BOOST_MAX_SPEED,
+            autopilotBoostAccel: PERFORMANCE_BOOST_ACCEL,
+            autopilotBoostDecel: PERFORMANCE_BOOST_DECEL,
 
             // Warp
             flightWarpSpeed: FLIGHT_WARP_SPEED,
@@ -121,10 +122,23 @@ export class Zenith extends Spaceship {
             damage: 1,
             coreWidth: 1,
             haloWidth: 4,
-            heatPerSecond: 1,
-            damageInterval: 0.2,
+            heatPerSecond: 0.5,
+            damageInterval: 0.1,
             coolPerSecond: 1.25,
         };
+
+        // Custom bolt weapon config
+        // const boltWeaponConfig: Partial<IBoltWeaponConfig> = {
+        //     baseSpeed: 8000 / DIST_SCALE, // 4 km/s
+        //     particleLifetime: 4.0,
+        //     boltColor: 0x00eeff,
+        //     boltHeadSize: 100 / RADIUS_SCALE,
+        //     fireRate: 12,
+        //     maxProjectiles: 800,
+        //     damage: 1,
+        //     heatPerSecond: 0.1,
+        //     coolPerSecond: 0.8,
+        // }
 
         super(dependencies, scene, {
             position: position,
@@ -138,6 +152,7 @@ export class Zenith extends Spaceship {
             weapons: [
                 new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig),
                 new BoltWeapon(scene, SPACESHIP_RADIUS),
+                new MissileWeapon(scene, SPACESHIP_RADIUS),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 2, rechargeTime: 30 },

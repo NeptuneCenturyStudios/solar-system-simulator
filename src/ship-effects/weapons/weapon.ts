@@ -34,10 +34,11 @@ export interface IWeaponSound {
  * loadout of Weapon classes; swapping weapon classes on a ship is a one-line change.
  *
  * Lifecycle (driven by Spaceship / flight-controllers / animation-loop):
- *   - tryFire(dt, origin, direction, shipVelocity) — called every frame while the
+ *   - tryFire(dt, origin, direction, shipVelocity, target) — called every frame while the
  *     trigger is held and the ship is controllable.  Burst weapons (e.g. BoltWeapon)
  *     rate-limit via an internal cooldown; continuous weapons (e.g. LaserWeapon)
- *     refresh their aim/origin each call.
+ *     refresh their aim/origin each call; homing weapons (e.g. MissileWeapon) launch
+ *     on the rising edge and capture `target` for the whole flight.
  *   - stopFire() — called when the trigger is released.  No-op for burst weapons,
  *     terminates beams for continuous weapons.
  *   - update(wallDt, simDt, bodies, cameraPosition, owner, isPaused) — called
@@ -91,6 +92,16 @@ export abstract class Weapon {
      */
     get muzzleSpeed(): number {
         return Infinity;
+    }
+
+    /**
+     * True while this weapon still has projectiles in flight. When the owning ship dies, a
+     * weapon reporting true is kept updating (see Spaceship.die) until its rounds hit or
+     * expire, instead of vanishing with the ship. False for weapons with nothing that
+     * outlives the trigger (e.g. the laser beam).
+     */
+    get hasLiveProjectiles(): boolean {
+        return false;
     }
 
     protected constructor(protected readonly scene: THREE.Scene) {}
@@ -157,12 +168,17 @@ export abstract class Weapon {
         this.loopSound = null;
     }
 
-    /** Trigger pulled (held). Implementations must not assume single-shot. */
+    /**
+     * Trigger pulled (held). Implementations must not assume single-shot.
+     * @param target Locked target at the moment of firing. Homing weapons (MissileWeapon)
+     *   capture it per launch; unguided weapons ignore it and may omit the parameter.
+     */
     abstract tryFire(
         dt: number,
         origin: THREE.Vector3,
         direction: THREE.Vector3,
-        shipVelocity: THREE.Vector3
+        shipVelocity: THREE.Vector3,
+        target: Body | null
     ): void;
 
     /** Trigger released. Base stops any looping weapon sound. */

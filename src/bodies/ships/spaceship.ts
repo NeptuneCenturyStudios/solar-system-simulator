@@ -75,14 +75,26 @@ export class Spaceship extends Body {
     muzzleOffset: THREE.Vector3;
     /** Glowing engine exhaust trail rendered as a connected line in world space. */
     trail: IShipEffect;
-    /** Handling characteristics of the spaceship. */
-    handling: ISpaceshipHandling;
+    /** Low-speed (dogfight) handling characteristics, as supplied by the ship subclass. */
+    readonly lowSpeedHandling: ISpaceshipHandling;
     /**
-     * Copy of `handling` with the thrust/boost tier swapped for the autopilot* values. The
-     * autopilot phase machine reads this instead of `handling`, so it can cruise between bodies
-     * while manual flight and ship AI keep the slower dogfight tuning. Warp is unchanged.
+     * Copy of `lowSpeedHandling` with the thrust/boost tier swapped for the autopilot* values.
+     * The autopilot phase machine always reads this, so it can cruise between bodies; manual
+     * flight uses it too while `highSpeedMode` is on. Warp is unchanged.
      */
     readonly autopilotHandling: ISpaceshipHandling;
+    /** True while manual flight uses the high-speed tier (player toggle; AI ships stay low). */
+    highSpeedMode: boolean = false;
+    /**
+     * True while a boost-decel ramp was started by dropping out of high-speed mode. The ramp
+     * then brakes at the high-speed tier's rates instead of the far weaker low-speed boost decel.
+     */
+    downshiftDecelerating: boolean = false;
+
+    /** Handling for manual flight and ship AI: the tier selected by `highSpeedMode`. */
+    get handling(): ISpaceshipHandling {
+        return this.highSpeedMode ? this.autopilotHandling : this.lowSpeedHandling;
+    }
     /** Weapon systems mounted on this ship. Empty for unarmed ships. Subclasses mount a loadout of Weapon classes. */
     weapons: Weapon[] = [];
 
@@ -154,6 +166,7 @@ export class Spaceship extends Body {
         steerY: 0,
         fire: false,
         aimDir: new THREE.Vector3(),
+        target: null,
         warp: false,
     };
 
@@ -336,7 +349,7 @@ export class Spaceship extends Body {
         this.dependencies = dependencies as IStateDependencies;
 
         // Store the handling characteristics for use in flight control calculations.
-        this.handling = options.handling;
+        this.lowSpeedHandling = options.handling;
         const h = options.handling;
         this.autopilotHandling = {
             ...h,
@@ -473,9 +486,17 @@ export class Spaceship extends Body {
         return this.activeWeapon;
     }
 
-    /** Fire the selected weapon toward `aimDir`. No-op if this ship is unarmed. */
-    fireWeapon(dt: number, muzzlePos: THREE.Vector3, aimDir: THREE.Vector3): void {
-        this.activeWeapon?.tryFire(dt, muzzlePos, aimDir, this.velocity);
+    /**
+     * Fire the selected weapon toward `aimDir`. No-op if this ship is unarmed.
+     * @param target The locked target handed to homing weapons at launch; ignored by unguided ones.
+     */
+    fireWeapon(
+        dt: number,
+        muzzlePos: THREE.Vector3,
+        aimDir: THREE.Vector3,
+        target: Body | null = null
+    ): void {
+        this.activeWeapon?.tryFire(dt, muzzlePos, aimDir, this.velocity, target);
     }
 
     /** Release the trigger on all mounted weapons (stops continuous beams). */
@@ -757,7 +778,7 @@ export class Spaceship extends Body {
     applyBoostDecelerationStep(simDt: number, forward: THREE.Vector3): boolean {
         const rel = this.relativeVelocity(_govRel);
         const fwdSpd = rel.dot(forward);
-        const unclamped = fwdSpd - this.handling.flightBoostDecel * simDt;
+        const unclamped = fwdSpd - this.boostDecelRateAt(fwdSpd) * simDt;
         if (unclamped > this.handling.flightMaxSpeed) {
             rel.copy(forward).multiplyScalar(unclamped);
             this.setRelativeVelocity(rel);
@@ -766,7 +787,55 @@ export class Spaceship extends Body {
         // Reached normal max — snap and signal done.
         rel.copy(forward).multiplyScalar(this.handling.flightMaxSpeed);
         this.setRelativeVelocity(rel);
+        this.downshiftDecelerating = false;
         return false;
+    }
+
+    /**
+     * Rate (u/s²) the boost-decel ramp brakes at for a given forward speed: the high-speed
+     * tier's band rate while downshifting out of high-speed mode, the boost decel otherwise.
+     */
+    boostDecelRateAt(speed: number): number {
+        return this.downshiftDecelerating
+            ? this.decelRateForSpeed(speed, this.autopilotHandling)
+            : this.handling.flightBoostDecel;
+    }
+
+    /**
+     * Switch manual flight between the low-speed (dogfight) and high-speed tiers.
+     *
+     * Refused while warp or autopilot owns the ship's speed. Dropping to low speed while
+     * faster than its cruise max starts the boost-decel ramp, braking at the high-speed
+     * tier's rates, so the ship sheds the excess in seconds rather than minutes.
+     *
+     * @returns false when the change was refused.
+     */
+    setHighSpeedMode(enabled: boolean): boolean {
+        if (
+            this.autopilotActive ||
+            this.warpCharging ||
+            this.warpActive ||
+            this.warpDecelerating ||
+            this.stopBraking
+        ) {
+            return false;
+        }
+        if (enabled === this.highSpeedMode) return true;
+
+        this.highSpeedMode = enabled;
+        if (!enabled) {
+            const forward = _govForward.set(0, 0, 1).applyQuaternion(this.controlFrameQuat);
+            if (this.forwardSpeedInFrame(forward) > this.lowSpeedHandling.flightMaxSpeed) {
+                this.boostDecelerating = true;
+                this.downshiftDecelerating = true;
+            }
+        } else {
+            // Upshifting: low-tier speeds are all below the high cruise max, and the ramp's
+            // completion snap would otherwise jump the ship UP to it — cancel any ramp.
+            this.boostDecelerating = false;
+            this.downshiftDecelerating = false;
+        }
+        return true;
     }
 
     /**
@@ -959,6 +1028,7 @@ export class Spaceship extends Body {
                 // clamped max speed after the ship has come to rest.
                 this.warpDecelerating = false;
                 this.boostDecelerating = false;
+                this.downshiftDecelerating = false;
                 return { phase: 'idle', forwardSpeed: 0, decelDone: true };
             }
             const fwdSpd = this.forwardSpeedInFrame(forward);
@@ -1114,6 +1184,7 @@ export class Spaceship extends Body {
         // Re-engaging boost cancels the decel — but only once we're at or below boost max.
         if (boostHeld && fwdSpeed <= this.handling.flightBoostMaxSpeed) {
             this.boostDecelerating = false;
+            this.downshiftDecelerating = false;
         }
 
         this.prevShiftHeld = boostHeld;
@@ -1185,6 +1256,7 @@ export class Spaceship extends Body {
         input.steerX = 0;
         input.steerY = 0;
         input.fire = false;
+        input.target = null;
         input.warp = false;
         // aimDir is deliberately left as-is: it is only meaningful while `fire` is true, and
         // there is no direction that means "not aiming". Clearing the trigger disarms the ship.
@@ -1682,6 +1754,7 @@ export class Spaceship extends Body {
         this.warpActive = false;
         this.warpDecelerating = false;
         this.boostDecelerating = false;
+        this.downshiftDecelerating = false;
         this.stopBraking = true;
     }
 
@@ -1694,6 +1767,7 @@ export class Spaceship extends Body {
         this.warpActive = false;
         this.warpDecelerating = false;
         this.boostDecelerating = false;
+        this.downshiftDecelerating = false;
         this.stopBraking = false;
     }
 
@@ -1753,7 +1827,16 @@ export class Spaceship extends Body {
         this.warpEffect.forceHide();
         this.warpEffect.dispose();
         this.disposeModelChildren();
-        for (const weapon of this.weapons) weapon.dispose();
+        // Rounds already in flight outlive the ship: hand those weapons to the animation loop,
+        // which keeps updating them until the last round hits or expires, then disposes them.
+        for (const weapon of this.weapons) {
+            weapon.stopFire();
+            if (weapon.hasLiveProjectiles) {
+                simulationState.orphanedWeapons.push({ weapon, owner: this });
+            } else {
+                weapon.dispose();
+            }
+        }
         this.weapons = [];
         this.resetAutopilotState();
         this.trail.dispose();

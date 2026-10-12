@@ -45,6 +45,8 @@ export interface SpeedHudParams {
     shipThrustRate: number;
     /** Total gravitational acceleration magnitude on the ship in u/s². */
     gravRate: number;
+    /** Which handling tier the ship is flying on (autopilot always flies HIGH). */
+    speedMode: 'HIGH' | 'LOW';
 }
 
 /**
@@ -52,7 +54,8 @@ export interface SpeedHudParams {
  * The canvas must already be sized to `SPEED_CANVAS_W × speedCanvasHeight(hasExtra)`.
  */
 export function paintSpeed(ctx: CanvasRenderingContext2D, params: SpeedHudParams): void {
-    const { speed, isBoosting, pos, vel, isWarp, isBraking, shipThrustRate, gravRate } = params;
+    const { speed, isBoosting, pos, vel, isWarp, isBraking, shipThrustRate, gravRate, speedMode } =
+        params;
     const hasExtra = !!(pos && vel);
     const W = SPEED_CANVAS_W;
     const H = speedCanvasHeight(hasExtra);
@@ -76,14 +79,19 @@ export function paintSpeed(ctx: CanvasRenderingContext2D, params: SpeedHudParams
     ctx.shadowColor = glow;
     ctx.shadowBlur = 12;
     ctx.font = '36px monospace';
-    if (isWarp) {
-        ctx.fillText('WARP', W - 24, hasExtra ? 44 : 56);
-    } else if (isBraking) {
-        ctx.fillText('SPEED - BRAKING', W - 24, hasExtra ? 44 : 56);
-    } else if (isBoosting) {
-        ctx.fillText('BOOST', W - 24, hasExtra ? 44 : 56);
-    } else {
-        ctx.fillText('SPEED', W - 24, hasExtra ? 44 : 56);
+    const labelY = hasExtra ? 44 : 56;
+    const label = isWarp ? 'WARP' : isBraking ? 'SPEED - BRAKING' : isBoosting ? 'BOOST' : 'SPEED';
+    ctx.fillText(label, W - 24, labelY);
+
+    // ── Speed mode tag (HIGH / LOW), just left of the mode label ─────────────
+    {
+        const labelWidth = ctx.measureText(label).width;
+        const isHigh = speedMode === 'HIGH';
+        ctx.font = '26px monospace';
+        ctx.fillStyle = isHigh ? '#ffcc44' : dim;
+        ctx.shadowColor = isHigh ? 'rgba(255,204,68,0.7)' : 'transparent';
+        ctx.shadowBlur = isHigh ? 8 : 0;
+        ctx.fillText(speedMode, W - 24 - labelWidth - 18, labelY);
     }
 
     // ── Thrust rate vs Gravity rate ───────────────────────────────────────────

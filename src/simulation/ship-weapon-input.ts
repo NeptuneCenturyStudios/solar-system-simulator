@@ -26,7 +26,7 @@ export function applyWeaponInput(ship: Spaceship, dt: number): void {
     // aimDir is only meaningful while the trigger is held, and a ship that has never aimed still
     // carries a zero vector — firing on that would shoot along an undefined bearing.
     if (input.fire && input.aimDir.lengthSq() > 0) {
-        ship.fireWeapon(dt, muzzleWorldPosition(ship, _muzzle), input.aimDir);
+        ship.fireWeapon(dt, muzzleWorldPosition(ship, _muzzle), input.aimDir, input.target);
     } else {
         ship.stopFire();
     }

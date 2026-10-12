@@ -300,6 +300,8 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     playerInput.rollRight = flightState.rollRight;
     // The autopilot flies the ship, so the trigger is dead while it is engaged.
     playerInput.fire = flightState.isFiring && !autopilotState.isActive;
+    // Homing weapons capture this at launch; switching locks later never redirects a missile.
+    playerInput.target = flightState.selectedTarget;
 
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
 
