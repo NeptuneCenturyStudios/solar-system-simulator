@@ -1714,11 +1714,16 @@ export class Spaceship extends Body {
 
     /**
      * Update the warp tunnel visual.  Call once per frame while the ship exists.
+     * Streak length, speed and opacity follow this ship's cruise / boost / warp speeds.
      * @param dt        Delta time in seconds.
-     * @param maxSpeed  Speed at which the effect reaches full opacity (pass FLIGHT_WARP_SPEED).
      */
-    updateWarpEffect(dt: number, maxSpeed: number): void {
-        this.warpEffect.update(dt, this.mesh.position, this.velocity, maxSpeed);
+    updateWarpEffect(dt: number): void {
+        this.warpEffect.update(dt, this.mesh.position, this.velocity, {
+            cruise: this.handling.flightMaxSpeed,
+            boost: this.handling.flightBoostMaxSpeed,
+            warp: this.handling.flightWarpSpeed,
+            shipRadius: this.radius,
+        });
     }
 
     /**

@@ -498,18 +498,12 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             );
         }
 
-        // ── Warp effect ──────────────────────────────────────────────────
-        // Driven for every ship in the system, not just the player's current one and the NPCs.
-        // A ship belonging to neither group is easy to create — spawn one, leave it, then enter
-        // a different ship — and it used to have nothing advancing or hiding its tunnel, so the
-        // streaks froze in the scene at whatever opacity they last held. The effect is
-        // speed-driven and self-hiding, so running it on everything is safe: a ship that isn't
-        // moving simply stays invisible.
+        // ── Shield effect ────────────────────────────────────────────────
+        // (The warp effect is updated post-physics — see "Warp effect" below.)
         for (const body of ctx.simulationState.bodies) {
             if (!body || body.bodyType !== BodyTypeEnum.SpaceShip) continue;
             if (body._isDisposed || !body.mesh) continue;
             const ship = body as Spaceship;
-            ship.updateWarpEffect(dtTotal, ship.handling.flightWarpSpeed);
             // Wall-clock so the shield glow fades at the same pace at any time-warp, but held
             // while paused.
             ship.updateShieldEffect(simulationState.timeScale === 0 ? 0 : wallDt);
@@ -1192,6 +1186,23 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
         // ── HUD ──────────────────────────────────────────────────────────────
         ctx.flightHUD.updateHintSprite();
+
+        // ── Warp effect ──────────────────────────────────────────────────
+        // Driven for every ship in the system, not just the player's current one and the NPCs.
+        // A ship belonging to neither group is easy to create — spawn one, leave it, then enter
+        // a different ship — and it used to have nothing advancing or hiding its tunnel, so the
+        // streaks froze in the scene at whatever opacity they last held. The effect is
+        // speed-driven and self-hiding, so running it on everything is safe: a ship that isn't
+        // moving simply stays invisible.
+        //
+        // Must run after physics: the tunnel is anchored to the ship's position, and at warp
+        // the ship moves tens of units per frame. Anchoring to the pre-physics position left
+        // the (ship-sized, at low warp) tunnel entirely behind the camera until ~2c.
+        for (const body of ctx.simulationState.bodies) {
+            if (!body || body.bodyType !== BodyTypeEnum.SpaceShip) continue;
+            if (body._isDisposed || !body.mesh) continue;
+            (body as Spaceship).updateWarpEffect(dtTotal);
+        }
 
         // ── Warp tunnel visibility ─────────────────────────────────────────
         // One rule for every ship in the system:
