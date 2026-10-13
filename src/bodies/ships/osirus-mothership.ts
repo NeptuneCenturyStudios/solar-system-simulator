@@ -126,6 +126,7 @@ export class OsirisMothership extends Spaceship {
 
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
             beamColor: 0x800080,
+            optimalRange: 100_000 / DIST_SCALE,
             damage: 10,
             coreWidth: 2,
             haloWidth: 6,
@@ -150,7 +151,7 @@ export class OsirisMothership extends Spaceship {
                 }),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
-            shield: { hullMultiplier: 4, rechargeTime: 90 },
+            shield: { hullMultiplier: 4, rechargeTime: 150 },
             shipTypeId: 'osiris_mothership',
             thirdPersonOffset: THIRD_PERSON_OFFSET,
         });

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Body } from '../../bodies/body';
+import { IDamageEffectiveness } from '../../interfaces';
 import { SoundEffect, playSoundEffect } from '../../utilities/audio.js';
 import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
 import { DIST_SCALE, RADIUS_SCALE } from '../../utilities/consts';
@@ -23,6 +24,10 @@ export interface IBoltWeaponConfig {
     maxProjectiles: number;
     /** HP damage dealt on impact. */
     damage: number;
+    /** Damage multiplier against shields (1 = full damage). */
+    shieldEffectiveness: number;
+    /** Damage multiplier against hulls and unshielded bodies (1 = full damage). */
+    hullEffectiveness: number;
     /** Thermal load gained per second while the trigger is held (0..1 scale). */
     heatPerSecond: number;
     /** Thermal load lost per second while the trigger is released (0..1 scale). */
@@ -60,10 +65,12 @@ interface Projectile {
  * technique used by ShipFlame.
  *
  * On body impact, dispatches `window` CustomEvent `'weapon:hit'` with:
- *   { body: Body, position: THREE.Vector3, damage: number }
+ *   { body: Body, position: THREE.Vector3, damage: number, effectiveness: IDamageEffectiveness }
  */
 export class BoltWeapon extends Weapon {
     private readonly config: IBoltWeaponConfig;
+    /** Shield/hull damage multipliers sent with every hit — built once from config. */
+    private readonly effectiveness: IDamageEffectiveness;
     private projectiles: Projectile[] = [];
     private readonly maxProjectiles: number;
     /** Glowing point at each bolt head. */
@@ -87,12 +94,18 @@ export class BoltWeapon extends Weapon {
             fireRate: 12,
             maxProjectiles: 800,
             damage: 1,
+            shieldEffectiveness: 1.0,
+            hullEffectiveness: 1.0,
             heatPerSecond: 0.1,
             coolPerSecond: 0.8,
             fireSound: () => playSoundEffect(SoundEffect.WeaponFire),
         };
 
         this.config = { ...DEFAULT_BOLT_CONFIG, ...config };
+        this.effectiveness = {
+            shield: this.config.shieldEffectiveness,
+            hull: this.config.hullEffectiveness,
+        };
         this.maxProjectiles = this.config.maxProjectiles;
 
         const weaponSound: IWeaponSound = {
@@ -310,6 +323,7 @@ export class BoltWeapon extends Weapon {
                             body: hitBody,
                             position: p.position.clone(),
                             damage: this.config.damage,
+                            effectiveness: this.effectiveness,
                         },
                     })
                 );

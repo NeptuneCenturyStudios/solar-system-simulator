@@ -90,7 +90,7 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         // Wormholes are indestructible — weapons can hit them but never damage them.
         if (body instanceof Wormhole) return;
 
-        body.takeDamage(e.detail.damage);
+        body.takeDamage(e.detail.damage, e.detail.effectiveness);
 
         // Ripple the shield only while it still has points left after the hit; once it is down
         // the impact flash alone marks the strike.

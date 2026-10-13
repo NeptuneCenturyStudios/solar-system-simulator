@@ -15,7 +15,13 @@ declare global {
         'body:selected': CustomEvent<{ body: Body; id: string; name: string }>;
         'body:deselected': CustomEvent<{ body: Body; id: string; name: string }>;
         /** Fired when a weapon projectile strikes a body. */
-        'weapon:hit': CustomEvent<{ body: Body; position: THREE.Vector3; damage: number }>;
+        'weapon:hit': CustomEvent<{
+            body: Body;
+            position: THREE.Vector3;
+            /** Raw damage, before the weapon's shield/hull effectiveness is applied. */
+            damage: number;
+            effectiveness: IDamageEffectiveness;
+        }>;
         'camera:focusChanged': CustomEvent<{
             body: Body | null;
             id: string | null;
@@ -168,6 +174,7 @@ import { Spaceship } from './bodies/ships/spaceship';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
 import {
     IAutopilotContext,
+    IDamageEffectiveness,
     IFlightControlContext,
     IMagneticFieldOptions,
     IProceduralGeneratorPromptResult,

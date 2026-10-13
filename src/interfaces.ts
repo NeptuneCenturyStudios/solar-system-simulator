@@ -475,6 +475,17 @@ export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {
 /**
  * Options for creating a spaceship, including its physical properties, position, velocity, and handling characteristics.
  */
+/**
+ * Per-layer damage multipliers for a damage source. Raw damage is scaled by `shield` while it
+ * is absorbed by a shield and by `hull` once it reaches healthPoints. 1 = full damage.
+ */
+export interface IDamageEffectiveness {
+    /** Multiplier applied to damage dealt to a shield layer. */
+    shield: number;
+    /** Multiplier applied to damage dealt to a hull (healthPoints) — including unshielded bodies. */
+    hull: number;
+}
+
 /** Per-ship-type shield tuning. */
 export interface IShipShieldConfig {
     /** Max shield HP as a multiple of the hull's maxHealthPoints. */

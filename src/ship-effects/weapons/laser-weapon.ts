@@ -3,8 +3,9 @@ import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Body } from '../../bodies/body';
+import { IDamageEffectiveness } from '../../interfaces';
 import { LoopSoundController, SoundEffect, playSoundEffect } from '../../utilities/audio.js';
-import { C } from '../../utilities/consts.js';
+import { C, DIST_SCALE } from '../../utilities/consts.js';
 import {
     IBodyRayHit,
     IWeaponOwner,
@@ -18,6 +19,7 @@ const LASER_FLICKER_FREQ_A = 9.1; // rad/s — incommensurate with B for non-rep
 const LASER_FLICKER_FREQ_B = 17.3;
 const LASER_FLICKER_OPACITY_AMP = 0.2; // ±20 % brightness swing
 const LASER_FLICKER_WIDTH_AMP = 0.15; // ±15 % linewidth swing
+const LASER_OPTIMAL_RANGE_KM = 25000;
 
 /**
  * Per-instance tuning for LaserWeapon.  Ships may pass a partial config to
@@ -34,6 +36,16 @@ export interface ILaserWeaponConfig {
     haloWidth: number;
     /** HP damage dealt per damage tick while the beam touches a body. */
     damage: number;
+    /**
+     * Distance (world units) out to which the beam deals full damage.  Beyond it the
+     * beam has diverged into a wider spot, so damage falls off with the inverse square
+     * of distance: 2× optimal range = 25 %, 10× = 1 %.
+     */
+    optimalRange: number;
+    /** Damage multiplier against shields (1 = full damage). */
+    shieldEffectiveness: number;
+    /** Damage multiplier against hulls and unshielded bodies (1 = full damage). */
+    hullEffectiveness: number;
     /** Minimum seconds between damage ticks on the same body. */
     damageInterval: number;
     /** Thermal load gained per second while the trigger is held (0..1 scale). */
@@ -59,6 +71,8 @@ export interface ILaserWeaponConfig {
  */
 export class LaserWeapon extends Weapon {
     private readonly config: ILaserWeaponConfig;
+    /** Shield/hull damage multipliers sent with every hit — built once from config. */
+    private readonly effectiveness: IDamageEffectiveness;
 
     /** True while the trigger is held (beam active). */
     private active = false;
@@ -111,6 +125,9 @@ export class LaserWeapon extends Weapon {
             coreWidth: 1,
             haloWidth: 4,
             damage: 2,
+            optimalRange: LASER_OPTIMAL_RANGE_KM / DIST_SCALE,
+            shieldEffectiveness: 1.75,
+            hullEffectiveness: 0.25,
             damageInterval: 0.2,
             heatPerSecond: 0.25,
             coolPerSecond: 0.75,
@@ -118,6 +135,10 @@ export class LaserWeapon extends Weapon {
         };
 
         this.config = { ...DEFAULT_LASER_CONFIG, ...config };
+        this.effectiveness = {
+            shield: this.config.shieldEffectiveness,
+            hull: this.config.hullEffectiveness,
+        };
 
         const weaponSound: IWeaponSound = {
             loop: this.config.loopSound ?? (() => playSoundEffect(SoundEffect.LaserBeam, true)),
@@ -322,7 +343,8 @@ export class LaserWeapon extends Weapon {
                     detail: {
                         body: hitBody,
                         position: this.tip.clone(),
-                        damage: this.config.damage,
+                        damage: this.config.damage * this.rangeFalloff(hitT),
+                        effectiveness: this.effectiveness,
                     },
                 })
             );
@@ -371,6 +393,17 @@ export class LaserWeapon extends Weapon {
             this.setBeamVisible(true);
             this.prevBeamVisible = true;
         }
+    }
+
+    /**
+     * Damage multiplier for a hit at `distance` world units: 1 inside optimal range,
+     * then inverse-square (spot area grows with distance², so intensity drops with it).
+     */
+    private rangeFalloff(distance: number): number {
+        const optimal = this.config.optimalRange;
+        if (distance <= optimal) return 1;
+        const ratio = optimal / distance;
+        return ratio * ratio;
     }
 
     private setBeamVisible(visible: boolean): void {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Body } from '../../bodies/body';
+import { IDamageEffectiveness } from '../../interfaces';
 import { SoundEffect, playSoundEffect } from '../../utilities/audio.js';
 import {
     IBodyRayHit,
@@ -39,6 +40,10 @@ export interface IMissileWeaponConfig {
     lifetime: number;
     /** HP damage dealt by each missile that hits. */
     damage: number;
+    /** Damage multiplier against shields (1 = full damage). */
+    shieldEffectiveness: number;
+    /** Damage multiplier against hulls and unshielded bodies (1 = full damage). */
+    hullEffectiveness: number;
     /** Thermal load added per salvo (0..1 scale). 1 overheats the launcher on every salvo. */
     heatPerSalvo: number;
     /** Thermal load lost per second while the trigger is released (0..1 scale). */
@@ -136,10 +141,12 @@ function perpendicularTo(v: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
  * single glowing point per missile at the tail for the exhaust, plus a MissileSmoke trail.
  *
  * On body impact, dispatches `window` CustomEvent `'weapon:hit'` with:
- *   { body: Body, position: THREE.Vector3, damage: number }
+ *   { body: Body, position: THREE.Vector3, damage: number, effectiveness: IDamageEffectiveness }
  */
 export class MissileWeapon extends Weapon {
     private readonly config: IMissileWeaponConfig;
+    /** Shield/hull damage multipliers sent with every hit — built once from config. */
+    private readonly effectiveness: IDamageEffectiveness;
     private missiles: Missile[] = [];
     private pending: PendingLaunch[] = [];
     /** Hidden meshes available for new launches. */
@@ -175,7 +182,9 @@ export class MissileWeapon extends Weapon {
             salvoSplay: THREE.MathUtils.degToRad(6),
             turnRate: 3,
             lifetime: 30,
-            damage: 100,
+            damage: 15,
+            shieldEffectiveness: 0.25,
+            hullEffectiveness: 1.75,
             heatPerSalvo: 1,
             coolPerSecond: 0.2, // full cooldown in 5 s
             maxMissiles: 32,
@@ -194,6 +203,10 @@ export class MissileWeapon extends Weapon {
         };
 
         this.config = { ...DEFAULT_MISSILE_CONFIG, ...config };
+        this.effectiveness = {
+            shield: this.config.shieldEffectiveness,
+            hull: this.config.hullEffectiveness,
+        };
 
         const weaponSound: IWeaponSound = {
             fire: this.config.fireSound ?? (() => playSoundEffect(SoundEffect.WeaponFire)),
@@ -517,6 +530,7 @@ export class MissileWeapon extends Weapon {
                                 body: hitBody,
                                 position: m.position.clone(),
                                 damage: this.config.damage,
+                                effectiveness: this.effectiveness,
                             },
                         })
                     );

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { createTextTexture } from '../drawing/text-texture.js';
 import { BodyTypeEnum } from './body-enums.js';
-import { HP_MASS_MULTIPLIER } from '../utilities/consts.js';
+import { HP_MASS_MULTIPLIER, NEUTRAL_DAMAGE_EFFECTIVENESS } from '../utilities/consts.js';
 import { SoundEffect, playSoundEffect } from '../utilities/audio.js';
-import { IDeathOptions } from '../interfaces.js';
+import { IDamageEffectiveness, IDeathOptions } from '../interfaces.js';
 import { EntryFlameEffect } from '../effects/entry-flame.js';
 
 /**
@@ -190,11 +190,19 @@ export class Body {
      * Apply `damage` HP of damage to this body. Every damage source (weapons, collisions,
      * atmospheric heating) must go through here. Subclasses override to add damage layers
      * (e.g. ship shields). Does NOT call die() — callers check healthPoints and decide.
-     * @param damage HP to remove. Non-positive and NaN values are ignored.
+     * The base body is unshielded, so only `effectiveness.hull` applies.
+     * @param damage Raw damage, before effectiveness. Non-positive and NaN values are ignored.
+     * @param effectiveness Per-layer multipliers of the damage source (e.g. a weapon type).
+     *   Defaults to neutral (1 / 1) for collisions and atmospheric heating.
      */
-    takeDamage(damage: number): void {
+    takeDamage(
+        damage: number,
+        effectiveness: Readonly<IDamageEffectiveness> = NEUTRAL_DAMAGE_EFFECTIVENESS
+    ): void {
         if (!(damage > 0)) return;
-        this._healthPoints -= damage;
+        const hullDamage = damage * effectiveness.hull;
+        if (!(hullDamage > 0)) return;
+        this._healthPoints -= hullDamage;
     }
 
     setMass(mass: number) {

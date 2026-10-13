@@ -118,12 +118,12 @@ export class Zenith extends Spaceship {
 
         // Custom laser weapon config
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
-            beamColor: 0x008020,
+            beamColor: 0x0020FF,
             damage: 1,
             coreWidth: 1,
             haloWidth: 4,
             heatPerSecond: 0.5,
-            damageInterval: 0.1,
+            damageInterval: 0.2,
             coolPerSecond: 1.25,
         };
 

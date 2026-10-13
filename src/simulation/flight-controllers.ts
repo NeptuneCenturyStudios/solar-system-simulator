@@ -18,6 +18,7 @@ import { IBodyRayHit, muzzleWorldPosition, raycastBodies } from '../ship-effects
 import { leadAimDirection } from '../ship-effects/weapons/intercept';
 import { settingsStore } from '../settings/settings-store';
 import type { Body } from '../bodies/body';
+import { BodyTypeEnum } from '../bodies/body-enums';
 
 // Chase-mode scratch — reused every frame so steering toward a locked target allocates nothing.
 const _chaseToTarget = new THREE.Vector3();
@@ -51,6 +52,23 @@ const _assistReticle: IAssistReticle = { tanHalfFovX: 0, tanHalfFovY: 0, screenX
 /** A body target assist may aim at: live, rendered, and not the shooter itself. */
 function isAssistCandidate(body: Body, ship: Body): boolean {
     return !!body.mesh && !body._isDisposed && body !== ship;
+}
+
+/** Body types that firing with them under the reticle will lock onto and flag as a threat. */
+const AUTO_TARGET_BODY_TYPES =
+    BodyTypeEnum.SpaceShip |
+    BodyTypeEnum.Asteroid |
+    BodyTypeEnum.Comet |
+    BodyTypeEnum.Satellite |
+    BodyTypeEnum.Probe;
+
+/**
+ * A body the reticle may auto-lock while firing: an existing threat, or a small body (ship,
+ * asteroid, comet, satellite, probe). Stars, planets and moons are never newly flagged just
+ * because they sat behind the reticle.
+ */
+function isAutoTargetable(body: Body): boolean {
+    return body.isThreat || (body.bodyType & AUTO_TARGET_BODY_TYPES) !== 0;
 }
 
 /**
@@ -558,38 +576,49 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
             .applyQuaternion(_aimFrameDelta)
             .add(ship.mesh.position);
 
-        // Target assist: with a threat touching the aim reticle ring, shoot at where it will be
-        // rather than along the reticle ray. The Tab-locked target wins if it is under the ring;
-        // otherwise the threat nearest the reticle is used, so assist works without a lock.
-        // Re-picked every frame, so moving the reticle off the target disengages immediately.
-        let assistTarget: Body | null = null;
-        if (settingsStore.settings.targetAssistEnabled) {
-            _assistInvCamQuat.copy(_aimFrameDelta).multiply(ctx.camera.quaternion).invert();
-            const reticle = _assistReticle;
-            reticle.tanHalfFovX = tanHalfFovX;
-            reticle.tanHalfFovY = tanHalfFovY;
-            reticle.screenX = noseScreenX + displayOffX;
-            reticle.screenY = noseScreenY - displayOffY;
+        // Reticle target: whatever eligible body touches the aim reticle ring. The Tab-locked
+        // target wins if it is under the ring; otherwise the eligible body nearest the reticle
+        // is used. Re-picked every frame while the trigger is held.
+        _assistInvCamQuat.copy(_aimFrameDelta).multiply(ctx.camera.quaternion).invert();
+        const reticle = _assistReticle;
+        reticle.tanHalfFovX = tanHalfFovX;
+        reticle.tanHalfFovY = tanHalfFovY;
+        reticle.screenX = noseScreenX + displayOffX;
+        reticle.screenY = noseScreenY - displayOffY;
 
-            const locked = flightState.selectedTarget;
-            if (
-                locked &&
-                isAssistCandidate(locked, ship) &&
-                assistReticleDistance(locked, reticle) >= 0
-            ) {
-                assistTarget = locked;
-            } else {
-                let best = Infinity;
-                for (const body of simulationState.bodies) {
-                    if (!body?.isThreat || !isAssistCandidate(body, ship)) continue;
-                    const d = assistReticleDistance(body, reticle);
-                    if (d >= 0 && d < best) {
-                        best = d;
-                        assistTarget = body;
-                    }
+        let reticleTarget: Body | null = null;
+        const locked = flightState.selectedTarget;
+        if (
+            locked &&
+            isAssistCandidate(locked, ship) &&
+            assistReticleDistance(locked, reticle) >= 0
+        ) {
+            reticleTarget = locked;
+        } else {
+            let best = Infinity;
+            for (const body of simulationState.bodies) {
+                if (!body || !isAutoTargetable(body) || !isAssistCandidate(body, ship)) continue;
+                const d = assistReticleDistance(body, reticle);
+                if (d >= 0 && d < best) {
+                    best = d;
+                    reticleTarget = body;
                 }
             }
         }
+
+        // Auto-lock: shooting at a body flags it as a threat and locks it before the weapon
+        // fires, so homing weapons track it even if the player never pressed Tab. playerInput.target
+        // was copied from the lock above, so refresh it for this frame's applyWeaponInput().
+        // Nothing under the ring leaves the existing lock alone.
+        if (reticleTarget) {
+            reticleTarget.isThreat = true;
+            flightState.selectedTarget = reticleTarget;
+            playerInput.target = reticleTarget;
+        }
+
+        // Target assist: shoot at where the reticle target will be rather than along the
+        // reticle ray. Moving the reticle off the target disengages immediately.
+        const assistTarget = settingsStore.settings.targetAssistEnabled ? reticleTarget : null;
 
         if (assistTarget) {
             // Lead with the selected mount's muzzle speed — the same solve CombatShipAI fires

@@ -14,13 +14,19 @@ import {
     ISpaceshipCreationOptions,
     IShipControlInput,
     IStateDependencies,
+    IDamageEffectiveness,
 } from '../../interfaces';
 import { ParticleExplosion } from '../../effects/particle-explosion';
 import type { ShipAI } from '../../simulation/ai/ship-ai';
 import { brakingSpeedLimit } from '../../simulation/ai/obstacle-avoidance';
 import { Weapon } from '../../ship-effects/weapons/weapon';
 import { autopilotState, flightState, simulationState } from '../../simulation/simulation';
-import { G, SHIELD_DEPLETED_EPSILON, SHIP_EXPLOSION_COLOR } from '../../utilities/consts';
+import {
+    G,
+    NEUTRAL_DAMAGE_EFFECTIVENESS,
+    SHIELD_DEPLETED_EPSILON,
+    SHIP_EXPLOSION_COLOR,
+} from '../../utilities/consts';
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_BRAKE_PAD,
@@ -410,11 +416,22 @@ export class Spaceship extends Body {
     /**
      * Shields absorb damage first; only damage beyond the remaining shield reaches the hull.
      * Every hit restarts the recharge so the shield refills to full over shieldRechargeTime.
+     *
+     * `damage` is raw: the shield takes `damage × effectiveness.shield`, and the raw damage it
+     * could not absorb carries through to the hull, where Body applies `effectiveness.hull`.
+     * A source with zero shield effectiveness is stopped outright by a raised shield.
      */
-    override takeDamage(damage: number): void {
+    override takeDamage(
+        damage: number,
+        effectiveness: Readonly<IDamageEffectiveness> = NEUTRAL_DAMAGE_EFFECTIVENESS
+    ): void {
         if (!(damage > 0)) return;
 
-        const absorbed = Math.min(this._shieldPoints, damage);
+        const shieldEff = Math.max(0, effectiveness.shield);
+        const absorbed = Math.min(this._shieldPoints, damage * shieldEff);
+        // Raw damage the shield soaked up: everything, if it was up against a zero-effect source.
+        const rawConsumed =
+            shieldEff > 0 ? absorbed / shieldEff : this._shieldPoints > 0 ? damage : 0;
         this._shieldPoints -= absorbed;
         if (this._shieldPoints <= this.maxShieldPoints * SHIELD_DEPLETED_EPSILON) {
             this._shieldPoints = 0;
@@ -425,8 +442,8 @@ export class Spaceship extends Body {
                 (this.maxShieldPoints - this._shieldPoints) / this.shieldRechargeTime;
         }
 
-        const overflow = damage - absorbed;
-        if (overflow > 0) super.takeDamage(overflow);
+        const overflow = damage - rawConsumed;
+        if (overflow > 0) super.takeDamage(overflow, effectiveness);
     }
 
     /**

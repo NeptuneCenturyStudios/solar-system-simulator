@@ -1,3 +1,5 @@
+import type { IDamageEffectiveness } from '../interfaces';
+
 export enum SimulationStartMode {
     Default = 0,
     Empty = 1,
@@ -588,6 +590,12 @@ export const HP_MASS_MULTIPLIER = 1000;
  * Absorbs floating-point residue so a shield left at ~0 after a hit snaps to exactly 0.
  */
 export const SHIELD_DEPLETED_EPSILON = 1e-6;
+
+/**
+ * Damage effectiveness for sources with no shield/hull preference (collisions, atmospheric
+ * heating): raw damage applies at full strength to every layer.
+ */
+export const NEUTRAL_DAMAGE_EFFECTIVENESS: Readonly<IDamageEffectiveness> = { shield: 1, hull: 1 };
 
 // === Collision damage ===
 // Two colliding bodies each lose the same HP: the kinetic energy of their relative motion in
