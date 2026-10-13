@@ -23,6 +23,7 @@ export const enum SettingKey {
     HidePanelManagerInFlight = 'hidePanelManagerInFlight',
     ChaseModeEnabled = 'chaseModeEnabled',
     CoastDriftAlignEnabled = 'coastDriftAlignEnabled',
+    TargetAssistEnabled = 'targetAssistEnabled',
     RenderDistanceAU = 'renderDistanceAU',
     TextureQuality = 'textureQuality',
 }
@@ -94,6 +95,12 @@ export interface SpaceSimSettings {
      * Off restores free inertial drift (needed to free-fall into an orbit).
      */
     coastDriftAlignEnabled: boolean;
+    /**
+     * While a threat is inside the steering circle, the player's shots aim at its intercept point
+     * instead of along the reticle — the Tab-locked target first, else the threat nearest the
+     * reticle. The reticle and steering are unaffected.
+     */
+    targetAssistEnabled: boolean;
     /** Camera far plane in AU. Anything farther from the camera than this is not drawn. */
     renderDistanceAU: number;
     /** Body-texture quality tier. `high` is only honoured on desktop (see texture-quality.ts). */
@@ -122,6 +129,7 @@ const defaultSettings: SpaceSimSettings = {
     hidePanelManagerInFlight: true,
     chaseModeEnabled: true,
     coastDriftAlignEnabled: true,
+    targetAssistEnabled: false,
     renderDistanceAU: RENDER_DISTANCE_DEFAULT_AU,
     // Low is the safe default: it is the only tier a browser can use, and installing the
     // desktop build should not silently jump to multi-megabyte textures nobody asked for.

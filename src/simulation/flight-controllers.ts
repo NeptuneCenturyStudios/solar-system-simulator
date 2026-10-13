@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { NotificationType } from '../event-log/event-log';
-import { AI_STEER_FULL_DEFLECTION_ANGLE, TEXT_SPRITE_Z } from '../utilities/consts';
+import {
+    AI_STEER_FULL_DEFLECTION_ANGLE,
+    STEERING_RETICLE_RADIUS,
+    TEXT_SPRITE_Z,
+} from '../utilities/consts';
 import {
     autopilotState,
     cameraState,
@@ -11,6 +15,7 @@ import {
 import { IFlightControlContext } from '../interfaces';
 import { applyWeaponInput } from './ship-weapon-input';
 import { IBodyRayHit, muzzleWorldPosition, raycastBodies } from '../ship-effects/weapons/weapon';
+import { leadAimDirection } from '../ship-effects/weapons/intercept';
 import { settingsStore } from '../settings/settings-store';
 import type { Body } from '../bodies/body';
 
@@ -29,6 +34,55 @@ const _aimCamOrigin = new THREE.Vector3();
 const _aimCamDir = new THREE.Vector3();
 const _aimMuzzle = new THREE.Vector3();
 const _aimHit: IBodyRayHit = { t: 0, body: null };
+/** Inverse of the camera orientation the aim ray was built in — maps world into camera space. */
+const _assistInvCamQuat = new THREE.Quaternion();
+/** Assist candidate's offset from the camera, in camera space. */
+const _assistLocal = new THREE.Vector3();
+
+/** This frame's aim reticle ring, in the same screen space as the steering line (px, y up). */
+interface IAssistReticle {
+    tanHalfFovX: number;
+    tanHalfFovY: number;
+    screenX: number;
+    screenY: number;
+}
+const _assistReticle: IAssistReticle = { tanHalfFovX: 0, tanHalfFovY: 0, screenX: 0, screenY: 0 };
+
+/** A body target assist may aim at: live, rendered, and not the shooter itself. */
+function isAssistCandidate(body: Body, ship: Body): boolean {
+    return !!body.mesh && !body._isDisposed && body !== ship;
+}
+
+/**
+ * Screen distance (px) from the reticle centre to `body`, or -1 when the body does not touch
+ * the reticle ring or is behind the camera.
+ *
+ * A body counts once any part of its on-screen disc overlaps the ring, so a nearby asteroid
+ * larger than the reticle still engages; a distant one is effectively a point and has to sit
+ * inside the ring. Re-evaluated every frame the trigger is held, so sliding the reticle off a
+ * target mid-burst (or mid-beam) hands the aim straight back to the reticle.
+ *
+ * Projects through the same camera model the aim ray is built from — `_aimCamOrigin` and
+ * `_assistInvCamQuat` (inverse of camera orientation × this frame's steering delta) must be
+ * current — so the test agrees with the ring the player actually sees.
+ */
+function assistReticleDistance(body: Body, reticle: IAssistReticle): number {
+    _assistLocal.subVectors(body.mesh.position, _aimCamOrigin).applyQuaternion(_assistInvCamQuat);
+    // Camera looks down -Z; anything at or behind the camera plane can't be under the reticle.
+    if (_assistLocal.z >= 0) return -1;
+
+    const halfW = window.innerWidth * 0.5;
+    const halfH = window.innerHeight * 0.5;
+    const depth = -_assistLocal.z;
+    const screenX = (_assistLocal.x / depth / reticle.tanHalfFovX) * halfW;
+    const screenY = (_assistLocal.y / depth / reticle.tanHalfFovY) * halfH;
+    const dist = Math.hypot(screenX - reticle.screenX, screenY - reticle.screenY);
+
+    // Same apparent-size formula as ScreenProjector.apparentRadius.
+    const radius = Number.isFinite(body.radius) && body.radius > 0 ? body.radius : 0;
+    const apparentR = (radius / _assistLocal.length()) * (halfH / reticle.tanHalfFovY);
+    return dist - apparentR <= STEERING_RETICLE_RADIUS ? dist : -1;
+}
 
 /** How far ahead (seconds) chase steering predicts the aim error from its current closing
  *  rate, so it starts easing off before the nose reaches the target instead of only reacting
@@ -504,17 +558,70 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
             .applyQuaternion(_aimFrameDelta)
             .add(ship.mesh.position);
 
-        raycastBodies(_aimCamOrigin, _aimCamDir, Infinity, simulationState.bodies, ship, _aimHit);
-        if (_aimHit.body) {
-            // Converge on the point under the reticle.
-            playerInput.aimDir
-                .copy(_aimCamOrigin)
-                .addScaledVector(_aimCamDir, _aimHit.t)
-                .sub(muzzleWorldPosition(ship, _aimMuzzle))
-                .normalize();
+        // Target assist: with a threat touching the aim reticle ring, shoot at where it will be
+        // rather than along the reticle ray. The Tab-locked target wins if it is under the ring;
+        // otherwise the threat nearest the reticle is used, so assist works without a lock.
+        // Re-picked every frame, so moving the reticle off the target disengages immediately.
+        let assistTarget: Body | null = null;
+        if (settingsStore.settings.targetAssistEnabled) {
+            _assistInvCamQuat.copy(_aimFrameDelta).multiply(ctx.camera.quaternion).invert();
+            const reticle = _assistReticle;
+            reticle.tanHalfFovX = tanHalfFovX;
+            reticle.tanHalfFovY = tanHalfFovY;
+            reticle.screenX = noseScreenX + displayOffX;
+            reticle.screenY = noseScreenY - displayOffY;
+
+            const locked = flightState.selectedTarget;
+            if (
+                locked &&
+                isAssistCandidate(locked, ship) &&
+                assistReticleDistance(locked, reticle) >= 0
+            ) {
+                assistTarget = locked;
+            } else {
+                let best = Infinity;
+                for (const body of simulationState.bodies) {
+                    if (!body?.isThreat || !isAssistCandidate(body, ship)) continue;
+                    const d = assistReticleDistance(body, reticle);
+                    if (d >= 0 && d < best) {
+                        best = d;
+                        assistTarget = body;
+                    }
+                }
+            }
+        }
+
+        if (assistTarget) {
+            // Lead with the selected mount's muzzle speed — the same solve CombatShipAI fires
+            // along. Hitscan (laser) collapses to the target's current position.
+            leadAimDirection(
+                muzzleWorldPosition(ship, _aimMuzzle),
+                assistTarget.mesh.position,
+                assistTarget.velocity,
+                ship.velocity,
+                ship.activeWeapon?.muzzleSpeed ?? Infinity,
+                playerInput.aimDir
+            );
         } else {
-            // Nothing under the reticle: aim at infinity, where parallel rays converge.
-            playerInput.aimDir.copy(_aimCamDir);
+            raycastBodies(
+                _aimCamOrigin,
+                _aimCamDir,
+                Infinity,
+                simulationState.bodies,
+                ship,
+                _aimHit
+            );
+            if (_aimHit.body) {
+                // Converge on the point under the reticle.
+                playerInput.aimDir
+                    .copy(_aimCamOrigin)
+                    .addScaledVector(_aimCamDir, _aimHit.t)
+                    .sub(muzzleWorldPosition(ship, _aimMuzzle))
+                    .normalize();
+            } else {
+                // Nothing under the reticle: aim at infinity, where parallel rays converge.
+                playerInput.aimDir.copy(_aimCamDir);
+            }
         }
     }
 

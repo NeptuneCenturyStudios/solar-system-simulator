@@ -64,6 +64,18 @@
             Chase Mode (Hold S)
         </label>
 
+        <label
+            class="checkbox-row"
+            title="While a threat is inside the steering circle, shots lead it automatically — the locked target (Tab) first, otherwise the one nearest the reticle. The reticle itself does not move."
+        >
+            <input
+                type="checkbox"
+                :checked="simStore.targetAssistEnabled"
+                @change="onTargetAssistChange"
+            />
+            Target Assist
+        </label>
+
         <div class="vue-ui-card-header">Handling</div>
 
         <label
@@ -91,6 +103,7 @@ import {
     setCoastDriftAlignEnabled,
     setHidePanelManagerInFlight,
     setSelectedShipTypeId,
+    setTargetAssistEnabled,
     simStore,
 } from '../sim-bridge';
 import SvgIcon from '@jamescoyle/vue-icon';
@@ -115,6 +128,10 @@ function onChaseModeChange(e: Event): void {
 
 function onCoastDriftAlignChange(e: Event): void {
     setCoastDriftAlignEnabled((e.target as HTMLInputElement).checked);
+}
+
+function onTargetAssistChange(e: Event): void {
+    setTargetAssistEnabled((e.target as HTMLInputElement).checked);
 }
 </script>
 

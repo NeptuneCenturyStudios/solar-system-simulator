@@ -288,6 +288,8 @@ export interface VueSimHooks {
     setChaseModeEnabled?: (checked: boolean) => void;
     /** Toggle coasting drift redirecting into the nose axis (persisted via settingsStore). */
     setCoastDriftAlignEnabled?: (checked: boolean) => void;
+    /** Toggle weapon target assist for threats in the steering circle (persisted via settingsStore). */
+    setTargetAssistEnabled?: (checked: boolean) => void;
     /** Select the body-texture quality tier (persisted via settingsStore; high is desktop-only). */
     setTextureQuality?: (mode: TextureQuality) => void;
 
@@ -384,6 +386,8 @@ export interface VueSimStore {
     chaseModeEnabled: boolean;
     /** While coasting, sideways drift turns to follow the ship's nose (player and AI ships). */
     coastDriftAlignEnabled: boolean;
+    /** Shots lead a threat automatically while it is inside the steering circle. */
+    targetAssistEnabled: boolean;
     /** Body-texture quality tier. `high` is desktop-only; a browser is always downgraded to `low`. */
     textureQuality: TextureQuality;
 
@@ -442,6 +446,7 @@ const state = reactive<VueSimStore>({
     hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
     chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
     coastDriftAlignEnabled: settingsStore.settings.coastDriftAlignEnabled,
+    targetAssistEnabled: settingsStore.settings.targetAssistEnabled,
     textureQuality: settingsStore.settings.textureQuality,
     autopilotTargetId: null as string | null,
     selectedShipTypeId: SHIP_TYPES[0].id,
@@ -1026,6 +1031,16 @@ export function setCoastDriftAlignEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.CoastDriftAlignEnabled, checked);
     }
     state.coastDriftAlignEnabled = checked;
+}
+
+/** Toggle weapon target assist (Flight Controls panel). */
+export function setTargetAssistEnabled(checked: boolean): void {
+    if (hookRegistry.setTargetAssistEnabled) {
+        hookRegistry.setTargetAssistEnabled(checked);
+    } else {
+        settingsStore.update(SettingKey.TargetAssistEnabled, checked);
+    }
+    state.targetAssistEnabled = checked;
 }
 
 /** Select the body-texture quality tier. Takes effect live — the registered hook

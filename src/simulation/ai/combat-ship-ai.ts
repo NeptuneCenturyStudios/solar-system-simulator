@@ -47,6 +47,7 @@ import {
     NPC_COMBAT_FOLLOW_DISTANCE,
 } from '../../utilities/consts';
 import { muzzleWorldPosition } from '../../ship-effects/weapons/weapon';
+import { INTERCEPT_EPSILON, interceptTime } from '../../ship-effects/weapons/intercept';
 import type { Spaceship } from '../../bodies/ships/spaceship';
 import type { ISpaceshipHandling } from '../../interfaces';
 import { formatAngleFromCos, formatDistance, formatSpeed, formatThrottle } from './ai-debug-format';
@@ -69,9 +70,6 @@ const _evadeU = new THREE.Vector3();
 const _evadeV = new THREE.Vector3();
 const _goal = new THREE.Vector3();
 const _toGoal = new THREE.Vector3();
-
-/** Below this the intercept quadratic's leading coefficient is treated as zero. */
-const INTERCEPT_EPSILON = 1e-12;
 
 /**
  * The two halves of a dogfight.
@@ -249,57 +247,11 @@ export class CombatShipAI extends FollowShipAI {
      *
      * Only the selected weapon responds to the trigger (see Spaceship.fireWeapon), so the lead
      * solve must use its speed rather than the loadout's slowest. Infinity for a hitscan weapon
-     * (e.g. the laser), which collapses the intercept solve below to "aim where the target is
-     * now" — the correct answer for a beam.
+     * (e.g. the laser), which collapses the intercept solve (see interceptTime) to "aim where
+     * the target is now" — the correct answer for a beam.
      */
     private activeMuzzleSpeed(): number {
         return this.ship.activeWeapon?.muzzleSpeed ?? Infinity;
-    }
-
-    /**
-     * Time of flight to an intercept, or a negative number when no shot exists.
-     *
-     * Solved in the shooter's frame. A bolt leaves with world velocity `dir * S + shipVelocity`
-     * (Galilean — see BoltWeapon.tryFire), so working relative to the shooter cancels its own
-     * velocity out of the problem entirely and leaves the standard quadratic:
-     *
-     *     | r + w·t | = S·t        with r the offset to the target and w its relative velocity
-     *     (|w|² − S²)·t² + 2(r·w)·t + |r|² = 0
-     *
-     * The relative form is not a refinement here — both ships share a large orbital velocity, and
-     * solving in world coordinates would put the lead point hundreds of metres out.
-     *
-     * @param r Offset from muzzle to target.
-     * @param w Target velocity relative to the shooter.
-     * @param s Projectile muzzle speed.
-     */
-    private interceptTime(r: THREE.Vector3, w: THREE.Vector3, s: number): number {
-        if (!Number.isFinite(s)) return 0; // hitscan — no lead needed
-
-        const a = w.lengthSq() - s * s;
-        const b = 2 * r.dot(w);
-        const c = r.lengthSq();
-
-        // Target closing at exactly projectile speed: the quadratic degenerates to a line.
-        if (Math.abs(a) < INTERCEPT_EPSILON) {
-            return b < 0 ? -c / b : -1;
-        }
-
-        const disc = b * b - 4 * a * c;
-        // Only reachable when the target outruns the projectile (|w| > S), which a boosting ship
-        // can do. There is genuinely no intercept — hold fire rather than shooting at nothing.
-        if (disc < 0) return -1;
-
-        const sqrtDisc = Math.sqrt(disc);
-        const t1 = (-b - sqrtDisc) / (2 * a);
-        const t2 = (-b + sqrtDisc) / (2 * a);
-
-        // Soonest arrival that is actually in the future.
-        const lo = Math.min(t1, t2);
-        const hi = Math.max(t1, t2);
-        if (lo > 0) return lo;
-        if (hi > 0) return hi;
-        return -1;
     }
 
     /**
@@ -515,7 +467,7 @@ export class CombatShipAI extends FollowShipAI {
         this.updateAttackMode(facing);
 
         if (this.attackMode !== 'position') {
-            const flightTime = this.interceptTime(_toTarget, _relVel, this.activeMuzzleSpeed());
+            const flightTime = interceptTime(_toTarget, _relVel, this.activeMuzzleSpeed());
             out.copy(_toTarget);
             if (flightTime > 0) out.addScaledVector(_relVel, flightTime);
             return out.normalize();
@@ -969,7 +921,7 @@ export class CombatShipAI extends FollowShipAI {
         if (dist - hullRadius(target) > AI_FIRE_RANGE) return 'out of range';
 
         _relVel.subVectors(target.velocity, ship.velocity);
-        const flightTime = this.interceptTime(_toTarget, _relVel, this.activeMuzzleSpeed());
+        const flightTime = interceptTime(_toTarget, _relVel, this.activeMuzzleSpeed());
         if (flightTime < 0) return 'no intercept'; // target outruns the projectile
 
         // Lead the target to where it will be — in the shooter's frame, the same frame the

@@ -53,6 +53,7 @@ import {
 
     // Flight feel constants moved from index.ts
     FLIGHT_MAX_POINTER_OFFSET,
+    STEERING_RETICLE_RADIUS,
     FLIGHT_ALT_ORBIT_SENSITIVITY,
     FLIGHT_ALT_ORBIT_PITCH_MIN,
     FLIGHT_ALT_ORBIT_PITCH_MAX,
@@ -432,7 +433,7 @@ uiScene.add(flightCrosshair);
 // End-circle marker (aim reticle) at the pointer end of the steering line.
 // Kept large so it's easy to aim; driven by pointer offset each frame.
 const steeringEndMarker = new THREE.Mesh(
-    new THREE.RingGeometry(18, 24, 48),
+    new THREE.RingGeometry(STEERING_RETICLE_RADIUS - 6, STEERING_RETICLE_RADIUS, 48),
     new THREE.MeshBasicMaterial({
         color: 0x00ffcc,
         transparent: true,
@@ -3081,6 +3082,9 @@ registerVueSimHooks({
     },
     setCoastDriftAlignEnabled: (checked: boolean) => {
         settingsStore.update(SettingKey.CoastDriftAlignEnabled, checked);
+    },
+    setTargetAssistEnabled: (checked: boolean) => {
+        settingsStore.update(SettingKey.TargetAssistEnabled, checked);
     },
     setTextureQuality: (mode) => {
         settingsStore.update(SettingKey.TextureQuality, mode);
