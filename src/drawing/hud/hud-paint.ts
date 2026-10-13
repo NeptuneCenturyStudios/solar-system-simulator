@@ -281,3 +281,41 @@ export function createChevronTexture(color: string, glow: string): THREE.CanvasT
     tex.needsUpdate = true;
     return tex;
 }
+
+// ── Tracking triangle ────────────────────────────────────────────────────────
+
+/**
+ * Build the downward-pointing triangle texture used to tag small, fast objects (missiles in
+ * flight). Drawn tip-down so a sprite placed above the object points at it. Static, so one
+ * texture is shared by every pooled sprite and never redrawn.
+ */
+export function createTriangleTexture(color: string, glow: string): THREE.CanvasTexture {
+    const S = 64;
+    const c = document.createElement('canvas');
+    c.width = S;
+    c.height = S;
+    const ctx = c.getContext('2d')!;
+
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = glow;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+
+    const cx = S / 2;
+    const cy = S / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 18, cy - 13);
+    ctx.lineTo(cx + 18, cy - 13);
+    ctx.lineTo(cx, cy + 17);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.stroke();
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+}

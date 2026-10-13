@@ -119,6 +119,7 @@ import { PlanetNameIndicator } from './drawing/planet-name-indicator';
 import { HealthBarIndicator } from './drawing/health-bar-indicator';
 import { AiDebugIndicator } from './drawing/ai-debug-indicator';
 import { ThreatIndicator } from './drawing/threat-indicator';
+import { MissileTrackerIndicator } from './drawing/missile-tracker-indicator';
 import { TargetLockIndicator } from './drawing/target-lock-indicator';
 import { installKeyboardControls } from './simulation/keyboard-controls';
 import { ScreenFlashEffect, registerScreenFlash } from './effects/screen-flash';
@@ -818,6 +819,8 @@ const healthBarIndicator = new HealthBarIndicator(uiScene, simulationState);
 const aiDebugIndicator = new AiDebugIndicator(uiScene);
 
 const threatIndicator = new ThreatIndicator(uiScene, simulationState);
+
+const missileTrackerIndicator = new MissileTrackerIndicator(uiScene, simulationState, flightState);
 
 const targetLockIndicator = new TargetLockIndicator(uiScene, flightState);
 targetLockIndicator.init();
@@ -4846,6 +4849,7 @@ const animCtx: AnimationContext = {
     healthBarIndicator,
     aiDebugIndicator,
     threatIndicator,
+    missileTrackerIndicator,
     targetLockIndicator,
     surfaceCam,
     screenFlash,

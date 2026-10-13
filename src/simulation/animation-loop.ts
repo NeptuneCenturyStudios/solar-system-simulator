@@ -20,6 +20,7 @@ import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet
 import { HealthBarIndicator } from '../drawing/health-bar-indicator';
 import { AiDebugIndicator } from '../drawing/ai-debug-indicator';
 import { ThreatIndicator } from '../drawing/threat-indicator';
+import { MissileTrackerIndicator } from '../drawing/missile-tracker-indicator';
 import { TargetLockIndicator } from '../drawing/target-lock-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
@@ -116,6 +117,7 @@ export interface AnimationContext {
     healthBarIndicator: HealthBarIndicator;
     aiDebugIndicator: AiDebugIndicator;
     threatIndicator: ThreatIndicator;
+    missileTrackerIndicator: MissileTrackerIndicator;
     targetLockIndicator: TargetLockIndicator;
     surfaceCam: SurfaceCameraManager;
     screenFlash: ScreenFlashEffect;
@@ -1386,6 +1388,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.screenProjector.beginFrame(ctx.camera);
         ctx.targetIndicator.update(ctx.screenProjector);
         ctx.targetLockIndicator.update(ctx.screenProjector);
+        // Missiles are fast and often chased by the flight camera, so they're tracked here, after
+        // the camera's final move, rather than with the other indicators above.
+        ctx.missileTrackerIndicator.update(ctx.screenProjector);
 
         // ── Render ──────────────────────────────────────────────────────────
         ctx.lensingEffect.beginCapture(ctx.renderer);

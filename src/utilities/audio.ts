@@ -30,6 +30,7 @@ export enum SoundEffect {
     // Weapon sounds
     WeaponFire,
     WeaponImpact,
+    MissileLaunch,
     // Loop sounds
     WarpLoop,
     LaserBeam,
@@ -124,6 +125,15 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
             new URL('../assets/sounds/weapon-blast-2.mp3', import.meta.url).href,
             new URL('../assets/sounds/weapon-blast-3.mp3', import.meta.url).href,
         ],
+        buffers: [],
+        volume: WEAPON_VOLUME,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        activeLoop: null,
+    },
+    [SoundEffect.MissileLaunch]: {
+        soundEffectBank: [new URL('../assets/sounds/missile-launch.mp3', import.meta.url).href],
         buffers: [],
         volume: WEAPON_VOLUME,
         defaultFadeDuration: 0.15,

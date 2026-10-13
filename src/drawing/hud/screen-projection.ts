@@ -53,6 +53,7 @@ export class ScreenProjector {
     private tanHalfFovY = 0;
 
     private readonly scratch = new THREE.Vector3();
+    private readonly worldPos = new THREE.Vector3();
 
     /** Cache the per-frame constants. Call once per frame before any `project` call. */
     beginFrame(camera: THREE.PerspectiveCamera): void {
@@ -79,11 +80,26 @@ export class ScreenProjector {
      *          in which case `out` is left untouched.
      */
     project(body: Body, out: ScreenProjection): boolean {
-        const camera = this.camera;
-        if (!camera) return false;
+        if (!this.camera) return false;
         if (!body || body._isDisposed || !body.mesh) return false;
 
-        body.mesh.getWorldPosition(this.scratch);
+        body.mesh.getWorldPosition(this.worldPos);
+        if (!this.projectPoint(this.worldPos, out)) return false;
+        out.body = body;
+        return true;
+    }
+
+    /**
+     * Project a world-space point into UI screen space, filling every field of `out` except
+     * `body`, which is left untouched — for things that aren't bodies (e.g. missiles in flight).
+     *
+     * @returns false when no camera has been primed via `beginFrame`.
+     */
+    projectPoint(worldPos: THREE.Vector3, out: ScreenProjection): boolean {
+        const camera = this.camera;
+        if (!camera) return false;
+
+        this.scratch.copy(worldPos);
         // Same two transforms as Vector3.project, split so the camera-space z is visible: the
         // camera looks down -Z, so z > 0 means the body is behind it.
         this.scratch.applyMatrix4(camera.matrixWorldInverse);
@@ -94,13 +110,12 @@ export class ScreenProjector {
         const ny = this.scratch.y;
         const nz = this.scratch.z;
 
-        out.body = body;
         out.nx = nx;
         out.ny = ny;
         out.nz = nz;
         out.uiX = nx * this.halfW;
         out.uiY = ny * this.halfH;
-        out.camDist = camera.position.distanceTo(body.mesh.position);
+        out.camDist = camera.position.distanceTo(worldPos);
         out.behind = behind;
         out.onScreen = nz < 1 && Math.abs(nx) <= 1 && Math.abs(ny) <= 1;
 

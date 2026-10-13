@@ -169,7 +169,7 @@ export class MissileWeapon extends Weapon {
         /** Class-level defaults — a ship wanting different behaviour passes a partial IMissileWeaponConfig. */
         const DEFAULT_MISSILE_CONFIG: IMissileWeaponConfig = {
             speed: 5000 / DIST_SCALE, // 2,500 km/s
-            accelTime: 10,
+            accelTime: 13,
             salvoSize: 1,
             salvoInterval: 0.15,
             salvoSplay: THREE.MathUtils.degToRad(6),
@@ -190,7 +190,7 @@ export class MissileWeapon extends Weapon {
             smokeSize: 0.012 / RADIUS_SCALE, // 12 m
             smokeGrowth: 5,
             smokeOpacity: 0.55,
-            fireSound: () => playSoundEffect(SoundEffect.WeaponFire),
+            fireSound: () => playSoundEffect(SoundEffect.MissileLaunch),
         };
 
         this.config = { ...DEFAULT_MISSILE_CONFIG, ...config };
@@ -326,6 +326,14 @@ export class MissileWeapon extends Weapon {
      */
     override get hasLiveProjectiles(): boolean {
         return this.missiles.length > 0 || (this.smoke?.hasLive ?? false);
+    }
+
+    /**
+     * Visit the world-space (float64) position of every missile in flight, for HUD trackers.
+     * The vector passed to `cb` is the missile's live position — read it, don't keep or mutate it.
+     */
+    forEachMissilePosition(cb: (worldPos: THREE.Vector3) => void): void {
+        for (let i = 0; i < this.missiles.length; i++) cb(this.missiles[i].position);
     }
 
     /**
