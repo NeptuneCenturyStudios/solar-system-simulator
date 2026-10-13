@@ -53,6 +53,7 @@ import {
 
     // Flight feel constants moved from index.ts
     FLIGHT_MAX_POINTER_OFFSET,
+    STEERING_ORIGIN_RADIUS,
     STEERING_RETICLE_RADIUS,
     FLIGHT_ALT_ORBIT_SENSITIVITY,
     FLIGHT_ALT_ORBIT_PITCH_MIN,
@@ -122,6 +123,7 @@ import { AiDebugIndicator } from './drawing/ai-debug-indicator';
 import { ThreatIndicator } from './drawing/threat-indicator';
 import { MissileTrackerIndicator } from './drawing/missile-tracker-indicator';
 import { TargetLockIndicator } from './drawing/target-lock-indicator';
+import { LeadAimIndicator } from './drawing/lead-aim-indicator';
 import { installKeyboardControls } from './simulation/keyboard-controls';
 import { ScreenFlashEffect, registerScreenFlash } from './effects/screen-flash';
 import { ScenarioMessageHud, registerScenarioMessageHud } from './drawing/scenario-message-hud';
@@ -450,7 +452,7 @@ uiScene.add(steeringEndMarker);
 // Origin circle — large translucent gray ring centred on the ship nose projection.
 // Defines the aim boundary; the steering line + aim reticle live inside it.
 const steeringOriginMarker = new THREE.Mesh(
-    new THREE.RingGeometry(120, 124, 72),
+    new THREE.RingGeometry(STEERING_ORIGIN_RADIUS - 4, STEERING_ORIGIN_RADIUS, 72),
     new THREE.MeshBasicMaterial({
         color: 0xaaaaaa,
         transparent: true,
@@ -825,6 +827,14 @@ const missileTrackerIndicator = new MissileTrackerIndicator(uiScene, simulationS
 
 const targetLockIndicator = new TargetLockIndicator(uiScene, flightState);
 targetLockIndicator.init();
+
+const leadAimIndicator = new LeadAimIndicator(
+    uiScene,
+    simulationState,
+    flightState,
+    steeringOriginMarker,
+    steeringEndMarker
+);
 
 // Shared by every overlay indicator; primed once per frame by the animation loop.
 const screenProjector = new ScreenProjector();
@@ -4855,6 +4865,7 @@ const animCtx: AnimationContext = {
     threatIndicator,
     missileTrackerIndicator,
     targetLockIndicator,
+    leadAimIndicator,
     surfaceCam,
     screenFlash,
     scenarioMessageHud,

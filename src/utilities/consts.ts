@@ -525,6 +525,8 @@ export const FLIGHT_MAX_POINTER_OFFSET = 260; // pixels before reaching full tur
 /** Outer radius (px) of the aim reticle ring at the end of the steering line. Target assist
  *  engages on a threat that touches this ring. */
 export const STEERING_RETICLE_RADIUS = 24;
+/** Outer radius (px) of the gray steering origin circle centred on the ship's nose. */
+export const STEERING_ORIGIN_RADIUS = 124;
 export const FLIGHT_AUTOPILOT_CHARGE_TIME = 1.0; // seconds to hold E over a body before autopilot engages
 
 /** Mouse sensitivity for ALT-key orbit camera mode (radians per pixel). */

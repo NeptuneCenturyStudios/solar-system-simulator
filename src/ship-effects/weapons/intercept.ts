@@ -55,6 +55,37 @@ export function interceptTime(r: THREE.Vector3, w: THREE.Vector3, s: number): nu
 }
 
 /**
+ * World-space point to aim at so a shot from `muzzle` meets the target — the target's current
+ * position advanced by its velocity *relative to the shooter* over the time of flight. The
+ * projectile inherits the shooter's velocity, so this is the point that sits on the shot's
+ * line as seen from the (moving) shooter, which is also what the player sees on screen.
+ *
+ * @param muzzle World position the shot leaves from.
+ * @param targetPos Target's current world position.
+ * @param targetVel Target's world velocity.
+ * @param shooterVel Shooter's world velocity — inherited by the projectile.
+ * @param muzzleSpeed Projectile muzzle speed (Infinity for hitscan, which yields `targetPos`).
+ * @param out Receives the lead point. May alias none of the inputs.
+ * @returns false when no intercept exists (the target outruns the projectile); `out` is then
+ *   left untouched.
+ */
+export function leadTargetPoint(
+    muzzle: THREE.Vector3,
+    targetPos: THREE.Vector3,
+    targetVel: THREE.Vector3,
+    shooterVel: THREE.Vector3,
+    muzzleSpeed: number,
+    out: THREE.Vector3
+): boolean {
+    _r.subVectors(targetPos, muzzle);
+    _w.subVectors(targetVel, shooterVel);
+    const t = interceptTime(_r, _w, muzzleSpeed);
+    if (t < 0) return false;
+    out.copy(targetPos).addScaledVector(_w, t);
+    return true;
+}
+
+/**
  * Unit aim direction from `muzzle` to the target's intercept point, in the shooter's frame —
  * the same lead CombatShipAI fires along, so the player's target assist and an AI pilot
  * agree on where a moving target will be.
@@ -62,13 +93,7 @@ export function interceptTime(r: THREE.Vector3, w: THREE.Vector3, s: number): nu
  * Falls back to the target's current position when no intercept exists (the target outruns
  * the projectile), so the caller always gets a usable bearing.
  *
- * @param muzzle World position the shot leaves from.
- * @param targetPos Target's current world position.
- * @param targetVel Target's world velocity.
- * @param shooterVel Shooter's world velocity — inherited by the projectile.
- * @param muzzleSpeed Projectile muzzle speed (Infinity for hitscan).
- * @param out Receives the unit direction. May alias none of the inputs.
- * @returns `out`.
+ * Parameters as {@link leadTargetPoint}; `out` receives the unit direction and is returned.
  */
 export function leadAimDirection(
     muzzle: THREE.Vector3,
@@ -78,8 +103,8 @@ export function leadAimDirection(
     muzzleSpeed: number,
     out: THREE.Vector3
 ): THREE.Vector3 {
-    _r.subVectors(targetPos, muzzle);
-    _w.subVectors(targetVel, shooterVel);
-    const t = interceptTime(_r, _w, muzzleSpeed);
-    return out.copy(_r).addScaledVector(_w, Math.max(t, 0)).normalize();
+    if (!leadTargetPoint(muzzle, targetPos, targetVel, shooterVel, muzzleSpeed, out)) {
+        out.copy(targetPos);
+    }
+    return out.sub(muzzle).normalize();
 }

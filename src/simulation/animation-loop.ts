@@ -22,6 +22,7 @@ import { AiDebugIndicator } from '../drawing/ai-debug-indicator';
 import { ThreatIndicator } from '../drawing/threat-indicator';
 import { MissileTrackerIndicator } from '../drawing/missile-tracker-indicator';
 import { TargetLockIndicator } from '../drawing/target-lock-indicator';
+import { LeadAimIndicator } from '../drawing/lead-aim-indicator';
 import { SurfaceCameraManager } from '../camera/surface-camera';
 import { Comet } from '../bodies/comet';
 import { Wormhole } from '../bodies/wormhole';
@@ -119,6 +120,7 @@ export interface AnimationContext {
     threatIndicator: ThreatIndicator;
     missileTrackerIndicator: MissileTrackerIndicator;
     targetLockIndicator: TargetLockIndicator;
+    leadAimIndicator: LeadAimIndicator;
     surfaceCam: SurfaceCameraManager;
     screenFlash: ScreenFlashEffect;
     scenarioMessageHud: ScenarioMessageHud;
@@ -1388,6 +1390,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.screenProjector.beginFrame(ctx.camera);
         ctx.targetIndicator.update(ctx.screenProjector);
         ctx.targetLockIndicator.update(ctx.screenProjector);
+        ctx.leadAimIndicator.update(ctx.screenProjector);
         // Missiles are fast and often chased by the flight camera, so they're tracked here, after
         // the camera's final move, rather than with the other indicators above.
         ctx.missileTrackerIndicator.update(ctx.screenProjector);
