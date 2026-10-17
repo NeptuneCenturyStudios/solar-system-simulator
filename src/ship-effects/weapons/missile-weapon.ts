@@ -176,7 +176,7 @@ export class MissileWeapon extends Weapon {
         /** Class-level defaults — a ship wanting different behaviour passes a partial IMissileWeaponConfig. */
         const DEFAULT_MISSILE_CONFIG: IMissileWeaponConfig = {
             speed: 5000 / DIST_SCALE, // 2,500 km/s
-            accelTime: 13,
+            accelTime: 20,
             salvoSize: 1,
             salvoInterval: 0.15,
             salvoSplay: THREE.MathUtils.degToRad(6),
@@ -325,6 +325,18 @@ export class MissileWeapon extends Weapon {
     /** Top speed over the ship's own — used by AI lead solvers (homing corrects the rest). */
     override get muzzleSpeed(): number {
         return this.config.speed;
+    }
+
+    override get damageEffectiveness(): Readonly<IDamageEffectiveness> {
+        return this.effectiveness;
+    }
+
+    /**
+     * How far a missile flies before it expires. Assumes a launch from rest, so it is the
+     * conservative figure: a moving shooter adds its own speed on top.
+     */
+    override get effectiveRange(): number {
+        return this.config.speed * this.rampDistance(this.config.lifetime);
     }
 
     /** Name shown on the flight HUD's weapon selector. */
@@ -577,17 +589,19 @@ export class MissileWeapon extends Weapon {
      * reaching accelTime / 2 at the end of the ramp; top speed holds from there.
      */
     private distanceTravelled(m: Missile, age: number): number {
+        return m.launchSpeed * age + this.config.speed * this.rampDistance(age);
+    }
+
+    /**
+     * Integral of the boost ramp, smoothstep(age / accelTime), from launch to `age` — distance
+     * covered per unit of `speed`, excluding the launch speed.
+     */
+    private rampDistance(age: number): number {
         const T = this.config.accelTime;
-        let boost: number;
-        if (T <= 0) {
-            boost = age;
-        } else if (age >= T) {
-            boost = T * 0.5 + (age - T);
-        } else {
-            const u = age / T;
-            boost = T * (u * u * u - (u * u * u * u) / 2);
-        }
-        return m.launchSpeed * age + this.config.speed * boost;
+        if (T <= 0) return age;
+        if (age >= T) return T * 0.5 + (age - T);
+        const u = age / T;
+        return T * (u * u * u - (u * u * u * u) / 2);
     }
 
     /**

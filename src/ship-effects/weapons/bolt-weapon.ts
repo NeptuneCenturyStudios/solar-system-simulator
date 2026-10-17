@@ -90,7 +90,7 @@ export class BoltWeapon extends Weapon {
             baseSpeed: 4 / DIST_SCALE, // 4 km/s
             particleLifetime: 4.0,
             boltColor: 0x00eeff,
-            boltHeadSize: (15 / 1000) / RADIUS_SCALE,
+            boltHeadSize: 15 / 1000 / RADIUS_SCALE,
             fireRate: 12,
             maxProjectiles: 800,
             damage: 1,
@@ -164,6 +164,15 @@ export class BoltWeapon extends Weapon {
     /** Bolts leave the muzzle at their configured base speed, before the ship's own velocity. */
     override get muzzleSpeed(): number {
         return this.config.baseSpeed;
+    }
+
+    override get damageEffectiveness(): Readonly<IDamageEffectiveness> {
+        return this.effectiveness;
+    }
+
+    /** How far a bolt travels, relative to the shooter, before it fizzles. */
+    override get effectiveRange(): number {
+        return this.config.baseSpeed * this.config.particleLifetime;
     }
 
     /** Name shown on the flight HUD's weapon selector. */

@@ -1214,6 +1214,22 @@ export const AI_AIM_JITTER_PERIOD = 0.6;
 export const AI_BURST_FIRE_TIME = 1.0;
 /** Seconds the combat AI holds fire between bursts. */
 export const AI_BURST_REST_TIME = 0.5;
+/** Weapon choice: target shield fraction at or below which the combat AI treats the shield as
+ *  down and scores its weapons on hull effectiveness alone. Above 0 on purpose — on a Zenith
+ *  (40 shield, 20 hull) a missile into the last 2 shield points still puts ~12 into the hull. */
+export const AI_SHIELD_DOWN_FRACTION = 0.05;
+/** Weapon choice: target shield fraction at or above which weapons are scored on shield
+ *  effectiveness alone. Between this and AI_SHIELD_DOWN_FRACTION the two blend smoothly. */
+export const AI_SHIELD_UP_FRACTION = 0.25;
+/** Weapon choice: score lost per unit of thermal load (0.5 → a mount at 80 % heat scores
+ *  0.6×), so a hot weapon yields to a cool one before it reaches the overheat lockout. */
+export const AI_WEAPON_HEAT_PENALTY = 0.5;
+/** Weapon choice: how much better (fractionally) another mount must score before the combat AI
+ *  switches to it. Hysteresis — keeps two near-equal mounts from trading places every frame. */
+export const AI_WEAPON_SWITCH_MARGIN = 0.2;
+/** Weapon choice: minimum wall-clock seconds between switches, unless the current mount can't
+ *  fire at all (overheated or out of reach). */
+export const AI_WEAPON_MIN_DWELL = 0.5;
 /** Range (sim units) inside which the combat AI stops station-keeping and starts dogfighting:
  *  8 km. Outside it the follow controller flies the approach (boost, warp, braking). */
 export const AI_DOGFIGHT_ENGAGE_RANGE = 8 / DIST_SCALE;

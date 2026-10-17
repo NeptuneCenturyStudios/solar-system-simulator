@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { Body } from '../../bodies/body';
+import { IDamageEffectiveness } from '../../interfaces';
 import { LoopSoundController } from '../../utilities/audio';
+import { NEUTRAL_DAMAGE_EFFECTIVENESS } from '../../utilities/consts';
 
 /**
  * Structural owner contract for weapons.  Satisfied by Spaceship (and any
@@ -92,6 +94,31 @@ export abstract class Weapon {
      */
     get muzzleSpeed(): number {
         return Infinity;
+    }
+
+    /**
+     * Shield/hull damage multipliers this weapon's hits carry. Read by the combat AI to pick
+     * the mount that does the most to whichever layer the target currently presents.
+     */
+    get damageEffectiveness(): Readonly<IDamageEffectiveness> {
+        return NEUTRAL_DAMAGE_EFFECTIVENESS;
+    }
+
+    /**
+     * Distance (sim units) out to which this weapon still does its job — a bolt's reach before
+     * it fizzles, a missile's flight before it expires, a beam's full-damage range. Infinity
+     * for a weapon with no meaningful limit.
+     */
+    get effectiveRange(): number {
+        return Infinity;
+    }
+
+    /**
+     * Damage multiplier for a hit at `distance` sim units. 1 for weapons whose damage does not
+     * depend on range.
+     */
+    damageFalloffAt(_distance: number): number {
+        return 1;
     }
 
     /**

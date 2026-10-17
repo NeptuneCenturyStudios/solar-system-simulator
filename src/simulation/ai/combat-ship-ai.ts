@@ -44,9 +44,12 @@ import {
     AI_EVADE_SHOT_WEIGHT_FACTOR,
     AI_FIRE_RANGE,
     AI_FOLLOW_APPROACH_GAIN,
+    AI_WEAPON_MIN_DWELL,
+    AI_WEAPON_SWITCH_MARGIN,
     NPC_COMBAT_FOLLOW_DISTANCE,
 } from '../../utilities/consts';
 import { muzzleWorldPosition } from '../../ship-effects/weapons/weapon';
+import { shieldWeight, weaponScore } from './weapon-choice';
 import { INTERCEPT_EPSILON, interceptTime } from '../../ship-effects/weapons/intercept';
 import type { Spaceship } from '../../bodies/ships/spaceship';
 import type { ISpaceshipHandling } from '../../interfaces';
@@ -104,6 +107,7 @@ type GunStatus =
     | 'avoiding obstacle'
     | 'burst rest'
     | 'all overheated'
+    | 'no weapon in range'
     | 'out of range'
     | 'no intercept'
     | 'outside cone';
@@ -150,6 +154,11 @@ type GunStatus =
  * It is not, however, a turret: the firing solution carries a drifting angular error, and the
  * trigger runs on a burst rhythm rather than being held down. Both are there to make it beatable
  * and to keep it clear of its own overheat lockout.
+ *
+ * It picks its mount the way a pilot would, through the same selectWeapon the player's cycle
+ * key uses: the weapon most effective against the layer the target presents (laser on a raised
+ * shield, missiles and bolts on a bare hull), among those in reach and not overheated, with
+ * heat counted against a mount before it locks out (see updateWeaponChoice / weaponScore).
  */
 export class CombatShipAI extends FollowShipAI {
     readonly name: string = 'Combat';
@@ -167,6 +176,9 @@ export class CombatShipAI extends FollowShipAI {
     private jitterTargetPitch = 0;
     /** Seconds until the next re-roll. */
     private jitterTimer = 0;
+
+    /** Wall-clock seconds since the last weapon switch (see updateWeaponChoice). */
+    private weaponDwell = AI_WEAPON_MIN_DWELL;
 
     /** True while inside the dogfight regime (latched with hysteresis around the engage range). */
     private dogfighting = false;
@@ -218,6 +230,10 @@ export class CombatShipAI extends FollowShipAI {
     private debugGun: GunStatus = 'no target';
     /** Cosine between the nose and the (jittered) firing solution on the last cone test. */
     private debugAimCos = 1;
+    /** Target shield weight on the last weapon choice (1 = shield up, 0 = down). */
+    private debugShieldWeight = 1;
+    /** Score of each mount, by weapon index, on the last weapon choice. */
+    private readonly debugWeaponScores: number[] = [];
 
     constructor(ship: Spaceship) {
         super(ship, NPC_COMBAT_FOLLOW_DISTANCE);
@@ -267,6 +283,8 @@ export class CombatShipAI extends FollowShipAI {
             this.triggerOpen = !this.triggerOpen;
             this.burstTimer = this.triggerOpen ? AI_BURST_FIRE_TIME : AI_BURST_REST_TIME;
         }
+
+        this.weaponDwell += dt;
 
         this.jitterTimer -= dt;
         if (this.jitterTimer <= 0) {
@@ -879,6 +897,55 @@ export class CombatShipAI extends FollowShipAI {
         this.debugGun = this.updateGunnery();
     }
 
+    /**
+     * Select the mount best suited to the target right now (see weaponScore): the one most
+     * effective against the layer it presents, in reach, and not too hot. Returns false when no
+     * mount can fire on it at all — every one overheated or out of reach.
+     *
+     * Only the selected weapon fires, and its heat only drains while its trigger is released,
+     * so an overheated mount scores 0 and is always switched off at once. Otherwise a switch
+     * needs a clear margin and a minimum dwell, so near-equal mounts don't trade places every
+     * frame as heat and shield drift.
+     *
+     * Switching mid-burst is safe: selectWeapon releases every mount's trigger, which cuts a
+     * beam cleanly and re-arms a launcher's rising edge, so a freshly selected launcher fires
+     * on the next frame the trigger is held.
+     *
+     * @param range Hull-to-hull distance from the muzzle.
+     */
+    private updateWeaponChoice(target: Spaceship, range: number): boolean {
+        const ship = this.ship;
+        const weapons = ship.weapons;
+        const shieldW = shieldWeight(target);
+        this.debugShieldWeight = shieldW;
+        this.debugWeaponScores.length = weapons.length;
+
+        let best = -1;
+        let bestScore = 0;
+        for (let i = 0; i < weapons.length; i++) {
+            const score = weaponScore(weapons[i], range, shieldW);
+            this.debugWeaponScores[i] = score;
+            if (score > bestScore) {
+                best = i;
+                bestScore = score;
+            }
+        }
+        if (best === -1) return false;
+
+        const current = ship.activeWeaponIndex;
+        if (best === current) return true;
+        const currentScore = this.debugWeaponScores[current] ?? 0;
+        const mustSwitch = currentScore <= 0;
+        const worthSwitching =
+            this.weaponDwell >= AI_WEAPON_MIN_DWELL &&
+            bestScore > currentScore * (1 + AI_WEAPON_SWITCH_MARGIN);
+        if (mustSwitch || worthSwitching) {
+            ship.selectWeapon(best);
+            this.weaponDwell = 0;
+        }
+        return true;
+    }
+
     /** Decide whether to fire this frame. Returns the outcome, for the debug overlay. */
     private updateGunnery(): GunStatus {
         const ship = this.ship;
@@ -899,27 +966,28 @@ export class CombatShipAI extends FollowShipAI {
         // About to fly into something. Flying clear takes priority over shooting.
         if (this.avoidance.last.flee) return 'avoiding obstacle';
 
-        // Between bursts.
-        if (!this.triggerOpen) return 'burst rest';
-
-        // Thermal management. Only the selected weapon fires, and its heat only drains while its
-        // trigger is released — so if it is hot, switch to a cool mount rather than holding a
-        // trigger that does nothing. With nothing cool left, hold fire and let them all cool.
-        const activeWeapon = ship.activeWeapon;
-        if (activeWeapon?.isOverheated) {
-            const coolIndex = ship.weapons.findIndex((w) => !w.isOverheated);
-            if (coolIndex === -1) return 'all overheated';
-            ship.selectWeapon(coolIndex);
-        }
-
-        // ── Firing solution ──────────────────────────────────────────────────
+        // ── Range ────────────────────────────────────────────────────────────
         muzzleWorldPosition(ship, _muzzle);
         _toTarget.subVectors(target.mesh.position, _muzzle);
         const dist = _toTarget.length();
         if (dist < INTERCEPT_EPSILON) return 'out of range';
         // Range to the hull: a capital ship is in reach once its near side is.
-        if (dist - hullRadius(target) > AI_FIRE_RANGE) return 'out of range';
+        const range = dist - hullRadius(target);
+        if (range > AI_FIRE_RANGE) return 'out of range';
 
+        // ── Weapon choice ────────────────────────────────────────────────────
+        // Ahead of the burst gate, so a rest between bursts is also a chance to change mounts.
+        // With nothing able to fire, hold the trigger released and let the mounts cool.
+        if (!this.updateWeaponChoice(target, range)) {
+            return ship.weapons.every((w) => w.isOverheated)
+                ? 'all overheated'
+                : 'no weapon in range';
+        }
+
+        // Between bursts.
+        if (!this.triggerOpen) return 'burst rest';
+
+        // ── Firing solution ──────────────────────────────────────────────────
         _relVel.subVectors(target.velocity, ship.velocity);
         const flightTime = interceptTime(_toTarget, _relVel, this.activeMuzzleSpeed());
         if (flightTime < 0) return 'no intercept'; // target outruns the projectile
@@ -998,6 +1066,18 @@ export class CombatShipAI extends FollowShipAI {
         let gun = `Gun ${this.debugGun}`;
         if (this.debugGun === 'outside cone') gun += ` (${formatAngleFromCos(this.debugAimCos)})`;
         lines.push(gun);
+
+        // Weapon choice: the selected mount, how much the target's shield counts, and each
+        // mount's score by the first letter of its name.
+        const active = ship.activeWeapon;
+        if (active && this.debugWeaponScores.length === ship.weapons.length) {
+            const scores = ship.weapons
+                .map((w, i) => `${w.displayName[0]} ${this.debugWeaponScores[i].toFixed(2)}`)
+                .join(' · ');
+            lines.push(
+                `Weapon ${active.displayName}  shield wt ${this.debugShieldWeight.toFixed(2)}  ${scores}`
+            );
+        }
 
         if (this.debugBreakReason) {
             lines.push(

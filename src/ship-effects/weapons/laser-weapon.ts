@@ -19,7 +19,7 @@ const LASER_FLICKER_FREQ_A = 9.1; // rad/s — incommensurate with B for non-rep
 const LASER_FLICKER_FREQ_B = 17.3;
 const LASER_FLICKER_OPACITY_AMP = 0.2; // ±20 % brightness swing
 const LASER_FLICKER_WIDTH_AMP = 0.15; // ±15 % linewidth swing
-const LASER_OPTIMAL_RANGE_KM = 25000;
+const LASER_OPTIMAL_RANGE_KM = 30_000;
 
 /**
  * Per-instance tuning for LaserWeapon.  Ships may pass a partial config to
@@ -210,6 +210,15 @@ export class LaserWeapon extends Weapon {
         return 'Laser';
     }
 
+    override get damageEffectiveness(): Readonly<IDamageEffectiveness> {
+        return this.effectiveness;
+    }
+
+    /** Full-damage range: past it the beam still reaches, but falls off with distance². */
+    override get effectiveRange(): number {
+        return this.config.optimalRange;
+    }
+
     /** Build a round, soft-edged glow sprite that falls off radially. */
     private createGlowPointMaterial(size: number, opacity: number): THREE.PointsMaterial {
         const material = new THREE.PointsMaterial({
@@ -343,7 +352,7 @@ export class LaserWeapon extends Weapon {
                     detail: {
                         body: hitBody,
                         position: this.tip.clone(),
-                        damage: this.config.damage * this.rangeFalloff(hitT),
+                        damage: this.config.damage * this.damageFalloffAt(hitT),
                         effectiveness: this.effectiveness,
                     },
                 })
@@ -399,7 +408,7 @@ export class LaserWeapon extends Weapon {
      * Damage multiplier for a hit at `distance` world units: 1 inside optimal range,
      * then inverse-square (spot area grows with distance², so intensity drops with it).
      */
-    private rangeFalloff(distance: number): number {
+    override damageFalloffAt(distance: number): number {
         const optimal = this.config.optimalRange;
         if (distance <= optimal) return 1;
         const ratio = optimal / distance;
