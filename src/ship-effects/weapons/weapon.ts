@@ -47,8 +47,8 @@ export interface IWeaponSound {
  *     once per frame while the owning ship is in flight mode, and continues
  *     to be called for the last-flown ship even after flight exit so any
  *     live bolts/beam persist and run to their natural end. `isPaused`
- *     freezes all wall-clock-driven decay (lifetimes, cooldowns, thermal, and
- *     the beam's hide-on-release transition) so effects only ever disappear
+ *     freezes all decay (lifetimes, cooldowns, thermal, and the beam's
+ *     hide-on-release transition) so effects only ever disappear
  *     once the sim is unpaused — never as a side effect of pausing or of
  *     leaving flight mode.
  *   - reset() — clear all active state. Not called automatically on flight
@@ -146,6 +146,7 @@ export abstract class Weapon {
      * Cool down while not firing; clears the overheat lockout once heat fully
      * drains to 0. No-op while `firing` is true, so an overheated weapon stays
      * pegged at max until the trigger is released.
+     * @param dt Sim-time seconds, so cooling slows with the time warp like everything else.
      */
     protected updateThermal(dt: number, firing: boolean, coolPerSecond: number): void {
         if (firing) return;
@@ -197,6 +198,7 @@ export abstract class Weapon {
 
     /**
      * Trigger pulled (held). Implementations must not assume single-shot.
+     * @param dt Sim-time seconds this frame — drives rate-of-fire cooldown and heat build-up.
      * @param target Locked target at the moment of firing. Homing weapons (MissileWeapon)
      *   capture it per launch; unguided weapons ignore it and may omit the parameter.
      */

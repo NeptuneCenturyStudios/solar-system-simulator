@@ -15,18 +15,18 @@ const _muzzle = new THREE.Vector3();
  * gives for handling.
  *
  * @param ship The ship whose control input to act on.
- * @param dt Wall-clock seconds this frame. Load-bearing: a bolt weapon's rate-of-fire cooldown
- *   and thermal model both run on the wall clock, so rate of fire stays constant across time
- *   scales — passing sim time here would let time-warp empty the heat bar in a single frame.
+ * @param simDt Sim-time seconds this frame (wall dt × time scale). Load-bearing: a bolt weapon's
+ *   rate-of-fire cooldown and thermal model both run on sim time, so slowing the time warp slows
+ *   the rate of fire and the heat build-up along with everything else the ships do.
  */
-export function applyWeaponInput(ship: Spaceship, dt: number): void {
+export function applyWeaponInput(ship: Spaceship, simDt: number): void {
     if (ship.weapons.length === 0) return;
 
     const input = ship.controlInput;
     // aimDir is only meaningful while the trigger is held, and a ship that has never aimed still
     // carries a zero vector — firing on that would shoot along an undefined bearing.
     if (input.fire && input.aimDir.lengthSq() > 0) {
-        ship.fireWeapon(dt, muzzleWorldPosition(ship, _muzzle), input.aimDir, input.target);
+        ship.fireWeapon(simDt, muzzleWorldPosition(ship, _muzzle), input.aimDir, input.target);
     } else {
         ship.stopFire();
     }

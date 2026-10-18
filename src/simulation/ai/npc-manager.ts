@@ -206,7 +206,7 @@ export function stepNpcShips(dt: number, simDt: number, addEvent?: NpcEventSink)
         // player's path uses — so an AI pilot gets no more (and no less) than a human does from
         // the same weapon. After applyFrameOrientation(), so the muzzle it fires from is this
         // frame's hull position rather than the previous one's.
-        applyWeaponInput(ship, dt);
+        applyWeaponInput(ship, simDt);
 
         if (addEvent && settingsStore.settings.showAiDebug && ship.warpActive !== wasWarping) {
             addEvent({

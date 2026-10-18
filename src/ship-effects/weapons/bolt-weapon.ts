@@ -187,7 +187,7 @@ export class BoltWeapon extends Weapon {
 
     /**
      * Attempt to fire a new bolt, respecting the rate-of-fire cooldown.
-     * @param dt           Delta time this frame (seconds).
+     * @param dt           Sim-time delta this frame (seconds).
      * @param origin       World-space muzzle position.
      * @param direction    Normalised world-space fire direction.
      * @param shipVelocity Current ship velocity (added for Galilean relativity).
@@ -204,7 +204,10 @@ export class BoltWeapon extends Weapon {
 
         this.fireCooldown -= dt;
         if (this.fireCooldown > 0) return;
-        this.fireCooldown = 1.0 / this.config.fireRate;
+        // Carry the overshoot so the long-run rate is exactly fireRate at any frame rate; clamp so
+        // a stall (or a dt longer than the interval at high warp) yields one shot per frame
+        // rather than a queued burst.
+        this.fireCooldown = Math.max(0, this.fireCooldown + 1.0 / this.config.fireRate);
 
         if (this.projectiles.length >= this.maxProjectiles) return;
 
@@ -234,11 +237,11 @@ export class BoltWeapon extends Weapon {
      * Advance all bolts, expire old ones, check sphere collisions, and upload
      * camera-relative positions to the GPU buffer.
      *
-     * @param wallDt         Wall-clock delta time (seconds) — used for lifetime so bolt
-     *                       flight duration is consistent regardless of FPS.
+     * @param _wallDt        Wall-clock delta time (seconds) — unused; bolts run on sim time.
      * @param simDt          Total physics simulation advance this frame (seconds) — used
-     *                       for position so bolts stay in sync with the ship's physics
-     *                       movement (dtTotal = wallDt × TIME_SCALE × tScale).
+     *                       for position, lifetime and thermal so bolts stay in sync with the
+     *                       ship's physics movement and keep their full range at any time
+     *                       scale (dtTotal = wallDt × TIME_SCALE × tScale).
      * @param bodies         All active simulation bodies for collision testing.
      * @param cameraPosition World-space camera position for camera-relative rendering.
      * @param owner          Ship firing this weapon — skipped in collision checks.
@@ -246,7 +249,7 @@ export class BoltWeapon extends Weapon {
      *                       decay so bolts hold their position and don't fizzle out.
      */
     update(
-        wallDt: number,
+        _wallDt: number,
         simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
@@ -254,7 +257,7 @@ export class BoltWeapon extends Weapon {
         isPaused: boolean
     ): void {
         if (!isPaused) {
-            this.updateThermal(wallDt, this.active, this.config.coolPerSecond);
+            this.updateThermal(simDt, this.active, this.config.coolPerSecond);
         }
 
         const toRemove = new Set<number>();
@@ -263,7 +266,7 @@ export class BoltWeapon extends Weapon {
             const p = this.projectiles[i];
 
             if (!isPaused) {
-                p.timeRemaining -= wallDt;
+                p.timeRemaining -= simDt;
 
                 if (p.timeRemaining <= 0) {
                     toRemove.add(i);

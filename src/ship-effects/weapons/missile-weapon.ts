@@ -436,9 +436,10 @@ export class MissileWeapon extends Weapon {
      * Launch pending salvo missiles, steer, advance and hit-test every missile, and
      * upload camera-relative transforms.
      *
-     * @param wallDt   Wall-clock delta (s) — salvo ripple and thermal.
-     * @param simDt    Physics advance this frame (s) — movement, guidance and lifetime, so
-     *                 missiles stay in step with the ships they chase under any time scale.
+     * @param wallDt   Wall-clock delta (s) — smoke emission and ageing only (purely visual).
+     * @param simDt    Physics advance this frame (s) — movement, guidance, lifetime, salvo ripple
+     *                 and thermal, so missiles stay in step with the ships they chase under any
+     *                 time scale.
      * @param isPaused Freezes all wall-clock decay so missiles hold position while paused.
      */
     update(
@@ -450,12 +451,12 @@ export class MissileWeapon extends Weapon {
         isPaused: boolean
     ): void {
         if (!isPaused) {
-            this.updateThermal(wallDt, this.active, this.config.coolPerSecond);
+            this.updateThermal(simDt, this.active, this.config.coolPerSecond);
 
             // ── Ripple-fire the rest of the salvo from the owner's current muzzle ──
             for (let i = this.pending.length - 1; i >= 0; i--) {
                 const p = this.pending[i];
-                p.delay -= wallDt;
+                p.delay -= simDt;
                 if (p.delay > 0) continue;
                 this.pending.splice(i, 1);
                 if (owner._isDisposed || !owner.mesh) continue;

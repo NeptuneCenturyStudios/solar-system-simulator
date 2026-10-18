@@ -45,17 +45,17 @@ export class OsirisMothership extends Spaceship {
         const FLIGHT_WARP_DECEL_TOLERANCE = FLIGHT_WARP_SPEED * 0.01;
         const FLIGHT_PERP_DECAY = 0.5;
         const FLIGHT_MAX_POINTER_OFFSET = 340;
-        const FLIGHT_MAX_TURN_RATE = 0.55;
-        const FLIGHT_STEER_SMOOTH_RATE = 0.48;
+        const FLIGHT_MAX_TURN_RATE = 0.95;
+        const FLIGHT_STEER_SMOOTH_RATE = 0.55;
         const FLIGHT_STEER_DEADZONE = 0.08;
-        const FLIGHT_ROLL_SPEED = 1.6;
-        const FLIGHT_ROLL_ACCEL = 0.32;
-        const FLIGHT_ROLL_FRICTION = 0.5;
-        const FLIGHT_BANK_LERP_SPEED = 8.5;
-        const FLIGHT_MAX_BANK_ANGLE = 0.12;
-        const FLIGHT_MAX_BANK_PITCH = 0.07;
-        const FLIGHT_MAX_BANK_YAW = 0.07;
-        const FLIGHT_WARP_CHARGE_TIME = 5.0;
+        const FLIGHT_ROLL_SPEED = 2.8;
+        const FLIGHT_ROLL_ACCEL = 0.62;
+        const FLIGHT_ROLL_FRICTION = 0.8;
+        const FLIGHT_BANK_LERP_SPEED = 10.5;
+        const FLIGHT_MAX_BANK_ANGLE = 0.18;
+        const FLIGHT_MAX_BANK_PITCH = 0.1;
+        const FLIGHT_MAX_BANK_YAW = 0.1;
+        const FLIGHT_WARP_CHARGE_TIME = 4.0;
         // Autopilot tuning — slightly slower than the Zenith to reflect the mothership's mass
         const PERFORMANCE_MAX_SPEED = 400 / DIST_SCALE; // 400 km/s
         const PERFORMANCE_THRUST_ACCEL = PERFORMANCE_MAX_SPEED * 0.004;

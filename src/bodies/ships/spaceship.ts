@@ -505,6 +505,7 @@ export class Spaceship extends Body {
 
     /**
      * Fire the selected weapon toward `aimDir`. No-op if this ship is unarmed.
+     * @param dt Sim-time seconds this frame (drives cooldown and heat).
      * @param target The locked target handed to homing weapons at launch; ignored by unguided ones.
      */
     fireWeapon(

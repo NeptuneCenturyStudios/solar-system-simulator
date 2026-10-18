@@ -350,6 +350,7 @@ import { WormholeShortcutGenerator } from './procedural/wormhole-shortcut-genera
 import { AsteroidFieldGenerator } from './procedural/asteroid-field-generator';
 import { AsteroidDefenseGenerator } from './procedural/asteroid-defense-generator';
 import { ExtinctionEventGenerator } from './procedural/extinction-event-generator';
+import { OsirisAmbushGenerator } from './procedural/osiris-ambush-generator';
 import { clearNpcShips, registerNpcShipsIn } from './simulation/ai/npc-manager';
 import { scenarioManager } from './scenarios/scenario-manager';
 import {
@@ -1846,6 +1847,10 @@ async function spawn(
         // Extinction event scenario: the player always flies the Osiris Mothership, regardless
         // of whatever ship is selected in Normal Mode's Flight Controls dropdown.
         generator = new ExtinctionEventGenerator(dependencies, scene, proceduralResult?.seed);
+    } else if (mode === SimulationStartMode.OsirisAmbush) {
+        // Osiris ambush scenario: the player always flies the Osiris Mothership, hunted by a
+        // wave of AI ships that only respawns once the whole wave is destroyed.
+        generator = new OsirisAmbushGenerator(dependencies, scene, proceduralResult?.seed);
     } else {
         // Empty system generator
         generator = new EmptySystemGenerator(dependencies, scene);
@@ -4663,6 +4668,9 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
             } else if (scenarioResult.scenario === 'extinctionEvent') {
                 // Extinction event scenario — no seed prompt; the player starts in flight mode.
                 await launchSystem(SimulationStartMode.ExtinctionEvent);
+            } else if (scenarioResult.scenario === 'osirisAmbush') {
+                // Osiris ambush scenario — fixed setup, no seed prompt; the player starts in flight mode.
+                await launchSystem(SimulationStartMode.OsirisAmbush);
             }
             break;
         }

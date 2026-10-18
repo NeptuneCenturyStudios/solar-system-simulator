@@ -656,7 +656,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
 
     // Shared with the AI firing path, so muzzle placement, rate of fire, heat and beam
     // termination stay identical between a player-flown ship and an AI-flown one.
-    applyWeaponInput(ship, dt);
+    applyWeaponInput(ship, simDt);
 
     // ── Warp sprite catch-all ──────────────────────────────────────────────
     // When the ship exits warp (e.g. autopilot transitions WARP → APPROACH)

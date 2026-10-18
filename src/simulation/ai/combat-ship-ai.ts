@@ -273,9 +273,9 @@ export class CombatShipAI extends FollowShipAI {
     /**
      * Advance the burst cycle and the aim wander.
      *
-     * @param dt Wall-clock seconds. Both are weapon-side rhythms, and the weapons themselves run
-     *   their cooldown and thermal models on the wall clock, so these have to agree with them
-     *   rather than with sim time.
+     * @param dt Sim-time seconds. Both are weapon-side rhythms, and the weapons themselves run
+     *   their cooldown and thermal models on sim time, so these have to agree with them — in
+     *   slow motion the burst cycle and aim wander slow down along with the rate of fire.
      */
     private advanceTimers(dt: number): void {
         this.burstTimer -= dt;
@@ -892,7 +892,7 @@ export class CombatShipAI extends FollowShipAI {
             super.update(dt, simDt);
         }
 
-        this.advanceTimers(dt);
+        this.advanceTimers(simDt);
 
         this.debugGun = this.updateGunnery();
     }

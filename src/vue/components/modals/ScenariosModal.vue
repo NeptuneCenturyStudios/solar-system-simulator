@@ -57,6 +57,14 @@
                 <svg-icon type="mdi" :path="mdiAlertOutline"></svg-icon>
                 EXTINCTION EVENT
             </button>
+            <button
+                class="old-ui btn-dark btn-with-icon"
+                type="button"
+                @click="selectScenario('osirisAmbush')"
+            >
+                <svg-icon type="mdi" :path="mdiTargetAccount"></svg-icon>
+                OSIRIS AMBUSH
+            </button>
             <button class="old-ui btn-with-icon btn-danger" type="button" @click="onCancel">
                 <svg-icon type="mdi" :path="mdiArrowLeft"></svg-icon>
                 CANCEL
@@ -83,6 +91,7 @@ import {
     mdiRobotOutline,
     mdiShieldOutline,
     mdiSwapHorizontal,
+    mdiTargetAccount,
 } from '@mdi/js';
 import ModalBase from './ModalBase.vue';
 

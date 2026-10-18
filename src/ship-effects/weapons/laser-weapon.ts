@@ -287,7 +287,7 @@ export class LaserWeapon extends Weapon {
      *                 stays on screen until the sim actually resumes.
      */
     update(
-        wallDt: number,
+        _wallDt: number,
         simDt: number,
         bodies: Body[],
         cameraPosition: THREE.Vector3,
@@ -295,8 +295,8 @@ export class LaserWeapon extends Weapon {
         isPaused: boolean
     ): void {
         if (!isPaused) {
-            this.hitCooldown -= wallDt;
-            this.updateThermal(wallDt, this.active, this.config.coolPerSecond);
+            this.hitCooldown -= simDt;
+            this.updateThermal(simDt, this.active, this.config.coolPerSecond);
         }
 
         if (!this.active || this.overheated) {
