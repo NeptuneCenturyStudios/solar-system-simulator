@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { calculateTrajectory } from '../physics/physics.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import {
     SUN_MASS,
@@ -14,8 +13,14 @@ import {
     JUPITER_MAG_STRENGTH,
     JUPITER_MAG_TILT,
     JUPITER_ORBITAL_PERIOD_REAL,
+    JUPITER_PERIHELION_DIST,
+    JUPITER_APHELION_DIST,
+    JUPITER_INCLINATION,
+    JUPITER_LONG_ASC_NODE,
+    JUPITER_ARG_PERIHELION,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
+import { planetOrbitFromElements } from './planet-orbit.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -37,13 +42,30 @@ export class Jupiter extends Planet {
      * Constructs a new Jupiter object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Jupiter belongs.
+     * @param trueAnomaly Position along the orbit in radians, measured from perihelion
+     *                    (0 = perihelion, π = aphelion).
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, trueAnomaly: number = 0) {
         const gEff = dependencies.getG();
         const timeScale =
             JUPITER_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(JUPITER_DIST, gEff, SUN_MASS);
+        // 9.9250 h is the System III rotation period the fact sheet publishes.
         const rotSpeed = ((2 * Math.PI) / (9.925 * 3600)) * timeScale;
-        const trajectory = calculateTrajectory(gEff, JUPITER_DIST, SUN_MASS, angleRad);
+
+        // Jupiter's eccentricity is small (e ≈ 0.0484), but the orbit is so vast that it still
+        // moves the Sun distance by 75.8 million km between perihelion and aphelion; the plane also
+        // sits 1.31° off the ecliptic.
+        const trajectory = planetOrbitFromElements(
+            {
+                perihelion: JUPITER_PERIHELION_DIST,
+                aphelion: JUPITER_APHELION_DIST,
+                inclinationDeg: JUPITER_INCLINATION,
+                longitudeAscendingNodeDeg: JUPITER_LONG_ASC_NODE,
+                argumentOfPeriapsisDeg: JUPITER_ARG_PERIHELION,
+            },
+            trueAnomaly,
+            gEff * SUN_MASS
+        );
         const texture = getBodyTexture('jupiter.jpg');
         const geometry = buildBodySphereGeometry(JUPITER_RADIUS);
         const material = new THREE.MeshStandardMaterial({

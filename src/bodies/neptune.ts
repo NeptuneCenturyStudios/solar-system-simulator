@@ -20,7 +20,7 @@ import {
     NEPTUNE_ARG_PERIHELION,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
-import { stateVectorsFromElements } from '../procedural/orbital-math.js';
+import { planetOrbitFromElements } from './planet-orbit.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -56,21 +56,19 @@ export class Neptune extends Planet {
         const rotSpeed = ((2 * Math.PI) / (16.11 * 3600)) * timeScale;
 
         // Neptune's real orbit is very nearly circular (e ≈ 0.0087) and only 1.77° out of the
-        // ecliptic, but both departures are real, so the orbit is built from its orbital
-        // elements rather than the flat circle the inner planets still use.
-        const semiMajorAxis = (NEPTUNE_PERIHELION_DIST + NEPTUNE_APHELION_DIST) / 2;
-        const ecc =
-            (NEPTUNE_APHELION_DIST - NEPTUNE_PERIHELION_DIST) /
-            (NEPTUNE_APHELION_DIST + NEPTUNE_PERIHELION_DIST); // ≈ 0.008647
-        const trajectory = stateVectorsFromElements({
-            semiMajorAxis,
-            eccentricity: ecc,
-            inclinationRad: THREE.MathUtils.degToRad(NEPTUNE_INCLINATION),
-            longitudeAscendingNodeRad: THREE.MathUtils.degToRad(NEPTUNE_LONG_ASC_NODE),
-            argumentOfPeriapsisRad: THREE.MathUtils.degToRad(NEPTUNE_ARG_PERIHELION),
-            trueAnomalyRad: trueAnomaly,
-            mu: gEff * SUN_MASS,
-        });
+        // ecliptic, but both departures are real, so the orbit is built from its orbital elements
+        // rather than a flat circle.
+        const trajectory = planetOrbitFromElements(
+            {
+                perihelion: NEPTUNE_PERIHELION_DIST,
+                aphelion: NEPTUNE_APHELION_DIST,
+                inclinationDeg: NEPTUNE_INCLINATION,
+                longitudeAscendingNodeDeg: NEPTUNE_LONG_ASC_NODE,
+                argumentOfPeriapsisDeg: NEPTUNE_ARG_PERIHELION,
+            },
+            trueAnomaly,
+            gEff * SUN_MASS
+        );
 
         const texture = getBodyTexture('neptune.jpg');
         const geometry = buildBodySphereGeometry(NEPTUNE_RADIUS);

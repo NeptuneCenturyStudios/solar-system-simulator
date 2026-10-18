@@ -140,7 +140,7 @@ For previous milestone info, see milestones.md
 - [x] Phase 3.3: Graphics option for render distance to help with performance. (Options → Graphics slider, 0.1–100 AU on a log scale, default 12 AU; sets `camera.far` via `applyRenderDistance` in `index.ts`, persisted as `renderDistanceAU`. Zoom limits use the fixed `MAX_VIEW_DISTANCE`, not the slider. `ScreenProjection.behind` separates "behind camera" from "beyond far plane" for the edge markers.)
 - ** Phase 4
 - [x] Phase 4.1: Improve gizmo. It currently doesn't scale to body size well and is still a pain to use.
-- [ ] Phase 4.2: Improve orbital data for all other planets. Pluto and Nepture already done.
+- [x] Phase 4.2: Improve orbital data for all other planets. Pluto and Nepture already done. Every major planet (Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto) now flies its real J2000 orbit: perihelion, aphelion, inclination, node and perihelion orientation come from the NASA planetary fact sheets, and `bodies/planet-orbit.ts` turns those elements into state vectors. The data lives in the `*_PERIHELION_DIST` / `*_APHELION_DIST` / `*_INCLINATION` / `*_LONG_ASC_NODE` / `*_ARG_PERIHELION` blocks in `consts.ts`.
 - [ ] Phase 4.3: More work on ship AI.
 
 ## UI (Vue)

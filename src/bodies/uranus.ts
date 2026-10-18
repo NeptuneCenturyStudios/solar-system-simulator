@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { calculateTrajectory } from '../physics/physics.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import {
     SUN_MASS,
@@ -14,8 +13,14 @@ import {
     URANUS_MAG_STRENGTH,
     URANUS_MAG_TILT,
     URANUS_ORBITAL_PERIOD_REAL,
+    URANUS_PERIHELION_DIST,
+    URANUS_APHELION_DIST,
+    URANUS_INCLINATION,
+    URANUS_LONG_ASC_NODE,
+    URANUS_ARG_PERIHELION,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
+import { planetOrbitFromElements } from './planet-orbit.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -37,13 +42,29 @@ export class Uranus extends Planet {
      * Constructs a new Uranus object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Uranus belongs.
+     * @param trueAnomaly Position along the orbit in radians, measured from perihelion
+     *                    (0 = perihelion, π = aphelion).
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, trueAnomaly: number = 0) {
         const gEff = dependencies.getG();
         const timeScale =
             URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, gEff, SUN_MASS);
         const rotSpeed = ((-2 * Math.PI) / (17.24 * 3600)) * timeScale; // retrograde
-        const trajectory = calculateTrajectory(gEff, URANUS_DIST, SUN_MASS, angleRad);
+
+        // Uranus's orbit is close to circular (e ≈ 0.0472) and barely tilted (0.77°), but at 19 AU
+        // that small eccentricity still moves the Sun distance by 269 million km over the 84-year
+        // orbit.
+        const trajectory = planetOrbitFromElements(
+            {
+                perihelion: URANUS_PERIHELION_DIST,
+                aphelion: URANUS_APHELION_DIST,
+                inclinationDeg: URANUS_INCLINATION,
+                longitudeAscendingNodeDeg: URANUS_LONG_ASC_NODE,
+                argumentOfPeriapsisDeg: URANUS_ARG_PERIHELION,
+            },
+            trueAnomaly,
+            gEff * SUN_MASS
+        );
         const texture = getBodyTexture('uranus.jpg');
         const geometry = buildBodySphereGeometry(URANUS_RADIUS);
         const material = new THREE.MeshStandardMaterial({

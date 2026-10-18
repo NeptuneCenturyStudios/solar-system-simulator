@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { calculateTrajectory } from '../physics/physics.js';
 import {
     MERCURY_AXIS,
     MERCURY_AZIMUTH,
@@ -12,11 +11,17 @@ import {
     MERCURY_MASS,
     MERCURY_ORBITAL_PERIOD_REAL,
     MERCURY_RADIUS,
+    MERCURY_PERIHELION_DIST,
+    MERCURY_APHELION_DIST,
+    MERCURY_INCLINATION,
+    MERCURY_LONG_ASC_NODE,
+    MERCURY_ARG_PERIHELION,
     SUN_MASS,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
+import { planetOrbitFromElements } from './planet-orbit.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -38,13 +43,32 @@ export class Mercury extends Planet {
      * Constructs a new Mercury object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Mercury belongs.
+     * @param trueAnomaly Position along the orbit in radians, measured from perihelion
+     *                    (0 = perihelion, π = aphelion).
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, trueAnomaly: number = 0) {
         const gEff = dependencies.getG();
+        // Kepler's third law relates the period to the *semi-major axis*, not to the instantaneous
+        // distance, so the time scale is keyed to MERCURY_DIST (the semi-major axis) even though
+        // the body itself swings between perihelion and aphelion.
         const timeScale =
             MERCURY_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MERCURY_DIST, gEff, SUN_MASS);
-        const rotSpeed = ((2 * Math.PI) / (1407.5 * 3600)) * timeScale;
-        const trajectory = calculateTrajectory(gEff, MERCURY_DIST, SUN_MASS, angleRad);
+        const rotSpeed = ((2 * Math.PI) / (1407.6 * 3600)) * timeScale;
+
+        // Mercury has the most eccentric orbit of the eight planets (e ≈ 0.206) and rides 7° out of
+        // the ecliptic, so both departures from a flat circle are real and worth modelling: the
+        // Sun distance swings by 52% over the 88-day year.
+        const trajectory = planetOrbitFromElements(
+            {
+                perihelion: MERCURY_PERIHELION_DIST,
+                aphelion: MERCURY_APHELION_DIST,
+                inclinationDeg: MERCURY_INCLINATION,
+                longitudeAscendingNodeDeg: MERCURY_LONG_ASC_NODE,
+                argumentOfPeriapsisDeg: MERCURY_ARG_PERIHELION,
+            },
+            trueAnomaly,
+            gEff * SUN_MASS
+        );
 
         const texture = getBodyTexture('mercury.jpg');
         const geometry = buildBodySphereGeometry(MERCURY_RADIUS);

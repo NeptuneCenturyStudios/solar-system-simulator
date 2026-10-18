@@ -15,7 +15,7 @@ import {
     PLUTO_ARG_PERIHELION,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
-import { stateVectorsFromElements } from '../procedural/orbital-math.js';
+import { planetOrbitFromElements } from './planet-orbit.js';
 import { IStateDependencies } from '../interfaces.js';
 import { DwarfPlanet } from './dwarf-planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -53,19 +53,17 @@ export class Pluto extends DwarfPlanet {
 
         // Pluto's orbit is highly eccentric (it crosses inside Neptune's orbit near perihelion)
         // and inclined 17° out of the ecliptic, so it is built from real orbital elements.
-        const semiMajorAxis = (PLUTO_PERIHELION_DIST + PLUTO_APHELION_DIST) / 2;
-        const ecc =
-            (PLUTO_APHELION_DIST - PLUTO_PERIHELION_DIST) /
-            (PLUTO_APHELION_DIST + PLUTO_PERIHELION_DIST); // ≈ 0.2488
-        const trajectory = stateVectorsFromElements({
-            semiMajorAxis,
-            eccentricity: ecc,
-            inclinationRad: THREE.MathUtils.degToRad(PLUTO_INCLINATION),
-            longitudeAscendingNodeRad: THREE.MathUtils.degToRad(PLUTO_LONG_ASC_NODE),
-            argumentOfPeriapsisRad: THREE.MathUtils.degToRad(PLUTO_ARG_PERIHELION),
-            trueAnomalyRad: trueAnomaly,
-            mu: gEff * SUN_MASS,
-        });
+        const trajectory = planetOrbitFromElements(
+            {
+                perihelion: PLUTO_PERIHELION_DIST,
+                aphelion: PLUTO_APHELION_DIST,
+                inclinationDeg: PLUTO_INCLINATION,
+                longitudeAscendingNodeDeg: PLUTO_LONG_ASC_NODE,
+                argumentOfPeriapsisDeg: PLUTO_ARG_PERIHELION,
+            },
+            trueAnomaly,
+            gEff * SUN_MASS
+        );
 
         const texture = getBodyTexture('pluto.jpg');
         const geometry = buildBodySphereGeometry(PLUTO_RADIUS);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
-import { stateVectorsFromElements } from '../procedural/orbital-math.js';
+import { planetOrbitFromElements } from './planet-orbit.js';
 import {
     SUN_MASS,
     EARTH_MASS,
@@ -203,19 +203,17 @@ export class Earth extends Planet {
         // passes `orbitDistance`, which keeps the old flat-circle placement.
         let trajectory: { pos: THREE.Vector3; vel: THREE.Vector3 };
         if (orbitDistance === undefined) {
-            const semiMajorAxis = (EARTH_PERIHELION_DIST + EARTH_APHELION_DIST) / 2;
-            const ecc =
-                (EARTH_APHELION_DIST - EARTH_PERIHELION_DIST) /
-                (EARTH_APHELION_DIST + EARTH_PERIHELION_DIST); // ≈ 0.0167
-            trajectory = stateVectorsFromElements({
-                semiMajorAxis,
-                eccentricity: ecc,
-                inclinationRad: THREE.MathUtils.degToRad(EARTH_INCLINATION),
-                longitudeAscendingNodeRad: THREE.MathUtils.degToRad(EARTH_LONG_ASC_NODE),
-                argumentOfPeriapsisRad: THREE.MathUtils.degToRad(EARTH_ARG_PERIHELION),
-                trueAnomalyRad: angleRad,
-                mu: gEff * SUN_MASS,
-            });
+            trajectory = planetOrbitFromElements(
+                {
+                    perihelion: EARTH_PERIHELION_DIST,
+                    aphelion: EARTH_APHELION_DIST,
+                    inclinationDeg: EARTH_INCLINATION,
+                    longitudeAscendingNodeDeg: EARTH_LONG_ASC_NODE,
+                    argumentOfPeriapsisDeg: EARTH_ARG_PERIHELION,
+                },
+                angleRad,
+                gEff * SUN_MASS
+            );
         } else {
             trajectory = calculateTrajectory(gEff, orbitDistance, SUN_MASS, angleRad);
         }

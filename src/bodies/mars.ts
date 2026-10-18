@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { calculateTrajectory } from '../physics/physics.js';
 import {
     SUN_MASS,
     MARS_MASS,
@@ -8,10 +7,16 @@ import {
     MARS_AXIS,
     MARS_AZIMUTH,
     MARS_ORBITAL_PERIOD_REAL,
+    MARS_PERIHELION_DIST,
+    MARS_APHELION_DIST,
+    MARS_INCLINATION,
+    MARS_LONG_ASC_NODE,
+    MARS_ARG_PERIHELION,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
+import { planetOrbitFromElements } from './planet-orbit.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -33,13 +38,29 @@ export class Mars extends Planet {
      * Constructs a new Mars object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Mars belongs.
+     * @param trueAnomaly Position along the orbit in radians, measured from perihelion
+     *                    (0 = perihelion, π = aphelion).
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, trueAnomaly: number = 0) {
         const gEff = dependencies.getG();
         const timeScale =
             MARS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(MARS_DIST, gEff, SUN_MASS);
-        const rotSpeed = ((2 * Math.PI) / (24.623 * 3600)) * timeScale;
-        const trajectory = calculateTrajectory(gEff, MARS_DIST, SUN_MASS, angleRad);
+        const rotSpeed = ((2 * Math.PI) / (24.6229 * 3600)) * timeScale;
+
+        // Mars's orbit is noticeably oval (e ≈ 0.0935) and tilted 1.85° to the ecliptic. The Sun
+        // distance swings from 206.7 to 249.3 million km over the 687-day year, and that variation
+        // is what drives the planet's seasons.
+        const trajectory = planetOrbitFromElements(
+            {
+                perihelion: MARS_PERIHELION_DIST,
+                aphelion: MARS_APHELION_DIST,
+                inclinationDeg: MARS_INCLINATION,
+                longitudeAscendingNodeDeg: MARS_LONG_ASC_NODE,
+                argumentOfPeriapsisDeg: MARS_ARG_PERIHELION,
+            },
+            trueAnomaly,
+            gEff * SUN_MASS
+        );
         const texture = getBodyTexture('mars.jpg');
         const geometry = buildBodySphereGeometry(MARS_RADIUS);
         const material = new THREE.MeshStandardMaterial({

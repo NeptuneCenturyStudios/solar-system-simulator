@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { calculateTrajectory } from '../physics/physics.js';
 import {
     SUN_MASS,
     VENUS_AXIS,
@@ -8,10 +7,16 @@ import {
     VENUS_MASS,
     VENUS_ORBITAL_PERIOD_REAL,
     VENUS_RADIUS,
+    VENUS_PERIHELION_DIST,
+    VENUS_APHELION_DIST,
+    VENUS_INCLINATION,
+    VENUS_LONG_ASC_NODE,
+    VENUS_ARG_PERIHELION,
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
+import { planetOrbitFromElements } from './planet-orbit.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -33,13 +38,29 @@ export class Venus extends Planet {
      * Constructs a new Venus object with its unique properties, orbit, and cloud layer.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Venus belongs.
+     * @param trueAnomaly Position along the orbit in radians, measured from perihelion
+     *                    (0 = perihelion, π = aphelion).
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, trueAnomaly: number = 0) {
         const gEff = dependencies.getG();
         const timeScale =
             VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, gEff, SUN_MASS);
-        const rotSpeed = ((-2 * Math.PI) / (5832.5 * 3600)) * timeScale; // retrograde
-        const trajectory = calculateTrajectory(gEff, VENUS_DIST, SUN_MASS, angleRad);
+        const rotSpeed = ((-2 * Math.PI) / (5832.6 * 3600)) * timeScale; // retrograde
+
+        // Venus has the roundest orbit of the eight planets (e ≈ 0.0068) and only 3.4° of
+        // inclination, but both are real: the Sun distance still varies by 1.46 million km over the
+        // 225-day year, and the node and perihelion point where they really point.
+        const trajectory = planetOrbitFromElements(
+            {
+                perihelion: VENUS_PERIHELION_DIST,
+                aphelion: VENUS_APHELION_DIST,
+                inclinationDeg: VENUS_INCLINATION,
+                longitudeAscendingNodeDeg: VENUS_LONG_ASC_NODE,
+                argumentOfPeriapsisDeg: VENUS_ARG_PERIHELION,
+            },
+            trueAnomaly,
+            gEff * SUN_MASS
+        );
         const venusTexture = getBodyTexture('venus_surface.jpg');
         const geometry = buildBodySphereGeometry(VENUS_RADIUS);
         const material = new THREE.MeshStandardMaterial({
