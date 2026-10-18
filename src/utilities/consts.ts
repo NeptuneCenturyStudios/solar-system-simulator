@@ -1123,6 +1123,21 @@ export const AI_APPROACH_SAFETY_PAD = 1.5;
  *  gap between the two thresholds is the hysteresis that stops boost from flickering. */
 export const AI_BOOST_ENGAGE_FACTOR = 1.25;
 
+// === Ship AI speed mode (the player's R-key High/Low toggle) ===
+/** Hull gap (sim units) at which an AI in high-speed mode hands off to low speed: 40 km, five
+ *  times the dogfight engage range. High mode brakes to arrive here already inside the
+ *  low-speed envelope — braking to the hold distance instead would still be doing tens of km/s
+ *  at the 8 km dogfight range, since the high tier's decel is enormous in absolute terms. */
+export const AI_HIGH_SPEED_HANDOFF_RANGE = 40 / DIST_SCALE;
+/** Hull gap (sim units) beyond which a low-speed AI switches up to high speed: 400 km. Well
+ *  above the handoff range — the gap between the two is the hysteresis that stops the mode
+ *  flipping back and forth around a single distance. */
+export const AI_HIGH_SPEED_ENGAGE_RANGE = 400 / DIST_SCALE;
+/** For a controller whose hold distance is large (the 5,000 km follower), the handoff range is
+ *  this multiple of the hold distance, and the engage range scales with it, so the thresholds
+ *  stay on the far side of the station it is keeping. */
+export const AI_HIGH_SPEED_HANDOFF_FACTOR = 2;
+
 // === Ship AI warp drive ===
 /** Multiplier on a ship's own `autopilotWarpThreshold` before an AI will charge warp.
  *  That threshold is already the full warp→rest stopping distance with a 1.5× margin

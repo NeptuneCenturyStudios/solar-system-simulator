@@ -887,6 +887,10 @@ export class CombatShipAI extends FollowShipAI {
         // inside the warp cruise, and via resetControlInput() when there is no target — so what
         // follows starts from a released trigger and only has to decide whether to raise it.
         const flightTarget = this.getTarget();
+        // Ahead of the dogfight, which bypasses super.update() and reads `ship.handling` at its
+        // top. If the target outruns the low tier the ship is still high here, and the dogfight
+        // is flown on that tier — the best a ship can do against something it can't keep up with.
+        this.updateSpeedMode(flightTarget);
         this.updateDogfightLatch(flightTarget);
         if (!(this.dogfighting && flightTarget && this.flyDogfight(flightTarget, simDt))) {
             super.update(dt, simDt);
@@ -1052,7 +1056,7 @@ export class CombatShipAI extends FollowShipAI {
             );
         }
 
-        let throttle = `Speed ${formatSpeed(ship.forwardSpeedInFrame(fwd))}  ${formatThrottle(ship.controlInput)}`;
+        let throttle = `Speed ${formatSpeed(ship.forwardSpeedInFrame(fwd))} ${ship.highSpeedMode ? 'HIGH' : 'LOW'}  ${formatThrottle(ship.controlInput)}`;
         if (
             this.dogfighting &&
             this.state === 'attack' &&

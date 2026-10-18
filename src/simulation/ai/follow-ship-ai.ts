@@ -10,6 +10,9 @@ import {
     AI_BOOST_ENGAGE_FACTOR,
     AI_CLOSING_SPEED_TOLERANCE,
     AI_FOLLOW_APPROACH_GAIN,
+    AI_HIGH_SPEED_ENGAGE_RANGE,
+    AI_HIGH_SPEED_HANDOFF_FACTOR,
+    AI_HIGH_SPEED_HANDOFF_RANGE,
     AI_STEER_FULL_DEFLECTION_ANGLE,
     AI_THRUST_ALIGN_ANGLE,
     AI_WARP_ABORT_FACTOR,
@@ -117,6 +120,56 @@ export class FollowShipAI extends ShipAI {
     }
 
     /**
+     * Range (sim units, hull to hull) at which a high-speed approach hands off to low speed.
+     *
+     * At least AI_HIGH_SPEED_HANDOFF_RANGE, and twice the hold distance for a controller that
+     * keeps a far-off station, so the handoff never lands inside the station it is holding.
+     */
+    private highSpeedHandoffRange(): number {
+        return Math.max(
+            AI_HIGH_SPEED_HANDOFF_RANGE,
+            this.followDistance * AI_HIGH_SPEED_HANDOFF_FACTOR
+        );
+    }
+
+    /**
+     * Pick the flight tier — the AI-side equivalent of the player's R key.
+     *
+     * High speed is for long hauls: the low tier tops out at a few km/s, so crossing hundreds
+     * of km under boost takes minutes. Low speed is for everything close — the dogfight and
+     * station-keeping are tuned for it, and the high tier covers their whole range in a frame.
+     *
+     * - Up to high beyond the engage range, or whenever the target is faster than the low tier
+     *   can fly (it would never be caught, or kept up with, otherwise).
+     * - Back to low inside the handoff range. The high-speed approach brakes to arrive there
+     *   (see update()), so the ship is already inside the low-speed envelope when it switches.
+     * - Low with nothing to chase.
+     *
+     * Idempotent within a frame. A refused change (warp, autopilot or a stop-brake in progress
+     * own the ship's speed) is simply retried next frame, so no state is kept for it.
+     *
+     * Must run before anything reads `ship.handling` this frame.
+     */
+    protected updateSpeedMode(target: Spaceship | null): void {
+        const ship = this.ship;
+        if (!target) {
+            if (ship.highSpeedMode) ship.setHighSpeedMode(false);
+            return;
+        }
+
+        const range = this.hullGap(target, ship.mesh.position.distanceTo(target.mesh.position));
+        const handoff = this.highSpeedHandoffRange();
+        const engage = AI_HIGH_SPEED_ENGAGE_RANGE * (handoff / AI_HIGH_SPEED_HANDOFF_RANGE);
+        const outruns = target.velocity.length() > ship.lowSpeedHandling.flightBoostMaxSpeed;
+
+        if (ship.highSpeedMode) {
+            if (range <= handoff && !outruns) ship.setHighSpeedMode(false);
+        } else if (range > engage || outruns) {
+            ship.setHighSpeedMode(true);
+        }
+    }
+
+    /**
      * Closing speed to aim for, given how far out of position we are.
      *
      * Positive means "move toward the target", negative "back off". The command
@@ -205,7 +258,7 @@ export class FollowShipAI extends ShipAI {
             `${this.name} · ${this.debugPhase}`,
             `Range ${formatDistance(this.debugRange)}  hold ${formatDistance(this.followDistance)}`,
             `Closing ${formatSpeed(this.debugClosing, true)}  want ${formatSpeed(this.debugDesiredClosing, true)}`,
-            `Throttle ${formatThrottle(this.ship.controlInput)}`,
+            `Throttle ${formatThrottle(this.ship.controlInput)}  ${this.ship.highSpeedMode ? 'HIGH' : 'LOW'} speed`,
         ];
     }
 
@@ -369,9 +422,11 @@ export class FollowShipAI extends ShipAI {
     update(_dt: number, simDt: number): void {
         const ship = this.ship;
         const input = ship.controlInput;
-        const h = ship.handling;
 
         const target = this.getTarget();
+        // Before `ship.handling` is read: the tier picked here is the one flown this frame.
+        this.updateSpeedMode(target);
+        const h = ship.handling;
         if (!target) {
             // Nobody to follow — release the controls and coast.
             this.debugPhase = 'NO TARGET';
@@ -436,8 +491,21 @@ export class FollowShipAI extends ShipAI {
         // width (rather than zeroing it inside) keeps the commanded speed
         // continuous across the boundary — a hard switch there makes the ship
         // drift out, lunge back, and settle into a small permanent oscillation.
-        const slack = this.followDistance * NPC_FOLLOW_DEAD_BAND;
-        const rawGap = range - this.followDistance; // positive = too far away
+        //
+        // In high-speed mode the station is the handoff range instead of the hold distance, so
+        // the approach brakes to arrive there already slow enough for low speed to take over
+        // (see updateSpeedMode); the low-speed approach then closes the rest of the way. Sized so
+        // the slack zone's far edge sits just inside the handoff range — the proportional
+        // approach only creeps up on that edge, and would otherwise stall outside the handoff
+        // and never hand off.
+        const standoff = ship.highSpeedMode
+            ? Math.max(
+                  this.followDistance,
+                  this.highSpeedHandoffRange() / (1 + 2 * NPC_FOLLOW_DEAD_BAND)
+              )
+            : this.followDistance;
+        const slack = standoff * NPC_FOLLOW_DEAD_BAND;
+        const rawGap = range - standoff; // positive = too far away
         const gap = rawGap > slack ? rawGap - slack : rawGap < -slack ? rawGap + slack : 0;
 
         // ── Warp ─────────────────────────────────────────────────────────────

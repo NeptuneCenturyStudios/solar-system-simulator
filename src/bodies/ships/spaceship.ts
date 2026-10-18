@@ -89,7 +89,7 @@ export class Spaceship extends Body {
      * flight uses it too while `highSpeedMode` is on. Warp is unchanged.
      */
     readonly autopilotHandling: ISpaceshipHandling;
-    /** True while manual flight uses the high-speed tier (player toggle; AI ships stay low). */
+    /** True while flight uses the high-speed tier (the player's R toggle; ship AI sets it via `FollowShipAI.updateSpeedMode`). */
     highSpeedMode: boolean = false;
     /**
      * True while a boost-decel ramp was started by dropping out of high-speed mode. The ramp
