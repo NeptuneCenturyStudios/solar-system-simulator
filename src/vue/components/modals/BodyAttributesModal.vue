@@ -18,6 +18,44 @@
             </section>
 
             <section class="attribute-section">
+                <h3 class="attribute-section-title">Orbital Data</h3>
+
+                <dl v-if="snapshot.orbitalRows.length > 0" class="attribute-list">
+                    <div
+                        v-for="row in snapshot.orbitalRows"
+                        :key="row.key"
+                        class="attribute-row"
+                    >
+                        <dt class="attribute-label">{{ row.label }}</dt>
+                        <dd class="attribute-value">{{ row.value }}</dd>
+                    </div>
+                </dl>
+                <p v-else class="attribute-note">No orbital reference for this body.</p>
+
+                <p v-if="snapshot.orbitalNote" class="attribute-note">
+                    {{ snapshot.orbitalNote }}
+                </p>
+
+                <template v-if="snapshot.referenceOrbitRows">
+                    <h4 class="attribute-subsection-title">Reference Orbit (as initialized)</h4>
+                    <dl class="attribute-list">
+                        <div
+                            v-for="row in snapshot.referenceOrbitRows"
+                            :key="row.key"
+                            class="attribute-row"
+                        >
+                            <dt class="attribute-label">{{ row.label }}</dt>
+                            <dd class="attribute-value">{{ row.value }}</dd>
+                        </div>
+                    </dl>
+                    <p class="attribute-note attribute-note-hint">
+                        The orbit this body was placed on; the live values above are its current
+                        osculating orbit.
+                    </p>
+                </template>
+            </section>
+
+            <section class="attribute-section">
                 <h3 class="attribute-section-title">Science Data</h3>
 
                 <p v-if="!snapshot.hasScienceData" class="attribute-note">None</p>

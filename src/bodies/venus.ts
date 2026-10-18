@@ -17,6 +17,7 @@ import {
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides } from './orbital-elements.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -50,17 +51,14 @@ export class Venus extends Planet {
         // Venus has the roundest orbit of the eight planets (e ≈ 0.0068) and only 3.4° of
         // inclination, but both are real: the Sun distance still varies by 1.46 million km over the
         // 225-day year, and the node and perihelion point where they really point.
-        const trajectory = planetOrbitFromElements(
-            {
-                perihelion: VENUS_PERIHELION_DIST,
-                aphelion: VENUS_APHELION_DIST,
-                inclinationDeg: VENUS_INCLINATION,
-                longitudeAscendingNodeDeg: VENUS_LONG_ASC_NODE,
-                argumentOfPeriapsisDeg: VENUS_ARG_PERIHELION,
-            },
-            trueAnomaly,
-            gEff * SUN_MASS
+        const orbitElements = orbitElementsFromApsides(
+            VENUS_PERIHELION_DIST,
+            VENUS_APHELION_DIST,
+            VENUS_INCLINATION,
+            VENUS_LONG_ASC_NODE,
+            VENUS_ARG_PERIHELION
         );
+        const trajectory = planetOrbitFromElements(orbitElements, trueAnomaly, gEff * SUN_MASS);
         const venusTexture = getBodyTexture('venus_surface.jpg');
         const geometry = buildBodySphereGeometry(VENUS_RADIUS);
         const material = new THREE.MeshStandardMaterial({
@@ -80,6 +78,7 @@ export class Venus extends Planet {
             radius: VENUS_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: orbitElements,
             bodySubtype: PlanetTypeEnum.Terrestrial,
             trailColor: 0xffdd88,
             maxTrail: 3500,

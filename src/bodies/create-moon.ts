@@ -15,6 +15,7 @@ import {
 import type { CelestialBody } from './celestial-body';
 import { MoonTypeEnum } from './body-enums';
 import { IMoonCreationOptions, IMoonOrbitElements } from '../interfaces';
+import { orbitElementsFromApsides, type IBodyOrbitElements } from './orbital-elements';
 import { pickMoonTextureForMoonType } from '../procedural/moon-factory';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 
@@ -164,5 +165,25 @@ export function createMoon(
         mesh: moonMesh,
         moonType: resolvedMoonType,
         attributes: config.attributes,
+        referenceOrbitElements: config.orbitElements
+            ? referenceElementsFromMoonElements(config.orbitElements)
+            : undefined,
     });
+}
+
+/**
+ * Convert a moon's placement elements (radians, semi-major axis + eccentricity form) into the
+ * display form the attributes modal uses (degrees, apsis form). Only the shape and orientation
+ * survive — the true anomaly the moon was placed at is a starting position, not part of the
+ * orbit's definition.
+ */
+function referenceElementsFromMoonElements(elements: IMoonOrbitElements): IBodyOrbitElements {
+    const { semiMajorAxis, eccentricity } = elements;
+    return orbitElementsFromApsides(
+        semiMajorAxis * (1 - eccentricity),
+        semiMajorAxis * (1 + eccentricity),
+        THREE.MathUtils.radToDeg(elements.inclinationRad),
+        THREE.MathUtils.radToDeg(elements.longitudeAscendingNodeRad),
+        THREE.MathUtils.radToDeg(elements.argumentOfPeriapsisRad)
+    );
 }

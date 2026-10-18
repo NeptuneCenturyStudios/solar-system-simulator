@@ -18,6 +18,7 @@ import { FlightHUD } from './drawing/flight-hud';
 import type { HudSprite } from './drawing/hud/hud-sprite';
 import { IWeaponOwner, Weapon } from './ship-effects/weapons/weapon';
 import type { IPlanetaryAttributes } from './bodies/body-attributes';
+import type { IBodyOrbitElements } from './bodies/orbital-elements';
 
 /**
  * Options for configuring an atmosphere on a celestial body, including its radius and tint color.
@@ -364,6 +365,16 @@ export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptio
      * origin)" convention already used for orbital-speed calculation in planet-generator.ts.
      */
     orbitBarycenterMass?: number;
+    /**
+     * The Keplerian elements this body was placed on, when it was placed on known ones (the real
+     * solar-system bodies, whose elements come from the NASA fact sheets). Purely descriptive:
+     * the physics only ever uses the resulting position and velocity. Carried so the attributes
+     * modal can show the orbit a body was initialized on alongside its live osculating elements.
+     *
+     * Distinct from {@link IMoonCreationOptions.orbitElements}, which is a moon's *placement*
+     * input in radians; this one is the resulting orbit, in degrees, for display.
+     */
+    referenceOrbitElements?: IBodyOrbitElements;
 }
 
 /**

@@ -21,6 +21,7 @@ import {
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides } from './orbital-elements.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -58,17 +59,14 @@ export class Neptune extends Planet {
         // Neptune's real orbit is very nearly circular (e ≈ 0.0087) and only 1.77° out of the
         // ecliptic, but both departures are real, so the orbit is built from its orbital elements
         // rather than a flat circle.
-        const trajectory = planetOrbitFromElements(
-            {
-                perihelion: NEPTUNE_PERIHELION_DIST,
-                aphelion: NEPTUNE_APHELION_DIST,
-                inclinationDeg: NEPTUNE_INCLINATION,
-                longitudeAscendingNodeDeg: NEPTUNE_LONG_ASC_NODE,
-                argumentOfPeriapsisDeg: NEPTUNE_ARG_PERIHELION,
-            },
-            trueAnomaly,
-            gEff * SUN_MASS
+        const orbitElements = orbitElementsFromApsides(
+            NEPTUNE_PERIHELION_DIST,
+            NEPTUNE_APHELION_DIST,
+            NEPTUNE_INCLINATION,
+            NEPTUNE_LONG_ASC_NODE,
+            NEPTUNE_ARG_PERIHELION
         );
+        const trajectory = planetOrbitFromElements(orbitElements, trueAnomaly, gEff * SUN_MASS);
 
         const texture = getBodyTexture('neptune.jpg');
         const geometry = buildBodySphereGeometry(NEPTUNE_RADIUS);
@@ -89,6 +87,7 @@ export class Neptune extends Planet {
             radius: NEPTUNE_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: orbitElements,
             bodySubtype: PlanetTypeEnum.IceGiant,
             trailColor: 0x6688ff,
             maxTrail: 18000,

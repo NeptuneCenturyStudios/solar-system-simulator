@@ -17,6 +17,7 @@ import {
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides } from './orbital-elements.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -50,17 +51,14 @@ export class Mars extends Planet {
         // Mars's orbit is noticeably oval (e ≈ 0.0935) and tilted 1.85° to the ecliptic. The Sun
         // distance swings from 206.7 to 249.3 million km over the 687-day year, and that variation
         // is what drives the planet's seasons.
-        const trajectory = planetOrbitFromElements(
-            {
-                perihelion: MARS_PERIHELION_DIST,
-                aphelion: MARS_APHELION_DIST,
-                inclinationDeg: MARS_INCLINATION,
-                longitudeAscendingNodeDeg: MARS_LONG_ASC_NODE,
-                argumentOfPeriapsisDeg: MARS_ARG_PERIHELION,
-            },
-            trueAnomaly,
-            gEff * SUN_MASS
+        const orbitElements = orbitElementsFromApsides(
+            MARS_PERIHELION_DIST,
+            MARS_APHELION_DIST,
+            MARS_INCLINATION,
+            MARS_LONG_ASC_NODE,
+            MARS_ARG_PERIHELION
         );
+        const trajectory = planetOrbitFromElements(orbitElements, trueAnomaly, gEff * SUN_MASS);
         const texture = getBodyTexture('mars.jpg');
         const geometry = buildBodySphereGeometry(MARS_RADIUS);
         const material = new THREE.MeshStandardMaterial({
@@ -80,6 +78,7 @@ export class Mars extends Planet {
             radius: MARS_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: orbitElements,
             bodySubtype: PlanetTypeEnum.Terrestrial,
             trailColor: 0xff8888,
             maxTrail: 3000,

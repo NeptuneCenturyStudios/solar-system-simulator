@@ -1404,6 +1404,16 @@ button.btn.toolbar-btn.btn-care:focus-visible {
     color: rgba(255, 255, 255, 0.55);
 }
 
+/* Second-level heading inside a section, e.g. the reference orbit under Orbital Data. */
+.attribute-subsection-title {
+    margin: 12px 0 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--new-ui-label-color, rgba(255, 255, 255, 0.6));
+}
+
 .attribute-note-hint {
     margin: 8px 0 0;
     color: var(--new-ui-label-color);

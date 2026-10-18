@@ -144,6 +144,11 @@ import { createMoon, earthMoonOrbitElements } from './bodies/create-moon';
 import { Planet } from './bodies/planet';
 import { DwarfPlanet } from './bodies/dwarf-planet';
 import { buildBasicRows, buildScienceRows, hasScienceData } from './bodies/body-attribute-display';
+import {
+    buildLiveOrbitRows,
+    buildReferenceOrbitRows,
+    orbitalDataNote,
+} from './bodies/orbital-data-display';
 import { moonSubTypeLabel, planetSubTypeLabel } from './bodies/body-attribute-labels';
 import { Mercury } from './bodies/mercury';
 import { Venus } from './bodies/venus';
@@ -3534,6 +3539,11 @@ registerVueSimHooks({
         const celestial = body instanceof CelestialBody ? body : null;
         const attributes = celestial?.attributes;
 
+        // Live osculating orbit, measured against the same reference frame getOrbitalPeriod()
+        // uses. Derived fresh from the current state vector on every poll tick, so the modal's
+        // orbital values track the physics instead of describing the orbit as it started.
+        const orbitData = celestial?.getLiveOrbitData() ?? null;
+
         return {
             bodyId: body.id,
             bodyName: body.name || 'Unnamed',
@@ -3559,6 +3569,19 @@ registerVueSimHooks({
                 environmentState.starDeathEnabled
             ),
             hasScienceData: hasScienceData(attributes),
+            orbitalRows: orbitData
+                ? buildLiveOrbitRows({
+                      referenceLabel: orbitData.referenceLabel,
+                      elements: orbitData.elements,
+                  })
+                : [],
+            referenceOrbitRows: celestial?.referenceOrbitElements
+                ? buildReferenceOrbitRows(celestial.referenceOrbitElements)
+                : null,
+            orbitalNote: orbitalDataNote(
+                orbitData?.elements ?? null,
+                orbitData?.referenceLabel ?? null
+            ),
         };
     },
 

@@ -21,6 +21,7 @@ import {
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides } from './orbital-elements.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -54,17 +55,14 @@ export class Uranus extends Planet {
         // Uranus's orbit is close to circular (e ≈ 0.0472) and barely tilted (0.77°), but at 19 AU
         // that small eccentricity still moves the Sun distance by 269 million km over the 84-year
         // orbit.
-        const trajectory = planetOrbitFromElements(
-            {
-                perihelion: URANUS_PERIHELION_DIST,
-                aphelion: URANUS_APHELION_DIST,
-                inclinationDeg: URANUS_INCLINATION,
-                longitudeAscendingNodeDeg: URANUS_LONG_ASC_NODE,
-                argumentOfPeriapsisDeg: URANUS_ARG_PERIHELION,
-            },
-            trueAnomaly,
-            gEff * SUN_MASS
+        const orbitElements = orbitElementsFromApsides(
+            URANUS_PERIHELION_DIST,
+            URANUS_APHELION_DIST,
+            URANUS_INCLINATION,
+            URANUS_LONG_ASC_NODE,
+            URANUS_ARG_PERIHELION
         );
+        const trajectory = planetOrbitFromElements(orbitElements, trueAnomaly, gEff * SUN_MASS);
         const texture = getBodyTexture('uranus.jpg');
         const geometry = buildBodySphereGeometry(URANUS_RADIUS);
         const material = new THREE.MeshStandardMaterial({
@@ -84,6 +82,7 @@ export class Uranus extends Planet {
             radius: URANUS_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: orbitElements,
             bodySubtype: PlanetTypeEnum.IceGiant,
             trailColor: 0x88ddff,
             maxTrail: 15000,

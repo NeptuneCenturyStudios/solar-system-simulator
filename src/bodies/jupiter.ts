@@ -21,6 +21,7 @@ import {
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides } from './orbital-elements.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -55,17 +56,14 @@ export class Jupiter extends Planet {
         // Jupiter's eccentricity is small (e ≈ 0.0484), but the orbit is so vast that it still
         // moves the Sun distance by 75.8 million km between perihelion and aphelion; the plane also
         // sits 1.31° off the ecliptic.
-        const trajectory = planetOrbitFromElements(
-            {
-                perihelion: JUPITER_PERIHELION_DIST,
-                aphelion: JUPITER_APHELION_DIST,
-                inclinationDeg: JUPITER_INCLINATION,
-                longitudeAscendingNodeDeg: JUPITER_LONG_ASC_NODE,
-                argumentOfPeriapsisDeg: JUPITER_ARG_PERIHELION,
-            },
-            trueAnomaly,
-            gEff * SUN_MASS
+        const orbitElements = orbitElementsFromApsides(
+            JUPITER_PERIHELION_DIST,
+            JUPITER_APHELION_DIST,
+            JUPITER_INCLINATION,
+            JUPITER_LONG_ASC_NODE,
+            JUPITER_ARG_PERIHELION
         );
+        const trajectory = planetOrbitFromElements(orbitElements, trueAnomaly, gEff * SUN_MASS);
         const texture = getBodyTexture('jupiter.jpg');
         const geometry = buildBodySphereGeometry(JUPITER_RADIUS);
         const material = new THREE.MeshStandardMaterial({
@@ -85,6 +83,7 @@ export class Jupiter extends Planet {
             radius: JUPITER_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: orbitElements,
             bodySubtype: PlanetTypeEnum.GasGiant,
             trailColor: 0xffcc88,
             maxTrail: 5000,

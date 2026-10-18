@@ -21,6 +21,7 @@ import {
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides } from './orbital-elements.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -54,17 +55,14 @@ export class Saturn extends Planet {
 
         // Saturn's orbit is the most eccentric of the giants (e ≈ 0.0542) and tilted 2.48° to the
         // ecliptic, the largest orbital inclination of any planet bright enough to see by eye.
-        const trajectory = planetOrbitFromElements(
-            {
-                perihelion: SATURN_PERIHELION_DIST,
-                aphelion: SATURN_APHELION_DIST,
-                inclinationDeg: SATURN_INCLINATION,
-                longitudeAscendingNodeDeg: SATURN_LONG_ASC_NODE,
-                argumentOfPeriapsisDeg: SATURN_ARG_PERIHELION,
-            },
-            trueAnomaly,
-            gEff * SUN_MASS
+        const orbitElements = orbitElementsFromApsides(
+            SATURN_PERIHELION_DIST,
+            SATURN_APHELION_DIST,
+            SATURN_INCLINATION,
+            SATURN_LONG_ASC_NODE,
+            SATURN_ARG_PERIHELION
         );
+        const trajectory = planetOrbitFromElements(orbitElements, trueAnomaly, gEff * SUN_MASS);
         const texture = getBodyTexture('saturn.jpg');
         const geometry = buildBodySphereGeometry(SATURN_RADIUS);
         const material = new THREE.MeshStandardMaterial({
@@ -84,6 +82,7 @@ export class Saturn extends Planet {
             radius: SATURN_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: orbitElements,
             bodySubtype: PlanetTypeEnum.GasGiant,
             trailColor: 0xffeebb,
             maxTrail: 12000,

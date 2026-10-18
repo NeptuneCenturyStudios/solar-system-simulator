@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { calculateTrajectory } from '../physics/physics.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides, type IBodyOrbitElements } from './orbital-elements.js';
 import {
     SUN_MASS,
     EARTH_MASS,
@@ -202,15 +203,18 @@ export class Earth extends Planet {
         // correct way round the ecliptic. A scenario that needs Earth on a bespoke circular orbit
         // passes `orbitDistance`, which keeps the old flat-circle placement.
         let trajectory: { pos: THREE.Vector3; vel: THREE.Vector3 };
+        /** Set only on the real orbit; a bespoke circular orbit was never placed on elements. */
+        let referenceOrbitElements: IBodyOrbitElements | null = null;
         if (orbitDistance === undefined) {
+            referenceOrbitElements = orbitElementsFromApsides(
+                EARTH_PERIHELION_DIST,
+                EARTH_APHELION_DIST,
+                EARTH_INCLINATION,
+                EARTH_LONG_ASC_NODE,
+                EARTH_ARG_PERIHELION
+            );
             trajectory = planetOrbitFromElements(
-                {
-                    perihelion: EARTH_PERIHELION_DIST,
-                    aphelion: EARTH_APHELION_DIST,
-                    inclinationDeg: EARTH_INCLINATION,
-                    longitudeAscendingNodeDeg: EARTH_LONG_ASC_NODE,
-                    argumentOfPeriapsisDeg: EARTH_ARG_PERIHELION,
-                },
+                referenceOrbitElements,
                 angleRad,
                 gEff * SUN_MASS
             );
@@ -238,6 +242,7 @@ export class Earth extends Planet {
             radius: EARTH_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: referenceOrbitElements ?? undefined,
             rotation: {
                 tilt: EARTH_AXIS,
                 speed: rotSpeed,

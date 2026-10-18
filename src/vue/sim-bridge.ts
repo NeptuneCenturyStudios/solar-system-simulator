@@ -109,6 +109,15 @@ export interface BodyAttributesSnapshot {
     scienceRows: IBodyAttributeRow[];
     /** False when the body carries no science payload at all (stars, black holes, wormholes). */
     hasScienceData: boolean;
+    /** Live osculating orbital elements, relative to the body's orbital reference frame.
+     *  Empty when the body has no reference frame at all (the system's central star). */
+    orbitalRows: IBodyAttributeRow[];
+    /** The Keplerian elements this body was placed on, when it was placed on known ones (the
+     *  real solar-system bodies). Null for procedurally placed bodies, which were never given
+     *  named elements. */
+    referenceOrbitRows: IBodyAttributeRow[] | null;
+    /** Set when the live orbit needs explaining, e.g. an unbound trajectory. */
+    orbitalNote: string | null;
 }
 
 /** Payload for creating a custom body from the add form. Mirrors the old

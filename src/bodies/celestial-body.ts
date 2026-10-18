@@ -17,6 +17,11 @@ import { PlanetRingsHandle, createPlanetRings } from '../effects/planet-rings';
 import { BodyTypeEnum } from './body-enums';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 import { IPlanetaryAttributes } from './body-attributes';
+import {
+    orbitalElementsFromStateVectors,
+    type IBodyOrbitElements,
+    type ILiveOrbitElements,
+} from './orbital-elements';
 
 // Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
 const _Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -39,6 +44,31 @@ export interface ITidalLockOptions {
     spinAxisWorld: THREE.Vector3;
     faceAxisLocal: THREE.Vector3;
     angularSpeed: number;
+}
+
+/** Display label for the P-type (circumbinary) reference frame, which has no body to name. */
+export const BARYCENTER_REFERENCE_LABEL = 'System barycenter';
+
+/**
+ * The frame a body's orbit is measured against: the parent body it orbits, or the system
+ * barycentre at the origin for a P-type/circumbinary orbit with no single parent.
+ */
+export interface ICelestialOrbitReference {
+    /** Human-readable name of the frame, for display. */
+    label: string;
+    /** Mass whose gravity defines the orbit, used to build mu. */
+    mass: number;
+    /** Position of the frame, in world space. */
+    pos: THREE.Vector3;
+    /** Velocity of the frame, in world space. */
+    vel: THREE.Vector3;
+}
+
+/** A body's live orbit: the derived elements plus the frame they were measured in. */
+export interface ICelestialOrbitData {
+    referenceLabel: string;
+    /** Null when the elements could not be derived from the current state vector. */
+    elements: ILiveOrbitElements | null;
 }
 
 /**
@@ -112,6 +142,13 @@ export class CelestialBody extends Body {
      * is treated as fixed at the world origin with zero velocity.
      */
     orbitBarycenterMass?: number;
+
+    /**
+     * The Keplerian elements this body was placed on, when it was placed on known ones (the real
+     * solar-system bodies). Descriptive only — the physics never reads it. Lets the attributes
+     * modal show the orbit a body was initialized on next to its live osculating elements.
+     */
+    readonly referenceOrbitElements: IBodyOrbitElements | null = null;
 
     // Tidal lock properties
     tidalLockEnabled: boolean;
@@ -232,6 +269,7 @@ export class CelestialBody extends Body {
 
         this.attributes = options.attributes;
         this.orbitBarycenterMass = options.orbitBarycenterMass;
+        this.referenceOrbitElements = options.referenceOrbitElements ?? null;
         this.orbitParent = options.orbitParent ?? this.tidalLockTarget ?? null;
 
         this.baseColor = new THREE.Color(this.color);
@@ -783,29 +821,17 @@ export class CelestialBody extends Body {
      * on every call, since this is an n-body sim where orbits can drift over time.
      */
     getOrbitalPeriod(): number | null {
-        let parentMass: number;
-        let parentPos: THREE.Vector3;
-        let parentVel: THREE.Vector3;
+        const reference = this.getOrbitReference();
+        if (!reference) return null;
 
-        if (this.orbitParent && !this.orbitParent._isDisposed) {
-            parentMass = this.orbitParent.mass;
-            parentPos = this.orbitParent.mesh.position;
-            parentVel = this.orbitParent.velocity;
-        } else if (typeof this.orbitBarycenterMass === 'number') {
-            parentMass = this.orbitBarycenterMass;
-            parentPos = _ORIGIN;
-            parentVel = _ZERO_VELOCITY;
-        } else {
-            return null;
-        }
-
+        const parentMass = reference.mass;
         if (!(parentMass > 0)) return null;
 
         const mu = this.dependencies.getG() * parentMass;
         if (!(mu > 0) || !Number.isFinite(mu)) return null;
 
-        const relPos = this.mesh.position.clone().sub(parentPos);
-        const relVel = this.velocity.clone().sub(parentVel);
+        const relPos = this.mesh.position.clone().sub(reference.pos);
+        const relVel = this.velocity.clone().sub(reference.vel);
         const r = relPos.length();
         if (!(r > 0)) return null;
 
@@ -814,6 +840,59 @@ export class CelestialBody extends Body {
 
         const semiMajorAxis = -mu / (2 * specificEnergy);
         return 2 * Math.PI * Math.sqrt(Math.pow(semiMajorAxis, 3) / mu);
+    }
+
+    /**
+     * The frame this body's orbit is measured against, resolved once and shared by
+     * getOrbitalPeriod() and the attributes modal so the two can never disagree. Null when the
+     * body orbits nothing and has no barycentre mass (the system's central star).
+     */
+    getOrbitReference(): ICelestialOrbitReference | null {
+        if (this.orbitParent && !this.orbitParent._isDisposed) {
+            return {
+                label: this.orbitParent.name || 'Orbit parent',
+                mass: this.orbitParent.mass,
+                pos: this.orbitParent.mesh.position,
+                vel: this.orbitParent.velocity,
+            };
+        }
+
+        if (typeof this.orbitBarycenterMass === 'number') {
+            return {
+                label: BARYCENTER_REFERENCE_LABEL,
+                mass: this.orbitBarycenterMass,
+                pos: _ORIGIN,
+                vel: _ZERO_VELOCITY,
+            };
+        }
+
+        return null;
+    }
+
+    /**
+     * This body's current osculating orbit relative to getOrbitReference(). Recomputed on every
+     * call — this is an n-body sim, so the elements genuinely drift as other bodies pull on it.
+     * Returns null only when there is no orbital reference frame at all.
+     */
+    getLiveOrbitData(): ICelestialOrbitData | null {
+        const reference = this.getOrbitReference();
+        if (!reference || !(reference.mass > 0)) return null;
+
+        const elements = orbitalElementsFromStateVectors(
+            {
+                x: this.mesh.position.x - reference.pos.x,
+                y: this.mesh.position.y - reference.pos.y,
+                z: this.mesh.position.z - reference.pos.z,
+            },
+            {
+                x: this.velocity.x - reference.vel.x,
+                y: this.velocity.y - reference.vel.y,
+                z: this.velocity.z - reference.vel.z,
+            },
+            this.dependencies.getG() * reference.mass
+        );
+
+        return { referenceLabel: reference.label, elements };
     }
 
     /**

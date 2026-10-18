@@ -16,6 +16,7 @@ import {
     calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides } from './orbital-elements.js';
 import { IStateDependencies } from '../interfaces.js';
 import { DwarfPlanet } from './dwarf-planet';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -53,17 +54,14 @@ export class Pluto extends DwarfPlanet {
 
         // Pluto's orbit is highly eccentric (it crosses inside Neptune's orbit near perihelion)
         // and inclined 17° out of the ecliptic, so it is built from real orbital elements.
-        const trajectory = planetOrbitFromElements(
-            {
-                perihelion: PLUTO_PERIHELION_DIST,
-                aphelion: PLUTO_APHELION_DIST,
-                inclinationDeg: PLUTO_INCLINATION,
-                longitudeAscendingNodeDeg: PLUTO_LONG_ASC_NODE,
-                argumentOfPeriapsisDeg: PLUTO_ARG_PERIHELION,
-            },
-            trueAnomaly,
-            gEff * SUN_MASS
+        const orbitElements = orbitElementsFromApsides(
+            PLUTO_PERIHELION_DIST,
+            PLUTO_APHELION_DIST,
+            PLUTO_INCLINATION,
+            PLUTO_LONG_ASC_NODE,
+            PLUTO_ARG_PERIHELION
         );
+        const trajectory = planetOrbitFromElements(orbitElements, trueAnomaly, gEff * SUN_MASS);
 
         const texture = getBodyTexture('pluto.jpg');
         const geometry = buildBodySphereGeometry(PLUTO_RADIUS);
@@ -84,6 +82,7 @@ export class Pluto extends DwarfPlanet {
             radius: PLUTO_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: orbitElements,
             bodySubtype: PlanetTypeEnum.Terrestrial,
             trailColor: 0xddbb99,
             maxTrail: 20000,

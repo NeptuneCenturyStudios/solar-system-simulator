@@ -141,6 +141,33 @@ export function formatPressure(bar: number): string {
     return `${trimNumber(bar * 1e6, bar >= 1e-5 ? 0 : 2)} µbar`;
 }
 
+/**
+ * Format a sim-space orbital distance as AU, always.
+ *
+ * Distinct from {@link formatDistance} on purpose: that one falls back to kilometres below
+ * Earth's orbit, which reads badly for orbital elements — Mercury's semi-major axis would print
+ * as "57,909,227 km" instead of "0.387 AU". Extra decimals are kept for small orbits so the
+ * inner planets stay distinguishable.
+ */
+export function formatAU(simDist: number): string {
+    if (!Number.isFinite(simDist)) return '—';
+    const au = simDistanceToKm(simDist) / ASTRONOMICAL_UNIT_KM;
+    const decimals = Math.abs(au) >= 10 ? 2 : Math.abs(au) >= 1 ? 3 : 4;
+    return `${trimNumber(au, decimals)} AU`;
+}
+
+/** Format an angle in degrees, e.g. "7.005°". */
+export function formatAngleDeg(degrees: number): string {
+    if (!Number.isFinite(degrees)) return '—';
+    return `${trimNumber(degrees, 2)}°`;
+}
+
+/** Format an orbital eccentricity, e.g. "0.2056" or "0" for a circular orbit. */
+export function formatEccentricity(eccentricity: number): string {
+    if (!Number.isFinite(eccentricity)) return '—';
+    return trimNumber(eccentricity, 4);
+}
+
 /** Round to `maxDecimals` and strip trailing zeros (e.g. "0.50" → "0.5", "100.00" → "100"). */
 function trimNumber(value: number, maxDecimals: number): string {
     if (!Number.isFinite(value)) return '—';

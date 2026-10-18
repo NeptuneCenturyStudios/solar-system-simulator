@@ -22,6 +22,7 @@ import {
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides } from './orbital-elements.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
@@ -58,17 +59,14 @@ export class Mercury extends Planet {
         // Mercury has the most eccentric orbit of the eight planets (e ≈ 0.206) and rides 7° out of
         // the ecliptic, so both departures from a flat circle are real and worth modelling: the
         // Sun distance swings by 52% over the 88-day year.
-        const trajectory = planetOrbitFromElements(
-            {
-                perihelion: MERCURY_PERIHELION_DIST,
-                aphelion: MERCURY_APHELION_DIST,
-                inclinationDeg: MERCURY_INCLINATION,
-                longitudeAscendingNodeDeg: MERCURY_LONG_ASC_NODE,
-                argumentOfPeriapsisDeg: MERCURY_ARG_PERIHELION,
-            },
-            trueAnomaly,
-            gEff * SUN_MASS
+        const orbitElements = orbitElementsFromApsides(
+            MERCURY_PERIHELION_DIST,
+            MERCURY_APHELION_DIST,
+            MERCURY_INCLINATION,
+            MERCURY_LONG_ASC_NODE,
+            MERCURY_ARG_PERIHELION
         );
+        const trajectory = planetOrbitFromElements(orbitElements, trueAnomaly, gEff * SUN_MASS);
 
         const texture = getBodyTexture('mercury.jpg');
         const geometry = buildBodySphereGeometry(MERCURY_RADIUS);
@@ -89,6 +87,7 @@ export class Mercury extends Planet {
             radius: MERCURY_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: orbitElements,
             rotation: {
                 tilt: MERCURY_AXIS,
                 speed: rotSpeed,
