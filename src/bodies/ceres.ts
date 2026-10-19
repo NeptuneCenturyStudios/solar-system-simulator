@@ -1,11 +1,17 @@
 import * as THREE from 'three';
 
-import { calculateTrajectory } from '../physics/physics.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
+import { planetOrbitFromElements } from './planet-orbit.js';
+import { orbitElementsFromApsides } from './orbital-elements.js';
 import {
+    CERES_APHELION_DIST,
+    CERES_ARG_PERIHELION,
     CERES_AXIS,
     CERES_AZIMUTH,
     CERES_DISTANCE,
+    CERES_INCLINATION,
+    CERES_LONG_ASC_NODE,
+    CERES_PERIHELION_DIST,
     CERES_MASS,
     CERES_ORBITAL_PERIOD_REAL,
     CERES_RADIUS,
@@ -35,13 +41,22 @@ export class Ceres extends DwarfPlanet {
      * Constructs a new Ceres object with its unique properties and orbit.
      * @param dependencies State dependencies for the simulation.
      * @param scene The THREE.Scene to which Ceres belongs.
+     * @param trueAnomaly Position along the orbit in radians, measured from perihelion
+     *                    (0 = perihelion, π = aphelion).
      */
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, angleRad: number = 0) {
+    constructor(dependencies: IStateDependencies, scene: THREE.Scene, trueAnomaly: number = 0) {
         const gEff = dependencies.getG();
         const timeScale =
             CERES_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(CERES_DISTANCE, gEff, SUN_MASS);
         const rotSpeed = ((2 * Math.PI) / (9.074 * 3600)) * timeScale;
-        const trajectory = calculateTrajectory(gEff, CERES_DISTANCE, SUN_MASS, angleRad);
+        const orbitElements = orbitElementsFromApsides(
+            CERES_PERIHELION_DIST,
+            CERES_APHELION_DIST,
+            CERES_INCLINATION,
+            CERES_LONG_ASC_NODE,
+            CERES_ARG_PERIHELION
+        );
+        const trajectory = planetOrbitFromElements(orbitElements, trueAnomaly, gEff * SUN_MASS);
         const texture = getBodyTexture('ceres.jpg');
         const geometry = buildBodySphereGeometry(CERES_RADIUS);
         const material = new THREE.MeshStandardMaterial({
@@ -61,6 +76,7 @@ export class Ceres extends DwarfPlanet {
             radius: CERES_RADIUS,
             pos: trajectory.pos,
             vel: trajectory.vel,
+            referenceOrbitElements: orbitElements,
             bodySubtype: PlanetTypeEnum.Terrestrial,
             trailColor: 0xcccccc,
             maxTrail: 2000,

@@ -10,6 +10,26 @@ import {
     MOON_INCLINATION,
     MOON_LONG_ASC_NODE,
     MOON_ARG_PERIGEE,
+    IO_PERIAPSIS_DIST,
+    IO_APOAPSIS_DIST,
+    IO_INCLINATION,
+    IO_LONG_ASC_NODE,
+    IO_ARG_PERIAPSIS,
+    CALLISTO_PERIAPSIS_DIST,
+    CALLISTO_APOAPSIS_DIST,
+    CALLISTO_INCLINATION,
+    CALLISTO_LONG_ASC_NODE,
+    CALLISTO_ARG_PERIAPSIS,
+    EUROPA_PERIAPSIS_DIST,
+    EUROPA_APOAPSIS_DIST,
+    EUROPA_INCLINATION,
+    EUROPA_LONG_ASC_NODE,
+    EUROPA_ARG_PERIAPSIS,
+    GANYMEDE_PERIAPSIS_DIST,
+    GANYMEDE_APOAPSIS_DIST,
+    GANYMEDE_INCLINATION,
+    GANYMEDE_LONG_ASC_NODE,
+    GANYMEDE_ARG_PERIAPSIS,
 } from '../utilities/consts';
 
 import type { CelestialBody } from './celestial-body';
@@ -26,22 +46,85 @@ interface LocalOrbitState {
 }
 
 /**
- * Earth's real lunar orbit, ready to hand to {@link createMoon}. Values are the J2000 mean
- * elements from consts.ts: semi-major axis (perigee + apogee) / 2, eccentricity ≈ 0.0549, and
- * the Moon's 5.145° inclination to the ecliptic.
+ * Builds moon placement elements from a pair of apsides plus the three orientation angles
+ * (degrees), deriving the semi-major axis and eccentricity the same way the planets do.
+ */
+function moonOrbitElementsFromApsides(
+    periapsis: number,
+    apoapsis: number,
+    inclinationDeg: number,
+    longitudeAscendingNodeDeg: number,
+    argumentOfPeriapsisDeg: number
+): IMoonOrbitElements {
+    return {
+        semiMajorAxis: (periapsis + apoapsis) / 2,
+        eccentricity: (apoapsis - periapsis) / (apoapsis + periapsis),
+        inclinationRad: THREE.MathUtils.degToRad(inclinationDeg),
+        longitudeAscendingNodeRad: THREE.MathUtils.degToRad(longitudeAscendingNodeDeg),
+        argumentOfPeriapsisRad: THREE.MathUtils.degToRad(argumentOfPeriapsisDeg),
+    };
+}
+
+/**
+ * Earth's real lunar orbit, ready to hand to {@link createMoon}. Values are the J2000 osculating
+ * elements from consts.ts (JPL Horizons): semi-major axis (perigee + apogee) / 2, eccentricity
+ * ≈ 0.063, and the Moon's ≈5.24° inclination to the ecliptic.
  *
  * Exposed as a function rather than a frozen constant so each call site gets its own object
  * identity and nothing can mutate a shared one.
  */
 export function earthMoonOrbitElements(): IMoonOrbitElements {
-    return {
-        semiMajorAxis: (MOON_PERIGEE_DIST + MOON_APOGEE_DIST) / 2,
-        eccentricity:
-            (MOON_APOGEE_DIST - MOON_PERIGEE_DIST) / (MOON_APOGEE_DIST + MOON_PERIGEE_DIST),
-        inclinationRad: THREE.MathUtils.degToRad(MOON_INCLINATION),
-        longitudeAscendingNodeRad: THREE.MathUtils.degToRad(MOON_LONG_ASC_NODE),
-        argumentOfPeriapsisRad: THREE.MathUtils.degToRad(MOON_ARG_PERIGEE),
-    };
+    return moonOrbitElementsFromApsides(
+        MOON_PERIGEE_DIST,
+        MOON_APOGEE_DIST,
+        MOON_INCLINATION,
+        MOON_LONG_ASC_NODE,
+        MOON_ARG_PERIGEE
+    );
+}
+
+/** Io's real orbit about Jupiter (J2000 osculating elements from consts.ts, JPL Horizons). */
+export function ioOrbitElements(): IMoonOrbitElements {
+    return moonOrbitElementsFromApsides(
+        IO_PERIAPSIS_DIST,
+        IO_APOAPSIS_DIST,
+        IO_INCLINATION,
+        IO_LONG_ASC_NODE,
+        IO_ARG_PERIAPSIS
+    );
+}
+
+/** Callisto's real orbit about Jupiter (J2000 osculating elements from consts.ts, JPL Horizons). */
+export function callistoOrbitElements(): IMoonOrbitElements {
+    return moonOrbitElementsFromApsides(
+        CALLISTO_PERIAPSIS_DIST,
+        CALLISTO_APOAPSIS_DIST,
+        CALLISTO_INCLINATION,
+        CALLISTO_LONG_ASC_NODE,
+        CALLISTO_ARG_PERIAPSIS
+    );
+}
+
+/** Europa's real orbit about Jupiter (J2000 osculating elements from consts.ts, JPL Horizons). */
+export function europaOrbitElements(): IMoonOrbitElements {
+    return moonOrbitElementsFromApsides(
+        EUROPA_PERIAPSIS_DIST,
+        EUROPA_APOAPSIS_DIST,
+        EUROPA_INCLINATION,
+        EUROPA_LONG_ASC_NODE,
+        EUROPA_ARG_PERIAPSIS
+    );
+}
+
+/** Ganymede's real orbit about Jupiter (J2000 osculating elements from consts.ts, JPL Horizons). */
+export function ganymedeOrbitElements(): IMoonOrbitElements {
+    return moonOrbitElementsFromApsides(
+        GANYMEDE_PERIAPSIS_DIST,
+        GANYMEDE_APOAPSIS_DIST,
+        GANYMEDE_INCLINATION,
+        GANYMEDE_LONG_ASC_NODE,
+        GANYMEDE_ARG_PERIAPSIS
+    );
 }
 
 /**

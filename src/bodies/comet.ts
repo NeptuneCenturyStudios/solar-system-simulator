@@ -56,6 +56,7 @@ export abstract class Comet extends CelestialBody {
                 mesh: options.mesh,
                 attributes: options.attributes,
                 orbitParent: options.orbitParent,
+                referenceOrbitElements: options.referenceOrbitElements,
                 orbitBarycenterMass: options.orbitBarycenterMass,
             },
             BodyTypeEnum.Comet

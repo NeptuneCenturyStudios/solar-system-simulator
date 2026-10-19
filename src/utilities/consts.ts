@@ -45,8 +45,8 @@ export const TIME_SCALE = BASE_TIME_SCALE * USER_TIME_MULTIPLIER; // ≈ 1
 export const G = 6.6743e-20 * (MASS_SCALE / DIST_SCALE ** 3) * G_SCALE; // km^3 / kg / s^2 //
 export const C = 299792.458 / DIST_SCALE; // Speed of light
 
-// Planet data based on nasa.gov fact sheets
-// Source: https://nssdc.gsfc.nasa.gov/planetary/factsheet/
+// Body data based on JPL Horizons
+// Source: https://ssd.jpl.nasa.gov/horizons/app.html#/
 
 // === Planetary System: Mass ===
 // Masses use: (real-world mass in kg / MASS_SCALE)
@@ -113,29 +113,31 @@ export const RENDER_DISTANCE_DEFAULT_AU = 12;
 // Mercury is the most eccentric of the eight planets (e = 0.2056): its distance from the Sun
 // swings from 46.0 to 69.8 million km over an 88-day year, a 52% change, and its orbit rides
 // 7.0° above and below the ecliptic. A flat circle hides both of those.
-// MERCURY_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
-export const MERCURY_PERIHELION_DIST = 46000000 / DIST_SCALE; // 0.3075 AU
-export const MERCURY_APHELION_DIST = 69818000 / DIST_SCALE; // 0.4667 AU
-export const MERCURY_INCLINATION = 7.00487; // degrees, relative to the ecliptic
-export const MERCURY_LONG_ASC_NODE = 48.33167; // degrees, longitude of the ascending node (Ω)
-export const MERCURY_ARG_PERIHELION = 29.12478; // degrees, argument of perihelion (ω)
-// ω is derived, not published: the fact sheet gives longitude of perihelion (77.45645°) and
-// longitude of the ascending node, and ω = ϖ − Ω. Real mean longitude at epoch is 252.25084°,
-// but the generator places Mercury at a random true anomaly instead, matching how the other
-// planets and Halley are seeded.
+// These are JPL Horizons (Mercury 199, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+// MERCURY_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2 to within
+// 0.001%.
+export const MERCURY_PERIHELION_DIST = 46001210 / DIST_SCALE; // 46,001,210 km (0.3075 AU)
+export const MERCURY_APHELION_DIST = 69816927 / DIST_SCALE; // 69,816,927 km (0.4667 AU)
+export const MERCURY_INCLINATION = 7.005014; // degrees, relative to the ecliptic
+export const MERCURY_LONG_ASC_NODE = 48.330539; // degrees, longitude of the ascending node (Ω)
+export const MERCURY_ARG_PERIHELION = 29.124282; // degrees, argument of perihelion (ω)
+export const MERCURY_MEAN_ANOMALY_J2000 = 174.795883; // degrees
 
 // === Venus: Orbital Elements (J2000) ===
 // Venus has the roundest orbit of any planet (e = 0.0068, only 3.4° out of the ecliptic), so a
 // circle would nearly do — but "nearly" is still a 1.46 million km variation in Sun distance,
 // and the node and perihelion directions point where they really point.
-// VENUS_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
-export const VENUS_PERIHELION_DIST = 107480000 / DIST_SCALE; // 0.7185 AU
-export const VENUS_APHELION_DIST = 108941000 / DIST_SCALE; // 0.7282 AU
-export const VENUS_INCLINATION = 3.39471; // degrees, relative to the ecliptic
-export const VENUS_LONG_ASC_NODE = 76.68069; // degrees, longitude of the ascending node (Ω)
-export const VENUS_ARG_PERIHELION = 54.85229; // degrees, argument of perihelion (ω)
-// Real mean longitude at epoch is 181.97973°, but the generator places Venus at a random true
-// anomaly instead, matching how the other planets and Halley are seeded.
+// These are JPL Horizons (Venus 299, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+// VENUS_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2 to within
+// 0.002%.
+export const VENUS_PERIHELION_DIST = 107477137 / DIST_SCALE; // 107,477,137 km (0.7184 AU)
+export const VENUS_APHELION_DIST = 108939199 / DIST_SCALE; // 108,939,199 km (e ≈ 0.00676)
+export const VENUS_INCLINATION = 3.39459; // degrees, relative to the ecliptic
+export const VENUS_LONG_ASC_NODE = 76.678374; // degrees, longitude of the ascending node (Ω)
+export const VENUS_ARG_PERIHELION = 55.185967; // degrees, argument of perihelion (ω)
+export const VENUS_MEAN_ANOMALY_J2000 = 50.114772; // degrees
 
 // === Earth: Orbital Elements (J2000) ===
 // Earth's orbit is the least exotic of all: nearly circular (e ≈ 0.0167) and lying in the
@@ -145,125 +147,203 @@ export const VENUS_ARG_PERIHELION = 54.85229; // degrees, argument of perihelion
 // wrong are both real: the small eccentricity makes the Sun distance vary by ~1.7% over the
 // year (perihelion in early January, aphelion in early July), and the argument of perihelion
 // points that ellipse the correct way round the ecliptic.
-// EARTH_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
-export const EARTH_PERIHELION_DIST = 147095000 / DIST_SCALE; // 0.98329 AU
-export const EARTH_APHELION_DIST = 152100000 / DIST_SCALE; // 1.01671 AU
-// Earth defines the ecliptic, so its inclination to it is zero by definition. The fact sheet's
-// J2000 mean elements quote 0.00005°, the residual measured against the J2000 *mean* ecliptic —
-// numerically indistinguishable from zero, and using it would tilt Earth a hair out of the very
-// plane the other planets share.
+// These are JPL Horizons (Earth 399, Sun-centred, J2000 ecliptic) osculating elements at exactly
+// J2000 (JD 2451545.0 TDB). Body-centre elements wobble with the Moon (Earth's centre circles the
+// Earth–Moon barycentre monthly), so the perihelion and aphelion differ from the long-run
+// fact-sheet values by up to ~0.1%.
+// EARTH_DIST above is the long-run mean semi-major axis (it keys the time scale to the real
+// period); the osculating one here, (perihelion + aphelion) / 2 = 1.0004 AU, is very slightly larger.
+export const EARTH_PERIHELION_DIST = 147102955 / DIST_SCALE; // 147,102,955 km (0.98332 AU)
+export const EARTH_APHELION_DIST = 152227074 / DIST_SCALE; // 152,227,074 km (1.01758 AU)
+// Earth defines the ecliptic, so its inclination to it is zero by definition. Horizons reports
+// 0.0004° at J2000 (the Moon's wobble) — numerically indistinguishable from zero, and using it
+// would tilt Earth a hair out of the very plane the other planets share.
 export const EARTH_INCLINATION = 0;
+// With zero inclination Ω has no meaning (Horizons' own Ω swings by degrees from one minute to
+// the next), and only the longitude of perihelion ϖ = Ω + ω matters: 101.8089° at J2000. Ω keeps
+// its fact-sheet value and ω is set so that Ω + ω = ϖ.
 export const EARTH_LONG_ASC_NODE = -11.26064; // degrees, longitude of the ascending node (Ω)
-export const EARTH_ARG_PERIHELION = 114.20783; // degrees, argument of perihelion (ω)
-// Real mean longitude at epoch is 100.464°, but the generator places Earth at a random true
-// anomaly instead, matching how the other planets, Neptune, Pluto and Halley are seeded.
+export const EARTH_ARG_PERIHELION = 113.069577; // degrees, argument of perihelion (ω)
+export const EARTH_MEAN_ANOMALY_J2000 = 358.617256; // degrees
 
 // === Moon: Orbital Elements (J2000, orbit about Earth) ===
 // The Moon is the one natural satellite modelled from real orbital elements, for the same
 // reason Neptune, Pluto and Earth are: a flat circle loses two things that are plainly
-// visible. The first is eccentricity — at e ≈ 0.0549 the Earth–Moon distance swings from
-// 363,300 km at perigee to 405,500 km at apogee, an 11.6% difference that also makes the
-// Moon's orbital speed vary from ≈0.97 to ≈1.08 km/s. The second is the orbital plane: the
-// Moon orbits 5.145° out of the ecliptic, so it spends half of each month north of Earth's
-// orbit plane and half south of it.
+// visible. The first is eccentricity — at J2000 e ≈ 0.063 the Earth–Moon distance swings from
+// 357,821 km at perigee to 405,997 km at apogee, a 13% difference that also makes the Moon's
+// orbital speed vary from ≈0.96 to ≈1.09 km/s. The second is the orbital plane: the Moon
+// orbits ≈5.24° out of the ecliptic, so it spends half of each month north of Earth's orbit
+// plane and half south of it.
 //
 // Note which plane it is inclined to: the *ecliptic*, not Earth's equator. That is unusual
 // among moons — most regular satellites orbit their primary's equatorial plane — and it is
 // convenient here, because this simulation's local Earth frame is already ecliptic-aligned.
 // The elements below therefore drop straight into stateVectorsFromElements() with no frame
-// rotation required. MOON_DIST_FROM_EARTH above is the semi-major axis and equals
-// (perigee + apogee) / 2.
-export const MOON_PERIGEE_DIST = 363300 / DIST_SCALE; // 363,300 km
-export const MOON_APOGEE_DIST = 405500 / DIST_SCALE; // 405,500 km (e ≈ 0.0549)
-export const MOON_INCLINATION = 5.145; // degrees, inclination to the ecliptic
-// J2000 mean longitude of the ascending node (Ω) and argument of perigee (ω). Both precess in
-// reality — the node regresses once per 18.6 years, the line of apsides rotates once per 8.85
-// years — and both are driven by the Sun's perturbation of the Moon's orbit. This simulation
-// integrates full Sun–Earth–Moon n-body gravity, so those precessions emerge from the physics
-// on their own; these values only seed the direction the orbit starts out pointing.
-export const MOON_LONG_ASC_NODE = 125.044; // degrees (Ω)
-export const MOON_ARG_PERIGEE = 318.309; // degrees (ω)
+// rotation required.
+//
+// These are JPL Horizons (Moon 301, Earth-centred body centre, J2000 ecliptic) osculating
+// elements at exactly J2000 (JD 2451545.0 TDB). They reproduce the Moon's real position at J2000
+// (ecliptic longitude ≈223.3°).
+// Osculating elements swing widely around the long-run means because of the Sun's perturbation
+// (perigee 356,000–370,000 km, e 0.03–0.08), which is why they differ from the textbook mean
+// values (363,300 / 405,500 km, e 0.0549, i 5.145°). MOON_DIST_FROM_EARTH above stays the mean
+// semi-major axis; the osculating one here, (perigee + apogee) / 2 = 381,875 km, is smaller.
+// The node regresses once per 18.6 years and the line of apsides rotates once per 8.85 years;
+// this simulation integrates full Sun–Earth–Moon n-body gravity, so those precessions emerge
+// from the physics on their own.
+export const MOON_PERIGEE_DIST = 357760 / DIST_SCALE; // 357,760 km
+export const MOON_APOGEE_DIST = 405989 / DIST_SCALE; // 405,989 km (e ≈ 0.0631)
+export const MOON_INCLINATION = 5.240273; // degrees, inclination to the ecliptic
+export const MOON_LONG_ASC_NODE = 123.958055; // degrees (Ω)
+export const MOON_ARG_PERIGEE = 308.922673; // degrees (ω)
+export const MOON_MEAN_ANOMALY_J2000 = 146.673275; // degrees
 // The Moon's rotation axis is not perpendicular to its orbital plane: the lunar equator is
 // tilted 6.687° to the orbit (Cassini's laws). Recorded for completeness — the body is tidally
 // locked and the simulation currently spins it about the orbit normal, so this tilt is not
 // applied to the geometry.
 export const MOON_OBLIQUITY = 6.687; // degrees, lunar equator to orbit
 
+// === Io: Orbital Elements (J2000, orbit about Jupiter) ===
+// JPL Horizons (Io 501, Jupiter-centred body centre, J2000 ecliptic) osculating elements at
+// exactly J2000 (JD 2451545.0 TDB, a 1-minute-step pull so no interpolation is needed), so Io
+// starts in its true place around Jupiter and the Jupiter–Io pair matches the Jupiter state taken
+// from the same epoch. The angles are measured against the ecliptic, not Jupiter's equator, which
+// is why the inclination is ≈2.2° (Jupiter's equator is tilted 3.1° to its orbit).
+//
+// Io goes round in 1.77 days, so a one-day-apart bracket is more than half an orbit wide and its
+// angles cannot be averaged; an exact-epoch row sidesteps that. (A mean-longitude interpolation
+// of the old daily rows agreed with this to 0.0015°.)
+export const IO_PERIAPSIS_DIST = 420046 / DIST_SCALE; // 420,046 km
+export const IO_APOAPSIS_DIST = 424027 / DIST_SCALE; // 424,027 km (e ≈ 0.00472)
+export const IO_INCLINATION = 2.212618; // degrees, inclination to the ecliptic
+export const IO_LONG_ASC_NODE = 336.852445; // degrees (Ω)
+export const IO_ARG_PERIAPSIS = 66.164885; // degrees (ω)
+export const IO_MEAN_ANOMALY_J2000 = 335.153206; // degrees
+
+// === Callisto: Orbital Elements (J2000, orbit about Jupiter) ===
+// JPL Horizons (Callisto 504, Jupiter-centred body centre, J2000 ecliptic) osculating elements at
+// exactly J2000 (JD 2451545.0 TDB), measured against the ecliptic like Io's (see above).
+export const CALLISTO_PERIAPSIS_DIST = 1868766 / DIST_SCALE; // 1,868,766 km
+export const CALLISTO_APOAPSIS_DIST = 1896780 / DIST_SCALE; // 1,896,780 km (e ≈ 0.00744)
+export const CALLISTO_INCLINATION = 2.016916; // degrees, inclination to the ecliptic
+export const CALLISTO_LONG_ASC_NODE = 337.94261; // degrees (Ω)
+export const CALLISTO_ARG_PERIAPSIS = 16.126895; // degrees (ω)
+export const CALLISTO_MEAN_ANOMALY_J2000 = 85.118889; // degrees
+
+// === Europa: Orbital Elements (J2000, orbit about Jupiter) ===
+// JPL Horizons (Europa 502, Jupiter-centred body centre, J2000 ecliptic) osculating elements at
+// exactly J2000 (JD 2451545.0 TDB), measured against the ecliptic like Io's (see above).
+export const EUROPA_PERIAPSIS_DIST = 664662 / DIST_SCALE; // 664,662 km
+export const EUROPA_APOAPSIS_DIST = 677835 / DIST_SCALE; // 677,835 km (e ≈ 0.00981)
+export const EUROPA_INCLINATION = 1.790971; // degrees, inclination to the ecliptic
+export const EUROPA_LONG_ASC_NODE = 332.628732; // degrees (Ω)
+export const EUROPA_ARG_PERIAPSIS = 254.647142; // degrees (ω)
+export const EUROPA_MEAN_ANOMALY_J2000 = 345.411037; // degrees
+
+// === Ganymede: Orbital Elements (J2000, orbit about Jupiter) ===
+// JPL Horizons (Ganymede 503, Jupiter-centred body centre, J2000 ecliptic) osculating elements at
+// exactly J2000 (JD 2451545.0 TDB), measured against the ecliptic like Io's (see above).
+export const GANYMEDE_PERIAPSIS_DIST = 1068938 / DIST_SCALE; // 1,068,938 km
+export const GANYMEDE_APOAPSIS_DIST = 1072057 / DIST_SCALE; // 1,072,057 km (e ≈ 0.00146)
+export const GANYMEDE_INCLINATION = 2.214148; // degrees, inclination to the ecliptic
+export const GANYMEDE_LONG_ASC_NODE = 343.172846; // degrees (Ω)
+export const GANYMEDE_ARG_PERIAPSIS = 319.807813; // degrees (ω)
+export const GANYMEDE_MEAN_ANOMALY_J2000 = 277.048768; // degrees
+
 // === Mars: Orbital Elements (J2000) ===
-// Mars's orbit is noticeably oval (e = 0.0935): the Sun distance ranges from 206.7 to 249.3
+// Mars's orbit is noticeably oval (e = 0.0933): the Sun distance ranges from 206.7 to 249.3
 // million km over a 687-day year, which is what drives the planet's seasons, and the orbital
 // plane is tilted 1.85° to the ecliptic.
-// MARS_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
-export const MARS_PERIHELION_DIST = 206650000 / DIST_SCALE; // 1.3814 AU
-export const MARS_APHELION_DIST = 249261000 / DIST_SCALE; // 1.6662 AU
-export const MARS_INCLINATION = 1.85061; // degrees, relative to the ecliptic
-export const MARS_LONG_ASC_NODE = 49.57854; // degrees, longitude of the ascending node (Ω)
-export const MARS_ARG_PERIHELION = 286.4623; // degrees, argument of perihelion (ω)
-// Real mean longitude at epoch is 355.45332°, but the generator places Mars at a random true
-// anomaly instead, matching how the other planets and Halley are seeded.
+// These are JPL Horizons (Mars 499, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+// MARS_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2 to within 0.01%.
+export const MARS_PERIHELION_DIST = 206668970 / DIST_SCALE; // 206,668,970 km (1.3815 AU)
+export const MARS_APHELION_DIST = 249209296 / DIST_SCALE; // 249,209,296 km (e ≈ 0.09332)
+export const MARS_INCLINATION = 1.849876; // degrees, relative to the ecliptic
+export const MARS_LONG_ASC_NODE = 49.562006; // degrees, longitude of the ascending node (Ω)
+export const MARS_ARG_PERIHELION = 286.537383; // degrees, argument of perihelion (ω)
+export const MARS_MEAN_ANOMALY_J2000 = 19.356483; // degrees
 
 // === Jupiter: Orbital Elements (J2000) ===
-// Jupiter's eccentricity is small (e = 0.0484), but the orbit is so vast that it still moves the
-// Sun distance by 75.8 million km between perihelion and aphelion, and the plane sits 1.31° off
+// Jupiter's eccentricity is small (e = 0.0488), but the orbit is so vast that it still moves the
+// Sun distance by 76.0 million km between perihelion and aphelion, and the plane sits 1.31° off
 // the ecliptic. Both are real, so both are modelled.
-// JUPITER_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
-export const JUPITER_PERIHELION_DIST = 740595000 / DIST_SCALE; // 4.9506 AU
-export const JUPITER_APHELION_DIST = 816363000 / DIST_SCALE; // 5.4570 AU
-export const JUPITER_INCLINATION = 1.3053; // degrees, relative to the ecliptic
-export const JUPITER_LONG_ASC_NODE = 100.55615; // degrees, longitude of the ascending node (Ω)
-export const JUPITER_ARG_PERIHELION = 274.1977; // degrees, argument of perihelion (ω)
-// Real mean longitude at epoch is 34.40438°, but the generator places Jupiter at a random true
-// anomaly instead, matching how the other planets and Halley are seeded.
+// These are JPL Horizons (Jupiter 599, Sun-centred, J2000 ecliptic) osculating elements at exactly
+// J2000 (JD 2451545.0 TDB). JUPITER_DIST above is Jupiter's long-run mean semi-major axis (it keys
+// the time scale to the real period); the osculating one here, (perihelion + aphelion) / 2 =
+// 5.204 AU, is slightly different. Body-centre elements wobble with the Galilean moons, which are
+// now placed from their own J2000 states, so the pair stays consistent.
+export const JUPITER_PERIHELION_DIST = 740573663 / DIST_SCALE; // 740,573,663 km (4.9504 AU)
+export const JUPITER_APHELION_DIST = 816541569 / DIST_SCALE; // 816,541,569 km (e ≈ 0.04879)
+export const JUPITER_INCLINATION = 1.304631; // degrees, relative to the ecliptic
+export const JUPITER_LONG_ASC_NODE = 100.49115; // degrees, longitude of the ascending node (Ω)
+export const JUPITER_ARG_PERIHELION = 275.069067; // degrees, argument of perihelion (ω)
+export const JUPITER_MEAN_ANOMALY_J2000 = 18.815627; // degrees
 
 // === Saturn: Orbital Elements (J2000) ===
-// Saturn's orbit is the most eccentric of the giants (e = 0.0542) and tilted 2.48° to the
+// Saturn's orbit is the most eccentric of the giants (e = 0.0556) and tilted 2.48° to the
 // ecliptic — the largest orbital inclination of any planet bright enough to see with the naked
 // eye.
-// SATURN_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
-export const SATURN_PERIHELION_DIST = 1357554000 / DIST_SCALE; // 9.0747 AU
-export const SATURN_APHELION_DIST = 1506527000 / DIST_SCALE; // 10.0705 AU
-export const SATURN_INCLINATION = 2.48446; // degrees, relative to the ecliptic
-export const SATURN_LONG_ASC_NODE = 113.71504; // degrees, longitude of the ascending node (Ω)
-export const SATURN_ARG_PERIHELION = 338.7169; // degrees, argument of perihelion (ω)
-// Real mean longitude at epoch is 49.94432°, but the generator places Saturn at a random true
-// anomaly instead, matching how the other planets and Halley are seeded.
+// These are JPL Horizons (Saturn 699, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+// SATURN_DIST above is Saturn's long-run mean semi-major axis (it keys the time scale to the real
+// period); the osculating one here, (perihelion + aphelion) / 2 = 9.582 AU, is slightly larger.
+export const SATURN_PERIHELION_DIST = 1353682191 / DIST_SCALE; // 1,353,682,191 km (9.0488 AU)
+export const SATURN_APHELION_DIST = 1513190220 / DIST_SCALE; // 1,513,190,220 km (e ≈ 0.05564)
+export const SATURN_INCLINATION = 2.484252; // degrees, relative to the ecliptic
+export const SATURN_LONG_ASC_NODE = 113.69966; // degrees, longitude of the ascending node (Ω)
+export const SATURN_ARG_PERIHELION = 335.865594; // degrees, argument of perihelion (ω)
+export const SATURN_MEAN_ANOMALY_J2000 = 320.425557; // degrees
 
 // === Uranus: Orbital Elements (J2000) ===
-// Uranus's orbit is close to circular (e = 0.0472) and barely tilted (0.77°), but at 19 AU that
-// small eccentricity still moves the Sun distance by 269 million km over its 84-year orbit.
-// URANUS_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
-export const URANUS_PERIHELION_DIST = 2732696000 / DIST_SCALE; // 18.2669 AU
-export const URANUS_APHELION_DIST = 3001390000 / DIST_SCALE; // 20.0630 AU
-export const URANUS_INCLINATION = 0.76986; // degrees, relative to the ecliptic
-export const URANUS_LONG_ASC_NODE = 74.22988; // degrees, longitude of the ascending node (Ω)
-export const URANUS_ARG_PERIHELION = 96.73436; // degrees, argument of perihelion (ω)
-// Real mean longitude at epoch is 313.23218°, but the generator places Uranus at a random true
-// anomaly instead, matching how the other planets and Halley are seeded.
+// Uranus's orbit is close to circular (e = 0.0444) and barely tilted (0.77°), but at 19 AU that
+// small eccentricity still moves the Sun distance by 255 million km over its 84-year orbit.
+// These are JPL Horizons (Uranus 799, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+// URANUS_DIST above is Uranus's long-run mean semi-major axis (it keys the time scale to the real
+// period); the osculating one here, (perihelion + aphelion) / 2 = 19.23 AU, is slightly different.
+// Body-centre elements wobble with the moons, and Ω is poorly defined at 0.77° inclination, so Ω
+// and ω move a tenth of a degree per day (their sum ϖ + M, which fixes the position, stays put).
+export const URANUS_PERIHELION_DIST = 2749080518 / DIST_SCALE; // 2,749,080,518 km (18.3765 AU)
+export const URANUS_APHELION_DIST = 3004497768 / DIST_SCALE; // 3,004,497,768 km (e ≈ 0.04439)
+export const URANUS_INCLINATION = 0.772676; // degrees, relative to the ecliptic
+export const URANUS_LONG_ASC_NODE = 74.004746; // degrees, longitude of the ascending node (Ω)
+export const URANUS_ARG_PERIHELION = 96.588725; // degrees, argument of perihelion (ω)
+export const URANUS_MEAN_ANOMALY_J2000 = 142.889576; // degrees
 
 // === Neptune: Orbital Elements (J2000) ===
-// Neptune's orbit is far less exotic than Pluto's — eccentricity 0.0087 against Pluto's 0.25,
+// Neptune's orbit is far less exotic than Pluto's — eccentricity 0.011 against Pluto's 0.25,
 // and only 1.77° out of the ecliptic — but those two small departures are still real, and they
 // are what make Neptune's path its own rather than a perfect circle.
-// NEPTUNE_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
-export const NEPTUNE_PERIHELION_DIST = 4459500000 / DIST_SCALE; // 29.81 AU
-export const NEPTUNE_APHELION_DIST = 4537300000 / DIST_SCALE; // 30.33 AU
-export const NEPTUNE_INCLINATION = 1.77; // degrees, relative to the ecliptic
-export const NEPTUNE_LONG_ASC_NODE = 131.783; // degrees, longitude of the ascending node (Ω)
-export const NEPTUNE_ARG_PERIHELION = 273.187; // degrees, argument of perihelion (ω)
-// Real mean anomaly at epoch is 259.883°, but the generator places Neptune at a random true
-// anomaly instead, matching how the other planets, Pluto and Halley are seeded.
+// These are JPL Horizons (Neptune 899, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+// NEPTUNE_DIST above is Neptune's long-run mean semi-major axis (it keys the time scale to the
+// real period); the osculating one here, (perihelion + aphelion) / 2 = 30.09 AU, is slightly
+// larger. Body-centre elements wobble with Triton, so ω and M move a few hundredths of a degree
+// per day (their sum ϖ + M, which fixes the position, stays put).
+export const NEPTUNE_PERIHELION_DIST = 4451548601 / DIST_SCALE; // 4,451,548,601 km (29.7568 AU)
+export const NEPTUNE_APHELION_DIST = 4552424871 / DIST_SCALE; // 4,552,424,871 km (e ≈ 0.01120)
+export const NEPTUNE_INCLINATION = 1.770214; // degrees, relative to the ecliptic
+export const NEPTUNE_LONG_ASC_NODE = 131.783877; // degrees, longitude of the ascending node (Ω)
+export const NEPTUNE_ARG_PERIHELION = 267.315805; // degrees, argument of perihelion (ω)
+export const NEPTUNE_MEAN_ANOMALY_J2000 = 266.105016; // degrees
 
 // === Pluto: Orbital Elements (J2000) ===
 // Pluto's orbit is the most eccentric and most inclined of the major bodies — it crosses inside
 // Neptune's orbit near perihelion — so it is the body where real elements matter most.
-// PLUTO_DIST above is the semi-major axis and equals (perihelion + aphelion) / 2.
-export const PLUTO_PERIHELION_DIST = 4436820000 / DIST_SCALE; // 29.658 AU
-export const PLUTO_APHELION_DIST = 7375930000 / DIST_SCALE; // 49.305 AU
-export const PLUTO_INCLINATION = 17.16; // degrees, relative to the ecliptic
-export const PLUTO_LONG_ASC_NODE = 110.299; // degrees, longitude of the ascending node (Ω)
-export const PLUTO_ARG_PERIHELION = 113.834; // degrees, argument of perihelion (ω)
-// Real mean anomaly at epoch is 14.53°, but the generator places Pluto at a random true anomaly
-// instead, matching how the other planets and Halley are seeded.
+// These are JPL Horizons (Pluto 999, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+// PLUTO_DIST above is Pluto's long-run mean semi-major axis (it keys the time scale to the real
+// period); the osculating one here, (perihelion + aphelion) / 2 = 39.57 AU, is slightly larger.
+// Body-centre elements wobble with Charon (Pluto's centre circles the system barycentre every
+// 6.4 days), so e, i, Ω and ω swing noticeably from day to day (their sum ϖ + M, which fixes the
+// position, stays put).
+export const PLUTO_PERIHELION_DIST = 4443097133 / DIST_SCALE; // 4,443,097,133 km (29.7003 AU)
+export const PLUTO_APHELION_DIST = 7396455796 / DIST_SCALE; // 7,396,455,796 km (e ≈ 0.24945)
+export const PLUTO_INCLINATION = 17.235653; // degrees, relative to the ecliptic
+export const PLUTO_LONG_ASC_NODE = 110.03994; // degrees, longitude of the ascending node (Ω)
+export const PLUTO_ARG_PERIHELION = 115.178666; // degrees, argument of perihelion (ω)
+export const PLUTO_MEAN_ANOMALY_J2000 = 14.143655; // degrees
 
 // === Planetary System: Rotation Axis (degrees) ===
 export const SUN_AXIS = 7.25;
@@ -405,11 +485,49 @@ export const VESTA_RADIUS = 262.7 / RADIUS_SCALE;
 export const PALLAS_RADIUS = 256 / RADIUS_SCALE;
 export const HYGIEA_RADIUS = 215 / RADIUS_SCALE;
 
-// === Asteroids: Distance ===
-export const CERES_DISTANCE = 413700000 / DIST_SCALE;
-export const VESTA_DISTANCE = 353400000 / DIST_SCALE;
-export const PALLAS_DISTANCE = 414500000 / DIST_SCALE;
-export const HYGIEA_DISTANCE = 470300000 / DIST_SCALE;
+// === Asteroids & Halley: Orbital Elements (JPL Horizons, J2000) ===
+// Ceres, Vesta, Pallas, Hygiea and Halley use JPL Horizons osculating elements at J2000
+// (Sun-centred, J2000 ecliptic), the same epoch as the planets, taken at exactly JD 2451545.0 TDB.
+
+// Ceres uses JPL Horizons (SB: 1 Ceres, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+export const CERES_DISTANCE = 413861914 / DIST_SCALE; // semi-major axis (413,861,914 km)
+export const CERES_PERIHELION_DIST = 381425227 / DIST_SCALE; // 381,425,227 km
+export const CERES_APHELION_DIST = 446298601 / DIST_SCALE; // 446,298,601 km (e ≈ 0.07838)
+export const CERES_INCLINATION = 10.58336; // degrees
+export const CERES_LONG_ASC_NODE = 80.494357; // degrees (Ω)
+export const CERES_ARG_PERIHELION = 73.922863; // degrees (ω)
+export const CERES_MEAN_ANOMALY_J2000 = 6.176655; // degrees
+
+// Vesta uses JPL Horizons (SB: 4 Vesta, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+export const VESTA_DISTANCE = 353280598 / DIST_SCALE; // semi-major axis (353,280,598 km)
+export const VESTA_PERIHELION_DIST = 321477414 / DIST_SCALE; // 321,477,414 km
+export const VESTA_APHELION_DIST = 385083781 / DIST_SCALE; // 385,083,781 km (e ≈ 0.09002)
+export const VESTA_INCLINATION = 7.133936; // degrees
+export const VESTA_LONG_ASC_NODE = 103.951437; // degrees (Ω)
+export const VESTA_ARG_PERIHELION = 149.586668; // degrees (ω)
+export const VESTA_MEAN_ANOMALY_J2000 = 341.023834; // degrees
+
+// Pallas uses JPL Horizons (SB: 2 Pallas, Sun-centred, J2000 ecliptic) osculating elements at J2000
+// directly, at exactly JD 2451545.0 TDB.
+export const PALLAS_DISTANCE = 414733539 / DIST_SCALE; // semi-major axis (414,733,539 km)
+export const PALLAS_PERIHELION_DIST = 319492664 / DIST_SCALE; // 319,492,664 km
+export const PALLAS_APHELION_DIST = 509974414 / DIST_SCALE; // 509,974,414 km (e ≈ 0.22964)
+export const PALLAS_INCLINATION = 34.84614; // degrees
+export const PALLAS_LONG_ASC_NODE = 173.197799; // degrees (Ω)
+export const PALLAS_ARG_PERIHELION = 310.265638; // degrees (ω)
+export const PALLAS_MEAN_ANOMALY_J2000 = 352.960286; // degrees
+
+// Hygiea uses JPL Horizons (SB: 10 Hygiea, Sun-centred, J2000 ecliptic) osculating elements at
+// J2000 directly, at exactly JD 2451545.0 TDB.
+export const HYGIEA_DISTANCE = 469501148 / DIST_SCALE; // semi-major axis (469,501,148 km)
+export const HYGIEA_PERIHELION_DIST = 413412290 / DIST_SCALE; // 413,412,290 km
+export const HYGIEA_APHELION_DIST = 525590005 / DIST_SCALE; // 525,590,005 km (e ≈ 0.11946)
+export const HYGIEA_INCLINATION = 3.842651; // degrees
+export const HYGIEA_LONG_ASC_NODE = 283.663205; // degrees (Ω)
+export const HYGIEA_ARG_PERIHELION = 314.368234; // degrees (ω)
+export const HYGIEA_MEAN_ANOMALY_J2000 = 339.214814; // degrees
 
 // == Asteroids: Axial Tilt ===
 export const CERES_AXIS = 4.0;
@@ -421,8 +539,14 @@ export const CERES_ORBITAL_PERIOD_REAL = 1682.0 * 24 * 3600; // ~4.607 Earth yea
 // Halley's Comet: 2.2e14 kg
 export const COMET_MASS = 2.2e14 / MASS_SCALE;
 export const COMET_RADIUS = 11 / RADIUS_SCALE;
-export const COMET_PERIHELION_DIST = 88000000 / DIST_SCALE;
-export const COMET_APHELION_DIST = 5250000000 / DIST_SCALE;
+// Orbit: Horizons SB: 1P/Halley. Retrograde (i > 90°). Osculating, so the semi-major axis
+// (17.9 AU) and aphelion (35.3 AU) differ slightly from the long-run mean values.
+export const COMET_PERIHELION_DIST = 87749221 / DIST_SCALE; // 87,749,221 km (0.5866 AU)
+export const COMET_APHELION_DIST = 5274289477 / DIST_SCALE; // 5,274,289,477 km (e ≈ 0.96727)
+export const COMET_INCLINATION = 162.196043; // degrees
+export const COMET_LONG_ASC_NODE = 59.507865; // degrees (Ω)
+export const COMET_ARG_PERIHELION = 112.449622; // degrees (ω)
+export const COMET_MEAN_ANOMALY_J2000 = 65.848901; // degrees
 
 /** Camera distance (u) at which the warp tunnel is still fully opaque. */
 export const WARP_FULL_VIS_DIST = 50;

@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import type { Body } from '../bodies/body';
 import { SolarSystemGenerator } from './solar-system-generator';
 
-import { calculateTrajectory } from '../physics/physics';
-
 import { Halley } from '../bodies/halley';
 import { Sun } from '../bodies/sun';
 import { Mercury } from '../bodies/mercury';
@@ -22,7 +20,14 @@ import { AsteroidPocked } from '../bodies/asteroid-pocked';
 
 import { createSatellite } from '../utilities/utilities';
 import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
-import { createMoon, earthMoonOrbitElements } from '../bodies/create-moon';
+import {
+    callistoOrbitElements,
+    createMoon,
+    earthMoonOrbitElements,
+    europaOrbitElements,
+    ganymedeOrbitElements,
+    ioOrbitElements,
+} from '../bodies/create-moon';
 import { KuiperBelt } from '../features/kuiper-belt';
 
 import {
@@ -35,27 +40,92 @@ import {
     ISS_RADIUS,
     ISS_INCLINATION,
     IO_MASS,
+    IO_PERIAPSIS_DIST,
+    IO_APOAPSIS_DIST,
+    IO_MEAN_ANOMALY_J2000,
     IO_DIST_FROM_JUPITER,
     IO_RADIUS,
     EUROPA_MASS,
+    EUROPA_PERIAPSIS_DIST,
+    EUROPA_APOAPSIS_DIST,
+    EUROPA_MEAN_ANOMALY_J2000,
     EUROPA_DIST_FROM_JUPITER,
     EUROPA_RADIUS,
     GANYMEDE_MASS,
+    GANYMEDE_PERIAPSIS_DIST,
+    GANYMEDE_APOAPSIS_DIST,
+    GANYMEDE_MEAN_ANOMALY_J2000,
     GANYMEDE_DIST_FROM_JUPITER,
     GANYMEDE_RADIUS,
     CALLISTO_MASS,
+    CALLISTO_PERIAPSIS_DIST,
+    CALLISTO_APOAPSIS_DIST,
+    CALLISTO_MEAN_ANOMALY_J2000,
     CALLISTO_DIST_FROM_JUPITER,
     CALLISTO_RADIUS,
     VESTA_MASS,
-    VESTA_DISTANCE,
     VESTA_RADIUS,
     PALLAS_MASS,
-    PALLAS_DISTANCE,
     PALLAS_RADIUS,
     HYGIEA_MASS,
-    HYGIEA_DISTANCE,
     HYGIEA_RADIUS,
+    MERCURY_PERIHELION_DIST,
+    MERCURY_APHELION_DIST,
+    MERCURY_MEAN_ANOMALY_J2000,
+    VENUS_PERIHELION_DIST,
+    VENUS_APHELION_DIST,
+    VENUS_MEAN_ANOMALY_J2000,
+    EARTH_PERIHELION_DIST,
+    EARTH_APHELION_DIST,
+    EARTH_MEAN_ANOMALY_J2000,
+    MOON_PERIGEE_DIST,
+    MOON_APOGEE_DIST,
+    MOON_MEAN_ANOMALY_J2000,
+    MARS_PERIHELION_DIST,
+    MARS_APHELION_DIST,
+    MARS_MEAN_ANOMALY_J2000,
+    JUPITER_PERIHELION_DIST,
+    JUPITER_APHELION_DIST,
+    JUPITER_MEAN_ANOMALY_J2000,
+    SATURN_PERIHELION_DIST,
+    SATURN_APHELION_DIST,
+    SATURN_MEAN_ANOMALY_J2000,
+    URANUS_PERIHELION_DIST,
+    URANUS_APHELION_DIST,
+    URANUS_MEAN_ANOMALY_J2000,
+    NEPTUNE_PERIHELION_DIST,
+    NEPTUNE_APHELION_DIST,
+    NEPTUNE_MEAN_ANOMALY_J2000,
+    PLUTO_PERIHELION_DIST,
+    PLUTO_APHELION_DIST,
+    PLUTO_MEAN_ANOMALY_J2000,
+    CERES_PERIHELION_DIST,
+    CERES_APHELION_DIST,
+    CERES_MEAN_ANOMALY_J2000,
+    VESTA_PERIHELION_DIST,
+    VESTA_APHELION_DIST,
+    VESTA_INCLINATION,
+    VESTA_LONG_ASC_NODE,
+    VESTA_ARG_PERIHELION,
+    VESTA_MEAN_ANOMALY_J2000,
+    PALLAS_PERIHELION_DIST,
+    PALLAS_APHELION_DIST,
+    PALLAS_INCLINATION,
+    PALLAS_LONG_ASC_NODE,
+    PALLAS_ARG_PERIHELION,
+    PALLAS_MEAN_ANOMALY_J2000,
+    HYGIEA_PERIHELION_DIST,
+    HYGIEA_APHELION_DIST,
+    HYGIEA_INCLINATION,
+    HYGIEA_LONG_ASC_NODE,
+    HYGIEA_ARG_PERIHELION,
+    HYGIEA_MEAN_ANOMALY_J2000,
+    COMET_PERIHELION_DIST,
+    COMET_APHELION_DIST,
+    COMET_MEAN_ANOMALY_J2000,
 } from '../utilities/consts';
+import { planetOrbitFromElements, trueAnomalyFromApsides } from '../bodies/planet-orbit';
+import { orbitElementsFromApsides } from '../bodies/orbital-elements';
 import { MoonTypeEnum } from '../bodies/body-enums';
 import {
     AtmosphericGasEnum,
@@ -79,6 +149,34 @@ import type {
 } from './procedural-generation-progress';
 
 export class NormalSolarSystemGenerator extends SolarSystemGenerator {
+    /**
+     * State vectors and reference elements for a small body on its real orbit, placed at the
+     * true anomaly that its J2000 mean anomaly corresponds to.
+     */
+    private j2000Orbit(
+        perihelion: number,
+        aphelion: number,
+        inclinationDeg: number,
+        longitudeAscendingNodeDeg: number,
+        argumentOfPeriapsisDeg: number,
+        meanAnomalyDeg: number
+    ) {
+        const elements = orbitElementsFromApsides(
+            perihelion,
+            aphelion,
+            inclinationDeg,
+            longitudeAscendingNodeDeg,
+            argumentOfPeriapsisDeg
+        );
+        const trueAnomaly = trueAnomalyFromApsides(meanAnomalyDeg, perihelion, aphelion);
+        const { pos, vel } = planetOrbitFromElements(
+            elements,
+            trueAnomaly,
+            this.dependencies.getG() * SUN_MASS
+        );
+        return { elements, pos, vel };
+    }
+
     private readonly dependencies: IStateDependencies;
     private readonly scene: THREE.Scene;
 
@@ -120,7 +218,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Mercury
-        const mercury = new Mercury(this.dependencies, this.scene, randomAngle());
+        const mercury = new Mercury(
+            this.dependencies,
+            this.scene,
+            trueAnomalyFromApsides(
+                MERCURY_MEAN_ANOMALY_J2000,
+                MERCURY_PERIHELION_DIST,
+                MERCURY_APHELION_DIST
+            )
+        );
         mercury.orbitParent = sun;
         bodies.push(mercury);
         completed++;
@@ -128,15 +234,27 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Venus
-        const venus = new Venus(this.dependencies, this.scene, randomAngle());
+        const venus = new Venus(
+            this.dependencies,
+            this.scene,
+            trueAnomalyFromApsides(
+                VENUS_MEAN_ANOMALY_J2000,
+                VENUS_PERIHELION_DIST,
+                VENUS_APHELION_DIST
+            )
+        );
         venus.orbitParent = sun;
         bodies.push(venus);
         completed++;
         report({ phase: 'planets', label: `Venus ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Earth (+ Moon) — random true anomaly preserves the slightly eccentric orbit shape
-        const earthTrueAnomaly = randomAngle();
+        // Earth (+ Moon) — placed at its J2000 position
+        const earthTrueAnomaly = trueAnomalyFromApsides(
+            EARTH_MEAN_ANOMALY_J2000,
+            EARTH_PERIHELION_DIST,
+            EARTH_APHELION_DIST
+        );
         const earth = new Earth(this.dependencies, this.scene, earthTrueAnomaly);
         earth.orbitParent = sun;
         bodies.push(earth);
@@ -144,8 +262,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         report({ phase: 'planets', label: `Earth ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Moon — real J2000 orbital elements (eccentric, inclined 5.145° to the ecliptic) with a
-        // random true anomaly to seed where in the ellipse it starts.
+        // Moon — real J2000 orbital elements (eccentric, inclined 5.145° to the ecliptic), placed
+        // at its J2000 position in the ellipse.
         bodies.push(
             createMoon(earth, this.scene, {
                 distance: MOON_DIST_FROM_EARTH,
@@ -159,7 +277,11 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 maxTrail: 1500,
                 texture: moonTexture,
                 moonType: MoonTypeEnum.Terrestrial,
-                angle: randomAngle(),
+                angle: trueAnomalyFromApsides(
+                    MOON_MEAN_ANOMALY_J2000,
+                    MOON_PERIGEE_DIST,
+                    MOON_APOGEE_DIST
+                ),
                 orbitElements: earthMoonOrbitElements(),
                 attributes: {
                     surfacePressure: { discovered: true },
@@ -207,16 +329,31 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Mars
-        const mars = new Mars(this.dependencies, this.scene, randomAngle());
+        const mars = new Mars(
+            this.dependencies,
+            this.scene,
+            trueAnomalyFromApsides(
+                MARS_MEAN_ANOMALY_J2000,
+                MARS_PERIHELION_DIST,
+                MARS_APHELION_DIST
+            )
+        );
         mars.orbitParent = sun;
         bodies.push(mars);
         completed++;
         report({ phase: 'planets', label: `Mars ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Ceres (~2.77 AU)
-        const ceresAngle = randomAngle();
-        const ceres = new Ceres(this.dependencies, this.scene, ceresAngle);
+        // Ceres (~2.77 AU) — placed at its J2000 position
+        const ceres = new Ceres(
+            this.dependencies,
+            this.scene,
+            trueAnomalyFromApsides(
+                CERES_MEAN_ANOMALY_J2000,
+                CERES_PERIHELION_DIST,
+                CERES_APHELION_DIST
+            )
+        );
         ceres.orbitParent = sun;
         bodies.push(ceres);
         completed++;
@@ -224,21 +361,19 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Vesta (~2.36 AU)
-        const vestaAngle = randomAngle();
-        const vestaTrajectory = calculateTrajectory(
-            this.dependencies.getG(),
-            VESTA_DISTANCE,
-            SUN_MASS,
-            vestaAngle
+        const vestaOrbit = this.j2000Orbit(
+            VESTA_PERIHELION_DIST,
+            VESTA_APHELION_DIST,
+            VESTA_INCLINATION,
+            VESTA_LONG_ASC_NODE,
+            VESTA_ARG_PERIHELION,
+            VESTA_MEAN_ANOMALY_J2000
         );
         const vesta = new Vesta(this.dependencies, this.scene, {
             radius: VESTA_RADIUS,
-            pos: new THREE.Vector3(
-                vestaTrajectory.pos.x,
-                (Math.random() - 0.5) * 1639,
-                vestaTrajectory.pos.z
-            ),
-            vel: new THREE.Vector3(vestaTrajectory.vel.x, 0, vestaTrajectory.vel.z),
+            pos: vestaOrbit.pos,
+            vel: vestaOrbit.vel,
+            referenceOrbitElements: vestaOrbit.elements,
             mass: VESTA_MASS,
             id: 'vesta',
             name: 'Vesta',
@@ -270,21 +405,19 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Pallas (~2.77 AU)
-        const pallasAngle = randomAngle();
-        const pallasTrajectory = calculateTrajectory(
-            this.dependencies.getG(),
-            PALLAS_DISTANCE,
-            SUN_MASS,
-            pallasAngle
+        const pallasOrbit = this.j2000Orbit(
+            PALLAS_PERIHELION_DIST,
+            PALLAS_APHELION_DIST,
+            PALLAS_INCLINATION,
+            PALLAS_LONG_ASC_NODE,
+            PALLAS_ARG_PERIHELION,
+            PALLAS_MEAN_ANOMALY_J2000
         );
         const pallas = new Asteroid(this.dependencies, this.scene, {
             radius: PALLAS_RADIUS,
-            pos: new THREE.Vector3(
-                pallasTrajectory.pos.x,
-                (Math.random() - 0.5) * 2185,
-                pallasTrajectory.pos.z
-            ),
-            vel: new THREE.Vector3(pallasTrajectory.vel.x, 0, pallasTrajectory.vel.z),
+            pos: pallasOrbit.pos,
+            vel: pallasOrbit.vel,
+            referenceOrbitElements: pallasOrbit.elements,
             mass: PALLAS_MASS,
             id: 'pallas',
             name: 'Pallas',
@@ -316,21 +449,19 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Hygiea (~3.14 AU)
-        const hygieaAngle = randomAngle();
-        const hygieaTrajectory = calculateTrajectory(
-            this.dependencies.getG(),
-            HYGIEA_DISTANCE,
-            SUN_MASS,
-            hygieaAngle
+        const hygieaOrbit = this.j2000Orbit(
+            HYGIEA_PERIHELION_DIST,
+            HYGIEA_APHELION_DIST,
+            HYGIEA_INCLINATION,
+            HYGIEA_LONG_ASC_NODE,
+            HYGIEA_ARG_PERIHELION,
+            HYGIEA_MEAN_ANOMALY_J2000
         );
         const hygiea = new AsteroidPocked(this.dependencies, this.scene, {
             radius: HYGIEA_RADIUS,
-            pos: new THREE.Vector3(
-                hygieaTrajectory.pos.x,
-                (Math.random() - 0.5) * 1093,
-                hygieaTrajectory.pos.z
-            ),
-            vel: new THREE.Vector3(hygieaTrajectory.vel.x, 0, hygieaTrajectory.vel.z),
+            pos: hygieaOrbit.pos,
+            vel: hygieaOrbit.vel,
+            referenceOrbitElements: hygieaOrbit.elements,
             mass: HYGIEA_MASS,
             id: 'hygiea',
             name: 'Hygiea',
@@ -363,7 +494,11 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Jupiter (+ 4 Galilean moons)
-        const jupiterAngle = randomAngle();
+        const jupiterAngle = trueAnomalyFromApsides(
+            JUPITER_MEAN_ANOMALY_J2000,
+            JUPITER_PERIHELION_DIST,
+            JUPITER_APHELION_DIST
+        );
         const jupiter = new Jupiter(this.dependencies, this.scene, jupiterAngle);
         jupiter.orbitParent = sun;
         bodies.push(jupiter);
@@ -371,10 +506,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         report({ phase: 'planets', label: `Jupiter ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Jovian moons each get their own random angle around Jupiter
+        // The four Galilean moons sit on their real J2000 orbits around Jupiter
         bodies.push(
             createMoon(jupiter, this.scene, {
-                angle: randomAngle(),
+                angle: trueAnomalyFromApsides(
+                    IO_MEAN_ANOMALY_J2000,
+                    IO_PERIAPSIS_DIST,
+                    IO_APOAPSIS_DIST
+                ),
+                orbitElements: ioOrbitElements(),
                 distance: IO_DIST_FROM_JUPITER,
                 radius: IO_RADIUS,
                 pos: new THREE.Vector3(0, 0, 0), // Will be overridden
@@ -384,7 +524,6 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 name: 'Io',
                 trailColor: 0xffdd77,
                 maxTrail: 800,
-                yVariation: 109,
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: ioTexture,
                 attributes: {
@@ -417,7 +556,12 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         bodies.push(
             createMoon(jupiter, this.scene, {
-                angle: randomAngle(),
+                angle: trueAnomalyFromApsides(
+                    EUROPA_MEAN_ANOMALY_J2000,
+                    EUROPA_PERIAPSIS_DIST,
+                    EUROPA_APOAPSIS_DIST
+                ),
+                orbitElements: europaOrbitElements(),
                 distance: EUROPA_DIST_FROM_JUPITER,
                 radius: EUROPA_RADIUS,
                 pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
@@ -427,7 +571,6 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 name: 'Europa',
                 trailColor: 0xccddee,
                 maxTrail: 1000,
-                yVariation: 164,
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: europaTexture,
                 attributes: {
@@ -454,7 +597,12 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         bodies.push(
             createMoon(jupiter, this.scene, {
-                angle: randomAngle(),
+                angle: trueAnomalyFromApsides(
+                    GANYMEDE_MEAN_ANOMALY_J2000,
+                    GANYMEDE_PERIAPSIS_DIST,
+                    GANYMEDE_APOAPSIS_DIST
+                ),
+                orbitElements: ganymedeOrbitElements(),
                 distance: GANYMEDE_DIST_FROM_JUPITER,
                 radius: GANYMEDE_RADIUS,
                 pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
@@ -464,7 +612,6 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 name: 'Ganymede',
                 trailColor: 0xcccccc,
                 maxTrail: 1200,
-                yVariation: 219,
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: ganymedeTexture,
                 attributes: {
@@ -494,7 +641,12 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
 
         bodies.push(
             createMoon(jupiter, this.scene, {
-                angle: randomAngle(),
+                angle: trueAnomalyFromApsides(
+                    CALLISTO_MEAN_ANOMALY_J2000,
+                    CALLISTO_PERIAPSIS_DIST,
+                    CALLISTO_APOAPSIS_DIST
+                ),
+                orbitElements: callistoOrbitElements(),
                 distance: CALLISTO_DIST_FROM_JUPITER,
                 radius: CALLISTO_RADIUS,
                 pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
@@ -504,7 +656,6 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
                 name: 'Callisto',
                 trailColor: 0xaa9988,
                 maxTrail: 1500,
-                yVariation: 273,
                 moonType: MoonTypeEnum.Terrestrial,
                 texture: callistoTexture,
                 attributes: {
@@ -533,7 +684,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Saturn
-        const saturn = new Saturn(this.dependencies, this.scene, randomAngle());
+        const saturn = new Saturn(
+            this.dependencies,
+            this.scene,
+            trueAnomalyFromApsides(
+                SATURN_MEAN_ANOMALY_J2000,
+                SATURN_PERIHELION_DIST,
+                SATURN_APHELION_DIST
+            )
+        );
         saturn.orbitParent = sun;
         bodies.push(saturn);
         completed++;
@@ -541,31 +700,63 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         await this.yieldToEventLoop();
 
         // Uranus
-        const uranus = new Uranus(this.dependencies, this.scene, randomAngle());
+        const uranus = new Uranus(
+            this.dependencies,
+            this.scene,
+            trueAnomalyFromApsides(
+                URANUS_MEAN_ANOMALY_J2000,
+                URANUS_PERIHELION_DIST,
+                URANUS_APHELION_DIST
+            )
+        );
         uranus.orbitParent = sun;
         bodies.push(uranus);
         completed++;
         report({ phase: 'planets', label: `Uranus ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Neptune — random true anomaly preserves the slightly eccentric, inclined orbit shape
-        const neptune = new Neptune(this.dependencies, this.scene, randomAngle());
+        // Neptune
+        const neptune = new Neptune(
+            this.dependencies,
+            this.scene,
+            trueAnomalyFromApsides(
+                NEPTUNE_MEAN_ANOMALY_J2000,
+                NEPTUNE_PERIHELION_DIST,
+                NEPTUNE_APHELION_DIST
+            )
+        );
         neptune.orbitParent = sun;
         bodies.push(neptune);
         completed++;
         report({ phase: 'planets', label: `Neptune ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Pluto — random true anomaly preserves the eccentric, inclined orbit shape
-        const pluto = new Pluto(this.dependencies, this.scene, randomAngle());
+        // Pluto
+        const pluto = new Pluto(
+            this.dependencies,
+            this.scene,
+            trueAnomalyFromApsides(
+                PLUTO_MEAN_ANOMALY_J2000,
+                PLUTO_PERIHELION_DIST,
+                PLUTO_APHELION_DIST
+            )
+        );
         pluto.orbitParent = sun;
         bodies.push(pluto);
         completed++;
         report({ phase: 'planets', label: `Pluto ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
-        // Comet (Halley) — random orbital angle preserves elliptical orbit shape
-        const halley = new Halley(this.dependencies, this.scene, randomAngle());
+        // Comet (Halley) — real orbit, placed at its J2000 position
+        const halley = new Halley(
+            this.dependencies,
+            this.scene,
+            trueAnomalyFromApsides(
+                COMET_MEAN_ANOMALY_J2000,
+                COMET_PERIHELION_DIST,
+                COMET_APHELION_DIST
+            )
+        );
         halley.orbitParent = sun;
         bodies.push(halley);
         completed++;

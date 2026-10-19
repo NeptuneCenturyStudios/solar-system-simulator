@@ -61,6 +61,39 @@ export function safeUnitCross(a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3
 }
 
 /**
+ * Converts a mean anomaly `M` into the true anomaly `ν` of an elliptical orbit by solving
+ * Kepler's equation `M = E − e·sin E` for the eccentric anomaly `E` with Newton's method.
+ *
+ * @param meanAnomalyRad Mean anomaly `M`; any real value, it is treated modulo 2π.
+ * @param eccentricity   Eccentricity `e`, in [0, 1).
+ * @returns True anomaly in radians, measured from periapsis, in (−π, π].
+ */
+export function trueAnomalyFromMeanAnomaly(meanAnomalyRad: number, eccentricity: number): number {
+    const twoPi = Math.PI * 2;
+    // Wrap to (−π, π] so the starting guess is always close to the root.
+    let m = meanAnomalyRad % twoPi;
+    if (m > Math.PI) m -= twoPi;
+    else if (m <= -Math.PI) m += twoPi;
+
+    let eccAnomaly = eccentricity < 0.8 ? m : Math.PI;
+    for (let i = 0; i < 30; i++) {
+        const delta =
+            (eccAnomaly - eccentricity * Math.sin(eccAnomaly) - m) /
+            (1 - eccentricity * Math.cos(eccAnomaly));
+        eccAnomaly -= delta;
+        if (Math.abs(delta) < 1e-12) break;
+    }
+
+    return (
+        2 *
+        Math.atan2(
+            Math.sqrt(1 + eccentricity) * Math.sin(eccAnomaly / 2),
+            Math.sqrt(1 - eccentricity) * Math.cos(eccAnomaly / 2)
+        )
+    );
+}
+
+/**
  * Converts classical Keplerian orbital elements into position and velocity state vectors.
  *
  * Reference plane and angle convention match {@link calculateTrajectory} in physics.ts:
