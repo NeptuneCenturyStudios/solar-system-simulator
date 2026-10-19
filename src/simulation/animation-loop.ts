@@ -68,6 +68,7 @@ import type { ScreenProjector } from '../drawing/hud/screen-projection';
 import { interactionState, simulationState, cameraState } from './simulation';
 import { exitFlightMode, updateFlightControls } from './flight-controllers';
 import { stepNpcShips } from './ai/npc-manager';
+import { stepShipAiAutopilot } from './autopilot';
 import { scenarioManager } from '../scenarios/scenario-manager';
 import type { Spaceship } from '../bodies/ships/spaceship';
 
@@ -209,7 +210,7 @@ function updateShipTrail(
         .applyQuaternion(ship.mesh.quaternion)
         .add(ship.mesh.position);
     _trailExhaustDir.set(0, 0, -1).applyQuaternion(ship.mesh.quaternion);
-    const h = ship.autopilotActive ? ship.autopilotHandling : ship.handling;
+    const h = ship.classicAutopilotActive ? ship.autopilotHandling : ship.handling;
     const trailMax = boosting ? h.flightBoostMaxSpeed : h.flightMaxSpeed;
     ship.trail.update(
         _trailNozzle,
@@ -481,15 +482,23 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // ── Background warp/boost speed (unified) ────────────────────────
         const bgShip = ctx.flightState.knownShip;
         if (!isFlightModeActive && bgShip && !bgShip._isDisposed && bgShip.mesh) {
-            const bgWarpActive = bgShip.warpActive;
-            const bgWarpDecel = bgShip.warpDecelerating;
-            const bgBoostDecel = bgShip.boostDecelerating;
-            const bgStopBrake = bgShip.stopBraking;
+            if (bgShip.autopilotAI) {
+                // The Ship AI autopilot flies on while the player watches from outside. Its
+                // pipeline advances warp/boost/stop decel itself.
+                stepShipAiAutopilot(bgShip, wallDt, dtTotal);
+            } else {
+                const bgWarpActive = bgShip.warpActive;
+                const bgWarpDecel = bgShip.warpDecelerating;
+                const bgBoostDecel = bgShip.boostDecelerating;
+                const bgStopBrake = bgShip.stopBraking;
 
-            if (bgWarpActive || bgWarpDecel || bgBoostDecel || bgStopBrake) {
-                const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bgShip.mesh.quaternion);
-                bgShip.advanceWarpSpeed(dtTotal, bgFwd);
-                ctx.flightState.currentSpeed = bgShip.forwardSpeedInFrame(bgFwd);
+                if (bgWarpActive || bgWarpDecel || bgBoostDecel || bgStopBrake) {
+                    const bgFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(
+                        bgShip.mesh.quaternion
+                    );
+                    bgShip.advanceWarpSpeed(dtTotal, bgFwd);
+                    ctx.flightState.currentSpeed = bgShip.forwardSpeedInFrame(bgFwd);
+                }
             }
 
             // Background warp HUD — use the unified method for all three states.
@@ -1302,8 +1311,22 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             const spd = ctx.speedSprite;
             if (spd.visible && ctx.flightState.isActive) {
                 const ship = ctx.flightState.activeShip;
-                // Report the tier the ship is actually flying on: the autopilot has its own.
-                const h = ctx.autopilotState.isActive ? ship?.autopilotHandling : ship?.handling;
+                // The classic autopilot flies on its own tier and phases; the Ship AI autopilot
+                // flies on the ship's selected tier through its control input, like a pilot.
+                const classicAp = !!ship?.classicAutopilotActive;
+                const aiInput = ship?.autopilotAI ? ship.controlInput : null;
+                // Report the tier the ship is actually flying on: the classic autopilot has its own.
+                const h = classicAp ? ship?.autopilotHandling : ship?.handling;
+                // Ship AI: braking means holding brake above the setpoint.
+                const aiBraking =
+                    !!ship &&
+                    !!aiInput &&
+                    ship.thrustActive &&
+                    aiInput.brake &&
+                    aiInput.speedSetpoint !== null &&
+                    ship.velocity.dot(
+                        new THREE.Vector3(0, 0, 1).applyQuaternion(ship.controlFrameQuat)
+                    ) > aiInput.speedSetpoint;
                 const hWarp =
                     ship?.warpActive ||
                     ship?.warpDecelerating ||
@@ -1313,9 +1336,12 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     !!h &&
                     !hWarp &&
                     ((!ctx.autopilotState.isActive && ctx.keys.shift) ||
-                        (ctx.autopilotState.phase === 'APPROACH' &&
+                        (!!aiInput && aiInput.boost && !!ship?.thrustActive && !aiBraking) ||
+                        (classicAp &&
+                            ctx.autopilotState.phase === 'APPROACH' &&
                             ctx.autopilotState.isBoostActive) ||
-                        (ctx.autopilotState.phase === 'BRAKE' &&
+                        (classicAp &&
+                            ctx.autopilotState.phase === 'BRAKE' &&
                             (ctx.flightState.activeShip?.velocity?.length() ?? 0) >
                                 h.flightMaxSpeed));
                 const hBrake =
@@ -1323,8 +1349,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     (ship?.boostDecelerating ||
                         ship?.warpDecelerating ||
                         ship?.stopBraking ||
-                        ctx.autopilotState.phase === 'BRAKE' ||
-                        ctx.keys.s);
+                        aiBraking ||
+                        (classicAp && ctx.autopilotState.phase === 'BRAKE') ||
+                        (!aiInput && ctx.keys.s));
                 const thrustRate: number = (() => {
                     if (!h) return 0;
                     if (ship?.warpDecelerating) return h.flightWarpDecel;
@@ -1343,10 +1370,11 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                             ? h.flightBoostDecel
                             : h.flightThrustDecel;
                     if (!ctx.autopilotState.isActive && ctx.keys.w) return h.flightThrustAccel;
-                    if (ctx.autopilotState.isActive && ctx.autopilotState.phase === 'BRAKE')
+                    if (aiInput && ship?.thrustActive) return h.flightThrustAccel;
+                    if (classicAp && ctx.autopilotState.phase === 'BRAKE')
                         return h.flightThrustDecel;
                     if (
-                        ctx.autopilotState.isActive &&
+                        classicAp &&
                         (ctx.autopilotState.phase === 'APPROACH' ||
                             ctx.autopilotState.phase === 'CIRCULARIZE' ||
                             ctx.autopilotState.phase === 'TIDAL_LOCK')
@@ -1366,7 +1394,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     isBraking: !!hBrake,
                     shipThrustRate: thrustRate,
                     gravRate: gRate,
-                    speedMode: ship?.autopilotActive || ship?.highSpeedMode ? 'HIGH' : 'LOW',
+                    speedMode: classicAp || ship?.highSpeedMode ? 'HIGH' : 'LOW',
                 });
             }
 

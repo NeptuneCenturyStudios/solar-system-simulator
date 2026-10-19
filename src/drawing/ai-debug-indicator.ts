@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Spaceship } from '../bodies/ships/spaceship';
+import { activeController } from '../simulation/ai/npc-manager';
 import { flightState, simulationState } from '../simulation/simulation';
 import { settingsStore } from '../settings/settings-store';
 import { HudSprite } from './hud/hud-sprite';
@@ -95,9 +96,15 @@ export class AiDebugIndicator {
 
         this.projections.reset();
         for (const ship of simulationState.npcShips) {
-            if (!this.isPiloted(ship)) continue;
+            if (!activeController(ship)) continue;
             const slot = this.projections.next();
             if (!projector.project(ship, slot)) this.projections.rollback();
+        }
+        // The player's own ship, while the Ship AI autopilot flies it.
+        const known = flightState.knownShip;
+        if (known && activeController(known) && !simulationState.npcShips.includes(known)) {
+            const slot = this.projections.next();
+            if (!projector.project(known, slot)) this.projections.rollback();
         }
 
         const sprites = this.pool.acquire(this.projections.length);
@@ -109,7 +116,7 @@ export class AiDebugIndicator {
             const ship = p.body as Spaceship;
             const sprite = sprites[i];
 
-            const lines = ship.ai ? ship.ai.debugLines() : [];
+            const lines = activeController(ship)?.debugLines() ?? [];
             if (!p.onScreen) lines[0] = `${lines[0] ?? ''}  [off-screen]`;
 
             // Size the canvas to the text.
@@ -153,14 +160,5 @@ export class AiDebugIndicator {
     /** Free all GPU resources. */
     dispose(): void {
         this.pool.dispose();
-    }
-
-    /**
-     * True when the ship's controller is actually flying it. It stands down while the player or
-     * the autopilot has the ship, and its last report would then describe nothing.
-     */
-    private isPiloted(ship: Spaceship | undefined): ship is Spaceship {
-        if (!ship || ship._isDisposed || !ship.mesh || !ship.ai) return false;
-        return ship !== flightState.activeShip && !ship.autopilotActive;
     }
 }

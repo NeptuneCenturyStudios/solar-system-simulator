@@ -20,6 +20,9 @@ import { scenarioManager } from '../scenarios/scenario-manager';
 import { environmentState } from '../simulation/environment-state';
 import {
     AuroraDetailMode,
+    AutopilotMode,
+    AutopilotOrbitMode,
+    clampAutopilotOrbitDistanceM,
     clampRenderDistanceAU,
     PhysicsSolverMode,
     SettingKey,
@@ -402,6 +405,12 @@ export interface VueSimStore {
 
     /** Id of the autopilot target body, or null when autopilot is off. */
     autopilotTargetId: string | null;
+    /** Which autopilot engages on Hold E / "Fly here". */
+    autopilotMode: AutopilotMode;
+    /** Ship AI autopilot: natural or artificial orbit around celestial bodies. */
+    autopilotOrbitMode: AutopilotOrbitMode;
+    /** Ship AI autopilot: artificial orbit distance in meters. */
+    autopilotOrbitDistanceM: number;
 
     // ── Flight Controls ─────────────────────────────────────────────────────
     /** Registry id of the ship type currently chosen in the dropdown. */
@@ -410,6 +419,8 @@ export interface VueSimStore {
     hasKnownShip: boolean;
     /** Registry id of the known ship's type, or null if none exists. */
     knownShipTypeId: string | null;
+    /** Body id of the known ship, or null if none exists. */
+    knownShipId: string | null;
 
     /** Actions the active scenario (if any) has locked. Mirrors scenarioManager.activeLocks. */
     lockedActions: Set<ScenarioLock>;
@@ -458,9 +469,13 @@ const state = reactive<VueSimStore>({
     targetAssistEnabled: settingsStore.settings.targetAssistEnabled,
     textureQuality: settingsStore.settings.textureQuality,
     autopilotTargetId: null as string | null,
+    autopilotMode: settingsStore.settings.autopilotMode,
+    autopilotOrbitMode: settingsStore.settings.autopilotOrbitMode,
+    autopilotOrbitDistanceM: settingsStore.settings.autopilotOrbitDistanceM,
     selectedShipTypeId: SHIP_TYPES[0].id,
     hasKnownShip: false,
     knownShipTypeId: null as string | null,
+    knownShipId: null as string | null,
     lockedActions: new Set<ScenarioLock>(),
 });
 
@@ -594,6 +609,7 @@ function refreshCameraState(): void {
     const ship = flightState.knownShip;
     state.hasKnownShip = !!(ship && !ship._isDisposed && simulationState.bodies.includes(ship));
     state.knownShipTypeId = state.hasKnownShip ? (ship?.shipTypeId ?? null) : null;
+    state.knownShipId = state.hasKnownShip ? (ship?.id ?? null) : null;
 }
 
 /** Mirrors the active scenario's locked actions so components can disable
@@ -1030,6 +1046,31 @@ export function setChaseModeEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.ChaseModeEnabled, checked);
     }
     state.chaseModeEnabled = checked;
+}
+
+/**
+ * Pick which autopilot engages on Hold E / "Fly here" (Flight Controls panel). An autopilot
+ * already engaged keeps flying; the choice applies from the next engagement.
+ */
+export function setAutopilotMode(mode: AutopilotMode): void {
+    settingsStore.update(SettingKey.AutopilotMode, mode);
+    state.autopilotMode = mode;
+}
+
+/** Natural or artificial orbit around celestial bodies (Flight Controls panel). Applies live. */
+export function setAutopilotOrbitMode(mode: AutopilotOrbitMode): void {
+    settingsStore.update(SettingKey.AutopilotOrbitMode, mode);
+    state.autopilotOrbitMode = mode;
+}
+
+/**
+ * Artificial orbit distance in meters (Flight Controls panel), clamped to the supported range.
+ * Applies live — an orbit in progress moves to the new distance.
+ */
+export function setAutopilotOrbitDistanceM(meters: number): void {
+    const clamped = clampAutopilotOrbitDistanceM(meters);
+    settingsStore.update(SettingKey.AutopilotOrbitDistanceM, clamped);
+    state.autopilotOrbitDistanceM = clamped;
 }
 
 /** Toggle coasting drift redirecting into the nose axis (Flight Controls panel). */

@@ -150,6 +150,10 @@ export class ObstacleAvoidance {
     /** The body currently being avoided, held across frames. Null when nothing is. */
     private latchedHazard: Body | null = null;
 
+    /** The body that blocked the most recent straightPathClearance() call, or null when the
+     *  corridor was clear. Debug/telemetry only — nothing steers off it. */
+    corridorBlocker: Body | null = null;
+
     /** Unit normal of the plane the ship committed to going around the hazard in. */
     private readonly latchedAxis = new THREE.Vector3();
 
@@ -166,7 +170,7 @@ export class ObstacleAvoidance {
      * Hazard sphere radius for a body: its own radius, padded for the effects that kill outside
      * it, plus the ship's hull so the corridor test can treat the ship as a point.
      */
-    private hazardRadiusOf(body: Body): number {
+    hazardRadiusOf(body: Body): number {
         const factor = isBodyType(body, STAR_LIKE_TYPES)
             ? AI_AVOID_STAR_HAZARD_FACTOR
             : AI_AVOID_HAZARD_FACTOR;
@@ -310,9 +314,16 @@ export class ObstacleAvoidance {
      *
      * @param desiredDir Unit direction the controller wants to go.
      * @param simDt Sim-time seconds advanced this frame (wall dt × time scale).
+     * @param ignore A body that is never treated as a hazard — the autopilot passes its own
+     *   target, since it flies an orbit around it and owns that proximity itself. Null (the
+     *   default) leaves every body eligible.
      * @returns A reused result object — read it before the next call, don't retain it.
      */
-    evaluate(desiredDir: THREE.Vector3, simDt: number): IAvoidanceResult {
+    evaluate(
+        desiredDir: THREE.Vector3,
+        simDt: number,
+        ignore: Body | null = null
+    ): IAvoidanceResult {
         const ship = this.ship;
         const h = ship.handling;
         const result = this.result;
@@ -347,7 +358,8 @@ export class ObstacleAvoidance {
         let bestDistance = 0;
 
         for (const body of simulationState.bodies) {
-            if (!body || body === ship || body._isDisposed || !body.mesh) continue;
+            if (!body || body === ship || body === ignore || body._isDisposed || !body.mesh)
+                continue;
             if (isBodyType(body, EXCLUDED_TYPES)) continue;
             if (!(body.radius > 0) || !Number.isFinite(body.radius)) continue;
 
@@ -399,7 +411,7 @@ export class ObstacleAvoidance {
         // Nothing new in range, but we may still be part-way around something. `stillCommitted()`
         // leaves the hazard's bearing in `_toBody`.
         const held = this.latchedHazard;
-        if (!bestBody && held && this.stillCommitted(desiredDir)) {
+        if (!bestBody && held && held !== ignore && this.stillCommitted(desiredDir)) {
             bestBody = held;
             bestRadius = this.hazardRadiusOf(held);
             bestDistance = _toBody.length();
@@ -483,22 +495,26 @@ export class ObstacleAvoidance {
      * around the line, independent of distance.
      *
      * Unlike `evaluate()` this is stateless — nothing is latched and no result object is
-     * touched — so it is safe to call at any point in a controller's frame.
+     * touched (it only records `corridorBlocker` for debug display) — so it is safe to call at
+     * any point in a controller's frame.
      *
      * Costs a full pass over `simulationState.bodies`, so controllers should only call it
      * when they are actually considering or flying a warp, not every frame.
      *
      * @param dir Unit direction of the intended straight run.
      * @param range How far along `dir` to care about, in sim units.
+     * @param ignore A body that never blocks the corridor (see `evaluate`).
      * @returns Distance (u) to the nearest blocker's surface, or Infinity when clear.
      */
-    straightPathClearance(dir: THREE.Vector3, range: number): number {
+    straightPathClearance(dir: THREE.Vector3, range: number, ignore: Body | null = null): number {
         const ship = this.ship;
         const shipPos = ship.mesh.position;
         let nearest = Infinity;
+        this.corridorBlocker = null;
 
         for (const body of simulationState.bodies) {
-            if (!body || body === ship || body._isDisposed || !body.mesh) continue;
+            if (!body || body === ship || body === ignore || body._isDisposed || !body.mesh)
+                continue;
             if (isBodyType(body, EXCLUDED_TYPES)) continue;
             if (!(body.radius > 0) || !Number.isFinite(body.radius)) continue;
 
@@ -519,7 +535,10 @@ export class ObstacleAvoidance {
 
             // Blocked. Report the distance to its surface; already-overlapping reads as 0.
             const surfaceDistance = Math.max(0, along - hazardRadius);
-            if (surfaceDistance < nearest) nearest = surfaceDistance;
+            if (surfaceDistance < nearest) {
+                nearest = surfaceDistance;
+                this.corridorBlocker = body;
+            }
         }
 
         return nearest;

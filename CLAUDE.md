@@ -141,7 +141,7 @@ For previous milestone info, see milestones.md
 - ** Phase 4
 - [x] Phase 4.1: Improve gizmo. It currently doesn't scale to body size well and is still a pain to use.
 - [x] Phase 4.2: Improve orbital data for all other planets. Pluto and Nepture already done. Every major planet (Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto) now flies its real J2000 orbit: perihelion, aphelion, inclination, node and perihelion orientation come from the NASA planetary fact sheets, and `bodies/planet-orbit.ts` turns those elements into state vectors. The data lives in the `*_PERIHELION_DIST` / `*_APHELION_DIST` / `*_INCLINATION` / `*_LONG_ASC_NODE` / `*_ARG_PERIHELION` blocks in `consts.ts`.
-- [ ] Phase 4.3: More work on ship AI.
+- [ ] Phase 4.3: More work on ship AI. In progress: a Ship AI autopilot (`simulation/ai/autopilot-ship-ai.ts`), selectable in Flight Controls → Autopilot (Classic stays the default). It flies only through `controlInput`, in the world frame: warps/boosts/changes tier to reach any target (bodies or ships), then holds a natural (gravity) or artificial (powered) orbit; ships are always circled at the Flight Controls orbit distance. New ship AI *commands* are built from the shared pieces in `simulation/ai/navigation/` (steering, warp navigation, speed tier, `flyVelocity` — point the nose along the wanted world velocity and hold `controlInput.speedSetpoint`) and the maneuvers in `simulation/ai/maneuvers/` (approach, natural orbit, artificial orbit).
 
 ## UI (Vue)
 

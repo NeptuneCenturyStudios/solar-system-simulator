@@ -45,7 +45,6 @@ export const TIME_SCALE = BASE_TIME_SCALE * USER_TIME_MULTIPLIER; // ≈ 1
 export const G = 6.6743e-20 * (MASS_SCALE / DIST_SCALE ** 3) * G_SCALE; // km^3 / kg / s^2 //
 export const C = 299792.458 / DIST_SCALE; // Speed of light
 
-
 // Planet data based on nasa.gov fact sheets
 // Source: https://nssdc.gsfc.nasa.gov/planetary/factsheet/
 
@@ -1221,24 +1220,38 @@ export const AI_HIGH_SPEED_ENGAGE_RANGE = 400 / DIST_SCALE;
 export const AI_HIGH_SPEED_HANDOFF_FACTOR = 2;
 
 // === Ship AI warp drive ===
-/** Multiplier on a ship's own `autopilotWarpThreshold` before an AI will charge warp.
- *  That threshold is already the full warp→rest stopping distance with a 1.5× margin
- *  baked in, so 1.0 puts an AI on the same footing as the autopilot: warp whenever the
- *  run is long enough that there is still room to shed the speed again afterwards. */
-export const AI_WARP_ENGAGE_FACTOR = 1.0;
-/** Hysteresis on the above: an AI abandons a charge already in progress only once the
- *  distance falls below this fraction of the engage threshold. Without the gap, a target
- *  drifting across the threshold makes the charge start and abort on alternating frames. */
+/** An AI warps only when the warp plan's ETA (charge + warp leg + conventional remainder) is
+ *  below this fraction of the ETA flying the whole way conventionally (high-tier boost).
+ *  See planWarp() in simulation/ai/navigation/warp-navigation.ts. */
+export const AI_WARP_ETA_RATIO = 0.7;
+/** ...and only when that saves at least this many wall-clock seconds. Measured in wall time
+ *  because the warp charge spools in wall time: at high time scale its two seconds cost
+ *  thousands of sim-seconds, and a run boost covers in under a wall second isn't worth it. */
+export const AI_WARP_MIN_TIME_SAVED = 3;
+/** A warp leg is only worth flying when its speed cap (see AI_WARP_DROP_PAD and the decision
+ *  margin) is at least this multiple of the ship's best conventional speed. */
+export const AI_WARP_MIN_SPEED_GAIN = 2;
+/** Hysteresis: once a charge is running, both ETA tests above are relaxed by this factor, so
+ *  a plan hovering on the boundary can't make the charge start and abort on alternating
+ *  frames. */
 export const AI_WARP_ABORT_FACTOR = 0.8;
 /** Maximum off-axis angle (radians) at which an AI will start or hold a warp charge.
  *  Far tighter than AI_THRUST_ALIGN_ANGLE because warp is flown on a locked heading with
  *  steering disabled: whatever error is present at engagement is error the ship carries
  *  all the way to the drop-out point. */
 export const AI_WARP_ALIGN_ANGLE = Math.PI / 90;
-/** Safety margin on the distance at which an AI drops out of warp, applied to the ship's
- *  own three-band stopping distance. Matches the margin the autopilot uses for its own
- *  WARP → APPROACH transition. */
+/** Safety margin on the boost and cruise bands of the distance at which an AI drops out of
+ *  warp — the part of the run flown on conventional brakes after the warp drive lets go. */
 export const AI_WARP_DROP_PAD = 1.5;
+/** Safety margin on the *warp* band of that distance (warp max → boost max at flightWarpDecel).
+ *  Much tighter than AI_WARP_DROP_PAD: warp deceleration is enormous and deterministic, so a
+ *  1.5× pad on it left the ship 100,000+ km short, boosting the rest of the way for minutes. */
+export const AI_WARP_BAND_DROP_PAD = 1.1;
+/** Frames of travel at the projected warp speed added to the drop distance. The ship keeps
+ *  moving at warp for one frame after it decides to drop out (deceleration starts on the next
+ *  frame's step), so 2 leaves one frame of slack. Smaller than AI_AVOID_DECISION_MARGIN, which
+ *  covers reacting to an obstacle rather than a known, fixed stopping point. */
+export const AI_WARP_DECISION_MARGIN = 2;
 /** Clearance radius for the straight-line warp corridor, as a multiple of a body's hazard
  *  radius. The corridor is a cylinder rather than avoidance's silhouette cone: a fixed
  *  angular margin that is sensible at steering range sweeps an enormous exclusion volume
@@ -1455,6 +1468,55 @@ export const OSIRIS_AMBUSH_RESPAWN_DELAY = 5;
 /** Minimum angle (degrees) between two ships' bearings from the player, so a wave arrives from
  *  several directions instead of in a clump. Best effort — relaxed if it can't be satisfied. */
 export const OSIRIS_AMBUSH_MIN_SEPARATION_DEG = 40;
+
+// === Ship AI autopilot ===
+// The Ship AI autopilot (simulation/ai/autopilot-ship-ai.ts) flies only through controlInput, in
+// the world frame, so every maneuver is "point the nose along the world velocity you want and hold
+// the forward speed at its magnitude" (navigation/velocity-control.ts). These tune that controller
+// and the orbits built on it.
+/** Natural/artificial orbit radius floor, as a multiple of the target's avoidance hazard radius.
+ *  Keeps every orbit comfortably outside the sphere obstacle avoidance would flee from — for a
+ *  star that sphere is already 1.5R, so its orbit comes out wider than the classic 1.5R. */
+export const AI_AUTOPILOT_ORBIT_HAZARD_MARGIN = 1.15;
+/** Artificial orbit speed is capped at radius × turn rate ÷ this, so the ship can turn fast
+ *  enough to follow the circle with margin left over for radial corrections. */
+export const AI_AUTOPILOT_ORBIT_TURN_PAD = 2;
+/** Radial correction speed per unit of radius error, as a fraction of the orbit speed per orbit
+ *  radius (dimensionless) — how hard an orbit leans back toward its target radius. */
+export const AI_AUTOPILOT_ORBIT_RADIAL_GAIN = 2;
+/** Cap on the radial correction speed, as a fraction of the orbit speed. */
+export const AI_AUTOPILOT_ORBIT_RADIAL_MAX_FRACTION = 0.35;
+/** Natural orbit: insertion burn is finished once the relative velocity is within this fraction
+ *  of circular speed and the radius within this fraction of the target radius. */
+export const AI_AUTOPILOT_ORBIT_SETTLE_BAND = 0.02;
+/** Natural orbit: while coasting, a correction burn starts once radius or speed error exceeds
+ *  this fraction (hysteresis against AI_AUTOPILOT_ORBIT_SETTLE_BAND). */
+export const AI_AUTOPILOT_ORBIT_DRIFT_BAND = 0.06;
+/** Approach is complete once the gap to the orbit radius is within this fraction of the orbit
+ *  radius. */
+export const AI_AUTOPILOT_ARRIVAL_TOLERANCE = 0.15;
+/** Sim-seconds the approach must spend unable to match the target (commanded speed above the
+ *  ship's boost max) while the range keeps opening before "unable to catch" is reported. */
+export const AI_AUTOPILOT_OUTPACED_TIME = 10;
+/** An artificial orbit is infeasible when gravity at the orbit radius exceeds this fraction of
+ *  the ship's thrust acceleration on its current tier — it would be fighting a fall it can't
+ *  hold. The autopilot then falls back to a natural orbit. */
+export const AI_AUTOPILOT_ARTIFICIAL_MAX_G_FRACTION = 0.5;
+/** Orbit distance field limits (meters, hull to hull / surface to hull). */
+export const AI_AUTOPILOT_ORBIT_DISTANCE_MIN_M = 100;
+export const AI_AUTOPILOT_ORBIT_DISTANCE_MAX_M = 1000000;
+/** Default orbit distance (meters). */
+export const AI_AUTOPILOT_ORBIT_DISTANCE_DEFAULT_M = 2000;
+/** Speed tier selection: go to the high tier once the required world speed exceeds this
+ *  fraction of the low tier's boost max. */
+export const AI_AUTOPILOT_HIGH_TIER_ENGAGE = 0.9;
+/** Speed tier selection: drop back to the low tier only once the required world speed is below
+ *  this fraction of the low tier's boost max, and the ship itself is already inside the low
+ *  tier's boost envelope — the gap to AI_AUTOPILOT_HIGH_TIER_ENGAGE is the hysteresis. */
+export const AI_AUTOPILOT_LOW_TIER_RELEASE = 0.6;
+/** Forward-speed error (fraction of the commanded speed, floored at a fraction of cruise) below
+ *  which the velocity controller counts the throttle as settled — trail/HUD only. */
+export const AI_AUTOPILOT_SPEED_SETTLED = 0.02;
 
 // === Comet tail coloring ===
 /** Default main color for a comet's particle tail (blue — matches the original look). */

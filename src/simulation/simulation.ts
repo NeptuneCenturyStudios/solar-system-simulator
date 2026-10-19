@@ -146,6 +146,8 @@ export const cameraState: ICameraState = {
  */
 export const autopilotState: IAutopilotState = {
     isActive: false,
+    mode: 'classic',
+    orbitRadius: null,
     targetBody: null,
     phase: null,
     /** Stable-orbit notification timer (seconds remaining to display). */

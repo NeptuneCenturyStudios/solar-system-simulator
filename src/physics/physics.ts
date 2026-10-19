@@ -122,6 +122,19 @@ export function updateSimulation(
             if (!npc || npc._isDisposed || npc === flightState.activeShip) continue;
             npc.applyFlightThrustSubstep(substepDt);
         }
+
+        // A parked player ship still flying on the Ship AI autopilot. (Unless the NPC loop
+        // above already covered it — the player can take over, and autopilot, an NPC ship.)
+        const known = flightState.knownShip;
+        if (
+            known &&
+            known.autopilotAI &&
+            !known._isDisposed &&
+            known !== flightState.activeShip &&
+            !simulationState.npcShips.includes(known)
+        ) {
+            known.applyFlightThrustSubstep(substepDt);
+        }
     };
 
     // Autopilot impulses likewise scale with timeScale only if applied per substep;

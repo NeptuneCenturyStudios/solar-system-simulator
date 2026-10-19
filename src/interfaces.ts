@@ -291,6 +291,31 @@ export interface IShipControlInput {
      * exactly the same charge/engage/cancel/decel calls the key handler makes.
      */
     warp: boolean;
+    /**
+     * "Set speed" cruise control — a forward-speed target (u/s), or null for none.
+     *
+     * Measured in the same frame as the ship's own speed caps (world, or the captured
+     * atmosphere frame). While set, thrust and boost stop adding speed once the forward speed
+     * reaches it and brake stops removing speed once the forward speed falls to it — the same
+     * per-substep clamp the tier's max speed already applies, just at a value the pilot chose.
+     *
+     * Exists because a ShipAI decides once per rendered frame while thrust is integrated per
+     * physics substep: at the high-speed tier one frame of braking sheds kilometres per second,
+     * so a bang-bang throttle can never settle on a precise speed. With a setpoint the substep
+     * lands on it exactly at any frame rate or time scale. The player path always writes null.
+     */
+    speedSetpoint: number | null;
+    /**
+     * Ceiling on warp speed (u/s), or null for the drive's full speed. While warp is active the
+     * drive accelerates only up to this.
+     *
+     * Exists for the same reason as `speedSetpoint`: warp acceleration and travel happen once per
+     * rendered frame, so at high time scale one frame at full warp can carry a ship past a
+     * target it could have stopped for. A ShipAI sizes the cap so that a frame's travel plus the
+     * stopping distance always fits the remaining run (see warpSpeedCap() in
+     * simulation/ai/navigation/warp-navigation.ts). The player path always writes null.
+     */
+    warpSpeedCap: number | null;
 }
 
 /**
@@ -759,6 +784,11 @@ export type AutopilotPhase =
  */
 export interface IAutopilotState {
     isActive: boolean;
+    /** Which autopilot is engaged (meaningful while `isActive`). */
+    mode: 'classic' | 'shipAi';
+    /** Centre-to-centre radius of the Ship AI autopilot's orbit (u); null for the classic one,
+     *  whose orbit is always the target's radius × AUTOPILOT_ORBIT_ALTITUDE_FACTOR. */
+    orbitRadius: number | null;
     targetBody: Body | null;
     phase: AutopilotPhase | null;
     /** Stable-orbit notification timer (seconds remaining to display). */

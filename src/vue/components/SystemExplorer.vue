@@ -130,13 +130,15 @@
                             <svg-icon type="mdi" :path="mdiLogin" :size="16"></svg-icon>
                         </button>
                         <button
-                            v-else-if="hasShip"
+                            v-if="hasShip && body.id !== simStore.knownShipId"
                             class="icon-button"
                             :class="{ active: body.id === simStore.autopilotTargetId }"
                             :title="
                                 body.id === simStore.autopilotTargetId
                                     ? 'Cancel autopilot'
-                                    : 'Fly to this body'
+                                    : body.isShip
+                                      ? 'Fly to this ship (Ship AI autopilot)'
+                                      : 'Fly to this body'
                             "
                             @click.stop="flyToBody(body.id)"
                         >

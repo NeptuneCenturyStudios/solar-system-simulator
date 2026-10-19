@@ -18,6 +18,7 @@ import {
 } from '../../interfaces';
 import { ParticleExplosion } from '../../effects/particle-explosion';
 import type { ShipAI } from '../../simulation/ai/ship-ai';
+import type { AutopilotShipAI } from '../../simulation/ai/autopilot-ship-ai';
 import { brakingSpeedLimit } from '../../simulation/ai/obstacle-avoidance';
 import { Weapon } from '../../ship-effects/weapons/weapon';
 import { autopilotState, flightState, simulationState } from '../../simulation/simulation';
@@ -174,6 +175,8 @@ export class Spaceship extends Body {
         aimDir: new THREE.Vector3(),
         target: null,
         warp: false,
+        speedSetpoint: null,
+        warpSpeedCap: null,
     };
 
     /** This ship's steering reference frame, independent of the visual banking
@@ -229,8 +232,13 @@ export class Spaceship extends Body {
     warpEffect: WarpEffect;
 
     // ── Autopilot state ──────────────────────────────────────────────────────
-    /** True while the autopilot is engaged and controlling the ship. */
+    /** True while an autopilot (classic or Ship AI) is engaged and controlling the ship. */
     autopilotActive: boolean = false;
+    /**
+     * The Ship AI autopilot flying this ship, or null when the classic autopilot (or nobody) is.
+     * Set together with `autopilotActive`; see `classicAutopilotActive`.
+     */
+    autopilotAI: AutopilotShipAI | null = null;
     /** The body the autopilot is navigating toward. */
     autopilotTarget: Body | null = null;
     /** Current autopilot phase, or null when not engaged. */
@@ -244,6 +252,15 @@ export class Spaceship extends Body {
 
     /** Active warp loop sound controller, or null if not currently playing. */
     private _warpSound: WarpSoundController | null = null;
+
+    /**
+     * True while the *classic* autopilot owns the ship: it writes velocity and orientation
+     * directly, per substep, so manual thrust and tier changes must stay out of its way. The
+     * Ship AI autopilot flies through controlInput instead and needs no such exemption.
+     */
+    get classicAutopilotActive(): boolean {
+        return this.autopilotActive && this.autopilotAI === null;
+    }
 
     // ── Autopilot threshold computation (derived from handling at runtime) ──────
 
@@ -685,8 +702,9 @@ export class Spaceship extends Body {
         if (this._isDisposed || !this.mesh) return;
         if (simulationState.isPaused || simulationState.timeScale === 0) return;
 
-        // Autopilot handles its own thrust — stay out of its way.
-        if (this.autopilotActive) return;
+        // The classic autopilot handles its own thrust — stay out of its way. (The Ship AI
+        // autopilot flies through controlInput, so its thrust comes through here like a pilot's.)
+        if (this.classicAutopilotActive) return;
         // Warp/boost/stop deceleration is handled frame-level; do not add thrust during those.
         if (this.warpActive || this.warpDecelerating || this.boostDecelerating || this.stopBraking)
             return;
@@ -708,29 +726,41 @@ export class Spaceship extends Body {
         // coastDriftAlignEnabled setting is on, and left untouched otherwise.
         const thrustActive = input.boost || input.thrust || input.brake;
         if (thrustActive) {
-            const shiftEffective = input.boost && fwdSpeed < this.handling.flightBoostMaxSpeed;
-            const wEffective = input.thrust && fwdSpeed < this.handling.flightMaxSpeed;
+            // Cruise-control setpoint (AI only): thrust stops at it, brake stops at it.
+            const setpoint = input.speedSetpoint;
+            const boostCap =
+                setpoint === null
+                    ? this.handling.flightBoostMaxSpeed
+                    : Math.min(this.handling.flightBoostMaxSpeed, setpoint);
+            const thrustCap =
+                setpoint === null
+                    ? this.handling.flightMaxSpeed
+                    : Math.min(this.handling.flightMaxSpeed, setpoint);
+            const shiftEffective = input.boost && fwdSpeed < boostCap;
+            const wEffective = input.thrust && fwdSpeed < thrustCap;
 
             if (shiftEffective) {
-                const delta = Math.min(
-                    this.handling.flightBoostAccel * dt,
-                    this.handling.flightBoostMaxSpeed - fwdSpeed
-                );
+                const delta = Math.min(this.handling.flightBoostAccel * dt, boostCap - fwdSpeed);
                 rel.addScaledVector(forward, delta);
             } else if (wEffective && !input.boost) {
-                const delta = Math.min(
-                    this.handling.flightThrustAccel * dt,
-                    this.handling.flightMaxSpeed - fwdSpeed
-                );
+                const delta = Math.min(this.handling.flightThrustAccel * dt, thrustCap - fwdSpeed);
                 rel.addScaledVector(forward, delta);
             } else if (input.brake) {
-                // Decelerates through zero into reverse, capped at -flightMaxSpeed
-                const ceiling = Math.max(-this.handling.flightMaxSpeed, -fwdSpeed);
                 const decelRate =
                     fwdSpeed > this.handling.flightMaxSpeed
                         ? this.handling.flightBoostDecel
                         : this.handling.flightThrustDecel;
-                const delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
+                let delta: number;
+                if (setpoint === null) {
+                    // Decelerates through zero into reverse, capped at -flightMaxSpeed
+                    const ceiling = Math.max(-this.handling.flightMaxSpeed, -fwdSpeed);
+                    delta = Math.max(-decelRate * dt, ceiling - fwdSpeed);
+                } else {
+                    // Brake down to the setpoint and no further. Never a forward push: a ship
+                    // already under the setpoint simply holds its speed.
+                    const floor = Math.max(-this.handling.flightMaxSpeed, setpoint);
+                    delta = Math.min(0, Math.max(-decelRate * dt, floor - fwdSpeed));
+                }
                 rel.addScaledVector(forward, delta);
             }
 
@@ -822,7 +852,7 @@ export class Spaceship extends Body {
     /**
      * Switch manual flight between the low-speed (dogfight) and high-speed tiers.
      *
-     * Refused while warp or autopilot owns the ship's speed. Dropping to low speed while
+     * Refused while warp or the classic autopilot owns the ship's speed. Dropping to low speed while
      * faster than its cruise max starts the boost-decel ramp, braking at the high-speed
      * tier's rates, so the ship sheds the excess in seconds rather than minutes.
      *
@@ -830,7 +860,7 @@ export class Spaceship extends Body {
      */
     setHighSpeedMode(enabled: boolean): boolean {
         if (
-            this.autopilotActive ||
+            this.classicAutopilotActive ||
             this.warpCharging ||
             this.warpActive ||
             this.warpDecelerating ||
@@ -976,13 +1006,19 @@ export class Spaceship extends Body {
     applyWarpAccelerationStep(simDt: number, forward: THREE.Vector3): void {
         const rel = this.relativeVelocity(_govRel);
         const fwdSpd = rel.dot(forward);
-        if (fwdSpd < this.handling.flightWarpSpeed) {
-            const delta = Math.min(
-                this.handling.flightWarpAccel * simDt,
-                this.handling.flightWarpSpeed - fwdSpd
-            );
+        // An AI pilot may cap the warp below the drive's maximum (controlInput.warpSpeedCap);
+        // between the cap and the maximum the ship simply holds its speed.
+        const cap = this.controlInput.warpSpeedCap;
+        const ceiling =
+            cap === null
+                ? this.handling.flightWarpSpeed
+                : Math.min(this.handling.flightWarpSpeed, cap);
+        if (fwdSpd < ceiling) {
+            const delta = Math.min(this.handling.flightWarpAccel * simDt, ceiling - fwdSpd);
             rel.addScaledVector(forward, delta);
             this.setRelativeVelocity(rel);
+        } else if (fwdSpd < this.handling.flightWarpSpeed) {
+            // At or above an AI cap: hold.
         } else {
             // Clamp to warp max just in case gravity accelerates beyond it.
             rel.copy(forward).multiplyScalar(this.handling.flightWarpSpeed);
@@ -1233,7 +1269,12 @@ export class Spaceship extends Body {
     updateWarpIntentState(dt: number): void {
         const want = this.controlInput.warp;
         const rising = want && !this.prevWarpHeld;
-        const falling = !want && this.prevWarpHeld;
+        // Dropping out is judged on the level while the drive is live, not just the edge: a ship
+        // can be at warp with the edge detector reading "not held" (the pilot changed hands
+        // mid-warp, or flight mode was re-entered and reset it), and a controller that then keeps
+        // asking for no warp would otherwise never produce an edge — the ship would warp on
+        // forever. In every ordinary sequence this is the same as the falling edge.
+        const falling = !want && (this.prevWarpHeld || this.warpActive);
 
         if (rising) {
             // Same guards as the key handler: no charging into an already-live warp
@@ -1276,6 +1317,8 @@ export class Spaceship extends Body {
         input.fire = false;
         input.target = null;
         input.warp = false;
+        input.speedSetpoint = null;
+        input.warpSpeedCap = null;
         // aimDir is deliberately left as-is: it is only meaningful while `fire` is true, and
         // there is no direction that means "not aiming". Clearing the trigger disarms the ship.
     }
@@ -1311,7 +1354,7 @@ export class Spaceship extends Body {
      * one-shot events (sound, HUD notifications).
      */
     autopilotStep(dt: number): void {
-        if (!this.autopilotActive) return;
+        if (!this.classicAutopilotActive) return;
 
         // ── Safety guards ────────────────────────────────────────────────────
         const target = this.autopilotTarget;
@@ -1795,6 +1838,10 @@ export class Spaceship extends Body {
      * Clear all autopilot state.  Call on autopilot cancel or ship destruction.
      */
     resetAutopilotState(): void {
+        if (this.autopilotAI) {
+            this.autopilotAI.dispose();
+            this.autopilotAI = null;
+        }
         this.autopilotActive = false;
         this.autopilotTarget = null;
         this.autopilotPhase = null;

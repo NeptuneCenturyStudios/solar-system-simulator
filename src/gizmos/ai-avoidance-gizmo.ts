@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { flightState, simulationState } from '../simulation/simulation';
+import { activeController } from '../simulation/ai/npc-manager';
 import { NPC_FOLLOW_DISTANCE } from '../utilities/consts';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 
@@ -141,13 +142,18 @@ export class AiAvoidanceGizmo {
 
         let used = 0;
 
-        for (const ship of simulationState.npcShips) {
-            if (!ship || ship._isDisposed || !ship.mesh || !ship.ai) continue;
-            // The controller stands down when the player or the autopilot has the ship, so its
-            // last result is stale — don't draw a decision nothing is acting on.
-            if (ship === flightState.activeShip || ship.autopilotActive) continue;
+        const known = flightState.knownShip;
+        const knownExtra =
+            known && known.autopilotAI && !simulationState.npcShips.includes(known) ? 1 : 0;
+        const count = simulationState.npcShips.length + knownExtra;
+        for (let i = 0; i < count; i++) {
+            const ship = i < simulationState.npcShips.length ? simulationState.npcShips[i] : known;
+            // The controller actually flying the ship (the Ship AI autopilot included). A stood-
+            // down one's last result is stale — don't draw a decision nothing is acting on.
+            const controller = activeController(ship);
+            if (!ship || !controller) continue;
 
-            const avoid = ship.ai.avoidance.last;
+            const avoid = controller.avoidance.last;
             const entry = this.entries[used] ?? this.createEntry();
             if (!this.entries[used]) this.entries.push(entry);
             used++;

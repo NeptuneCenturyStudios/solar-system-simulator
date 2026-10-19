@@ -161,52 +161,7 @@ export function stepNpcShips(dt: number, simDt: number, addEvent?: NpcEventSink)
         }
 
         const wasWarping = ship.warpActive;
-
-        // Advance any warp/boost/stop deceleration first. These phases are driven
-        // frame-level (not per substep), and while one is active
-        // applyFlightThrustSubstep() deliberately refuses to add thrust — so
-        // without this the ship would enter boostDecelerating on a boost release
-        // and stay stuck there forever, coasting at boost speed with the AI
-        // unable to slow it down. updateFlightControls() does the same for the
-        // player's ship, and animation-loop.ts for the parked known ship.
-        if (
-            ship.warpActive ||
-            ship.warpDecelerating ||
-            ship.boostDecelerating ||
-            ship.stopBraking
-        ) {
-            _npcForward.set(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
-            const result = ship.advanceWarpSpeed(simDt, _npcForward);
-
-            // Warp decel just handed over to boost decel. If the AI is still asking for
-            // boost, abort that second ramp and let the ship sit at boost speed — the same
-            // thing holding Shift does for the player as a warp run bleeds off, and what an
-            // AI wants for the last leg of a chase it just warped most of the way across.
-            if (result.decelDone && result.phase === 'boost_decel' && ship.controlInput.boost) {
-                ship.boostDecelerating = false;
-            }
-        }
-
-        ship.ai.update(dt, simDt);
-
-        // Turn the AI's warp intent into charge/engage/cancel/decel on the drive. After the
-        // controller has run, so an intent raised this frame is acted on this frame.
-        ship.updateWarpIntentState(dt);
-
-        // The warp lockout. Skipping applyFrameOrientation() is what actually holds the ship
-        // to a straight line: it is the call that folds steering and roll into the control
-        // frame, and the control frame is the direction warp thrust and deceleration are
-        // applied along. updateFlightControls() enforces this for the player by returning
-        // before the equivalent call. Thrust needs no gate here — applyFlightThrustSubstep()
-        // already refuses to add any while a warp flag is set — and the controller releases
-        // the trigger itself for the duration.
-        if (!ship.warpActive) ship.applyFrameOrientation(dt);
-
-        // Turn the controller's trigger intent into actual shots, through the same helper the
-        // player's path uses — so an AI pilot gets no more (and no less) than a human does from
-        // the same weapon. After applyFrameOrientation(), so the muzzle it fires from is this
-        // frame's hull position rather than the previous one's.
-        applyWeaponInput(ship, simDt);
+        stepShipController(ship, ship.ai, dt, simDt);
 
         if (addEvent && settingsStore.settings.showAiDebug && ship.warpActive !== wasWarping) {
             addEvent({
@@ -217,4 +172,75 @@ export function stepNpcShips(dt: number, simDt: number, addEvent?: NpcEventSink)
             });
         }
     }
+}
+
+/**
+ * Run one frame of a ship controller against its ship: the per-ship half of stepNpcShips(),
+ * shared with the Ship AI autopilot so both drive a ship through exactly the same pipeline.
+ *
+ * Frame-level only — decisions, warp intent, steering/roll and weapons. Thrust is applied per
+ * physics substep by `applyFlightThrustSubstep()`, which the caller must arrange (the physics
+ * hook already covers NPCs and the player's ship).
+ *
+ * This is the AI-side counterpart of `updateFlightControls()`, and it enforces the same
+ * restrictions on an AI pilot that the player lives with — most importantly the warp lockout: a
+ * ship at warp flies a locked straight heading and cannot steer, roll, thrust or fire.
+ *
+ * @param ai The controller to run. Usually `ship.ai`; the autopilot passes `ship.autopilotAI`.
+ * @param dt    Wall-clock seconds since the previous frame (not time-scaled).
+ * @param simDt Sim-time seconds advanced this frame (wall dt × time scale).
+ */
+export function stepShipController(ship: Spaceship, ai: ShipAI, dt: number, simDt: number): void {
+    // Advance any warp/boost/stop deceleration first. These phases are driven
+    // frame-level (not per substep), and while one is active
+    // applyFlightThrustSubstep() deliberately refuses to add thrust — so
+    // without this the ship would enter boostDecelerating on a boost release
+    // and stay stuck there forever, coasting at boost speed with the AI
+    // unable to slow it down. updateFlightControls() does the same for the
+    // player's ship, and animation-loop.ts for the parked known ship.
+    if (ship.warpActive || ship.warpDecelerating || ship.boostDecelerating || ship.stopBraking) {
+        _npcForward.set(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
+        const result = ship.advanceWarpSpeed(simDt, _npcForward);
+
+        // Warp decel just handed over to boost decel. If the AI is still asking for
+        // boost, abort that second ramp and let the ship sit at boost speed — the same
+        // thing holding Shift does for the player as a warp run bleeds off, and what an
+        // AI wants for the last leg of a chase it just warped most of the way across.
+        if (result.decelDone && result.phase === 'boost_decel' && ship.controlInput.boost) {
+            ship.boostDecelerating = false;
+        }
+    }
+
+    ai.update(dt, simDt);
+
+    // Turn the AI's warp intent into charge/engage/cancel/decel on the drive. After the
+    // controller has run, so an intent raised this frame is acted on this frame.
+    ship.updateWarpIntentState(dt);
+
+    // The warp lockout. Skipping applyFrameOrientation() is what actually holds the ship
+    // to a straight line: it is the call that folds steering and roll into the control
+    // frame, and the control frame is the direction warp thrust and deceleration are
+    // applied along. updateFlightControls() enforces this for the player by returning
+    // before the equivalent call. Thrust needs no gate here — applyFlightThrustSubstep()
+    // already refuses to add any while a warp flag is set — and the controller releases
+    // the trigger itself for the duration.
+    if (!ship.warpActive) ship.applyFrameOrientation(dt);
+
+    // Turn the controller's trigger intent into actual shots, through the same helper the
+    // player's path uses — so an AI pilot gets no more (and no less) than a human does from
+    // the same weapon. After applyFrameOrientation(), so the muzzle it fires from is this
+    // frame's hull position rather than the previous one's.
+    applyWeaponInput(ship, simDt);
+}
+
+/**
+ * The controller actually flying `ship` this frame, or null. The Ship AI autopilot wins when it is
+ * engaged; otherwise the ship's own AI, which stands down while the player or the classic
+ * autopilot has the ship — its last report would then describe nothing.
+ */
+export function activeController(ship: Spaceship | undefined | null): ShipAI | null {
+    if (!ship || ship._isDisposed || !ship.mesh) return null;
+    if (ship.autopilotAI) return ship.autopilotAI;
+    if (!ship.ai || ship === flightState.activeShip || ship.autopilotActive) return null;
+    return ship.ai;
 }

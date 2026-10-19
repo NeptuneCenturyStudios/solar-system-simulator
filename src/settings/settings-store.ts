@@ -1,5 +1,8 @@
 // settingsStore.ts
 import {
+    AI_AUTOPILOT_ORBIT_DISTANCE_DEFAULT_M,
+    AI_AUTOPILOT_ORBIT_DISTANCE_MAX_M,
+    AI_AUTOPILOT_ORBIT_DISTANCE_MIN_M,
     RENDER_DISTANCE_DEFAULT_AU,
     RENDER_DISTANCE_MAX_AU,
     RENDER_DISTANCE_MIN_AU,
@@ -26,7 +29,26 @@ export const enum SettingKey {
     TargetAssistEnabled = 'targetAssistEnabled',
     RenderDistanceAU = 'renderDistanceAU',
     TextureQuality = 'textureQuality',
+    AutopilotMode = 'autopilotMode',
+    AutopilotOrbitMode = 'autopilotOrbitMode',
+    AutopilotOrbitDistanceM = 'autopilotOrbitDistanceM',
 }
+
+/**
+ * Which autopilot flies the player's ship.
+ *
+ * - `classic` — the original phase machine (Spaceship.autopilotStep), which writes the ship's
+ *               velocity directly. Bodies only.
+ * - `shipAi`  — the Ship AI autopilot (simulation/ai/autopilot-ship-ai.ts), which flies through
+ *               the same control inputs as a pilot and can also target ships.
+ */
+export type AutopilotMode = 'classic' | 'shipAi';
+
+/**
+ * How the Ship AI autopilot holds position around a celestial body. Ships are always circled
+ * under power ('artificial'), since they have no gravity to orbit.
+ */
+export type AutopilotOrbitMode = 'natural' | 'artificial';
 
 /**
  * Body-texture quality tier.
@@ -105,6 +127,12 @@ export interface SpaceSimSettings {
     renderDistanceAU: number;
     /** Body-texture quality tier. `high` is only honoured on desktop (see texture-quality.ts). */
     textureQuality: TextureQuality;
+    /** Which autopilot engages on Hold E / "Fly here". */
+    autopilotMode: AutopilotMode;
+    /** Ship AI autopilot: natural (gravity) or artificial (powered) orbit around bodies. */
+    autopilotOrbitMode: AutopilotOrbitMode;
+    /** Ship AI autopilot: artificial orbit distance in meters, surface (or hull) to hull. */
+    autopilotOrbitDistanceM: number;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -134,6 +162,10 @@ const defaultSettings: SpaceSimSettings = {
     // Low is the safe default: it is the only tier a browser can use, and installing the
     // desktop build should not silently jump to multi-megabyte textures nobody asked for.
     textureQuality: 'low',
+    // Classic until the Ship AI autopilot has been proven in play.
+    autopilotMode: 'classic',
+    autopilotOrbitMode: 'natural',
+    autopilotOrbitDistanceM: AI_AUTOPILOT_ORBIT_DISTANCE_DEFAULT_M,
 };
 
 /** Normalise a stored texture quality, falling back to `low` for anything unrecognised. */
@@ -147,6 +179,25 @@ export function clampRenderDistanceAU(au: number): number {
     return Math.min(Math.max(au, RENDER_DISTANCE_MIN_AU), RENDER_DISTANCE_MAX_AU);
 }
 
+/** Normalise a stored autopilot mode, falling back to `classic` for anything unrecognised. */
+export function normalizeAutopilotMode(value: unknown): AutopilotMode {
+    return value === 'shipAi' ? 'shipAi' : 'classic';
+}
+
+/** Normalise a stored orbit mode, falling back to `natural` for anything unrecognised. */
+export function normalizeAutopilotOrbitMode(value: unknown): AutopilotOrbitMode {
+    return value === 'artificial' ? 'artificial' : 'natural';
+}
+
+/** Clamp an orbit distance to the supported range, falling back to the default for non-finite input. */
+export function clampAutopilotOrbitDistanceM(m: number): number {
+    if (!Number.isFinite(m)) return AI_AUTOPILOT_ORBIT_DISTANCE_DEFAULT_M;
+    return Math.min(
+        Math.max(m, AI_AUTOPILOT_ORBIT_DISTANCE_MIN_M),
+        AI_AUTOPILOT_ORBIT_DISTANCE_MAX_M
+    );
+}
+
 class SettingsStore {
     private data: SpaceSimSettings;
 
@@ -156,6 +207,11 @@ class SettingsStore {
         // A hand-edited or stale save must not be able to put the far plane out of range.
         this.data.renderDistanceAU = clampRenderDistanceAU(this.data.renderDistanceAU);
         this.data.textureQuality = normalizeTextureQuality(this.data.textureQuality);
+        this.data.autopilotMode = normalizeAutopilotMode(this.data.autopilotMode);
+        this.data.autopilotOrbitMode = normalizeAutopilotOrbitMode(this.data.autopilotOrbitMode);
+        this.data.autopilotOrbitDistanceM = clampAutopilotOrbitDistanceM(
+            this.data.autopilotOrbitDistanceM
+        );
     }
 
     get settings(): SpaceSimSettings {

@@ -8,6 +8,12 @@ import {
 import { playSoundEffect, SoundEffect } from '../utilities/audio';
 import { IAutopilotContext } from '../interfaces';
 import { Body } from '../bodies/body';
+import { BodyTypeEnum } from '../bodies/body-enums';
+import type { Spaceship } from '../bodies/ships/spaceship';
+import { isBodyType } from '../utilities/utilities';
+import { settingsStore } from '../settings/settings-store';
+import { AutopilotShipAI } from './ai/autopilot-ship-ai';
+import { stepShipController } from './ai/npc-manager';
 import { autopilotState, flightState, simulationState } from './simulation';
 
 // ── Exported functions ────────────────────────────────────────────────────────
@@ -31,12 +37,19 @@ export function cancelAutopilot(ctx: IAutopilotContext, message?: string): void 
         }
     }
     // Clear any in-progress warp charge.
-    if (autopilotState.phase === 'WARP_CHARGING') {
+    if (autopilotState.phase === 'WARP_CHARGING' || ship.warpCharging) {
         ctx.flightHUD.hideWarpSprite();
         ship?.cancelWarpCharge();
     }
 
-    // Clear ship-local autopilot state
+    if (ship.autopilotAI) {
+        // Release everything the Ship AI was holding. In flight the player's input overwrites
+        // it next frame anyway, but a parked ship would otherwise keep thrusting on stale keys.
+        ship.resetControlInput();
+        ship.prevWarpHeld = false;
+    }
+
+    // Clear ship-local autopilot state (also disposes a Ship AI controller)
     ship.resetAutopilotState();
 
     // Sync global state
@@ -71,6 +84,24 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
     // If already engaged on the same target, cancel (toggle)
     if (ship.autopilotActive && ship.autopilotTarget === target) {
         cancelAutopilot(ctx, 'Autopilot disengaged.');
+        return;
+    }
+
+    if (target === ship) return;
+
+    if (settingsStore.settings.autopilotMode === 'shipAi') {
+        engageShipAiAutopilot(ctx, ship, target);
+        return;
+    }
+
+    // The classic phase machine orbits by gravity and has no notion of another ship.
+    if (isBodyType(target, BodyTypeEnum.SpaceShip)) {
+        ctx.addEvent({
+            message:
+                'Autopilot: the classic autopilot cannot target ships. Switch to the Ship AI autopilot in Flight Controls.',
+            notificationType: NotificationType.Warning,
+            logMethod: LogMethods.Alert | LogMethods.Console,
+        });
         return;
     }
 
@@ -170,6 +201,14 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
     const startInBrake =
         !startWithWarp && dist0 <= orbitRadius0 + ship.autopilotApproachMinDistance;
 
+    // Switching from a Ship AI autopilot (the mode changed mid-flight): retire its controller.
+    if (ship.autopilotAI) {
+        ship.autopilotAI.dispose();
+        ship.autopilotAI = null;
+        ship.resetControlInput();
+        ship.prevWarpHeld = false;
+    }
+
     // Set ship-local autopilot state
     ship.autopilotActive = true;
     ship.autopilotTarget = target;
@@ -181,6 +220,8 @@ export function engageAutopilot(ctx: IAutopilotContext, target: Body): void {
 
     // Sync global state
     autopilotState.isActive = true;
+    autopilotState.mode = 'classic';
+    autopilotState.orbitRadius = null;
     autopilotState.targetBody = target;
     autopilotState.phase = 'ALIGN';
     autopilotState.brakeEntryDistance = dist0;
@@ -232,4 +273,84 @@ export function drainAutopilotEvents(ctx: IAutopilotContext): void {
     }
 
     ship.autopilotEventMessages = [];
+}
+
+/**
+ * Engage the Ship AI autopilot: hand the ship to an AutopilotShipAI, which flies it through the
+ * same control inputs a pilot uses.
+ *
+ * Unlike the classic path there is no warp refusal and no obstruction gate: the controller's
+ * warp navigation takes over a warp already in progress, and its obstacle avoidance flies round
+ * anything in the way. Ships are valid targets.
+ */
+function engageShipAiAutopilot(ctx: IAutopilotContext, ship: Spaceship, target: Body): void {
+    // A stop-brake from an earlier cancel would keep fighting the controller's speed management.
+    ship.stopBraking = false;
+    // A manual warp charge is driven by the player's key path, which stands down now — abandon
+    // it rather than leave it spooling forever. The controller charges its own if it wants one.
+    if (ship.warpCharging) {
+        ship.cancelWarpCharge();
+        ctx.flightHUD.hideWarpSprite();
+    }
+
+    ship.resetControlInput();
+    // The controller drives warp as a held level and Spaceship.updateWarpIntentState() acts on
+    // its edges. Seed the edge detector with the drive's actual state, so a ship engaged at warp
+    // drops out on the first frame the controller lets go rather than never.
+    ship.prevWarpHeld = ship.warpActive;
+
+    if (ship.autopilotAI) ship.autopilotAI.dispose();
+    ship.autopilotAI = new AutopilotShipAI(ship, target);
+
+    ship.autopilotActive = true;
+    ship.autopilotTarget = target;
+    ship.autopilotPhase = 'ALIGN';
+    ship.autopilotBoostActive = false;
+    ship.autopilotBrakeEntryDistance = 0;
+    ship.autopilotEventMessages = [];
+
+    autopilotState.isActive = true;
+    autopilotState.mode = 'shipAi';
+    autopilotState.targetBody = target;
+    autopilotState.phase = 'ALIGN';
+    autopilotState.brakeEntryDistance = 0;
+    autopilotState.isBoostActive = false;
+    flightState.thrustActive = false;
+
+    playSoundEffect(SoundEffect.AutopilotEngaged);
+    ctx.addEvent({
+        message: `Ship AI autopilot engaged: flying to ${target.name || 'target'}.`,
+        notificationType: NotificationType.Info,
+    });
+}
+
+/**
+ * Run one frame of the Ship AI autopilot on `ship` and publish its progress.
+ *
+ * Frame-level, through the same per-ship pipeline NPC controllers use (stepShipController);
+ * thrust is applied per substep by applyFlightThrustSubstep(), which the physics hook runs for
+ * the autopilot ship. Called from updateFlightControls() while the player is in the ship, and
+ * from the animation loop while it flies on in the background.
+ *
+ * No-op when the ship has no Ship AI autopilot, or while the simulation is paused.
+ */
+export function stepShipAiAutopilot(ship: Spaceship, dt: number, simDt: number): void {
+    const ai = ship.autopilotAI;
+    if (!ai || ship._isDisposed || !ship.mesh) return;
+    if (simulationState.isPaused || simulationState.timeScale === 0) return;
+
+    stepShipController(ship, ai, dt, simDt);
+
+    ship.autopilotPhase = ai.phase;
+    ship.autopilotBoostActive = ship.controlInput.boost && ship.thrustActive;
+    if (ship === flightState.knownShip) {
+        autopilotState.isActive = ship.autopilotActive;
+        autopilotState.mode = 'shipAi';
+        autopilotState.targetBody = ship.autopilotTarget;
+        autopilotState.phase = ai.phase;
+        autopilotState.orbitRadius = ai.orbitRadius;
+        autopilotState.isBoostActive = ship.autopilotBoostActive;
+        // Drives the engine trail / HUD the same way the classic autopilot's flag does.
+        flightState.thrustActive = ship.thrustActive;
+    }
 }

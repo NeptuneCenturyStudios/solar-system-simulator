@@ -76,6 +76,60 @@
             Target Assist
         </label>
 
+        <div class="vue-ui-card-header">Autopilot</div>
+
+        <div class="control-group">
+            <label
+                for="vueAutopilotModeSelect"
+                title="Classic: the original autopilot, bodies only. Ship AI: flies the ship through the same controls a pilot uses, and can also target ships. Applies from the next engagement."
+                >Autopilot</label
+            >
+            <select
+                id="vueAutopilotModeSelect"
+                :value="simStore.autopilotMode"
+                @change="onAutopilotModeChange"
+            >
+                <option value="classic">Classic</option>
+                <option value="shipAi">Ship AI</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label
+                for="vueAutopilotOrbitModeSelect"
+                title="How the Ship AI autopilot holds position around planets, moons and stars. Natural: a gravity orbit. Artificial: a powered circle at the orbit distance below. Ships are always circled under power."
+                >Orbit Around Bodies</label
+            >
+            <select
+                id="vueAutopilotOrbitModeSelect"
+                :value="simStore.autopilotOrbitMode"
+                :disabled="isClassic"
+                @change="onAutopilotOrbitModeChange"
+            >
+                <option value="natural">Natural</option>
+                <option value="artificial">Artificial</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label
+                for="vueAutopilotOrbitDistanceInput"
+                :title="`Distance the Ship AI autopilot circles at, surface to hull: always for ship targets, and for artificial orbits around bodies (never closer than the body's safe altitude). ${ORBIT_DISTANCE_MIN_M}–${ORBIT_DISTANCE_MAX_M} m.`"
+                >Orbit Distance (m)</label
+            >
+            <input
+                id="vueAutopilotOrbitDistanceInput"
+                type="number"
+                class="text-input"
+                :min="ORBIT_DISTANCE_MIN_M"
+                :max="ORBIT_DISTANCE_MAX_M"
+                step="100"
+                :value="simStore.autopilotOrbitDistanceM"
+                :disabled="isClassic"
+                @change="onAutopilotOrbitDistanceChange"
+            />
+        </div>
+
         <div class="vue-ui-card-header">Handling</div>
 
         <label
@@ -99,6 +153,9 @@ import { SHIP_TYPES } from '../../bodies/ships/ship-registry';
 import {
     requestExitFlightMode,
     requestSpawnShip,
+    setAutopilotMode,
+    setAutopilotOrbitDistanceM,
+    setAutopilotOrbitMode,
     setChaseModeEnabled,
     setCoastDriftAlignEnabled,
     setHidePanelManagerInFlight,
@@ -110,6 +167,13 @@ import SvgIcon from '@jamescoyle/vue-icon';
 import { mdiLogin, mdiLogout, mdiRocketLaunchOutline } from '@mdi/js';
 
 import PanelBase from './PanelBase.vue';
+import {
+    AI_AUTOPILOT_ORBIT_DISTANCE_MAX_M as ORBIT_DISTANCE_MAX_M,
+    AI_AUTOPILOT_ORBIT_DISTANCE_MIN_M as ORBIT_DISTANCE_MIN_M,
+} from '../../utilities/consts';
+import { normalizeAutopilotMode, normalizeAutopilotOrbitMode } from '../../settings/settings-store';
+
+const isClassic = computed(() => simStore.autopilotMode === 'classic');
 
 const canReenter = computed(
     () => simStore.hasKnownShip && simStore.knownShipTypeId === simStore.selectedShipTypeId
@@ -128,6 +192,21 @@ function onChaseModeChange(e: Event): void {
 
 function onCoastDriftAlignChange(e: Event): void {
     setCoastDriftAlignEnabled((e.target as HTMLInputElement).checked);
+}
+
+function onAutopilotModeChange(e: Event): void {
+    setAutopilotMode(normalizeAutopilotMode((e.target as HTMLSelectElement).value));
+}
+
+function onAutopilotOrbitModeChange(e: Event): void {
+    setAutopilotOrbitMode(normalizeAutopilotOrbitMode((e.target as HTMLSelectElement).value));
+}
+
+function onAutopilotOrbitDistanceChange(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    setAutopilotOrbitDistanceM(Number(input.value));
+    // Show the clamped value back, even when it didn't change the store (e.g. typed 5 twice).
+    input.value = String(simStore.autopilotOrbitDistanceM);
 }
 
 function onTargetAssistChange(e: Event): void {

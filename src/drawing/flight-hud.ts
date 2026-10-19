@@ -725,7 +725,10 @@ export class FlightHUD {
                     const rawDist = ship.mesh.position.distanceTo(
                         this.autopilotState.targetBody.mesh.position
                     );
+                    // The Ship AI autopilot sizes its own orbit (body-safe altitude, or the
+                    // Flight Controls orbit distance); the classic one always uses 1.5R.
                     const orbitRadius =
+                        this.autopilotState.orbitRadius ??
                         this.autopilotState.targetBody.radius * AUTOPILOT_ORBIT_ALTITUDE_FACTOR;
                     const distToOrbit = Math.max(0, rawDist - orbitRadius);
                     distLabel = `Distance to target: ${formatDistance(distToOrbit)}`;

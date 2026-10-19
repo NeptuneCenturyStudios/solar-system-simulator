@@ -19,6 +19,12 @@ import { leadAimDirection } from '../ship-effects/weapons/intercept';
 import { settingsStore } from '../settings/settings-store';
 import type { Body } from '../bodies/body';
 import { BodyTypeEnum } from '../bodies/body-enums';
+import type { Spaceship } from '../bodies/ships/spaceship';
+import { stepShipAiAutopilot } from './autopilot';
+
+// Ship AI autopilot scratch.
+const _aiApForward = new THREE.Vector3();
+const _aiApRelVel = new THREE.Vector3();
 
 // Chase-mode scratch — reused every frame so steering toward a locked target allocates nothing.
 const _chaseToTarget = new THREE.Vector3();
@@ -274,6 +280,13 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // physics — remember it so the weapon aim can carry the camera ray through this frame's turn.
     _aimPrevFrameQuat.copy(flightState.flightCameraQuat);
 
+    // The Ship AI autopilot is flying: it writes the control input instead of the player, and
+    // drives warp, steering and the throttle through the shared NPC pipeline.
+    if (ship.autopilotAI) {
+        updateShipAiAutopilotFlight(ctx, ship, dt, simDt);
+        return;
+    }
+
     const h = ship.handling;
 
     // ── Translate the player's keys and pointer into the ship's control input ──
@@ -374,6 +387,9 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     playerInput.fire = flightState.isFiring && !autopilotState.isActive;
     // Homing weapons capture this at launch; switching locks later never redirects a missile.
     playerInput.target = flightState.selectedTarget;
+    // Cruise control is an AI-pilot input; the player flies on the tier caps alone.
+    playerInput.speedSetpoint = null;
+    playerInput.warpSpeedCap = null;
 
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
 
@@ -668,4 +684,51 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
 
     // prevShiftHeld for the next frame's boost-release detection is tracked by
     // ship.updateBoostDecelState(), called above.
+}
+
+/**
+ * The in-flight frame while the Ship AI autopilot has the player's ship.
+ *
+ * The controller does the flying (see stepShipAiAutopilot); all that is left here is what the
+ * player's own path would otherwise have done for the cockpit: keep the camera on the control
+ * frame, show the warp charge / warp overlays, hide the steering line (the player isn't
+ * steering), and report a speed. The trigger stays dead — the controller holds it released.
+ */
+function updateShipAiAutopilotFlight(
+    ctx: IFlightControlContext,
+    ship: Spaceship,
+    dt: number,
+    simDt: number
+): void {
+    stepShipAiAutopilot(ship, dt, simDt);
+
+    // The camera follows the control frame, exactly as in manual flight.
+    flightState.flightCameraQuat.copy(ship.controlFrameQuat);
+
+    if (ship.warpActive) {
+        ctx.flightHUD.updateWarpHUD(false, true, 0);
+    } else if (ship.warpCharging) {
+        ctx.flightHUD.updateWarpHUD(
+            true,
+            false,
+            ship.warpChargeTimer / ship.handling.flightWarpChargeTime
+        );
+    } else {
+        ctx.flightHUD.hideWarpSprite();
+    }
+
+    ctx.flightSteeringLine.visible = false;
+    ctx.steeringOriginMarker.visible = false;
+    ctx.steeringEndMarker.visible = false;
+
+    // Speed relative to the target, along the nose — what the classic autopilot shows too.
+    const forward = _aiApForward.set(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
+    const apTarget = ship.autopilotTarget;
+    if (apTarget?.mesh && !apTarget._isDisposed) {
+        flightState.currentSpeed = _aiApRelVel
+            .subVectors(ship.velocity, apTarget.velocity)
+            .dot(forward);
+    } else {
+        flightState.currentSpeed = ship.forwardSpeedInFrame(forward);
+    }
 }
