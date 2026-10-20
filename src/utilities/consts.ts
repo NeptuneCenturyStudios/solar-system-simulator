@@ -62,6 +62,7 @@ export const EUROPA_MASS = 4.7998e22 / MASS_SCALE;
 export const GANYMEDE_MASS = 1.4819e23 / MASS_SCALE;
 export const CALLISTO_MASS = 1.0759e23 / MASS_SCALE;
 export const SATURN_MASS = 5.6834e26 / MASS_SCALE;
+export const TITAN_MASS = 1.34553e23 / MASS_SCALE;
 export const URANUS_MASS = 8.681e25 / MASS_SCALE;
 export const NEPTUNE_MASS = 1.02413e26 / MASS_SCALE;
 export const PLUTO_MASS = 1.303e22 / MASS_SCALE;
@@ -79,6 +80,7 @@ export const EUROPA_RADIUS = 1560.8 / RADIUS_SCALE;
 export const GANYMEDE_RADIUS = 2634.1 / RADIUS_SCALE;
 export const CALLISTO_RADIUS = 2410.3 / RADIUS_SCALE;
 export const SATURN_RADIUS = 58232 / RADIUS_SCALE;
+export const TITAN_RADIUS = 2575.5 / RADIUS_SCALE;
 export const URANUS_RADIUS = 25362 / RADIUS_SCALE;
 export const NEPTUNE_RADIUS = 24622 / RADIUS_SCALE;
 export const PLUTO_RADIUS = 1188.3 / RADIUS_SCALE;
@@ -95,6 +97,7 @@ export const EUROPA_DIST_FROM_JUPITER = 671100 / DIST_SCALE;
 export const GANYMEDE_DIST_FROM_JUPITER = 1070400 / DIST_SCALE;
 export const CALLISTO_DIST_FROM_JUPITER = 1882700 / DIST_SCALE;
 export const SATURN_DIST = 1432041000 / DIST_SCALE;
+export const TITAN_DIST_FROM_SATURN = 1221870 / DIST_SCALE;
 export const URANUS_DIST = 2867043000 / DIST_SCALE;
 export const NEPTUNE_DIST = 4498400000 / DIST_SCALE;
 export const PLUTO_DIST = 5906380000 / DIST_SCALE;
@@ -249,6 +252,18 @@ export const GANYMEDE_INCLINATION = 2.214148; // degrees, inclination to the ecl
 export const GANYMEDE_LONG_ASC_NODE = 343.172846; // degrees (Ω)
 export const GANYMEDE_ARG_PERIAPSIS = 319.807813; // degrees (ω)
 export const GANYMEDE_MEAN_ANOMALY_J2000 = 277.048768; // degrees
+
+// === Titan: Orbital Elements (J2000, orbit about Saturn) ===
+// JPL Horizons (Titan 606, Saturn-centred body centre, J2000 ecliptic) osculating elements at
+// exactly J2000 (JD 2451545.0 TDB), measured against the ecliptic like the Galilean moons'. Titan
+// orbits in Saturn's equatorial plane, so the ≈27.7° inclination is Saturn's axial tilt (26.73°)
+// seen from the ecliptic, not an unusually tilted orbit.
+export const TITAN_PERIAPSIS_DIST = 1186986.656 / DIST_SCALE; // 1,186,986.656 km
+export const TITAN_APOAPSIS_DIST = 1256882.946 / DIST_SCALE; // 1,256,882.946 km (e ≈ 0.0286)
+export const TITAN_INCLINATION = 27.71833887; // degrees, inclination to the ecliptic
+export const TITAN_LONG_ASC_NODE = 169.2391603; // degrees (Ω)
+export const TITAN_ARG_PERIAPSIS = 164.4091286; // degrees (ω)
+export const TITAN_MEAN_ANOMALY_J2000 = 163.4361975; // degrees
 
 // === Mars: Orbital Elements (J2000) ===
 // Mars's orbit is noticeably oval (e = 0.0933): the Sun distance ranges from 206.7 to 249.3

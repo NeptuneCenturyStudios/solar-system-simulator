@@ -30,6 +30,11 @@ import {
     GANYMEDE_INCLINATION,
     GANYMEDE_LONG_ASC_NODE,
     GANYMEDE_ARG_PERIAPSIS,
+    TITAN_PERIAPSIS_DIST,
+    TITAN_APOAPSIS_DIST,
+    TITAN_INCLINATION,
+    TITAN_LONG_ASC_NODE,
+    TITAN_ARG_PERIAPSIS,
 } from '../utilities/consts';
 
 import type { CelestialBody } from './celestial-body';
@@ -124,6 +129,17 @@ export function ganymedeOrbitElements(): IMoonOrbitElements {
         GANYMEDE_INCLINATION,
         GANYMEDE_LONG_ASC_NODE,
         GANYMEDE_ARG_PERIAPSIS
+    );
+}
+
+/** Titan's real orbit about Saturn (J2000 osculating elements from consts.ts, JPL Horizons). */
+export function titanOrbitElements(): IMoonOrbitElements {
+    return moonOrbitElementsFromApsides(
+        TITAN_PERIAPSIS_DIST,
+        TITAN_APOAPSIS_DIST,
+        TITAN_INCLINATION,
+        TITAN_LONG_ASC_NODE,
+        TITAN_ARG_PERIAPSIS
     );
 }
 
@@ -248,6 +264,7 @@ export function createMoon(
         mesh: moonMesh,
         moonType: resolvedMoonType,
         attributes: config.attributes,
+        atmosphere: config.atmosphere,
         referenceOrbitElements: config.orbitElements
             ? referenceElementsFromMoonElements(config.orbitElements)
             : undefined,

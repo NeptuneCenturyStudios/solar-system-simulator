@@ -9,6 +9,7 @@ export const ioTexture = getBodyTexture('io.jpg');
 export const europaTexture = getBodyTexture('europa.jpg');
 export const ganymedeTexture = getBodyTexture('ganymede.jpg');
 export const callistoTexture = getBodyTexture('callisto.jpg');
+export const titanTexture = getBodyTexture('titan.png');
 
 const SPACE_TEXTURE_COUNT = 13;
 const PROCEDURAL_TEMPORATE_TEXTURES = 5;

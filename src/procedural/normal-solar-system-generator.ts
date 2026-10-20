@@ -27,6 +27,7 @@ import {
     europaOrbitElements,
     ganymedeOrbitElements,
     ioOrbitElements,
+    titanOrbitElements,
 } from '../bodies/create-moon';
 import { KuiperBelt } from '../features/kuiper-belt';
 
@@ -63,6 +64,12 @@ import {
     CALLISTO_MEAN_ANOMALY_J2000,
     CALLISTO_DIST_FROM_JUPITER,
     CALLISTO_RADIUS,
+    TITAN_MASS,
+    TITAN_PERIAPSIS_DIST,
+    TITAN_APOAPSIS_DIST,
+    TITAN_MEAN_ANOMALY_J2000,
+    TITAN_DIST_FROM_SATURN,
+    TITAN_RADIUS,
     VESTA_MASS,
     VESTA_RADIUS,
     PALLAS_MASS,
@@ -142,6 +149,7 @@ import {
     ioTexture,
     moonTexture,
     spaceTextures,
+    titanTexture,
 } from '../drawing/textures';
 import type {
     ProceduralGenerationReporter,
@@ -192,8 +200,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     ): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
 
-        // Total bodies: Sun + 9 planets + Ceres + 3 asteroids + 5 moons + ISS + Halley = 21
-        const totalBodies = 21;
+        // Total bodies: Sun + 9 planets + Ceres + 3 asteroids + 6 moons + ISS + Halley = 22
+        const totalBodies = 22;
         let completed = 0;
 
         const report = (workUnit?: ProceduralGenerationWorkUnit) => {
@@ -697,6 +705,58 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         bodies.push(saturn);
         completed++;
         report({ phase: 'planets', label: `Saturn ${completed}/${totalBodies}` });
+        await this.yieldToEventLoop();
+
+        bodies.push(
+            createMoon(saturn, this.scene, {
+                angle: trueAnomalyFromApsides(
+                    TITAN_MEAN_ANOMALY_J2000,
+                    TITAN_PERIAPSIS_DIST,
+                    TITAN_APOAPSIS_DIST
+                ),
+                orbitElements: titanOrbitElements(),
+                distance: TITAN_DIST_FROM_SATURN,
+                radius: TITAN_RADIUS,
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                mass: TITAN_MASS,
+                id: 'camTitan',
+                name: 'Titan',
+                trailColor: 0xd9902f,
+                maxTrail: 1500,
+                moonType: MoonTypeEnum.Terrestrial,
+                texture: titanTexture,
+                // Thick nitrogen/methane haze: ~1.47 bar at the surface, hazy orange layers
+                // extending a few hundred km up.
+                atmosphere: { radius: TITAN_RADIUS * 1.2, tint: 0xd9902f, density: 1.47 },
+                attributes: {
+                    surfacePressure: { discovered: true },
+                    coreType: { value: CoreTypeEnum.Icy, discovered: true },
+                    atmosphericComposition: {
+                        value: AtmosphericGasEnum.Nitrogen | AtmosphericGasEnum.Methane,
+                        discovered: true,
+                    },
+                    soilComposition: {
+                        value: SoilCompositionEnum.WaterIce | SoilCompositionEnum.Carbon,
+                        discovered: true,
+                    },
+                    liquidComposition: {
+                        value:
+                            LiquidCompositionEnum.LiquidMethane |
+                            LiquidCompositionEnum.LiquidEthane,
+                        discovered: true,
+                    },
+                    averageTemperatureKelvin: { value: 94, discovered: true },
+                    vegetation: { value: VegetationEnum.None, discovered: true },
+                    sentientLife: { value: false, discovered: true },
+                    lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                    orbitalPeriod: { discovered: true },
+                    rotationPeriod: { discovered: true },
+                },
+            })
+        );
+        completed++;
+        report({ phase: 'moons', label: `Titan ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Uranus

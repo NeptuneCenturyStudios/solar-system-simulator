@@ -1371,52 +1371,37 @@ function createNewBody(
             const parentPos = focusedBody.mesh.position.clone();
             const parentVel = focusedBody.velocity.clone();
 
-            // Step 2: random distance from parent surface
+            // Step 2: size/spin params. Only the procedural generators use the rolled orbital
+            // distance; a manually created moon goes where the camera is instead.
             const {
                 mass: moonMass,
                 radius: moonRadius,
-                distance: moonDistance,
                 rotationSpeed: moonRotationSpeed,
             } = randomMoonParams(focusedBody.radius, { mass: customMass, radius: customRadius });
 
-            // Step 3: random radial direction using uniform sphere sampling
-            //   theta ∈ [0, 2π), phi ∈ [0, π] distributed uniformly via inverse CDF
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-            const radialDir = new THREE.Vector3(
-                Math.sin(phi) * Math.cos(theta),
-                Math.cos(phi),
-                Math.sin(phi) * Math.sin(theta)
-            );
+            // Step 3: spawn at the camera (same as planets/asteroids), orbiting the parent from
+            // wherever that puts the moon.
+            const moonSpawnPos = getNearCameraSpawnPos();
+            const toMoon = moonSpawnPos.clone().sub(parentPos);
+            const moonDistance = toMoon.length();
 
-            // Step 4: moon position = parent position + radialDir * moonDistance
-            const moonSpawnPos = parentPos.clone().addScaledVector(radialDir, moonDistance);
-
-            // Step 5: orbital velocity perpendicular to radialDir
-            //   Build a full orthonormal basis in the plane perpendicular to radialDir,
-            //   then pick a random direction within it.
-            const circularSpeed = Math.sqrt(
-                (G * simulationState.gMultiplier * focusedBody.mass) / moonDistance
-            );
-            const orbitSpeed =
-                orbitType === 'elliptical'
-                    ? circularSpeed * Math.sqrt(Math.max(0, 1 - 0.3))
-                    : circularSpeed;
-
-            const basisHelper =
-                Math.abs(radialDir.y) < 0.9
-                    ? new THREE.Vector3(0, 1, 0)
-                    : new THREE.Vector3(1, 0, 0);
-            const perp1 = new THREE.Vector3().crossVectors(radialDir, basisHelper).normalize();
-            const perp2 = new THREE.Vector3().crossVectors(radialDir, perp1).normalize();
-            const orbitAngle = Math.random() * Math.PI * 2;
-            const orbitDir = perp1
+            // Step 4: orbital velocity about the parent at that point, carried along with the
+            // parent's own motion.
+            const moonSpawnVel = parentVel
                 .clone()
-                .multiplyScalar(Math.cos(orbitAngle))
-                .addScaledVector(perp2, Math.sin(orbitAngle));
+                .add(
+                    computeOrbitVelocityAtPos(
+                        moonSpawnPos,
+                        parentPos,
+                        focusedBody.mass,
+                        orbitType,
+                        0.3,
+                        inclination
+                    )
+                );
 
-            // Moon velocity = parent velocity + orbital velocity
-            const moonSpawnVel = parentVel.clone().addScaledVector(orbitDir, orbitSpeed);
+            // In-plane angle of the spawn point about the parent (0 = +X, π/2 = +Z).
+            const orbitAngle = Math.atan2(toMoon.z, toMoon.x);
 
             const moonId = createUniqueId('moon');
             // Moons are named relative to their parent: "<Parent> <Roman numeral>".
