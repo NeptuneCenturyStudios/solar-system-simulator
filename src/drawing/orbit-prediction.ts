@@ -4,6 +4,7 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { Body } from '../bodies/body';
 import { BodyTypeEnum } from '../bodies/body-enums';
+import { CelestialBody } from '../bodies/celestial-body';
 import {
     G,
     ORBIT_PREDICTION_BASE_SEGMENTS,
@@ -18,10 +19,18 @@ const ORBIT_PREDICTION_COLOR = 0x44aaff;
 /** Opacity of the orbit prediction line. */
 const ORBIT_PREDICTION_OPACITY = 0.35;
 
+/** Position, velocity and mass of the thing being predicted (a body, or a body plus its moons). */
+interface OrbiterState {
+    pos: THREE.Vector3;
+    vel: THREE.Vector3;
+    mass: number;
+}
+
 /**
  * Manages orbit prediction lines for all bodies in the simulation.
- * Computes a 2-body Keplerian orbit for each body relative to its
- * strongest gravitational influencer and draws the full orbital path.
+ * Computes a 2-body Keplerian orbit for each body relative to its declared orbit parent
+ * (falling back to its strongest gravitational influencer when it has none) and draws the full
+ * orbital path.
  */
 export class OrbitPredictionManager {
     private scene: THREE.Scene;
@@ -97,6 +106,60 @@ export class OrbitPredictionManager {
         return best;
     }
 
+    /**
+     * The body this one's prediction circles. The declared orbit parent wins — raw pull is the
+     * wrong question for a moon (the Sun out-pulls Earth on the Moon) or a planet with a massive
+     * moon (Charon out-pulls the Sun on Pluto). Bodies with no parent fall back to findPrimary().
+     */
+    private resolveReference(body: Body, allBodies: Body[]): Body | null {
+        if (body instanceof CelestialBody) {
+            const parent = body.orbitParent;
+            if (parent && !parent._isDisposed && parent.mesh) return parent;
+        }
+        return this.findPrimary(body, allBodies);
+    }
+
+    /**
+     * Groups bodies by their declared orbit parent, so a planet's moons can be found without
+     * scanning every body for every planet.
+     */
+    private buildChildrenMap(allBodies: Body[]): Map<Body, Body[]> {
+        const children = new Map<Body, Body[]>();
+        for (const other of allBodies) {
+            if (!(other instanceof CelestialBody) || other._isDisposed || !other.mesh) continue;
+            const parent = other.orbitParent;
+            if (!parent || parent._isDisposed) continue;
+            const siblings = children.get(parent);
+            if (siblings) siblings.push(other);
+            else children.set(parent, [other]);
+        }
+        return children;
+    }
+
+    /**
+     * The state to predict for a body. A body with moons is replaced by the barycenter of itself
+     * and its moons: its own position wobbles around that point (Pluto circles the Pluto–Charon
+     * barycenter every 6.4 days), and an ellipse fitted to the wobbling state is distorted.
+     * A body without moons is used as-is.
+     */
+    private orbiterState(body: Body, children: Map<Body, Body[]>): OrbiterState {
+        const moons = children.get(body);
+        if (!moons || moons.length === 0) {
+            return { pos: body.mesh.position, vel: body.velocity, mass: body.mass };
+        }
+
+        let mass = body.mass;
+        const pos = body.mesh.position.clone().multiplyScalar(body.mass);
+        const vel = body.velocity.clone().multiplyScalar(body.mass);
+        for (const moon of moons) {
+            mass += moon.mass;
+            pos.addScaledVector(moon.mesh.position, moon.mass);
+            vel.addScaledVector(moon.velocity, moon.mass);
+        }
+
+        return { pos: pos.divideScalar(mass), vel: vel.divideScalar(mass), mass };
+    }
+
     private buildPerifocalAxes(
         r: THREE.Vector3,
         orbitNormal: THREE.Vector3,
@@ -142,26 +205,28 @@ export class OrbitPredictionManager {
     }
 
     /**
-     * Compute orbital prediction points for a body relative to its primary.
+     * Compute orbital prediction points for an orbiter relative to its primary.
      * Uses two-body Keplerian orbital mechanics from the current state vector.
      * Returns an array of THREE.Vector3 points forming the orbit curve, or
      * null if a prediction cannot be computed (e.g. unbound trajectory).
      */
     private computeOrbitPoints(
-        body: Body,
+        orbiter: OrbiterState,
         primary: Body,
         gMultiplier: number
     ): THREE.Vector3[] | null {
-        const r = new THREE.Vector3().subVectors(body.mesh.position, primary.mesh.position);
-        const v = body.velocity.clone().sub(primary.velocity);
+        const r = new THREE.Vector3().subVectors(orbiter.pos, primary.mesh.position);
+        const v = orbiter.vel.clone().sub(primary.velocity);
 
         const rLen = r.length();
         const vLen = v.length();
 
         if (rLen < 1e-10 || vLen < 1e-10) return null;
 
-        // Standard gravitational parameter (scaled units), matching the physics engine.
-        const mu = G * gMultiplier * primary.mass;
+        // Standard gravitational parameter (scaled units), matching the physics engine. The
+        // relative orbit of a two-body pair is governed by the sum of both masses — the same
+        // value create-moon.ts uses to place moons.
+        const mu = G * gMultiplier * (primary.mass + orbiter.mass);
         if (mu <= 0) return null;
 
         // Specific angular momentum: h = r x v
@@ -276,6 +341,7 @@ export class OrbitPredictionManager {
         }
 
         const activeIds = new Set<string>();
+        const children = this.buildChildrenMap(bodies);
 
         for (const body of bodies) {
             if (!body || body._isDisposed || !body.mesh) continue;
@@ -283,10 +349,14 @@ export class OrbitPredictionManager {
             // Skip stars, they are the primaries, not orbiters.
             if (body.bodyType & BodyTypeEnum.Star) continue;
 
-            const primary = this.findPrimary(body, bodies);
+            const primary = this.resolveReference(body, bodies);
             if (!primary) continue;
 
-            const points = this.computeOrbitPoints(body, primary, gMultiplier);
+            const points = this.computeOrbitPoints(
+                this.orbiterState(body, children),
+                primary,
+                gMultiplier
+            );
             if (!points || points.length < 3) continue;
 
             activeIds.add(body.id);

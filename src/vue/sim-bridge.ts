@@ -731,7 +731,7 @@ export function setTimeScale(value: number): void {
 
 // Same bounds the old bottom toolbar used (ui-manager.ts).
 const MIN_TIME_SCALE = 0.01;
-const MAX_TIME_SCALE = 2 ** 12;
+const MAX_TIME_SCALE = 2 ** 14;
 
 /**
  * Multiply the time scale by `factor` (e.g. 0.5 / 2), clamped to the toolbar's bounds.
