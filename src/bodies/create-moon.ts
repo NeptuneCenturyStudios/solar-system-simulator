@@ -35,6 +35,11 @@ import {
     TITAN_INCLINATION,
     TITAN_LONG_ASC_NODE,
     TITAN_ARG_PERIAPSIS,
+    CHARON_PERIAPSIS_DIST,
+    CHARON_APOAPSIS_DIST,
+    CHARON_INCLINATION,
+    CHARON_LONG_ASC_NODE,
+    CHARON_ARG_PERIAPSIS,
 } from '../utilities/consts';
 
 import type { CelestialBody } from './celestial-body';
@@ -143,6 +148,17 @@ export function titanOrbitElements(): IMoonOrbitElements {
     );
 }
 
+/** Charon's real orbit about Pluto (J2000 osculating elements from consts.ts, JPL Horizons). */
+export function charonOrbitElements(): IMoonOrbitElements {
+    return moonOrbitElementsFromApsides(
+        CHARON_PERIAPSIS_DIST,
+        CHARON_APOAPSIS_DIST,
+        CHARON_INCLINATION,
+        CHARON_LONG_ASC_NODE,
+        CHARON_ARG_PERIAPSIS
+    );
+}
+
 /**
  * Places the moon on a flat, circular orbit at `config.distance` in the parent's local XZ
  * plane. `config.angle` is the in-plane orbital angle (0 = +X axis, π/2 = +Z axis) and
@@ -153,7 +169,11 @@ function circularLocalState(
     config: IMoonCreationOptions,
     angle: number
 ): LocalOrbitState {
-    const trajectory = calculateTrajectory(parent.dependencies.getG(), config.distance, parent.mass);
+    const trajectory = calculateTrajectory(
+        parent.dependencies.getG(),
+        config.distance,
+        parent.mass
+    );
     const speed = trajectory.vel.z; // magnitude of the circular orbital speed
 
     const localPos = new THREE.Vector3(

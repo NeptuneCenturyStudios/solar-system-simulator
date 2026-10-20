@@ -22,6 +22,7 @@ import { createSatellite } from '../utilities/utilities';
 import type { ISolarSystemGenerationResult, IStateDependencies } from '../interfaces';
 import {
     callistoOrbitElements,
+    charonOrbitElements,
     createMoon,
     earthMoonOrbitElements,
     europaOrbitElements,
@@ -70,6 +71,12 @@ import {
     TITAN_MEAN_ANOMALY_J2000,
     TITAN_DIST_FROM_SATURN,
     TITAN_RADIUS,
+    CHARON_MASS,
+    CHARON_PERIAPSIS_DIST,
+    CHARON_APOAPSIS_DIST,
+    CHARON_MEAN_ANOMALY_J2000,
+    CHARON_DIST_FROM_PLUTO,
+    CHARON_RADIUS,
     VESTA_MASS,
     VESTA_RADIUS,
     PALLAS_MASS,
@@ -144,6 +151,7 @@ import {
 } from '../bodies/body-attributes';
 import {
     callistoTexture,
+    charonTexture,
     europaTexture,
     ganymedeTexture,
     ioTexture,
@@ -200,8 +208,8 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
     ): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
 
-        // Total bodies: Sun + 9 planets + Ceres + 3 asteroids + 6 moons + ISS + Halley = 22
-        const totalBodies = 22;
+        // Total bodies: Sun + 9 planets + Ceres + 3 asteroids + 7 moons + ISS + Halley = 23
+        const totalBodies = 23;
         let completed = 0;
 
         const report = (workUnit?: ProceduralGenerationWorkUnit) => {
@@ -805,6 +813,47 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
         bodies.push(pluto);
         completed++;
         report({ phase: 'planets', label: `Pluto ${completed}/${totalBodies}` });
+        await this.yieldToEventLoop();
+
+        bodies.push(
+            createMoon(pluto, this.scene, {
+                angle: trueAnomalyFromApsides(
+                    CHARON_MEAN_ANOMALY_J2000,
+                    CHARON_PERIAPSIS_DIST,
+                    CHARON_APOAPSIS_DIST
+                ),
+                orbitElements: charonOrbitElements(),
+                distance: CHARON_DIST_FROM_PLUTO,
+                radius: CHARON_RADIUS,
+                pos: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                vel: new THREE.Vector3(0, 0, 0), // Will be overridden in createMoon
+                mass: CHARON_MASS,
+                id: 'camCharon',
+                name: 'Charon',
+                trailColor: 0x9a918a,
+                maxTrail: 1000,
+                moonType: MoonTypeEnum.Terrestrial,
+                texture: charonTexture,
+                attributes: {
+                    surfacePressure: { discovered: true },
+                    coreType: { value: CoreTypeEnum.Icy, discovered: true },
+                    atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
+                    soilComposition: {
+                        value: SoilCompositionEnum.WaterIce | SoilCompositionEnum.Carbon,
+                        discovered: true,
+                    },
+                    liquidComposition: { value: LiquidCompositionEnum.None, discovered: true },
+                    averageTemperatureKelvin: { value: 53, discovered: true },
+                    vegetation: { value: VegetationEnum.None, discovered: true },
+                    sentientLife: { value: false, discovered: true },
+                    lifeformBase: { value: LifeformBaseEnum.None, discovered: true },
+                    orbitalPeriod: { discovered: true },
+                    rotationPeriod: { discovered: true },
+                },
+            })
+        );
+        completed++;
+        report({ phase: 'moons', label: `Charon ${completed}/${totalBodies}` });
         await this.yieldToEventLoop();
 
         // Comet (Halley) — real orbit, placed at its J2000 position

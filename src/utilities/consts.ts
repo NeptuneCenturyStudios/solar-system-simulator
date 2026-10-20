@@ -66,6 +66,7 @@ export const TITAN_MASS = 1.34553e23 / MASS_SCALE;
 export const URANUS_MASS = 8.681e25 / MASS_SCALE;
 export const NEPTUNE_MASS = 1.02413e26 / MASS_SCALE;
 export const PLUTO_MASS = 1.303e22 / MASS_SCALE;
+export const CHARON_MASS = 1.5897e21 / MASS_SCALE; // GM = 106.10 km³/s² (PLU060)
 
 // === Planetary System: Radius ===
 export const SUN_RADIUS = 696340 / RADIUS_SCALE;
@@ -84,6 +85,7 @@ export const TITAN_RADIUS = 2575.5 / RADIUS_SCALE;
 export const URANUS_RADIUS = 25362 / RADIUS_SCALE;
 export const NEPTUNE_RADIUS = 24622 / RADIUS_SCALE;
 export const PLUTO_RADIUS = 1188.3 / RADIUS_SCALE;
+export const CHARON_RADIUS = 606 / RADIUS_SCALE;
 
 // === Planetary System: Distance ===
 export const MERCURY_DIST = 57909000 / DIST_SCALE;
@@ -101,6 +103,7 @@ export const TITAN_DIST_FROM_SATURN = 1221870 / DIST_SCALE;
 export const URANUS_DIST = 2867043000 / DIST_SCALE;
 export const NEPTUNE_DIST = 4498400000 / DIST_SCALE;
 export const PLUTO_DIST = 5906380000 / DIST_SCALE;
+export const CHARON_DIST_FROM_PLUTO = 19595.762 / DIST_SCALE;
 
 /** One astronomical unit in simulation units (same scaling as every other distance). */
 export const AU = EARTH_DIST;
@@ -359,6 +362,18 @@ export const PLUTO_INCLINATION = 17.235653; // degrees, relative to the ecliptic
 export const PLUTO_LONG_ASC_NODE = 110.03994; // degrees, longitude of the ascending node (Ω)
 export const PLUTO_ARG_PERIHELION = 115.178666; // degrees, argument of perihelion (ω)
 export const PLUTO_MEAN_ANOMALY_J2000 = 14.143655; // degrees
+
+// === Charon: Orbital Elements (J2000, orbit about Pluto) ===
+// JPL Horizons (Charon 901, Pluto-centred body centre, J2000 ecliptic, PLU060/DE440) osculating
+// elements at exactly J2000 (JD 2451545.0 TDB). Charon orbits in Pluto's equatorial plane, so the
+// ≈112.9° inclination is Pluto's 119.6° axial tilt seen from the ecliptic, not an unusually tilted
+// orbit. The orbit is almost perfectly circular (e ≈ 0.00016) and Charon is tidally locked.
+export const CHARON_PERIAPSIS_DIST = 19592.60580516936 / DIST_SCALE; // 19,592.606 km
+export const CHARON_APOAPSIS_DIST = 19598.91827731688 / DIST_SCALE; // 19,598.918 km
+export const CHARON_INCLINATION = 112.8908097641467; // degrees, inclination to the ecliptic
+export const CHARON_LONG_ASC_NODE = 227.3916867008565; // degrees (Ω)
+export const CHARON_ARG_PERIAPSIS = 172.5855027165132; // degrees (ω)
+export const CHARON_MEAN_ANOMALY_J2000 = 148.6651344828103; // degrees
 
 // === Planetary System: Rotation Axis (degrees) ===
 export const SUN_AXIS = 7.25;
@@ -739,10 +754,12 @@ export const BH_MAX_DEPTH = 24;
 /**
  * Mass threshold for the cutoff solver, as a fraction of the system's total mass. Bodies at
  * or above this are "significant" and interact exactly with each other; bodies below it feel
- * the significant bodies but not one another. At 1e-6 of total mass, a Sun-dominated system
- * classifies planets and moons as significant while asteroids and debris become tracers.
+ * the significant bodies but not one another. At 5e-10 of total mass, a Sun-dominated system
+ * classifies planets, dwarf planets and moons as significant while asteroids and debris become
+ * tracers. It sits just under Charon (≈8e-10) so Pluto and Charon, a binary whose mutual pull
+ * dominates Charon's motion, interact; Ceres (≈4.7e-10) is the largest body left below it.
  */
-export const CUTOFF_MASS_FRACTION = 1e-6;
+export const CUTOFF_MASS_FRACTION = 5e-10;
 
 // === Flight controls ===
 export const FLIGHT_MAX_POINTER_OFFSET = 260; // pixels before reaching full turn rate
