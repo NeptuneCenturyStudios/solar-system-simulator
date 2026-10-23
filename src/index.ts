@@ -3024,14 +3024,19 @@ registerVueSimHooks({
         simulationState.bodies.forEach((b) => {
             if (b instanceof CelestialBody && b.trail) b.trail.visible = checked;
         });
+        // Persisted like every Options panel setting, so the choice survives a reload.
+        // Bodies created later read the same setting in their constructor.
+        settingsStore.update(SettingKey.ShowOrbitTrails, checked);
         setDisplayState({ showTrails: checked });
     },
     setShowOrbitPrediction: (checked: boolean) => {
         orbitPrediction.visible = checked;
+        settingsStore.update(SettingKey.ShowOrbitPrediction, checked);
         setDisplayState({ showOrbitPrediction: checked });
     },
     setShowNames: (checked: boolean) => {
         simulationState.showNames = checked;
+        settingsStore.update(SettingKey.ShowPlanetNames, checked);
         dispatchSimStateChange();
     },
     flyToBody: (body: Body) => {
@@ -3059,11 +3064,20 @@ registerVueSimHooks({
     },
     // getSurfaceCameraState is registered later, once `surfaceCam` exists (see below).
 });
-mountVueUi();
+// Restore the persisted System Explorer display options into the live renderers and the
+// Vue store, so the checkboxes and what is drawn on screen agree from frame one. Done
+// before the UI mounts, because the first poll tick copies `simulationState.showNames`
+// into the store and would otherwise briefly show the wrong checkbox state.
+// Trails are applied per body as each one is constructed (see CelestialBody), which
+// covers every generator and every body added by hand later.
+setDisplayState({
+    showTrails: settingsStore.settings.showOrbitTrails,
+    showOrbitPrediction: settingsStore.settings.showOrbitPrediction,
+});
+orbitPrediction.visible = settingsStore.settings.showOrbitPrediction;
+simulationState.showNames = settingsStore.settings.showPlanetNames;
 
-// Mirror the old panel's default display-option state in the Vue store
-// (Show Orbit Trails checked, Show Orbit Prediction unchecked).
-setDisplayState({ showTrails: true, showOrbitPrediction: false });
+mountVueUi();
 
 // Vue Options panel: persisted user settings (same settingsStore paths as the
 // old panel). Music volume must also be pushed to the live AmbientSoundManager

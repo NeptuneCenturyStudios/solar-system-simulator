@@ -17,6 +17,7 @@ import { PlanetRingsHandle, createPlanetRings } from '../effects/planet-rings';
 import { BodyTypeEnum } from './body-enums';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 import { IPlanetaryAttributes } from './body-attributes';
+import { settingsStore } from '../settings/settings-store';
 import {
     orbitalElementsFromStateVectors,
     type IBodyOrbitElements,
@@ -296,6 +297,10 @@ export class CelestialBody extends Body {
             })
         );
         this.trail.frustumCulled = false;
+        // Honour the persisted System Explorer "Show Orbit Trails" setting from the moment the
+        // body exists, so bodies created while trails are hidden never flash a trail. The
+        // checkbox itself drives the same flag on every body it can already see.
+        this.trail.visible = settingsStore.settings.showOrbitTrails;
         scene.add(this.trail);
 
         // The rings are a child of the mesh, so they follow its position, tilt and azimuth.

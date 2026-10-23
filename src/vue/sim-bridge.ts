@@ -440,10 +440,11 @@ const state = reactive<VueSimStore>({
     lockToSun: false,
     surfaceActive: false,
     surfaceEnabled: false,
-    showNames: false,
-    // Same display defaults as the old panel's HTML checkboxes.
-    showTrails: true,
-    showOrbitPrediction: false,
+    // Display options persist exactly like the Options panel settings below, so the
+    // System Explorer checkboxes survive a reload.
+    showNames: settingsStore.settings.showPlanetNames,
+    showTrails: settingsStore.settings.showOrbitTrails,
+    showOrbitPrediction: settingsStore.settings.showOrbitPrediction,
     // Environment defaults mirror environmentState's initial values.
     spaceBackgroundVisible: true,
     spaceTextureFilename: null as string | null,
@@ -833,6 +834,7 @@ export function setShowTrails(checked: boolean): void {
     if (hookRegistry.setShowTrails) {
         hookRegistry.setShowTrails(checked);
     } else {
+        settingsStore.update(SettingKey.ShowOrbitTrails, checked);
         setDisplayState({ showTrails: checked });
     }
 }
@@ -841,6 +843,7 @@ export function setShowOrbitPrediction(checked: boolean): void {
     if (hookRegistry.setShowOrbitPrediction) {
         hookRegistry.setShowOrbitPrediction(checked);
     } else {
+        settingsStore.update(SettingKey.ShowOrbitPrediction, checked);
         setDisplayState({ showOrbitPrediction: checked });
     }
 }
@@ -849,6 +852,7 @@ export function setShowNames(checked: boolean): void {
     if (hookRegistry.setShowNames) {
         hookRegistry.setShowNames(checked);
     } else {
+        settingsStore.update(SettingKey.ShowPlanetNames, checked);
         simulationState.showNames = checked;
         refreshCameraState();
     }

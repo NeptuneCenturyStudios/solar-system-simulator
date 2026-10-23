@@ -29,6 +29,9 @@ export const enum SettingKey {
     TargetAssistEnabled = 'targetAssistEnabled',
     RenderDistanceAU = 'renderDistanceAU',
     TextureQuality = 'textureQuality',
+    ShowOrbitTrails = 'showOrbitTrails',
+    ShowOrbitPrediction = 'showOrbitPrediction',
+    ShowPlanetNames = 'showPlanetNames',
     AutopilotMode = 'autopilotMode',
     AutopilotOrbitMode = 'autopilotOrbitMode',
     AutopilotOrbitDistanceM = 'autopilotOrbitDistanceM',
@@ -127,6 +130,12 @@ export interface SpaceSimSettings {
     renderDistanceAU: number;
     /** Body-texture quality tier. `high` is only honoured on desktop (see texture-quality.ts). */
     textureQuality: TextureQuality;
+    /** Draw the orbit trail behind every celestial body (System Explorer). */
+    showOrbitTrails: boolean;
+    /** Draw the predicted Keplerian orbit line for every orbiting body (System Explorer). */
+    showOrbitPrediction: boolean;
+    /** Show the name/distance panel above every body (System Explorer, N key). */
+    showPlanetNames: boolean;
     /** Which autopilot engages on Hold E / "Fly here". */
     autopilotMode: AutopilotMode;
     /** Ship AI autopilot: natural (gravity) or artificial (powered) orbit around bodies. */
@@ -162,6 +171,11 @@ const defaultSettings: SpaceSimSettings = {
     // Low is the safe default: it is the only tier a browser can use, and installing the
     // desktop build should not silently jump to multi-megabyte textures nobody asked for.
     textureQuality: 'low',
+    // Same display defaults the System Explorer has always started with: trails on,
+    // prediction and names off.
+    showOrbitTrails: true,
+    showOrbitPrediction: false,
+    showPlanetNames: false,
     // Classic until the Ship AI autopilot has been proven in play.
     autopilotMode: 'classic',
     autopilotOrbitMode: 'natural',

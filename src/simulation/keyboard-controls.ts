@@ -14,6 +14,7 @@ import {
     simulationState,
 } from './simulation';
 import { cycleTargetLock } from './target-lock';
+import { SettingKey, settingsStore } from '../settings/settings-store';
 
 /** Names of the held-state flags on `cameraState.keys`. */
 type HeldKeyName = keyof ICameraState['keys'];
@@ -369,11 +370,14 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         onDown: pressOnce(inFlight, () => exitFlightMode(ctx.flightCtx)),
     });
 
+    // N: show/hide the body name panels. Persisted like the System Explorer checkbox that
+    // drives the same flag, so the choice survives a reload.
     bindings.set('n', {
         onDown: pressOnce(
             () => true,
             () => {
                 simulationState.showNames = !simulationState.showNames;
+                settingsStore.update(SettingKey.ShowPlanetNames, simulationState.showNames);
                 ctx.dispatchSimStateChange();
             },
             false
