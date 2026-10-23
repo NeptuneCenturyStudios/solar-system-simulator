@@ -971,65 +971,12 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 pi.updateIndicator(pi.yAxisIndicator, pi.yAxisRing, ctx.gizmo.target.mesh.position);
         }
 
-        // ── Planet name indicators (replaces old text labels) ───────────
-        // One reused context object instead of a fresh literal every frame.
-        let flightHoverCtx: IPlanetNameFlightContext | undefined;
-        if (isFlightModeActive) {
-            _flightHoverCtx.steeringLineVisible = ctx.flightSteeringLine.visible;
-            _flightHoverCtx.steeringTipX = ctx.steeringLinePositions[3];
-            _flightHoverCtx.steeringTipY = ctx.steeringLinePositions[4];
-            _flightHoverCtx.autopilotCharge = ctx.flightState.autopilotCharge;
-            _flightHoverCtx.activeShip = ctx.flightState.activeShip;
-            flightHoverCtx = _flightHoverCtx;
-        }
-
-        // Tan(fov/2) and the viewport half-sizes are computed once here for all indicators.
-        ctx.screenProjector.beginFrame(ctx.camera);
-        ctx.planetNameIndicator.update(ctx.screenProjector, ctx.autopilotState, flightHoverCtx);
-        // While flying, the ship's shield/hull are shown in the flight HUD (above the speed
-        // readout), so suppress the world-space bar that would otherwise float over its own hull.
-        // Every other body — including other ships — keeps its bar.
-        ctx.healthBarIndicator.update(
-            ctx.screenProjector,
-            isFlightModeActive ? ctx.flightState.activeShip : null
-        );
-        ctx.threatIndicator.update(ctx.screenProjector);
-        ctx.aiDebugIndicator.update(ctx.screenProjector);
-
         // Ship vitals panel: shown with the rest of the flight HUD whenever the player is
         // flying, hidden otherwise (so it disappears the moment flight mode ends).
         if (isFlightModeActive && ctx.flightState.activeShip) {
             ctx.flightHUD.updateShipStatusHUD(ctx.flightState.activeShip);
         } else {
             ctx.flightHUD.hideShipStatus();
-        }
-
-        // ── E-key autopilot charge accumulation ──────────────────────────
-        if (isFlightModeActive) {
-            const _hovered = ctx.planetNameIndicator.steeringHoveredBody;
-            const _eHeld = ctx.keys.e;
-            const _autopilotCanCancel = ctx.autopilotState.isActive;
-
-            // Clear the block as soon as E is released
-            if (!_eHeld) _eBlockedForCancel = false;
-
-            if (_eHeld && _autopilotCanCancel && !_eBlockedForCancel) {
-                // Cancel autopilot on any E press — no hover or charge required
-                ctx.cancelAutopilot('Autopilot disengaged.');
-            } else if (_hovered && _eHeld && !_autopilotCanCancel) {
-                ctx.flightState.autopilotCharge = Math.min(
-                    ctx.flightState.autopilotCharge + wallDt,
-                    FLIGHT_AUTOPILOT_CHARGE_TIME
-                );
-                if (ctx.flightState.autopilotCharge >= FLIGHT_AUTOPILOT_CHARGE_TIME) {
-                    ctx.engageAutopilot(_hovered);
-                    ctx.flightState.autopilotCharge = 0;
-                    // Prevent cancelling immediately if E is still held after engagement
-                    _eBlockedForCancel = true;
-                }
-            } else {
-                ctx.flightState.autopilotCharge = 0;
-            }
         }
 
         // ── Flight camera ──────────────────────────────────────────────────
@@ -1411,11 +1358,66 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             fpsLastUpdate = now;
         }
 
-        // Per-frame target tracking, also moved ahead of the overlay render. The camera may
-        // have moved since the indicators were projected earlier in the frame (flight camera,
-        // orbit controls), so refresh its matrices and re-prime the projector first.
+        // Every screen-projected indicator runs here, after the camera's final move (flight
+        // camera, follow-focus, orbit controls) and before the overlay render. Projecting
+        // earlier pairs this frame's body positions with last frame's camera, so at high
+        // timewarp or warp speed the panels drift a whole frame of motion away from their
+        // bodies. Refresh the camera matrices and prime the projector once for all of them.
         ctx.camera.updateMatrixWorld();
+        // Tan(fov/2) and the viewport half-sizes are computed once here for all indicators.
         ctx.screenProjector.beginFrame(ctx.camera);
+
+        // ── Planet name indicators (replaces old text labels) ───────────
+        // One reused context object instead of a fresh literal every frame.
+        let flightHoverCtx: IPlanetNameFlightContext | undefined;
+        if (isFlightModeActive) {
+            _flightHoverCtx.steeringLineVisible = ctx.flightSteeringLine.visible;
+            _flightHoverCtx.steeringTipX = ctx.steeringLinePositions[3];
+            _flightHoverCtx.steeringTipY = ctx.steeringLinePositions[4];
+            _flightHoverCtx.autopilotCharge = ctx.flightState.autopilotCharge;
+            _flightHoverCtx.activeShip = ctx.flightState.activeShip;
+            flightHoverCtx = _flightHoverCtx;
+        }
+
+        ctx.planetNameIndicator.update(ctx.screenProjector, ctx.autopilotState, flightHoverCtx);
+        // While flying, the ship's shield/hull are shown in the flight HUD (above the speed
+        // readout), so suppress the world-space bar that would otherwise float over its own hull.
+        // Every other body — including other ships — keeps its bar.
+        ctx.healthBarIndicator.update(
+            ctx.screenProjector,
+            isFlightModeActive ? ctx.flightState.activeShip : null
+        );
+        ctx.threatIndicator.update(ctx.screenProjector);
+        ctx.aiDebugIndicator.update(ctx.screenProjector);
+
+        // ── E-key autopilot charge accumulation ──────────────────────────
+        if (isFlightModeActive) {
+            const _hovered = ctx.planetNameIndicator.steeringHoveredBody;
+            const _eHeld = ctx.keys.e;
+            const _autopilotCanCancel = ctx.autopilotState.isActive;
+
+            // Clear the block as soon as E is released
+            if (!_eHeld) _eBlockedForCancel = false;
+
+            if (_eHeld && _autopilotCanCancel && !_eBlockedForCancel) {
+                // Cancel autopilot on any E press — no hover or charge required
+                ctx.cancelAutopilot('Autopilot disengaged.');
+            } else if (_hovered && _eHeld && !_autopilotCanCancel) {
+                ctx.flightState.autopilotCharge = Math.min(
+                    ctx.flightState.autopilotCharge + wallDt,
+                    FLIGHT_AUTOPILOT_CHARGE_TIME
+                );
+                if (ctx.flightState.autopilotCharge >= FLIGHT_AUTOPILOT_CHARGE_TIME) {
+                    ctx.engageAutopilot(_hovered);
+                    ctx.flightState.autopilotCharge = 0;
+                    // Prevent cancelling immediately if E is still held after engagement
+                    _eBlockedForCancel = true;
+                }
+            } else {
+                ctx.flightState.autopilotCharge = 0;
+            }
+        }
+
         ctx.targetIndicator.update(ctx.screenProjector);
         ctx.targetLockIndicator.update(ctx.screenProjector);
         ctx.leadAimIndicator.update(ctx.screenProjector);
