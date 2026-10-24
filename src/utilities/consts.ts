@@ -1117,15 +1117,15 @@ export const WORMHOLE_EMERGE_BUFFER_FACTOR = 1.0;
 // would destabilise the integrator). Effective lightspeed scales with sqrt(gMultiplier), so
 // these orbital speeds stay far below the clamp.
 /** Radius of the circular orbit shared by Earth and both gates (10,000,000 km / DIST_SCALE). */
-export const WORMHOLE_SHORTCUT_ORBIT_RADIUS = 10_000_000 / DIST_SCALE;
+export const WORMHOLE_SHORTCUT_ORBIT_RADIUS = 5_000_000 / DIST_SCALE;
 /**
  * Mouth radius of the two short-cut gates. Capture requires the body to be strictly smaller
  * than the mouth, and a wider mouth also tolerates more time-warp before a frame's chord bows
  * outside it, so this is deliberately roomier than WORMHOLE_DEFAULT_RADIUS.
  */
 export const WORMHOLE_SHORTCUT_GATE_RADIUS = EARTH_RADIUS * 3;
-export const WORMHOLE_SHORTCUT_G_MULTIPLIER = 2_500_000; // preset gravity at scenario launch
-export const WORMHOLE_SHORTCUT_TIME_SCALE = 1; // modest time scale so the orbit is watchable
+export const WORMHOLE_SHORTCUT_G_MULTIPLIER = 1; // preset gravity at scenario launch
+export const WORMHOLE_SHORTCUT_TIME_SCALE = 4096; // modest time scale so the orbit is watchable
 
 // === Asteroid Field scenario ===
 // Earth (with its Moon) flies a tight circular orbit around the Sun while a dense swarm of
