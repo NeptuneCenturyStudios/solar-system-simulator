@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Spaceship } from './spaceship';
 import { Zenith } from './zenith';
+import { Dart } from './dart';
 import { OsirisMothership } from './osirus-mothership';
 
 /**
@@ -33,6 +34,12 @@ export const SHIP_TYPES: IShipType[] = [
         label: 'Zenith',
         create: (dependencies, scene, position, velocity, id) =>
             new Zenith(dependencies, scene, position, velocity, id),
+    },
+    {
+        id: 'dart',
+        label: 'Dart',
+        create: (dependencies, scene, position, velocity, id) =>
+            new Dart(dependencies, scene, position, velocity, id),
     },
     {
         id: 'osiris_mothership',

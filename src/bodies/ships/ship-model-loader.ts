@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { loadGltfModelTemplate } from '../gltf-model-cache';
 
 /**
  * Creates the invisible placeholder container mesh that every Spaceship passes
@@ -55,6 +56,54 @@ export async function loadShipModelInto(
     objLoader.setMaterials(materials);
     const group = await objLoader.loadAsync(`${modelPath}${fileBase}.obj`);
 
+    return fitModelIntoContainer(container, group, radius, modelRotation);
+}
+
+/**
+ * GLB counterpart of loadShipModelInto().  The GLB is fetched and decoded once
+ * (via the shared glTF template cache) and each ship gets its own clone, so
+ * spawning many NPCs of one type doesn't re-decode the textures.  Geometry and
+ * textures are shared between clones; materials are cloned per ship.  The group
+ * is flagged `sharedGeometry` so Spaceship.disposeModelChildren() leaves the
+ * shared geometry alone when one ship dies.
+ *
+ * @param container       The placeholder mesh the model group is attached to.
+ * @param glbUrl          URL of the .glb file.
+ * @param radius          The ship radius the model's longest dimension is scaled to fit.
+ * @param modelRotation   Optional Euler correction for models not authored +Z-forward.
+ */
+export async function loadShipGltfInto(
+    container: THREE.Mesh,
+    glbUrl: string,
+    radius: number,
+    modelRotation: THREE.Euler = new THREE.Euler()
+): Promise<THREE.Box3> {
+    const { template } = await loadGltfModelTemplate({ glbUrl });
+
+    const group = new THREE.Group();
+    group.add(template.clone(true));
+    group.userData.sharedGeometry = true;
+    group.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        mesh.material = Array.isArray(mesh.material)
+            ? mesh.material.map((m) => m.clone())
+            : mesh.material.clone();
+    });
+
+    return fitModelIntoContainer(container, group, radius, modelRotation);
+}
+
+/**
+ * Orients, scales and centres a freshly loaded model group, attaches it to the
+ * container and returns its bounding box in container-local space.
+ */
+function fitModelIntoContainer(
+    container: THREE.Mesh,
+    group: THREE.Group,
+    radius: number,
+    modelRotation: THREE.Euler
+): THREE.Box3 {
     // Apply any authored orientation correction before measuring/scaling so the
     // bbox stays aligned to the game's local axes (+Z = forward, +Y = up).
     group.rotation.copy(modelRotation);

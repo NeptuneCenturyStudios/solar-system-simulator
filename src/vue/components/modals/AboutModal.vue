@@ -40,6 +40,8 @@ const visible = ref(false);
 const credits = `
 Spaceship by Liz Reddington [CC-BY] (https://creativecommons.org/licenses/by/3.0/) via Poly Pizza (https://poly.pizza/m/5nWeu4IQXVX)
 
+"Space Fighter" (https://sketchfab.com/3d-models/space-fighter-7862be0a14a4455cb51e78db16c13ba7) by pirate8888 is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+
 "Osiris Mothership" (https://skfb.ly/6RFKS) by alx_flameniro is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
 
 "Asteroid 01" (https://skfb.ly/6yJYI) by exabyte is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).

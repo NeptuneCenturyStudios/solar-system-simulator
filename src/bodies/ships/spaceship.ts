@@ -581,10 +581,12 @@ export class Spaceship extends Body {
         ) as THREE.Group[];
 
         for (const group of groupsToRemove) {
+            // GLB ships share their geometry with every other ship of the type.
+            const sharedGeometry = group.userData.sharedGeometry === true;
             group.traverse((child) => {
                 const mesh = child as THREE.Mesh;
                 if (mesh.isMesh) {
-                    mesh.geometry?.dispose();
+                    if (!sharedGeometry) mesh.geometry?.dispose();
                     if (Array.isArray(mesh.material)) {
                         mesh.material.forEach((m) => m.dispose());
                     } else {
