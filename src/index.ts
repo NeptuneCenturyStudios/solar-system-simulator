@@ -3851,6 +3851,7 @@ const flightCtx: IFlightControlContext = {
     addEvent,
     // Exit hook: every exit path funnels through exitFlightMode(), which calls this last.
     onFlightModeExited: restorePanelManagerAfterFlight,
+    calcFitDistanceForBody,
 };
 
 const autopilotCtx: IAutopilotContext = {

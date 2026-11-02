@@ -853,6 +853,13 @@ export interface IFlightControlContext {
      * restoring the PanelManager that the flight-mode hide took away.
      */
     onFlightModeExited: () => void;
+
+    /**
+     * Camera distance that frames `body` the way the normal look-at zoom does. Used when
+     * leaving flight from the cockpit, where the in-flight camera distance is ~0 (inside
+     * the hull) and can't be kept.
+     */
+    calcFitDistanceForBody: (body: Body) => number;
 }
 
 export interface IAutopilotContext {

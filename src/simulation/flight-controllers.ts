@@ -203,8 +203,12 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     ) {
         const shipPos = flightState.knownShip.mesh.position.clone();
         // Use the current in-flight camera-to-ship distance so the view doesn't
-        // jump to the pre-flight zoom level after exit.
-        const currentCamDist = ctx.camera.position.distanceTo(shipPos);
+        // jump to the pre-flight zoom level after exit. In cockpit view that distance is
+        // ~0 — the camera is inside the hull — so frame the ship at the normal look-at
+        // zoom instead.
+        const currentCamDist = flightState.isCockpitView
+            ? ctx.calcFitDistanceForBody(flightState.knownShip)
+            : ctx.camera.position.distanceTo(shipPos);
         const prevDir = new THREE.Vector3()
             .subVectors(flightState.prevCameraPos, flightState.prevControlsTarget)
             .normalize();

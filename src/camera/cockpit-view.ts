@@ -203,7 +203,12 @@ export class CockpitView {
 
     private gatherTelemetry(ship: Spaceship): ICockpitTelemetry {
         const h = ship.handling;
-        const speed = this.flightState.currentSpeed;
+        // currentSpeed is the signed speed along the nose: negative while drifting backwards.
+        const forwardSpeed = this.flightState.currentSpeed;
+        const speed = Math.abs(forwardSpeed);
+        // The regime label follows the drive (what the pilot is doing), not the speed: coasting
+        // fast in a gravity well is still cruise. The gauge scale follows the speed, so it
+        // switches to the boost range once you're past normal top speed for any reason.
         let regime = 'CRUISE';
         let gaugeMax = h.flightMaxSpeed;
         if (ship.warpActive) {
@@ -211,9 +216,11 @@ export class CockpitView {
             gaugeMax = h.flightWarpSpeed;
         } else if (ship.warpCharging) {
             regime = 'WARP CHG';
-        } else if (speed > h.flightMaxSpeed * 1.001) {
-            regime = 'BOOST';
-            gaugeMax = h.flightBoostMaxSpeed;
+        } else {
+            if (ship.controlInput.boost) regime = 'BOOST';
+            if (ship.controlInput.boost || speed > h.flightMaxSpeed * 1.001) {
+                gaugeMax = h.flightBoostMaxSpeed;
+            }
         }
 
         // Nearest body by surface distance.
@@ -261,6 +268,7 @@ export class CockpitView {
         return {
             shipName: ship.name,
             speed,
+            reversing: forwardSpeed < 0,
             speedGaugeMax: gaugeMax,
             regime,
             speedTier: ship.highSpeedMode ? 'HIGH' : 'LOW',

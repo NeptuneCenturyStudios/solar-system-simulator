@@ -7,11 +7,13 @@ import { formatAU, formatDistance, formatSpeed } from '../utilities/display-form
  */
 export interface ICockpitTelemetry {
     shipName: string;
-    /** Current flight speed (sim units/s). */
+    /** Current flight speed magnitude (sim units/s); see `reversing` for direction. */
     speed: number;
+    /** True when the ship is moving backwards along its nose (negative forward speed). */
+    reversing: boolean;
     /** Top speed of the tier the ship is flying in, for the speed gauge. */
     speedGaugeMax: number;
-    /** Flight regime label: CRUISE, BOOST, WARP, WARP CHG. */
+    /** Flight regime label: CRUISE, BOOST, WARP, WARP CHG. Comes from the drive, not the speed. */
     regime: string;
     /** LOW or HIGH speed tier. */
     speedTier: 'LOW' | 'HIGH';
@@ -232,7 +234,11 @@ function paintSpeedScreen(
     const r = Math.min(w * 0.4, h * 0.56);
     const start = Math.PI * 1.1;
     const end = Math.PI * 1.9;
-    const f = t.speedGaugeMax > 0 ? Math.min(1, t.speed / t.speedGaugeMax) : 0;
+    // Clamped at both ends: a negative fraction makes canvas draw the arc the long way round
+    // (the "overfill"), and coasting past the tier's top speed pegs the needle instead.
+    const raw = t.speedGaugeMax > 0 ? t.speed / t.speedGaugeMax : 0;
+    const f = Math.max(0, Math.min(1, raw));
+    const overspeed = raw > 1.001;
 
     ctx.lineCap = 'round';
     ctx.lineWidth = h * 0.045;
@@ -242,8 +248,10 @@ function paintSpeedScreen(
     ctx.stroke();
 
     const regimeColor = t.regime === 'WARP' ? '#a070ff' : t.regime === 'BOOST' ? AMBER : CYAN;
-    ctx.strokeStyle = regimeColor;
-    ctx.shadowColor = regimeColor;
+    // A pegged gauge turns amber so "beyond the scale" doesn't read as "exactly at max".
+    const arcColor = overspeed ? AMBER : regimeColor;
+    ctx.strokeStyle = arcColor;
+    ctx.shadowColor = arcColor;
     ctx.shadowBlur = 12;
     ctx.beginPath();
     ctx.arc(cx, cy, r, start, start + (end - start) * f);
@@ -264,7 +272,10 @@ function paintSpeedScreen(
     }
 
     text(ctx, formatSpeed(t.speed), cx, h * 0.5, h * 0.15, CYAN, 'center', 'bold');
-    text(ctx, t.regime, cx, h * 0.68, h * 0.085, regimeColor, 'center', 'bold');
+    const status = [t.regime];
+    if (t.reversing) status.push('REVERSE');
+    if (overspeed) status.push('OVERSPEED');
+    text(ctx, status.join(' · '), cx, h * 0.68, h * 0.085, overspeed ? AMBER : regimeColor, 'center', 'bold');
 
     if (t.warpCharge > 0) {
         bar(ctx, w * 0.2, h * 0.82, w * 0.6, h * 0.05, t.warpCharge, '#a070ff');
