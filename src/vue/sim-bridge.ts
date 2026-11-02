@@ -4,7 +4,7 @@ import { BodyTypeEnum } from '../bodies/body-enums';
 import { Body } from '../bodies/body';
 import { probeScanStatusLabel } from '../bodies/probe-scan-status';
 import type { IBodyAttributeRow } from '../bodies/body-attribute-display';
-import { SHIP_TYPES } from '../bodies/ships/ship-registry';
+import { getShipTypeById } from '../bodies/ships/ship-registry';
 import { generateRandomCustomBodyName } from '../procedural/custom-body-naming';
 import {
     autopilotState,
@@ -478,7 +478,7 @@ const state = reactive<VueSimStore>({
     autopilotMode: settingsStore.settings.autopilotMode,
     autopilotOrbitMode: settingsStore.settings.autopilotOrbitMode,
     autopilotOrbitDistanceM: settingsStore.settings.autopilotOrbitDistanceM,
-    selectedShipTypeId: SHIP_TYPES[0].id,
+    selectedShipTypeId: getShipTypeById(settingsStore.settings.selectedShipTypeId).id,
     hasKnownShip: false,
     knownShipTypeId: null as string | null,
     knownShipId: null as string | null,
@@ -1247,8 +1247,9 @@ export function playlistSelectTrack(index: number): void {
 
 // ── Flight Controls actions ───────────────────────────────────────────────
 
-/** Update the ship type selected in the Flight Controls dropdown (pure UI state). */
+/** Update the ship type selected in the Flight Controls dropdown and remember it for the next load. */
 export function setSelectedShipTypeId(id: string): void {
+    settingsStore.update(SettingKey.SelectedShipTypeId, id);
     state.selectedShipTypeId = id;
 }
 

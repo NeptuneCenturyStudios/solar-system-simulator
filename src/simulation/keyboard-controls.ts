@@ -286,6 +286,7 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
     // C: free-cam descend; in flight, toggles cockpit / 3rd-person view.
     const cockpitToggle = pressOnce(inFlight, () => {
         flightState.isCockpitView = !flightState.isCockpitView;
+        settingsStore.update(SettingKey.CockpitView, flightState.isCockpitView);
     });
     const cKey = heldKey('c');
     bindings.set('c', {

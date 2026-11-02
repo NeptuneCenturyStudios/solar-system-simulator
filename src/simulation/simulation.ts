@@ -10,6 +10,7 @@ import {
     ISimulationState,
 } from '../interfaces';
 import { Spaceship } from '../bodies/ships/spaceship';
+import { settingsStore } from '../settings/settings-store';
 
 /**
  * The central state object for the solar system simulation, tracking time, bodies, and visual effects.
@@ -34,7 +35,7 @@ export const simulationState: ISimulationState = {
 export const flightState: IFlightState = {
     isActive: false,
     activeShip: null as Spaceship | null,
-    isCockpitView: false,
+    isCockpitView: settingsStore.settings.cockpitView,
     /** Current thrust speed; persists after key release (W increases, S decreases). */
     currentSpeed: 0,
     /** Accumulated mouse pointer offset from screen centre (x/y pixels, capped). */

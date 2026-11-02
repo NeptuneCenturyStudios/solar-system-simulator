@@ -5,7 +5,6 @@ import { Sun } from '../bodies/sun';
 import { Earth } from '../bodies/earth';
 import { createMoon, earthMoonOrbitElements } from '../bodies/create-moon';
 import { getShipTypeById } from '../bodies/ships/ship-registry';
-import { calculateOrbitalSpeed } from '../physics/physics';
 import { AsteroidDefenseScenario } from '../scenarios/asteroid-defense-scenario';
 import { pickRandomSpaceTexture, generateSeedString } from './seed-utils';
 import { createUniqueId } from '../utilities/utilities';
@@ -13,7 +12,6 @@ import { moonTexture } from '../drawing/textures';
 import {
     ASTEROID_DEFENSE_SHIP_ALTITUDE,
     ASTEROID_DEFENSE_TIME_SCALE,
-    EARTH_MASS,
     MOON_DIST_FROM_EARTH,
     MOON_MASS,
     MOON_RADIUS,
@@ -62,19 +60,12 @@ export class AsteroidDefenseGenerator extends SolarSystemGenerator {
         // Tangent in the ecliptic, pointing along Earth's prograde direction of travel.
         const tangent = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), sunward);
         tangent.normalize();
-        const orbitSpeed = calculateOrbitalSpeed(
-            this.dependencies.getG(),
-            ASTEROID_DEFENSE_SHIP_ALTITUDE,
-            EARTH_MASS,
-            0
-        );
-        const velocity = earth.velocity.clone().addScaledVector(tangent, orbitSpeed);
 
         const ship = getShipTypeById('zenith').create(
             this.dependencies,
             this.scene,
             position,
-            velocity,
+            new THREE.Vector3(0, 0, 0),
             createUniqueId('spaceship')
         );
 

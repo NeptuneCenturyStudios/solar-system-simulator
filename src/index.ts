@@ -4587,7 +4587,9 @@ function applySystemLaunchOptions(options: ISystemLaunchOptions) {
     const ship = options.playerShip;
     if (ship && !ship._isDisposed && simulationState.bodies.includes(ship)) {
         flightState.knownShip = ship;
+
         enterFlightMode(ship);
+        setFocusBody(ship);
     }
 }
 

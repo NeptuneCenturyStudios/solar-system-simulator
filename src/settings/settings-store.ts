@@ -28,6 +28,8 @@ export const enum SettingKey {
     CoastDriftAlignEnabled = 'coastDriftAlignEnabled',
     SteeringTimeScaleEnabled = 'steeringTimeScaleEnabled',
     TargetAssistEnabled = 'targetAssistEnabled',
+    CockpitView = 'cockpitView',
+    SelectedShipTypeId = 'selectedShipTypeId',
     RenderDistanceAU = 'renderDistanceAU',
     TextureQuality = 'textureQuality',
     ShowOrbitTrails = 'showOrbitTrails',
@@ -134,6 +136,10 @@ export interface SpaceSimSettings {
      * reticle. The reticle and steering are unaffected.
      */
     targetAssistEnabled: boolean;
+    /** The flight camera starts in the cockpit (true) instead of 3rd person. Saved when C toggles the view. */
+    cockpitView: boolean;
+    /** Ship type preselected in the Flight Controls dropdown. Validated against the ship registry by the bridge. */
+    selectedShipTypeId: string;
     /** Camera far plane in AU. Anything farther from the camera than this is not drawn. */
     renderDistanceAU: number;
     /** Body-texture quality tier. `high` is only honoured on desktop (see texture-quality.ts). */
@@ -176,6 +182,8 @@ const defaultSettings: SpaceSimSettings = {
     coastDriftAlignEnabled: true,
     steeringTimeScaleEnabled: true,
     targetAssistEnabled: false,
+    cockpitView: false,
+    selectedShipTypeId: 'zenith',
     renderDistanceAU: RENDER_DISTANCE_DEFAULT_AU,
     // Low is the safe default: it is the only tier a browser can use, and installing the
     // desktop build should not silently jump to multi-megabyte textures nobody asked for.
@@ -230,6 +238,7 @@ class SettingsStore {
         // A hand-edited or stale save must not be able to put the far plane out of range.
         this.data.renderDistanceAU = clampRenderDistanceAU(this.data.renderDistanceAU);
         this.data.textureQuality = normalizeTextureQuality(this.data.textureQuality);
+        this.data.cockpitView = this.data.cockpitView === true;
         this.data.autopilotMode = normalizeAutopilotMode(this.data.autopilotMode);
         this.data.autopilotOrbitMode = normalizeAutopilotOrbitMode(this.data.autopilotOrbitMode);
         this.data.autopilotOrbitDistanceM = clampAutopilotOrbitDistanceM(

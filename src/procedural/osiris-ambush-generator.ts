@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { SolarSystemGenerator } from './solar-system-generator';
 import { Sun } from '../bodies/sun';
-import { calculateOrbitalSpeed } from '../physics/physics';
 import { getShipTypeById } from '../bodies/ships/ship-registry';
 import { createHostileWave, OsirisAmbushScenario } from '../scenarios/osiris-ambush-scenario';
 import {
@@ -65,20 +64,17 @@ export class OsirisAmbushGenerator extends SolarSystemGenerator {
         const offset = Math.max(sun.radius * NPC_SPAWN_STAR_RADII, NPC_SPAWN_FALLBACK_DISTANCE);
         const playerPosition = sun.mesh.position.clone().add(new THREE.Vector3(offset, 0, 0));
 
-        const orbitSpeed = calculateOrbitalSpeed(this.dependencies.getG(), offset, sun.mass, 0);
         // Circular orbit in the XZ plane: velocity is perpendicular to the radius.
         const radial = new THREE.Vector3().subVectors(playerPosition, sun.mesh.position);
         const velocity = new THREE.Vector3(-radial.z, 0, radial.x)
-            .normalize()
-            .multiplyScalar(orbitSpeed)
-            .add(sun.velocity);
+            .normalize();
 
         // ── Player ship ──────────────────────────────────────────────────────
         const playerShip = getShipTypeById('osiris_mothership').create(
             this.dependencies,
             this.scene,
             playerPosition,
-            velocity.clone(),
+            new THREE.Vector3(0, 0, 0),
             createUniqueId('spaceship')
         );
         // Point along the direction of travel. Ships are +Z forward while Matrix4.lookAt aims -Z

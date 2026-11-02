@@ -124,8 +124,18 @@ let _chasePrevPitchErr = 0;
 let _chaseHasPrevError = false;
 let _chasePrevTarget: Body | null = null;
 
+/** How far (in ship radii) the camera sits from a destroyed player ship's wreck at minimum, so
+ *  the expanding explosion stays in frame — in cockpit view the camera starts inside the hull. */
+const DEATH_CAM_MIN_RADII = 8;
+
 /** Exit flight mode and restore normal camera controls. */
 export function exitFlightMode(ctx: IFlightControlContext) {
+    // Where the player's ship died, if it did. The camera stays there instead of snapping back
+    // to the camera the player had before entering flight (which, for scenarios that start in
+    // flight, is the zoomed-out scene overview).
+    let deathPos: THREE.Vector3 | null = null;
+    let deathRadius = 0;
+
     // Preserve the ship reference so the user can re-enter later.
     // Only keep it if the ship is still alive.
     if (
@@ -135,6 +145,15 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     ) {
         flightState.knownShip = flightState.activeShip;
     } else {
+        if (flightState.activeShip) {
+            const dead = flightState.activeShip;
+            // The dead ship's mesh keeps its last transform after die() detaches it.
+            const lastPos = dead.mesh?.position ?? cameraState.frozenFocusPosition;
+            if (lastPos) {
+                deathPos = lastPos.clone();
+                deathRadius = dead.radius;
+            }
+        }
         // Ship was destroyed — clear the known reference too.
         // Also kill warp state so the background updater doesn't force the
         // respawned ship to warp speed, and hide the frozen tunnel immediately.
@@ -218,6 +237,26 @@ export function exitFlightMode(ctx: IFlightControlContext) {
                 : flightState.prevCameraPos.distanceTo(flightState.prevControlsTarget);
         ctx.camera.position.copy(shipPos).addScaledVector(prevDir, dist);
         ctx.controls.target.copy(shipPos);
+    } else if (deathPos) {
+        // The ship was destroyed: keep the flight camera where it is (beside the wreck) and
+        // orbit the death site, so the explosion stays in view.
+        const minDist = Math.max(1e-6, deathRadius) * DEATH_CAM_MIN_RADII;
+        const offset = ctx.camera.position.clone().sub(deathPos);
+        if (offset.lengthSq() < 1e-12) {
+            offset.set(0, 0, 1).applyQuaternion(ctx.camera.quaternion);
+        }
+        if (offset.length() < minDist) {
+            offset.setLength(minDist);
+        }
+        ctx.camera.position.copy(deathPos).add(offset);
+        ctx.controls.target.copy(deathPos);
+        ctx.camera.lookAt(deathPos);
+
+        // Same state handleBodyBecameInvalid sets for a destroyed focus body; set it here too
+        // because the player may have focused something else mid-flight.
+        cameraState.focusBody = null;
+        cameraState.frozenFocusPosition = deathPos.clone();
+        cameraState.isLookAtMode = true;
     } else {
         ctx.camera.position.copy(flightState.prevCameraPos);
         ctx.camera.quaternion.copy(flightState.prevCameraQuat);
