@@ -1855,14 +1855,14 @@ export class Spaceship extends Body {
 
     /**
      * Update the warp tunnel visual.  Call once per frame while the ship exists.
-     * Streak length, speed and opacity follow this ship's cruise / boost / warp speeds.
+     * Everything follows the ship's actual speed against fixed anchors taken from the
+     * low-speed tier (never `this.handling`), so toggling high-speed mode doesn't move them.
      * @param dt        Delta time in seconds.
      */
     updateWarpEffect(dt: number): void {
         this.warpEffect.update(dt, this.mesh.position, this.velocity, {
-            cruise: this.handling.flightMaxSpeed,
-            boost: this.handling.flightBoostMaxSpeed,
-            warp: this.handling.flightWarpSpeed,
+            streakStart: this.lowSpeedHandling.flightMaxSpeed,
+            warp: this.lowSpeedHandling.flightWarpSpeed,
             shipRadius: this.radius,
         });
     }

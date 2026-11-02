@@ -21,11 +21,9 @@ const OUTER_R = 20_0000 / DIST_SCALE;
 const BASE_MIN_LEN = 40_000 / DIST_SCALE;
 const BASE_MAX_LEN = 200_000 / DIST_SCALE;
 
-// Per-streak base travel speed toward the camera (u/s, along -Z in ship space),
-// scaled each frame by the flow multiplier.
-const BASE_MIN_SPD = 500_000 / DIST_SCALE;
-const BASE_MAX_SPD = 1_500_000 / DIST_SCALE;
-const AVG_BASE_SPD = (BASE_MIN_SPD + BASE_MAX_SPD) / 2;
+// Per-streak spread (±) on the flow speed, so streaks don't all move in lockstep. The dust
+// is stationary in space, so the *mean* flow past the ship is exactly the ship's own speed.
+const FLOW_VARIATION = 0.3;
 
 // Band split: fraction of streaks allocated to the dense outer ring.
 const OUTER_BAND_FRAC = 0.7;
@@ -36,37 +34,46 @@ const INNER_BAND_MIN = 0.05;
 const INNER_BAND_MAX = 0.35;
 
 // ─── Speed-response tuning ───────────────────────────────────────────────────
-// Ship speed maps to a `level` in [0,1]: 0 at/below cruise max speed (drifting dust),
-// BOOST_LEVEL at boost max speed, 1 at warp speed.
-const BOOST_LEVEL = 0.25;
+// Everything below is a function of the ship's actual speed alone — never of the flight
+// mode — so the effect looks the same at a given speed whichever tier produced it.
+//
+// Ship speed maps to `t` in [0,1], in log space: 0 at/below the streak-start speed
+// (drifting dust), 1 at warp speed.
 
-// Multipliers on the base streak speed/length at the boost / warp anchors (and length
-// at drift). These act in tunnel-local units, so they set how long a streak takes to
-// cross the tunnel (≈ 5 s / FLOW_MUL) independent of how far the tunnel has been
-// scaled down. There is no drift flow constant: at or below cruise speed the dust is
-// treated as stationary in space, so it passes the ship at the ship's own speed.
-const FLOW_MUL_BOOST = 1;
-const FLOW_MUL_WARP = 10;
-const LEN_MUL_DRIFT = 0;
-const LEN_MUL_BOOST = 0.4;
+// The dust is stationary in space, so it passes the ship at `speed × FLOW_GAIN`.
+const FLOW_GAIN = 1;
+
+// Streak length multiplier (on the per-streak base length) at warp, and the curve that
+// shapes it: lenMul = LEN_MUL_WARP × t^LEN_CURVE. 1.35 gives ≈ 0.4 just above Low-mode
+// boost speed and already-obvious streaks across the whole High-mode range.
 const LEN_MUL_WARP = 8;
+const LEN_CURVE = 1.35;
 
-// Tunnel size at drift, in ship radii. The full-size tunnel (OUTER_R / FAR_SPAWN_Z) is
-// hundreds of thousands of ship radii across, which at low speed reads as a distant
-// nebula; at drift it's shrunk around the ship so the dust visibly passes by. Depth is
-// squashed more than the radius so dots spawn just ahead rather than piling up at the
-// vanishing point.
+// The field is sized so a particle takes about this long to cross it, which keeps its
+// apparent angular rate roughly constant at any speed: field size is linear in speed
+// until it reaches the full-size tunnel (OUTER_R / FAR_SPAWN_Z).
+const FIELD_TRANSIT_TIME = 2.5;
+// Smallest field, in ship radii, so the dust visibly passes the ship at drift. The full-size
+// tunnel is hundreds of thousands of ship radii across, which at low speed would read as a
+// distant nebula. Depth is squashed more than the radius so dots spawn just ahead rather
+// than piling up at the vanishing point.
 const DRIFT_OUTER_RADII = 30;
 const DRIFT_SPAWN_RADII = 60;
-// The tunnel scale is interpolated in log space from the drift size (level 0) to full
-// size (level 1) along level^SCALE_CURVE, so it stays close to the ship through boost
-// and opens out during the warp spool-up. Existing streaks are held fixed in world
+// Radius ÷ depth: DRIFT_OUTER_RADII / DRIFT_SPAWN_RADII for the smallest field, easing in
+// log space to the full-size tunnel's own ratio. Existing streaks are held fixed in world
 // space while the scale changes (see rescaleStreaks); only new spawns use the new size.
-const SCALE_CURVE = 2;
+const DRIFT_ASPECT = DRIFT_OUTER_RADII / DRIFT_SPAWN_RADII;
+const FULL_ASPECT = OUTER_R / FAR_SPAWN_Z;
 
-// Crossfade from drifting points to streak lines over this level range.
+// Crossfade from drifting points to streak lines over this `t` range. Complete by about
+// Low-mode boost speed: points that keep moving fast read as static snow.
 const STREAK_FADE_START = 0.02;
-const STREAK_FADE_END = 0.2;
+const STREAK_FADE_END = 0.12;
+
+// Distance fade, in multiples of the field's current world radius: fully visible inside
+// FADE_FULL_RADII, gone beyond FADE_END_RADII.
+const FADE_FULL_RADII = 1.5;
+const FADE_END_RADII = 5;
 
 // Drift particle appearance (screen-space pixels, not attenuated by distance).
 const POINT_SIZE_PX = 2;
@@ -76,15 +83,16 @@ const POINT_OPACITY_GAIN = 1.5;
 const _FWD = new THREE.Vector3(0, 0, 1);
 const _dir = new THREE.Vector3();
 
-/** Ship speed anchors (u/s) that drive the warp effect's appearance. */
+/**
+ * Fixed, flight-mode-independent speed anchors (u/s) for the warp effect. They must not
+ * change when the ship toggles between its low- and high-speed handling tiers.
+ */
 export interface WarpSpeedProfile {
-    /** Normal (non-boost) max speed — at or below this the effect is drifting dust. */
-    cruise: number;
-    /** Boost max speed — the effect has become short streaks. */
-    boost: number;
-    /** Warp speed — full-length, full-speed streaks and full opacity. */
+    /** At or below this speed the effect is drifting dust; above it the dust starts to streak. */
+    streakStart: number;
+    /** Warp speed — full-length streaks, full-size field and full opacity. */
     warp: number;
-    /** Ship radius (u) — sizes the tunnel at drift so the dust passes close to the ship. */
+    /** Ship radius (u) — sizes the smallest field so the dust passes close to the ship. */
     shipRadius: number;
 }
 
@@ -92,11 +100,13 @@ export interface WarpSpeedProfile {
  * 3-D warp tunnel effect.
  *
  * Renders rainbow speed-streaks arranged in a cylindrical tunnel along the
- * ship's velocity direction.  Everything is driven by ship speed:
- *  - at cruise speeds the streaks are small particles drifting slowly past, with
- *    the tunnel shrunk to a few dozen ship radii so they pass close by,
- *  - while boosting they stretch into short streaks and move faster,
- *  - at warp they become long streaks streaming by at high speed.
+ * ship's velocity direction.  Everything is a continuous function of the ship's
+ * actual speed:
+ *  - the dust is stationary in space, so it streams past at the ship's own speed,
+ *  - the field grows linearly with speed (a particle always takes a similar time to
+ *    cross it) from a few dozen ship radii up to the full-size warp tunnel,
+ *  - particles stretch from dots into longer and longer streaks as speed rises
+ *    (log-scaled between the streak-start speed and warp).
  * Opacity also scales with speed (0 at rest → 1 at warp), so the effect fades
  * in and out automatically as the ship accelerates and decelerates.
  *
@@ -104,9 +114,9 @@ export interface WarpSpeedProfile {
  *   const warpEffect = new WarpEffect(scene);
  *   // each frame (always, whenever a ship exists):
  *   warpEffect.update(dt, ship.mesh.position, ship.velocity,
- *                     { cruise, boost, warp, shipRadius });
+ *                     { streakStart, warp, shipRadius });
  *   // optional per-frame distance fade from outside:
- *   warpEffect.setOpacity(distanceFade);  // 0–1 multiplier
+ *   warpEffect.setOpacity(warpEffect.distanceFadeFor(cameraDistance));  // 0–1 multiplier
  */
 export class WarpEffect {
     private scene: THREE.Scene;
@@ -115,7 +125,7 @@ export class WarpEffect {
     private angle: Float32Array; // radial angle around tunnel axis (rad)
     private radius: Float32Array; // radial distance from axis (u)
     private zPos: Float32Array; // leading-tip Z position (u)
-    private speed: Float32Array; // base travel speed toward camera (u/s, positive)
+    private speed: Float32Array; // flow-speed factor around 1 (× ship speed)
     private hue: Float32Array; // [0,1]
     private len: Float32Array; // base streak length along Z (u)
 
@@ -133,10 +143,10 @@ export class WarpEffect {
     private speedOpacity = 0;
     /** Distance-fade multiplier applied on top of speedOpacity (set by setOpacity). */
     private distanceFade = 1;
-    /** Speed level (0 drift → BOOST_LEVEL boost → 1 warp), updated each frame by update(). */
-    private level = 0;
+    /** Normalised log speed (0 at/below streak-start speed → 1 at warp), updated each frame by update(). */
+    private speedT = 0;
     /** Current length multiplier applied to the base streak lengths. */
-    private lenMul = LEN_MUL_DRIFT;
+    private lenMul = 0;
     /** Tunnel scale applied last frame (0 = not yet set), for world-fixed rescaling. */
     private prevRadialScale = 0;
     private prevDepthScale = 0;
@@ -205,7 +215,7 @@ export class WarpEffect {
     private seedStreak(i: number, zMin: number, zMax: number): void {
         this.angle[i] = Math.random() * Math.PI * 2;
         this.hue[i] = Math.random();
-        this.speed[i] = BASE_MIN_SPD + Math.random() * (BASE_MAX_SPD - BASE_MIN_SPD);
+        this.speed[i] = 1 + (Math.random() * 2 - 1) * FLOW_VARIATION;
         this.len[i] = BASE_MIN_LEN + Math.random() * (BASE_MAX_LEN - BASE_MIN_LEN);
         this.zPos[i] = zMin + Math.random() * (zMax - zMin);
 
@@ -218,30 +228,35 @@ export class WarpEffect {
     }
 
     /**
-     * Map ship speed to a level in [0,1]: 0 at/below cruise, BOOST_LEVEL at boost max,
-     * 1 at warp. The boost→warp segment is linear in speed (sqrt-eased) so it tracks the
-     * whole warp spool-up rather than saturating a moment after warp engages.
+     * Map ship speed to `t` in [0,1], in log space: 0 at/below the streak-start speed,
+     * 1 at warp. Log space because the speed range spans several orders of magnitude.
+     * Depends on speed only, so it is continuous across flight-mode changes.
      */
-    private speedLevel(speed: number, speeds: WarpSpeedProfile): number {
-        const { cruise, boost, warp } = speeds;
-        if (speed <= cruise) return 0;
-        if (speed <= boost) {
-            return boost > cruise
-                ? (BOOST_LEVEL * (speed - cruise)) / (boost - cruise)
-                : BOOST_LEVEL;
-        }
-        if (warp <= boost) return 1;
-        const f = THREE.MathUtils.clamp((speed - boost) / (warp - boost), 0, 1);
-        return BOOST_LEVEL + (1 - BOOST_LEVEL) * Math.sqrt(f);
+    private speedParam(speed: number, speeds: WarpSpeedProfile): number {
+        const { streakStart, warp } = speeds;
+        if (speed <= streakStart || warp <= streakStart) return speed >= warp ? 1 : 0;
+        return THREE.MathUtils.clamp(
+            Math.log(speed / streakStart) / Math.log(warp / streakStart),
+            0,
+            1
+        );
     }
 
     /**
-     * Log-space interpolation of a tunnel scale factor from `driftScale` (t = 0) to full
-     * size (t = 1). Log space because the two ends are ~6 orders of magnitude apart.
+     * Tunnel scale for the given speed. The field's depth in world units is
+     * `speed × FIELD_TRANSIT_TIME` (linear in speed), clamped between the drift size and the
+     * full-size tunnel; the radius follows at an aspect ratio that eases from the drift
+     * ratio to the full-size one (in log space, since the sizes span ~6 orders of magnitude).
      */
-    private tunnelScale(t: number, driftScale: number): number {
-        const lo = Math.log(THREE.MathUtils.clamp(driftScale, 1e-12, 1));
-        return Math.exp(lo * (1 - t));
+    private fieldScale(speed: number, shipRadius: number): { radial: number; depth: number } {
+        const minDepth = Math.max(DRIFT_SPAWN_RADII * shipRadius, FAR_SPAWN_Z * 1e-12);
+        const depth = THREE.MathUtils.clamp(speed * FIELD_TRANSIT_TIME, minDepth, FAR_SPAWN_Z);
+        const p =
+            FAR_SPAWN_Z > minDepth
+                ? Math.log(depth / minDepth) / Math.log(FAR_SPAWN_Z / minDepth)
+                : 1;
+        const aspect = DRIFT_ASPECT * Math.pow(FULL_ASPECT / DRIFT_ASPECT, p);
+        return { radial: (depth * aspect) / OUTER_R, depth: depth / FAR_SPAWN_Z };
     }
 
     /**
@@ -279,14 +294,6 @@ export class WarpEffect {
                 this.seedStreak(i, 0, FAR_SPAWN_Z);
             }
         }
-    }
-
-    /** Interpolate a drift / boost / warp anchor triple at the given level. */
-    private anchorLerp(level: number, drift: number, boost: number, warp: number): number {
-        if (level <= BOOST_LEVEL) {
-            return THREE.MathUtils.lerp(drift, boost, level / BOOST_LEVEL);
-        }
-        return THREE.MathUtils.lerp(boost, warp, (level - BOOST_LEVEL) / (1 - BOOST_LEVEL));
     }
 
     private hslToRgb(h: number, s: number, l: number): [number, number, number] {
@@ -387,7 +394,7 @@ export class WarpEffect {
      * @param dt           Delta time in seconds.
      * @param shipPos      World-space position of the ship.
      * @param shipVelocity World-space velocity of the ship.
-     * @param speeds       The ship's cruise / boost / warp speed anchors.
+     * @param speeds       The ship's fixed streak-start / warp speed anchors.
      */
     update(
         dt: number,
@@ -409,30 +416,21 @@ export class WarpEffect {
 
         this.lines.visible = true;
 
-        // Speed drives the look: drifting dust at cruise → short streaks at boost →
-        // long, fast streaks at warp.
-        this.level = this.speedLevel(speed, speeds);
-        this.lenMul = this.anchorLerp(this.level, LEN_MUL_DRIFT, LEN_MUL_BOOST, LEN_MUL_WARP);
+        // Speed alone drives the look: dots at/below the streak-start speed, streaks that
+        // lengthen continuously up to warp.
+        this.speedT = this.speedParam(speed, speeds);
+        this.lenMul = LEN_MUL_WARP * Math.pow(this.speedT, LEN_CURVE);
 
-        // Shrink the tunnel around the ship at low speed (see DRIFT_OUTER_RADII).
-        const driftDepthScale = THREE.MathUtils.clamp(
-            (DRIFT_SPAWN_RADII * speeds.shipRadius) / FAR_SPAWN_Z,
-            1e-12,
-            1
+        // Field size is linear in speed (see fieldScale).
+        const { radial: radialScale, depth: depthScale } = this.fieldScale(
+            speed,
+            speeds.shipRadius
         );
-        const scaleT = Math.pow(this.level, SCALE_CURVE);
-        const radialScale = this.tunnelScale(
-            scaleT,
-            (DRIFT_OUTER_RADII * speeds.shipRadius) / OUTER_R
-        );
-        const depthScale = this.tunnelScale(scaleT, driftDepthScale);
         this.rescaleStreaks(radialScale, depthScale);
 
-        // Drift flow: stationary dust, so the average particle passes at the ship's own
-        // speed (converted to tunnel-local units at the drift depth scale). Above cruise
-        // it's anchored at the cruise-speed value and blends into the boost/warp flow.
-        const driftFlowMul = Math.min(speed, speeds.cruise) / (AVG_BASE_SPD * driftDepthScale);
-        const flowMul = this.anchorLerp(this.level, driftFlowMul, FLOW_MUL_BOOST, FLOW_MUL_WARP);
+        // Stationary dust: it passes the ship at the ship's own speed. Streak positions are
+        // tunnel-local, so convert the world-space speed through the depth scale.
+        const localFlow = (speed * FLOW_GAIN) / depthScale;
 
         // Scale the opacity based on speed. The opacity should scale on a curve, so that it is 0 at rest and 1 at maxSpeed. The curve should be steep at low speeds and flatten out at high speeds.
         this.speedOpacity = this.warpOpacity(speed, speeds.warp);
@@ -448,7 +446,7 @@ export class WarpEffect {
 
         // Always advance streaks so they're ready the moment they become visible.
         for (let i = 0; i < N_STREAKS; i++) {
-            const step = Math.min(this.speed[i] * flowMul * dt, MAX_STEP);
+            const step = Math.min(this.speed[i] * localFlow * dt, MAX_STEP);
             this.zPos[i] -= step;
             if (this.zPos[i] + this.len[i] * this.lenMul < EXPIRE_Z) {
                 // Jitter the respawn inward by up to this frame's step, so streaks that
@@ -470,11 +468,25 @@ export class WarpEffect {
         this._applyOpacity();
     }
 
+    /**
+     * Distance fade (0–1) for a camera `cameraDistance` (u) from the ship, scaled to the
+     * field's current size: fully visible inside FADE_FULL_RADII field radii, gone beyond
+     * FADE_END_RADII. A small drift-size field therefore fades out after a short zoom-out,
+     * and the huge warp field stays visible out to a correspondingly larger distance.
+     */
+    distanceFadeFor(cameraDistance: number): number {
+        const fieldRadius = OUTER_R * this.prevRadialScale;
+        if (fieldRadius <= 0) return 0;
+        const full = FADE_FULL_RADII * fieldRadius;
+        const end = FADE_END_RADII * fieldRadius;
+        return 1 - THREE.MathUtils.clamp((cameraDistance - full) / (end - full), 0, 1);
+    }
+
     private _applyOpacity(): void {
         const final = this.speedOpacity * this.distanceFade;
         // Crossfade drifting points → streak lines as the ship speeds up.
         const streakMix = THREE.MathUtils.smoothstep(
-            this.level,
+            this.speedT,
             STREAK_FADE_START,
             STREAK_FADE_END
         );

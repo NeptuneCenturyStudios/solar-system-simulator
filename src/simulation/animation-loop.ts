@@ -54,8 +54,6 @@ import {
     GIZMO_TUNING,
     TIME_SCALE,
     TEXT_SPRITE_Z,
-    WARP_FADE_DIST,
-    WARP_FULL_VIS_DIST,
     WARP_SHAKE_MAG,
     FLIGHT_ALT_ORBIT_RETURN_SPEED,
     FREE_CAM_NORMAL_SPEED,
@@ -1216,13 +1214,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 ctx.cameraState.isLookAtMode &&
                 ctx.cameraState.focusBody === ship
             ) {
-                const d = ctx.camera.position.distanceTo(ship.mesh.position);
-                const t = THREE.MathUtils.clamp(
-                    (d - WARP_FULL_VIS_DIST) / (WARP_FADE_DIST - WARP_FULL_VIS_DIST),
-                    0,
-                    1
+                // The fade distances scale with the tunnel's current size.
+                fade = ship.warpEffect.distanceFadeFor(
+                    ctx.camera.position.distanceTo(ship.mesh.position)
                 );
-                fade = 1 - t;
             } else {
                 fade = 0;
             }

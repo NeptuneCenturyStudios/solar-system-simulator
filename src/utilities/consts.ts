@@ -578,10 +578,6 @@ export const COMET_LONG_ASC_NODE = 59.507865; // degrees (Ω)
 export const COMET_ARG_PERIHELION = 112.449622; // degrees (ω)
 export const COMET_MEAN_ANOMALY_J2000 = 65.848901; // degrees
 
-/** Camera distance (u) at which the warp tunnel is still fully opaque. */
-export const WARP_FULL_VIS_DIST = 50;
-/** Camera distance (u) at which the warp tunnel has fully faded out. */
-export const WARP_FADE_DIST = 200;
 /** Peak camera shake displacement (u) applied each frame during warp. */
 export const WARP_SHAKE_MAG = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.
 
