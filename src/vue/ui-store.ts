@@ -49,6 +49,11 @@ export interface VueUiState {
      * set and is never reset, so later re-launches don't re-hide the UI.
      */
     systemReady: boolean;
+    /**
+     * Whether the app is still starting up and no modal is on screen yet. Drives the
+     * "Initializing" message so a slow first load doesn't leave a blank scene.
+     */
+    initializing: boolean;
 }
 
 /**
@@ -69,6 +74,7 @@ const uiState = reactive<VueUiState>({
     panelManagerVisible: true,
     bodyEditor: null,
     systemReady: false,
+    initializing: true,
 });
 
 /**
@@ -84,6 +90,11 @@ export const vueUiState: VueUiState = uiState;
 /** Marks the initial system load as complete, revealing the toolbar/panels. */
 export function setSystemReady(ready: boolean): void {
     uiState.systemReady = ready;
+}
+
+/** Shows or hides the startup "Initializing" message. */
+export function setInitializing(initializing: boolean): void {
+    uiState.initializing = initializing;
 }
 
 /** Reveal the whole PanelManager and release whatever was holding it hidden. */

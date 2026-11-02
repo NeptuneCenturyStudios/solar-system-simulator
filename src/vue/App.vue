@@ -7,6 +7,8 @@
         </div>
     </div>
 
+    <InitializingOverlay />
+
     <WhatsNewModal />
     <StartupModal />
     <ProceduralModal />
@@ -18,6 +20,7 @@
 </template>
 
 <script setup lang="ts">
+import InitializingOverlay from './components/InitializingOverlay.vue';
 import SimControls from './components/SimControls.vue';
 import PanelManager from './components/PanelManager.vue';
 import WhatsNewModal from './components/modals/WhatsNewModal.vue';

@@ -204,6 +204,7 @@ import {
     hidePanelManagerForFlight,
     restorePanelManagerAfterFlight,
     setPanelManagerVisible,
+    setInitializing,
     setSystemReady,
 } from './vue/ui-store';
 import { environmentState } from './simulation/environment-state';
@@ -227,7 +228,11 @@ import {
     scenarioOutcomeModalIsVisible,
     showScenarioOutcomeModal,
 } from './vue/scenario-outcome-modal-service';
-import { showWhatsNewModalIfNeeded, whatsNewModalIsVisible } from './vue/whats-new-modal-service';
+import {
+    isWhatsNewDue,
+    showWhatsNewModalIfNeeded,
+    whatsNewModalIsVisible,
+} from './vue/whats-new-modal-service';
 
 // State singletons
 import {
@@ -4786,12 +4791,19 @@ document.addEventListener('pointerlockchange', () => {
 
 // ── Initialize: check for URL seed or show startup modal ────────────────────
 (async function initializeApp() {
-    // Show the "What's New" modal first if the version marker has changed.
-    await showWhatsNewModalIfNeeded();
+    // Show the "What's New" modal first if the version marker has changed. It is a modal
+    // in its own right, so the "Initializing" message steps aside while it is open.
+    if (isWhatsNewDue()) {
+        setInitializing(false);
+        await showWhatsNewModalIfNeeded();
+        setInitializing(true);
+    }
 
     const urlSeed = parseSeedFromURL();
     if (urlSeed) {
-        // Skip startup modal — proceed directly to generation
+        // Skip startup modal — proceed directly to generation. The procedural progress
+        // overlay takes over from the "Initializing" message.
+        setInitializing(false);
         applyStartupGMultiplier();
 
         const mode =
@@ -4816,7 +4828,12 @@ document.addEventListener('pointerlockchange', () => {
         // Load the default space texture to display while the startup modal is active before the user
         // does anything. This will get replaced once the actual space texture is loaded during the simulation setup.
         // Note: Build your own system doesn't have a generator yet, so it doesn't replace this texture yet.
-        await loadSpaceTexture(scene, './assets/textures/skydome/space-default.jpg');
+        try {
+            await loadSpaceTexture(scene, './assets/textures/skydome/space-default.jpg');
+        } finally {
+            // Hide the "Initializing" message even if the texture failed, so it never sticks.
+            setInitializing(false);
+        }
         // Display the startup modal.
         await startStartupFlow({ allowCancel: false });
     }
