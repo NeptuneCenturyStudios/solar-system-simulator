@@ -26,6 +26,7 @@ export const enum SettingKey {
     HidePanelManagerInFlight = 'hidePanelManagerInFlight',
     ChaseModeEnabled = 'chaseModeEnabled',
     CoastDriftAlignEnabled = 'coastDriftAlignEnabled',
+    SteeringTimeScaleEnabled = 'steeringTimeScaleEnabled',
     TargetAssistEnabled = 'targetAssistEnabled',
     RenderDistanceAU = 'renderDistanceAU',
     TextureQuality = 'textureQuality',
@@ -121,6 +122,13 @@ export interface SpaceSimSettings {
      */
     coastDriftAlignEnabled: boolean;
     /**
+     * Ship steering (yaw, pitch, roll, stick smoothing and banking) advances on sim time instead of
+     * wall time, so slowing time slows the turn rate and speeding it up raises it. Frame-rate
+     * independent either way. Off restores the fixed real-time turn rate at any time scale.
+     * Applies to the player and every AI ship.
+     */
+    steeringTimeScaleEnabled: boolean;
+    /**
      * While a threat is inside the steering circle, the player's shots aim at its intercept point
      * instead of along the reticle — the Tab-locked target first, else the threat nearest the
      * reticle. The reticle and steering are unaffected.
@@ -166,6 +174,7 @@ const defaultSettings: SpaceSimSettings = {
     hidePanelManagerInFlight: true,
     chaseModeEnabled: true,
     coastDriftAlignEnabled: true,
+    steeringTimeScaleEnabled: true,
     targetAssistEnabled: false,
     renderDistanceAU: RENDER_DISTANCE_DEFAULT_AU,
     // Low is the safe default: it is the only tier a browser can use, and installing the

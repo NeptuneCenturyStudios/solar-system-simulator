@@ -143,6 +143,18 @@
             />
             Nose-Aligned Drift
         </label>
+
+        <label
+            class="checkbox-row"
+            title="Steering, roll and banking follow the simulation speed: slow time for slower turns, fast time for faster turns. Turn off to steer at the same real-time rate at any time scale."
+        >
+            <input
+                type="checkbox"
+                :checked="simStore.steeringTimeScaleEnabled"
+                @change="onSteeringTimeScaleChange"
+            />
+            Steering Follows Time Scale
+        </label>
     </PanelBase>
 </template>
 
@@ -160,6 +172,7 @@ import {
     setCoastDriftAlignEnabled,
     setHidePanelManagerInFlight,
     setSelectedShipTypeId,
+    setSteeringTimeScaleEnabled,
     setTargetAssistEnabled,
     simStore,
 } from '../sim-bridge';
@@ -192,6 +205,10 @@ function onChaseModeChange(e: Event): void {
 
 function onCoastDriftAlignChange(e: Event): void {
     setCoastDriftAlignEnabled((e.target as HTMLInputElement).checked);
+}
+
+function onSteeringTimeScaleChange(e: Event): void {
+    setSteeringTimeScaleEnabled((e.target as HTMLInputElement).checked);
 }
 
 function onAutopilotModeChange(e: Event): void {

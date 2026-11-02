@@ -14,6 +14,7 @@ import {
 } from './simulation';
 import { IFlightControlContext } from '../interfaces';
 import { applyWeaponInput } from './ship-weapon-input';
+import { steeringDt } from './steering-clock';
 import { IBodyRayHit, muzzleWorldPosition, raycastBodies } from '../ship-effects/weapons/weapon';
 import { leadAimDirection } from '../ship-effects/weapons/intercept';
 import { settingsStore } from '../settings/settings-store';
@@ -288,6 +289,9 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     }
 
     const h = ship.handling;
+    // Steering runs on this clock (sim time by default), so chase mode's error rate and
+    // lookahead below have to be measured on it too.
+    const steerDt = steeringDt(dt, simDt);
 
     // ── Translate the player's keys and pointer into the ship's control input ──
     // From here on the player is just one input source among possible others: an
@@ -347,9 +351,10 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
             // error — the earlier countersteer this buys is what tames the overshoot.
             let yawTerm = yawErr;
             let pitchTerm = pitchErr;
-            if (_chaseHasPrevError && dt > 1e-4) {
-                const yawErrRate = (yawErr - _chasePrevYawErr) / dt;
-                const pitchErrRate = (pitchErr - _chasePrevPitchErr) / dt;
+            // Guard only against a zero step (the steering clock is tiny, not zero, at low time scales).
+            if (_chaseHasPrevError && steerDt > 1e-9) {
+                const yawErrRate = (yawErr - _chasePrevYawErr) / steerDt;
+                const pitchErrRate = (pitchErr - _chasePrevPitchErr) / steerDt;
                 yawTerm += yawErrRate * CHASE_STEER_LOOKAHEAD;
                 pitchTerm += pitchErrRate * CHASE_STEER_LOOKAHEAD;
             }
@@ -507,7 +512,7 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // and writes mesh.quaternion (frame × bank). NPC ships call the same method,
     // so player and AI orientation handling cannot drift apart.
     if (manualInput && !flightState.altOrbitActive) {
-        ship.applyFrameOrientation(dt);
+        ship.applyFrameOrientation(steerDt);
         flightState.flightCameraQuat.copy(ship.controlFrameQuat);
     } else {
         flightState.flightCameraQuat.copy(ship.mesh.quaternion);

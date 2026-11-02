@@ -118,7 +118,7 @@ export class Dart extends Spaceship {
         };
 
         const containerMesh = createShipContainerMesh();
-        const MODEL_URL = './assets/models/dart/dart1.glb';
+        const MODEL_URL = './assets/models/dart/dart.glb';
 
         // Correct model orientation if the nose is not authored along +Z.
         const MODEL_ROTATION = new THREE.Euler(0, 0, 0);

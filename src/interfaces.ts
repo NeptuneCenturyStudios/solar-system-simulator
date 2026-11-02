@@ -902,6 +902,8 @@ export interface ISpaceshipHandling {
     flightPerpDecay: number;
 
     // ── Steering feel ─────────────────────────────────────────────────
+    // Every "per second" in the steering, roll and banking blocks is a steering-clock second:
+    // sim time by default, wall time with the steeringTimeScaleEnabled setting off.
     flightMaxPointerOffset: number; // pixels before reaching full turn rate
     flightMaxTurnRate: number; // radians/s at full pointer deflection
     flightSteerSmoothRate: number; // exponential-decay rate (per second)

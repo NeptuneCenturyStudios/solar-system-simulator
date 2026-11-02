@@ -300,6 +300,8 @@ export interface VueSimHooks {
     setChaseModeEnabled?: (checked: boolean) => void;
     /** Toggle coasting drift redirecting into the nose axis (persisted via settingsStore). */
     setCoastDriftAlignEnabled?: (checked: boolean) => void;
+    /** Toggle ship steering following the sim time scale (persisted via settingsStore). */
+    setSteeringTimeScaleEnabled?: (checked: boolean) => void;
     /** Toggle weapon target assist for threats in the steering circle (persisted via settingsStore). */
     setTargetAssistEnabled?: (checked: boolean) => void;
     /** Select the body-texture quality tier (persisted via settingsStore; high is desktop-only). */
@@ -398,6 +400,8 @@ export interface VueSimStore {
     chaseModeEnabled: boolean;
     /** While coasting, sideways drift turns to follow the ship's nose (player and AI ships). */
     coastDriftAlignEnabled: boolean;
+    /** Ship steering, roll and banking run on sim time, so they slow down and speed up with it. */
+    steeringTimeScaleEnabled: boolean;
     /** Shots lead a threat automatically while it is inside the steering circle. */
     targetAssistEnabled: boolean;
     /** Body-texture quality tier. `high` is desktop-only; a browser is always downgraded to `low`. */
@@ -467,6 +471,7 @@ const state = reactive<VueSimStore>({
     hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
     chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
     coastDriftAlignEnabled: settingsStore.settings.coastDriftAlignEnabled,
+    steeringTimeScaleEnabled: settingsStore.settings.steeringTimeScaleEnabled,
     targetAssistEnabled: settingsStore.settings.targetAssistEnabled,
     textureQuality: settingsStore.settings.textureQuality,
     autopilotTargetId: null as string | null,
@@ -731,7 +736,7 @@ export function setTimeScale(value: number): void {
 }
 
 // Same bounds the old bottom toolbar used (ui-manager.ts).
-const MIN_TIME_SCALE = 0.01;
+const MIN_TIME_SCALE = 0.0078125;
 const MAX_TIME_SCALE = 2 ** 24;
 
 /**
@@ -1087,6 +1092,16 @@ export function setCoastDriftAlignEnabled(checked: boolean): void {
     state.coastDriftAlignEnabled = checked;
 }
 
+/** Toggle ship steering following the sim time scale (Flight Controls panel). */
+export function setSteeringTimeScaleEnabled(checked: boolean): void {
+    if (hookRegistry.setSteeringTimeScaleEnabled) {
+        hookRegistry.setSteeringTimeScaleEnabled(checked);
+    } else {
+        settingsStore.update(SettingKey.SteeringTimeScaleEnabled, checked);
+    }
+    state.steeringTimeScaleEnabled = checked;
+}
+
 /** Toggle weapon target assist (Flight Controls panel). */
 export function setTargetAssistEnabled(checked: boolean): void {
     if (hookRegistry.setTargetAssistEnabled) {
@@ -1274,6 +1289,6 @@ export function formatTimeScale(value: number): string {
     if (state.isPaused) {
         return `PAUSED`;
     }
-    if (value < 0) return `${Math.abs(value).toFixed(2)}x REVERSE`;
-    return `${value.toFixed(2)}x`;
+    if (value < 0) return `${Math.abs(value).toFixed(3)}x REVERSE`;
+    return `${value.toFixed(3)}x`;
 }

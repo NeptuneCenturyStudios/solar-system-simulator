@@ -3109,6 +3109,9 @@ registerVueSimHooks({
     setCoastDriftAlignEnabled: (checked: boolean) => {
         settingsStore.update(SettingKey.CoastDriftAlignEnabled, checked);
     },
+    setSteeringTimeScaleEnabled: (checked: boolean) => {
+        settingsStore.update(SettingKey.SteeringTimeScaleEnabled, checked);
+    },
     setTargetAssistEnabled: (checked: boolean) => {
         settingsStore.update(SettingKey.TargetAssistEnabled, checked);
     },

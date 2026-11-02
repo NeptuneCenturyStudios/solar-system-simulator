@@ -1098,7 +1098,7 @@ export class Spaceship extends Body {
 
     /**
      * Apply roll with inertia for one frame, driven by this ship's controlInput.
-     * @param dt  Wall-clock seconds (non-physics-scaled).
+     * @param dt  Steering-clock seconds (sim time by default, see `steeringDt`).
      * @returns The angular delta (radians) to apply to the control frame quaternion.
      */
     applyRoll(dt: number): number {
@@ -1129,7 +1129,7 @@ export class Spaceship extends Body {
      * Apply steering smoothing and compute yaw/pitch deltas for one frame.
      * Reads the (already normalised and deadzoned) steerX/steerY from this ship's
      * controlInput, so the player and an AI get identical smoothing and banking.
-     * @param dt  Wall-clock seconds.
+     * @param dt  Steering-clock seconds (sim time by default, see `steeringDt`).
      * @returns yawDelta, pitchDelta, and a banking quaternion for the ship mesh.
      */
     applySteering(dt: number): {
@@ -1170,7 +1170,9 @@ export class Spaceship extends Body {
      * NPC step, so the two can never drift apart. Call once per frame, after the
      * controlInput for this frame has been written.
      *
-     * @param dt Wall-clock seconds (non-physics-scaled).
+     * @param dt Steering-clock seconds: sim time by default, wall time if the
+     *   `steeringTimeScaleEnabled` setting is off. Choose it with `steeringDt()`
+     *   (simulation/steering-clock.ts).
      */
     applyFrameOrientation(dt: number): void {
         if (this._isDisposed || !this.mesh) return;

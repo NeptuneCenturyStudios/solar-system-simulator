@@ -6,6 +6,7 @@ import { createUniqueId } from '../../utilities/utilities';
 import { flightState, simulationState } from '../simulation';
 import { FollowShipAI } from './follow-ship-ai';
 import { applyWeaponInput } from '../ship-weapon-input';
+import { steeringDt } from '../steering-clock';
 import type { ShipAI } from './ship-ai';
 import { settingsStore } from '../../settings/settings-store';
 import { NotificationType } from '../../event-log/event-log';
@@ -224,7 +225,7 @@ export function stepShipController(ship: Spaceship, ai: ShipAI, dt: number, simD
     // before the equivalent call. Thrust needs no gate here — applyFlightThrustSubstep()
     // already refuses to add any while a warp flag is set — and the controller releases
     // the trigger itself for the duration.
-    if (!ship.warpActive) ship.applyFrameOrientation(dt);
+    if (!ship.warpActive) ship.applyFrameOrientation(steeringDt(dt, simDt));
 
     // Turn the controller's trigger intent into actual shots, through the same helper the
     // player's path uses — so an AI pilot gets no more (and no less) than a human does from
