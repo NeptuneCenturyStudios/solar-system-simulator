@@ -572,6 +572,16 @@ export class Spaceship extends Body {
     }
 
     /**
+     * Shows or hides the ship's exterior model (not its effects). The cockpit view hides
+     * the hull of the ship the player is sitting in so it doesn't obstruct the canopy.
+     */
+    setHullVisible(visible: boolean): void {
+        for (const child of this.mesh.children) {
+            if (child.userData.isShipModel === true) child.visible = visible;
+        }
+    }
+
+    /**
      * Disposes all loaded OBJ group children attached to this.mesh.
      * Called from die(); also usable by subclasses that replace their model.
      */

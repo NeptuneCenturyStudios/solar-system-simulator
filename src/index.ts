@@ -136,6 +136,7 @@ import { ScenarioMessageHud, registerScenarioMessageHud } from './drawing/scenar
 import { VelocityArcManager } from './drawing/velocity-arc';
 import { OrbitPredictionManager } from './drawing/orbit-prediction';
 import { SurfaceCameraManager } from './camera/surface-camera';
+import { CockpitView } from './camera/cockpit-view';
 import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
 import { Probe } from './bodies/probe';
@@ -824,6 +825,9 @@ const flightHUD = new FlightHUD(
     () => selectedBody
 );
 flightHUD.init();
+
+// First-person cockpit interior, drawn over the world while flying in cockpit view.
+const cockpitView = new CockpitView(renderer, flightState, () => simulationState.bodies);
 
 const targetIndicator = new AutopilotTargetIndicator(uiScene, autopilotState, flightState);
 targetIndicator.init();
@@ -4898,6 +4902,7 @@ const animCtx: AnimationContext = {
     gridHelperManager,
     aiAvoidanceGizmo,
     flightHUD,
+    cockpitView,
     targetIndicator,
     planetNameIndicator,
     healthBarIndicator,

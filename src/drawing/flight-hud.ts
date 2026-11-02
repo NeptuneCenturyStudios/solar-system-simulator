@@ -420,6 +420,12 @@ export class FlightHUD {
     autopilotBlockedNotifyTimer = 0;
     autopilotBlockedByName = '';
 
+    /**
+     * True while the cockpit's own displays are showing flight data (cockpit view). The 2D
+     * panels they duplicate — warp, thermal gauge, weapon selector, ship vitals — stay hidden.
+     */
+    private cockpitDisplaysActive = false;
+
     private uiScene: THREE.Scene;
     private autopilotState: IAutopilotState;
     private interactionState: {
@@ -539,6 +545,21 @@ export class FlightHUD {
         this.shipStatusSprite?.layout(width, height);
     }
 
+    /**
+     * Hand the duplicated flight readouts over to the cockpit displays (true) or back to
+     * the 2D HUD (false). Call once per frame; hiding happens on the transition.
+     */
+    setCockpitDisplaysActive(active: boolean): void {
+        if (active === this.cockpitDisplaysActive) return;
+        this.cockpitDisplaysActive = active;
+        if (active) {
+            this.hideWarpSprite();
+            this.hideThermalSprite();
+            this.hideWeaponSprite();
+            this.hideShipStatus();
+        }
+    }
+
     /** Show the orbit-notify sprite and reset its timer. */
     showOrbitNotify(): void {
         if (!this.orbitNotifySprite) return;
@@ -548,7 +569,7 @@ export class FlightHUD {
 
     /** Update warp sprite to show charge-bar state; makes it visible. */
     setWarpCharge(fill: number): void {
-        if (!this.warpSprite) return;
+        if (!this.warpSprite || this.cockpitDisplaysActive) return;
         this.setWarpChargeContent(fill);
         this.warpSprite.visible = true;
     }
@@ -556,7 +577,7 @@ export class FlightHUD {
     /** Update warp sprite to show "WARP ACTIVE" pulse; makes it visible. */
     setWarpActive(pulse: number): void {
         const sprite = this.warpSprite;
-        if (!sprite) return;
+        if (!sprite || this.cockpitDisplaysActive) return;
         sprite.setCanvasSize(WARP_ACTIVE_W, WARP_ACTIVE_H);
         sprite.draw(`active|${pulse.toFixed(3)}`, (ctx) => paintWarpActive(ctx, pulse));
         sprite.setScale(320, 60);
@@ -580,7 +601,7 @@ export class FlightHUD {
     /** Update the thermal gauge fill/overheat state and anchor it beside `anchorPos` (the gray steering ring). */
     updateThermalHUD(heat: number, overheated: boolean, anchorPos: THREE.Vector3): void {
         const sprite = this.thermalSprite;
-        if (!sprite) return;
+        if (!sprite || this.cockpitDisplaysActive) return;
         sprite.setScreenPos(anchorPos.x + THERMAL_GAUGE_OFFSET_X, anchorPos.y);
 
         const fill = Math.max(0, Math.min(1, heat));
@@ -609,7 +630,7 @@ export class FlightHUD {
         anchorPos: THREE.Vector3
     ): void {
         const sprite = this.weaponSprite;
-        if (!sprite) return;
+        if (!sprite || this.cockpitDisplaysActive) return;
         sprite.setScreenPos(
             anchorPos.x + WEAPON_LABEL_OFFSET_X,
             anchorPos.y + WEAPON_LABEL_OFFSET_Y
@@ -632,7 +653,7 @@ export class FlightHUD {
      */
     updateShipStatusHUD(ship: Spaceship): void {
         const sprite = this.shipStatusSprite;
-        if (!sprite) return;
+        if (!sprite || this.cockpitDisplaysActive) return;
 
         const shieldFraction =
             ship.maxShieldPoints > 0

@@ -15,6 +15,7 @@ import { PositionIndicatorManager } from '../gizmos/position-indicator';
 import { GridHelperManager } from '../gizmos/grid-helper';
 import { AiAvoidanceGizmo } from '../gizmos/ai-avoidance-gizmo';
 import { FlightHUD } from '../drawing/flight-hud';
+import type { CockpitView } from '../camera/cockpit-view';
 import { AutopilotTargetIndicator } from '../drawing/autopilot-target-indicator';
 import { PlanetNameIndicator, IPlanetNameFlightContext } from '../drawing/planet-name-indicator';
 import { HealthBarIndicator } from '../drawing/health-bar-indicator';
@@ -112,6 +113,7 @@ export interface AnimationContext {
     gridHelperManager: GridHelperManager;
     aiAvoidanceGizmo: AiAvoidanceGizmo;
     flightHUD: FlightHUD;
+    cockpitView: CockpitView;
     targetIndicator: AutopilotTargetIndicator;
     planetNameIndicator: PlanetNameIndicator;
     healthBarIndicator: HealthBarIndicator;
@@ -420,6 +422,13 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             ctx.flightState.isActive &&
             !!ctx.flightState.activeShip &&
             !ctx.flightState.activeShip._isDisposed;
+
+        // In cockpit view the dashboard displays carry speed, vitals, weapon heat and warp,
+        // so the 2D panels that duplicate them are hidden. Aiming aids, target markers,
+        // autopilot prompts and the controls hint stay on the 2D overlay.
+        const cockpitDisplaysActive = isFlightModeActive && ctx.flightState.isCockpitView;
+        ctx.flightHUD.setCockpitDisplaysActive(cockpitDisplaysActive);
+        if (ctx.flightState.isActive) ctx.speedSprite.visible = !cockpitDisplaysActive;
 
         if (
             ctx.flightState.isActive &&
@@ -1047,6 +1056,15 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             }
         }
 
+        // ── Cockpit interior ───────────────────────────────────────────────
+        // Called every frame (not only in flight) so it can restore the hull it hid
+        // when the player leaves cockpit view or flight mode.
+        ctx.cockpitView.update(
+            isFlightModeActive && ctx.flightState.isCockpitView,
+            ctx.camera,
+            wallDt
+        );
+
         // ── Warp shake ─────────────────────────────────────────────────────
         const _shakeShip = ctx.flightState.activeShip ?? ctx.flightState.knownShip;
         if (!simulationState.isPaused && _shakeShip?.warpActive) {
@@ -1435,6 +1453,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             ctx.camera,
             activeBHs.map((b) => ({ position: b.mesh.position, radius: b.radius }))
         );
+        // Cockpit interior overlay: after the world (and lensing), before the 2D HUD.
+        ctx.cockpitView.render(ctx.renderer);
         ctx.renderer.autoClear = false;
         ctx.renderer.clearDepth();
         ctx.renderer.render(ctx.uiScene, ctx.uiCamera);

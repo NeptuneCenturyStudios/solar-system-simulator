@@ -134,6 +134,8 @@ function fitModelIntoContainer(
         }
     });
 
+    // Tags the exterior model so the cockpit view can hide it (Spaceship.setHullVisible).
+    group.userData.isShipModel = true;
     container.add(group);
     return localBbox;
 }

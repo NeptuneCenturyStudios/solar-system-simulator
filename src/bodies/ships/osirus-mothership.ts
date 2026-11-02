@@ -4,7 +4,7 @@ import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
 import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
-import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
+import { createShipContainerMesh, loadShipGltfInto } from './ship-model-loader';
 
 /**
  * A massive alien mothership.
@@ -115,7 +115,7 @@ export class OsirisMothership extends Spaceship {
         };
 
         const containerMesh = createShipContainerMesh();
-        const MODEL_NAME = 'osiris-mothership/osiris-mothership';
+        const MODEL_URL = './assets/models/osiris-mothership/osiris_mothership.glb';
 
         // Correct model orientation so that the rear is facing the camera and not the front
         const MODEL_ROTATION = new THREE.Euler(
@@ -157,13 +157,13 @@ export class OsirisMothership extends Spaceship {
         });
 
         // Kick off the async model load; offsets are applied once the bbox is known.
-        loadShipModelInto(containerMesh, MODEL_NAME, SPACESHIP_RADIUS, MODEL_ROTATION)
+        loadShipGltfInto(containerMesh, MODEL_URL, SPACESHIP_RADIUS, MODEL_ROTATION)
             .then((localBbox) => {
                 this.applyModelOffsets(localBbox);
             })
             .catch((e) => {
                 console.warn(
-                    `Osiris Mothership OBJ/MTL load failed for ${MODEL_NAME} — using placeholder mesh`,
+                    `Osiris Mothership OBJ/MTL load failed for ${MODEL_URL} — using placeholder mesh`,
                     e
                 );
             });
