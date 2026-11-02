@@ -240,6 +240,15 @@ export class CockpitView {
             }
         }
 
+        // Autopilot destination: distance to its surface, like the nav altitude readout.
+        const apTarget =
+            ship.autopilotActive && ship.autopilotTarget && !ship.autopilotTarget._isDisposed
+                ? ship.autopilotTarget
+                : null;
+        const apDistance = apTarget
+            ? apTarget.mesh.position.distanceTo(ship.mesh.position) - apTarget.radius
+            : 0;
+
         const weapon = ship.activeWeapon;
         const warpChargeTime = h.flightWarpChargeTime;
         return {
@@ -264,8 +273,8 @@ export class CockpitView {
             targetName: targetAlive && target ? target.name : null,
             targetDistance,
             targetClosing,
-            autopilotTargetName:
-                ship.autopilotActive && ship.autopilotTarget ? ship.autopilotTarget.name : null,
+            autopilotTargetName: apTarget ? apTarget.name : null,
+            autopilotTargetDistance: apDistance,
         };
     }
 

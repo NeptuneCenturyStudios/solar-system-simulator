@@ -213,9 +213,10 @@ def screen(name, ident, i_path, u0, u1, v0, v1):
 # centre facet: big flight display + small target display
 screen("Screen_Speed", "speed", 1, 0.30, 0.78, 0.10, 0.90)
 screen("Screen_Target", "target", 1, 0.03, 0.27, 0.12, 0.88)
-# wing facets
-screen("Screen_Nav", "nav", 0, 0.06, 0.94, 0.10, 0.90)
-screen("Screen_Status", "status", 2, 0.06, 0.94, 0.10, 0.90)
+# wing facets: only the inboard part of each wing. The outboard ~45% sits past the
+# edge of a 16:9 view from the eye, so a full-width screen had its labels cut off.
+screen("Screen_Nav", "nav", 0, 0.45, 0.95, 0.10, 0.90)
+screen("Screen_Status", "status", 2, 0.05, 0.55, 0.10, 0.90)
 
 # button cluster to the right of the flight display
 for r in range(3):

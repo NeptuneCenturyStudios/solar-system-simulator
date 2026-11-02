@@ -37,6 +37,8 @@ export interface ICockpitTelemetry {
     /** Positive when the target is getting closer (sim units/s). */
     targetClosing: number;
     autopilotTargetName: string | null;
+    /** Distance from the autopilot target's surface (sim units). */
+    autopilotTargetDistance: number;
 }
 
 type ScreenPainter = (ctx: CanvasRenderingContext2D, w: number, h: number, t: ICockpitTelemetry) => void;
@@ -203,9 +205,10 @@ function row(
     x1: number,
     y: number,
     size: number,
-    valueColor = CYAN
+    valueColor = CYAN,
+    labelColor = CYAN_DIM
 ): void {
-    text(ctx, label, x0, y, size, CYAN_DIM);
+    text(ctx, label, x0, y, size, labelColor);
     text(ctx, value, x1, y, size, valueColor, 'right');
 }
 
@@ -277,11 +280,12 @@ function paintNavScreen(ctx: CanvasRenderingContext2D, w: number, h: number, t: 
     const step = h * 0.105;
     let y = top + step * 0.85;
 
-    row(ctx, 'X', formatAU(t.position.x), x0, x1, y, s);
+    // Axis labels in full brightness: the dim label colour washes out on these short rows.
+    row(ctx, 'POS X', formatAU(t.position.x), x0, x1, y, s, CYAN, CYAN);
     y += step;
-    row(ctx, 'Y', formatAU(t.position.y), x0, x1, y, s);
+    row(ctx, 'POS Y', formatAU(t.position.y), x0, x1, y, s, CYAN, CYAN);
     y += step;
-    row(ctx, 'Z', formatAU(t.position.z), x0, x1, y, s);
+    row(ctx, 'POS Z', formatAU(t.position.z), x0, x1, y, s, CYAN, CYAN);
     y += step * 1.15;
 
     ctx.strokeStyle = CYAN_DIM;
@@ -348,22 +352,33 @@ function paintTargetScreen(
     const cx = w / 2;
     const s = Math.min(h * 0.075, w * 0.075);
     if (t.targetName) {
-        text(ctx, t.targetName.toUpperCase(), cx, top + h * 0.13, s * 1.1, RED, 'center', 'bold');
-        text(ctx, formatDistance(t.targetDistance), cx, top + h * 0.27, s, CYAN, 'center');
+        text(ctx, t.targetName.toUpperCase(), cx, top + h * 0.08, s * 1.1, RED, 'center', 'bold');
+        text(ctx, formatDistance(t.targetDistance), cx, top + h * 0.19, s, CYAN, 'center');
         const closing = t.targetClosing >= 0 ? '▼ ' : '▲ ';
-        text(ctx, closing + formatSpeed(Math.abs(t.targetClosing)), cx, top + h * 0.39, s, CYAN_DIM, 'center');
+        text(ctx, closing + formatSpeed(Math.abs(t.targetClosing)), cx, top + h * 0.29, s, CYAN_DIM, 'center');
     } else {
-        text(ctx, 'NO LOCK', cx, top + h * 0.22, s * 1.1, CYAN_DIM, 'center', 'bold');
+        text(ctx, 'NO LOCK', cx, top + h * 0.17, s * 1.1, CYAN_DIM, 'center', 'bold');
     }
-    text(ctx, 'AUTOPILOT', cx, top + h * 0.56, s * 0.85, CYAN_DIM, 'center');
+
+    ctx.strokeStyle = CYAN_DIM;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.12, top + h * 0.37);
+    ctx.lineTo(w * 0.88, top + h * 0.37);
+    ctx.stroke();
+
+    text(ctx, 'AUTOPILOT', cx, top + h * 0.45, s * 0.85, CYAN_DIM, 'center');
     text(
         ctx,
         t.autopilotTargetName ? t.autopilotTargetName.toUpperCase() : 'OFF',
         cx,
-        top + h * 0.68,
+        top + h * 0.55,
         s,
         t.autopilotTargetName ? AMBER : CYAN_DIM,
         'center',
         'bold'
     );
+    if (t.autopilotTargetName) {
+        text(ctx, formatDistance(Math.max(0, t.autopilotTargetDistance)), cx, top + h * 0.66, s, AMBER, 'center');
+    }
 }
