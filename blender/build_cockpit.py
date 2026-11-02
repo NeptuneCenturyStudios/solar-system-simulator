@@ -273,6 +273,59 @@ box("Headrest", (0, 0.30, 0.02), (0.36, 0.14, 0.36), M_GRIP, bevel=0.03)
 box("SeatBack", (0, 0.36, -0.42), (0.52, 0.16, 0.70), M_GRIP, bevel=0.03)
 box("Floor", (0, -0.20, -0.86), (1.70, 1.80, 0.06), M_PANEL, bevel=0.01)
 
+# ── canopy glass ────────────────────────────────────────────────────────────
+# A bubble lofted front-to-back: every cross-section is a half-ellipse rising from the
+# sills, sized to sit just OUTSIDE the frame pillars and rear hoop (frame inside glass).
+# Tagged glass=1; the game swaps in its own tinted/smudged/reflective material.
+# UVs: u across the canopy (0 = pilot's left sill, 1 = right sill), v front -> back.
+GLASS_BASE_Z = -0.08
+GLASS_HALF_W = 0.86
+# Side profile: an elliptical nose that rises from the dash front (GLASS_FRONT_Y) to full
+# height GLASS_HEIGHT at GLASS_CROWN_Y, then stays level back to GLASS_BACK_Y (behind the hoop).
+GLASS_FRONT_Y, GLASS_CROWN_Y, GLASS_BACK_Y = -1.15, -0.10, 0.36
+GLASS_HEIGHT = 0.86
+GLASS_SEG_U, GLASS_SEG_V = 40, 28
+
+def glass_height(y):
+    if y >= GLASS_CROWN_Y:
+        return GLASS_HEIGHT
+    k = (GLASS_CROWN_Y - y) / (GLASS_CROWN_Y - GLASS_FRONT_Y)
+    return GLASS_HEIGHT * math.sqrt(max(0.0, 1.0 - k * k))
+
+M_GLASS = mat("Cockpit_Glass", (0.75, 0.85, 0.95), 0.0, 0.05)
+M_GLASS.node_tree.nodes["Principled BSDF"].inputs["Alpha"].default_value = 0.08
+try:
+    M_GLASS.surface_render_method = 'BLENDED'
+except AttributeError:
+    M_GLASS.blend_method = 'BLEND'
+
+g_verts, g_faces, g_uvs = [], [], []
+y_front, y_back = GLASS_FRONT_Y, GLASS_BACK_Y
+for j in range(GLASS_SEG_V + 1):
+    v = j / GLASS_SEG_V
+    y = y_front + (y_back - y_front) * v
+    h = glass_height(y)
+    for i in range(GLASS_SEG_U + 1):
+        u = i / GLASS_SEG_U
+        t = math.pi * u                    # u=0 -> +X (pilot's left), u=1 -> -X
+        g_verts.append((GLASS_HALF_W * math.cos(t), y, GLASS_BASE_Z + h * math.sin(t)))
+        g_uvs.append((u, v))
+row = GLASS_SEG_U + 1
+for j in range(GLASS_SEG_V):
+    for i in range(GLASS_SEG_U):
+        a = j * row + i
+        g_faces.append((a, a + 1, a + 1 + row, a + row))
+me = bpy.data.meshes.new("Canopy_Glass")
+me.from_pydata(g_verts, [], g_faces)
+me.update()
+uvl = me.uv_layers.new(name="UVMap")
+for poly in me.polygons:
+    poly.use_smooth = True
+    for li in poly.loop_indices:
+        uvl.data[li].uv = g_uvs[me.loops[li].vertex_index]
+glass_ob = link("Canopy_Glass", me, M_GLASS)
+glass_ob["glass"] = 1
+
 # ── convert curves to meshes (no operators: safe from any context) ───────────
 with bpy.context.temp_override(window=WIN, scene=scn, view_layer=scn.view_layers[0]):
     deps = bpy.context.evaluated_depsgraph_get()

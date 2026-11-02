@@ -6,6 +6,7 @@ import type { Body } from '../bodies/body';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import type { IFlightState } from '../interfaces';
 import { CockpitDashboard, ICockpitTelemetry } from '../drawing/cockpit-dashboard';
+import { CockpitGlass } from './cockpit-glass';
 import { AU } from '../utilities/consts';
 
 /**
@@ -58,6 +59,7 @@ export class CockpitView {
     readonly camera = new THREE.PerspectiveCamera(60, 1, COCKPIT_NEAR, COCKPIT_FAR);
 
     private readonly dashboard = new CockpitDashboard();
+    private readonly glass: CockpitGlass;
     private readonly starLight = new THREE.DirectionalLight(0xfff4e0, STARLIGHT_INTENSITY);
     private mixer: THREE.AnimationMixer | null = null;
     private model: THREE.Object3D | null = null;
@@ -80,6 +82,7 @@ export class CockpitView {
         pmrem.dispose();
 
         this.scene.add(this.starLight, this.starLight.target);
+        this.glass = new CockpitGlass(this.scene);
         this.camera.quaternion.copy(FACE_FORWARD);
         this.load();
     }
@@ -97,6 +100,7 @@ export class CockpitView {
                 }
                 this.scene.add(gltf.scene);
                 this.dashboard.bind(gltf.scene);
+                this.glass.bind(gltf.scene);
                 if (gltf.animations.length > 0) {
                     this.mixer = new THREE.AnimationMixer(gltf.scene);
                     for (const clip of gltf.animations) this.mixer.clipAction(clip).play();
@@ -135,6 +139,7 @@ export class CockpitView {
 
         this.updateStarlight(ship);
         this.mixer?.update(wallDt);
+        this.glass.tick(wallDt);
 
         this.dashboardTimer += wallDt;
         if (this.dashboardTimer >= DASHBOARD_REFRESH_INTERVAL) {
@@ -146,6 +151,8 @@ export class CockpitView {
     /** Draw the cockpit over whatever is already in the framebuffer. */
     render(renderer: THREE.WebGLRenderer): void {
         if (!this.visible) return;
+        // Before autoClear is switched off below, so the reflection cube faces get cleared.
+        this.glass.captureReflection(renderer, this.scene);
         const autoClear = renderer.autoClear;
         renderer.autoClear = false;
         renderer.clearDepth();
@@ -281,6 +288,7 @@ export class CockpitView {
     dispose(): void {
         this.syncHullVisibility(null);
         this.dashboard.dispose();
+        this.glass.dispose();
         this.scene.environment?.dispose();
     }
 }
