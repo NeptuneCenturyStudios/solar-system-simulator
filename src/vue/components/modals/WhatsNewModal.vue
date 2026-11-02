@@ -38,31 +38,41 @@ import { marked } from 'marked';
 const modal = useAsyncModal<void>();
 
 const releaseNotes = `
-### Version 1.3.0 - Major Update
+### Version 1.4.0 - Major Update
 
-**Introducing: Probes**
+**New features**
 
-Send probes to celestial objects to unlock hidden attributes.
-
-**Other new features**
-
--   Added new atmospheric drag. Small objects are now subjected to reduced speed while within the atmosphere of a body.
--   Added satellite station-keeping to counter drag, especially for low orbital vehicles like the ISS.
--   Added several new asteroid variants
--   Added shields to ships.
--   Added weapons testing for the Ship AI test scenario.
--   Added new Extinction Event scenario to give the Osirus Mothership a use
--   Added new target mode and chase mode to ships. Lock onto a threat target to be able to chase it.
--   Added new keyboard shortcuts for increasing and decreasing time scale (+/-) keys.
--   Added new option for smooth camera zoom
+-   Added a desktop app for Windows, macOS and Linux.
+-   Added a texture quality option (desktop app only). High resolution textures, including new 8k textures, also increase the detail of planet and moon meshes.
+-   Added procedurally generated ring systems for planets.
+-   The Kuiper belt is now a feature of the solar system rather than part of every system, and you can zoom out far enough to see all of it.
+-   Added a render distance option in Graphics settings to help with performance.
+-   Added a cockpit view with a new cockpit model, glass and a working dashboard.
+-   Added a health bar to flight mode.
+-   Added missiles, with a launch sound and a tracking icon.
+-   Added aim assist, a lead aim indicator and auto target. You can also cycle through your weapons.
+-   Added a Ship AI autopilot. Select it in Flight Controls to have your ship fly to a target and then hold a natural or powered orbit around it.
+-   Added atmospheric capture for small objects.
+-   Added new ship types and models.
+-   Added the moons Titan (Saturn) and Charon (Pluto).
+-   Added a new Osiris Ambush scenario.
+-   Added a "Steering Follows Time Scale" option to Flight Controls so ship turning keeps up with the time scale.
+-   Increased the maximum time warp.
+-   Updated warp streak visuals and the wormhole shortcut.
 
 **Bug fixes and improvements**
 
--   Improved ship weapon balancing.
--   Adjusted ship handling for Zenith and Osiris.
--   Fixed issue where entering flight mode no longer closed the system explorer
--   Neptune's orbit is now more accurately represented.
--   Minor UI adjustments.
+-   Every major planet now follows its real orbit, with accurate perihelion, aphelion, inclination and orientation based on the J2000 epoch from JPL Horizons.
+-   Improved orbit prediction.
+-   Improved the gizmo so it scales better with body size and is easier to use.
+-   Fixed body names drifting away from their bodies at high speeds.
+-   Fixed the camera position being restored when your ship is destroyed.
+-   Your selected ship is now remembered between sessions.
+-   Ship flames now only show while thrust or boost is active.
+-   Improved ship handling, autopilot speeds, weapon balancing and aiming accuracy.
+-   Improved the Ship AI's dog fighting.
+-   Improved speed formatting.
+-   Replaced icons and made minor UI adjustments.
 `;
 
 const relaseNotesHtml = ref(marked.parse(releaseNotes, {}));
