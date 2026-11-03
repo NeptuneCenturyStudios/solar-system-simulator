@@ -3,7 +3,7 @@
         <div class="modal-body">
             <p>
                 Solar System Simulator is a browser-based space simulation focused on physics,
-                exploration, and interactive body management.
+                exploration, and flight simulation.
             </p>
 
             <div class="footer-note">© {{ new Date().getFullYear() }} Neptune Century</div>
