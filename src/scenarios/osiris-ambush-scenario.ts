@@ -1,17 +1,20 @@
 import * as THREE from 'three';
 
+import { triggerScenarioMessage } from '../drawing/scenario-message-hud';
 import { NotificationType } from '../event-log/event-log';
 import type { IScenario, IStateDependencies } from '../interfaces';
+import { ScenarioLock } from '../interfaces';
 import type { Spaceship } from '../bodies/ships/spaceship';
 import { CombatShipAI } from '../simulation/ai/combat-ship-ai';
-import { createNpcShip, registerNpcShip } from '../simulation/ai/npc-manager';
-import { flightState } from '../simulation/simulation';
+import { createNpcShip } from '../simulation/ai/npc-manager';
 import {
+    OSIRIS_AMBUSH_DART_FRACTION,
     OSIRIS_AMBUSH_MIN_SEPARATION_DEG,
-    OSIRIS_AMBUSH_NPC_COUNT,
-    OSIRIS_AMBUSH_RESPAWN_DELAY,
     OSIRIS_AMBUSH_SPAWN_DISTANCE,
 } from '../utilities/consts';
+import { reportScenarioOutcome } from './scenario-outcome';
+
+type HostileShipType = 'dart' | 'zenith';
 
 /** Attempts at finding a bearing clear of the others before the separation rule is waived. */
 const MAX_BEARING_ATTEMPTS = 30;
@@ -50,11 +53,28 @@ function pickBearings(count: number): THREE.Vector3[] {
 }
 
 /**
- * Build a wave of AI-piloted hostiles around an anchor point, ready to be added to the simulation.
+ * Roll the ship type of each of `count` hostiles: OSIRIS_AMBUSH_DART_FRACTION of them Darts (rounded
+ * to the nearest whole ship), the rest Zeniths, in random order.
+ */
+function pickShipTypes(count: number): HostileShipType[] {
+    const darts = Math.round(count * OSIRIS_AMBUSH_DART_FRACTION);
+    const types: HostileShipType[] = Array.from({ length: count }, (_, i) =>
+        i < darts ? 'dart' : 'zenith'
+    );
+    // Fisher-Yates shuffle, so the type isn't tied to the bearing slot.
+    for (let i = types.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [types[i], types[j]] = [types[j], types[i]];
+    }
+    return types;
+}
+
+/**
+ * Build the force of AI-piloted hostiles (a mix of Darts and Zeniths) around an anchor point,
+ * ready to be added to the simulation.
  *
- * Shared by the generator (the opening wave, which goes into the system's body list) and the
- * scenario (every later wave), so the two cannot drift apart. Like createNpcShip, this does NOT
- * touch simulationState — the caller adds the bodies and registers the NPCs.
+ * Like createNpcShip, this does NOT touch simulationState — the caller adds the bodies and
+ * registers the NPCs.
  *
  * Each ship inherits the anchor's velocity outright rather than being given its own orbital
  * solution: at this range the difference in orbital speed is a fraction of a metre per second, so
@@ -68,17 +88,24 @@ export function createHostileWave(
     anchorVelocity: THREE.Vector3,
     count: number
 ): Spaceship[] {
+    const types = pickShipTypes(count);
+    const typeCounts: Record<HostileShipType, number> = { dart: 0, zenith: 0 };
+
     return pickBearings(count).map((bearing, index) => {
         const position = anchorPosition
             .clone()
             .addScaledVector(bearing, OSIRIS_AMBUSH_SPAWN_DISTANCE);
+
+        const type = types[index];
+        typeCounts[type]++;
 
         const ship = createNpcShip({
             dependencies,
             scene,
             position,
             velocity: anchorVelocity.clone(),
-            name: `NPC Zenith ${index + 1}`,
+            shipTypeId: type,
+            name: `NPC ${type === 'dart' ? 'Dart' : 'Zenith'} ${typeCounts[type]}`,
             ai: (s) => new CombatShipAI(s),
         });
 
@@ -98,141 +125,123 @@ export function createHostileWave(
 }
 
 /**
- * Scenario: the player, flying the Osiris Mothership, is hunted by a wave of AI ships.
+ * Scenario: the player, flying the Osiris Mothership, is hunted by a mixed force of AI Darts and
+ * Zeniths.
  *
- * Like Test AI Ships there is no win condition, score or outcome modal — but the hostiles come in
- * waves. Destroying one does not bring a replacement; only once the *entire* wave is down does the
- * respawn countdown start, after which a fresh wave of OSIRIS_AMBUSH_NPC_COUNT arrives around the
- * player's current position.
+ * A survival scenario, like Asteroid Defense: the player wins by destroying every hostile and
+ * loses the moment their own ship is destroyed. Destroyed hostiles are never replaced. The
+ * outcome is reported through the scenario-agnostic reportScenarioOutcome.
  */
 export class OsirisAmbushScenario implements IScenario {
     readonly name = 'Osiris Ambush';
+    /** The panel manager is hidden for this scenario (see start()); these keep the System
+     *  Explorer's add/edit/delete actions locked out even if it were shown. */
+    readonly locks = [ScenarioLock.AddBody, ScenarioLock.EditBody, ScenarioLock.DeleteBody];
 
     private readonly dependencies: IStateDependencies;
-    private readonly scene: THREE.Scene;
-    /**
-     * The ship the generator started the player in. Only a fallback: the live ship is resolved
-     * from flightState every frame, because spawning a different ship type from the Flight
-     * Controls panel destroys this one and builds a replacement.
-     */
-    private readonly initialPlayerShip: Spaceship;
+    /** The player's ship, watched so its destruction ends the scenario in failure. */
+    private readonly playerShip: Spaceship;
 
-    /** The live hostiles of the current wave; empty while the next wave is counting down. */
+    /** The hostiles still alive. */
     private npcs: Spaceship[];
-    /** Sim-seconds until the next wave appears; only counts down while `npcs` is empty. */
-    private respawnTimer = 0;
-    /** Hostiles destroyed so far across all waves. */
+    /** Hostiles the scenario started with — the denominator of the reported score. */
+    private readonly totalHostiles: number;
+    /** Hostiles destroyed so far. */
     private kills = 0;
-    /** The wave currently in play (the opening wave is 1). */
-    private wave = 1;
+    /** Set once the scenario has ended; every further update is a no-op. */
+    private finished = false;
 
-    constructor(
-        dependencies: IStateDependencies,
-        scene: THREE.Scene,
-        playerShip: Spaceship,
-        npcs: Spaceship[]
-    ) {
+    constructor(dependencies: IStateDependencies, playerShip: Spaceship, npcs: Spaceship[]) {
         this.dependencies = dependencies;
-        this.scene = scene;
-        this.initialPlayerShip = playerShip;
+        this.playerShip = playerShip;
         this.npcs = [...npcs];
+        this.totalHostiles = npcs.length;
     }
 
     start(): void {
         this.kills = 0;
-        this.wave = 1;
-        this.respawnTimer = 0;
+        this.finished = false;
+        this.npcs = this.npcs.filter((npc) => !npc._isDisposed);
+        // Hidden so the player can't swap ships from Flight Controls, which would replace the
+        // ship whose destruction means failure.
+        this.dependencies.setPanelManagerVisible(false);
+
         this.dependencies.addEvent({
             message: `${this.npcs.length} hostile ships detected. They are closing on your position.`,
             notificationType: NotificationType.Alert,
         });
-    }
-
-    /**
-     * The ship the player is currently flying, or null if they no longer have one. Falls back to
-     * the ship the scenario started them in for the window before flight mode is entered.
-     */
-    private livePlayerShip(): Spaceship | null {
-        const candidates = [flightState.activeShip, flightState.knownShip, this.initialPlayerShip];
-        for (const ship of candidates) {
-            if (ship && !ship._isDisposed && ship.mesh) return ship;
-        }
-        return null;
+        triggerScenarioMessage(
+            `WARNING: ${this.npcs.length} hostile ships inbound. Destroy them all!`,
+            { holdSecs: 3, fontSizePx: 32 }
+        );
     }
 
     update(simDt: number): void {
-        // Nobody left to fight, and nothing to anchor a wave on. Deliberately does NOT latch: the
-        // player can lose a ship and get another one, and the scenario resumes when they do.
-        const player = this.livePlayerShip();
-        if (!player) return;
+        if (this.finished) return;
 
-        // Paused: freeze the respawn countdown along with everything else.
-        if (simDt <= 0) return;
-
-        if (this.npcs.length > 0) {
-            const alive = this.npcs.filter((npc) => !npc._isDisposed);
-            const destroyed = this.npcs.length - alive.length;
-            if (destroyed > 0) {
-                this.kills += destroyed;
-                this.npcs = alive;
-                if (alive.length > 0) {
-                    this.dependencies.addEvent({
-                        message: `Hostile destroyed (${alive.length} remaining).`,
-                        notificationType: NotificationType.Info,
-                    });
-                } else {
-                    this.respawnTimer = OSIRIS_AMBUSH_RESPAWN_DELAY;
-                    this.dependencies.addEvent({
-                        message: `Wave ${this.wave} cleared (${this.kills} destroyed). Another wave is inbound.`,
-                        notificationType: NotificationType.Info,
-                    });
-                }
-            }
+        // Checked before the pause gate so a loss is never missed, and before the win check so a
+        // simultaneous death counts as a loss.
+        if (this.playerShip._isDisposed) {
+            this.finishFailed('Your ship has been destroyed.');
             return;
         }
 
-        // Whole wave is down — count down to the next one.
-        this.respawnTimer -= simDt;
-        if (this.respawnTimer <= 0) {
-            // Contained rather than allowed to propagate: ScenarioManager stops a scenario that
-            // throws from update(), which would turn one bad spawn into a permanently dead
-            // scenario with no further waves. Log it and try again after a delay.
-            try {
-                this.spawnWave(player);
-            } catch (e) {
-                console.error('[osiris-ambush] failed to spawn wave; retrying:', e);
-                this.respawnTimer = OSIRIS_AMBUSH_RESPAWN_DELAY;
-            }
+        // Paused: leave outcomes for the next running frame.
+        if (simDt <= 0) return;
+
+        const alive = this.npcs.filter((npc) => !npc._isDisposed);
+        const destroyed = this.npcs.length - alive.length;
+        if (destroyed === 0) return;
+
+        this.kills += destroyed;
+        this.npcs = alive;
+
+        if (alive.length === 0) {
+            this.finishSucceeded();
+            return;
         }
+        this.dependencies.addEvent({
+            message: `Hostile destroyed (${alive.length} remaining).`,
+            notificationType: NotificationType.Info,
+        });
     }
 
     dispose(): void {
         // The NPCs are ordinary bodies; the system teardown disposes them.
         this.npcs = [];
+        this.dependencies.setPanelManagerVisible(true);
     }
 
-    private spawnWave(anchor: Spaceship): void {
-        const wave = createHostileWave(
-            this.dependencies,
-            this.scene,
-            anchor.mesh.position,
-            anchor.velocity,
-            OSIRIS_AMBUSH_NPC_COUNT
-        );
+    private killStats(): { label: string; value: string }[] {
+        return [{ label: 'Hostiles destroyed', value: `${this.kills} / ${this.totalHostiles}` }];
+    }
 
-        // Order matters: the body list first, the NPC registry second. The registry must never
-        // hold a ship the physics loop cannot see, or its AI would fly it while gravity did not
-        // yet act on it.
-        for (const ship of wave) {
-            this.dependencies.addBody(ship);
-            registerNpcShip(ship);
-        }
-
-        this.npcs = wave;
-        this.wave++;
+    /** End the scenario in failure and report it once. */
+    private finishFailed(reason: string): void {
+        this.finished = true;
         this.dependencies.addEvent({
-            message: `Wave ${this.wave}: ${wave.length} hostile ships detected.`,
+            message: `${reason} ${this.npcs.length} hostile${this.npcs.length === 1 ? '' : 's'} remained.`,
             notificationType: NotificationType.Alert,
+        });
+        reportScenarioOutcome({
+            outcome: 'failed',
+            scenarioName: this.name,
+            message: reason,
+            stats: this.killStats(),
+        });
+    }
+
+    /** End the scenario in success: every hostile is down and the player's ship survived. */
+    private finishSucceeded(): void {
+        this.finished = true;
+        this.dependencies.addEvent({
+            message: `All ${this.totalHostiles} hostiles destroyed. You survived the ambush!`,
+            notificationType: NotificationType.Success,
+        });
+        reportScenarioOutcome({
+            outcome: 'succeeded',
+            scenarioName: this.name,
+            stats: this.killStats(),
         });
     }
 }

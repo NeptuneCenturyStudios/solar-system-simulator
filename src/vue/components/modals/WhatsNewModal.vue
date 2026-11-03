@@ -55,7 +55,7 @@ const releaseNotes = `
 -   Added atmospheric capture for small objects.
 -   Added a new ship: the "Dart" - a dual laser ship.
 -   Added the moons Titan (Saturn) and Charon (Pluto).
--   Added a new Osiris Ambush scenario.
+-   Added a new Osiris Ambush survival scenario: destroy every Dart and Zenith hostile before your ship is destroyed.
 -   Added a "Steering Follows Time Scale" option to Flight Controls so ship turning keeps up with the time scale.
 -   Increased the maximum time warp.
 -   Updated warp streak visuals and the wormhole shortcut.

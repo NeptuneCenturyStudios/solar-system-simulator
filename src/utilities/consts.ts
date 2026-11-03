@@ -15,7 +15,7 @@ export enum SimulationStartMode {
     AsteroidDefense = 7,
     /** Scenario: the player defends Earth from a single onslaught of ~100 asteroids/comets. */
     ExtinctionEvent = 8,
-    /** Scenario: the player, in the Osiris, is hunted by a wave of AI ships that respawns once the whole wave is destroyed. */
+    /** Scenario: the player, in the Osiris, is hunted by a mixed force of AI Darts and Zeniths. Win by destroying them all; lose if the Osiris is destroyed. */
     OsirisAmbush = 9,
 }
 
@@ -1611,12 +1611,12 @@ export const TEST_AI_SHIPS_RESPAWN_DELAY = 3;
 // === Osiris Ambush scenario ===
 /** Fixed time scale, so runs are comparable to each other. */
 export const OSIRIS_AMBUSH_TIME_SCALE = 1;
-/** Hostile ships per wave. */
-export const OSIRIS_AMBUSH_NPC_COUNT = 10;
-/** Distance (sim units) from the player at which each wave spawns: 25 km. */
-export const OSIRIS_AMBUSH_SPAWN_DISTANCE = 25 / DIST_SCALE;
-/** Sim-seconds between the last ship of a wave being destroyed and the next wave appearing. */
-export const OSIRIS_AMBUSH_RESPAWN_DELAY = 5;
+/** Hostile ships the player must destroy to win. */
+export const OSIRIS_AMBUSH_NPC_COUNT = 15;
+/** Fraction of the hostiles that are Darts; the rest are Zeniths. */
+export const OSIRIS_AMBUSH_DART_FRACTION = 0.5;
+/** Distance (sim units) from the player at which the hostiles spawn. */
+export const OSIRIS_AMBUSH_SPAWN_DISTANCE = 10 / DIST_SCALE;
 /** Minimum angle (degrees) between two ships' bearings from the player, so a wave arrives from
  *  several directions instead of in a clump. Best effort — relaxed if it can't be satisfied. */
 export const OSIRIS_AMBUSH_MIN_SEPARATION_DEG = 40;

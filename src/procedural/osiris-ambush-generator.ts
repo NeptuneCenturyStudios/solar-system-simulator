@@ -16,12 +16,13 @@ import type { ISolarSystemGenerationResult, IStateDependencies } from '../interf
 import { ProceduralGenerationReporter } from './procedural-generation-progress';
 
 /**
- * Scenario: one star, the player's Osiris Mothership, and a wave of AI-piloted ships hunting it.
+ * Scenario: one star, the player's Osiris Mothership, and a mixed force of AI-piloted Darts and
+ * Zeniths hunting it.
  *
  * Laid out like {@link TestAiShipsGenerator}: the real {@link Sun} (so every launch has identical
  * gravity), the player on a circular orbit far enough out that the star is irrelevant to the
  * engagement, and an otherwise empty sky. The hostiles are placed around the player by
- * {@link createHostileWave}, which the scenario reuses for every later wave.
+ * {@link createHostileWave}; the scenario then tracks them for its win/fail outcome.
  */
 export class OsirisAmbushGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
@@ -124,7 +125,7 @@ export class OsirisAmbushGenerator extends SolarSystemGenerator {
                 timeScale: OSIRIS_AMBUSH_TIME_SCALE,
                 playerShip,
             },
-            scenario: new OsirisAmbushScenario(this.dependencies, this.scene, playerShip, npcs),
+            scenario: new OsirisAmbushScenario(this.dependencies, playerShip, npcs),
         };
     }
 }
