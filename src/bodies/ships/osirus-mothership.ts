@@ -4,6 +4,7 @@ import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
 import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
+import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
 import { createShipContainerMesh, loadShipGltfInto } from './ship-model-loader';
 
 /**
@@ -143,12 +144,14 @@ export class OsirisMothership extends Spaceship {
             id: id,
             name: 'Osiris Mothership',
             handling: destroyerHandling,
-            weapons: [
-                new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig),
-                new MissileWeapon(scene, SPACESHIP_RADIUS, {
-                    salvoSize: 3,
-                    missileLength: 0.012 / RADIUS_SCALE, // 12 m
-                }),
+            weaponGroups: [
+                new WeaponGroup([new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)]),
+                new WeaponGroup([
+                    new MissileWeapon(scene, SPACESHIP_RADIUS, {
+                        salvoSize: 3,
+                        missileLength: 0.012 / RADIUS_SCALE, // 12 m
+                    }),
+                ]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 4, rechargeTime: 150 },

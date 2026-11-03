@@ -90,7 +90,7 @@ export class LeadAimIndicator {
         if (!this.flightState.isActive || !this.originMarker.visible) return false;
         if (!ship || ship._isDisposed || !ship.mesh) return false;
 
-        const weapon = ship.activeWeapon;
+        const weapon = ship.activeWeaponGroup;
         // Unarmed, or a beam: there is nothing to lead.
         if (!weapon || !Number.isFinite(weapon.muzzleSpeed)) return false;
 

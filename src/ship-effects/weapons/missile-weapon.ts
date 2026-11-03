@@ -461,7 +461,7 @@ export class MissileWeapon extends Weapon {
                 this.pending.splice(i, 1);
                 if (owner._isDisposed || !owner.mesh) continue;
                 this.launch(
-                    muzzleWorldPosition(owner, _muzzle),
+                    muzzleWorldPosition(owner, _muzzle, this),
                     p.direction,
                     owner.velocity,
                     p.target

@@ -155,8 +155,8 @@ type GunStatus =
  * trigger runs on a burst rhythm rather than being held down. Both are there to make it beatable
  * and to keep it clear of its own overheat lockout.
  *
- * It picks its mount the way a pilot would, through the same selectWeapon the player's cycle
- * key uses: the weapon most effective against the layer the target presents (laser on a raised
+ * It picks its weapon group the way a pilot would, through the same selectWeaponGroup the
+ * player's cycle key uses: the weapon most effective against the layer the target presents (laser on a raised
  * shield, missiles and bolts on a bare hull), among those in reach and not overheated, with
  * heat counted against a mount before it locks out (see updateWeaponChoice / weaponScore).
  */
@@ -232,7 +232,7 @@ export class CombatShipAI extends FollowShipAI {
     private debugAimCos = 1;
     /** Target shield weight on the last weapon choice (1 = shield up, 0 = down). */
     private debugShieldWeight = 1;
-    /** Score of each mount, by weapon index, on the last weapon choice. */
+    /** Score of each weapon group, by group index, on the last weapon choice. */
     private readonly debugWeaponScores: number[] = [];
 
     constructor(ship: Spaceship) {
@@ -259,15 +259,15 @@ export class CombatShipAI extends FollowShipAI {
     }
 
     /**
-     * Muzzle speed of the weapon that will actually fire — the ship's selected mount.
+     * Muzzle speed of the weapon that will actually fire — the ship's selected group.
      *
-     * Only the selected weapon responds to the trigger (see Spaceship.fireWeapon), so the lead
+     * Only the selected group responds to the trigger (see Spaceship.fireWeaponGroup), so the lead
      * solve must use its speed rather than the loadout's slowest. Infinity for a hitscan weapon
      * (e.g. the laser), which collapses the intercept solve (see interceptTime) to "aim where
      * the target is now" — the correct answer for a beam.
      */
     private activeMuzzleSpeed(): number {
-        return this.ship.activeWeapon?.muzzleSpeed ?? Infinity;
+        return this.ship.activeWeaponGroup?.muzzleSpeed ?? Infinity;
     }
 
     /**
@@ -902,16 +902,16 @@ export class CombatShipAI extends FollowShipAI {
     }
 
     /**
-     * Select the mount best suited to the target right now (see weaponScore): the one most
-     * effective against the layer it presents, in reach, and not too hot. Returns false when no
-     * mount can fire on it at all — every one overheated or out of reach.
+     * Select the weapon group best suited to the target right now (see weaponScore): the one
+     * most effective against the layer it presents, in reach, and not too hot. Returns false when
+     * no group can fire on it at all — every one overheated or out of reach.
      *
-     * Only the selected weapon fires, and its heat only drains while its trigger is released,
+     * Only the selected group fires, and its heat only drains while its trigger is released,
      * so an overheated mount scores 0 and is always switched off at once. Otherwise a switch
      * needs a clear margin and a minimum dwell, so near-equal mounts don't trade places every
      * frame as heat and shield drift.
      *
-     * Switching mid-burst is safe: selectWeapon releases every mount's trigger, which cuts a
+     * Switching mid-burst is safe: selectWeaponGroup releases every mount's trigger, which cuts a
      * beam cleanly and re-arms a launcher's rising edge, so a freshly selected launcher fires
      * on the next frame the trigger is held.
      *
@@ -919,15 +919,15 @@ export class CombatShipAI extends FollowShipAI {
      */
     private updateWeaponChoice(target: Spaceship, range: number): boolean {
         const ship = this.ship;
-        const weapons = ship.weapons;
+        const groups = ship.weaponGroups;
         const shieldW = shieldWeight(target);
         this.debugShieldWeight = shieldW;
-        this.debugWeaponScores.length = weapons.length;
+        this.debugWeaponScores.length = groups.length;
 
         let best = -1;
         let bestScore = 0;
-        for (let i = 0; i < weapons.length; i++) {
-            const score = weaponScore(weapons[i], range, shieldW);
+        for (let i = 0; i < groups.length; i++) {
+            const score = weaponScore(groups[i], range, shieldW);
             this.debugWeaponScores[i] = score;
             if (score > bestScore) {
                 best = i;
@@ -936,7 +936,7 @@ export class CombatShipAI extends FollowShipAI {
         }
         if (best === -1) return false;
 
-        const current = ship.activeWeaponIndex;
+        const current = ship.activeWeaponGroupIndex;
         if (best === current) return true;
         const currentScore = this.debugWeaponScores[current] ?? 0;
         const mustSwitch = currentScore <= 0;
@@ -944,7 +944,7 @@ export class CombatShipAI extends FollowShipAI {
             this.weaponDwell >= AI_WEAPON_MIN_DWELL &&
             bestScore > currentScore * (1 + AI_WEAPON_SWITCH_MARGIN);
         if (mustSwitch || worthSwitching) {
-            ship.selectWeapon(best);
+            ship.selectWeaponGroup(best);
             this.weaponDwell = 0;
         }
         return true;
@@ -953,7 +953,7 @@ export class CombatShipAI extends FollowShipAI {
     /** Decide whether to fire this frame. Returns the outcome, for the debug overlay. */
     private updateGunnery(): GunStatus {
         const ship = this.ship;
-        if (ship.weapons.length === 0) return 'no weapons';
+        if (ship.weaponGroups.length === 0) return 'no weapons';
 
         // ── Hold-fire gates ──────────────────────────────────────────────────
         // Order is load-bearing. ObstacleAvoidance.evaluate() is not called on the base
@@ -983,7 +983,7 @@ export class CombatShipAI extends FollowShipAI {
         // Ahead of the burst gate, so a rest between bursts is also a chance to change mounts.
         // With nothing able to fire, hold the trigger released and let the mounts cool.
         if (!this.updateWeaponChoice(target, range)) {
-            return ship.weapons.every((w) => w.isOverheated)
+            return ship.weaponGroups.every((g) => g.isOverheated)
                 ? 'all overheated'
                 : 'no weapon in range';
         }
@@ -999,7 +999,10 @@ export class CombatShipAI extends FollowShipAI {
         // Lead the target to where it will be — in the shooter's frame, the same frame the
         // intercept was solved in. The bolt inherits this ship's velocity, so leading by the
         // target's world velocity would be off by this ship's own motion × flight time.
-        _aim.copy(_toTarget).addScaledVector(_relVel, flightTime).normalize();
+        _aim.copy(_toTarget).addScaledVector(_relVel, flightTime);
+        // Splayed mounts (wing turrets) converge on the lead point.
+        const aimDistance = _aim.length();
+        _aim.normalize();
 
         // ── Aim cone ─────────────────────────────────────────────────────────
         // Measured about the control frame's forward axis, not the mesh's: the player's cone is
@@ -1019,6 +1022,7 @@ export class CombatShipAI extends FollowShipAI {
         if (this.debugAimCos < Math.cos(AI_AIM_CONE_ANGLE)) return 'outside cone';
 
         ship.controlInput.aimDir.copy(_aim);
+        ship.controlInput.aimDistance = aimDistance;
         ship.controlInput.target = target;
         ship.controlInput.fire = true;
         return 'FIRING';
@@ -1073,10 +1077,10 @@ export class CombatShipAI extends FollowShipAI {
 
         // Weapon choice: the selected mount, how much the target's shield counts, and each
         // mount's score by the first letter of its name.
-        const active = ship.activeWeapon;
-        if (active && this.debugWeaponScores.length === ship.weapons.length) {
-            const scores = ship.weapons
-                .map((w, i) => `${w.displayName[0]} ${this.debugWeaponScores[i].toFixed(2)}`)
+        const active = ship.activeWeaponGroup;
+        if (active && this.debugWeaponScores.length === ship.weaponGroups.length) {
+            const scores = ship.weaponGroups
+                .map((g, i) => `${g.displayName[0]} ${this.debugWeaponScores[i].toFixed(2)}`)
                 .join(' · ');
             lines.push(
                 `Weapon ${active.displayName}  shield wt ${this.debugShieldWeight.toFixed(2)}  ${scores}`

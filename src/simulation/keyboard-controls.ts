@@ -229,14 +229,14 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         });
     }
 
-    /** G in flight: select the ship's next mounted weapon (only the selected one fires). */
+    /** G in flight: select the ship's next weapon group (only the selected group fires). */
     const cycleSelectedWeapon = (): void => {
         const ship = flightState.activeShip;
-        if (!ship || ship._isDisposed || ship.weapons.length <= 1) return;
-        const weapon = ship.cycleWeapon();
-        if (weapon) {
+        if (!ship || ship._isDisposed || ship.weaponGroups.length <= 1) return;
+        const group = ship.cycleWeaponGroup();
+        if (group) {
             ctx.addEvent({
-                message: `Weapon selected: ${weapon.displayName} (${ship.activeWeaponIndex + 1}/${ship.weapons.length})`,
+                message: `Weapon selected: ${group.displayName} (${ship.activeWeaponGroupIndex + 1}/${ship.weaponGroups.length})`,
                 notificationType: NotificationType.Info,
             });
         }

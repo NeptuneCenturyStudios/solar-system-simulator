@@ -5,7 +5,7 @@ import {
     AI_WEAPON_HEAT_PENALTY,
 } from '../../utilities/consts';
 import type { Spaceship } from '../../bodies/ships/spaceship';
-import type { Weapon } from '../../ship-effects/weapons/weapon';
+import type { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
 
 /**
  * How much the target's shield should count when scoring weapons: 1 while it is up, 0 once it
@@ -18,20 +18,21 @@ export function shieldWeight(target: Spaceship): number {
 }
 
 /**
- * How good a choice `weapon` is against a target at `range`, given how much its shield counts
- * (`shieldW`, from {@link shieldWeight}). 0 when the weapon can't fire or can't reach.
+ * How good a choice weapon `group` is against a target at `range`, given how much its shield
+ * counts (`shieldW`, from {@link shieldWeight}). 0 when the group can't fire or can't reach.
  *
  * Scored on effectiveness against the layer being hit — not raw damage per second — so the
  * pick follows each weapon's role: the laser strips shields, missiles crack hulls, bolts are
  * the all-rounder. Then scaled by range falloff, and discounted by heat so a hot mount gives
- * way to a cool one before it locks out.
+ * way to a cool one before it locks out. Finally multiplied by the group's mount count, since
+ * every mount fires and hits on its own: a pair of lasers does twice what one does.
  *
  * @param range Hull-to-hull distance, sim units.
  */
-export function weaponScore(weapon: Weapon, range: number, shieldW: number): number {
-    if (weapon.isOverheated || range > weapon.effectiveRange) return 0;
-    const eff = weapon.damageEffectiveness;
+export function weaponScore(group: WeaponGroup, range: number, shieldW: number): number {
+    if (group.isOverheated || range > group.effectiveRange) return 0;
+    const eff = group.damageEffectiveness;
     const layer = THREE.MathUtils.lerp(eff.hull, eff.shield, shieldW);
-    const heat = 1 - AI_WEAPON_HEAT_PENALTY * weapon.thermalLoad;
-    return Math.max(0, layer * weapon.damageFalloffAt(range) * heat);
+    const heat = 1 - AI_WEAPON_HEAT_PENALTY * group.thermalLoad;
+    return Math.max(0, layer * group.damageFalloffAt(range) * heat * group.size);
 }

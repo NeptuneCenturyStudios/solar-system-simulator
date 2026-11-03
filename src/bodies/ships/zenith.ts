@@ -6,6 +6,7 @@ import { BoltWeapon } from '../../ship-effects/weapons/bolt-weapon';
 import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
 import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
+import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
 
 export class Zenith extends Spaceship {
     constructor(
@@ -118,7 +119,7 @@ export class Zenith extends Spaceship {
 
         // Custom laser weapon config
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
-            beamColor: 0x0020FF,
+            beamColor: 0x0020ff,
             damage: 1,
             coreWidth: 1,
             haloWidth: 4,
@@ -149,10 +150,10 @@ export class Zenith extends Spaceship {
             id: id,
             name: 'Zenith',
             handling: fighterHandling,
-            weapons: [
-                new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig),
-                new BoltWeapon(scene, SPACESHIP_RADIUS),
-                new MissileWeapon(scene, SPACESHIP_RADIUS),
+            weaponGroups: [
+                new WeaponGroup([new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)]),
+                new WeaponGroup([new BoltWeapon(scene, SPACESHIP_RADIUS)]),
+                new WeaponGroup([new MissileWeapon(scene, SPACESHIP_RADIUS)]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 2, rechargeTime: 30 },

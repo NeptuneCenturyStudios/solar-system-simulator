@@ -21,6 +21,7 @@ import type { ShipAI } from '../../simulation/ai/ship-ai';
 import type { AutopilotShipAI } from '../../simulation/ai/autopilot-ship-ai';
 import { brakingSpeedLimit } from '../../simulation/ai/obstacle-avoidance';
 import { Weapon } from '../../ship-effects/weapons/weapon';
+import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
 import { autopilotState, flightState, simulationState } from '../../simulation/simulation';
 import {
     G,
@@ -102,7 +103,15 @@ export class Spaceship extends Body {
     get handling(): ISpaceshipHandling {
         return this.highSpeedMode ? this.autopilotHandling : this.lowSpeedHandling;
     }
-    /** Weapon systems mounted on this ship. Empty for unarmed ships. Subclasses mount a loadout of Weapon classes. */
+    /**
+     * The loadout: each group is one selectable entry whose weapons fire together (e.g. a pair
+     * of wing lasers). Empty for unarmed ships.
+     */
+    weaponGroups: WeaponGroup[] = [];
+    /**
+     * Every mounted weapon across all groups, flattened. For per-weapon upkeep (update,
+     * projectile tracking, disposal); selecting and firing go through `weaponGroups`.
+     */
     weapons: Weapon[] = [];
 
     // ── Shields ──────────────────────────────────────────────────────────────
@@ -173,6 +182,7 @@ export class Spaceship extends Body {
         steerY: 0,
         fire: false,
         aimDir: new THREE.Vector3(),
+        aimDistance: Infinity,
         target: null,
         warp: false,
         speedSetpoint: null,
@@ -384,7 +394,8 @@ export class Spaceship extends Body {
             flightBoostDecel: h.autopilotBoostDecel,
         };
 
-        this.weapons = options.weapons;
+        this.weaponGroups = options.weaponGroups;
+        this.weapons = options.weaponGroups.flatMap((group) => [...group.weapons]);
 
         // Shield starts full.
         this.maxShieldPoints = options.shield.hullMultiplier * this.maxHealthPoints;
@@ -476,62 +487,65 @@ export class Spaceship extends Body {
     }
 
     /**
-     * Index of the weapon currently selected to fire, into `weapons`. Only the
-     * selected weapon responds to the trigger; the others are still advanced each
-     * frame (their bolts fly, their heat drains), so a pilot can overheat one
-     * weapon and cycle to another while the first cools.
+     * Index of the weapon group currently selected to fire, into `weaponGroups`. Only the
+     * selected group responds to the trigger; the others are still advanced each frame
+     * (their bolts fly, their heat drains), so a pilot can overheat one group and cycle to
+     * another while the first cools.
      */
-    activeWeaponIndex = 0;
+    activeWeaponGroupIndex = 0;
 
-    /** The weapon currently selected to fire, or null when the ship is unarmed. */
-    get activeWeapon(): Weapon | null {
-        if (this.weapons.length === 0) return null;
+    /** The weapon group currently selected to fire, or null when the ship is unarmed. */
+    get activeWeaponGroup(): WeaponGroup | null {
+        if (this.weaponGroups.length === 0) return null;
         const index =
-            this.activeWeaponIndex >= 0 && this.activeWeaponIndex < this.weapons.length
-                ? this.activeWeaponIndex
+            this.activeWeaponGroupIndex >= 0 &&
+            this.activeWeaponGroupIndex < this.weaponGroups.length
+                ? this.activeWeaponGroupIndex
                 : 0;
-        return this.weapons[index] ?? null;
+        return this.weaponGroups[index] ?? null;
     }
 
     /**
-     * Select the weapon at `index`, wrapping into range. Releasing the trigger on
+     * Select the weapon group at `index`, wrapping into range. Releasing the trigger on
      * every weapon as part of the switch is deliberate: a continuous weapon left
      * "active" (a live laser beam, its loop sound) would otherwise keep firing
      * until the trigger was released, no matter that it is no longer selected.
      */
-    selectWeapon(index: number): void {
-        const count = this.weapons.length;
+    selectWeaponGroup(index: number): void {
+        const count = this.weaponGroups.length;
         if (count === 0) {
-            this.activeWeaponIndex = 0;
+            this.activeWeaponGroupIndex = 0;
             return;
         }
         const wrapped = ((index % count) + count) % count;
-        if (wrapped === this.activeWeaponIndex) return;
-        this.activeWeaponIndex = wrapped;
+        if (wrapped === this.activeWeaponGroupIndex) return;
+        this.activeWeaponGroupIndex = wrapped;
         for (const weapon of this.weapons) weapon.stopFire();
     }
 
     /**
-     * Cycle to the next mounted weapon (wrapping). No-op on a single-weapon ship.
-     * @returns The newly selected weapon, or null when the ship is unarmed.
+     * Cycle to the next weapon group (wrapping). No-op on a single-group ship.
+     * @returns The newly selected group, or null when the ship is unarmed.
      */
-    cycleWeapon(): Weapon | null {
-        if (this.weapons.length > 1) this.selectWeapon(this.activeWeaponIndex + 1);
-        return this.activeWeapon;
+    cycleWeaponGroup(): WeaponGroup | null {
+        if (this.weaponGroups.length > 1) this.selectWeaponGroup(this.activeWeaponGroupIndex + 1);
+        return this.activeWeaponGroup;
     }
 
     /**
-     * Fire the selected weapon toward `aimDir`. No-op if this ship is unarmed.
+     * Fire every weapon in the selected group toward `aimDir`. No-op if this ship is unarmed.
      * @param dt Sim-time seconds this frame (drives cooldown and heat).
+     * @param aimDistance Distance along `aimDir` where the group's mounts converge (see
+     *   IShipControlInput.aimDistance); Infinity fires them parallel.
      * @param target The locked target handed to homing weapons at launch; ignored by unguided ones.
      */
-    fireWeapon(
+    fireWeaponGroup(
         dt: number,
-        muzzlePos: THREE.Vector3,
         aimDir: THREE.Vector3,
+        aimDistance: number,
         target: Body | null = null
     ): void {
-        this.activeWeapon?.tryFire(dt, muzzlePos, aimDir, this.velocity, target);
+        this.activeWeaponGroup?.fire(dt, this, aimDir, aimDistance, target);
     }
 
     /** Release the trigger on all mounted weapons (stops continuous beams). */
@@ -542,13 +556,13 @@ export class Spaceship extends Body {
     }
 
     /**
-     * Reset the selected weapon to the first mount. Called on flight-mode exit so
-     * a re-entry always sees the ship's primary weapon rather than whatever the
+     * Reset the selection to the first weapon group. Called on flight-mode exit so
+     * a re-entry always sees the ship's primary group rather than whatever the
      * pilot happened to leave selected.
      */
-    resetSelectedWeapon(): void {
-        if (this.activeWeaponIndex !== 0) {
-            this.activeWeaponIndex = 0;
+    resetSelectedWeaponGroup(): void {
+        if (this.activeWeaponGroupIndex !== 0) {
+            this.activeWeaponGroupIndex = 0;
             for (const weapon of this.weapons) weapon.stopFire();
         }
     }
@@ -1333,8 +1347,9 @@ export class Spaceship extends Body {
         input.warp = false;
         input.speedSetpoint = null;
         input.warpSpeedCap = null;
-        // aimDir is deliberately left as-is: it is only meaningful while `fire` is true, and
-        // there is no direction that means "not aiming". Clearing the trigger disarms the ship.
+        // aimDir/aimDistance are deliberately left as-is: they are only meaningful while `fire`
+        // is true, and there is no direction that means "not aiming". Clearing the trigger
+        // disarms the ship.
     }
 
     /**
@@ -1917,6 +1932,7 @@ export class Spaceship extends Body {
             }
         }
         this.weapons = [];
+        this.weaponGroups = [];
         this.resetAutopilotState();
         this.trail.dispose();
         this.shieldEffect.dispose();

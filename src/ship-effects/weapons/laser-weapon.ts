@@ -329,7 +329,7 @@ export class LaserWeapon extends Weapon {
         // already the post-physics one — read the muzzle straight off the live
         // mesh.  No extrapolation, so the beam stays pinned to the nose under
         // thrust/boost and while steering.
-        muzzleWorldPosition(owner, this.curOrigin);
+        muzzleWorldPosition(owner, this.curOrigin, this);
 
         // ── Ray-sphere hit test along the beam ───────────────────────────
         const { t: hitT, body: hitBody } = raycastBodies(

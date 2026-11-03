@@ -17,6 +17,7 @@ import { ImpactShockwave } from './effects/impact-shockwave';
 import { FlightHUD } from './drawing/flight-hud';
 import type { HudSprite } from './drawing/hud/hud-sprite';
 import { IWeaponOwner, Weapon } from './ship-effects/weapons/weapon';
+import type { WeaponGroup } from './ship-effects/weapons/weapon-group';
 import type { IPlanetaryAttributes } from './bodies/body-attributes';
 import type { IBodyOrbitElements } from './bodies/orbital-elements';
 
@@ -273,6 +274,13 @@ export interface IShipControlInput {
      * `aimDir.lengthSq() > 0`.
      */
     aimDir: THREE.Vector3;
+    /**
+     * Distance along `aimDir`, from the ship's nose muzzle, to the point being aimed at — where a
+     * weapon group's splayed mounts (e.g. wing turrets) converge. Infinity when aiming at nothing
+     * in particular, which fires every mount parallel to `aimDir`. Like `aimDir`, meaningful only
+     * while `fire` is true.
+     */
+    aimDistance: number;
     /**
      * Locked target handed to homing weapons — the player's Tab lock, or a ShipAI's current
      * target. A homing weapon captures it once at launch, so changing it later never redirects
@@ -538,7 +546,8 @@ export interface ISpaceshipCreationOptions extends IBodyCreationOptions {
     id: string;
     mesh: THREE.Mesh;
     handling: ISpaceshipHandling;
-    weapons: Weapon[];
+    /** Loadout: each group is one selectable entry whose weapons all fire together. */
+    weaponGroups: WeaponGroup[];
     /** Hull HP, set explicitly per ship type instead of derived from mass. Ship
      *  masses are real-world kg scaled by the same MASS_SCALE used for planetary
      *  masses, so mass * HP_MASS_MULTIPLIER (Body's default) would land many

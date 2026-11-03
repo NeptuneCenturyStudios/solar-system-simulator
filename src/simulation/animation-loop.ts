@@ -909,7 +909,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // ship's currently selected weapon (cycled with G), so the gauge and the name
         // always describe the same mount. Hides together with the ring.
         const hudShip = ctx.flightState.activeShip;
-        const hudWeapon = hudShip?.activeWeapon ?? null;
+        const hudWeapon = hudShip?.activeWeaponGroup ?? null;
         if (ctx.flightState.isActive && hudShip && hudWeapon && ctx.steeringOriginMarker.visible) {
             ctx.flightHUD.updateThermalHUD(
                 hudWeapon.thermalLoad,
@@ -918,8 +918,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             );
             ctx.flightHUD.updateWeaponHUD(
                 hudWeapon.displayName,
-                hudShip.activeWeaponIndex + 1,
-                hudShip.weapons.length,
+                hudShip.activeWeaponGroupIndex + 1,
+                hudShip.weaponGroups.length,
                 hudWeapon.isOverheated,
                 ctx.steeringOriginMarker.position
             );

@@ -139,3 +139,25 @@ function fitModelIntoContainer(
     container.add(group);
     return localBbox;
 }
+
+/**
+ * Converts a point authored in the model file's own coordinates (e.g. a gun muzzle read off
+ * the model in Blender, exported Y-up) into the container's local space, through the same
+ * orientation, scale and centring the loader applied. Call after the load resolves.
+ *
+ * Uses the fitted group's local matrix only, never a world one, so the result doesn't pick up
+ * float error from the ship's interplanetary world position. (A GLB's scene root sits under
+ * that group at identity, so the group's frame is the file's frame for both loaders.)
+ *
+ * @returns `out`, or null if no model has been loaded into `container`.
+ */
+export function modelPointToShipLocal(
+    container: THREE.Object3D,
+    modelPoint: THREE.Vector3,
+    out: THREE.Vector3
+): THREE.Vector3 | null {
+    const model = container.children.find((child) => child.userData.isShipModel);
+    if (!model) return null;
+    model.updateMatrix();
+    return out.copy(modelPoint).applyMatrix4(model.matrix);
+}

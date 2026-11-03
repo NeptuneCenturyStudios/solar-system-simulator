@@ -168,7 +168,7 @@ export function exitFlightMode(ctx: IFlightControlContext) {
         ship.resetFlightControlState();
         // Re-entry starts on the ship's primary weapon rather than whatever the
         // pilot left selected on the last sortie.
-        ship.resetSelectedWeapon();
+        ship.resetSelectedWeaponGroup();
     }
 
     // Zero pointer/camera-level steering state.
@@ -685,16 +685,18 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         const assistTarget = settingsStore.settings.targetAssistEnabled ? reticleTarget : null;
 
         if (assistTarget) {
-            // Lead with the selected mount's muzzle speed — the same solve CombatShipAI fires
+            // Lead with the selected group's muzzle speed — the same solve CombatShipAI fires
             // along. Hitscan (laser) collapses to the target's current position.
             leadAimDirection(
                 muzzleWorldPosition(ship, _aimMuzzle),
                 assistTarget.mesh.position,
                 assistTarget.velocity,
                 ship.velocity,
-                ship.activeWeapon?.muzzleSpeed ?? Infinity,
+                ship.activeWeaponGroup?.muzzleSpeed ?? Infinity,
                 playerInput.aimDir
             );
+            // Splayed mounts converge at the target's range.
+            playerInput.aimDistance = _aimMuzzle.distanceTo(assistTarget.mesh.position);
         } else {
             raycastBodies(
                 _aimCamOrigin,
@@ -709,11 +711,13 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
                 playerInput.aimDir
                     .copy(_aimCamOrigin)
                     .addScaledVector(_aimCamDir, _aimHit.t)
-                    .sub(muzzleWorldPosition(ship, _aimMuzzle))
-                    .normalize();
+                    .sub(muzzleWorldPosition(ship, _aimMuzzle));
+                playerInput.aimDistance = playerInput.aimDir.length();
+                playerInput.aimDir.normalize();
             } else {
                 // Nothing under the reticle: aim at infinity, where parallel rays converge.
                 playerInput.aimDir.copy(_aimCamDir);
+                playerInput.aimDistance = Infinity;
             }
         }
     }

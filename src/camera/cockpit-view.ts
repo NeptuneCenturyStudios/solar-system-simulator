@@ -263,7 +263,7 @@ export class CockpitView {
             ? apTarget.mesh.position.distanceTo(ship.mesh.position) - apTarget.radius
             : 0;
 
-        const weapon = ship.activeWeapon;
+        const weapon = ship.activeWeaponGroup;
         const warpChargeTime = h.flightWarpChargeTime;
         return {
             shipName: ship.name,

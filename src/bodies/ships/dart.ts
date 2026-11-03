@@ -2,14 +2,19 @@ import * as THREE from 'three';
 import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { Spaceship } from './spaceship';
-import { BoltWeapon } from '../../ship-effects/weapons/bolt-weapon';
-import { createShipContainerMesh, loadShipGltfInto } from './ship-model-loader';
+import {
+    createShipContainerMesh,
+    loadShipGltfInto,
+    modelPointToShipLocal,
+} from './ship-model-loader';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
 import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
+import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
 
 /**
- * Light fighter. Starts with the same tuning and weapon loadout as the Zenith, but the
- * values are deliberately duplicated here so each ship can be tweaked independently.
+ * Light fighter. Starts with the same flight tuning as the Zenith, but the values are
+ * deliberately duplicated here so each ship can be tweaked independently. Armed with a pair of
+ * wingtip lasers that fire together, plus a missile launcher.
  */
 export class Dart extends Spaceship {
     constructor(
@@ -134,6 +139,17 @@ export class Dart extends Spaceship {
             coolPerSecond: 1.25,
         };
 
+        // Wing gun muzzles in dart.glb's own coordinates (+Z nose, +Y up): the barrel tips under
+        // each wingtip, read off the model in Blender. Each one gets its own laser, and the
+        // pair fires together as one group.
+        const WING_GUN_MUZZLES = [
+            new THREE.Vector3(10.253, 1.444, 3.772),
+            new THREE.Vector3(-10.253, 1.444, 3.772),
+        ];
+        const wingLasers = WING_GUN_MUZZLES.map(
+            () => new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)
+        );
+
         super(dependencies, scene, {
             position: position,
             velocity: velocity,
@@ -143,10 +159,9 @@ export class Dart extends Spaceship {
             id: id,
             name: 'Dart',
             handling: fighterHandling,
-            weapons: [
-                new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig),
-                new BoltWeapon(scene, SPACESHIP_RADIUS),
-                new MissileWeapon(scene, SPACESHIP_RADIUS),
+            weaponGroups: [
+                new WeaponGroup(wingLasers),
+                new WeaponGroup([new MissileWeapon(scene, SPACESHIP_RADIUS)]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 2, rechargeTime: 30 },
@@ -158,6 +173,14 @@ export class Dart extends Spaceship {
         loadShipGltfInto(containerMesh, MODEL_URL, SPACESHIP_RADIUS, MODEL_ROTATION)
             .then((localBbox) => {
                 this.applyModelOffsets(localBbox);
+                // Until the model is in, the lasers fire from the shared nose muzzle.
+                wingLasers.forEach((laser, i) => {
+                    laser.mountOffset = modelPointToShipLocal(
+                        containerMesh,
+                        WING_GUN_MUZZLES[i],
+                        new THREE.Vector3()
+                    );
+                });
             })
             .catch((e) => {
                 console.warn(`Dart GLB load failed for ${MODEL_URL} — using placeholder mesh`, e);

@@ -62,6 +62,19 @@ export abstract class Weapon {
     /** Active loop controller — started by beginSound(), stopped by stopFire()/reset()/dispose(). */
     private loopSound: LoopSoundController | null = null;
 
+    /**
+     * Ship-local muzzle of this particular mount (e.g. a wingtip turret), or null to fire from
+     * the owner's shared nose muzzle (`IWeaponOwner.muzzleOffset`). Read by muzzleWorldPosition.
+     */
+    mountOffset: THREE.Vector3 | null = null;
+
+    /**
+     * False silences this mount's fire/loop sounds. A WeaponGroup clears it on every member but
+     * the first, so a pair of turrets firing together sounds like one weapon rather than two
+     * stacked copies of the same clip.
+     */
+    soundEnabled = true;
+
     /** Normalised thermal load, 0 (cold) .. 1 (overheated). */
     protected heat = 0;
     /** True once heat has hit 1; blocks firing until heat fully cools back to 0. */
@@ -166,6 +179,7 @@ export abstract class Weapon {
      *     their sound immediately and return.
      */
     protected beginSound(): void {
+        if (!this.soundEnabled) return;
         const loopFactory = this.weaponSound?.loop;
         if (loopFactory) {
             // Loop already running — nothing to do (prevents stack-ups on
@@ -184,6 +198,7 @@ export abstract class Weapon {
      * loop is running or when the weapon has no loop sound.
      */
     protected updateLoopSound(): void {
+        if (!this.soundEnabled) return;
         const loopFactory = this.weaponSound?.loop;
         if (!loopFactory || this.loopSound) return;
         this.loopSound = loopFactory();
@@ -246,7 +261,8 @@ export type WeaponConstructor = new (scene: THREE.Scene) => Weapon;
 
 /**
  * World position of `owner`'s muzzle: the model's nose anchor (ship-local +Z), carried out to
- * world space so beams and bolts emerge from the hull rather than floating ahead of it.
+ * world space so beams and bolts emerge from the hull rather than floating ahead of it. Given a
+ * `weapon` with its own `mountOffset` (a wing turret), that mount's muzzle instead.
  *
  * The single definition of that transform, shared by the player firing path, the AI firing path
  * and the laser's per-frame origin refresh — three call sites that must not drift apart.
@@ -256,10 +272,15 @@ export type WeaponConstructor = new (scene: THREE.Scene) => Weapon;
  *
  * @param out Destination vector, also returned. Zero-allocation: callers pass a scratch or a
  *   retained vector rather than receiving a fresh one each frame.
+ * @param weapon The mount to place; omitted (or one with no mountOffset) means the nose muzzle.
  */
-export function muzzleWorldPosition(owner: IWeaponOwner, out: THREE.Vector3): THREE.Vector3 {
+export function muzzleWorldPosition(
+    owner: IWeaponOwner,
+    out: THREE.Vector3,
+    weapon?: Weapon
+): THREE.Vector3 {
     return out
-        .copy(owner.muzzleOffset)
+        .copy(weapon?.mountOffset ?? owner.muzzleOffset)
         .applyQuaternion(owner.mesh.quaternion)
         .add(owner.mesh.position);
 }

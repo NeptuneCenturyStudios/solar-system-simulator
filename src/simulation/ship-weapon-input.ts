@@ -1,9 +1,4 @@
-import * as THREE from 'three';
-import { muzzleWorldPosition } from '../ship-effects/weapons/weapon';
 import type { Spaceship } from '../bodies/ships/spaceship';
-
-/** Scratch vector — reused every call to keep the per-frame allocation count at zero. */
-const _muzzle = new THREE.Vector3();
 
 /**
  * Turn a ship's trigger state into weapon calls.
@@ -20,13 +15,13 @@ const _muzzle = new THREE.Vector3();
  *   the rate of fire and the heat build-up along with everything else the ships do.
  */
 export function applyWeaponInput(ship: Spaceship, simDt: number): void {
-    if (ship.weapons.length === 0) return;
+    if (ship.weaponGroups.length === 0) return;
 
     const input = ship.controlInput;
     // aimDir is only meaningful while the trigger is held, and a ship that has never aimed still
     // carries a zero vector — firing on that would shoot along an undefined bearing.
     if (input.fire && input.aimDir.lengthSq() > 0) {
-        ship.fireWeapon(simDt, muzzleWorldPosition(ship, _muzzle), input.aimDir, input.target);
+        ship.fireWeaponGroup(simDt, input.aimDir, input.aimDistance, input.target);
     } else {
         ship.stopFire();
     }
