@@ -73,6 +73,7 @@ const releaseNotes = `
 -   Improved the Ship AI's dog fighting.
 -   Improved speed formatting.
 -   Replaced icons and made minor UI adjustments.
+-   Procedurally generated systems now have their seed visible in the System Explorer for easy copying.
 `;
 
 const relaseNotesHtml = ref(marked.parse(releaseNotes, {}));
