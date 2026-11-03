@@ -53,7 +53,7 @@ const releaseNotes = `
 -   Added aim assist, a lead aim indicator and auto target. You can also cycle through your weapons.
 -   Added a Ship AI autopilot. Select it in Flight Controls to have your ship fly to a target and then hold a natural or powered orbit around it.
 -   Added atmospheric capture for small objects.
--   Added new ship types and models.
+-   Added a new ship: the "Dart" - a dual laser ship.
 -   Added the moons Titan (Saturn) and Charon (Pluto).
 -   Added a new Osiris Ambush scenario.
 -   Added a "Steering Follows Time Scale" option to Flight Controls so ship turning keeps up with the time scale.
