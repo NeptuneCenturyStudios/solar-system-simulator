@@ -357,7 +357,10 @@ function applyBandShader(mat: THREE.MeshBasicMaterial, uniforms: AuroraUniforms)
         shader.uniforms.uSeed = uniforms.uSeed;
         shader.fragmentShader = shader.fragmentShader
             .replace('void main() {', `${AURORA_PARS_CHUNK}\nvoid main() {`)
-            .replace('#include <map_fragment>', `#include <map_fragment>\n${AURORA_FRAGMENT_CHUNK}`);
+            .replace(
+                '#include <map_fragment>',
+                `#include <map_fragment>\n${AURORA_FRAGMENT_CHUNK}`
+            );
     };
 }
 

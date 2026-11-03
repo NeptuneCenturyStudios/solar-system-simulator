@@ -172,7 +172,13 @@ function createSmudgeTexture(): THREE.CanvasTexture {
     // Broad haze patches.
     for (let i = 0; i < 9; i++) {
         const r = rng.range(40, 110);
-        blob(sideU() * size, rng.range(0.1, 0.9) * size, r, r * rng.range(0.5, 1), rng.range(0.08, 0.18));
+        blob(
+            sideU() * size,
+            rng.range(0.1, 0.9) * size,
+            r,
+            r * rng.range(0.5, 1),
+            rng.range(0.08, 0.18)
+        );
     }
 
     // Fingerprint clusters: a few small oval prints close together.
@@ -182,7 +188,13 @@ function createSmudgeTexture(): THREE.CanvasTexture {
         const prints = 2 + Math.floor(rng.range(0, 4));
         for (let p = 0; p < prints; p++) {
             const r = rng.range(7, 13);
-            blob(cx + rng.range(-28, 28), cy + rng.range(-20, 20), r, r * 1.4, rng.range(0.35, 0.6));
+            blob(
+                cx + rng.range(-28, 28),
+                cy + rng.range(-20, 20),
+                r,
+                r * 1.4,
+                rng.range(0.35, 0.6)
+            );
         }
     }
 

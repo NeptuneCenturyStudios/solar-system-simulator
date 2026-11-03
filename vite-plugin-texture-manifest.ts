@@ -78,8 +78,8 @@ function buildManifestSource(viteRoot: string): string {
 
 /** True when a dev-server change touches a `4k`/`8k` body texture. */
 function isHighResBodyTexture(viteRoot: string, changedPath: string): boolean {
-    const tierRoots = HIGH_RES_TIERS.map((tier) =>
-        path.resolve(viteRoot, BODIES_TEXTURES_DIR, tier) + path.sep
+    const tierRoots = HIGH_RES_TIERS.map(
+        (tier) => path.resolve(viteRoot, BODIES_TEXTURES_DIR, tier) + path.sep
     );
     return tierRoots.some((root) => changedPath.startsWith(root));
 }

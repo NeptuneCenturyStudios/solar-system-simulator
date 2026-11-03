@@ -503,7 +503,7 @@ export class Probe extends Satellite {
 
         // Clamp the remaining seconds to avoid absurd amounts
         this.scanTotalSeconds = Math.min(this.scanTotalSeconds, 1000);
-            
+
         this.scanRemainingSeconds = this.scanTotalSeconds;
     }
 }

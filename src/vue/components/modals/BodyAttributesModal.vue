@@ -21,11 +21,7 @@
                 <h3 class="attribute-section-title">Orbital Data</h3>
 
                 <dl v-if="snapshot.orbitalRows.length > 0" class="attribute-list">
-                    <div
-                        v-for="row in snapshot.orbitalRows"
-                        :key="row.key"
-                        class="attribute-row"
-                    >
+                    <div v-for="row in snapshot.orbitalRows" :key="row.key" class="attribute-row">
                         <dt class="attribute-label">{{ row.label }}</dt>
                         <dd class="attribute-value">{{ row.value }}</dd>
                     </div>

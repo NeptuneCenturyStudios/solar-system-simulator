@@ -1,6 +1,12 @@
 <template>
     <div v-if="vueUiState.initializing" class="vue-initializing" role="status" aria-live="polite">
-        <svg-icon type="mdi" :path="mdiLoading" class="loading-icon" width="2rem" height="2rem"></svg-icon>
+        <svg-icon
+            type="mdi"
+            :path="mdiLoading"
+            class="loading-icon"
+            width="2rem"
+            height="2rem"
+        ></svg-icon>
         <span class="vue-initializing-text">Initializing…</span>
     </div>
 </template>

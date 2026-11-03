@@ -181,10 +181,7 @@ export function orbitalElementsFromStateVectors(
     if (!(angularMomentumLength > 1e-20)) return null;
 
     // Inclination is the angle between the orbit normal and the reference normal (−Y).
-    const cosInclination = Math.max(
-        -1,
-        Math.min(1, -angularMomentum.y / angularMomentumLength)
-    );
+    const cosInclination = Math.max(-1, Math.min(1, -angularMomentum.y / angularMomentumLength));
     const inclinationRad = Math.acos(cosInclination);
     const inclinationDeg = (inclinationRad * 180) / Math.PI;
 
@@ -221,9 +218,7 @@ export function orbitalElementsFromStateVectors(
     // the flat plane is simply increasing atan2(z, x) — so subtracting the node angle is enough.
     const nodeAngleRad = Math.atan2(nodeDir.z, nodeDir.x);
     const argumentOfLatitudeRad = Math.atan2(flatPos.z, flatPos.x) - nodeAngleRad;
-    const periapsisAngleRad = isNearlyCircular
-        ? nodeAngleRad
-        : Math.atan2(eVec.z, eVec.x);
+    const periapsisAngleRad = isNearlyCircular ? nodeAngleRad : Math.atan2(eVec.z, eVec.x);
 
     const argumentOfPeriapsisDeg = isNearlyCircular
         ? 0

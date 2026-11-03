@@ -69,7 +69,7 @@ export const ASTEROID_VARIANTS: IAsteroidVariant[] = [
         weight: 0.75,
         create: (dependencies, scene, options) => new Asteroid5(dependencies, scene, options),
     },
-        {
+    {
         id: 'asteroid-6',
         label: 'Asteroid 6',
         weight: 0.5,

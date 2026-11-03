@@ -213,11 +213,7 @@ export class Earth extends Planet {
                 EARTH_LONG_ASC_NODE,
                 EARTH_ARG_PERIHELION
             );
-            trajectory = planetOrbitFromElements(
-                referenceOrbitElements,
-                angleRad,
-                gEff * SUN_MASS
-            );
+            trajectory = planetOrbitFromElements(referenceOrbitElements, angleRad, gEff * SUN_MASS);
         } else {
             trajectory = calculateTrajectory(gEff, orbitDistance, SUN_MASS, angleRad);
         }

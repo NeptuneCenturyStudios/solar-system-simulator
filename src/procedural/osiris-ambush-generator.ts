@@ -67,8 +67,7 @@ export class OsirisAmbushGenerator extends SolarSystemGenerator {
 
         // Circular orbit in the XZ plane: velocity is perpendicular to the radius.
         const radial = new THREE.Vector3().subVectors(playerPosition, sun.mesh.position);
-        const velocity = new THREE.Vector3(-radial.z, 0, radial.x)
-            .normalize();
+        const velocity = new THREE.Vector3(-radial.z, 0, radial.x).normalize();
 
         // ── Player ship ──────────────────────────────────────────────────────
         const playerShip = getShipTypeById('osiris_mothership').create(

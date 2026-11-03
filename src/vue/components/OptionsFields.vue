@@ -98,9 +98,7 @@
                 @change="onTextureQualityChange"
             >
                 <option value="low">Low (standard)</option>
-                <option value="high" :disabled="!highQualityAvailable">
-                    High (up to 8K)
-                </option>
+                <option value="high" :disabled="!highQualityAvailable">High (up to 8K)</option>
             </select>
             <p class="solver-hint">{{ textureQualityHint }}</p>
         </div>

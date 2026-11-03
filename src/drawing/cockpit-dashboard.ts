@@ -43,7 +43,12 @@ export interface ICockpitTelemetry {
     autopilotTargetDistance: number;
 }
 
-type ScreenPainter = (ctx: CanvasRenderingContext2D, w: number, h: number, t: ICockpitTelemetry) => void;
+type ScreenPainter = (
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    t: ICockpitTelemetry
+) => void;
 
 interface IScreen {
     id: string;
@@ -275,7 +280,16 @@ function paintSpeedScreen(
     const status = [t.regime];
     if (t.reversing) status.push('REVERSE');
     if (overspeed) status.push('OVERSPEED');
-    text(ctx, status.join(' · '), cx, h * 0.68, h * 0.085, overspeed ? AMBER : regimeColor, 'center', 'bold');
+    text(
+        ctx,
+        status.join(' · '),
+        cx,
+        h * 0.68,
+        h * 0.085,
+        overspeed ? AMBER : regimeColor,
+        'center',
+        'bold'
+    );
 
     if (t.warpCharge > 0) {
         bar(ctx, w * 0.2, h * 0.82, w * 0.6, h * 0.05, t.warpCharge, '#a070ff');
@@ -283,7 +297,12 @@ function paintSpeedScreen(
 }
 
 /** Left wing display: position and nearest body. */
-function paintNavScreen(ctx: CanvasRenderingContext2D, w: number, h: number, t: ICockpitTelemetry): void {
+function paintNavScreen(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    t: ICockpitTelemetry
+): void {
     const top = frame(ctx, w, h, 'NAVIGATION');
     const x0 = w * 0.08;
     const x1 = w * 0.92;
@@ -308,7 +327,15 @@ function paintNavScreen(ctx: CanvasRenderingContext2D, w: number, h: number, t: 
 
     row(ctx, 'NEAREST', t.nearestName ?? '—', x0, x1, y, s);
     y += step;
-    row(ctx, 'ALT', t.nearestName ? formatDistance(Math.max(0, t.nearestAltitude)) : '—', x0, x1, y, s);
+    row(
+        ctx,
+        'ALT',
+        t.nearestName ? formatDistance(Math.max(0, t.nearestAltitude)) : '—',
+        x0,
+        x1,
+        y,
+        s
+    );
     y += step;
     row(ctx, 'REL V', t.nearestName ? formatSpeed(t.nearestRelSpeed) : '—', x0, x1, y, s);
 }
@@ -332,7 +359,16 @@ function paintStatusScreen(
     bar(ctx, x0, y, bw, bh, t.shieldFraction, '#3aa8ff');
     y += bh + h * 0.09;
 
-    row(ctx, 'HULL', `${Math.round(t.hullFraction * 100)}%`, x0, x0 + bw, y, s, fractionColor(t.hullFraction));
+    row(
+        ctx,
+        'HULL',
+        `${Math.round(t.hullFraction * 100)}%`,
+        x0,
+        x0 + bw,
+        y,
+        s,
+        fractionColor(t.hullFraction)
+    );
     y += h * 0.07;
     bar(ctx, x0, y, bw, bh, t.hullFraction, fractionColor(t.hullFraction));
     y += bh + h * 0.09;
@@ -366,7 +402,15 @@ function paintTargetScreen(
         text(ctx, t.targetName.toUpperCase(), cx, top + h * 0.08, s * 1.1, RED, 'center', 'bold');
         text(ctx, formatDistance(t.targetDistance), cx, top + h * 0.19, s, CYAN, 'center');
         const closing = t.targetClosing >= 0 ? '▼ ' : '▲ ';
-        text(ctx, closing + formatSpeed(Math.abs(t.targetClosing)), cx, top + h * 0.29, s, CYAN_DIM, 'center');
+        text(
+            ctx,
+            closing + formatSpeed(Math.abs(t.targetClosing)),
+            cx,
+            top + h * 0.29,
+            s,
+            CYAN_DIM,
+            'center'
+        );
     } else {
         text(ctx, 'NO LOCK', cx, top + h * 0.17, s * 1.1, CYAN_DIM, 'center', 'bold');
     }
@@ -390,6 +434,14 @@ function paintTargetScreen(
         'bold'
     );
     if (t.autopilotTargetName) {
-        text(ctx, formatDistance(Math.max(0, t.autopilotTargetDistance)), cx, top + h * 0.66, s, AMBER, 'center');
+        text(
+            ctx,
+            formatDistance(Math.max(0, t.autopilotTargetDistance)),
+            cx,
+            top + h * 0.66,
+            s,
+            AMBER,
+            'center'
+        );
     }
 }
