@@ -281,8 +281,9 @@ box("Floor", (0, -0.20, -0.86), (1.70, 1.80, 0.06), M_PANEL, bevel=0.01)
 GLASS_BASE_Z = -0.08
 GLASS_HALF_W = 0.86
 # Side profile: an elliptical nose that rises from the dash front (GLASS_FRONT_Y) to full
-# height GLASS_HEIGHT at GLASS_CROWN_Y, then stays level back to GLASS_BACK_Y (behind the hoop).
-GLASS_FRONT_Y, GLASS_CROWN_Y, GLASS_BACK_Y = -1.15, -0.10, 0.36
+# height GLASS_HEIGHT at GLASS_CROWN_Y, then stays level back to GLASS_BACK_Y, which is inside
+# the bulkhead (0.58..0.66) so the seam is hidden; the rear glass closes the end off there.
+GLASS_FRONT_Y, GLASS_CROWN_Y, GLASS_BACK_Y = -1.15, -0.10, 0.62
 GLASS_HEIGHT = 0.86
 GLASS_SEG_U, GLASS_SEG_V = 40, 28
 
@@ -325,6 +326,64 @@ for poly in me.polygons:
         uvl.data[li].uv = g_uvs[me.loops[li].vertex_index]
 glass_ob = link("Canopy_Glass", me, M_GLASS)
 glass_ob["glass"] = 1
+
+# ── rear glass ──────────────────────────────────────────────────────────────
+# Closes the back of the canopy above the bulkhead: the canopy's last cross-section,
+# filled. It sits inside the bulkhead box, so only the part above the bulkhead shows.
+# UVs are planar (x, z) at the canopy's texel density.
+rear_arc = g_verts[GLASS_SEG_V * row:]
+me = bpy.data.meshes.new("Rear_Glass")
+me.from_pydata(rear_arc, [], [list(range(len(rear_arc)))])
+me.update()
+uvl = me.uv_layers.new(name="UVMap")
+for li in me.polygons[0].loop_indices:
+    x, _, z = rear_arc[me.loops[li].vertex_index]
+    uvl.data[li].uv = ((GLASS_HALF_W - x) / (math.pi * GLASS_HALF_W),
+                       (z - GLASS_BASE_Z) / (math.pi * GLASS_HALF_W))
+rear_ob = link("Rear_Glass", me, M_GLASS)
+rear_ob["glass"] = 1
+
+# ── side glass ──────────────────────────────────────────────────────────────
+# Closes the lower sides: a flat pane on each side in the plane of the canopy's sill edge
+# (x = ±GLASS_HALF_W), from the canopy base down past the floor and back past the
+# bulkhead. Its front edge follows the back of the dashboard's end cap so the two only
+# share an edge (overlapping coplanar faces would z-fight).
+# UVs are planar (y, z) at the canopy's texel density, so the smudges match in scale.
+SIDE_GLASS_BOTTOM_Z = -0.89    # floor underside
+SIDE_GLASS_BACK_Y = 0.66       # bulkhead back face
+
+def dash_edge_y(z):
+    """Y of the dash end cap's back edge (profile points 1..5, swept by the wing offset) at height z."""
+    yo = PATH[0][1]
+    for (ya, za), (yb, zb) in zip(PROFILE[1:5], PROFILE[2:6]):
+        if min(za, zb) <= z <= max(za, zb) and za != zb:
+            return ya + (yb - ya) * (z - za) / (zb - za) + yo
+    raise ValueError(z)
+
+side_outline = [(dash_edge_y(GLASS_BASE_Z), GLASS_BASE_Z)]
+side_outline += [(y + PATH[0][1], z) for y, z in PROFILE[2:6] if z < GLASS_BASE_Z]
+side_outline += [(PROFILE[5][0] + PATH[0][1], SIDE_GLASS_BOTTOM_Z),
+                 (SIDE_GLASS_BACK_Y, SIDE_GLASS_BOTTOM_Z),
+                 (SIDE_GLASS_BACK_Y, GLASS_BASE_Z)]
+uv_per_m_u = 1.0 / (math.pi * GLASS_HALF_W)              # canopy u: across the arc
+uv_per_m_v = 1.0 / (GLASS_BACK_Y - GLASS_FRONT_Y)        # canopy v: front -> back
+
+for side in (-1, 1):
+    s = "L" if side > 0 else "R"                         # +X is the pilot's left
+    verts = [(side * GLASS_HALF_W, y, z) for y, z in side_outline]
+    face = list(range(len(verts)))
+    if side < 0:
+        face.reverse()                                   # keep normals facing outward
+    me = bpy.data.meshes.new(f"Side_Glass_{s}")
+    me.from_pydata(verts, [], [face])
+    me.update()
+    uvl = me.uv_layers.new(name="UVMap")
+    for li in me.polygons[0].loop_indices:
+        _, y, z = verts[me.loops[li].vertex_index]
+        uvl.data[li].uv = ((z - SIDE_GLASS_BOTTOM_Z) * uv_per_m_u,
+                           (y - GLASS_FRONT_Y) * uv_per_m_v)
+    ob = link(f"Side_Glass_{s}", me, M_GLASS)
+    ob["glass"] = 1
 
 # ── convert curves to meshes (no operators: safe from any context) ───────────
 with bpy.context.temp_override(window=WIN, scene=scn, view_layer=scn.view_layers[0]):
