@@ -11,6 +11,8 @@ export interface SurfaceCameraState {
     isActive: boolean;
     body: Body | null;
     anchorLocalDir: THREE.Vector3;
+    /** Heading (tangent to the surface at the anchor) in the body's local frame. */
+    anchorLocalNorth: THREE.Vector3;
     yaw: number;
     pitch: number;
     prevCameraPos: THREE.Vector3;
@@ -26,6 +28,7 @@ export class SurfaceCameraManager {
         isActive: false,
         body: null,
         anchorLocalDir: new THREE.Vector3(0, 1, 0),
+        anchorLocalNorth: new THREE.Vector3(0, 0, 1),
         yaw: 0,
         pitch: 0,
         prevCameraPos: new THREE.Vector3(),
@@ -131,9 +134,23 @@ export class SurfaceCameraManager {
         const invQ = body.mesh!.quaternion.clone().invert();
         this.state.anchorLocalDir = surfaceNormalWorld.clone().applyQuaternion(invQ).normalize();
 
+        // Pick the starting heading from world axes once, then store it in the body's frame so
+        // the view stays fixed to the surface as the body spins and tilts.
+        const northWorld = this.initialNorth(surfaceNormalWorld);
+        this.state.anchorLocalNorth = northWorld.applyQuaternion(invQ).normalize();
+
         this.updateTransform();
 
         this.flightHUD.forceHintRefresh();
+    }
+
+    /** World-space "north" at the given surface normal: world +Y (or +Z near the poles) projected onto the tangent plane. */
+    private initialNorth(surfaceNormal: THREE.Vector3): THREE.Vector3 {
+        const north = new THREE.Vector3(0, 1, 0).projectOnPlane(surfaceNormal);
+        if (north.lengthSq() < 1e-10) {
+            north.set(0, 0, 1).projectOnPlane(surfaceNormal);
+        }
+        return north.normalize();
     }
 
     updateTransform(): void {
@@ -157,22 +174,13 @@ export class SurfaceCameraManager {
             .clone()
             .add(gravityUp.clone().multiplyScalar(worldRadius + s.eyeHeight));
 
-        const worldRefA = new THREE.Vector3(0, 1, 0);
-        const worldRefB = new THREE.Vector3(0, 0, 1);
-
-        let north = worldRefA.clone().projectOnPlane(gravityUp);
-        if (north.lengthSq() < 1e-10) {
-            north = worldRefB.clone().projectOnPlane(gravityUp);
-        }
-        north.normalize();
-
-        let east = new THREE.Vector3().crossVectors(gravityUp, north);
-        if (east.lengthSq() < 1e-10) {
-            east = new THREE.Vector3(1, 0, 0).projectOnPlane(gravityUp);
-        }
-        east.normalize();
-
-        north = new THREE.Vector3().crossVectors(east, gravityUp).normalize();
+        // Heading is carried in the body's frame like the anchor, so it never drifts against the
+        // surface. Re-orthogonalize against gravityUp to absorb numeric drift.
+        const north = s.anchorLocalNorth
+            .clone()
+            .applyQuaternion(b.mesh!.quaternion)
+            .projectOnPlane(gravityUp)
+            .normalize();
 
         const yawQuat = new THREE.Quaternion().setFromAxisAngle(gravityUp, s.yaw);
         const forwardYawed = north.clone().applyQuaternion(yawQuat).normalize();

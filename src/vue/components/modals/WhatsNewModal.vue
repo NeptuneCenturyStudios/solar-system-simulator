@@ -49,7 +49,7 @@ const releaseNotes = `
 -   Added a render distance option in Graphics settings to help with performance.
 -   Added a cockpit view with a new cockpit model, glass and a working dashboard.
 -   Added a health bar to flight mode.
--   Added missiles, with a launch sound and a tracking icon.
+-   Added a new missile launcher for ships.
 -   Added aim assist, a lead aim indicator and auto target. You can also cycle through your weapons.
 -   Added a Ship AI autopilot. Select it in Flight Controls to have your ship fly to a target and then hold a natural or powered orbit around it.
 -   Added atmospheric capture for small objects.
@@ -62,7 +62,7 @@ const releaseNotes = `
 
 **Bug fixes and improvements**
 
--   Every major planet now follows its real orbit, with accurate perihelion, aphelion, inclination and orientation based on the J2000 epoch from JPL Horizons.
+-   Every planet/moon in the solar system now follows its real orbit, with accurate perihelion, aphelion, inclination and orientation based on the J2000 epoch from JPL Horizons.
 -   Improved orbit prediction.
 -   Improved the gizmo so it scales better with body size and is easier to use.
 -   Fixed body names drifting away from their bodies at high speeds.
@@ -74,6 +74,7 @@ const releaseNotes = `
 -   Improved speed formatting.
 -   Replaced icons and made minor UI adjustments.
 -   Procedurally generated systems now have their seed visible in the System Explorer for easy copying.
+-   Fixed issue with surface cam not properly following the axial tilt of planets.
 `;
 
 const relaseNotesHtml = ref(marked.parse(releaseNotes, {}));
