@@ -27,6 +27,13 @@ const STARLIGHT_MIN_FACTOR = 0.08;
 const STARLIGHT_MAX_FACTOR = 1.6;
 /** Interior fill from the room environment so the cockpit is never pitch black. */
 const INTERIOR_ENV_INTENSITY = 0.35;
+/**
+ * The model's blinking shield warning lamp. The clip loops while the shield is below
+ * {@link SHIELD_WARNING_FRACTION} of max; stopping it restores the lamp's rest pose (off).
+ * Every other clip in the model loops all the time.
+ */
+const SHIELD_WARNING_CLIP = 'ShieldWarning';
+const SHIELD_WARNING_FRACTION = 0.05;
 
 const STAR_TYPES =
     BodyTypeEnum.Star | BodyTypeEnum.WhiteDwarf | BodyTypeEnum.Pulsar | BodyTypeEnum.BrownDwarf;
@@ -62,6 +69,7 @@ export class CockpitView {
     private readonly glass: CockpitGlass;
     private readonly starLight = new THREE.DirectionalLight(0xfff4e0, STARLIGHT_INTENSITY);
     private mixer: THREE.AnimationMixer | null = null;
+    private shieldWarning: THREE.AnimationAction | null = null;
     private model: THREE.Object3D | null = null;
     private loadFailed = false;
 
@@ -103,7 +111,11 @@ export class CockpitView {
                 this.glass.bind(gltf.scene);
                 if (gltf.animations.length > 0) {
                     this.mixer = new THREE.AnimationMixer(gltf.scene);
-                    for (const clip of gltf.animations) this.mixer.clipAction(clip).play();
+                    for (const clip of gltf.animations) {
+                        const action = this.mixer.clipAction(clip);
+                        if (clip.name === SHIELD_WARNING_CLIP) this.shieldWarning = action;
+                        else action.play();
+                    }
                 }
             })
             .catch((e: unknown) => {
@@ -138,6 +150,7 @@ export class CockpitView {
         this.camera.quaternion.copy(_look).multiply(FACE_FORWARD);
 
         this.updateStarlight(ship);
+        this.updateWarningLamps(ship);
         this.mixer?.update(wallDt);
         this.glass.tick(wallDt);
 
@@ -170,6 +183,18 @@ export class CockpitView {
         ship?.setHullVisible(false);
     }
 
+    /** Start or stop the warning lamp clips to match the ship's state. */
+    private updateWarningLamps(ship: Spaceship): void {
+        const warning = this.shieldWarning;
+        if (!warning) return;
+        const shieldsDown =
+            ship.maxShieldPoints > 0 &&
+            ship.shieldPoints < ship.maxShieldPoints * SHIELD_WARNING_FRACTION;
+        // reset() so each warning starts at the top of the cycle (the clip opens on "off").
+        if (shieldsDown && !warning.isRunning()) warning.reset().play();
+        else if (!shieldsDown && warning.isRunning()) warning.stop();
+    }
+
     /** Point the directional light from the brightest-looking star, in cockpit space. */
     private updateStarlight(ship: Spaceship): void {
         let best: Body | null = null;
@@ -191,7 +216,9 @@ export class CockpitView {
         }
         this.starLight.visible = true;
         _invShip.copy(ship.mesh.quaternion).invert();
-        _tmp.subVectors(best.mesh.position, ship.mesh.position).normalize().applyQuaternion(_invShip);
+        _tmp.subVectors(best.mesh.position, ship.mesh.position)
+            .normalize()
+            .applyQuaternion(_invShip);
         this.starLight.position.copy(_tmp).multiplyScalar(10);
         const factor = THREE.MathUtils.clamp(
             (AU * AU) / Math.max(bestDistSq, 1e-12),

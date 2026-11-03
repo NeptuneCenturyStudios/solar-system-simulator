@@ -54,6 +54,7 @@ M_TRIM   = mat("Cockpit_Trim",   (0.85, 0.32, 0.04), 0.1, 0.5)
 M_CYAN   = mat("Cockpit_LightCyan",  (0, 0.2, 0.18), 0, 0.4, (0.0, 1.0, 0.8), 4.0)
 M_AMBER  = mat("Cockpit_LightAmber", (0.2, 0.1, 0), 0, 0.4, (1.0, 0.55, 0.05), 4.0)
 M_RED    = mat("Cockpit_LightRed",   (0.2, 0, 0), 0, 0.4, (1.0, 0.08, 0.05), 4.0)
+M_RED_OFF = mat("Cockpit_LightRedOff", (0.06, 0.005, 0.005), 0, 0.3)
 M_SCREEN = mat("Cockpit_Screen", (0.0, 0.0, 0.0), 0, 0.2, (0.0, 0.05, 0.05), 1.0)
 M_GRIP   = mat("Cockpit_Grip",   (0.02, 0.02, 0.02), 0.0, 0.85)
 
@@ -218,15 +219,58 @@ screen("Screen_Target", "target", 1, 0.03, 0.27, 0.12, 0.88)
 screen("Screen_Nav", "nav", 0, 0.45, 0.95, 0.10, 0.90)
 screen("Screen_Status", "status", 2, 0.05, 0.55, 0.10, 0.90)
 
-# button cluster to the right of the flight display
+# button cluster to the right of the flight display; the middle-right slot is the
+# shield warning lamp
+BUTTON_TILT = math.atan2(0.11, 0.22)
 for r in range(3):
     for c in range(2):
+        if (r, c) == (1, 1):
+            continue
         u = 0.83 + c * 0.075
         v = 0.25 + r * 0.25
         p = facet_point(1, u, v, 0.008)
-        m = [M_CYAN, M_AMBER, M_RED][(r + c) % 3] if (r, c) != (1, 1) else M_PANEL
+        m = [M_CYAN, M_AMBER, M_RED][(r + c) % 3]
         b = box(f"Button_{r}_{c}", p, (0.035, 0.012, 0.028), m, bevel=0.002)
-        b.rotation_euler.x = math.atan2(0.11, 0.22)
+        b.rotation_euler.x = BUTTON_TILT
+
+# ── shield warning lamp ─────────────────────────────────────────────────────
+# A dark red lens with a glowing cap over it. The cap carries the "ShieldWarning" action:
+# its scale steps between full (lit) and near zero (hidden, showing the dark lens), 0.5 s
+# each. The exported rest pose is "off"; the game plays the clip while shields are down
+# and stops it (which restores the rest pose) when they come back.
+WARN_U, WARN_V = 0.83 + 0.075, 0.50
+lamp = box("WarnLamp_Shield", facet_point(1, WARN_U, WARN_V, 0.008),
+           (0.035, 0.012, 0.028), M_RED_OFF, bevel=0.002)
+lamp.rotation_euler.x = BUTTON_TILT
+glow = box("WarnLamp_Shield_Glow", facet_point(1, WARN_U, WARN_V, 0.0105),
+           (0.037, 0.012, 0.030), M_RED, bevel=0.002)
+glow.rotation_euler.x = BUTTON_TILT
+
+WARN_ACTION = "ShieldWarning"
+WARN_OFF_SCALE = 0.001     # not 0: a singular matrix upsets Blender and the exporter
+old_action = bpy.data.actions.get(WARN_ACTION)
+if old_action:
+    bpy.data.actions.remove(old_action)
+# 24 fps: off 0.5 s, on 0.5 s. Starts off because the exporter takes the rest pose from the
+# first frame, and the rest pose must be "off".
+for frame, scale in ((0, WARN_OFF_SCALE), (12, 1.0), (24, WARN_OFF_SCALE)):
+    glow.scale = (scale, scale, scale)
+    glow.keyframe_insert("scale", frame=frame)
+glow.animation_data.action.name = WARN_ACTION
+
+def action_fcurves(ob):
+    """F-curves of an object's action (Blender 4.4+ slotted actions, or the legacy list)."""
+    ad = ob.animation_data
+    try:
+        from bpy_extras import anim_utils
+        return anim_utils.action_get_channelbag_for_slot(ad.action, ad.action_slot).fcurves
+    except (ImportError, AttributeError):
+        return ad.action.fcurves
+
+for fc in action_fcurves(glow):
+    for kp in fc.keyframe_points:
+        kp.interpolation = 'CONSTANT'
+glow.scale = (WARN_OFF_SCALE,) * 3    # rest pose
 
 # light strip along the lower lip of the dash
 for i in range(len(PATH) - 1):
@@ -424,6 +468,10 @@ sun.data.energy = 3
 sun.rotation_euler = (math.radians(50), 0, math.radians(30))
 col.objects.link(sun)
 
+scn.render.fps = 24
+scn.frame_start, scn.frame_end = 0, 24
+scn.frame_set(0)           # export with the animated parts in their rest ("off") pose
+
 os.makedirs(os.path.dirname(EXPORT_GLB), exist_ok=True)
 with bpy.context.temp_override(window=WIN, scene=scn, view_layer=scn.view_layers[0]):
     bpy.ops.export_scene.gltf(
@@ -435,6 +483,8 @@ with bpy.context.temp_override(window=WIN, scene=scn, view_layer=scn.view_layers
         export_yup=True,
         export_cameras=False,
         export_lights=False,
+        export_animations=True,
+        export_animation_mode='ACTIONS',
     )
 
 result = {
