@@ -30,6 +30,7 @@ import {
     TextureQuality,
 } from '../settings/settings-store';
 import type { PlaylistEntry } from '../utilities/playlist';
+import { getLastPushedSeed } from '../utilities/url-seed';
 
 /**
  * Plain, serialisable snapshot of a simulation body. Vue reactivity cannot
@@ -369,6 +370,9 @@ export interface VueSimStore {
     spaceBackgroundVisible: boolean;
     spaceTextureFilename: string | null;
     starDeathEnabled: boolean;
+    /** Seed of the running system, or null when it wasn't generated from a user-enterable seed
+     *  (Normal Mode and the fixed scenarios have none). */
+    systemSeed: string | null;
 
     // ── Options (persisted user settings, mirrored from settingsStore) ─────
     particleEffectsEnabled: boolean;
@@ -453,6 +457,7 @@ const state = reactive<VueSimStore>({
     spaceBackgroundVisible: true,
     spaceTextureFilename: null as string | null,
     starDeathEnabled: false,
+    systemSeed: null as string | null,
     // Options mirror settingsStore (persisted in localStorage) at startup; the
     // Vue Options panel is the only live writer afterwards.
     particleEffectsEnabled: settingsStore.settings.particleEffectsEnabled,
@@ -634,6 +639,40 @@ function refreshEnvironmentState(): void {
     state.spaceBackgroundVisible = environmentState.spaceBackgroundVisible;
     state.spaceTextureFilename = environmentState.spaceTextureFilename;
     state.starDeathEnabled = environmentState.starDeathEnabled;
+    state.systemSeed = currentSystemSeed();
+}
+
+/** The running system's seed with the URL type prefix ("normal_" / "blackhole_") stripped,
+ *  or null when no seeded system is running. Reads the same tracker that feeds the URL, so
+ *  it is set only for the modes that accept a custom seed and works in the desktop app too. */
+function currentSystemSeed(): string | null {
+    const pushed = getLastPushedSeed();
+    if (!pushed) return null;
+    const underscoreIdx = pushed.indexOf('_');
+    return underscoreIdx >= 0 ? pushed.substring(underscoreIdx + 1) : pushed;
+}
+
+/** Copy `text` to the clipboard. Resolves false if the browser/shell refused. */
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch {
+        // Clipboard API unavailable or denied (e.g. insecure context) — try the legacy path.
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            return document.execCommand('copy');
+        } catch {
+            return false;
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    }
 }
 
 /** Copy the ambient-music playlist state into the reactive store for the

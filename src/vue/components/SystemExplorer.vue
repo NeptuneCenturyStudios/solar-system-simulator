@@ -63,6 +63,27 @@
             Lock Camera to Sun
         </label>
 
+        <!-- Only systems generated from a user-enterable seed (Procedural, Black Hole) have one. -->
+        <div v-if="simStore.systemSeed" class="vue-ui-seed-row">
+            <span class="vue-ui-seed-label">Seed</span>
+            <span class="vue-ui-seed-value" :title="simStore.systemSeed">{{
+                simStore.systemSeed
+            }}</span>
+            <button
+                class="icon-button vue-ui-seed-copy"
+                type="button"
+                :title="seedCopied ? 'Copied!' : 'Copy seed'"
+                aria-label="Copy system seed"
+                @click="onCopySeed"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="seedCopied ? mdiCheck : mdiContentCopy"
+                    :size="16"
+                ></svg-icon>
+            </button>
+        </div>
+
         <input
             v-model="searchQuery"
             type="search"
@@ -209,10 +230,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { formatMass, formatRadius, formatSpeed } from '../../utilities/display-format';
 import {
+    copyTextToClipboard,
     enterShipById,
     flyToBody,
     isActionLocked,
@@ -239,6 +261,8 @@ import SvgIcon from '@jamescoyle/vue-icon';
 import {
     mdiAirplane,
     mdiClose,
+    mdiCheck,
+    mdiContentCopy,
     mdiCrosshairs,
     mdiCrosshairsGps,
     mdiEyeOffOutline,
@@ -258,6 +282,25 @@ import {
 import PanelBase from './PanelBase.vue';
 
 const searchQuery = ref('');
+
+/** True briefly after the seed is copied, so the icon can confirm the click. */
+const seedCopied = ref(false);
+let seedCopiedTimer: number | null = null;
+
+async function onCopySeed(): Promise<void> {
+    if (!simStore.systemSeed) return;
+    if (!(await copyTextToClipboard(simStore.systemSeed))) return;
+    seedCopied.value = true;
+    if (seedCopiedTimer !== null) window.clearTimeout(seedCopiedTimer);
+    seedCopiedTimer = window.setTimeout(() => {
+        seedCopied.value = false;
+        seedCopiedTimer = null;
+    }, 1500);
+}
+
+onBeforeUnmount(() => {
+    if (seedCopiedTimer !== null) window.clearTimeout(seedCopiedTimer);
+});
 
 const filteredBodies = computed<BodySnapshot[]>(() => {
     const q = searchQuery.value.trim().toLowerCase();
@@ -306,6 +349,34 @@ function onSelect(body: BodySnapshot): void {
    own margin-left:auto so it stays flush right. */
 .vue-ui-body-name-row {
     align-items: center;
+}
+
+.vue-ui-seed-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.vue-ui-seed-label {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.vue-ui-seed-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: monospace;
+    user-select: text;
+}
+
+.vue-ui-seed-copy {
+    flex: 0 0 auto;
+    padding: 0;
+    line-height: 1;
 }
 
 .vue-ui-body-info {
