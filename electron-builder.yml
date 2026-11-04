@@ -89,6 +89,22 @@ linux:
           arch: [x64]
         - target: deb
           arch: [x64]
+    # A directory of one PNG per size, not the single build/icon.png. The
+    # hicolor theme stops at 512x512 (see /usr/share/icons/hicolor/index.theme),
+    # so a lone 1024x1024 PNG gets installed to hicolor/1024x1024/apps — a
+    # directory index.theme never declares and therefore never scans. The
+    # launcher's Icon=solar-system-simulator then resolves to nothing and
+    # GNOME draws its generic placeholder tile instead. With an icons
+    # directory every size lands in a declared directory and resolves.
+    icon: build/icons
+    # Makes the .desktop file name and its StartupWMClass follow
+    # `desktopName` in package.json ("solar-system-simulator"). Electron derives
+    # its app_id / WM_CLASS from that same field, so the running window matches
+    # its launcher. Without it StartupWMClass falls back to productName
+    # ("Solar System Simulator"), which no Electron window ever reports — the
+    # desktop then treats the running app as unassociated and draws a generic
+    # icon in the dock and window list.
+    syncDesktopName: true
     category: Education
     synopsis: Interactive 3D solar system simulator
     maintainer: Neptune Century Studios
