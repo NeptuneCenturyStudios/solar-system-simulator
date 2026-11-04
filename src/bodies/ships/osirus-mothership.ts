@@ -19,7 +19,7 @@ export class OsirisMothership extends Spaceship {
         id: string
     ) {
         const SPACESHIP_MASS = 80_000_000 / MASS_SCALE;
-        const SPACESHIP_RADIUS = 0.5 / RADIUS_SCALE;
+        const SPACESHIP_RADIUS = 250 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
         const SPACESHIP_HEALTH_POINTS = 250;

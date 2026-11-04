@@ -26,7 +26,7 @@ export class Dart extends Spaceship {
     ) {
         // Ship radius
         const SPACESHIP_MASS = 75000 / MASS_SCALE;
-        const SPACESHIP_RADIUS = 0.037 / RADIUS_SCALE;
+        const SPACESHIP_RADIUS = 20 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
         const SPACESHIP_HEALTH_POINTS = 20;
