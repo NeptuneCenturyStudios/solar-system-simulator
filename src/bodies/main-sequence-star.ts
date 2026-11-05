@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { Star, IStarCreationOptions } from './star';
-import { IDeathOptions, IStateDependencies } from '../interfaces';
+import { Star } from './star';
+import { IStarCreationOptions, IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
-import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities';
+import { createUniqueId } from '../utilities/utilities';
 import {
     PLUTO_DIST,
     BROWN_DWARF_MASS_THRESHOLD,
@@ -16,8 +16,6 @@ import { Supernova } from '../effects/supernova';
 import { PlanetaryNebula } from '../effects/planetary-nebula';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { StarLensflare } from '../effects/star-lensflare';
-import { StarSurfaceMaterial, starSurfaceOctaves } from '../effects/star-surface-material';
-import { StarHalo } from '../effects/star-halo';
 import { BodyTypeEnum } from './body-enums';
 import { environmentState } from '../simulation/environment-state';
 
@@ -37,44 +35,26 @@ function _isStarDeathEnabled(): boolean {
     return environmentState.starDeathEnabled;
 }
 
+/**
+ * A fuel-burning star. Burns fuel while star death is enabled, swells into a red giant as it
+ * runs low, and finally dies as a white dwarf (with a planetary nebula), a pulsar or a black
+ * hole depending on its initial mass. Drops to a brown dwarf if its mass falls too low.
+ *
+ * The procedural surface and limb halo come from {@link Star}.
+ */
 export class MainSequenceStar extends Star {
     fuel: number | null;
     maxFuel: number | null;
     initialMass: number;
     initialRadius: number;
     initialColor: THREE.Color;
-    /** Limb glow around the procedural surface. Hidden while the star is a brown dwarf. */
-    halo: StarHalo | null;
 
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         options: IStarCreationOptions
     ) {
-        // Procedural, animated surface (a port of the "Stylized Sun" Blender material).
-        // Star requires each subclass to build its own surface.
-        if (!options.mesh) {
-            options.mesh = new THREE.Mesh(
-                buildBodySphereGeometry(options.radius),
-                new StarSurfaceMaterial({
-                    temperature: options.temperature,
-                    octaves: starSurfaceOctaves(),
-                })
-            );
-        }
-
         super(dependencies, scene, options);
-
-        const surface = this.surfaceMaterial;
-        this.halo = surface
-            ? new StarHalo(
-                  this.mesh,
-                  options.radius,
-                  surface.tint,
-                  surface.exposure,
-                  surface.surfaceUniforms.uSsTime
-              )
-            : null;
 
         this.initialMass = options.mass;
         this.initialRadius = options.radius;
@@ -84,11 +64,6 @@ export class MainSequenceStar extends Star {
         this.fuel = this.maxFuel;
 
         this.setMass(this.mass);
-    }
-
-    /** The procedural surface material, or null if a custom mesh was supplied. */
-    get surfaceMaterial(): StarSurfaceMaterial | null {
-        return this.mesh?.material instanceof StarSurfaceMaterial ? this.mesh.material : null;
     }
 
     /** Current fuel as a percentage of max, or null when this star has no fuel model. */
@@ -105,20 +80,17 @@ export class MainSequenceStar extends Star {
     }
 
     /**
-     * Drives the star's evolution and effects once per rendered frame.
+     * Drives the star's evolution once per rendered frame.
      *
      * This previously ran inside the physics substep loop — 64 times per frame by default —
-     * including corona particle updates, material colour lerps and label-line geometry
-     * rewrites. None of it affects the gravity solution, and fuel burn is linear in dt, so
-     * running it once per frame with the frame's total elapsed time is equivalent and vastly
-     * cheaper.
+     * including material colour lerps and label-line geometry rewrites. None of it affects the
+     * gravity solution, and fuel burn is linear in dt, so running it once per frame with the
+     * frame's total elapsed time is equivalent and vastly cheaper.
      */
     override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
         super.updateVisuals(dtTotal, cameraPos);
 
         if (this._isDisposed) return;
-
-        this.surfaceMaterial?.update(dtTotal);
 
         const starDeathEnabled = _isStarDeathEnabled();
         if (starDeathEnabled && this.fuel !== null && this.fuel > 0) {
@@ -159,13 +131,10 @@ export class MainSequenceStar extends Star {
                     const targetTemp = 2200 + (fuelPercent / 0.3) * 3578;
                     this.temperature = targetTemp;
 
-                    // Cool the surface toward red. The halo shares the surface tint, so it
-                    // follows; only its exposure needs copying across.
-                    const surface = this.surfaceMaterial;
-                    if (surface) {
-                        surface.setTemperature(targetTemp, RED_GIANT_BLEND);
-                        this.halo?.setExposure(surface.exposure);
-                    }
+                    // Cool the surface (eased) and the light toward red. The halo shares the
+                    // surface uniforms, so it follows.
+                    this.surfaceMaterial?.setTemperature(targetTemp, RED_GIANT_BLEND);
+                    this.applyLightColor(targetTemp);
                 }
             }
 
@@ -179,35 +148,7 @@ export class MainSequenceStar extends Star {
 
     override setRadius(newRadius: number) {
         super.setRadius(newRadius);
-        this.halo?.setRadius(newRadius);
         this._syncBaselineRadiusIfStable();
-    }
-
-    override die(deathOptions?: IDeathOptions) {
-        try {
-            if (this.halo) {
-                this.halo.dispose();
-                this.halo = null;
-            }
-        } catch {
-            // ignore
-        }
-
-        super.die(deathOptions);
-    }
-
-    override setTemperature(temp: number) {
-        super.setTemperature(temp);
-
-        if (this.bodyType & BodyTypeEnum.BrownDwarf) return;
-
-        // Retint the procedural surface (continuous with temperature — no texture bins). This
-        // also runs from inside Star's constructor, before `halo` exists, hence the `?.`.
-        const surface = this.surfaceMaterial;
-        if (surface) {
-            surface.setTemperature(temp);
-            this.halo?.setExposure(surface.exposure);
-        }
     }
 
     override setMass(mass: number) {
@@ -275,20 +216,22 @@ export class MainSequenceStar extends Star {
             }
         }
 
+        // Every remnant keeps the progenitor's position and motion.
+        const pos = this.mesh.position.clone();
+        const vel = this.velocity;
+
         if (this.initialMass > MIN_NEUTRON_STAR_MASS && this.initialMass < MIN_BLACK_HOLE_MASS) {
             try {
-                const pulsar = new Pulsar(
-                    this.dependencies,
-                    this.scene,
-                    this.mesh.position.clone(),
-                    this.mass,
-                    createUniqueId('pulsar'),
-                    this.name + ' (Pulsar)',
-                    this.rotation,
-                    this.initialRadius,
-                    this.magneticField,
-                    this.velocity
-                );
+                const pulsar = new Pulsar(this.dependencies, this.scene, {
+                    pos,
+                    vel,
+                    mass: this.mass,
+                    id: createUniqueId('pulsar'),
+                    name: this.name + ' (Pulsar)',
+                    rotation: this.rotation,
+                    magneticField: this.magneticField,
+                    progenitorRadius: this.initialRadius,
+                });
 
                 if (this.dependencies?.addBody) {
                     this.dependencies.addBody(pulsar);
@@ -307,18 +250,15 @@ export class MainSequenceStar extends Star {
             this.die({ skipExplosion: true, skipImpactSound: true });
         } else if (this.initialMass >= MIN_BLACK_HOLE_MASS) {
             try {
-                const blackHoleMass = this.mass * 0.9999;
-                const newBlackHole = new BlackHole(
-                    this.dependencies,
-                    this.scene,
-                    this.mesh.position.clone(),
-                    blackHoleMass,
-                    createUniqueId('blackhole'),
-                    'Black Hole',
-                    this.rotation,
-                    true,
-                    this.velocity
-                );
+                const newBlackHole = new BlackHole(this.dependencies, this.scene, {
+                    pos,
+                    vel,
+                    mass: this.mass * 0.9999,
+                    id: createUniqueId('blackhole'),
+                    name: 'Black Hole',
+                    rotation: this.rotation,
+                    spawnedFromSupernova: true,
+                });
 
                 if (this.dependencies?.addBody) {
                     this.dependencies.addBody(newBlackHole);
@@ -337,10 +277,10 @@ export class MainSequenceStar extends Star {
             this.die({ skipExplosion: true, skipImpactSound: true });
         } else {
             try {
-                // The exposed core keeps the star's motion, spin and field.
+                // The exposed core keeps the star's spin and field too.
                 const newWhiteDwarf = new WhiteDwarf(this.dependencies, this.scene, {
-                    pos: this.mesh.position.clone(),
-                    vel: this.velocity,
+                    pos,
+                    vel,
                     mass: this.mass,
                     id: createUniqueId('whitedwarf'),
                     name: this.name + ' (White Dwarf)',
@@ -379,7 +319,7 @@ export class MainSequenceStar extends Star {
         }
     }
 
-    /** Transitions this star into a brown dwarf, applying its texture and removing stellar effects. */
+    /** Transitions this star into a brown dwarf: a dim, deep-red surface with no halo, flare or fuel. */
     transitionToBrownDwarf() {
         if (this.bodyType & BodyTypeEnum.BrownDwarf) return; // already transitioned
 
@@ -389,6 +329,7 @@ export class MainSequenceStar extends Star {
         this.bodyType |= BodyTypeEnum.BrownDwarf;
 
         // A brown dwarf barely glows: keep the dim, deep-red surface but drop the limb halo.
+        // (During construction the halo doesn't exist yet; Star hides it when it is built.)
         this.halo?.setVisible(false);
 
         if (this.lensflare) {
@@ -424,20 +365,15 @@ export class MainSequenceStar extends Star {
         // Restore the limb halo.
         this.halo?.setVisible(true);
 
-        // Restore lens flare.
+        // Restore lens flare. The caller's setTemperature recolours it.
         if (!this.lensflare && this.sunLight) {
             this.lensflare = new StarLensflare(this.sunLight, this.radius);
-            // Base setTemperature() above doesn't reach here; tint the
-            // recreated flare so resurrection isn't left white until the
-            // caller happens to call setTemperature again.
             this.lensflare.setColor(this.baseColor.getHex());
         }
 
-        // Restore light intensity.
-        if (this.sunLight) {
-            this.sunLight.intensity = Math.max(1.0, this.lightIntensity / 20000000);
-            this.sunLight.color.setHex(0xffffff);
-        }
+        // Restore the light the star had before it dimmed (transitionToBrownDwarf only changed
+        // the light itself, not `lightIntensity`).
+        this.setLightIntensity(this.lightIntensity);
 
         // Strip the suffix from the name if present.
         if (this.name.includes(' (Brown Dwarf)')) {

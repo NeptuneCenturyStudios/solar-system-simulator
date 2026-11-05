@@ -20,18 +20,5 @@ export function createBlackHoleBodyFromProceduralCreation(
     creation: ProceduralBlackHoleCreation
 ): BlackHole {
     const { id, name, pos, mass, vel } = creation;
-
-    const bh = new BlackHole(
-        dependencies,
-        scene,
-        pos,
-        mass,
-        id,
-        name,
-        { tilt: 0, speed: 0 },
-        false // not spawned from supernova
-    );
-
-    bh.velocity.copy(vel);
-    return bh;
+    return new BlackHole(dependencies, scene, { pos, vel, mass, id, name });
 }

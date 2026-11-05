@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { STAR_NOISE_GLSL } from './star-noise-glsl';
+import type { StarSurfaceMaterial } from './star-surface-material';
 
 /** Halo shell radius as a multiple of the star's radius. The glow is ~0 well before this. */
 const HALO_SHELL_SCALE = 3.0;
@@ -20,8 +21,8 @@ const _invWorld = new THREE.Matrix4();
  * The maths runs in the shell's object space, so the wisps are anchored to the star (they turn
  * with it, rather than sliding when the camera rolls) and drift outward on the surface clock.
  *
- * The halo shares the surface material's tint `Color` and clock uniform, so it recolours and
- * animates with the star without its own bookkeeping.
+ * The halo shares the surface material's tint, exposure and clock uniforms by reference, so it
+ * recolours and animates with the star without any bookkeeping of its own.
  */
 export class StarHalo {
     readonly mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
@@ -36,27 +37,19 @@ export class StarHalo {
     };
 
     /**
-     * @param parent    The star mesh. The halo follows it with no per-frame sync.
-     * @param radius    Star radius in world units.
-     * @param tint      The surface tint; shared by reference.
-     * @param exposure  Initial exposure (see {@link setExposure}).
-     * @param time      The surface clock uniform; shared by reference.
-     * @param wisps     Flame-wisp strength: 1 for main-sequence stars, 0 for a clean glow.
+     * @param parent   The star mesh. The halo follows it with no per-frame sync.
+     * @param radius   Star radius in world units.
+     * @param surface  The star's surface material; its tint, exposure and clock are shared.
+     * @param wisps    Flame-wisp strength: 1 for main-sequence stars, 0 for a clean glow.
      */
-    constructor(
-        parent: THREE.Object3D,
-        radius: number,
-        tint: THREE.Color,
-        exposure: number,
-        time: THREE.IUniform<number>,
-        wisps = 1
-    ) {
+    constructor(parent: THREE.Object3D, radius: number, surface: StarSurfaceMaterial, wisps = 1) {
+        const shared = surface.surfaceUniforms;
         this._uniforms = {
-            uShTint: { value: tint },
-            uShExposure: { value: exposure },
+            uShTint: shared.uSsTint,
+            uShExposure: shared.uSsExposure,
             uShIntensity: { value: 1.0 },
             uShWisps: { value: wisps },
-            uShTime: time,
+            uShTime: shared.uSsTime,
             uShCamObj: { value: new THREE.Vector3() },
         };
 
@@ -156,10 +149,6 @@ export class StarHalo {
 
     setRadius(radius: number): void {
         this.mesh.scale.setScalar(radius * HALO_SHELL_SCALE);
-    }
-
-    setExposure(exposure: number): void {
-        this._uniforms.uShExposure.value = exposure;
     }
 
     setVisible(visible: boolean): void {

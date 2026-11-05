@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { SUN_MASS, EARTH_DIST } from '../utilities/consts.js';
 import { CelestialBody } from './celestial-body';
-import { IRotation } from '../interfaces';
-import { IStateDependencies, ISiphonTarget, IMassTransferBody } from '../interfaces.js';
+import {
+    IBlackHoleCreationOptions,
+    IStateDependencies,
+    ISiphonTarget,
+    IMassTransferBody,
+} from '../interfaces.js';
 import { IPipelineFeedEffect } from '../effects/effect-base.js';
 import { MassSiphonEffect } from '../effects/mass-siphon.js';
 import { AccretionDiskEffect, BLACK_HOLE_DISK_COLORS } from '../effects/accretion-disk.js';
@@ -43,15 +47,13 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        pos: THREE.Vector3,
-        mass: number,
-        id = 'blackHole',
-        name = 'Black Hole',
-        rotation: IRotation,
-        spawnedFromSupernova = false,
-        /** Inherited from a collapsing progenitor so the remnant keeps its orbit. */
-        vel?: THREE.Vector3
+        options: IBlackHoleCreationOptions
     ) {
+        const { pos, vel, mass, id, name } = options;
+        // Default: no tilt, no spin.
+        const rotation = options.rotation ?? { tilt: 0, speed: 0 };
+        const spawnedFromSupernova = options.spawnedFromSupernova ?? false;
+
         const EVENT_HORIZON_RADIUS = BlackHole.massToEventHorizonRadius(mass);
         const BLACK_HOLE_COLOR = 0x000000; // Pure black
         // The mesh is a simple sphere; the visual complexity comes from the accretion disk and jet effects.
@@ -65,7 +67,7 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
             {
                 radius: EVENT_HORIZON_RADIUS,
                 pos: pos,
-                vel: vel?.clone() ?? new THREE.Vector3(0, 0, 0),
+                vel: vel.clone(),
                 mass: mass,
                 id: id,
                 name: name,

@@ -6,40 +6,37 @@ import {
     STAR_LIGHT_INTENSITY_MAX,
     STAR_LIGHT_DECAY,
 } from '../utilities/consts';
-import { isBodyType } from '../utilities/utilities';
+import { buildBodySphereGeometry } from '../utilities/utilities';
 import { settingsStore } from '../settings/settings-store';
 import { CelestialBody } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
 import { StarLensflare } from '../effects/star-lensflare';
-import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from '../interfaces';
+import { StarSurfaceMaterial, StarSurfaceStyle } from '../effects/star-surface-material';
+import { StarHalo } from '../effects/star-halo';
+import { starLightColor } from '../effects/star-tint';
+import { IDeathOptions, IStarCreationOptions, IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from './body-enums';
 
-/**
- * Options for creating a Star. Used to keep constructor parameter list manageable and allow future expansion without breaking changes.
- */
-export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
-    temperature: number;
-    lightIntensity: number;
-    lightDistance: number;
-    /** Extra type flags OR-ed onto `BodyTypeEnum.Star` (e.g. WhiteDwarf, Pulsar). */
-    bodyType?: BodyTypeEnum;
-    /**
-     * Skip the [STAR_LIGHT_INTENSITY_MIN, MAX] clamp on `lightIntensity`. Remnants that are
-     * meant to be far dimmer than any main-sequence star (white dwarfs) set this.
-     */
-    unclampedLightIntensity?: boolean;
+/** Builds the procedural, animated star surface mesh. */
+function buildStarSurfaceMesh(
+    radius: number,
+    temperature: number,
+    style: StarSurfaceStyle | undefined
+): THREE.Mesh {
+    return new THREE.Mesh(
+        buildBodySphereGeometry(radius),
+        new StarSurfaceMaterial({ temperature, style })
+    );
 }
 
 /**
- * Star (e.g. Sun). Owns what every star shares: the point light (and its colour from
- * temperature), the ambient light and the lens-flare shine.
+ * A star (e.g. the Sun). Owns what every star shares:
+ *  - the procedural surface ({@link StarSurfaceMaterial}, in the style the subclass asks for)
+ *    and the limb {@link StarHalo} that shares its tint, exposure and clock;
+ *  - the point light (coloured by temperature), the ambient light and the lens-flare shine.
  *
- * The surface is not built here: each subclass supplies its own mesh through `options.mesh`
- * (the procedural surface for main-sequence stars and white dwarfs, a texture for pulsars).
- */
-/**
- * Represents a star (e.g. Sun) in the simulation, including visuals like corona, glow, and light.
- * Handles star-specific physics, rendering, and lifecycle events.
+ * Subclasses add their own behaviour: fuel and evolution (MainSequenceStar), cooling
+ * (WhiteDwarf), beams, field and accretion (Pulsar).
  */
 export class Star extends CelestialBody {
     temperature: number;
@@ -57,26 +54,24 @@ export class Star extends CelestialBody {
      */
     lensflare: StarLensflare | null;
 
+    /** Limb glow around the procedural surface. Null if a custom mesh was supplied. */
+    halo: StarHalo | null;
+
     /**
      * @param dependencies Same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
      * @param scene        The scene the star (and its lights) are added to.
-     * @param options      Creation options. `options.mesh` is required: subclasses build the surface.
+     * @param options      Creation options. Without `options.mesh` the procedural surface is built.
      */
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         options: IStarCreationOptions
     ) {
-        if (!options.mesh) {
-            throw new Error('Star requires a mesh: build the surface in the subclass');
-        }
-
         super(
             dependencies,
             scene,
             {
                 radius: options.radius,
-                //color: color,
                 pos: options.pos,
                 vel: options.vel ?? new THREE.Vector3(0, 0, 0),
                 mass: options.mass,
@@ -85,7 +80,9 @@ export class Star extends CelestialBody {
                 trailColor: 0xffffff,
                 maxTrail: 500,
                 rotation: options.rotation,
-                mesh: options.mesh,
+                mesh:
+                    options.mesh ??
+                    buildStarSurfaceMesh(options.radius, options.temperature, options.surfaceStyle),
                 magneticField: options.magneticField,
                 attributes: options.attributes,
             },
@@ -93,37 +90,31 @@ export class Star extends CelestialBody {
         );
 
         this.unclampedLightIntensity = options.unclampedLightIntensity ?? false;
-        const lightIntensity = this.unclampedLightIntensity
-            ? options.lightIntensity
-            : Math.max(
-                  STAR_LIGHT_INTENSITY_MIN,
-                  Math.min(STAR_LIGHT_INTENSITY_MAX, options.lightIntensity)
-              );
-
-        this.lightIntensity = lightIntensity;
-
+        this.lightIntensity = this._clampLightIntensity(options.lightIntensity);
         this.temperature = options.temperature;
 
-        this.sunLight = this.createLight(options.pos, lightIntensity, options.lightDistance);
+        this.sunLight = this.createLight(options.pos, this.lightIntensity, options.lightDistance);
 
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
         scene.add(this.ambientLight);
 
+        // Classic screen-space lens flare attached to the star's point light. Follows the light
+        // automatically (updateVisuals syncs sunLight.position each frame). Created before
+        // setTemperature so the flare picks up the star's colour. Brown dwarfs get none.
+        this.lensflare =
+            !(this.bodyType & BodyTypeEnum.BrownDwarf) && this.sunLight
+                ? new StarLensflare(this.sunLight, options.radius)
+                : null;
+
         this.setTemperature(options.temperature);
 
-        // Classic screen-space lens flare attached to the star's point light.
-        // Follows the light automatically (Star.update syncs sunLight.position
-        // each frame). Brown dwarfs are excluded for consistency with the other
-        // star-only effects.
-        if (!(this.bodyType & BodyTypeEnum.BrownDwarf) && this.sunLight) {
-            this.lensflare = new StarLensflare(this.sunLight, options.radius);
-            // setTemperature() above ran before the lensflare existed, so its
-            // setColor() call was a no-op. Apply the star's color now so a
-            // newly created star isn't stuck with the white default flare.
-            this.lensflare.setColor(this.baseColor.getHex());
-        } else {
-            this.lensflare = null;
-        }
+        const surface = this.surfaceMaterial;
+        this.halo = surface
+            ? new StarHalo(this.mesh, options.radius, surface, options.haloWisps ?? 1)
+            : null;
+        // A brown dwarf barely glows. (The flag may already be set if the mass was applied
+        // during construction.)
+        this.halo?.setVisible(!(this.bodyType & BodyTypeEnum.BrownDwarf));
     }
 
     /** Computes the expected radius for a star of the given mass using a mass-radius power law (R ∝ M^0.8). */
@@ -131,87 +122,15 @@ export class Star extends CelestialBody {
         return SUN_RADIUS * Math.pow(Math.max(0, mass) / SUN_MASS, 0.8);
     }
 
-    /**
-     * Calculates the RGB color corresponding to a given surface temperature using an approximation of blackbody radiation.
-     * @param temp The surface temperature of the star in Kelvin.
-     * @returns The RGB color as a hexadecimal number.
-     */
-    static temperatureToColor(temp: number) {
-        temp = Math.max(1000, Math.min(40000, temp));
-
-        temp = temp / 100;
-
-        let red, green, blue;
-
-        if (temp <= 66) {
-            red = 255;
-        } else {
-            red = temp - 60;
-            red = 329.698727446 * Math.pow(red, -0.1332047592);
-            red = Math.max(0, Math.min(255, red));
-
-            if (temp > 80) {
-                const redReduction = (temp - 80) / 320;
-                red = red * (1 - redReduction * 0.5);
-            }
-        }
-
-        if (temp <= 66) {
-            green = temp;
-            green = 99.4708025861 * Math.log(green) - 161.1195681661;
-            green = Math.max(0, Math.min(255, green));
-
-            if (temp < 40) {
-                const greenReduction = (40 - temp) / 40;
-                green = green * (1 - greenReduction * 0.7);
-            }
-        } else {
-            green = temp - 60;
-            green = 288.1221695283 * Math.pow(green, -0.0755148492);
-            green = Math.max(0, Math.min(255, green));
-
-            if (temp > 80) {
-                const greenReduction = (temp - 80) / 320;
-                green = green * (1 - greenReduction * 0.6);
-            }
-        }
-
-        if (temp >= 66) {
-            blue = 255;
-        } else if (temp <= 19) {
-            blue = 0;
-        } else {
-            blue = temp - 10;
-            blue = 138.5177312231 * Math.log(blue) - 305.0447927307;
-            blue = Math.max(0, Math.min(255, blue));
-
-            if (temp < 40) {
-                const blueReduction = (40 - temp) / 40;
-                blue = blue * (1 - blueReduction * 0.5);
-            }
-        }
-
-        red = Math.round(red);
-        green = Math.round(green);
-        blue = Math.round(blue);
-
-        return (red << 16) | (green << 8) | blue;
+    /** The procedural surface material, or null if a custom mesh was supplied. */
+    get surfaceMaterial(): StarSurfaceMaterial | null {
+        return this.mesh?.material instanceof StarSurfaceMaterial ? this.mesh.material : null;
     }
 
     createLight(pos: THREE.Vector3, intensity: number, distance: number) {
-        console.log(
-            'Creating light at position:',
-            pos,
-            'with intensity:',
-            intensity,
-            'and distance:',
-            distance
-        );
         const light = new THREE.PointLight(0xffffff, intensity, distance);
-        light.position.set(pos.x, pos.y, pos.z);
+        light.position.copy(pos);
         light.decay = STAR_LIGHT_DECAY;
-        // this.scene.add(light);
-
         light.userData.distance = distance;
 
         this.scene.add(light);
@@ -219,14 +138,15 @@ export class Star extends CelestialBody {
     }
 
     /**
-     * Per-rendered-frame visual update. Keeps the star's light source on the star, and drives
-     * the diffraction-cross shine so it follows the star and fades out as the camera
-     * approaches. Brown dwarfs never show the effect.
+     * Per-rendered-frame visual update. Advances the surface animation, keeps the star's light
+     * source on the star, and drives the lens-flare shine. Brown dwarfs never show the flare.
      */
     override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
         super.updateVisuals(dtTotal, cameraPos);
 
         if (this._isDisposed) return;
+
+        this.surfaceMaterial?.update(dtTotal);
 
         if (this.sunLight) {
             this.sunLight.position.copy(this.mesh.position);
@@ -241,64 +161,58 @@ export class Star extends CelestialBody {
         this.lensflare?.update(dtTotal);
     }
 
-    setLightIntensity(intensity: number) {
-        const clamped = this.unclampedLightIntensity
+    private _clampLightIntensity(intensity: number): number {
+        return this.unclampedLightIntensity
             ? intensity
             : Math.max(STAR_LIGHT_INTENSITY_MIN, Math.min(STAR_LIGHT_INTENSITY_MAX, intensity));
+    }
 
-        this.lightIntensity = clamped;
+    setLightIntensity(intensity: number) {
+        this.lightIntensity = this._clampLightIntensity(intensity);
         if (this.sunLight) {
-            this.sunLight.intensity = clamped;
+            this.sunLight.intensity = this.lightIntensity;
         }
     }
 
+    /**
+     * Sets the surface temperature: retints the surface (the halo follows, as it shares the
+     * surface uniforms) and recolours the light. Brown dwarfs ignore it.
+     */
     setTemperature(temp: number) {
-        if (!isBodyType(this, BodyTypeEnum.Star)) {
-            this.temperature = temp;
-            return;
-        }
-
         // Brown dwarfs manage their own fixed visual state; ignore temperature overrides.
         if (this.bodyType & BodyTypeEnum.BrownDwarf) {
             return;
         }
 
         this.temperature = temp;
-
-        let glowHex: number;
-        if (temp <= 2000) glowHex = 0x8b3a0a;
-        else if (temp <= 3000) glowHex = 0xff6644;
-        else if (temp < 4000) glowHex = 0xffaa55;
-        else if (temp < 10000) glowHex = 0xffffee;
-        else if (temp < 25000) glowHex = 0xffffff;
-        else if (temp < 40000) glowHex = 0xaaccff;
-        else glowHex = 0xd6f0ff;
-
-        // The surface itself is the subclass's business (see MainSequenceStar / WhiteDwarf).
-        this.baseColor.setHex(glowHex);
-
-        if (this.sunLight) {
-            this.sunLight.color.setHex(glowHex);
-        }
-
-        this.lensflare?.setColor(glowHex);
+        this.surfaceMaterial?.setTemperature(temp);
+        this.applyLightColor(temp);
     }
 
-    setRadius(newRadius: number) {
+    /** Colours the base colour, point light and lens flare for the given temperature. */
+    protected applyLightColor(temp: number) {
+        starLightColor(temp, this.baseColor);
+        this.sunLight?.color.copy(this.baseColor);
+        this.lensflare?.setColor(this.baseColor.getHex());
+    }
+
+    override setRadius(newRadius: number) {
         super.setRadius(newRadius);
+        this.halo?.setRadius(newRadius);
     }
-
-    // setLightDistance(distance: number) {
-    //     if (!this.sunLight) return;
-    //     this.sunLight.userData.distance = distance;
-    //     if (this.sunLight.shadow && this.sunLight.shadow.camera) {
-    //         this.sunLight.shadow.camera.far = Math.min(distance * 0.5, 500000);
-    //         this.sunLight.shadow.camera.updateProjectionMatrix();
-    //     }
-    // }
 
     die(deathOptions?: IDeathOptions) {
         if (this._isDisposed) return;
+
+        // The halo is a child of the mesh: dispose it before the mesh goes.
+        try {
+            if (this.halo) {
+                this.halo.dispose();
+                this.halo = null;
+            }
+        } catch {
+            // ignore
+        }
 
         try {
             if (this.trail) {
@@ -320,7 +234,6 @@ export class Star extends CelestialBody {
 
                 this.mesh.geometry?.dispose?.();
                 (this.mesh.material as THREE.Material)?.dispose?.();
-                //this.mesh = null;
             }
         } catch {
             // ignore
@@ -330,15 +243,6 @@ export class Star extends CelestialBody {
             if (this.sunLight) {
                 this.sunLight.visible = false;
                 this.scene.remove(this.sunLight);
-
-                // if (this.sunLight.target) {
-                //     this.scene.remove(this.sunLight.target);
-                //     //this.sunLight.target = null;
-                // }
-                if (this.sunLight) {
-                    this.scene.remove(this.sunLight);
-                }
-
                 this.sunLight = null;
             }
         } catch {

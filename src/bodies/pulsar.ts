@@ -1,26 +1,24 @@
 import * as THREE from 'three';
-import { Star, IStarCreationOptions } from './star';
+import { Star } from './star';
 import {
     IStateDependencies,
     ISiphonTarget,
     IMassTransferBody,
     IDeathOptions,
     IMagneticFieldOptions,
+    IPulsarCreationOptions,
+    IRotation,
 } from '../interfaces';
-import { IRotation } from '../interfaces';
 import { SUN_MASS, EARTH_DIST, DIST_SCALE } from '../utilities/consts';
 import { rollMagneticField, computeMagneticAxis } from '../procedural/magnetic-field';
 import { SeededRandom } from '../utilities/prng';
 import { PulsarBeam } from '../effects/pulsar-beam';
-import { StarHalo } from '../effects/star-halo';
-import { StarSurfaceMaterial, starSurfaceOctaves } from '../effects/star-surface-material';
 import { AccretionDiskEffect, PULSAR_DISK_COLORS } from '../effects/accretion-disk';
 import { PulsarMagneticField } from '../effects/pulsar-magnetic-field';
 import { MassSiphonEffect } from '../effects/mass-siphon';
 import { IPipelineFeedEffect } from '../effects/effect-base';
 import { NotificationType } from '../event-log/event-log';
 import { BodyTypeEnum } from './body-enums';
-import { buildBodySphereGeometry } from '../utilities/utilities';
 
 /**
  * Base radius constant used in the neutron-star mass-to-radius formula.
@@ -71,12 +69,12 @@ const SIPHON_MASS_TRANSFER_SCALE = 0.0001;
  *  - Rotating magnetic-axis beam effect (PulsarBeam)
  *  - Dipole magnetic field loop effect (PulsarMagneticField)
  *  - Mass siphoning from nearby stars into an accretion disk (AccretionDiskEffect + MassSiphonEffect)
+ *
+ * The surface (neutron-star style, with polar hot spots) and its tight halo come from {@link Star}.
  */
 export class Pulsar extends Star implements IMassTransferBody {
     /** The twin radiation beams (children of the mesh, swept by its spin). */
     private beam: PulsarBeam | null;
-    /** Tight limb glow around the surface. */
-    private halo: StarHalo | null;
     /** The rendered dipole field-line effect. Named to avoid colliding with
      *  `CelestialBody.magneticField`, which is the attribute-only field data. */
     private magneticFieldEffect: PulsarMagneticField;
@@ -86,22 +84,15 @@ export class Pulsar extends Star implements IMassTransferBody {
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        pos: THREE.Vector3,
-        mass: number,
-        id: string,
-        name: string,
-        progenitorRotation: IRotation,
-        progenitorRadius: number,
-        progenitorMagneticField: IMagneticFieldOptions | null,
-        /** Inherited so the remnant keeps the progenitor's orbit. */
-        progenitorVelocity?: THREE.Vector3
+        options: IPulsarCreationOptions
     ) {
+        const { id, mass, pos, rotation: progenitorRotation } = options;
         const pulsarRadius = massToNeutronStarRadius(mass);
 
         // Angular momentum conservation: I * ω = const, I ∝ R²
         // ω_new = ω_old * (R_old / R_new)²
-
-        const rawSpinUp = progenitorRotation.speed * Math.pow(progenitorRadius / pulsarRadius, 2);
+        const rawSpinUp =
+            progenitorRotation.speed * Math.pow(options.progenitorRadius / pulsarRadius, 2);
         const newSpeed = Math.max(PULSAR_MIN_SPIN, Math.min(PULSAR_MAX_SPIN, rawSpinUp));
         // Inherit tilt from progenitor
         const newRotation: IRotation = {
@@ -113,37 +104,27 @@ export class Pulsar extends Star implements IMassTransferBody {
         // and amplifies the pre-existing field via flux freezing, it doesn't randomize a new
         // one). Falls back to a fresh seeded roll only if the progenitor somehow has none.
         const magneticField: IMagneticFieldOptions =
-            progenitorMagneticField ??
+            options.magneticField ??
             rollMagneticField(new SeededRandom(`${id}|magnetic-field`), 'star')!;
 
         // Procedural surface in the neutron-star style: smooth, ~10^6 K violet-white, with hot
         // spots at the magnetic poles (aimed below, once the mesh's tilt is known).
-        const mesh = new THREE.Mesh(
-            buildBodySphereGeometry(pulsarRadius),
-            new StarSurfaceMaterial({
-                temperature: PULSAR_TEMPERATURE,
-                octaves: starSurfaceOctaves(),
-                style: 'pulsar',
-            })
-        );
-
-        const options: IStarCreationOptions = {
-            pos: pos,
-            vel: progenitorVelocity?.clone() ?? new THREE.Vector3(0, 0, 0),
-            mass: mass,
+        super(dependencies, scene, {
+            pos,
+            vel: options.vel.clone(),
+            mass,
             radius: pulsarRadius,
-            id: id,
-            name: name,
+            id,
+            name: options.name,
             temperature: PULSAR_TEMPERATURE,
             lightIntensity: PULSAR_LIGHT_INTENSITY,
             lightDistance: PULSAR_LIGHT_DISTANCE,
             rotation: newRotation,
-            mesh: mesh,
             magneticField,
             bodyType: BodyTypeEnum.Pulsar,
-        };
-
-        super(dependencies, scene, options);
+            surfaceStyle: 'pulsar',
+            haloWisps: 0,
+        });
 
         // Compute spin axis from tilt (YZ plane, as in CelestialBody)
         const tiltRad = (newRotation.tilt * Math.PI) / 180;
@@ -157,21 +138,10 @@ export class Pulsar extends Star implements IMassTransferBody {
             this.mesh.quaternion.clone().invert()
         );
 
-        const surface =
-            this.mesh.material instanceof StarSurfaceMaterial ? this.mesh.material : null;
+        const surface = this.surfaceMaterial;
         surface?.setPoleAxis(magneticAxisObj);
 
-        this.halo = surface
-            ? new StarHalo(
-                  this.mesh,
-                  pulsarRadius,
-                  surface.tint,
-                  surface.exposure,
-                  surface.surfaceUniforms.uSsTime,
-                  0
-              )
-            : null;
-
+        // The beam streaks run on the surface clock.
         this.beam = surface
             ? new PulsarBeam(
                   this.mesh,
@@ -206,15 +176,6 @@ export class Pulsar extends Star implements IMassTransferBody {
         );
     }
 
-    override setTemperature(temp: number): void {
-        super.setTemperature(temp);
-        // Also runs inside Star's constructor, before `halo` exists.
-        if (this.mesh?.material instanceof StarSurfaceMaterial) {
-            this.mesh.material.setTemperature(temp);
-            this.halo?.setExposure(this.mesh.material.exposure);
-        }
-    }
-
     enqueueAccretionParticle(angle: number): void {
         this.accretionDisk.enqueueAccretionParticle(angle);
     }
@@ -224,10 +185,7 @@ export class Pulsar extends Star implements IMassTransferBody {
 
         if (this._isDisposed) return;
 
-        // Surface boil and beam streaks share the surface clock.
-        if (this.mesh.material instanceof StarSurfaceMaterial) {
-            this.mesh.material.update(dtTotal);
-        }
+        // (Star advances the surface clock, which also drives the beam streaks.)
         this.magneticFieldEffect.update(dtTotal);
         this.accretionDisk.setPosition(this.mesh.position);
         this.accretionDisk.update(dtTotal);
@@ -344,12 +302,6 @@ export class Pulsar extends Star implements IMassTransferBody {
         try {
             this.beam?.dispose();
             this.beam = null;
-        } catch {
-            // ignore
-        }
-        try {
-            this.halo?.dispose();
-            this.halo = null;
         } catch {
             // ignore
         }

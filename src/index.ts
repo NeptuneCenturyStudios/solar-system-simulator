@@ -1610,15 +1610,13 @@ function createNewBody(
         const { mass: bhMass } = randomBlackHoleParams({ mass: customMass });
 
         const blackHoleId = createUniqueId('black_hole');
-        newBody = new BlackHole(
-            dependencies,
-            scene,
-            bhSpawnPos,
-            bhMass,
-            blackHoleId,
-            customName ?? generateCustomBodyName('black_hole', blackHoleId),
-            { tilt: 0, speed: 0 }
-        );
+        newBody = new BlackHole(dependencies, scene, {
+            pos: bhSpawnPos,
+            vel: new THREE.Vector3(0, 0, 0),
+            mass: bhMass,
+            id: blackHoleId,
+            name: customName ?? generateCustomBodyName('black_hole', blackHoleId),
+        });
 
         // Apply custom radius if the user overrode the slider
         if (typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0) {

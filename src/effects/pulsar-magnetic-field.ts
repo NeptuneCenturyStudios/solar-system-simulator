@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { IEffect } from './effect-base';
 import { IStateDependencies } from '../interfaces';
 import { settingsStore } from '../settings/settings-store';
+import { MAX_STAR_CLOCK_STEP } from './star-surface-material';
 
 /**
  * Number of azimuthal loops evenly spaced around the magnetic axis.
@@ -20,13 +21,6 @@ const FIELD_PARTICLE_COUNT = 320;
 
 /** How quickly particles travel along their field line (θ radians per sim-second). */
 const FIELD_PARTICLE_SPEED = 0.8;
-
-/**
- * Largest per-frame time step (sim seconds) the particle flow advances by. At high time scales a
- * frame can cover hours of sim time; capping keeps the flow smooth instead of strobing (the same
- * cap the star surface clock uses).
- */
-const MAX_FLOW_STEP = 0.25;
 
 /**
  * Multiplier applied to the host radius to derive the equatorial max radius of the
@@ -289,7 +283,7 @@ export class PulsarMagneticField implements IEffect {
             // large step, letting θ grow without bound; once it was large, the Float32 store
             // could no longer resolve small steps, and the particles snapped into clumps (and
             // stayed stuck even after the time scale came back down).
-            const step = FIELD_PARTICLE_SPEED * Math.min(absDt, MAX_FLOW_STEP);
+            const step = FIELD_PARTICLE_SPEED * Math.min(absDt, MAX_STAR_CLOCK_STEP);
             this._particleTheta[i] = (this._particleTheta[i] + step) % Math.PI;
 
             const theta = this._particleTheta[i];

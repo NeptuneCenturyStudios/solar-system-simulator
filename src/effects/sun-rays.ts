@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BodyTypeEnum } from '../bodies/body-enums';
 
 /** Most stars that cast rays in one frame (the largest on screen win). */
 const MAX_RAY_STARS = 4;
@@ -22,10 +23,22 @@ const FULL_RADIUS_PX = 24;
 /** The rays are worked out at this fraction of the screen resolution, then upscaled. */
 const RESOLUTION_SCALE = 0.5;
 
-/** A star that may cast rays this frame. */
-export interface ISunRaySource {
-    position: THREE.Vector3;
+/** The parts of a sim body the rays need. Only stars (other than brown dwarfs) cast rays. */
+export interface ISunRayBody {
+    _isDisposed: boolean;
+    bodyType: BodyTypeEnum;
     radius: number;
+    mesh: { position: THREE.Vector3 };
+}
+
+/** Brown dwarfs barely glow and cast no rays. */
+const NO_RAY_STAR_TYPES = BodyTypeEnum.BrownDwarf;
+
+/** A star that made the cut this frame, in screen-height units. */
+interface IRayCandidate {
+    center: THREE.Vector2;
+    radius: number;
+    strength: number;
 }
 
 const _view = new THREE.Vector3();
@@ -45,7 +58,7 @@ const _ndc = new THREE.Vector3();
  * lens-flare shine takes over.
  *
  * Usage each frame, after the scene has been captured (and drawn to the screen):
- *   `render(renderer, camera, sceneTexture, stars)` — adds the rays on top of the screen.
+ *   `render(renderer, camera, sceneTexture, bodies)` — adds the rays on top of the screen.
  */
 export class SunRaysEffect {
     private readonly rt: THREE.WebGLRenderTarget;
@@ -65,8 +78,10 @@ export class SunRaysEffect {
         uStarStrengths: THREE.IUniform<number[]>;
     };
 
-    private readonly _candidates: { center: THREE.Vector2; radius: number; strength: number }[] =
-        [];
+    /** Reused candidate objects, so collecting stars allocates nothing per frame. */
+    private readonly _candidatePool: IRayCandidate[] = [];
+    /** This frame's candidates (entries of the pool), sorted largest first. */
+    private readonly _candidates: IRayCandidate[] = [];
 
     /** Overall ray brightness. */
     intensity = 0.55;
@@ -209,9 +224,9 @@ export class SunRaysEffect {
         renderer: THREE.WebGLRenderer,
         camera: THREE.PerspectiveCamera,
         sceneTexture: THREE.Texture,
-        stars: ISunRaySource[]
+        bodies: readonly ISunRayBody[]
     ): void {
-        const count = this._collectStars(renderer, camera, stars);
+        const count = this._collectStars(renderer, camera, bodies);
         if (count === 0) return;
 
         this.uniforms.tScene.value = sceneTexture;
@@ -229,44 +244,59 @@ export class SunRaysEffect {
         renderer.autoClear = prevAutoClear;
     }
 
-    /** Projects the stars, keeps the largest few on screen, and fills the uniforms. */
+    /**
+     * Picks the ray-casting stars out of `bodies`, projects them, keeps the largest few on
+     * screen, and fills the uniforms.
+     */
     private _collectStars(
         renderer: THREE.WebGLRenderer,
         camera: THREE.PerspectiveCamera,
-        stars: ISunRaySource[]
+        bodies: readonly ISunRayBody[]
     ): number {
         const heightPx = renderer.domElement.height;
         const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5);
+        const aspect = this.uniforms.uAspect.value;
         this._candidates.length = 0;
 
-        for (const star of stars) {
-            _view.copy(star.position).applyMatrix4(camera.matrixWorldInverse);
+        for (const body of bodies) {
+            if (body._isDisposed || !(body.bodyType & BodyTypeEnum.Star)) continue;
+            if (body.bodyType & NO_RAY_STAR_TYPES) continue;
+
+            const position = body.mesh.position;
+            _view.copy(position).applyMatrix4(camera.matrixWorldInverse);
             const depth = -_view.z;
             // Behind the camera, or the camera is inside the star.
-            if (depth <= star.radius) continue;
+            if (depth <= body.radius) continue;
 
             // Angular radius -> fraction of the screen height.
-            const radius = star.radius / (depth * tanHalfFov) / 2;
+            const radius = body.radius / (depth * tanHalfFov) / 2;
             const radiusPx = radius * heightPx;
             if (radiusPx < MIN_RADIUS_PX) continue;
 
-            _ndc.copy(star.position).project(camera);
-            const center = new THREE.Vector2((_ndc.x + 1) * 0.5, (_ndc.y + 1) * 0.5);
+            _ndc.copy(position).project(camera);
+            const cx = (_ndc.x + 1) * 0.5;
+            const cy = (_ndc.y + 1) * 0.5;
 
             // Skip stars whose rays can't reach the screen.
             const reach = Math.min(radius * RAY_LENGTH_RADII, MAX_RAY_LENGTH_SCREEN) + radius;
-            const aspect = this.uniforms.uAspect.value;
-            if (
-                center.x < -reach / aspect ||
-                center.x > 1 + reach / aspect ||
-                center.y < -reach ||
-                center.y > 1 + reach
-            ) {
+            if (cx < -reach / aspect || cx > 1 + reach / aspect || cy < -reach || cy > 1 + reach) {
                 continue;
             }
 
-            const strength = THREE.MathUtils.smoothstep(radiusPx, MIN_RADIUS_PX, FULL_RADIUS_PX);
-            this._candidates.push({ center, radius, strength });
+            const index = this._candidates.length;
+            let candidate = this._candidatePool[index];
+            if (!candidate) {
+                candidate = { center: new THREE.Vector2(), radius: 0, strength: 0 };
+                this._candidatePool.push(candidate);
+            }
+            candidate.center.set(cx, cy);
+            candidate.radius = radius;
+            candidate.strength = THREE.MathUtils.smoothstep(
+                radiusPx,
+                MIN_RADIUS_PX,
+                FULL_RADIUS_PX
+            );
+            this._candidates.push(candidate);
         }
 
         this._candidates.sort((a, b) => b.radius - a.radius);

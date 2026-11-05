@@ -8,7 +8,7 @@ import { ScreenFlashEffect } from '../effects/screen-flash';
 import { ScenarioMessageHud } from '../drawing/scenario-message-hud';
 import { PlanetaryNebula } from '../effects/planetary-nebula';
 import { GravitationalLensingEffect } from '../effects/gravitational-lensing';
-import { ISunRaySource, SunRaysEffect } from '../effects/sun-rays';
+import { SunRaysEffect } from '../effects/sun-rays';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { VelocityArcManager } from '../drawing/velocity-arc';
 import { OrbitPredictionManager } from '../drawing/orbit-prediction';
@@ -173,11 +173,6 @@ export interface AnimationContext {
 // Scratch vectors for updateShipTrail (called once per ship per frame).
 const _trailNozzle = new THREE.Vector3();
 const _trailExhaustDir = new THREE.Vector3();
-
-/** Reused list of stars handed to the sun-rays pass each frame. */
-const _raySources: ISunRaySource[] = [];
-/** Brown dwarfs barely glow and cast no rays. */
-const NO_RAY_STAR_TYPES = BodyTypeEnum.BrownDwarf;
 
 /**
  * Whether a ship's main engine is firing this frame — the signal that drives the
@@ -1462,17 +1457,11 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         );
         // Sun rays read the captured scene and add on top of the (lensed) screen image.
         if (settingsStore.settings.sunRaysEnabled) {
-            _raySources.length = 0;
-            for (const b of ctx.simulationState.bodies) {
-                if (b._isDisposed || !(b.bodyType & BodyTypeEnum.Star)) continue;
-                if (b.bodyType & NO_RAY_STAR_TYPES) continue;
-                _raySources.push({ position: b.mesh.position, radius: b.radius });
-            }
             ctx.sunRaysEffect.render(
                 ctx.renderer,
                 ctx.camera,
                 ctx.lensingEffect.sceneTexture,
-                _raySources
+                ctx.simulationState.bodies
             );
         }
         // Cockpit interior overlay: after the world (and lensing), before the 2D HUD.

@@ -20,6 +20,7 @@ import { IWeaponOwner, Weapon } from './ship-effects/weapons/weapon';
 import type { WeaponGroup } from './ship-effects/weapons/weapon-group';
 import type { IPlanetaryAttributes } from './bodies/body-attributes';
 import type { IBodyOrbitElements } from './bodies/orbital-elements';
+import type { StarSurfaceStyle } from './effects/star-surface-material';
 
 /**
  * Options for configuring an atmosphere on a celestial body, including its radius and tint color.
@@ -514,6 +515,57 @@ export interface IMoonCreationOptions extends ISatelliteCreationOptions {
 export interface IPlanetCreationOptions extends ICelestialBodyCreationOptions {
     bodySubtype: PlanetTypeEnum;
     atmosphere?: IAtmosphereOptions;
+}
+
+/** Options for creating a star (main-sequence stars, and the base of white dwarfs and pulsars). */
+export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
+    temperature: number;
+    lightIntensity: number;
+    lightDistance: number;
+    /** Extra type flags OR-ed onto `BodyTypeEnum.Star` (e.g. WhiteDwarf, Pulsar). */
+    bodyType?: BodyTypeEnum;
+    /**
+     * Skip the [STAR_LIGHT_INTENSITY_MIN, MAX] clamp on `lightIntensity`. Remnants that are
+     * meant to be far dimmer than any main-sequence star (white dwarfs) set this.
+     */
+    unclampedLightIntensity?: boolean;
+    /** Look of the procedural surface. Default `mainSequence`. Ignored when `mesh` is given. */
+    surfaceStyle?: StarSurfaceStyle;
+    /** Flame-wisp strength of the limb halo: 1 for flames, 0 for a clean glow. Default 1. */
+    haloWisps?: number;
+}
+
+/**
+ * Options for creating a stellar remnant (white dwarf, pulsar, black hole). A remnant's radius
+ * follows from its mass, so it is not an input. `pos`/`vel` are normally the progenitor's, so
+ * the remnant keeps its orbit.
+ */
+export interface IStellarRemnantCreationOptions
+    extends
+        Omit<IOrbitalBodyCreationOptions, 'radius'>,
+        Pick<ICelestialBodyCreationOptions, 'magneticField'> {}
+
+export interface IWhiteDwarfCreationOptions extends IStellarRemnantCreationOptions {
+    rotation: IRotation;
+    /** Surface temperature (K). Default: the blue-white birth temperature. */
+    temperature?: number;
+}
+
+export interface IPulsarCreationOptions extends IStellarRemnantCreationOptions {
+    /** The progenitor's spin: the pulsar keeps its tilt and spins up from its speed. */
+    rotation: IRotation;
+    /**
+     * The progenitor's field, which the pulsar inherits (flux freezing). A fresh seeded field
+     * is rolled if absent.
+     */
+    magneticField?: IMagneticFieldOptions | null;
+    /** The progenitor's radius, for the angular-momentum spin-up. */
+    progenitorRadius: number;
+}
+
+export interface IBlackHoleCreationOptions extends IStellarRemnantCreationOptions {
+    /** Seeds the accretion disk with the collapsing envelope. Default false. */
+    spawnedFromSupernova?: boolean;
 }
 
 /**

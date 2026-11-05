@@ -1,11 +1,8 @@
 import * as THREE from 'three';
 import { Star } from './star';
-import { IDeathOptions, IMagneticFieldOptions, IRotation, IStateDependencies } from '../interfaces';
+import { IStateDependencies, IWhiteDwarfCreationOptions } from '../interfaces';
 import { EARTH_RADIUS, SUN_LIGHT_INTENSITY, SUN_MASS } from '../utilities/consts';
 import { BodyTypeEnum } from './body-enums';
-import { buildBodySphereGeometry } from '../utilities/utilities';
-import { StarSurfaceMaterial, starSurfaceOctaves } from '../effects/star-surface-material';
-import { StarHalo } from '../effects/star-halo';
 import { environmentState } from '../simulation/environment-state';
 
 const WHITE_DWARF_RADIUS = EARTH_RADIUS;
@@ -29,7 +26,7 @@ const WHITE_DWARF_FINAL_TEMPERATURE = 4000;
  * seconds with star death on, so this keeps the remnant's fade on the same visible scale:
  * blue-white to white within a minute or so, then a long slide toward orange.
  */
-const WHITE_DWARF_COOLING_TIME = 60;
+const WHITE_DWARF_COOLING_TIME = 300;
 
 /** Light at birth: white dwarfs are far dimmer than main-sequence stars. */
 const WHITE_DWARF_LIGHT_INTENSITY = SUN_LIGHT_INTENSITY * 0.0001;
@@ -42,20 +39,6 @@ const WHITE_DWARF_LIGHT_DISTANCE = (SUN_LIGHT_INTENSITY / WHITE_DWARF_LIGHT_INTE
 
 /** Only retint/relight when cooling has moved the temperature by at least this much (K). */
 const RETINT_STEP_K = 25;
-
-/** Options for creating a white dwarf. */
-export interface IWhiteDwarfOptions {
-    pos: THREE.Vector3;
-    /** Inherited from the progenitor so the remnant keeps its orbit. */
-    vel?: THREE.Vector3;
-    mass: number;
-    id: string;
-    name: string;
-    rotation: IRotation;
-    magneticField?: IMagneticFieldOptions;
-    /** Default: {@link WHITE_DWARF_BIRTH_TEMPERATURE}. */
-    temperature?: number;
-}
 
 /**
  * White dwarf — the Earth-sized, electron-degenerate core a red giant leaves behind once it
@@ -70,33 +53,24 @@ export interface IWhiteDwarfOptions {
  * while star evolution (star death) is enabled.
  */
 export class WhiteDwarf extends Star {
-    /** Limb glow around the surface. */
-    halo: StarHalo | null;
-
     /** Light intensity at birth temperature; the light scales down from this as it cools. */
     private readonly _birthLightIntensity = WHITE_DWARF_LIGHT_INTENSITY;
     private readonly _birthTemperature: number;
     /** Temperature the surface/light were last retinted for. */
     private _shownTemperature: number;
 
-    constructor(dependencies: IStateDependencies, scene: THREE.Scene, options: IWhiteDwarfOptions) {
-        const radius = massToWhiteDwarfRadius(options.mass);
+    constructor(
+        dependencies: IStateDependencies,
+        scene: THREE.Scene,
+        options: IWhiteDwarfCreationOptions
+    ) {
         const temperature = options.temperature ?? WHITE_DWARF_BIRTH_TEMPERATURE;
-
-        const mesh = new THREE.Mesh(
-            buildBodySphereGeometry(radius),
-            new StarSurfaceMaterial({
-                temperature,
-                octaves: starSurfaceOctaves(),
-                style: 'whiteDwarf',
-            })
-        );
 
         super(dependencies, scene, {
             pos: options.pos,
-            vel: options.vel?.clone() ?? new THREE.Vector3(0, 0, 0),
+            vel: options.vel.clone(),
             mass: options.mass,
-            radius,
+            radius: massToWhiteDwarfRadius(options.mass),
             id: options.id,
             name: options.name,
             temperature,
@@ -104,8 +78,9 @@ export class WhiteDwarf extends Star {
             lightDistance: WHITE_DWARF_LIGHT_DISTANCE,
             rotation: options.rotation,
             magneticField: options.magneticField,
-            mesh,
             bodyType: BodyTypeEnum.WhiteDwarf,
+            surfaceStyle: 'whiteDwarf',
+            haloWisps: 0,
             // Far dimmer than the main-sequence minimum, by design.
             unclampedLightIntensity: true,
         });
@@ -113,31 +88,12 @@ export class WhiteDwarf extends Star {
         this._birthTemperature = Math.max(temperature, WHITE_DWARF_FINAL_TEMPERATURE + 1);
         this._shownTemperature = temperature;
 
-        const surface = this.surfaceMaterial;
-        this.halo = surface
-            ? new StarHalo(
-                  this.mesh,
-                  radius,
-                  surface.tint,
-                  surface.exposure,
-                  surface.surfaceUniforms.uSsTime,
-                  0
-              )
-            : null;
-
         this._applyCoolingLight();
-    }
-
-    /** The procedural surface material. */
-    get surfaceMaterial(): StarSurfaceMaterial | null {
-        return this.mesh?.material instanceof StarSurfaceMaterial ? this.mesh.material : null;
     }
 
     override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
         super.updateVisuals(dtTotal, cameraPos);
         if (this._isDisposed) return;
-
-        this.surfaceMaterial?.update(dtTotal);
 
         if (environmentState.starDeathEnabled && dtTotal > 0) {
             this._cool(dtTotal);
@@ -160,14 +116,6 @@ export class WhiteDwarf extends Star {
     override setTemperature(temp: number) {
         super.setTemperature(temp);
         this._shownTemperature = temp;
-
-        // Called from inside Star's constructor too, before `halo` exists.
-        const surface = this.surfaceMaterial;
-        if (surface) {
-            surface.setTemperature(temp);
-            this.halo?.setExposure(surface.exposure);
-        }
-
         this._applyCoolingLight();
     }
 
@@ -182,20 +130,5 @@ export class WhiteDwarf extends Star {
         const ratio = Math.pow(this.temperature / this._birthTemperature, 4);
         const fraction = Math.max(WHITE_DWARF_MIN_LIGHT_FRACTION, Math.min(1, ratio));
         this.setLightIntensity(this._birthLightIntensity * fraction);
-    }
-
-    override setRadius(newRadius: number) {
-        super.setRadius(newRadius);
-        this.halo?.setRadius(newRadius);
-    }
-
-    override die(deathOptions?: IDeathOptions) {
-        try {
-            this.halo?.dispose();
-            this.halo = null;
-        } catch {
-            // ignore
-        }
-        super.die(deathOptions);
     }
 }

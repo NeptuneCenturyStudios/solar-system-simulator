@@ -4,16 +4,17 @@ import { starSurfaceExposure, starSurfaceTint } from './star-tint';
 import { settingsStore } from '../settings/settings-store';
 
 /** Granulation detail for the procedural surface: fewer fBm octaves on low graphics quality. */
-export function starSurfaceOctaves(): number {
+function starSurfaceOctaves(): number {
     return settingsStore.settings.textureQuality === 'low' ? 4 : 6;
 }
 
 /**
- * Largest per-frame advance of the surface clock, in sim seconds. Boiling follows sim time
- * (it freezes when the sim is paused), but at high time scales a frame can advance hours of sim
- * time; capping the step keeps the surface churning instead of turning into flicker.
+ * Largest per-frame advance of a star's animation clock, in sim seconds. Boiling follows sim
+ * time (it freezes when the sim is paused), but at high time scales a frame can advance hours of
+ * sim time; capping the step keeps the surface churning instead of turning into flicker. Other
+ * star-attached animations (the pulsar field flow) use the same cap.
  */
-const MAX_BOIL_STEP = 0.25;
+export const MAX_STAR_CLOCK_STEP = 0.25;
 
 /**
  * Surface looks:
@@ -28,8 +29,6 @@ export type StarSurfaceStyle = 'mainSequence' | 'whiteDwarf' | 'pulsar';
 /** Tunables for {@link StarSurfaceMaterial}. All have defaults matched to the Blender model. */
 export interface IStarSurfaceOptions {
     temperature: number;
-    /** Max fBm octaves for the granulation; drop for low graphics quality. Default 6. */
-    octaves?: number;
     /** Default `mainSequence`. */
     style?: StarSurfaceStyle;
 }
@@ -107,7 +106,6 @@ type NumericSurfaceUniform = {
  *  - is independent of radius — red-giant expansion just scales the same surface up.
  */
 export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
-    readonly isStarSurfaceMaterial = true;
     readonly surfaceUniforms: StarSurfaceUniforms;
 
     private readonly _targetTint = new THREE.Color();
@@ -126,7 +124,8 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
             uSsTime: { value: Math.random() * 1000 },
             uSsTint: { value: tint },
             uSsExposure: { value: this._targetExposure },
-            uSsOctaves: { value: options.octaves ?? 6 },
+            // Max fBm octaves for the granulation; follows the texture-quality setting.
+            uSsOctaves: { value: starSurfaceOctaves() },
             uSsBoilRate: { value: 0.0045 },
             uSsWarp: { value: 0.012 },
             uSsCellLo: { value: 0.3 },
@@ -310,28 +309,18 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
         u.uSsExposure.value += (this._targetExposure - u.uSsExposure.value) * blend;
     }
 
-    /** The current surface tint (shared with the halo so the two always match). */
-    get tint(): THREE.Color {
-        return this.surfaceUniforms.uSsTint.value;
-    }
-
-    /** Current surface exposure. */
-    get exposure(): number {
-        return this.surfaceUniforms.uSsExposure.value;
-    }
-
-    /** Advances the boiling animation by `dt` sim seconds. */
+    /**
+     * Advances the boiling animation by `dt` sim seconds, and picks up texture-quality changes
+     * so existing stars follow the setting without being rebuilt.
+     */
     update(dt: number): void {
-        const step = Math.min(Math.abs(dt), MAX_BOIL_STEP);
-        this.surfaceUniforms.uSsTime.value += step;
+        const u = this.surfaceUniforms;
+        u.uSsTime.value += Math.min(Math.abs(dt), MAX_STAR_CLOCK_STEP);
+        u.uSsOctaves.value = starSurfaceOctaves();
     }
 
     /** Sets the magnetic axis (object space) the polar hot spots sit on. */
     setPoleAxis(axis: THREE.Vector3): void {
         this.surfaceUniforms.uSsPoleAxis.value.copy(axis).normalize();
-    }
-
-    setOctaves(octaves: number): void {
-        this.surfaceUniforms.uSsOctaves.value = octaves;
     }
 }

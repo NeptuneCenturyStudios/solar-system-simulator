@@ -74,18 +74,14 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
             gForce
         );
 
-        const blackHole = new BlackHole(
-            this.dependencies,
-            this.scene,
-            bhPlacement.pos,
-            bhParams.mass,
-            bhId,
-            bhName,
-            { tilt: 0, speed: 0 }
-        );
-
-        // Apply the binary orbit velocity to the black hole
-        blackHole.velocity.copy(bhPlacement.vel);
+        const blackHole = new BlackHole(this.dependencies, this.scene, {
+            pos: bhPlacement.pos,
+            // The binary orbit velocity.
+            vel: bhPlacement.vel,
+            mass: bhParams.mass,
+            id: bhId,
+            name: bhName,
+        });
         bodies.push(blackHole);
 
         // Report completion of black hole creation

@@ -119,8 +119,7 @@ export abstract class Comet extends CelestialBody {
         this.tailGeo.setAttribute('position', new THREE.BufferAttribute(this.tailGpuBuf, 3));
         this.tailGeo.setAttribute('color', new THREE.BufferAttribute(this.tailColors, 3));
         // Per-particle life/opacity passed as a custom attribute so the shader can
-        // produce smooth circular discs with radial falloff and life-based fade —
-        // identical pattern to the sun corona shader.
+        // produce smooth circular discs with radial falloff and life-based fade.
         this.tailGeo.setAttribute('life', new THREE.BufferAttribute(this.tailOpacities, 1));
 
         this.tailMat = new THREE.PointsMaterial({
