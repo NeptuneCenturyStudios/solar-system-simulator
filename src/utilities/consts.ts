@@ -617,6 +617,14 @@ export const STAR_LIGHT_INTENSITY_MIN = BASE_STAR_LIGHT_INTENSITY_MIN * STAR_LIG
 export const STAR_LIGHT_INTENSITY_MAX = BASE_STAR_LIGHT_INTENSITY_MAX * STAR_LIGHT_SCALE;
 export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
 
+/**
+ * A dying star's red-giant radius, as a multiple of its pre-expansion radius, is rolled uniformly
+ * in [MIN, MAX]. Real orbit-to-Sun-radius ratios are Mercury ≈ 83x, Venus ≈ 155x and Earth ≈ 215x,
+ * so 200-250x always swallows Mercury and Venus, and Earth when the roll lands above ~215x.
+ */
+export const RED_GIANT_MIN_EXPANSION = 200;
+export const RED_GIANT_MAX_EXPANSION = 250;
+
 export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;
 export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4;
 export const MAX_NEUTRON_STAR_MASS = SUN_MASS * 3;

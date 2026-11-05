@@ -8,6 +8,8 @@ import {
     BROWN_DWARF_MASS_THRESHOLD,
     MIN_BLACK_HOLE_MASS,
     MIN_NEUTRON_STAR_MASS,
+    RED_GIANT_MIN_EXPANSION,
+    RED_GIANT_MAX_EXPANSION,
 } from '../utilities/consts';
 import { BlackHole } from './black-hole';
 import { WhiteDwarf } from './white-dwarf';
@@ -19,17 +21,17 @@ import { BodyTypeEnum } from './body-enums';
 import { environmentState } from '../simulation/environment-state';
 
 /**
- * Blend factor for the red-giant expansion lerps (radius, mass, colour, emissive intensity).
+ * How quickly a red giant's radius, mass and surface colour ease toward their fuel-driven
+ * targets, per sim second. Each frame blends by `1 - exp(-rate * |dtTotal|)`, so the easing
+ * runs on sim time: the same at any frame rate, faster under time warp, frozen while paused.
  *
- * These used to apply a 0.01 lerp once per physics substep. At the default 64 substeps the
- * effective per-frame blend was `1 - 0.99^64 ≈ 0.47`, so applying that once per frame keeps
- * the transition running at the speed it always did. As a bonus it no longer silently
- * changes speed when the user adjusts the substep count.
+ * Matches the speed the transition was originally tuned at: a 0.01 lerp per physics substep,
+ * 64 substeps per 0.016 s, gives `-ln(0.99) * 64 / 0.016 ≈ 40` per second.
  */
-const RED_GIANT_BLEND = 0.47;
+const RED_GIANT_EASE_RATE = 40;
 
-/** Smallest relative radius change (0.4%) that rebuilds the red giant's geometry. */
-const RED_GIANT_RESIZE_STEP = 0.004;
+/** Smallest relative radius change (0.01%) that rebuilds the red giant's geometry. */
+const RED_GIANT_RESIZE_STEP = 0.0001;
 
 // Star death is a shared environment setting (toggled from either UI layer);
 // reading it from the state singleton avoids DOM coupling in body classes.
@@ -50,6 +52,12 @@ export class MainSequenceStar extends Star {
     initialMass: number;
     initialRadius: number;
     initialColor: THREE.Color;
+    /**
+     * How many times its pre-expansion radius this star swells to as a red giant, rolled once per
+     * star in [RED_GIANT_MIN_EXPANSION, RED_GIANT_MAX_EXPANSION] so the target stays stable
+     * from frame to frame.
+     */
+    redGiantExpansionFactor: number;
 
     constructor(
         dependencies: IStateDependencies,
@@ -61,6 +69,9 @@ export class MainSequenceStar extends Star {
         this.initialMass = options.mass;
         this.initialRadius = options.radius;
         this.initialColor = this.baseColor.clone();
+        this.redGiantExpansionFactor =
+            RED_GIANT_MIN_EXPANSION +
+            Math.random() * (RED_GIANT_MAX_EXPANSION - RED_GIANT_MIN_EXPANSION);
 
         this.maxFuel = options.mass * 100000;
         this.fuel = this.maxFuel;
@@ -105,38 +116,38 @@ export class MainSequenceStar extends Star {
 
             // Check if star should start expanding into a red giant (only for stars that won't become neutron stars or black holes)
             if (this.initialMass < MIN_NEUTRON_STAR_MASS) {
-                // Once fuel drops below 30%, start expanding and cooling into a red giant.
+                // Once fuel drops below 30%, start expanding and cooling into a red giant,
+                // reaching redGiantExpansionFactor (200-250x) times its initial radius at 0% fuel.
                 if (fuelPercent < 0.3 && fuelPercent > 0) {
                     const expansionProgress = 1 - fuelPercent / 0.3;
                     const STAR_MAX_RADIUS = PLUTO_DIST;
 
-                    const targetRadiusUnclamped = this.initialRadius * (1 + expansionProgress * 99);
+                    const targetRadiusUnclamped =
+                        this.initialRadius *
+                        (1 + expansionProgress * (this.redGiantExpansionFactor - 1));
                     const targetRadius = Math.min(targetRadiusUnclamped, STAR_MAX_RADIUS);
+
+                    // Sim-time easing (see RED_GIANT_EASE_RATE); 0 while paused.
+                    const blend = 1 - Math.exp(-RED_GIANT_EASE_RATE * Math.abs(dtTotal));
 
                     // setRadius rebuilds the whole sphere geometry (and moves the label and
                     // halo with it), so only resize once the change is big enough to see. A
                     // slow-burning star would otherwise rebuild a ~8k-vertex sphere every frame
                     // for a sub-pixel change, for as long as its red-giant phase lasts.
-                    if (dtTotal !== 0) {
-                        const nextRadius =
-                            this.radius + (targetRadius - this.radius) * RED_GIANT_BLEND;
-                        if (
-                            Math.abs(nextRadius - this.radius) >
-                            this.radius * RED_GIANT_RESIZE_STEP
-                        ) {
-                            this.setRadius(nextRadius);
-                        }
+                    const nextRadius = this.radius + (targetRadius - this.radius) * blend;
+                    if (Math.abs(nextRadius - this.radius) > this.radius * RED_GIANT_RESIZE_STEP) {
+                        this.setRadius(nextRadius);
                     }
 
                     const targetMass = this.initialMass * (1 - expansionProgress * 0.5);
-                    this.mass = this.mass + (targetMass - this.mass) * RED_GIANT_BLEND;
+                    this.mass = this.mass + (targetMass - this.mass) * blend;
 
                     const targetTemp = 2200 + (fuelPercent / 0.3) * 3578;
                     this.temperature = targetTemp;
 
                     // Cool the surface (eased) and the light toward red. The halo shares the
                     // surface uniforms, so it follows.
-                    this.surfaceMaterial?.setTemperature(targetTemp, RED_GIANT_BLEND);
+                    this.surfaceMaterial?.setTemperature(targetTemp, blend);
                     this.applyLightColor(targetTemp);
                 }
             }

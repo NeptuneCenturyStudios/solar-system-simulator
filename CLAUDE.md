@@ -130,9 +130,10 @@ For previous milestone info, see milestones.md
 ## Current milestone
 - **Version 1.5.0**
 - **Phase 1**
-- [ ] Phase 1.1: Complete star overhaul
+- [x] Phase 1.1: Complete star overhaul
 - [ ] Phase 1.2: Overhaul atmosphere shell effect so that when camera is within the atmosphere, it looks like an actual sky
-- [ ] Phase 1.3: Optional if possible - volumetric clouds (what do we need to do to support it and a fallback for lower end machines use the cloud texture in use today)
+- [ ] Phase 1.3: Update Earth day/night shader to show any side toward a star as night if the light level is too low. Faint stars who's light is too dim cause Earth to use it's day texture while still showing up dark currently.
+- [ ] Phase 1.4: Optional if possible - volumetric clouds (what do we need to do to support it and a fallback for lower end machines use the cloud texture in use today)
 - **Phase 2**
 - [ ] Phase 2.1: Add new alien mothership model and class
 - [ ] Phase 2.2: Add new alien fighter model and class
