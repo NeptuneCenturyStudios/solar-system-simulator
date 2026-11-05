@@ -140,6 +140,8 @@ For previous milestone info, see milestones.md
 - **Phase 3**
 - [ ] Phase 3.1: Review performance on slower machines after star update and add performance adjustment options as needed.
 - [ ] Phase 3.2: Fix more issues with surface cam mode (surface cam gets messed up when generating new system, deactivating leaves camera in weird state, etc...)
+- **Phase 4**
+- [ ] Phase 4.1: Ability to save edits to a solar system or procedurally generated system. For app, this can be built in, for web version, user can select files from browser to load and save.
 
 ## UI (Vue)
 
