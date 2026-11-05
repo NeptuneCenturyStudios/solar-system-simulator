@@ -118,6 +118,7 @@ import { ParticleExplosion } from './effects/particle-explosion';
 import { AmbientSoundManager } from './utilities/ambient-sound';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
 import { SunRaysEffect } from './effects/sun-rays';
+import { LensFlareEffect } from './effects/lens-flare';
 import { createBridgeForPair } from './effects/wormhole-link-bridge';
 import { GridHelperManager } from './gizmos/grid-helper';
 import { AiAvoidanceGizmo } from './gizmos/ai-avoidance-gizmo';
@@ -297,6 +298,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const lensingEffect = new GravitationalLensingEffect(renderer);
 const sunRaysEffect = new SunRaysEffect(renderer.domElement.width, renderer.domElement.height);
+const lensFlareEffect = new LensFlareEffect();
 
 // Create orthographic camera and scene for 2D UI overlay
 const uiScene = new THREE.Scene();
@@ -4917,6 +4919,7 @@ const animCtx: AnimationContext = {
     planetaryNebulae: { value: planetaryNebulae },
     lensingEffect,
     sunRaysEffect,
+    lensFlareEffect,
     gizmo,
     velArc,
     orbitPrediction,

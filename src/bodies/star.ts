@@ -7,10 +7,8 @@ import {
     STAR_LIGHT_DECAY,
 } from '../utilities/consts';
 import { buildBodySphereGeometry } from '../utilities/utilities';
-import { settingsStore } from '../settings/settings-store';
 import { CelestialBody } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
-import { StarLensflare } from '../effects/star-lensflare';
 import { StarSurfaceMaterial, StarSurfaceStyle } from '../effects/star-surface-material';
 import { StarHalo } from '../effects/star-halo';
 import { starLightColor } from '../effects/star-tint';
@@ -33,7 +31,8 @@ function buildStarSurfaceMesh(
  * A star (e.g. the Sun). Owns what every star shares:
  *  - the procedural surface ({@link StarSurfaceMaterial}, in the style the subclass asks for)
  *    and the limb {@link StarHalo} that shares its tint, exposure and clock;
- *  - the point light (coloured by temperature), the ambient light and the lens-flare shine.
+ *  - the point light (coloured by temperature) and the ambient light. The lens flare is a
+ *    screen-space pass (`effects/lens-flare.ts`) that reads `baseColor`, so it follows too.
  *
  * Subclasses add their own behaviour: fuel and evolution (MainSequenceStar), cooling
  * (WhiteDwarf), beams, field and accretion (Pulsar).
@@ -47,12 +46,6 @@ export class Star extends CelestialBody {
     unclampedLightIntensity: boolean;
     ambientLight: THREE.AmbientLight | null;
     sunLight: THREE.PointLight | null;
-
-    /**
-     * Classic screen-space lens flare (ghost-image chain) attached to the star's
-     * point light. Null for brown dwarfs.
-     */
-    lensflare: StarLensflare | null;
 
     /** Limb glow around the procedural surface. Null if a custom mesh was supplied. */
     halo: StarHalo | null;
@@ -98,14 +91,6 @@ export class Star extends CelestialBody {
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
         scene.add(this.ambientLight);
 
-        // Classic screen-space lens flare attached to the star's point light. Follows the light
-        // automatically (updateVisuals syncs sunLight.position each frame). Created before
-        // setTemperature so the flare picks up the star's colour. Brown dwarfs get none.
-        this.lensflare =
-            !(this.bodyType & BodyTypeEnum.BrownDwarf) && this.sunLight
-                ? new StarLensflare(this.sunLight, options.radius)
-                : null;
-
         this.setTemperature(options.temperature);
 
         const surface = this.surfaceMaterial;
@@ -138,8 +123,8 @@ export class Star extends CelestialBody {
     }
 
     /**
-     * Per-rendered-frame visual update. Advances the surface animation, keeps the star's light
-     * source on the star, and drives the lens-flare shine. Brown dwarfs never show the flare.
+     * Per-rendered-frame visual update. Advances the surface animation and keeps the star's
+     * light source on the star.
      */
     override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {
         super.updateVisuals(dtTotal, cameraPos);
@@ -151,14 +136,6 @@ export class Star extends CelestialBody {
         if (this.sunLight) {
             this.sunLight.position.copy(this.mesh.position);
         }
-
-        if (this.bodyType & BodyTypeEnum.BrownDwarf) {
-            this.lensflare?.setVisible(false);
-            return;
-        }
-
-        this.lensflare?.setVisible(settingsStore.settings.lensflareEnabled);
-        this.lensflare?.update(dtTotal);
     }
 
     private _clampLightIntensity(intensity: number): number {
@@ -189,11 +166,10 @@ export class Star extends CelestialBody {
         this.applyLightColor(temp);
     }
 
-    /** Colours the base colour, point light and lens flare for the given temperature. */
+    /** Colours the base colour (which the lens flare reads) and point light for the temperature. */
     protected applyLightColor(temp: number) {
         starLightColor(temp, this.baseColor);
         this.sunLight?.color.copy(this.baseColor);
-        this.lensflare?.setColor(this.baseColor.getHex());
     }
 
     override setRadius(newRadius: number) {
@@ -254,15 +230,6 @@ export class Star extends CelestialBody {
                 this.ambientLight.visible = false;
                 this.scene.remove(this.ambientLight);
                 this.ambientLight = null;
-            }
-        } catch {
-            // ignore
-        }
-
-        try {
-            if (this.lensflare) {
-                this.lensflare.dispose();
-                this.lensflare = null;
             }
         } catch {
             // ignore

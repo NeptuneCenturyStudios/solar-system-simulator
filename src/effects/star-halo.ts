@@ -5,6 +5,12 @@ import type { StarSurfaceMaterial } from './star-surface-material';
 /** Halo shell radius as a multiple of the star's radius. The glow is ~0 well before this. */
 const HALO_SHELL_SCALE = 3.0;
 
+/**
+ * Height above the limb (in star radii) beyond which the flame wisps are skipped. Their
+ * slowest falloff is exp(-10h), so here they are under 0.5% of their peak.
+ */
+const WISP_MAX_H = 0.55;
+
 const _camWorld = new THREE.Vector3();
 const _invWorld = new THREE.Matrix4();
 
@@ -113,12 +119,17 @@ export class StarHalo {
                     // Wisps: noise that is fine around the limb but stretched along the radius,
                     // drifting outward over time, so it reads as licking flame tendrils. A slow,
                     // coarse field gathers them into active regions instead of an even fringe.
-                    float t = uShTime * 0.01;
-                    float flame = ss_fbm(vec4(dir * 16.0, h * 6.0 - t * 4.0), 3.0, 0.55);
-                    float region = ss_fbm(vec4(dir * 2.5 + 9.1, t * 0.3), 2.0, 0.5);
-                    float reach = mix(10.0, 26.0, smoothstep(0.35, 0.65, 1.0 - region));
-                    float wisps = smoothstep(0.45, 0.7, flame) * exp(-h * reach);
-                    glow += wisps * 0.75 * uShWisps;
+                    // The wisps fall off at least as fast as exp(-10h), so past WISP_MAX_H they
+                    // are invisible; skipping the noise there (most of the shell's screen area
+                    // when the camera is close) and for wisp-less remnants saves 5 noise calls.
+                    if (uShWisps > 0.0 && h < ${WISP_MAX_H.toFixed(2)}) {
+                        float t = uShTime * 0.01;
+                        float flame = ss_fbm(vec4(dir * 16.0, h * 6.0 - t * 4.0), 3.0, 0.55);
+                        float region = ss_fbm(vec4(dir * 2.5 + 9.1, t * 0.3), 2.0, 0.5);
+                        float reach = mix(10.0, 26.0, smoothstep(0.35, 0.65, 1.0 - region));
+                        float wisps = smoothstep(0.45, 0.7, flame) * exp(-h * reach);
+                        glow += wisps * 0.75 * uShWisps;
+                    }
 
                     // Fade to zero before the shell's own silhouette so its edge never shows.
                     glow *= 1.0 - smoothstep(${(HALO_SHELL_SCALE * 0.7).toFixed(2)}, ${HALO_SHELL_SCALE.toFixed(2)}, x);
@@ -128,7 +139,7 @@ export class StarHalo {
                     `
                 );
         };
-        material.customProgramCacheKey = () => 'star-halo-v2';
+        material.customProgramCacheKey = () => 'star-halo-v3';
 
         this.mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), material);
         this.mesh.name = 'StarHalo';

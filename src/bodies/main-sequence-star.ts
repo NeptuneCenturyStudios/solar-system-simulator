@@ -15,7 +15,6 @@ import { Pulsar } from './pulsar';
 import { Supernova } from '../effects/supernova';
 import { PlanetaryNebula } from '../effects/planetary-nebula';
 import { triggerScreenFlash } from '../effects/screen-flash';
-import { StarLensflare } from '../effects/star-lensflare';
 import { BodyTypeEnum } from './body-enums';
 import { environmentState } from '../simulation/environment-state';
 
@@ -28,6 +27,9 @@ import { environmentState } from '../simulation/environment-state';
  * changes speed when the user adjusts the substep count.
  */
 const RED_GIANT_BLEND = 0.47;
+
+/** Smallest relative radius change (0.4%) that rebuilds the red giant's geometry. */
+const RED_GIANT_RESIZE_STEP = 0.004;
 
 // Star death is a shared environment setting (toggled from either UI layer);
 // reading it from the state singleton avoids DOM coupling in body classes.
@@ -111,22 +113,23 @@ export class MainSequenceStar extends Star {
                     const targetRadiusUnclamped = this.initialRadius * (1 + expansionProgress * 99);
                     const targetRadius = Math.min(targetRadiusUnclamped, STAR_MAX_RADIUS);
 
+                    // setRadius rebuilds the whole sphere geometry (and moves the label and
+                    // halo with it), so only resize once the change is big enough to see. A
+                    // slow-burning star would otherwise rebuild a ~8k-vertex sphere every frame
+                    // for a sub-pixel change, for as long as its red-giant phase lasts.
                     if (dtTotal !== 0) {
-                        this.radius = this.radius + (targetRadius - this.radius) * RED_GIANT_BLEND;
-                        this.setRadius(this.radius);
+                        const nextRadius =
+                            this.radius + (targetRadius - this.radius) * RED_GIANT_BLEND;
+                        if (
+                            Math.abs(nextRadius - this.radius) >
+                            this.radius * RED_GIANT_RESIZE_STEP
+                        ) {
+                            this.setRadius(nextRadius);
+                        }
                     }
 
                     const targetMass = this.initialMass * (1 - expansionProgress * 0.5);
                     this.mass = this.mass + (targetMass - this.mass) * RED_GIANT_BLEND;
-
-                    if (this.labelLine) {
-                        const labelHeight = this.radius * 3.5;
-                        const linePositions = this.labelLine.geometry.attributes.position.array;
-                        linePositions[1] = this.radius;
-                        linePositions[4] = labelHeight;
-                        this.labelLine.geometry.attributes.position.needsUpdate = true;
-                        this.label.position.y = labelHeight;
-                    }
 
                     const targetTemp = 2200 + (fuelPercent / 0.3) * 3578;
                     this.temperature = targetTemp;
@@ -332,11 +335,6 @@ export class MainSequenceStar extends Star {
         // (During construction the halo doesn't exist yet; Star hides it when it is built.)
         this.halo?.setVisible(false);
 
-        if (this.lensflare) {
-            this.lensflare.dispose();
-            this.lensflare = null;
-        }
-
         if (this.sunLight) {
             this.sunLight.intensity = 0.002;
             this.sunLight.color.setHex(0xff6020);
@@ -364,12 +362,6 @@ export class MainSequenceStar extends Star {
 
         // Restore the limb halo.
         this.halo?.setVisible(true);
-
-        // Restore lens flare. The caller's setTemperature recolours it.
-        if (!this.lensflare && this.sunLight) {
-            this.lensflare = new StarLensflare(this.sunLight, this.radius);
-            this.lensflare.setColor(this.baseColor.getHex());
-        }
 
         // Restore the light the star had before it dimmed (transitionToBrownDwarf only changed
         // the light itself, not `lightIntensity`).

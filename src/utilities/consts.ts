@@ -617,23 +617,6 @@ export const STAR_LIGHT_INTENSITY_MIN = BASE_STAR_LIGHT_INTENSITY_MIN * STAR_LIG
 export const STAR_LIGHT_INTENSITY_MAX = BASE_STAR_LIGHT_INTENSITY_MAX * STAR_LIGHT_SCALE;
 export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
 
-// ─── Lens Flare element sizes ──────────────────────────────────────────────
-export const LENSFLARE_STARBURST_SIZE = 128;
-export const LENSFLARE_CORE_SIZE = 75;
-export const LENSFLARE_HALO_SIZE = 250;
-export const LENSFLARE_CARDINAL_SPIKE_LENGTH = 0.46;
-export const LENSFLARE_CARDINAL_SPIKE_WIDTH = 0.02;
-export const LENSFLARE_DIAGONAL_SPIKE_LENGTH = 0.32;
-export const LENSFLARE_DIAGONAL_SPIKE_WIDTH = 0.015;
-
-// ─── Lens Flare starburst flicker ──────────────────────────────────────────
-/** Peak size perturbation of the starburst as a fraction of its base size (±4%). */
-export const LENSFLARE_STARBURST_FLICKER_AMPLITUDE = 0.04;
-/** Primary flicker rate (rad/s) — slow shimmer dominant term. */
-export const LENSFLARE_STARBURST_FLICKER_FREQ_A = 3.0;
-/** Secondary flicker rate (rad/s) — incommensurate with A so the shimmer never repeats. */
-export const LENSFLARE_STARBURST_FLICKER_FREQ_B = 7.3;
-
 export const BROWN_DWARF_MASS_THRESHOLD = SUN_MASS * 0.08;
 export const MIN_NEUTRON_STAR_MASS = SUN_MASS * 1.4;
 export const MAX_NEUTRON_STAR_MASS = SUN_MASS * 3;

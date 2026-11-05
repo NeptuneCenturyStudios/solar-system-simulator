@@ -218,7 +218,6 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
                     float octaves = clamp(log2(0.5 / footprint) + 1.0, 1.0, uSsOctaves);
 
                     float cells = ss_fbm(vec4(cellCoord, w * 30.0), octaves, 0.825);
-                    float spots = ss_fbm(vec4(qw * 15.7 + 7.3, w * 15.7), 2.0, 0.783);
 
                     // Dark lanes: a medium-scale field dragged through a strong, slow flow warp,
                     // so its low values join up into the connected, river-like dark channels of
@@ -245,7 +244,13 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
                     // Dark intergranular lanes -> bright granules, plus sparse hot spots where
                     // the coarse field peaks inside a bright granule.
                     float granules = smoothstep(uSsCellLo, uSsCellHi, cells);
-                    float hot = smoothstep(0.6, 0.76, cells) * smoothstep(0.5, 0.68, spots);
+                    // The spot field only matters inside bright granules, so it is skipped
+                    // (2 noise calls) everywhere else. Nothing below takes its derivative.
+                    float hot = 0.0;
+                    if (cells > 0.6) {
+                        float spots = ss_fbm(vec4(qw * 15.7 + 7.3, w * 15.7), 2.0, 0.783);
+                        hot = smoothstep(0.6, 0.76, cells) * smoothstep(0.5, 0.68, spots);
+                    }
 
                     // Fine fuzz: the very high octaves of the Blender noise (Detail ~16) that we
                     // don't reach with 'cells'. Faded out once it would be sub-pixel.
@@ -296,7 +301,7 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
         };
 
         // All instances share one program; the uniforms are per-instance objects.
-        this.customProgramCacheKey = () => 'star-surface-v4';
+        this.customProgramCacheKey = () => 'star-surface-v5';
     }
 
     /** Retints the surface for a new temperature. Pass `blend` < 1 to ease toward it. */

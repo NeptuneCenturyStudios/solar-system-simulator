@@ -9,6 +9,7 @@ import { ScenarioMessageHud } from '../drawing/scenario-message-hud';
 import { PlanetaryNebula } from '../effects/planetary-nebula';
 import { GravitationalLensingEffect } from '../effects/gravitational-lensing';
 import { SunRaysEffect } from '../effects/sun-rays';
+import { LensFlareEffect } from '../effects/lens-flare';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { VelocityArcManager } from '../drawing/velocity-arc';
 import { OrbitPredictionManager } from '../drawing/orbit-prediction';
@@ -108,6 +109,7 @@ export interface AnimationContext {
     // Managers & effects
     lensingEffect: GravitationalLensingEffect;
     sunRaysEffect: SunRaysEffect;
+    lensFlareEffect: LensFlareEffect;
     gizmo: CoordinateGizmo;
     velArc: VelocityArcManager;
     orbitPrediction: OrbitPredictionManager;
@@ -1462,6 +1464,17 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 ctx.camera,
                 ctx.lensingEffect.sceneTexture,
                 ctx.simulationState.bodies
+            );
+        }
+        // Lens flare goes on last, straight to the screen, so the rays don't smear it and the
+        // lensing doesn't warp it. Its shimmer runs on real time but freezes while paused.
+        if (settingsStore.settings.lensflareEnabled) {
+            ctx.lensFlareEffect.render(
+                ctx.renderer,
+                ctx.camera,
+                ctx.simulationState.bodies,
+                dtTotal > 0 ? wallDt : 0,
+                wallDt
             );
         }
         // Cockpit interior overlay: after the world (and lensing), before the 2D HUD.
