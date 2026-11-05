@@ -22,6 +22,8 @@ import {
     EARTH_ARG_PERIHELION,
     calcSimOrbitalPeriod,
     MAX_LIGHTING_STARS,
+    EARTH_NIGHT_IRRADIANCE,
+    EARTH_DAY_IRRADIANCE,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import {
@@ -59,6 +61,8 @@ type EarthUniforms = {
     nightTexture: { value: THREE.Texture };
     specularTexture: { value: THREE.Texture };
     starPositions: { value: THREE.Vector3[] };
+    /** Per-star illuminance scale: irradiance × luminance of the light's colour. */
+    starLight: { value: number[] };
     numStars: { value: number };
     earthPosition: { value: THREE.Vector3 };
 };
@@ -98,40 +102,38 @@ vEarthWorldNormal = normalize(mat3(modelMatrix) * objectNormal);`
             '#include <common>',
             `#include <common>
 #define MAX_STARS ${MAX_STARS}
+#define EARTH_NIGHT_IRRADIANCE ${EARTH_NIGHT_IRRADIANCE.toFixed(6)}
+#define EARTH_DAY_IRRADIANCE ${EARTH_DAY_IRRADIANCE.toFixed(6)}
 uniform sampler2D nightTexture;
 uniform sampler2D specularTexture;
 uniform vec3 starPositions[MAX_STARS];
+uniform float starLight[MAX_STARS];
 uniform int  numStars;
 uniform vec3 earthPosition;
 varying vec3 vEarthWorldNormal;`
         );
 
-        // Blend day/night textures in the base map for smoother terminator.
+        // Day/night blend driven by the light actually reaching each spot: the sum over stars of
+        // irradiance × luminance × N·L, i.e. the illuminance three.js lights this surface with.
+        // A faint or distant star therefore leaves even the side facing it on the night texture.
+        // earthDayFactor is declared at main() scope so the emissive pass below reuses it.
         // vMapUv is declared by Three.js under USE_MAP (guaranteed since map is set).
         shader.fragmentShader = shader.fragmentShader.replace(
             '#include <map_fragment>',
-            `{
-    float maxLight = 0.0;
+            `float earthDayFactor;
+{
+    float illuminance = 0.0;
     for (int i = 0; i < MAX_STARS; i++) {
         if (i >= numStars) break;
         vec3  lightDir = normalize(starPositions[i] - earthPosition);
         float ndotl    = max(dot(vEarthWorldNormal, lightDir), 0.0);
-        maxLight = max(maxLight, ndotl);
+        illuminance += starLight[i] * ndotl;
     }
-
-    // Day factor for texture blend (wider than before so sunset/twilight wraps farther).
-    float dayFactor = smoothstep(0.06, 0.35, maxLight);
+    earthDayFactor = smoothstep(EARTH_NIGHT_IRRADIANCE, EARTH_DAY_IRRADIANCE, illuminance);
 
     vec3 dayColor   = texture2D(map, vMapUv).rgb;
     vec3 nightColor = texture2D(nightTexture, vMapUv).rgb;
-
-    // Warm tint near the terminator for a sunset-like transition.
-    float twilight = dayFactor * (1.0 - dayFactor); // peaks around 0.5
-    vec3 warmTint = vec3(1.0, 0.72, 0.45);
-    vec3 blended = mix(nightColor, dayColor, dayFactor);
-    blended = mix(blended, blended * warmTint, twilight * 1.25);
-
-    diffuseColor.rgb *= blended;
+    diffuseColor.rgb *= mix(nightColor, dayColor, earthDayFactor);
 }`
         );
 
@@ -151,16 +153,8 @@ roughnessFactor = mix(${LAND_ROUGHNESS.toFixed(2)}, ${OCEAN_ROUGHNESS.toFixed(2)
             '#include <emissivemap_fragment>',
             `#include <emissivemap_fragment>
 {
-    float maxLight = 0.0;
-    for (int i = 0; i < MAX_STARS; i++) {
-        if (i >= numStars) break;
-        vec3  lightDir = normalize(starPositions[i] - earthPosition);
-        float ndotl    = max(dot(vEarthWorldNormal, lightDir), 0.0);
-        maxLight = max(maxLight, ndotl);
-    }
-    float nightFactor = 1.0 - smoothstep(0.06, 0.35, maxLight);
-    vec3  nightColor  = texture2D(nightTexture, vMapUv).rgb;
-    totalEmissiveRadiance += nightColor * nightFactor * 1.6;
+    vec3 nightColor = texture2D(nightTexture, vMapUv).rgb;
+    totalEmissiveRadiance += nightColor * (1.0 - earthDayFactor) * 1.6;
 }`
         );
     };
@@ -231,6 +225,7 @@ export class Earth extends Planet {
             nightTexture: { value: earthNightTexture },
             specularTexture: { value: earthSpecularTexture },
             starPositions: { value: Array.from({ length: MAX_STARS }, () => new THREE.Vector3()) },
+            starLight: { value: new Array<number>(MAX_STARS).fill(0) },
             numStars: { value: 0 },
             earthPosition: { value: new THREE.Vector3() },
         };
@@ -352,15 +347,20 @@ export class Earth extends Planet {
 
         if (this._isDisposed) return;
 
-        // Feed the stars lighting Earth most strongly into the day/night shader each frame.
-        // The set also carries each star's light level, which Phase 1.3 will use.
+        // Feed the stars lighting Earth most strongly into the day/night shader each frame, with
+        // the exact irradiance each one delivers here (weighted by its colour's luminance), so
+        // day vs night follows the light actually reaching the surface.
         gatherStarLighting(this.mesh.position, this.starLighting);
         const count = Math.min(this.starLighting.count, MAX_STARS);
         this.customUniforms.numStars.value = count;
 
         const posArray = this.customUniforms.starPositions.value;
+        const lightArray = this.customUniforms.starLight.value;
         for (let i = 0; i < count; i++) {
-            posArray[i].copy(this.starLighting.lights[i].position);
+            const light = this.starLighting.lights[i];
+            posArray[i].copy(light.position);
+            const c = light.color;
+            lightArray[i] = light.irradiance * (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b);
         }
 
         this.customUniforms.earthPosition.value.copy(this.mesh.position);

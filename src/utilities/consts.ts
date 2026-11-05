@@ -628,6 +628,16 @@ export const MAX_LIGHTING_STARS = 4;
 // intensity, STAR_LIGHT_DECAY and light distance), the same light the surface receives, with no
 // reference or normalisation. So the star-light constants above set the sky's brightness too.
 /**
+ * Earth's day/night switch, in illuminance: Σ star irradiance × luminance(light colour) × N·L,
+ * the same units three.js lights the surface with. These are absolute visibility thresholds, not
+ * an Earth reference: a spot receiving less than EARTH_NIGHT_IRRADIANCE shows the night texture
+ * and city lights, more than EARTH_DAY_IRRADIANCE shows the day texture, smoothly in between.
+ * For scale, with STAR_LIGHT_DECAY = 1 the Sun gives ≈13.4 at 1 AU, ≈1.4 at Saturn and ≈0.44
+ * at Neptune; a white dwarf gives ≈0.0013 at 1 AU.
+ */
+export const EARTH_NIGHT_IRRADIANCE = 0.15;
+export const EARTH_DAY_IRRADIANCE = 1.5;
+/**
  * Surface pressure (bar) above which the visual atmosphere thickens quickly. The visual optical
  * depth grows with log(1 + pressure / knee), normalised to 1 at 1 bar. A very low knee makes even
  * thin atmospheres read as a mostly opaque sky, as Mars's dusty 0.006-bar sky does (≈0.56 of
