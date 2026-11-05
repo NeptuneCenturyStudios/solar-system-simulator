@@ -228,8 +228,7 @@ function radiusProfile(t: number, bodyT: number, rNose: number, rMax: number): n
  *    which point the owner disposes the effect (see `checkAtmosphericEntry`).
  *
  * The effect keeps a live reference to `body` and reads `mesh.position`/`velocity` fresh every frame,
- * so it tracks a moving body without needing to be re-parented or fed transform data externally
- * (same pattern as `src/effects/solar-flare.ts`).
+ * so it tracks a moving body without needing to be re-parented or fed transform data externally.
  */
 export class EntryFlameEffect {
     private readonly scene: THREE.Scene;

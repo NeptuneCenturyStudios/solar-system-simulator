@@ -183,6 +183,11 @@ export class GravitationalLensingEffect {
         renderer.render(this.quadScene, this.quadCamera);
     }
 
+    /** The captured (unwarped) scene, for later screen-space passes such as sun rays. */
+    get sceneTexture(): THREE.Texture {
+        return this.rt.texture;
+    }
+
     /** Call from the window resize handler. */
     resize(width: number, height: number): void {
         this.rt.setSize(width, height);

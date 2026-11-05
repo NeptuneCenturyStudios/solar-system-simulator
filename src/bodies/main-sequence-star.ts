@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import { Star, IStarCreationOptions } from './star';
 import { IDeathOptions, IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
-import { getBodyTexture } from '../drawing/texture-registry';
-import { createUniqueId } from '../utilities/utilities';
+import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities';
 import {
     PLUTO_DIST,
     BROWN_DWARF_MASS_THRESHOLD,
@@ -15,14 +14,11 @@ import { WhiteDwarf } from './white-dwarf';
 import { Pulsar } from './pulsar';
 import { Supernova } from '../effects/supernova';
 import { PlanetaryNebula } from '../effects/planetary-nebula';
-import { SolarFlare, SolarFlareType } from '../effects/solar-flare';
 import { triggerScreenFlash } from '../effects/screen-flash';
-import { Corona } from '../effects/corona';
-import { StarGlow } from '../effects/star-glow';
-import { GlowDisk } from '../effects/glow-disk';
 import { StarLensflare } from '../effects/star-lensflare';
+import { StarSurfaceMaterial, starSurfaceOctaves } from '../effects/star-surface-material';
+import { StarHalo } from '../effects/star-halo';
 import { BodyTypeEnum } from './body-enums';
-import { settingsStore } from '../settings/settings-store';
 import { environmentState } from '../simulation/environment-state';
 
 /**
@@ -47,46 +43,38 @@ export class MainSequenceStar extends Star {
     initialMass: number;
     initialRadius: number;
     initialColor: THREE.Color;
-    isBecomingWhiteDwarf: boolean;
-    targetWhiteDwarfRadius: number;
-    activeSolarFlares: SolarFlare[];
-    _solarFlareTimer: number;
-    _nextFlareInterval: number;
-    corona: Corona | null;
-    sunGlow: StarGlow | null;
-    glowDisk: GlowDisk | null;
+    /** Limb glow around the procedural surface. Hidden while the star is a brown dwarf. */
+    halo: StarHalo | null;
 
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         options: IStarCreationOptions
     ) {
-        const textures = {
-            sunTexture: getBodyTexture('sun.jpg'),
-            redStarTexture: getBodyTexture('red-star.jpg'),
-            orangeStarTexture: getBodyTexture('orange_star.jpg'),
-            whiteStarTexture: getBodyTexture('white_star.jpg'),
-            blueStarTexture: getBodyTexture('blue-star.jpg'),
-            whiteDwarfTexture: getBodyTexture('white_dwarf.jpg'),
-            brownDwarfTexture: getBodyTexture('brown_dwarf.jpg'),
-        };
-        super(dependencies, scene, options, textures);
+        // Procedural, animated surface (a port of the "Stylized Sun" Blender material).
+        // Star requires each subclass to build its own surface.
+        if (!options.mesh) {
+            options.mesh = new THREE.Mesh(
+                buildBodySphereGeometry(options.radius),
+                new StarSurfaceMaterial({
+                    temperature: options.temperature,
+                    octaves: starSurfaceOctaves(),
+                })
+            );
+        }
 
-        this.corona = new Corona(dependencies, scene, options.radius + 1, this.baseColor.getHex());
-        this.sunGlow = new StarGlow(
-            dependencies,
-            scene,
-            options.radius,
-            this.baseColor.getHex(),
-            this.mesh.position
-        );
-        this.glowDisk = new GlowDisk(
-            dependencies,
-            scene,
-            options.radius,
-            this.baseColor.getHex(),
-            this.mesh.position
-        );
+        super(dependencies, scene, options);
+
+        const surface = this.surfaceMaterial;
+        this.halo = surface
+            ? new StarHalo(
+                  this.mesh,
+                  options.radius,
+                  surface.tint,
+                  surface.exposure,
+                  surface.surfaceUniforms.uSsTime
+              )
+            : null;
 
         this.initialMass = options.mass;
         this.initialRadius = options.radius;
@@ -95,14 +83,12 @@ export class MainSequenceStar extends Star {
         this.maxFuel = options.mass * 100000;
         this.fuel = this.maxFuel;
 
-        this.isBecomingWhiteDwarf = false;
-        this.targetWhiteDwarfRadius = 8;
-
-        this.activeSolarFlares = [];
-        this._solarFlareTimer = 0;
-        this._nextFlareInterval = 5 + Math.random() * 25;
-
         this.setMass(this.mass);
+    }
+
+    /** The procedural surface material, or null if a custom mesh was supplied. */
+    get surfaceMaterial(): StarSurfaceMaterial | null {
+        return this.mesh?.material instanceof StarSurfaceMaterial ? this.mesh.material : null;
     }
 
     /** Current fuel as a percentage of max, or null when this star has no fuel model. */
@@ -132,12 +118,7 @@ export class MainSequenceStar extends Star {
 
         if (this._isDisposed) return;
 
-        if (this.corona) {
-            this.corona.update(dtTotal);
-        }
-        if (this.corona?.points) {
-            this.corona.points.position.copy(this.mesh.position);
-        }
+        this.surfaceMaterial?.update(dtTotal);
 
         const starDeathEnabled = _isStarDeathEnabled();
         if (starDeathEnabled && this.fuel !== null && this.fuel > 0) {
@@ -178,16 +159,12 @@ export class MainSequenceStar extends Star {
                     const targetTemp = 2200 + (fuelPercent / 0.3) * 3578;
                     this.temperature = targetTemp;
 
-                    const redGiantColor = this.temperatureToColor(targetTemp);
-                    if (this.mesh.material instanceof THREE.MeshPhongMaterial) {
-                        this.mesh.material.color.lerp(redGiantColor, RED_GIANT_BLEND);
-                        this.mesh.material.emissive.lerp(redGiantColor, RED_GIANT_BLEND);
-
-                        const targetIntensity = Star.temperatureToEmissiveIntensity(targetTemp);
-                        this.mesh.material.emissiveIntensity =
-                            this.mesh.material.emissiveIntensity +
-                            (targetIntensity - this.mesh.material.emissiveIntensity) *
-                                RED_GIANT_BLEND;
+                    // Cool the surface toward red. The halo shares the surface tint, so it
+                    // follows; only its exposure needs copying across.
+                    const surface = this.surfaceMaterial;
+                    if (surface) {
+                        surface.setTemperature(targetTemp, RED_GIANT_BLEND);
+                        this.halo?.setExposure(surface.exposure);
                     }
                 }
             }
@@ -198,87 +175,24 @@ export class MainSequenceStar extends Star {
                 this.triggerStarDeath();
             }
         }
-
-        if (this.sunGlow) {
-            this.sunGlow.setPosition(this.mesh.position);
-            this.sunGlow.update(dtTotal);
-        }
-
-        if (this.glowDisk) {
-            this.glowDisk.setPosition(this.mesh.position);
-            this.glowDisk.update(dtTotal);
-        }
-
-        // Solar flare timer
-        if (!(this.bodyType & BodyTypeEnum.BrownDwarf) && !this._isDisposed) {
-            this._solarFlareTimer += dtTotal;
-            if (this._solarFlareTimer >= this._nextFlareInterval) {
-                this._solarFlareTimer = 0;
-                this._nextFlareInterval = 5 + Math.random() * 25;
-                this._triggerSolarFlare();
-            }
-        }
-
-        // Update active solar flares, dispose finished ones
-        for (let i = this.activeSolarFlares.length - 1; i >= 0; i--) {
-            this.activeSolarFlares[i].update(dtTotal);
-            if (!this.activeSolarFlares[i].active) {
-                this.activeSolarFlares[i].dispose();
-                this.activeSolarFlares.splice(i, 1);
-            }
-        }
     }
 
     override setRadius(newRadius: number) {
         super.setRadius(newRadius);
-        if (this.corona) {
-            this.corona.setRadius(newRadius + 1);
-        }
-        if (this.sunGlow) {
-            this.sunGlow.setRadius(newRadius);
-        }
-        if (this.glowDisk) {
-            this.glowDisk.setRadius(newRadius);
-        }
+        this.halo?.setRadius(newRadius);
         this._syncBaselineRadiusIfStable();
     }
 
     override die(deathOptions?: IDeathOptions) {
         try {
-            if (this.sunGlow) {
-                this.sunGlow.dispose();
-                this.sunGlow = null;
+            if (this.halo) {
+                this.halo.dispose();
+                this.halo = null;
             }
         } catch {
             // ignore
         }
 
-        try {
-            if (this.glowDisk) {
-                this.glowDisk.dispose();
-                this.glowDisk = null;
-            }
-        } catch {
-            // ignore
-        }
-
-        try {
-            for (const flare of this.activeSolarFlares) {
-                flare.dispose();
-            }
-            this.activeSolarFlares = [];
-        } catch {
-            // ignore
-        }
-
-        try {
-            if (this.corona) {
-                this.corona.dispose();
-                this.corona = null;
-            }
-        } catch {
-            // ignore
-        }
         super.die(deathOptions);
     }
 
@@ -287,42 +201,12 @@ export class MainSequenceStar extends Star {
 
         if (this.bodyType & BodyTypeEnum.BrownDwarf) return;
 
-        // Apply temperature-appropriate texture (main-sequence stars change texture bins with temperature)
-        let map: THREE.Texture | null;
-        if (temp <= 2000) map = this.textures.brownDwarfTexture;
-        else if (temp <= 3000) map = this.textures.redStarTexture;
-        else if (temp < 4000) map = this.textures.orangeStarTexture;
-        else if (temp < 10000) map = this.textures.sunTexture;
-        else if (temp < 25000) map = this.textures.whiteStarTexture;
-        else map = this.textures.blueStarTexture;
-
-        if (map) {
-            const material = this.mesh.material as THREE.MeshPhongMaterial;
-            material.emissiveMap = map;
-            material.needsUpdate = true;
-        }
-
-        // baseColor was already updated by super.setTemperature; reuse it for glow/corona
-        const glowHex = this.baseColor.getHex();
-
-        if (this.corona) {
-            this.corona.setColor(glowHex);
-        }
-
-        if (this.sunGlow) {
-            try {
-                this.sunGlow.setColor(glowHex);
-            } catch {
-                // ignore
-            }
-        }
-
-        if (this.glowDisk) {
-            try {
-                this.glowDisk.setColor(glowHex);
-            } catch {
-                // ignore
-            }
+        // Retint the procedural surface (continuous with temperature — no texture bins). This
+        // also runs from inside Star's constructor, before `halo` exists, hence the `?.`.
+        const surface = this.surfaceMaterial;
+        if (surface) {
+            surface.setTemperature(temp);
+            this.halo?.setExposure(surface.exposure);
         }
     }
 
@@ -341,7 +225,6 @@ export class MainSequenceStar extends Star {
         // Keep radius in sync with mass whenever not in a special transition phase.
         if (
             !this.isInRedGiantPhase &&
-            !this.isBecomingWhiteDwarf &&
             !(this.bodyType & BodyTypeEnum.BrownDwarf) &&
             !(this.bodyType & BodyTypeEnum.WhiteDwarf)
         ) {
@@ -365,34 +248,10 @@ export class MainSequenceStar extends Star {
     }
 
     _syncBaselineRadiusIfStable() {
-        if (this.isInRedGiantPhase || this.isBecomingWhiteDwarf) return;
+        if (this.isInRedGiantPhase) return;
 
         this.initialRadius = this.radius;
         if (this.mesh) this.mesh.scale.setScalar(1);
-    }
-
-    _triggerSolarFlare() {
-        if (!this.mesh || this._isDisposed || !settingsStore.settings.particleEffectsEnabled) {
-            return;
-        }
-
-        // 75% small cone burst, 25% large arc loop
-        const type: SolarFlareType = Math.random() < 0.75 ? 'small' : 'large';
-        const colorHex = this.baseColor.getHex();
-
-        try {
-            const flare = new SolarFlare(
-                this.dependencies,
-                this.scene,
-                this.mesh.position,
-                this.radius,
-                type,
-                colorHex
-            );
-            this.activeSolarFlares.push(flare);
-        } catch (e) {
-            console.error('Error triggering solar flare:', e);
-        }
     }
 
     createSupernova(pos: THREE.Vector3, radius: number) {
@@ -427,7 +286,8 @@ export class MainSequenceStar extends Star {
                     this.name + ' (Pulsar)',
                     this.rotation,
                     this.initialRadius,
-                    this.magneticField
+                    this.magneticField,
+                    this.velocity
                 );
 
                 if (this.dependencies?.addBody) {
@@ -456,7 +316,8 @@ export class MainSequenceStar extends Star {
                     createUniqueId('blackhole'),
                     'Black Hole',
                     this.rotation,
-                    true
+                    true,
+                    this.velocity
                 );
 
                 if (this.dependencies?.addBody) {
@@ -476,15 +337,16 @@ export class MainSequenceStar extends Star {
             this.die({ skipExplosion: true, skipImpactSound: true });
         } else {
             try {
-                const newWhiteDwarf = new WhiteDwarf(
-                    this.dependencies,
-                    this.scene,
-                    this.mesh.position.clone(),
-                    this.mass,
-                    createUniqueId('whitedwarf'),
-                    this.name + ' (White Dwarf)',
-                    this.rotation
-                );
+                // The exposed core keeps the star's motion, spin and field.
+                const newWhiteDwarf = new WhiteDwarf(this.dependencies, this.scene, {
+                    pos: this.mesh.position.clone(),
+                    vel: this.velocity,
+                    mass: this.mass,
+                    id: createUniqueId('whitedwarf'),
+                    name: this.name + ' (White Dwarf)',
+                    rotation: this.rotation,
+                    magneticField: this.magneticField ?? undefined,
+                });
 
                 if (this.dependencies?.addBody) {
                     this.dependencies.addBody(newWhiteDwarf);
@@ -526,20 +388,8 @@ export class MainSequenceStar extends Star {
 
         this.bodyType |= BodyTypeEnum.BrownDwarf;
 
-        if (this.corona) {
-            this.corona.dispose();
-            this.corona = null;
-        }
-
-        if (this.sunGlow) {
-            this.sunGlow.dispose();
-            this.sunGlow = null;
-        }
-
-        if (this.glowDisk) {
-            this.glowDisk.dispose();
-            this.glowDisk = null;
-        }
+        // A brown dwarf barely glows: keep the dim, deep-red surface but drop the limb halo.
+        this.halo?.setVisible(false);
 
         if (this.lensflare) {
             this.lensflare.dispose();
@@ -571,37 +421,8 @@ export class MainSequenceStar extends Star {
         this.maxFuel = this.mass * 100000;
         this.fuel = this.maxFuel;
 
-        // Restore corona.
-        if (!this.corona) {
-            this.corona = new Corona(
-                this.dependencies,
-                this.scene,
-                this.radius + 1,
-                this.baseColor.getHex()
-            );
-        }
-
-        // Restore glow.
-        if (!this.sunGlow) {
-            this.sunGlow = new StarGlow(
-                this.dependencies,
-                this.scene,
-                this.radius,
-                this.baseColor.getHex(),
-                this.mesh.position
-            );
-        }
-
-        // Restore glow disk.
-        if (!this.glowDisk) {
-            this.glowDisk = new GlowDisk(
-                this.dependencies,
-                this.scene,
-                this.radius,
-                this.baseColor.getHex(),
-                this.mesh.position
-            );
-        }
+        // Restore the limb halo.
+        this.halo?.setVisible(true);
 
         // Restore lens flare.
         if (!this.lensflare && this.sunLight) {

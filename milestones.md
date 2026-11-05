@@ -1,4 +1,19 @@
 ## previous milestones
+- **Version 1.4.0 - COMPLETE**
+- **Phase 1**
+- [x] Phase 1.1: Make codebase buildable to web and electron
+- **Phase 2**
+- [x] Phase 2.1: Add 8k assets
+- [x] Phase 2.2: Add option to pick low or high res (if a high res texture exists). Also increases the segement count for sphere meshes. Available only for electron app.
+- **Phase 3**
+- [x] Phase 3.1: Convert Kuiper belt into a solar system "feature" instead of being a static object in all systems. (Also ground work for future solar system features and procedurally generated features). Also allow farther zoom out than it currently so full kuiper belt can be viewed.
+- [x] Phase 3.2: Procedural ring systems for planets (`procedural/ring-generator.ts` rolls an `IRingSpec`; `effects/planet-rings.ts` renders it as a lit, planet-shadowed banded annulus attached to the body mesh; real giants use `procedural/ring-presets.ts`)
+- [x] Phase 3.3: Graphics option for render distance to help with performance. (Options → Graphics slider, 0.1–100 AU on a log scale, default 12 AU; sets `camera.far` via `applyRenderDistance` in `index.ts`, persisted as `renderDistanceAU`. Zoom limits use the fixed `MAX_VIEW_DISTANCE`, not the slider. `ScreenProjection.behind` separates "behind camera" from "beyond far plane" for the edge markers.)
+- **Phase 4**
+- [x] Phase 4.1: Improve gizmo. It currently doesn't scale to body size well and is still a pain to use.
+- [x] Phase 4.2: Improve orbital data for all other planets. Pluto and Nepture already done. Every major planet (Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto) now flies its real J2000 orbit: perihelion, aphelion, inclination, node and perihelion orientation come from the NASA planetary fact sheets, and `bodies/planet-orbit.ts` turns those elements into state vectors. The data lives in the `*_PERIHELION_DIST` / `*_APHELION_DIST` / `*_INCLINATION` / `*_LONG_ASC_NODE` / `*_ARG_PERIHELION` blocks in `consts.ts`.
+- [x] Phase 4.3: More work on ship AI. In progress: a Ship AI autopilot (`simulation/ai/autopilot-ship-ai.ts`), selectable in Flight Controls → Autopilot (Classic stays the default). It flies only through `controlInput`, in the world frame: warps/boosts/changes tier to reach any target (bodies or ships), then holds a natural (gravity) or artificial (powered) orbit; ships are always circled at the Flight Controls orbit distance. New ship AI *commands* are built from the shared pieces in `simulation/ai/navigation/` (steering, warp navigation, speed tier, `flyVelocity` — point the nose along the wanted world velocity and hold `controlInput.speedSetpoint`) and the maneuvers in `simulation/ai/maneuvers/` (approach, natural orbit, artificial orbit). Ship steering/roll/banking runs on sim time (`steeringDt()` in `simulation/steering-clock.ts`) so turn rate follows the time scale; Flight Controls → "Steering Follows Time Scale" (`steeringTimeScaleEnabled`, on by default) restores the fixed real-time rate.
+
 - **Version 1.3.0 - COMPLETE**
 - **Phase 1**
 - [x] Phase 1.1: Add atmospheric drag

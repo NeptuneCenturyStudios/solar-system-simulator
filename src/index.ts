@@ -117,6 +117,7 @@ import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { AmbientSoundManager } from './utilities/ambient-sound';
 import { GravitationalLensingEffect } from './effects/gravitational-lensing';
+import { SunRaysEffect } from './effects/sun-rays';
 import { createBridgeForPair } from './effects/wormhole-link-bridge';
 import { GridHelperManager } from './gizmos/grid-helper';
 import { AiAvoidanceGizmo } from './gizmos/ai-avoidance-gizmo';
@@ -295,6 +296,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const lensingEffect = new GravitationalLensingEffect(renderer);
+const sunRaysEffect = new SunRaysEffect(renderer.domElement.width, renderer.domElement.height);
 
 // Create orthographic camera and scene for 2D UI overlay
 const uiScene = new THREE.Scene();
@@ -4442,6 +4444,7 @@ window.addEventListener('resize', () => {
     flightHUD.layout(window.innerWidth, window.innerHeight);
 
     lensingEffect.resize(window.innerWidth, window.innerHeight);
+    sunRaysEffect.resize(window.innerWidth, window.innerHeight);
     screenFlash.resize(window.innerWidth, window.innerHeight);
     scenarioMessageHud.resize(window.innerWidth, window.innerHeight);
 });
@@ -4915,6 +4918,7 @@ const animCtx: AnimationContext = {
     supernovas: { value: supernovas },
     planetaryNebulae: { value: planetaryNebulae },
     lensingEffect,
+    sunRaysEffect,
     gizmo,
     velArc,
     orbitPrediction,

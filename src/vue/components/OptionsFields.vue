@@ -21,6 +21,11 @@
         </label>
 
         <label class="checkbox-row">
+            <input type="checkbox" :checked="simStore.sunRaysEnabled" @change="onSunRaysChange" />
+            Sun Rays
+        </label>
+
+        <label class="checkbox-row">
             <input type="checkbox" :checked="simStore.auroraEnabled" @change="onAuroraChange" />
             Aurorae
         </label>
@@ -246,6 +251,7 @@ import {
     setPhysicsSolver,
     setRenderDistance,
     setSfxVolume,
+    setSunRaysEnabled,
     setShowAiDebug,
     setSmoothZoomEnabled,
     setSubsteps,
@@ -288,6 +294,10 @@ function onParticleEffectsChange(e: Event): void {
 
 function onLensflareChange(e: Event): void {
     setLensflareEnabled((e.target as HTMLInputElement).checked);
+}
+
+function onSunRaysChange(e: Event): void {
+    setSunRaysEnabled((e.target as HTMLInputElement).checked);
 }
 
 function onAuroraChange(e: Event): void {

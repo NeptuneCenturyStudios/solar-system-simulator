@@ -377,6 +377,7 @@ export interface VueSimStore {
     // ── Options (persisted user settings, mirrored from settingsStore) ─────
     particleEffectsEnabled: boolean;
     lensflareEnabled: boolean;
+    sunRaysEnabled: boolean;
     auroraEnabled: boolean;
     /** How much per-pixel work the aurora curtains do. */
     auroraDetail: AuroraDetailMode;
@@ -462,6 +463,7 @@ const state = reactive<VueSimStore>({
     // Vue Options panel is the only live writer afterwards.
     particleEffectsEnabled: settingsStore.settings.particleEffectsEnabled,
     lensflareEnabled: settingsStore.settings.lensflareEnabled,
+    sunRaysEnabled: settingsStore.settings.sunRaysEnabled,
     auroraEnabled: settingsStore.settings.auroraEnabled,
     auroraDetail: settingsStore.settings.auroraDetail,
     substeps: settingsStore.settings.substeps,
@@ -1050,6 +1052,12 @@ export function setLensflareEnabled(checked: boolean): void {
         settingsStore.update(SettingKey.LensflareEnabled, checked);
     }
     state.lensflareEnabled = checked;
+}
+
+/** Toggle the screen-space sun rays (Options panel). Read by the render loop each frame. */
+export function setSunRaysEnabled(checked: boolean): void {
+    settingsStore.update(SettingKey.SunRaysEnabled, checked);
+    state.sunRaysEnabled = checked;
 }
 
 /** Toggle eased/smooth camera zoom (Options panel). */

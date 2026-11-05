@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { IEffect } from './effect-base';
-import { IStateDependencies, IMagneticFieldOptions } from '../interfaces';
+import { IStateDependencies } from '../interfaces';
 import { settingsStore } from '../settings/settings-store';
-import { computeMagneticAxis } from '../procedural/magnetic-field';
 
 /**
  * Number of azimuthal loops evenly spaced around the magnetic axis.
@@ -23,6 +22,13 @@ const FIELD_PARTICLE_COUNT = 320;
 const FIELD_PARTICLE_SPEED = 0.8;
 
 /**
+ * Largest per-frame time step (sim seconds) the particle flow advances by. At high time scales a
+ * frame can cover hours of sim time; capping keeps the flow smooth instead of strobing (the same
+ * cap the star surface clock uses).
+ */
+const MAX_FLOW_STEP = 0.25;
+
+/**
  * Multiplier applied to the host radius to derive the equatorial max radius of the
  * field loops. A larger value makes the dipole reach further from the pulsar.
  */
@@ -36,34 +42,28 @@ const FIELD_LOOP_RADIUS_MULT = 20;
  * equatorial maximum reach. Multiple lines are placed at evenly-spaced
  * azimuthal angles around the magnetic axis.
  *
- * The magnetic axis is derived from the host body's real `IMagneticFieldOptions`
- * (tilt/azimuth relative to the spin/rotation axis) via `computeMagneticAxis`, the same
- * pure function `Pulsar` uses to derive PulsarBeam's axis — both agree by construction.
- * That axis then precesses (spins) around the rotation axis as the pulsar rotates.
+ * Everything is built in the pulsar mesh's object space and parented to the mesh, around the
+ * magnetic axis `Pulsar` derives (the same one the beams use). The sim's spin and tilt of the
+ * mesh therefore carry the loops round with the beams — there is no separate spin clock.
  *
  * **Particles mode** (settingsStore.settings.particleEffectsEnabled = true):
  *  Small particles travel continuously along each field line, with colour
  *  lerping from blue at the equatorial bulge to near-white at the poles.
  *
  * **Lines fallback** (particleEffectsEnabled = false):
- *  A set of BufferGeometry line curves, rewritten in-place each frame so
- *  they follow the spinning magnetic axis without allocation.
+ *  A set of BufferGeometry line curves, parented to the mesh, so they
+ *  follow the spinning magnetic axis without being rewritten.
  */
 export class PulsarMagneticField implements IEffect {
     dependencies: IStateDependencies;
     active: boolean = true;
 
-    private scene: THREE.Scene;
-    private position: THREE.Vector3;
+    /** The pulsar mesh; all geometry lives in its object space. */
+    private parent: THREE.Object3D;
     private radius: number;
-    private rotationAxis: THREE.Vector3;
-    private rotationSpeed: number;
 
-    /** Magnetic axis in its initial orientation (before any spin phase is applied). */
+    /** Magnetic axis in the parent's object space (unit). */
     private magneticAxisBase: THREE.Vector3;
-
-    /** Accumulates spin angle over time (radians). */
-    private spinPhase: number = 0;
 
     /** Maximum equatorial radius of field loops. */
     private fieldLoopRadius: number;
@@ -89,21 +89,15 @@ export class PulsarMagneticField implements IEffect {
 
     constructor(
         dependencies: IStateDependencies,
-        scene: THREE.Scene,
-        position: THREE.Vector3,
+        parent: THREE.Object3D,
         radius: number,
-        rotationAxis: THREE.Vector3,
-        rotationSpeed: number,
-        magneticField: IMagneticFieldOptions
+        magneticAxisObj: THREE.Vector3
     ) {
         this.dependencies = dependencies;
-        this.scene = scene;
-        this.position = position.clone();
+        this.parent = parent;
         this.radius = radius;
-        this.rotationAxis = rotationAxis.clone().normalize();
-        this.rotationSpeed = rotationSpeed;
         this.fieldLoopRadius = radius * FIELD_LOOP_RADIUS_MULT;
-        this.magneticAxisBase = computeMagneticAxis(this.rotationAxis, magneticField);
+        this.magneticAxisBase = magneticAxisObj.clone().normalize();
 
         this._buildParticles();
     }
@@ -114,7 +108,6 @@ export class PulsarMagneticField implements IEffect {
         if (!this.active) return;
 
         const absDt = Math.abs(dt);
-        this.spinPhase += this.rotationSpeed * absDt;
 
         const particlesEnabled = settingsStore.settings.particleEffectsEnabled;
 
@@ -137,14 +130,10 @@ export class PulsarMagneticField implements IEffect {
         }
     }
 
-    setPosition(pos: THREE.Vector3): void {
-        this.position.copy(pos);
-    }
-
     dispose(): void {
         this.active = false;
         if (this._particlePoints) {
-            this.scene.remove(this._particlePoints);
+            this.parent.remove(this._particlePoints);
             this._particleGeo?.dispose();
             this._particleMat?.dispose();
             this._particlePoints = null;
@@ -161,14 +150,13 @@ export class PulsarMagneticField implements IEffect {
         return perp.clone().cross(v).normalize();
     }
 
-    /** Returns the current magnetic axis direction after applying accumulated spin. */
+    /** The magnetic axis in object space (the parent mesh's rotation does the spinning). */
     private _currentMagAxis(): THREE.Vector3 {
-        const q = new THREE.Quaternion().setFromAxisAngle(this.rotationAxis, this.spinPhase);
-        return this.magneticAxisBase.clone().applyQuaternion(q);
+        return this.magneticAxisBase;
     }
 
     /**
-     * Computes the world-space position of a point on a dipole field line.
+     * Computes the object-space position of a point on a dipole field line.
      *
      * @param theta  Polar angle along the field line, θ ∈ [0, π].
      * @param loopIndex  Azimuthal loop index [0, FIELD_LOOP_COUNT).
@@ -201,9 +189,9 @@ export class PulsarMagneticField implements IEffect {
         const localZ = r * cosTheta;
 
         out.set(
-            this.position.x + localX * perp1.x + localY * perp2.x + localZ * magAxis.x,
-            this.position.y + localX * perp1.y + localY * perp2.y + localZ * magAxis.y,
-            this.position.z + localX * perp1.z + localY * perp2.z + localZ * magAxis.z
+            localX * perp1.x + localY * perp2.x + localZ * magAxis.x,
+            localX * perp1.y + localY * perp2.y + localZ * magAxis.y,
+            localX * perp1.z + localY * perp2.z + localZ * magAxis.z
         );
     }
 
@@ -270,8 +258,10 @@ export class PulsarMagneticField implements IEffect {
 
         this._particlePoints = new THREE.Points(this._particleGeo, this._particleMat);
         this._particlePoints.frustumCulled = false;
+        // A child of the pulsar mesh: keep it out of click picking.
+        this._particlePoints.raycast = () => {};
         this._particlePoints.renderOrder = 998;
-        this.scene.add(this._particlePoints);
+        this.parent.add(this._particlePoints);
     }
 
     private _setParticlesVisible(visible: boolean): void {
@@ -295,10 +285,12 @@ export class PulsarMagneticField implements IEffect {
 
         for (let i = 0; i < FIELD_PARTICLE_COUNT; i++) {
             // Advance θ along the field line; wrap from π back to 0 for continuous loops
-            this._particleTheta[i] += FIELD_PARTICLE_SPEED * absDt;
-            if (this._particleTheta[i] > Math.PI) {
-                this._particleTheta[i] -= Math.PI;
-            }
+            // Wrap into [0, π) every frame. A single "subtract π" could not keep up with a
+            // large step, letting θ grow without bound; once it was large, the Float32 store
+            // could no longer resolve small steps, and the particles snapped into clumps (and
+            // stayed stuck even after the time scale came back down).
+            const step = FIELD_PARTICLE_SPEED * Math.min(absDt, MAX_FLOW_STEP);
+            this._particleTheta[i] = (this._particleTheta[i] + step) % Math.PI;
 
             const theta = this._particleTheta[i];
             this._fieldPoint(theta, this._particleLoop[i], magAxis, perp1, perp2, pt);
@@ -347,8 +339,9 @@ export class PulsarMagneticField implements IEffect {
 
             const line = new THREE.Line(geo, mat);
             line.frustumCulled = false;
+            line.raycast = () => {};
             line.renderOrder = 997;
-            this.scene.add(line);
+            this.parent.add(line);
             this._lineObjects.push({ line, geo, mat });
         }
     }
@@ -391,7 +384,7 @@ export class PulsarMagneticField implements IEffect {
 
     private _removeLines(): void {
         for (const obj of this._lineObjects) {
-            this.scene.remove(obj.line);
+            this.parent.remove(obj.line);
             obj.geo.dispose();
             obj.mat.dispose();
         }

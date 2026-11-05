@@ -48,7 +48,9 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
         id = 'blackHole',
         name = 'Black Hole',
         rotation: IRotation,
-        spawnedFromSupernova = false
+        spawnedFromSupernova = false,
+        /** Inherited from a collapsing progenitor so the remnant keeps its orbit. */
+        vel?: THREE.Vector3
     ) {
         const EVENT_HORIZON_RADIUS = BlackHole.massToEventHorizonRadius(mass);
         const BLACK_HOLE_COLOR = 0x000000; // Pure black
@@ -63,7 +65,7 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
             {
                 radius: EVENT_HORIZON_RADIUS,
                 pos: pos,
-                vel: new THREE.Vector3(0, 0, 0),
+                vel: vel?.clone() ?? new THREE.Vector3(0, 0, 0),
                 mass: mass,
                 id: id,
                 name: name,

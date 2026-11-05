@@ -6,7 +6,7 @@ import {
     STAR_LIGHT_INTENSITY_MAX,
     STAR_LIGHT_DECAY,
 } from '../utilities/consts';
-import { buildBodySphereGeometry, isBodyType } from '../utilities/utilities';
+import { isBodyType } from '../utilities/utilities';
 import { settingsStore } from '../settings/settings-store';
 import { CelestialBody } from './celestial-body';
 import { triggerScreenFlash } from '../effects/screen-flash';
@@ -21,50 +21,33 @@ export interface IStarCreationOptions extends ICelestialBodyCreationOptions {
     temperature: number;
     lightIntensity: number;
     lightDistance: number;
+    /** Extra type flags OR-ed onto `BodyTypeEnum.Star` (e.g. WhiteDwarf, Pulsar). */
+    bodyType?: BodyTypeEnum;
     /**
-     * When true (default), setTemperature() drives the surface emissive
-     * (color + intensity) from temperature. Compact remnants (white dwarfs)
-     * opt out so they keep their own surface material.
+     * Skip the [STAR_LIGHT_INTENSITY_MIN, MAX] clamp on `lightIntensity`. Remnants that are
+     * meant to be far dimmer than any main-sequence star (white dwarfs) set this.
      */
-    emissiveDrivenByTemperature?: boolean;
+    unclampedLightIntensity?: boolean;
 }
 
 /**
- * Star (e.g. Sun). Owns star-only visuals:
- * - emissive surface material with temperature-based texture bins
- * - directional light + ambient light
+ * Star (e.g. Sun). Owns what every star shares: the point light (and its colour from
+ * temperature), the ambient light and the lens-flare shine.
  *
- * Note: This file intentionally does NOT import textures directly. They are injected via `textures`
- * so `main.js` remains the single place that loads texture assets.
- *
- * Main-sequence-specific visuals (glow, corona, solar flares, birth effect) live in MainSequenceStar.
+ * The surface is not built here: each subclass supplies its own mesh through `options.mesh`
+ * (the procedural surface for main-sequence stars and white dwarfs, a texture for pulsars).
  */
 /**
  * Represents a star (e.g. Sun) in the simulation, including visuals like corona, glow, and light.
  * Handles star-specific physics, rendering, and lifecycle events.
  */
 export class Star extends CelestialBody {
-    textures: {
-        sunTexture: THREE.Texture;
-        redStarTexture: THREE.Texture | null;
-        orangeStarTexture: THREE.Texture | null;
-        whiteStarTexture: THREE.Texture | null;
-        blueStarTexture: THREE.Texture | null;
-        whiteDwarfTexture: THREE.Texture | null;
-        brownDwarfTexture: THREE.Texture | null;
-    };
-
     temperature: number;
-
-    /**
-     * Whether setTemperature() should drive the surface emissive from
-     * temperature. Compact remnants (white dwarfs) set this to false to keep
-     * their own surface material.
-     */
-    emissiveDrivenByTemperature: boolean;
 
     // Lighting effects
     lightIntensity: number;
+    /** See {@link IStarCreationOptions.unclampedLightIntensity}. */
+    unclampedLightIntensity: boolean;
     ambientLight: THREE.AmbientLight | null;
     sunLight: THREE.PointLight | null;
 
@@ -75,64 +58,17 @@ export class Star extends CelestialBody {
     lensflare: StarLensflare | null;
 
     /**
-     * @param {object} dependencies - same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
-     * @param {THREE.Scene} scene
-     * @param {object} options
-     * @param {number} options.radius
-     * @param {number[]} options.pos
-     * @param {number} options.mass
-     * @param {string|null} [options.id]
-     * @param {string} [options.name]
-     * @param {number} [options.temperature]
-     * @param {number} [options.lightIntensity]
-     * @param {number} [options.lightDistance]
-     * @param {object} textures
-     * @param {THREE.Texture} textures.sunTexture
-     * @param {THREE.Texture} textures.redStarTexture
-     * @param {THREE.Texture} textures.orangeStarTexture
-     * @param {THREE.Texture} textures.whiteStarTexture
-     * @param {THREE.Texture} textures.blueStarTexture
-     * @param {THREE.Texture} textures.whiteDwarfTexture
+     * @param dependencies Same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
+     * @param scene        The scene the star (and its lights) are added to.
+     * @param options      Creation options. `options.mesh` is required: subclasses build the surface.
      */
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
-        options: IStarCreationOptions,
-
-        textures: {
-            sunTexture: THREE.Texture;
-            redStarTexture: THREE.Texture | null;
-            orangeStarTexture: THREE.Texture | null;
-            whiteStarTexture: THREE.Texture | null;
-            blueStarTexture: THREE.Texture | null;
-            whiteDwarfTexture: THREE.Texture | null;
-            brownDwarfTexture: THREE.Texture | null;
-        }
+        options: IStarCreationOptions
     ) {
-        if (!textures) {
-            throw new Error('Star requires textures to be injected');
-        }
-
-        //const color = Star.temperatureToColor(options.temperature);
-
-        // TODO: Move mesh creation to MainSequenceStar and other derived classes.
         if (!options.mesh) {
-            const geometry = buildBodySphereGeometry(options.radius);
-            // No `map`/diffuse color: the surface is driven entirely by `emissiveMap`, which
-            // isn't affected by scene lighting. Binding the same texture to `map` used to let
-            // the scene's ambient lights add an extra texture-shaped contribution on top of the
-            // emissive term, pushing already-bright texture pixels (solar flare highlights) past
-            // 1.0 while leaving darker pixels untouched — producing a hard clipped edge around
-            // those highlights instead of the soft, feathered look they have in the source
-            // texture. Emissive-only rendering reproduces the texture as authored.
-            const starMaterial = new THREE.MeshPhongMaterial({
-                color: 0xffffff,
-                emissive: 0xffffff,
-                emissiveMap: textures.sunTexture,
-                emissiveIntensity: 1.0,
-                shininess: 10,
-            });
-            options.mesh = new THREE.Mesh(geometry, starMaterial);
+            throw new Error('Star requires a mesh: build the surface in the subclass');
         }
 
         super(
@@ -153,31 +89,22 @@ export class Star extends CelestialBody {
                 magneticField: options.magneticField,
                 attributes: options.attributes,
             },
-            BodyTypeEnum.Star
+            BodyTypeEnum.Star | (options.bodyType ?? BodyTypeEnum.None)
         );
 
-        this.textures = textures;
+        this.unclampedLightIntensity = options.unclampedLightIntensity ?? false;
+        const lightIntensity = this.unclampedLightIntensity
+            ? options.lightIntensity
+            : Math.max(
+                  STAR_LIGHT_INTENSITY_MIN,
+                  Math.min(STAR_LIGHT_INTENSITY_MAX, options.lightIntensity)
+              );
 
-        const clampedLightIntensity = Math.max(
-            STAR_LIGHT_INTENSITY_MIN,
-            Math.min(STAR_LIGHT_INTENSITY_MAX, options.lightIntensity)
-        );
-
-        this.lightIntensity = clampedLightIntensity;
+        this.lightIntensity = lightIntensity;
 
         this.temperature = options.temperature;
 
-        this.emissiveDrivenByTemperature = options.emissiveDrivenByTemperature ?? true;
-
-        if (
-            this.emissiveDrivenByTemperature &&
-            this.mesh.material instanceof THREE.MeshPhongMaterial
-        ) {
-            this.mesh.material.emissive.setHex(0xffffff);
-            this.mesh.material.emissiveIntensity = 1.0;
-        }
-
-        this.sunLight = this.createLight(options.pos, clampedLightIntensity, options.lightDistance);
+        this.sunLight = this.createLight(options.pos, lightIntensity, options.lightDistance);
 
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
         scene.add(this.ambientLight);
@@ -271,33 +198,6 @@ export class Star extends CelestialBody {
         return (red << 16) | (green << 8) | blue;
     }
 
-    static temperatureToEmissiveIntensity(temp: number) {
-        const minTemp = 1000;
-        const maxTemp = 30000;
-        const sunTemp = 5778;
-
-        temp = Math.max(minTemp, Math.min(maxTemp, temp));
-
-        const lowTempIntensity = 1;
-        const midTempIntensity = 10;
-        const highTempIntensity = 1;
-
-        let intensity;
-
-        if (temp <= sunTemp) {
-            const progress = (temp - minTemp) / (sunTemp - minTemp);
-            intensity = lowTempIntensity + progress * (midTempIntensity - lowTempIntensity);
-        } else {
-            const progress = (temp - sunTemp) / (maxTemp - sunTemp);
-            intensity = midTempIntensity - progress * (midTempIntensity - highTempIntensity);
-        }
-
-        // Capped at 1.0 so the emissive multiply never amplifies the surface texture past its
-        // own source brightness. The renderer has no tone mapping, so any value above 1.0 here
-        // hard-clips bright texture pixels to solid white instead of rolling off smoothly.
-        return Math.max(0, Math.min(1.0, intensity));
-    }
-
     createLight(pos: THREE.Vector3, intensity: number, distance: number) {
         console.log(
             'Creating light at position:',
@@ -342,10 +242,9 @@ export class Star extends CelestialBody {
     }
 
     setLightIntensity(intensity: number) {
-        const clamped = Math.max(
-            STAR_LIGHT_INTENSITY_MIN,
-            Math.min(STAR_LIGHT_INTENSITY_MAX, intensity)
-        );
+        const clamped = this.unclampedLightIntensity
+            ? intensity
+            : Math.max(STAR_LIGHT_INTENSITY_MIN, Math.min(STAR_LIGHT_INTENSITY_MAX, intensity));
 
         this.lightIntensity = clamped;
         if (this.sunLight) {
@@ -375,13 +274,7 @@ export class Star extends CelestialBody {
         else if (temp < 40000) glowHex = 0xaaccff;
         else glowHex = 0xd6f0ff;
 
-        if (this.emissiveDrivenByTemperature) {
-            const material = this.mesh.material as THREE.MeshPhongMaterial;
-            material.emissive.setHex(0xffffff);
-            material.emissiveIntensity = Star.temperatureToEmissiveIntensity(temp);
-            material.needsUpdate = true;
-        }
-
+        // The surface itself is the subclass's business (see MainSequenceStar / WhiteDwarf).
         this.baseColor.setHex(glowHex);
 
         if (this.sunLight) {

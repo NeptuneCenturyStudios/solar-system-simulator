@@ -16,6 +16,7 @@ export const enum SettingKey {
     SfxVolume = 'sfxVolume',
     MusicVolume = 'musicVolume',
     LensflareEnabled = 'lensflareEnabled',
+    SunRaysEnabled = 'sunRaysEnabled',
     AuroraEnabled = 'auroraEnabled',
     AuroraDetail = 'auroraDetail',
     FrameRateLimit = 'frameRateLimit',
@@ -96,6 +97,8 @@ export interface SpaceSimSettings {
     sfxVolume: number;
     musicVolume: number;
     lensflareEnabled: boolean;
+    /** Screen-space rays streaming from stars that are large on screen. */
+    sunRaysEnabled: boolean;
     /** Draw aurora curtains around the magnetic poles of bodies that have a field and an atmosphere. */
     auroraEnabled: boolean;
     /** How much per-pixel work the aurora curtains do. Ignored when `auroraEnabled` is false. */
@@ -164,6 +167,7 @@ const defaultSettings: SpaceSimSettings = {
     sfxVolume: 1.0,
     musicVolume: 0.5,
     lensflareEnabled: true,
+    sunRaysEnabled: true,
     auroraEnabled: true,
     // The ribbons cover few pixels even at close range, so the animated bands are cheap enough
     // to be the default. Static is there for machines where every fragment counts.

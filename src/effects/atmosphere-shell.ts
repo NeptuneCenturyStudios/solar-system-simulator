@@ -11,7 +11,7 @@ export type AtmosphereShellHandle = {
  * Atmosphere haze rendered as a billboard sprite with a radial-gradient canvas texture.
  *
  * The gradient is transparent over the planet disc and glows outward from the limb,
- * producing a soft haze that fades away — similar to the star-glow effect but without
+ * producing a soft haze that fades away — a soft radial glow, without
  * the pulse and sized for a planetary atmosphere.
  *
  * The sprite is added as a child of `parent` (the planet mesh) so it follows the planet
