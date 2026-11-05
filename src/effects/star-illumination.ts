@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BodyTypeEnum } from '../bodies/body-enums';
-import { MAX_LIGHTING_STARS } from '../utilities/consts';
+import { DIST_SCALE, MAX_LIGHTING_STARS, RADIUS_SCALE } from '../utilities/consts';
 
 /**
  * The parts of a star this module reads. Structural, so it needs no import of Star (which
@@ -11,6 +11,8 @@ interface ILightingStar {
     readonly _isDisposed: boolean;
     readonly mesh: THREE.Object3D;
     readonly sunLight: THREE.PointLight | null;
+    /** Star radius, scaled by RADIUS_SCALE. */
+    readonly radius: number;
 }
 
 /** The parts of any body this module looks at when picking out the stars. */
@@ -32,6 +34,8 @@ export interface IStarLight {
      * surfaces with (before the colour and N·L). No reference, normalisation or cap.
      */
     irradiance: number;
+    /** Angular radius of the star's disc as seen from the lit point, in radians. */
+    angularRadius: number;
 }
 
 /** Up to MAX_LIGHTING_STARS lights at one point, brightest first. Pre-allocated; reuse it. */
@@ -48,6 +52,7 @@ export function createStarLightingSet(): IStarLightingSet {
             dir: new THREE.Vector3(),
             color: new THREE.Color(),
             irradiance: 0,
+            angularRadius: 0,
         });
     }
     return { count: 0, lights };
@@ -158,6 +163,10 @@ export function gatherStarLighting(position: THREE.Vector3, out: IStarLightingSe
         // brown dwarf's light, for one, differs from its surface tint).
         light.color.copy(ranked.light.color);
         light.irradiance = ranked.irradiance;
+        // Radius and distance carry separate scales, so compare them in km.
+        const radiusKm = ranked.star.radius * RADIUS_SCALE;
+        const distanceKm = ranked.distance * DIST_SCALE;
+        light.angularRadius = Math.asin(Math.min(1, radiusKm / distanceKm));
     }
     out.count = count;
 }

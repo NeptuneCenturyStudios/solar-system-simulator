@@ -34,13 +34,6 @@ const _Y_AXIS = new THREE.Vector3(0, 1, 0);
 // Shared, never-mutated scratch values for the P-type (barycentric) branch of getOrbitalPeriod.
 const _ORIGIN = new THREE.Vector3(0, 0, 0);
 const _ZERO_VELOCITY = new THREE.Vector3(0, 0, 0);
-// Scratch vector for the ring lighting direction, reused every frame.
-const _RING_LIGHT_DIR = new THREE.Vector3();
-// Scratch quaternion for the ring lighting direction, reused every frame.
-const _RING_INV_QUAT = new THREE.Quaternion();
-/** Body types that emit light, and so can light and shadow a ring system. */
-const _LIGHT_EMITTER_TYPES =
-    BodyTypeEnum.Star | BodyTypeEnum.BrownDwarf | BodyTypeEnum.WhiteDwarf | BodyTypeEnum.Pulsar;
 
 /**
  * Tidal locking options
@@ -113,8 +106,8 @@ export class CelestialBody extends Body {
     atmosphereSurfaceDensity: number = 0;
     /** Haze tint, kept so updateAtmosphere() can rebuild the shell without re-deriving it. */
     atmosphereTint: THREE.Color = new THREE.Color(0x5599ff);
-    /** Star lighting at this body, refilled each frame for the atmosphere shell. */
-    private _atmosphereLighting: IStarLightingSet | null = null;
+    /** Star lighting at this body, refilled each frame for the atmosphere shell and rings. */
+    private _starLighting: IStarLightingSet | null = null;
 
     /**
      * Polar aurora curtains, or null when this body doesn't qualify for them.
@@ -313,6 +306,7 @@ export class CelestialBody extends Body {
         // The rings are a child of the mesh, so they follow its position, tilt and azimuth.
         if (options.rings) {
             this.rings = createPlanetRings(this.radius, options.rings, this.mesh);
+            this._starLighting ??= createStarLightingSet();
         }
 
         this.refreshAurora();
@@ -346,7 +340,7 @@ export class CelestialBody extends Body {
             this.atmosphereSurfaceDensity,
             this.mesh
         );
-        this._atmosphereLighting ??= createStarLightingSet();
+        this._starLighting ??= createStarLightingSet();
 
         this.refreshAurora();
     }
@@ -709,39 +703,6 @@ export class CelestialBody extends Body {
     }
 
     /**
-     * Points the rings' lighting at the nearest star, or switches it off when there is none.
-     *
-     * The direction is handed over in the mesh's local frame, where the rings live, and
-     * computed here on the CPU because world coordinates are too large for the shader to
-     * resolve a planet-sized shadow edge.
-     */
-    private updateRingLighting() {
-        if (!this.rings) return;
-
-        let nearest: Body | null = null;
-        let nearestDistSq = Infinity;
-        for (const other of this.dependencies.getBodies()) {
-            if (other._isDisposed || !(other.bodyType & _LIGHT_EMITTER_TYPES)) continue;
-            const distSq = other.mesh.position.distanceToSquared(this.mesh.position);
-            if (distSq < nearestDistSq) {
-                nearest = other;
-                nearestDistSq = distSq;
-            }
-        }
-
-        if (!nearest || nearestDistSq === 0) {
-            this.rings.update(null);
-            return;
-        }
-
-        _RING_LIGHT_DIR
-            .subVectors(nearest.mesh.position, this.mesh.position)
-            .normalize()
-            .applyQuaternion(_RING_INV_QUAT.copy(this.mesh.quaternion).invert());
-        this.rings.update(_RING_LIGHT_DIR);
-    }
-
-    /**
      * Update purely visual properties that don't affect physics.
      * Called once per rendered frame (after all substeps) rather than per substep.
      * @param dtTotal Total elapsed simulation time for this frame (sum of all substep dts).
@@ -756,12 +717,12 @@ export class CelestialBody extends Body {
             this.clouds.rotation.y += this.cloudRotationSpeed * dtTotal;
         }
 
-        this.updateRingLighting();
-
-        // The atmosphere is lit by the stars actually reaching this body this frame.
-        if (this.atmosphereShell && this._atmosphereLighting) {
-            gatherStarLighting(this.mesh.position, this._atmosphereLighting);
-            this.atmosphereShell.update(this._atmosphereLighting);
+        // The atmosphere and rings are lit by the stars actually reaching this body this frame,
+        // gathered once and shared between them.
+        if (this._starLighting && (this.atmosphereShell || this.rings)) {
+            gatherStarLighting(this.mesh.position, this._starLighting);
+            this.atmosphereShell?.update(this._starLighting);
+            this.rings?.update(this._starLighting);
         }
 
         // The aurora is a child of the mesh, so it needs no position sync — only the

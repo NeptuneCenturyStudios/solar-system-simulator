@@ -1,17 +1,16 @@
 import * as THREE from 'three';
 import type { IRingSpec } from '../interfaces';
 import { SeededRandom } from '../utilities/prng';
+import { MAX_LIGHTING_STARS } from '../utilities/consts';
+import type { IStarLightingSet } from './star-illumination';
 
 export type PlanetRingsHandle = {
     dispose: () => void;
     /**
-     * Points the ring's lighting at a star.
-     *
-     * `lightDirLocal` is the unit vector from the body toward the star, expressed in the body
-     * mesh's local frame (the frame the rings live in). Pass null when there is no star, which
-     * leaves the rings evenly lit and unshadowed.
+     * Feeds this frame's star lighting at the body (world space, from gatherStarLighting).
+     * Every star in the set lights the rings and casts the planet's shadow across them.
      */
-    update: (lightDirLocal: THREE.Vector3 | null) => void;
+    update: (lights: IStarLightingSet) => void;
     /** Rescales the rings after the host body's radius changes — no geometry rebuild. */
     setRadius: (radius: number) => void;
 };
@@ -39,12 +38,6 @@ const RINGLET_OCTAVES = [
 
 /** How strongly the ringlet noise modulates a band's density (0 = smooth bands). */
 const RINGLET_STRENGTH = 0.8;
-
-/** Light reaching the side of the planet's shadow, relative to full light. */
-const SHADOW_LIGHT = 0.06;
-
-/** Shadow penumbra width, as a fraction of the planet radius. */
-const SHADOW_PENUMBRA = 0.04;
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
     const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
@@ -160,10 +153,16 @@ function buildRingGeometry(innerRadius: number, outerRadius: number): THREE.Buff
  * programs between materials, so a captured reference can end up belonging to another one.
  */
 type RingUniforms = {
-    /** Unit vector toward the star, in the ring's local frame. */
-    uLightDir: { value: THREE.Vector3 };
-    /** 1 when a star is lighting the ring, 0 for even, unshadowed light. */
-    uLightOn: { value: number };
+    /** How many entries of the star arrays are live this frame. */
+    uRingStarCount: { value: number };
+    /** Unit vectors toward each star, in the ring's local frame. */
+    uRingStarDir: { value: THREE.Vector3[] };
+    /** Each star's light at the body: colour × irradiance, as three.js lights the surface. */
+    uRingStarLight: { value: THREE.Vector3[] };
+    /** Angular radius of each star's disc as seen from the body, in radians. */
+    uRingStarAngle: { value: number[] };
+    /** The scene's ambient light (colour × intensity, summed). */
+    uRingAmbient: { value: THREE.Vector3 };
     /** Host body radius in geometry units, for the shadow test. */
     uPlanetRadius: { value: number };
 };
@@ -178,37 +177,94 @@ const RING_VERTEX_PARS = /* glsl */ `
 `;
 
 const RING_FRAGMENT_PARS = /* glsl */ `
-    uniform vec3 uLightDir;
-    uniform float uLightOn;
+    #define RING_MAX_STARS ${MAX_LIGHTING_STARS}
+    uniform int uRingStarCount;
+    uniform vec3 uRingStarDir[RING_MAX_STARS];
+    uniform vec3 uRingStarLight[RING_MAX_STARS];
+    uniform float uRingStarAngle[RING_MAX_STARS];
+    uniform vec3 uRingAmbient;
     uniform float uPlanetRadius;
     varying vec3 vRingLocal;
+
+    // Fraction of a star's disc (angular radius a) hidden by the planet's disc (angular
+    // radius b) when their centres are an angle t apart, as seen from the fragment: the
+    // overlap area of two circles over the star's area. Covers the umbra (planet hides the
+    // whole star), the penumbra (partial overlap) and the antumbra (a planet smaller than
+    // the star in the sky, which can never hide all of it). Treats the sky patch as flat,
+    // which is accurate wherever the star's disc is small; the edge itself sits at the
+    // exact angular radius of the planet either way.
+    float ringStarOcclusion(float a, float b, float t) {
+        if (t >= a + b) return 0.0;
+        if (t <= abs(b - a)) return min(1.0, (b * b) / (a * a));
+        float a2 = a * a;
+        float b2 = b * b;
+        float t2 = t * t;
+        float ca = clamp((t2 + a2 - b2) / (2.0 * t * a), -1.0, 1.0);
+        float cb = clamp((t2 + b2 - a2) / (2.0 * t * b), -1.0, 1.0);
+        float k = max((-t + a + b) * (t + a - b) * (t - a + b) * (t + a + b), 0.0);
+        float area = a2 * acos(ca) + b2 * acos(cb) - 0.5 * sqrt(k);
+        return clamp(area / (PI * a2), 0.0, 1.0);
+    }
 `;
 
 const RING_FRAGMENT_CHUNK = /* glsl */ `
-    if (uLightOn > 0.5) {
-        // Rings are thin and translucent, so they glow on the face turned away from the star
-        // instead of going black; the floor keeps an edge-on ring faintly visible.
-        float ringLit = 0.2 + 0.8 * abs(uLightDir.y);
+    {
+        vec3 ringLight = uRingAmbient;
 
-        // The planet shadows the ring when the ray from the ring toward the star passes
-        // through the planet: the planet is on the star's side of the fragment (b < 0) and
-        // the ray's closest approach to the planet's centre is inside its radius.
-        float ringB = dot(vRingLocal, uLightDir);
-        float ringD = sqrt(max(dot(vRingLocal, vRingLocal) - ringB * ringB, 0.0));
-        float ringPenumbra = uPlanetRadius * ${SHADOW_PENUMBRA.toFixed(3)};
-        float ringShadow = (1.0 - smoothstep(uPlanetRadius - ringPenumbra, uPlanetRadius + ringPenumbra, ringD))
-            * step(ringB, 0.0);
+        // The planet as seen from this fragment: its direction and angular radius.
+        float ringDist = length(vRingLocal);
+        vec3 ringToPlanet = -vRingLocal / max(ringDist, 1e-6);
+        float ringPlanetAngle = asin(clamp(uPlanetRadius / max(ringDist, 1e-6), 0.0, 1.0));
 
-        diffuseColor.rgb *= ringLit * mix(1.0, ${SHADOW_LIGHT.toFixed(2)}, ringShadow);
+        for (int s = 0; s < RING_MAX_STARS; s++) {
+            if (s >= uRingStarCount) break;
+            vec3 L = uRingStarDir[s];
+
+            // Rings are thin and translucent, so they glow on the face turned away from the
+            // star instead of going black; the floor keeps an edge-on ring faintly visible.
+            float ringLit = 0.2 + 0.8 * abs(L.y);
+
+            // Angle between the star and the planet's centre in this fragment's sky. atan2
+            // of cross and dot stays precise where acos of a near-1 dot would not.
+            float ringSep = atan(length(cross(ringToPlanet, L)), dot(ringToPlanet, L));
+
+            // A distant star's shadow edge can be far narrower than a pixel; widen the star
+            // to about one pixel of separation so the edge is antialiased, not jagged.
+            float ringStarAngle = max(max(uRingStarAngle[s], fwidth(ringSep)), 1e-6);
+
+            float ringShadow = ringStarOcclusion(ringStarAngle, ringPlanetAngle, ringSep);
+            ringLight += uRingStarLight[s] * ringLit * (1.0 - ringShadow);
+        }
+        // Lambertian 1/pi, exactly as the lit surfaces scale their irradiance.
+        diffuseColor.rgb *= ringLight * RECIPROCAL_PI;
     }
 `;
+
+/**
+ * Scene ambient light, summed once per rendered frame and shared by every ring.
+ * MeshBasicMaterial gets no light uniforms from three.js, so the rings read it themselves.
+ */
+const _ambient = new THREE.Vector3();
+let _ambientFrame = -1;
+
+function sceneAmbient(renderer: THREE.WebGLRenderer, scene: THREE.Object3D): THREE.Vector3 {
+    const frame = renderer.info.render.frame;
+    if (frame === _ambientFrame) return _ambient;
+    _ambientFrame = frame;
+    _ambient.set(0, 0, 0);
+    for (const child of scene.children) {
+        if (!(child instanceof THREE.AmbientLight) || !child.visible) continue;
+        _ambient.x += child.color.r * child.intensity;
+        _ambient.y += child.color.g * child.intensity;
+        _ambient.z += child.color.b * child.intensity;
+    }
+    return _ambient;
+}
 
 /** Attaches the lighting shader to a ring material, driven by the caller-owned uniforms. */
 function applyRingShader(mat: THREE.MeshBasicMaterial, uniforms: RingUniforms): void {
     mat.onBeforeCompile = (shader) => {
-        shader.uniforms.uLightDir = uniforms.uLightDir;
-        shader.uniforms.uLightOn = uniforms.uLightOn;
-        shader.uniforms.uPlanetRadius = uniforms.uPlanetRadius;
+        Object.assign(shader.uniforms, uniforms);
 
         shader.vertexShader = shader.vertexShader
             .replace('void main() {', `${RING_VERTEX_PARS}\nvoid main() {`)
@@ -229,8 +285,10 @@ function applyRingShader(mat: THREE.MeshBasicMaterial, uniforms: RingUniforms): 
  * azimuth automatically. They also inherit the body's spin, which is invisible because the
  * texture is radially symmetric.
  *
- * Lit by one star and shadowed by the body, both analytically in the fragment shader — no
- * shadow maps. Feed it the star's direction each frame through `update()`.
+ * Lit by up to MAX_LIGHTING_STARS stars, each of which the body shadows, all analytically in
+ * the fragment shader — no shadow maps. Feed it the star lighting each frame through
+ * `update()`. Brightness is the raw irradiance the planet's surface receives, plus the scene's
+ * ambient light, so the rings brighten and dim with the planet.
  *
  * @param radius Host body radius, in the same units as the body mesh.
  * @param spec Ring extent (in body radii), bands and detail seed.
@@ -252,14 +310,28 @@ export function createPlanetRings(
     });
 
     const uniforms: RingUniforms = {
-        uLightDir: { value: new THREE.Vector3(0, 1, 0) },
-        uLightOn: { value: 0 },
+        uRingStarCount: { value: 0 },
+        uRingStarDir: { value: [] },
+        uRingStarLight: { value: [] },
+        uRingStarAngle: { value: [] },
+        uRingAmbient: { value: new THREE.Vector3() },
         uPlanetRadius: { value: radius },
     };
+    for (let i = 0; i < MAX_LIGHTING_STARS; i++) {
+        uniforms.uRingStarDir.value.push(new THREE.Vector3(0, 1, 0));
+        uniforms.uRingStarLight.value.push(new THREE.Vector3());
+        uniforms.uRingStarAngle.value.push(0);
+    }
     applyRingShader(material, uniforms);
 
     const mesh = new THREE.Mesh(geometry, material);
+    mesh.onBeforeRender = (renderer, scene) => {
+        uniforms.uRingAmbient.value.copy(sceneAmbient(renderer, scene));
+    };
     parent.add(mesh);
+
+    // Scratch for taking world directions into the body's local frame.
+    const invParentQuat = new THREE.Quaternion();
 
     // Remembered so setRadius rescales relative to the build rather than compounding.
     const builtRadius = radius;
@@ -272,13 +344,27 @@ export function createPlanetRings(
             texture.dispose();
         },
 
-        update: (lightDirLocal) => {
-            if (lightDirLocal) {
-                uniforms.uLightDir.value.copy(lightDirLocal);
-                uniforms.uLightOn.value = 1;
-            } else {
-                uniforms.uLightOn.value = 0;
+        update: (lights) => {
+            // The direction is handed over in the body mesh's local frame, where the rings
+            // live, and computed here on the CPU because world coordinates are too large for
+            // the shader to resolve a planet-sized shadow edge.
+            invParentQuat.copy(parent.quaternion).invert();
+            const count = Math.min(lights.count, MAX_LIGHTING_STARS);
+            let active = 0;
+            for (let i = 0; i < count; i++) {
+                const light = lights.lights[i];
+                if (!(light.irradiance > 0)) continue;
+                uniforms.uRingStarDir.value[active].copy(light.dir).applyQuaternion(invParentQuat);
+                const k = light.irradiance;
+                uniforms.uRingStarLight.value[active].set(
+                    light.color.r * k,
+                    light.color.g * k,
+                    light.color.b * k
+                );
+                uniforms.uRingStarAngle.value[active] = light.angularRadius;
+                active++;
             }
+            uniforms.uRingStarCount.value = active;
         },
 
         setRadius: (newRadius) => {
