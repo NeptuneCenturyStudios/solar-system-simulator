@@ -10,6 +10,8 @@ import { PlanetaryNebula } from '../effects/planetary-nebula';
 import { GravitationalLensingEffect } from '../effects/gravitational-lensing';
 import { SunRaysEffect } from '../effects/sun-rays';
 import { LensFlareEffect } from '../effects/lens-flare';
+import { beginStarLightingFrame } from '../effects/star-illumination';
+import { SkyBackgroundDimmer } from '../effects/sky-background';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { VelocityArcManager } from '../drawing/velocity-arc';
 import { OrbitPredictionManager } from '../drawing/orbit-prediction';
@@ -175,6 +177,8 @@ export interface AnimationContext {
 // Scratch vectors for updateShipTrail (called once per ship per frame).
 const _trailNozzle = new THREE.Vector3();
 const _trailExhaustDir = new THREE.Vector3();
+/** Dims the starfield under a daytime sky (see effects/sky-background.ts). */
+const _skyBackground = new SkyBackgroundDimmer();
 
 /**
  * Whether a ship's main engine is firing this frame — the signal that drives the
@@ -671,6 +675,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         }
 
         // ── Collision & post-physics updates ─────────────────────────────
+        // Gather the live stars once, for every body's star lighting (atmospheres, Earth).
+        beginStarLightingFrame(ctx.simulationState.bodies);
         if (!ctx.interactionState.isRepositioning) {
             for (let j = 0; j < ctx.simulationState.bodies.length; j++) {
                 const b1 = ctx.simulationState.bodies[j];
@@ -1443,6 +1449,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.missileTrackerIndicator.update(ctx.screenProjector);
 
         // ── Render ──────────────────────────────────────────────────────────
+        // A daytime sky around the camera hides the starfield behind it.
+        _skyBackground.update(ctx.scene, ctx.camera.position, ctx.simulationState.bodies, wallDt);
         ctx.lensingEffect.beginCapture(ctx.renderer);
         try {
             ctx.renderer.render(ctx.scene, ctx.camera);

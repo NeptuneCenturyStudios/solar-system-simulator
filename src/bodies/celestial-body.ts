@@ -12,6 +12,11 @@ import { createTextTexture } from '../drawing/text-texture';
 import { IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { AtmosphereShellHandle, createAtmosphereShell } from '../effects/atmosphere-shell';
+import {
+    createStarLightingSet,
+    gatherStarLighting,
+    type IStarLightingSet,
+} from '../effects/star-illumination';
 import { AuroraHandle, createAurora } from '../effects/aurora';
 import { PlanetRingsHandle, createPlanetRings } from '../effects/planet-rings';
 import { BodyTypeEnum } from './body-enums';
@@ -108,6 +113,8 @@ export class CelestialBody extends Body {
     atmosphereSurfaceDensity: number = 0;
     /** Haze tint, kept so updateAtmosphere() can rebuild the shell without re-deriving it. */
     atmosphereTint: THREE.Color = new THREE.Color(0x5599ff);
+    /** Star lighting at this body, refilled each frame for the atmosphere shell. */
+    private _atmosphereLighting: IStarLightingSet | null = null;
 
     /**
      * Polar aurora curtains, or null when this body doesn't qualify for them.
@@ -333,12 +340,13 @@ export class CelestialBody extends Body {
                 ? options.tint.clone()
                 : new THREE.Color(options.tint);
         this.atmosphereShell = createAtmosphereShell(
-            this.scene,
-            this.atmosphereRadius,
             this.radius,
+            this.atmosphereRadius,
             this.atmosphereTint,
+            this.atmosphereSurfaceDensity,
             this.mesh
         );
+        this._atmosphereLighting ??= createStarLightingSet();
 
         this.refreshAurora();
     }
@@ -737,7 +745,7 @@ export class CelestialBody extends Body {
      * Update purely visual properties that don't affect physics.
      * Called once per rendered frame (after all substeps) rather than per substep.
      * @param dtTotal Total elapsed simulation time for this frame (sum of all substep dts).
-     * @param cameraPos Camera world position (used for atmosphere shell fresnel calculation).
+     * @param cameraPos Camera world position.
      */
     updateVisuals(dtTotal: number, _cameraPos?: THREE.Vector3) {
         if (this._isDisposed) return;
@@ -749,6 +757,12 @@ export class CelestialBody extends Body {
         }
 
         this.updateRingLighting();
+
+        // The atmosphere is lit by the stars actually reaching this body this frame.
+        if (this.atmosphereShell && this._atmosphereLighting) {
+            gatherStarLighting(this.mesh.position, this._atmosphereLighting);
+            this.atmosphereShell.update(this._atmosphereLighting);
+        }
 
         // The aurora is a child of the mesh, so it needs no position sync — only the
         // curtain drift and brightness pulse advanced here.

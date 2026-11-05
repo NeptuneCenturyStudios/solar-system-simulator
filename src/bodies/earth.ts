@@ -21,12 +21,18 @@ import {
     EARTH_LONG_ASC_NODE,
     EARTH_ARG_PERIHELION,
     calcSimOrbitalPeriod,
+    MAX_LIGHTING_STARS,
 } from '../utilities/consts.js';
-import { buildBodySphereGeometry, createUniqueId, isBodyType } from '../utilities/utilities.js';
+import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
+import {
+    createStarLightingSet,
+    gatherStarLighting,
+    type IStarLightingSet,
+} from '../effects/star-illumination.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
-import { BodyTypeEnum, PlanetTypeEnum } from './body-enums.js';
+import { PlanetTypeEnum } from './body-enums.js';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -36,8 +42,8 @@ import {
     VegetationEnum,
 } from './body-attributes.js';
 
-// Maximum number of stars supported by the day/night shader.
-const MAX_STARS = 8;
+// Maximum number of stars supported by the day/night shader (shared with every star effect).
+const MAX_STARS = MAX_LIGHTING_STARS;
 
 const earthDayTexture = getBodyTexture('earth_day.jpg');
 const earthNightTexture = getBodyTexture('earth_night.jpg');
@@ -168,6 +174,7 @@ roughnessFactor = mix(${LAND_ROUGHNESS.toFixed(2)}, ${OCEAN_ROUGHNESS.toFixed(2)
  */
 export class Earth extends Planet {
     private customUniforms: EarthUniforms;
+    private readonly starLighting: IStarLightingSet = createStarLightingSet();
 
     /**
      * Constructs a new Earth object with its unique properties, orbit, and cloud layer.
@@ -345,18 +352,15 @@ export class Earth extends Planet {
 
         if (this._isDisposed) return;
 
-        // Feed live star positions into the day/night shader each frame.
-        // This allocated a filtered array once per substep before; now it runs once per frame.
-        const stars = this.dependencies
-            .getBodies()
-            .filter((b) => isBodyType(b, BodyTypeEnum.Star) && !b._isDisposed);
-
-        const count = Math.min(stars.length, MAX_STARS);
+        // Feed the stars lighting Earth most strongly into the day/night shader each frame.
+        // The set also carries each star's light level, which Phase 1.3 will use.
+        gatherStarLighting(this.mesh.position, this.starLighting);
+        const count = Math.min(this.starLighting.count, MAX_STARS);
         this.customUniforms.numStars.value = count;
 
         const posArray = this.customUniforms.starPositions.value;
         for (let i = 0; i < count; i++) {
-            posArray[i].copy(stars[i].mesh.position);
+            posArray[i].copy(this.starLighting.lights[i].position);
         }
 
         this.customUniforms.earthPosition.value.copy(this.mesh.position);

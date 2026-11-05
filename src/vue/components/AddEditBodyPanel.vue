@@ -86,8 +86,8 @@
                         <input
                             v-model.number="lightIntensity"
                             type="range"
-                            min="1000"
-                            max="15000"
+                            :min="BASE_STAR_LIGHT_INTENSITY_MIN"
+                            :max="BASE_STAR_LIGHT_INTENSITY_MAX"
                             step="100"
                         />
                     </div>
@@ -407,8 +407,8 @@
                         <input
                             v-model.number="editLightIntensity"
                             type="range"
-                            min="1000"
-                            max="15000"
+                            :min="BASE_STAR_LIGHT_INTENSITY_MIN"
+                            :max="BASE_STAR_LIGHT_INTENSITY_MAX"
                             step="100"
                         />
                     </div>
@@ -643,7 +643,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import { COMET_TAIL_COLOR_PALETTE } from '../../utilities/consts';
+import { COMET_TAIL_COLOR_PALETTE, BASE_STAR_LIGHT_INTENSITY_MIN, BASE_STAR_LIGHT_INTENSITY_MAX } from '../../utilities/consts';
 import { closeBodyEditor, openBodyEditor, vueUiState } from '../ui-store';
 import {
     applyBodyEdit,

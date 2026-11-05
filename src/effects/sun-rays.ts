@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { BodyTypeEnum } from '../bodies/body-enums';
+import { MAX_LIGHTING_STARS } from '../utilities/consts';
 
 /** Most stars that cast rays in one frame (the largest on screen win). */
-const MAX_RAY_STARS = 4;
+const MAX_RAY_STARS = MAX_LIGHTING_STARS;
 
 /** Samples marched toward each star per pixel. */
 const RAY_SAMPLES = 40;

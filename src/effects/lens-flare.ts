@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { BodyTypeEnum } from '../bodies/body-enums';
+import { MAX_LIGHTING_STARS } from '../utilities/consts';
 
 /** Most stars that flare in one frame (the largest on screen win). */
-const MAX_FLARE_STARS = 4;
+const MAX_FLARE_STARS = MAX_LIGHTING_STARS;
 
 /**
  * Shine sizes are tuned in pixels at this screen height and scale with the real height, so

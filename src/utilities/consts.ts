@@ -592,12 +592,12 @@ export const KUIPER_BELT_VERTICAL_SPREAD = 100000000 / DIST_SCALE; // 100,000,00
 export const LIGHT_INTENSITY_REFERENCE_DIST_SCALE = 100;
 /** Point-light decay exponent. decay=2 would be the physical inverse-square law;
  *  0.45 is tuned for the visual model. */
-export const STAR_LIGHT_DECAY = 0.45; // Tuned for model
+export const STAR_LIGHT_DECAY = 1; // Tuned for model
 
 // Base light intensity values, tuned at DIST_SCALE = LIGHT_INTENSITY_REFERENCE_DIST_SCALE.
-const BASE_SUN_LIGHT_INTENSITY = 10_000;
-const BASE_STAR_LIGHT_INTENSITY_MIN = 1_000;
-const BASE_STAR_LIGHT_INTENSITY_MAX = 15_000;
+const BASE_SUN_LIGHT_INTENSITY = 20_000_000;
+export const BASE_STAR_LIGHT_INTENSITY_MIN = 10_000_000;
+export const BASE_STAR_LIGHT_INTENSITY_MAX = 50_000_000;
 
 /**
  * Multiplier that keeps a star's punctual-light irradiance constant as
@@ -616,6 +616,38 @@ export const SUN_LIGHT_INTENSITY = BASE_SUN_LIGHT_INTENSITY * STAR_LIGHT_SCALE;
 export const STAR_LIGHT_INTENSITY_MIN = BASE_STAR_LIGHT_INTENSITY_MIN * STAR_LIGHT_SCALE;
 export const STAR_LIGHT_INTENSITY_MAX = BASE_STAR_LIGHT_INTENSITY_MAX * STAR_LIGHT_SCALE;
 export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
+
+/**
+ * Most stars any star-lighting effect considers at once: the lens flare, sun rays, Earth's
+ * day/night shader and the atmosphere shells. One constant so they always stay in sync.
+ */
+export const MAX_LIGHTING_STARS = 4;
+
+// === Sky / atmosphere lighting ===
+// A sky is lit by the exact irradiance each star's point light delivers to the body (its
+// intensity, STAR_LIGHT_DECAY and light distance), the same light the surface receives, with no
+// reference or normalisation. So the star-light constants above set the sky's brightness too.
+/**
+ * Surface pressure (bar) above which the visual atmosphere thickens quickly. The visual optical
+ * depth grows with log(1 + pressure / knee), normalised to 1 at 1 bar. A very low knee makes even
+ * thin atmospheres read as a mostly opaque sky, as Mars's dusty 0.006-bar sky does (≈0.56 of
+ * Earth's), while near-vacuum ones (Pluto, 1e-5 bar ≈ 0.06) stay clear enough to show stars, and
+ * Venus (≈1.39) thickens without blowing out. Lower it to make thin skies more opaque.
+ */
+export const ATMOSPHERE_VISUAL_PRESSURE_KNEE_BAR = 1e-5;
+/** Rayleigh (tinted) vertical optical depth of a 1-bar atmosphere, on the tint's brightest channel. */
+export const ATMOSPHERE_RAYLEIGH_ZENITH_DEPTH = 0.4;
+/**
+ * Absorption of the colours a tint lacks, as a vertical optical depth per decade of surface
+ * pressure above 1 bar (× log10(pressure); 0 at or below Earth's pressure, ≈1.18 for Venus).
+ * Scattering alone turns a thick, yellow-tinted sky blue from the ground (the scattered colours
+ * are used up first); absorbing the complement, as Venus's air absorbs blue, keeps thick skies the
+ * colour of their tint. Keyed to pressure, not the visual depth curve, so tuning
+ * ATMOSPHERE_VISUAL_PRESSURE_KNEE_BAR for thin skies doesn't change it.
+ */
+export const ATMOSPHERE_ABSORPTION_ZENITH_DEPTH = 0.6;
+/** Mie (grey haze, sun glare) vertical optical depth of a 1-bar atmosphere. */
+export const ATMOSPHERE_MIE_ZENITH_DEPTH = 0.04;
 
 /**
  * A dying star's red-giant radius, as a multiple of its pre-expansion radius, is rolled uniformly
