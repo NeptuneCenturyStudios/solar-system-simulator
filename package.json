@@ -1,6 +1,6 @@
 {
     "name": "solar-system-simulator",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "description": "Solar System Simulator is a space simulation focused on physics, exploration, and flight simulation. Build your own solar system or explore procedurally generated systems. Fly spaceships and play through various scenarios.",
     "main": "electron-dist/main.js",
     "desktopName": "solar-system-simulator.desktop",

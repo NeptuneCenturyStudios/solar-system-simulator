@@ -256,8 +256,11 @@ export interface VueSimHooks {
     applyBodyEdit?: (bodyId: string, payload: ApplyBodyEditPayload) => void;
     /** Delete a body by id (same behavior as the old Delete button). */
     deleteBodyById?: (bodyId: string) => void;
-    /** Re-roll add-custom form preview values for the given body type (old Randomize button). */
-    getRandomizedCreateDefaults?: (bodyType: string) => RandomizedCreateDefaults;
+    /**
+     * Re-roll add-custom form preview values for the given body type (old Randomize button).
+     * When `subtype` is a valid planet/moon type, it is kept instead of rolling a random one.
+     */
+    getRandomizedCreateDefaults?: (bodyType: string, subtype?: string) => RandomizedCreateDefaults;
 
     // ── Solar System Management (same sim paths as the old management panel) ─
     /** Show/hide the skydome background texture. */
@@ -960,9 +963,15 @@ export function deleteBodyById(bodyId: string): void {
     hookRegistry.deleteBodyById?.(bodyId);
 }
 
-/** Get freshly-randomized preview values for the add-custom form. */
-export function getRandomizedCreateDefaults(bodyType: string): RandomizedCreateDefaults | null {
-    return hookRegistry.getRandomizedCreateDefaults?.(bodyType) ?? null;
+/**
+ * Get freshly-randomized preview values for the add-custom form. Pass `subtype` to pin the
+ * planet/moon type instead of rolling a random one.
+ */
+export function getRandomizedCreateDefaults(
+    bodyType: string,
+    subtype?: string
+): RandomizedCreateDefaults | null {
+    return hookRegistry.getRandomizedCreateDefaults?.(bodyType, subtype) ?? null;
 }
 
 /**

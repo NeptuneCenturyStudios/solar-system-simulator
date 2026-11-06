@@ -3683,7 +3683,7 @@ registerVueSimHooks({
         }
         deleteSelectedBody();
     },
-    getRandomizedCreateDefaults: (bodyType) => {
+    getRandomizedCreateDefaults: (bodyType, requestedSubtype) => {
         const PLANET_TYPES = [
             'solid',
             'gas_giant',
@@ -3763,7 +3763,11 @@ registerVueSimHooks({
         }
 
         if (bodyType === 'planet') {
-            const planetType = PLANET_TYPES[Math.floor(Math.random() * PLANET_TYPES.length)];
+            // A caller-pinned subtype (the user just picked one in the dropdown) is kept;
+            // otherwise roll one.
+            const planetType =
+                PLANET_TYPES.find((t) => t === requestedSubtype) ??
+                PLANET_TYPES[Math.floor(Math.random() * PLANET_TYPES.length)];
             const params = randomPlanetParams(planetType);
             // Same odds as procedural generation; the values also pre-fill the controls when the
             // roll comes up airless, so checking "Has Atmosphere" still starts from sane numbers.
@@ -3795,7 +3799,9 @@ registerVueSimHooks({
         }
 
         if (bodyType === 'moon') {
-            const moonType = MOON_TYPES[Math.floor(Math.random() * MOON_TYPES.length)];
+            const moonType =
+                MOON_TYPES.find((t) => t === requestedSubtype) ??
+                MOON_TYPES[Math.floor(Math.random() * MOON_TYPES.length)];
             const params = randomMoonParams(EARTH_RADIUS);
             const atmosphereRng = new SeededRandom(generateSeedString());
             const subtype = moonType as MoonTypeEnum;
