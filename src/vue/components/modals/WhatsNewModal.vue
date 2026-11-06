@@ -38,6 +38,11 @@ import { marked } from 'marked';
 const modal = useAsyncModal<void>();
 
 const releaseNotes = `
+### Version 1.4.1 - Patch Update
+**Bug fixes and improvements**
+
+-   Fixed an issue that prevented the Planet Type dropdown from sticking to the selected value.
+
 ### Version 1.4.0 - Major Update
 
 **New features**

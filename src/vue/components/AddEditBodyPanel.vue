@@ -26,7 +26,7 @@
                         <select
                             id="vueBodyTypeSelect"
                             v-model="bodyType"
-                            @change="applyRandomDefaults"
+                            @change="applyRandomDefaults()"
                         >
                             <option value="sun">Star</option>
                             <option value="planet">Planet</option>
@@ -175,7 +175,7 @@
                         <select
                             id="vuePlanetTypeSelect"
                             v-model="planetType"
-                            @change="applyRandomDefaults"
+                            @change="applyRandomDefaults(true)"
                         >
                             <option value="solid">Solid</option>
                             <option value="gas_giant">Gas Giant</option>
@@ -193,7 +193,7 @@
                         <select
                             id="vueMoonTypeSelect"
                             v-model="moonType"
-                            @change="applyRandomDefaults"
+                            @change="applyRandomDefaults(true)"
                         >
                             <option value="solid">Solid</option>
                             <option value="temperate">Temperate</option>
@@ -323,7 +323,7 @@
                         <button
                             class="old-ui btn-with-icon"
                             type="button"
-                            @click="applyRandomDefaults"
+                            @click="applyRandomDefaults()"
                         >
                             <svg-icon type="mdi" :path="mdiShuffleVariant"></svg-icon>
                             RANDOMIZE
@@ -838,12 +838,23 @@ function resetAddForm(): void {
     magReversed.value = false;
 }
 
-function applyRandomDefaults(): void {
+/**
+ * Re-rolls the add-form preview values. With `keepSubtype`, the currently selected planet/moon
+ * type is preserved (and the other values are rolled for that type) instead of re-rolled.
+ */
+function applyRandomDefaults(keepSubtype = false): void {
     // Re-roll the name alongside the other preview values, so the Name box always shows a
     // procedural name the user can accept or edit before creating.
     bodyName.value = generateAddFormBodyName(bodyType.value);
 
-    const defaults = getRandomizedCreateDefaults(bodyType.value);
+    const subtype = !keepSubtype
+        ? undefined
+        : bodyType.value === 'planet'
+          ? planetType.value
+          : bodyType.value === 'moon'
+            ? moonType.value
+            : undefined;
+    const defaults = getRandomizedCreateDefaults(bodyType.value, subtype);
     if (!defaults) return;
     if (defaults.mass !== null) mass.value = defaults.mass;
     if (defaults.radius !== null) radius.value = defaults.radius;
