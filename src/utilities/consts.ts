@@ -1722,3 +1722,39 @@ export const COMET_TAIL_COLOR_PALETTE = [
     0xbb88ff, // purple
     0xff66ff, // magenta
 ];
+
+// === Cloud layers ===
+/**
+ * Cloud deck bounds as multiples of the body radius. Stylised rather than to scale (Earth's real
+ * cloud tops sit ~0.2% above the surface), so the volume still reads from orbit. The flat (Low)
+ * tier draws a single sphere at the top radius; the volumetric tiers march between the two.
+ */
+export const CLOUD_BASE_FACTOR = 1.01;
+export const CLOUD_TOP_FACTOR = 1.03;
+/**
+ * Flat/volumetric LOD by the body's angular radius (radians) as seen from the camera. Below
+ * FADE_START only the flat layer draws (it looks the same at a fraction of the cost when the
+ * planet is small); above FADE_END only the volumetric deck; in between they crossfade, so the
+ * swap never pops. ≈ 1.1°–2.3°, about 20–40 px of radius on a 1080p screen at a 60° FOV.
+ */
+export const CLOUD_VOLUMETRIC_FADE_START = 0.02;
+export const CLOUD_VOLUMETRIC_FADE_END = 0.04;
+/**
+ * View-ray samples through the cloud deck per quality tier. A ray takes one sample per
+ * 1/CLOUD_SAMPLES_PER_THICKNESS of the deck's thickness, clamped to [MIN, MAX]: a ray straight
+ * down the deck gets MIN, a long grazing one (toward the horizon from the surface, or the
+ * limb from orbit) up to MAX, so it isn't left with steps longer than the clouds are tall.
+ */
+export const CLOUD_SAMPLES_PER_THICKNESS = 12;
+export const CLOUD_STEPS_MEDIUM = 24;
+export const CLOUD_MAX_STEPS_MEDIUM = 64;
+export const CLOUD_STEPS_HIGH = 48;
+export const CLOUD_MAX_STEPS_HIGH = 128;
+/** Samples toward each star (self-shadowing) per quality tier. */
+export const CLOUD_LIGHT_STEPS_MEDIUM = 2;
+export const CLOUD_LIGHT_STEPS_HIGH = 4;
+/**
+ * Vertical optical depth through the thickest part of a cloud at density scale 1. Thick enough
+ * that a whole cloud is opaque, low enough that thin margins and wisps stay translucent.
+ */
+export const CLOUD_OPTICAL_DEPTH = 12;

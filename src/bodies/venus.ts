@@ -21,6 +21,7 @@ import { orbitElementsFromApsides } from './orbital-elements.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
+import { VENUS_CLOUD_PROFILE } from '../procedural/cloud-profile.js';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -117,23 +118,7 @@ export class Venus extends Planet {
             },
         });
 
-        const venusAtmosphereTexture = getBodyTexture('venus_atmosphere.jpg');
-        const cloudsMat = new THREE.MeshStandardMaterial({
-            map: venusAtmosphereTexture,
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.85,
-            depthWrite: false,
-            roughness: 1.0,
-            metalness: 0.0,
-        });
-
-        const cloudsGeo = buildBodySphereGeometry(this.radius * 1.03);
-        this.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
-        this.clouds.renderOrder = 2;
-        this.clouds.userData = { parentBody: this };
-        this.mesh.add(this.clouds);
-
-        this.cloudRotationSpeed = rotSpeed * 60; // Clouds rotate much faster than the surface
+        // A closed, banded deck that super-rotates far faster than the surface.
+        this.setClouds(VENUS_CLOUD_PROFILE, rotSpeed * 60);
     }
 }

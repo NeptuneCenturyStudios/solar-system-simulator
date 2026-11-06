@@ -19,6 +19,8 @@ import {
 } from '../effects/star-illumination';
 import { AuroraHandle, createAurora } from '../effects/aurora';
 import { PlanetRingsHandle, createPlanetRings } from '../effects/planet-rings';
+import { createCloudLayer, type CloudLayerHandle } from './cloud-layer';
+import type { ICloudProfile } from '../procedural/cloud-profile';
 import { BodyTypeEnum } from './body-enums';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 import { IPlanetaryAttributes } from './body-attributes';
@@ -92,7 +94,10 @@ export class CelestialBody extends Body {
     trail: THREE.Line | null;
     /** Ring system, attached to the body mesh. Null when the body has none. */
     rings: PlanetRingsHandle | null = null;
-    clouds: THREE.Mesh | null = null;
+    /** The cloud layer's group (spun at `cloudRotationSpeed`). Set only through setClouds(). */
+    clouds: THREE.Object3D | null = null;
+    /** Procedural cloud layer (flat or volumetric by the Cloud Quality setting). */
+    cloudLayer: CloudLayerHandle | null = null;
     cloudRotationSpeed: number = 0;
     /** Visual haze for the atmosphere. Set only through setAtmosphere(). */
     atmosphereShell: AtmosphereShellHandle | null = null;
@@ -354,6 +359,31 @@ export class CelestialBody extends Body {
         this.setAtmosphere({ radius, density, tint: this.atmosphereTint });
     }
 
+    /**
+     * Gives this body a procedural cloud layer, replacing any existing one.
+     * @param profile What the clouds look like (coverage, banding, tint...).
+     * @param rotationSpeed Spin of the cloud layer about the body's axis (rad per sim second).
+     */
+    setClouds(profile: ICloudProfile, rotationSpeed: number): void {
+        this.removeClouds();
+        this.cloudLayer = createCloudLayer(this, profile);
+        this.clouds = this.cloudLayer.group;
+        this.cloudRotationSpeed = rotationSpeed;
+        this._starLighting ??= createStarLightingSet();
+    }
+
+    private removeClouds(): void {
+        if (this.cloudLayer) {
+            try {
+                this.cloudLayer.dispose();
+            } catch {
+                // ignore cleanup errors
+            }
+        }
+        this.cloudLayer = null;
+        this.clouds = null;
+    }
+
     /** Surface pressure in bar (0 when airless), gated by the surfacePressure discovery flag. */
     getDiscoveredSurfacePressure(): number | null {
         if (!this.attributes?.surfacePressure?.discovered) return null;
@@ -442,15 +472,7 @@ export class CelestialBody extends Body {
         }
 
         // Clouds
-        if (this.clouds) {
-            this.scene.remove(this.clouds);
-            this.clouds.geometry.dispose();
-            if (Array.isArray(this.clouds.material)) {
-                this.clouds.material.forEach((mat) => mat.dispose());
-            } else {
-                this.clouds.material.dispose();
-            }
-        }
+        this.removeClouds();
 
         // Trail
         if (this.trail) {
@@ -565,14 +587,7 @@ export class CelestialBody extends Body {
         }
 
         try {
-            if (this.clouds && this.clouds.geometry) {
-                try {
-                    this.clouds.geometry.dispose();
-                } catch (e) {
-                    console.error('Error disposing old cloud geometry:', e);
-                }
-                this.clouds.geometry = buildBodySphereGeometry(newRadius * 1.03);
-            }
+            this.cloudLayer?.setRadius(newRadius);
         } catch (e) {
             console.error('Error updating cloud layer radius:', e);
         }
@@ -719,10 +734,11 @@ export class CelestialBody extends Body {
 
         // The atmosphere and rings are lit by the stars actually reaching this body this frame,
         // gathered once and shared between them.
-        if (this._starLighting && (this.atmosphereShell || this.rings)) {
+        if (this._starLighting && (this.atmosphereShell || this.rings || this.cloudLayer)) {
             gatherStarLighting(this.mesh.position, this._starLighting);
             this.atmosphereShell?.update(this._starLighting);
             this.rings?.update(this._starLighting);
+            this.cloudLayer?.update(this._starLighting, dtTotal);
         }
 
         // The aurora is a child of the mesh, so it needs no position sync — only the

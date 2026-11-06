@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import type { CelestialBody } from '../bodies/celestial-body';
 import { MoonTypeEnum, PlanetTypeEnum } from '../bodies/body-enums';
-import { cloudTextures } from '../drawing/textures';
 import { SeededRandom } from '../utilities/prng';
-import { buildBodySphereGeometry } from '../utilities/utilities';
 import type { IAtmosphereProfile } from './atmosphere-profile';
+import { rollCloudProfile } from './cloud-profile';
 
 type AtmosphereSubtype = PlanetTypeEnum | MoonTypeEnum;
 
@@ -44,7 +43,8 @@ function pickAtmosphereTint(subtype: AtmosphereSubtype, seed: string): THREE.Col
 
 /**
  * Attaches a procedural cloud layer if the subtype and seeded roll call for one. Gas/ice giants
- * never get a separate cloud mesh — their texture already is the cloud deck.
+ * never get a separate cloud layer — their texture already is the cloud deck. The look of the
+ * clouds (coverage, banding, tint) is rolled from the same seed in rollCloudProfile.
  */
 function addCloudLayer(
     body: CelestialBody,
@@ -58,32 +58,7 @@ function addCloudLayer(
     const enableRng = new SeededRandom(`${seed}|clouds-enabled`);
     if (chance < 1.0 && !enableRng.chance(chance)) return;
 
-    if (cloudTextures.length === 0) return;
-
-    const textureRng = new SeededRandom(`${seed}|clouds-texture`);
-    const cloudTexture = textureRng.pick(cloudTextures);
-    if (!cloudTexture) return;
-
-    const cloudsMat = new THREE.MeshStandardMaterial({
-        map: cloudTexture,
-        alphaMap: cloudTexture,
-        transparent: true,
-        opacity: 1.0,
-        depthWrite: false,
-        depthTest: true,
-        color: 0xffffff,
-        roughness: 1.0,
-        metalness: 0.0,
-    });
-
-    const cloudsGeo = buildBodySphereGeometry(body.radius * 1.03);
-    body.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
-    body.clouds.renderOrder = 2;
-    body.clouds.receiveShadow = true;
-    body.clouds.userData = { parentBody: body };
-    body.mesh.add(body.clouds);
-
-    body.cloudRotationSpeed = rotationSpeed * 1.3;
+    body.setClouds(rollCloudProfile(subtype, seed), rotationSpeed * 1.3);
 }
 
 /**

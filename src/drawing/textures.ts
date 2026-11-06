@@ -21,7 +21,6 @@ const PROCEDURAL_DESERT_TEXTURES = 5;
 const PROCEDURAL_TERRESTRIAL_TEXTURES = 9;
 const PROCEDURAL_GAS_GIANT_TEXTURES = 5;
 const PROCEDURAL_ICE_GIANT_TEXTURES = 5;
-const PROCEDURAL_CLOUD_TEXTURES = 2;
 
 /**
  * Generates an array of THREE.Texture objects representing the available temperate planet textures for procedural generation.
@@ -178,23 +177,6 @@ function getSpaceTextures(): ISpaceBackground[] {
  * An array of ISpaceBackground objects representing the available space textures.
  */
 export const spaceTextures: ISpaceBackground[] = getSpaceTextures();
-
-/**
- * Gets the list of cloud textures for procedural generation.
- * @returns An array of THREE.Texture objects.
- */
-function getCloudTextures(): THREE.Texture[] {
-    const textures: THREE.Texture[] = [];
-    for (let i = 1; i <= PROCEDURAL_CLOUD_TEXTURES; i++) {
-        textures.push(getBodyTexture(`procedural/clouds-${i}.jpg`));
-    }
-    return textures;
-}
-
-/**
- * An array of THREE.Texture objects representing the available cloud textures for procedural generation.
- */
-export const cloudTextures = getCloudTextures();
 
 // =============================================================================
 // Volcanic lava emissive map extraction

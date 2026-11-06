@@ -39,6 +39,10 @@ export interface ILensFlareBody {
     mesh: THREE.Object3D;
     /** Star light colour (linear). Stars set it from their temperature. */
     baseColor?: THREE.Color;
+    /** A cloud layer, which dims stars seen through it (bodies/cloud-layer.ts). */
+    cloudLayer?: {
+        lineTransmittance: (from: THREE.Vector3, to: THREE.Vector3) => number;
+    } | null;
 }
 
 /** Brown dwarfs barely glow and do not flare. */
@@ -470,7 +474,8 @@ export class LensFlareEffect {
     /**
      * How much of the star is visible past the bodies between it and the camera (0..1).
      * Each body in the way covers the star's disc (as seen at the body's distance) by how
-     * close the line of sight passes to it; the coverages multiply.
+     * close the line of sight passes to it, and any cloud layer the line crosses lets through
+     * only its transmittance; the factors multiply.
      */
     private _occlusion(
         star: ILensFlareBody,
@@ -488,6 +493,14 @@ export class LensFlareEffect {
         let visibility = 1;
         for (const body of bodies) {
             if (body === star || body._isDisposed || !body.mesh.visible) continue;
+
+            // Clouds first: the camera may well be inside the deck (surface view, low flight),
+            // which the solid-body test below rightly skips.
+            if (body.cloudLayer) {
+                visibility *= body.cloudLayer.lineTransmittance(cam, star.mesh.position);
+                if (visibility <= 0.001) return 0;
+            }
+
             _toBody.copy(body.mesh.position).sub(cam);
             const along = _toBody.dot(_toStar);
             if (along <= 0 || along >= starDist) continue;

@@ -35,6 +35,7 @@ import { getBodyTexture } from '../drawing/texture-registry.js';
 import { IStateDependencies } from '../interfaces.js';
 import { Planet } from './planet.js';
 import { PlanetTypeEnum } from './body-enums.js';
+import { EARTH_CLOUD_PROFILE } from '../procedural/cloud-profile.js';
 import {
     AtmosphericGasEnum,
     CoreTypeEnum,
@@ -307,39 +308,8 @@ export class Earth extends Planet {
 
         this.customUniforms = customUniforms;
 
-        const earthCloudsTexture = getBodyTexture('earth_clouds.jpg');
-        earthCloudsTexture.wrapS = THREE.ClampToEdgeWrapping;
-        earthCloudsTexture.wrapT = THREE.ClampToEdgeWrapping;
-
-        // earthCloudsTexture.repeat.set(-1, 1);
-        // earthCloudsTexture.offset.set(1, 0);
-
-        // earthCloudsTexture.rotation = 0;
-
-        // Cloud layer (UV sphere slightly above surface)
-        const cloudsMat = new THREE.MeshStandardMaterial({
-            map: earthCloudsTexture,
-            alphaMap: earthCloudsTexture,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 1.0,
-            depthWrite: false,
-            depthTest: true,
-            color: 0xffffff,
-            roughness: 1.0,
-            metalness: 0.0,
-        });
-
-        const cloudsGeo = buildBodySphereGeometry(this.radius * 1.03);
-        this.clouds = new THREE.Mesh(cloudsGeo, cloudsMat);
-        this.clouds.renderOrder = 2;
-        this.clouds.receiveShadow = true;
-        // Make cloud sphere selectable (raycaster maps back to owning body)
-        this.clouds.userData = { parentBody: this };
-        this.mesh.add(this.clouds);
-
-        // Clouds rotate slightly faster than Earth to simulate moving atmosphere.
-        this.cloudRotationSpeed = rotSpeed * 1.3;
+        // Procedural, Earth-like weather; clouds drift slightly faster than the surface turns.
+        this.setClouds(EARTH_CLOUD_PROFILE, rotSpeed * 1.3);
     }
 
     override updateVisuals(dtTotal: number, cameraPos?: THREE.Vector3) {

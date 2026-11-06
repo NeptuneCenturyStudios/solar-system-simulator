@@ -24,6 +24,7 @@ import {
     AutopilotOrbitMode,
     clampAutopilotOrbitDistanceM,
     clampRenderDistanceAU,
+    CloudQuality,
     PhysicsSolverMode,
     SettingKey,
     settingsStore,
@@ -381,6 +382,8 @@ export interface VueSimStore {
     auroraEnabled: boolean;
     /** How much per-pixel work the aurora curtains do. */
     auroraDetail: AuroraDetailMode;
+    /** How cloud layers are drawn (flat or volumetric). */
+    cloudQuality: CloudQuality;
     /** Physics substeps per frame. */
     substeps: number;
     /** Gravity solver used by the n-body engine. */
@@ -466,6 +469,7 @@ const state = reactive<VueSimStore>({
     sunRaysEnabled: settingsStore.settings.sunRaysEnabled,
     auroraEnabled: settingsStore.settings.auroraEnabled,
     auroraDetail: settingsStore.settings.auroraDetail,
+    cloudQuality: settingsStore.settings.cloudQuality,
     substeps: settingsStore.settings.substeps,
     physicsSolver: settingsStore.settings.physicsSolver,
     barnesHutTheta: settingsStore.settings.barnesHutTheta,
@@ -1192,6 +1196,15 @@ export function setAuroraDetail(mode: AuroraDetailMode): void {
         settingsStore.update(SettingKey.AuroraDetail, mode);
     }
     state.auroraDetail = mode;
+}
+
+/**
+ * Select how cloud layers are drawn. Takes effect on the next frame: each cloud layer reads the
+ * setting every tick and swaps or recompiles its material in place.
+ */
+export function setCloudQuality(quality: CloudQuality): void {
+    settingsStore.update(SettingKey.CloudQuality, quality);
+    state.cloudQuality = quality;
 }
 
 /** Toggle the ship-AI obstacle avoidance debug overlay. */

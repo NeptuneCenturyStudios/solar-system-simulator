@@ -44,6 +44,21 @@
             <p class="solver-hint">{{ auroraDetailHint }}</p>
         </div>
 
+        <div class="control-group">
+            <label>Cloud Quality</label>
+            <select
+                class="solver-select"
+                :value="simStore.cloudQuality"
+                title="How cloud layers are drawn. Every level shows the same clouds in the same places; higher levels give them depth and self-shadowing at a higher GPU cost."
+                @change="onCloudQualityChange"
+            >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+            <p class="solver-hint">{{ cloudQualityHint }}</p>
+        </div>
+
         <label class="checkbox-row">
             <input type="checkbox" :checked="simStore.showAiDebug" @change="onShowAiDebugChange" />
             Show Ship AI Debug
@@ -244,6 +259,7 @@ import {
     setAuroraDetail,
     setAuroraEnabled,
     setBarnesHutTheta,
+    setCloudQuality,
     setFrameRateLimit,
     setLensflareEnabled,
     setMusicVolume,
@@ -260,6 +276,7 @@ import {
 } from '../sim-bridge';
 import type {
     AuroraDetailMode,
+    CloudQuality,
     PhysicsSolverMode,
     TextureQuality,
 } from '../../settings/settings-store';
@@ -315,6 +332,19 @@ const auroraDetailHint = computed(() => AURORA_DETAIL_HINTS[simStore.auroraDetai
 
 function onAuroraDetailChange(e: Event): void {
     setAuroraDetail((e.target as HTMLSelectElement).value as AuroraDetailMode);
+}
+
+/** One-line explanation of what each cloud quality level costs. */
+const CLOUD_QUALITY_HINTS: Record<CloudQuality, string> = {
+    low: 'Flat procedural clouds. Fastest.',
+    medium: 'Volumetric clouds with depth and soft self-shadowing. Distant planets stay flat.',
+    high: 'Volumetric clouds with twice the samples and detailed self-shadowing. Highest GPU cost.',
+};
+
+const cloudQualityHint = computed(() => CLOUD_QUALITY_HINTS[simStore.cloudQuality]);
+
+function onCloudQualityChange(e: Event): void {
+    setCloudQuality((e.target as HTMLSelectElement).value as CloudQuality);
 }
 
 function onShowAiDebugChange(e: Event): void {

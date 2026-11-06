@@ -39,6 +39,7 @@ export const enum SettingKey {
     AutopilotMode = 'autopilotMode',
     AutopilotOrbitMode = 'autopilotOrbitMode',
     AutopilotOrbitDistanceM = 'autopilotOrbitDistanceM',
+    CloudQuality = 'cloudQuality',
 }
 
 /**
@@ -90,6 +91,18 @@ export type PhysicsSolverMode = 'direct' | 'cutoff' | 'barnes-hut';
  * Declared here rather than in the effects layer so the settings store stays dependency-free.
  */
 export type AuroraDetailMode = 'static' | 'dynamic';
+
+/**
+ * How cloud layers are drawn. All tiers draw the same procedural clouds in the same places.
+ *
+ * - `low`    — a flat sphere shaded by the cloud coverage. About the cost of a textured sphere.
+ * - `medium` — volumetric ray-marched clouds with light self-shadowing.
+ * - `high`   — volumetric with twice the samples and detailed self-shadowing.
+ *
+ * Bodies that are small on screen always use the flat layer.
+ * Declared here rather than in the effects layer so the settings store stays dependency-free.
+ */
+export type CloudQuality = 'low' | 'medium' | 'high';
 
 export interface SpaceSimSettings {
     particleEffectsEnabled: boolean;
@@ -159,6 +172,8 @@ export interface SpaceSimSettings {
     autopilotOrbitMode: AutopilotOrbitMode;
     /** Ship AI autopilot: artificial orbit distance in meters, surface (or hull) to hull. */
     autopilotOrbitDistanceM: number;
+    /** How cloud layers are drawn (flat or volumetric). */
+    cloudQuality: CloudQuality;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -201,6 +216,7 @@ const defaultSettings: SpaceSimSettings = {
     autopilotMode: 'classic',
     autopilotOrbitMode: 'natural',
     autopilotOrbitDistanceM: AI_AUTOPILOT_ORBIT_DISTANCE_DEFAULT_M,
+    cloudQuality: 'medium',
 };
 
 /** Normalise a stored texture quality, falling back to `low` for anything unrecognised. */
@@ -212,6 +228,11 @@ export function normalizeTextureQuality(value: unknown): TextureQuality {
 export function clampRenderDistanceAU(au: number): number {
     if (!Number.isFinite(au)) return RENDER_DISTANCE_DEFAULT_AU;
     return Math.min(Math.max(au, RENDER_DISTANCE_MIN_AU), RENDER_DISTANCE_MAX_AU);
+}
+
+/** Normalise a stored cloud quality, falling back to `medium` for anything unrecognised. */
+export function normalizeCloudQuality(value: unknown): CloudQuality {
+    return value === 'low' || value === 'high' ? value : 'medium';
 }
 
 /** Normalise a stored autopilot mode, falling back to `classic` for anything unrecognised. */
@@ -244,6 +265,7 @@ class SettingsStore {
         this.data.textureQuality = normalizeTextureQuality(this.data.textureQuality);
         this.data.cockpitView = this.data.cockpitView === true;
         this.data.autopilotMode = normalizeAutopilotMode(this.data.autopilotMode);
+        this.data.cloudQuality = normalizeCloudQuality(this.data.cloudQuality);
         this.data.autopilotOrbitMode = normalizeAutopilotOrbitMode(this.data.autopilotOrbitMode);
         this.data.autopilotOrbitDistanceM = clampAutopilotOrbitDistanceM(
             this.data.autopilotOrbitDistanceM
