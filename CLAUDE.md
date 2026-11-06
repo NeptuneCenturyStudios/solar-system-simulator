@@ -141,6 +141,7 @@ For previous milestone info, see milestones.md
 - [ ] Phase 2.3: Add alien invasion scenario (massive fleet battle)
 - **Phase 3**
 - [ ] Phase 3.1: Review performance on slower machines after star update and add performance adjustment options as needed.
+    - [ ] HDR output pipeline: the scene renders into the GravitationalLensingEffect's 8-bit `UnsignedByteType` render target, so three.js applies no tone mapping or sRGB conversion there (`renderer.toneMapping = ACESFilmicToneMapping` is effectively inert) and anything brighter than 1.0 clips to flat white. This causes hard day/night terminators (Earth surface, lit cloud tops) and blown-out highlights. Fix: make the capture target half-float and apply tone mapping and the sRGB output conversion in the final blit to the screen. This changes the look of the whole app, so star, glow, lens-flare, sun-ray and atmosphere constants will need retuning afterwards.
 - [ ] Phase 3.2: Fix more issues with surface cam mode (surface cam gets messed up when generating new system, deactivating leaves camera in weird state, etc...)
 - **Phase 4**
 - [ ] Phase 4.1: Ability to save edits to a solar system or procedurally generated system. For app, this can be built in, for web version, user can select files from browser to load and save.
