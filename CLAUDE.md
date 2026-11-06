@@ -133,7 +133,7 @@ For previous milestone info, see milestones.md
 - [x] Phase 1.1: Complete star overhaul
 - [x] Phase 1.2: Overhaul atmosphere shell effect so that when camera is within the atmosphere, it looks like an actual sky
 - [x] Phase 1.3: Update Earth day/night shader to show any side toward a star as night if the light level is too low. Faint stars who's light is too dim cause Earth to use it's day texture while still showing up dark currently.
-- [ ] Phase 1.4: Optional if possible - volumetric clouds (what do we need to do to support it and a fallback for lower end machines use the cloud texture in use today)
+- [x] Phase 1.4: Optional if possible - volumetric clouds (what do we need to do to support it and a fallback for lower end machines use the cloud texture in use today)
 - [ ] Phase 1.5: We need to do something with the keiper belt. It is always visible and looks weird most of the time. I tried to hide it with a render distance option, but that actually didn't work because I realized that the kuiper belt is a points material that pretty much spans the entire solar system, so it is never out of visual range unless you actually zoom all the way out. Think of some ways to keep it but make it so that you can't really see it unless you zoom out far enough. You can't see the kuiper belt from earth.
 - **Phase 2**
 - [ ] Phase 2.1: Add new alien mothership model and class
