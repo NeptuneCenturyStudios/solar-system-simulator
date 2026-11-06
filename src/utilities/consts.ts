@@ -586,6 +586,14 @@ export const KUIPER_BELT_COUNT = 12000;
 export const KUIPER_BELT_INNER_DIST = 4500000000 / DIST_SCALE; // 4,500,000,000 km
 export const KUIPER_BELT_OUTER_DIST = 7500000000 / DIST_SCALE; // 7,500,000,000 km
 export const KUIPER_BELT_VERTICAL_SPREAD = 100000000 / DIST_SCALE; // 100,000,000 km
+/** Peak opacity of the Kuiper belt points once the camera is far enough out to see them. */
+export const KUIPER_BELT_OPACITY = 0.4;
+// Kuiper belt objects are far too small and dim to see from inside the system; the belt only reads
+// as a structure from well outside it. Its opacity follows the camera's distance from the system
+// centre: invisible inside FADE_START (just past the outer edge, ~57 AU), fully visible beyond
+// FADE_END (~80 AU), which the camera reaches near its maximum zoom-out (~87 AU).
+export const KUIPER_BELT_FADE_START_DIST = 8500000000 / DIST_SCALE; // 8,500,000,000 km
+export const KUIPER_BELT_FADE_END_DIST = 12000000000 / DIST_SCALE; // 12,000,000,000 km
 
 // === Star Light ===
 /** The DIST_SCALE at which the base light intensity values below were tuned. */
