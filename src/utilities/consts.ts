@@ -1024,6 +1024,16 @@ export const SHIP_GROUND_SETTLE_TIME_MAX = 20;
 export const SHIP_GROUNDED_CLEARANCE_FRACTION = 0.02;
 
 /**
+ * Minimum hull clearance (km, scaled by DIST_SCALE) within which a ship that touched the ground
+ * still counts as grounded — the bounce tolerance. On a low-gravity body a small touchdown hop
+ * climbs a long way (the same rebound speed rises ~16× higher on Pluto than on Earth), and without
+ * this floor the ship would count as airborne mid-hop and hand the controls back. Within it the
+ * ship stays grounded while gravity brings it back down and it settles. Must stay well under
+ * SHIP_LAUNCH_LIFT_HEIGHT so a launch clears it.
+ */
+export const SHIP_GROUNDED_CLEARANCE_MIN = 10 / 1000 / DIST_SCALE; // 10 m
+
+/**
  * Seconds W must be held on a grounded ship to charge its lift-off (see simulation/ship-launch.ts).
  * Wall-clock, like the warp charge. Releasing early cancels the charge.
  */
@@ -1037,6 +1047,45 @@ export const SHIP_LAUNCH_LIFT_HEIGHT = 75 / 1000 / DIST_SCALE; // 200 m
 
 /** Sim seconds a launching ship takes to rise SHIP_LAUNCH_LIFT_HEIGHT (a steady vertical climb). */
 export const SHIP_LAUNCH_LIFT_TIME = 1.5;
+
+// === Ship landing procedure (see simulation/ship-landing.ts) ===
+
+/**
+ * Hull-to-surface clearance (km, scaled by DIST_SCALE) within which the flight HUD shows its
+ * altimeter beside the steering ring.
+ */
+export const HUD_ALTIMETER_MAX_ALTITUDE = 500 / DIST_SCALE; // 500 km
+
+/**
+ * Hull-to-ground clearance (km, scaled by DIST_SCALE) within which E starts a landing on the
+ * nearest landable body.
+ */
+export const SHIP_LANDING_MAX_ALTITUDE = 10 / DIST_SCALE; // 10 km
+
+/**
+ * Speed relative to the surface (sim units/s) at or below which the braking phase counts as
+ * stopped, so — once level — the ship begins its descent.
+ */
+export const SHIP_LANDING_HOLD_SPEED = 1 / 1000 / DIST_SCALE; // 1 m/s
+
+/** Attitude error (radians) at or below which a landing ship counts as level over the ground. */
+export const SHIP_LANDING_ALIGN_TOLERANCE = (2 * Math.PI) / 180; // 2°
+
+/**
+ * Descent rate (sim units/s) a landing ship is held to over the last stretch of its fall. Below
+ * SHIP_LANDING_REST_SPEED, so touchdown is resting contact and gives back no bounce.
+ */
+export const SHIP_LANDING_TOUCHDOWN_SPEED = 0.4 / 1000 / DIST_SCALE; // 0.4 m/s
+
+/** Fastest a landing ship is allowed to fall (sim units/s), however high it starts. */
+export const SHIP_LANDING_MAX_DESCENT_SPEED = 200 / 1000 / DIST_SCALE; // 200 m/s
+
+/**
+ * Deceleration (sim units/s²) the descent profile is planned against: the allowed fall speed at
+ * height h is √(2·a·h), so the ship arrives at the ground at touchdown speed. Halved further for
+ * a ship whose spare thrust over local gravity is weaker than this.
+ */
+export const SHIP_LANDING_PROFILE_DECEL = 5 / 1000 / DIST_SCALE; // 5 m/s²
 
 // === Atmospheric drag & damage ===
 // A small/light body (satellite, ship, asteroid fragment) passing through a planet's

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { Spaceship } from '../bodies/ships/spaceship';
 import { surfaceClearance, surfaceVelocityAt } from '../physics/collision';
+import { groundedClearanceTolerance } from '../physics/ground-alignment';
 import {
-    SHIP_GROUNDED_CLEARANCE_FRACTION,
     SHIP_LAUNCH_CHARGE_TIME,
     SHIP_LAUNCH_LIFT_HEIGHT,
     SHIP_LAUNCH_LIFT_TIME,
@@ -27,10 +27,11 @@ const _up = new THREE.Vector3();
 
 /**
  * How high `ship` climbs before controls return: SHIP_LAUNCH_LIFT_HEIGHT, or twice the grounded
- * tolerance for a hull big enough that the fixed height would leave it still counted as grounded.
+ * tolerance (see groundedClearanceTolerance) if that is higher, so a finished lift is never still
+ * counted as grounded.
  */
 export function launchLiftHeight(ship: Spaceship): number {
-    return Math.max(SHIP_LAUNCH_LIFT_HEIGHT, 2 * ship.radius * SHIP_GROUNDED_CLEARANCE_FRACTION);
+    return Math.max(SHIP_LAUNCH_LIFT_HEIGHT, 2 * groundedClearanceTolerance(ship));
 }
 
 /** Launch charge progress in [0, 1] while charging, otherwise 0. */

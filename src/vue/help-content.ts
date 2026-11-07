@@ -83,7 +83,14 @@ export const HELP_SECTIONS: HelpSection[] = [
             { action: 'Orbit camera around ship', keys: ['Hold Alt'] },
             { action: 'Lock / cycle threat target', keys: ['Tab', 'Shift+Tab'] },
             { action: 'Chase locked target (needs Chase Mode)', keys: ['Hold S'] },
-            { action: 'Autopilot to hovered target (ships: Ship AI mode)', keys: ['Hold E'] },
+            {
+                action: 'Land on the surface below (within 10 km; press again to abort)',
+                keys: ['E'],
+            },
+            {
+                action: 'Autopilot to hovered target, when no surface is in landing range (ships: Ship AI mode)',
+                keys: ['Hold E'],
+            },
             { action: 'Fire selected weapon', keys: ['Left-click'] },
             { action: 'Cycle weapon', keys: ['G'] },
             { action: 'Exit flight mode', keys: ['Esc'] },

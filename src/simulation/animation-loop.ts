@@ -38,6 +38,19 @@ import { settingsStore } from '../settings/settings-store';
 import { absorbBody, destroyBody, updateSimulation } from '../physics/physics';
 import { resolveCollision } from '../physics/collision';
 import { updateGroundAlignment } from '../physics/ground-alignment';
+import { NotificationType } from '../event-log/event-log';
+import { steeringDt } from './steering-clock';
+import { findNearestSurface } from '../physics/nearest-surface';
+import { surfaceVelocityAt } from '../physics/collision';
+import { SoundEffect, playSoundEffect } from '../utilities/audio';
+import {
+    applyLandingAttitudes,
+    beginLanding,
+    canBeginLanding,
+    cancelLanding,
+    findLandingSurface,
+    updateLandings,
+} from './ship-landing';
 import { computeAtmosphericDensity } from '../physics/atmosphere-density';
 import { resolveAtmosphericPassage } from '../physics/atmospheric-drag';
 import { computeAtmosphereFrameVelocity } from '../physics/atmosphere-frame';
@@ -65,6 +78,7 @@ import {
     FREE_CAM_NORMAL_SPEED,
     FREE_CAM_BOOST_SPEED,
     FLIGHT_AUTOPILOT_CHARGE_TIME,
+    HUD_ALTIMETER_MAX_ALTITUDE,
 } from '../utilities/consts';
 import { paintFPS, type SpeedHudParams } from '../drawing/text-rendering';
 import type { HudSprite } from '../drawing/hud/hud-sprite';
@@ -80,6 +94,9 @@ import { updateShadows } from '../effects/shadows/shadow-system';
 
 /** Scratch for the warp-sound speed lookup. */
 const _warpSoundVel = new THREE.Vector3();
+/** Scratch for the altimeter: local vertical and the surface frame velocity under the ship. */
+const _altUp = new THREE.Vector3();
+const _altFrameVel = new THREE.Vector3();
 
 // ── Context interface ───────────────────────────────────────────────────────
 
@@ -381,8 +398,11 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
     let fpsLastUpdate = 0;
     let lastT = performance.now();
-    // Prevents an E-hold that triggered autopilot engagement from immediately cancelling it.
-    let _eBlockedForCancel = false;
+    // Set once an E press has done something (engaged or cancelled the autopilot, started or
+    // aborted a landing), so holding E on afterwards does nothing more until it is released.
+    let _ePressConsumed = false;
+    // E's state last frame, so a landing starts or aborts on the press, not while held.
+    let _ePrevHeld = false;
 
     function animate(): void {
         const now = performance.now();
@@ -508,6 +528,15 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // regardless. Frame-level only (decisions + steering/roll); their thrust
         // is applied per physics substep inside updateSimulation().
         stepNpcShips(wallDt, dtTotal, flightCtx.addEvent);
+
+        // Landing ships the flight controls above didn't steer (NPCs, or the player's ship while
+        // out of flight mode) still level themselves over the ground. Not while paused.
+        if (dtTotal > 0) {
+            applyLandingAttitudes(
+                steeringDt(wallDt, dtTotal),
+                isFlightModeActive ? ctx.flightState.activeShip : null
+            );
+        }
 
         // ── Guidance reference frames ────────────────────────────────────
         // Refresh every body's Hill sphere once, then let each ship with guidance on pick the
@@ -818,6 +847,29 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             // pass, which records what each ship is touching this frame.
             updateGroundAlignment(ctx.simulationState.bodies, dtTotal);
 
+            // Landings end here: a ship grounded this frame has touched down, and one whose
+            // surface was destroyed mid-landing is cancelled with its controls handed back.
+            for (const { ship, body, outcome } of updateLandings()) {
+                if (ship !== ctx.flightState.activeShip) continue;
+                playSoundEffect(
+                    outcome === 'touchdown'
+                        ? SoundEffect.LandingComplete
+                        : SoundEffect.LandingCanceled
+                );
+                flightCtx.addEvent(
+                    outcome === 'touchdown'
+                        ? {
+                              message: `🛬 Touchdown${body ? ` on ${body.name}` : ''}. Hold W to launch.`,
+                              notificationType: NotificationType.Success,
+                          }
+                        : {
+                              message:
+                                  'Landing canceled: the surface was destroyed. Flight controls restored.',
+                              notificationType: NotificationType.Warning,
+                          }
+                );
+            }
+
             processWormholeInteractions(ctx.simulationState.bodies, _wormholePrevPositions);
 
             // Bezier particle streams between linked wormholes (once per frame, not per body).
@@ -966,6 +1018,43 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         } else {
             ctx.flightHUD.hideThermalSprite();
             ctx.flightHUD.hideWeaponSprite();
+        }
+
+        // ── Landing status ─────────────────────────────────────────────────
+        // Pulsing text in the autopilot-message slot while the flown ship is landing.
+        const landingShip = ctx.flightState.isActive ? hudShip : null;
+        ctx.flightHUD.updateLandingHUD(
+            landingShip && !landingShip._isDisposed ? landingShip.landingPhase : 'idle',
+            landingShip?.landingBody?.name ?? ''
+        );
+
+        // ── Altimeter ──────────────────────────────────────────────────────
+        // Left of the steering ring, mirroring the heat gauge, within HUD_ALTIMETER_MAX_ALTITUDE
+        // of the nearest surface. Unlike the heat gauge it stays up while the ring is hidden —
+        // landing, grounded and autopilot are exactly when altitude matters. The ring's position
+        // is still updated every frame while it is hidden, so it remains a valid anchor.
+        const altSurface =
+            ctx.flightState.isActive && hudShip && !hudShip._isDisposed && hudShip.mesh
+                ? findNearestSurface(hudShip, ctx.simulationState.bodies)
+                : null;
+        if (hudShip && altSurface && altSurface.clearance <= HUD_ALTIMETER_MAX_ALTITUDE) {
+            const altBody = altSurface.body;
+            _altUp.subVectors(hudShip.mesh.position, altBody.mesh.position);
+            const altDist = _altUp.length();
+            let verticalSpeed = 0;
+            if (altDist > 1e-12) {
+                _altUp.divideScalar(altDist);
+                surfaceVelocityAt(altBody, hudShip.mesh.position, _altFrameVel);
+                verticalSpeed = _altFrameVel.subVectors(hudShip.velocity, _altFrameVel).dot(_altUp);
+            }
+            ctx.flightHUD.updateAltimeterHUD(
+                altSurface.clearance,
+                verticalSpeed,
+                altBody.name,
+                ctx.steeringOriginMarker.position
+            );
+        } else {
+            ctx.flightHUD.hideAltimeterSprite();
         }
 
         // ── Explosions / impacts / supernovas / nebulae ──────────────────
@@ -1450,14 +1539,52 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         if (isFlightModeActive) {
             const _hovered = ctx.planetNameIndicator.steeringHoveredBody;
             const _eHeld = ctx.keys.e;
+            const _ePressed = _eHeld && !_ePrevHeld;
+            _ePrevHeld = _eHeld;
             const _autopilotCanCancel = ctx.autopilotState.isActive;
+            const _ship = ctx.flightState.activeShip;
 
             // Clear the block as soon as E is released
-            if (!_eHeld) _eBlockedForCancel = false;
+            if (!_eHeld) _ePressConsumed = false;
 
-            if (_eHeld && _autopilotCanCancel && !_eBlockedForCancel) {
+            // Landing (see simulation/ship-landing.ts): E aborts one in progress, or — within
+            // range of a surface — starts one. Out of range E keeps its autopilot role below.
+            let _landingSurface: Body | null = null;
+            if (_ePressed && !_autopilotCanCancel && _ship && !_ship._isDisposed) {
+                if (_ship.landingPhase === 'idle' && !_ship.isGrounded) {
+                    _landingSurface = findLandingSurface(_ship, ctx.simulationState.bodies);
+                }
+            }
+
+            if (_eHeld && _autopilotCanCancel && !_ePressConsumed) {
                 // Cancel autopilot on any E press — no hover or charge required
                 ctx.cancelAutopilot('Autopilot disengaged.');
+            } else if (_ePressed && _ship && _ship.landingPhase !== 'idle') {
+                cancelLanding(_ship);
+                _ePressConsumed = true;
+                playSoundEffect(SoundEffect.LandingCanceled);
+                flightCtx.addEvent({
+                    message: 'Landing aborted. Flight controls restored.',
+                    notificationType: NotificationType.Info,
+                });
+            } else if (_ePressed && _ship && _landingSurface) {
+                _ePressConsumed = true;
+                if (canBeginLanding(_ship) && beginLanding(_ship, _landingSurface)) {
+                    ctx.flightState.autopilotCharge = 0;
+                    playSoundEffect(SoundEffect.LandingInitiated);
+                    flightCtx.addEvent({
+                        message: `🛬 Landing on ${_landingSurface.name}. Press E to abort.`,
+                        notificationType: NotificationType.Info,
+                    });
+                } else {
+                    flightCtx.addEvent({
+                        message: 'Drop out of warp before landing.',
+                        notificationType: NotificationType.Warning,
+                    });
+                }
+            } else if (_ePressConsumed || (_ship && _ship.landingPhase !== 'idle')) {
+                // This press already did its job (or a landing owns the ship): no charging.
+                ctx.flightState.autopilotCharge = 0;
             } else if (_hovered && _eHeld && !_autopilotCanCancel) {
                 ctx.flightState.autopilotCharge = Math.min(
                     ctx.flightState.autopilotCharge + wallDt,
@@ -1467,7 +1594,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     ctx.engageAutopilot(_hovered);
                     ctx.flightState.autopilotCharge = 0;
                     // Prevent cancelling immediately if E is still held after engagement
-                    _eBlockedForCancel = true;
+                    _ePressConsumed = true;
                 }
             } else {
                 ctx.flightState.autopilotCharge = 0;

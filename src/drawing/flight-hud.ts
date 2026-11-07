@@ -4,8 +4,15 @@ import type { Spaceship } from '../bodies/ships/spaceship';
 import {
     AUTOPILOT_ORBIT_ALTITUDE_FACTOR,
     AUTOPILOT_ORBIT_NOTIFY_DURATION,
+    HUD_ALTIMETER_MAX_ALTITUDE,
 } from '../utilities/consts';
-import { formatDistance } from '../utilities/display-format';
+import {
+    formatAltitude,
+    formatDistance,
+    formatSpeed,
+    simDistanceToKm,
+    simSpeedToMS,
+} from '../utilities/display-format';
 import { IAutopilotState } from '../interfaces';
 import { HudSprite } from './hud/hud-sprite';
 import { drawGaugeTrack } from './hud/hud-paint';
@@ -22,6 +29,9 @@ export type AutopilotHudState =
     | 'BLOCKED'
     | 'NONE';
 
+/** Landing procedure phases the HUD shows (see Spaceship.landingPhase). */
+export type LandingHudPhase = 'idle' | 'braking' | 'descending';
+
 // Fixed pixel offset to the right of the gray steering-origin ring (radius ~120-124px).
 const THERMAL_GAUGE_OFFSET_X = 160;
 
@@ -32,6 +42,32 @@ const WARP_ACTIVE_W = 512;
 const WARP_ACTIVE_H = 96;
 const THERMAL_W = 90;
 const THERMAL_H = 170;
+
+// ── Altimeter ────────────────────────────────────────────────────────────────
+// Mirrors the heat gauge on the left of the steering ring: a vertical bar in the same column
+// position (just mirrored), with the readouts to its left, away from the ring.
+const ALTIMETER_W = 220;
+const ALTIMETER_H = THERMAL_H;
+/** Same on-screen scale as the heat gauge (90×170 canvas → 48×90 px). */
+const ALTIMETER_SCALE = 90 / THERMAL_H;
+const ALTIMETER_BAR_X = 160;
+const ALTIMETER_BAR_W = 50;
+const ALTIMETER_BAR_Y = 28;
+const ALTIMETER_BAR_H = ALTIMETER_H - 44;
+/** Right edge of the right-aligned readouts, leaving a gap before the bar. */
+const ALTIMETER_TEXT_X = 150;
+/**
+ * Sprite-centre offset from the steering ring: the bar's centre sits at −THERMAL_GAUGE_OFFSET_X,
+ * mirroring the heat gauge's, so the sprite centre is shifted left by the bar's offset from the
+ * canvas centre.
+ */
+const ALTIMETER_OFFSET_X =
+    -THERMAL_GAUGE_OFFSET_X -
+    (ALTIMETER_BAR_X + ALTIMETER_BAR_W / 2 - ALTIMETER_W / 2) * ALTIMETER_SCALE;
+/** Below this vertical speed (m/s) the readout shows level flight. */
+const ALTIMETER_LEVEL_SPEED_MS = 0.05;
+/** Altitudes (km) marked on the bar's log scale. */
+const ALTIMETER_TICKS_KM = [0.1, 1, 10, 100];
 
 // ── Weapon selector label ─────────────────────────────────────────────────────
 // Sits in the same column as the heat gauge, directly above it, naming whichever
@@ -218,6 +254,86 @@ function paintThermalGauge(
 }
 
 /**
+ * Bar position (0..1) for an altitude in metres: logarithmic up to HUD_ALTIMETER_MAX_ALTITUDE, so
+ * the final metres of a landing still move the bar visibly.
+ */
+function altimeterFraction(altitudeM: number): number {
+    const maxM = simDistanceToKm(HUD_ALTIMETER_MAX_ALTITUDE) * 1000;
+    const f = Math.log10(1 + Math.max(0, altitudeM)) / Math.log10(1 + maxM);
+    return Math.max(0, Math.min(1, f));
+}
+
+/**
+ * Renders the altimeter: an "ALT" bar filling bottom-up on a log scale (ticks at 100 m, 1 km,
+ * 10 km, 100 km), with the body's name, the altitude and the vertical speed to its left.
+ */
+function paintAltimeter(
+    ctx: CanvasRenderingContext2D,
+    fraction: number,
+    altitudeText: string,
+    verticalSpeedText: string,
+    bodyName: string
+): void {
+    ctx.clearRect(0, 0, ALTIMETER_W, ALTIMETER_H);
+
+    const barX = ALTIMETER_BAR_X,
+        barY = ALTIMETER_BAR_Y,
+        barW = ALTIMETER_BAR_W,
+        barH = ALTIMETER_BAR_H;
+
+    // Label, centred over the bar like the heat gauge's.
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 14px monospace';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#00ffcc';
+    ctx.shadowColor = 'rgba(0,255,204,0.7)';
+    ctx.fillText('ALT', barX + barW / 2, 14);
+
+    drawGaugeTrack(ctx, barX, barY, barW, barH);
+
+    const clamped = Math.max(0, Math.min(1, fraction));
+    if (clamped > 0) {
+        const fillH = barH * clamped;
+        const fillY = barY + barH - fillH;
+        const grad = ctx.createLinearGradient(0, barY + barH, 0, barY);
+        grad.addColorStop(0, 'rgba(255,180,0,0.9)');
+        grad.addColorStop(0.35, 'rgba(0,200,180,0.9)');
+        grad.addColorStop(1, 'rgba(0,255,220,1.0)');
+        ctx.fillStyle = grad;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(0,255,204,0.6)';
+        ctx.fillRect(barX, fillY, barW, fillH);
+    }
+
+    // Scale ticks on the inner (left) edge of the bar.
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (const km of ALTIMETER_TICKS_KM) {
+        const y = barY + barH - barH * altimeterFraction(km * 1000);
+        ctx.moveTo(barX, y);
+        ctx.lineTo(barX + 12, y);
+    }
+    ctx.stroke();
+
+    // Readouts, right-aligned against the bar.
+    ctx.textAlign = 'right';
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(0,255,204,0.7)';
+    ctx.fillStyle = '#7ef0ff';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText(bodyName.toUpperCase(), ALTIMETER_TEXT_X, 58, ALTIMETER_TEXT_X);
+    ctx.fillStyle = '#00ffcc';
+    ctx.font = 'bold 26px monospace';
+    ctx.fillText(altitudeText, ALTIMETER_TEXT_X, 92, ALTIMETER_TEXT_X);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(verticalSpeedText, ALTIMETER_TEXT_X, 124, ALTIMETER_TEXT_X);
+}
+
+/**
  * Renders the weapon-selector label: the selected weapon's name over its slot
  * index (e.g. "BOLT CANNON" / "2 / 2"). Turns red while that weapon is
  * overheated, matching the heat gauge beside it.
@@ -338,6 +454,37 @@ function paintAutopilotPhase(
     }
 }
 
+/**
+ * Renders the pulsing landing status in the autopilot-phase slot (pulse = 0..1 sine wave): the
+ * phase on top, the body and the abort key beneath.
+ */
+function paintLandingNotify(
+    ctx: CanvasRenderingContext2D,
+    phase: LandingHudPhase,
+    bodyName: string,
+    pulse: number
+): void {
+    const W = PHASE_W,
+        H = PHASE_H;
+    ctx.clearRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const text = phase === 'braking' ? '▼ LANDING: STABILIZING' : '▼ LANDING: DESCENDING';
+    const alpha = 0.55 + 0.45 * pulse; // 0.55–1.0, like WARP ACTIVE
+    ctx.font = 'bold 34px monospace';
+    ctx.shadowBlur = 10 + 16 * pulse;
+    ctx.shadowColor = `rgba(255,170,60,${alpha})`;
+    ctx.fillStyle = `rgba(255,${Math.round(160 + 50 * pulse)},64,${alpha})`;
+    ctx.fillText(text, W / 2, 34);
+
+    ctx.font = '24px monospace';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.fillText(`${bodyName ? `${bodyName} — ` : ''}press E to abort`, W / 2, 72);
+}
+
 function paintHint(context: CanvasRenderingContext2D, lines: string[]): void {
     context.clearRect(0, 0, HINT_W, HINT_H);
 
@@ -446,6 +593,7 @@ export class FlightHUD {
     orbitNotifySprite: HudSprite | null = null;
     hintSprite: HudSprite | null = null;
     thermalSprite: HudSprite | null = null;
+    altimeterSprite: HudSprite | null = null;
     weaponSprite: HudSprite | null = null;
     shipStatusSprite: HudSprite | null = null;
     autopilotBlockedNotifyTimer = 0;
@@ -456,6 +604,12 @@ export class FlightHUD {
      * panels they duplicate — warp, thermal gauge, weapon selector, ship vitals — stay hidden.
      */
     private cockpitDisplaysActive = false;
+
+    /**
+     * True while the landing status owns the autopilot-phase sprite (see updateLandingHUD). The
+     * autopilot can't fly during a landing, so the two never compete for it.
+     */
+    private landingNotifyActive = false;
 
     private uiScene: THREE.Scene;
     private autopilotState: IAutopilotState;
@@ -509,6 +663,7 @@ export class FlightHUD {
         this._initOrbitNotify();
         this._initHint();
         this._initThermal();
+        this._initAltimeter();
         this._initWeapon();
         this._initShipStatus();
     }
@@ -545,6 +700,14 @@ export class FlightHUD {
         this.thermalSprite.draw('0.000|false', (ctx) => paintThermalGauge(ctx, 0, false, 0));
         // 90×170 canvas → 48×90 screen pixels; positioned each frame beside the gray steering ring
         this.thermalSprite.setScale(48, 90);
+    }
+
+    private _initAltimeter(): void {
+        this.altimeterSprite = new HudSprite(this.uiScene);
+        this.altimeterSprite.setCanvasSize(ALTIMETER_W, ALTIMETER_H);
+        this.altimeterSprite.draw('', (ctx) => paintAltimeter(ctx, 0, '', '', ''));
+        this.altimeterSprite.setScale(ALTIMETER_W * ALTIMETER_SCALE, ALTIMETER_H * ALTIMETER_SCALE);
+        // Positioned each frame left of the gray steering ring (setScreenPos).
     }
 
     private _initWeapon(): void {
@@ -586,6 +749,7 @@ export class FlightHUD {
         if (active) {
             this.hideWarpSprite();
             this.hideThermalSprite();
+            this.hideAltimeterSprite();
             this.hideWeaponSprite();
             this.hideShipStatus();
         }
@@ -656,6 +820,46 @@ export class FlightHUD {
         const key = `${fill.toFixed(3)}|${overheated}|${flashPulse.toFixed(3)}`;
         sprite.draw(key, (ctx) => paintThermalGauge(ctx, heat, overheated, flashPulse));
         sprite.visible = true;
+    }
+
+    /**
+     * Update the altimeter and anchor it left of `anchorPos` (the gray steering ring), mirroring
+     * the heat gauge. Hidden in cockpit view, where the dashboard shows altitude.
+     *
+     * @param altitude Hull-to-surface clearance, in sim units.
+     * @param verticalSpeed Speed along the local vertical relative to the surface (sim units/s);
+     *   positive is climbing.
+     * @param bodyName The body the altitude is measured to.
+     */
+    updateAltimeterHUD(
+        altitude: number,
+        verticalSpeed: number,
+        bodyName: string,
+        anchorPos: THREE.Vector3
+    ): void {
+        const sprite = this.altimeterSprite;
+        if (!sprite || this.cockpitDisplaysActive) return;
+        sprite.setScreenPos(anchorPos.x + ALTIMETER_OFFSET_X, anchorPos.y);
+
+        const clamped = Math.max(0, altitude);
+        const fraction = altimeterFraction(simDistanceToKm(clamped) * 1000);
+        const altitudeText = formatAltitude(clamped);
+        const vsMs = simSpeedToMS(verticalSpeed);
+        const vsText =
+            Math.abs(vsMs) < ALTIMETER_LEVEL_SPEED_MS
+                ? '— 0 m/s'
+                : `${vsMs > 0 ? '▲' : '▼'} ${formatSpeed(Math.abs(verticalSpeed))}`;
+        // Keyed on what is actually drawn: the bar to the pixel, and the formatted text.
+        const fillPx = Math.round(fraction * ALTIMETER_BAR_H);
+        sprite.draw(`${fillPx}|${altitudeText}|${vsText}|${bodyName}`, (ctx) =>
+            paintAltimeter(ctx, fraction, altitudeText, vsText, bodyName)
+        );
+        sprite.visible = true;
+    }
+
+    /** Hide the altimeter. */
+    hideAltimeterSprite(): void {
+        if (this.altimeterSprite) this.altimeterSprite.visible = false;
     }
 
     /** Hide the thermal gauge. */
@@ -747,6 +951,8 @@ export class FlightHUD {
      */
     updateAutopilotHUD(dt: number): void {
         if (!this.orbitNotifySprite) return;
+        // A landing in progress owns the sprite; updateLandingHUD paints it every frame.
+        if (this.landingNotifyActive) return;
 
         // Determine desired HUD state
         let desiredHud: AutopilotHudState = 'NONE';
@@ -818,6 +1024,28 @@ export class FlightHUD {
                 }
             }
         }
+    }
+
+    /**
+     * Show the pulsing landing status in the autopilot-phase slot while `phase` is not idle, and
+     * hand the slot back once it is. Call every frame (the pulse animates on wall-clock time).
+     */
+    updateLandingHUD(phase: LandingHudPhase, bodyName: string): void {
+        const sprite = this.orbitNotifySprite;
+        if (!sprite) return;
+        if (phase === 'idle') {
+            if (this.landingNotifyActive) {
+                this.landingNotifyActive = false;
+                sprite.visible = false;
+            }
+            return;
+        }
+        this.landingNotifyActive = true;
+        const pulse = (Math.sin(Date.now() * 0.005) + 1) * 0.5;
+        sprite.draw(`landing|${phase}|${bodyName}|${pulse.toFixed(3)}`, (ctx) =>
+            paintLandingNotify(ctx, phase, bodyName, pulse)
+        );
+        sprite.visible = true;
     }
 
     /** Update hint sprite each frame (texture only redrawn when text changes). */

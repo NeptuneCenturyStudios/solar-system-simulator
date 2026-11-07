@@ -331,11 +331,25 @@ export class Spaceship extends Body {
     launchBody: Body | null = null;
 
     /**
+     * Landing procedure state, driven by simulation/ship-landing.ts:
+     * - 'idle': not landing.
+     * - 'braking': stopping relative to the surface under it and levelling belly-down, gravity
+     *   held off so it hovers.
+     * - 'descending': level and stopped; gravity pulls it down, thrust caps the descent rate.
+     * Touchdown hands over to the grounded state (isGrounded).
+     */
+    landingPhase: 'idle' | 'braking' | 'descending' = 'idle';
+    /** The body a landing ship is setting down on, or null. */
+    landingBody: Body | null = null;
+    /** True once a landing ship is level (belly toward the ground) within tolerance. */
+    landingAligned: boolean = false;
+
+    /**
      * Whether every flight control — steering, roll, thrust, boost, brake, warp and weapons — is
-     * ignored: the ship is sitting on the ground or still lifting off it.
+     * ignored: the ship is sitting on the ground, lifting off it, or flying a landing procedure.
      */
     get controlsLocked(): boolean {
-        return this.isGrounded || this.launchPhase !== 'idle';
+        return this.isGrounded || this.launchPhase !== 'idle' || this.landingPhase !== 'idle';
     }
 
     /** Pluggable AI controller piloting this ship, or null when player-controlled. */

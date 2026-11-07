@@ -7,7 +7,7 @@ import { BodyTypeEnum } from '../bodies/body-enums';
 import type { IFlightState } from '../interfaces';
 import { CockpitDashboard, ICockpitTelemetry } from '../drawing/cockpit-dashboard';
 import { CockpitGlass } from './cockpit-glass';
-import { surfaceClearance } from '../physics/collision';
+import { findNearestSurface } from '../physics/nearest-surface';
 import { launchChargeFill } from '../simulation/ship-launch';
 import { AU } from '../utilities/consts';
 
@@ -39,8 +39,6 @@ const SHIELD_WARNING_FRACTION = 0.05;
 
 const STAR_TYPES =
     BodyTypeEnum.Star | BodyTypeEnum.WhiteDwarf | BodyTypeEnum.Pulsar | BodyTypeEnum.BrownDwarf;
-/** Bodies that don't count as "nearest body" for the altitude readout. */
-const NAV_EXCLUDED_TYPES = BodyTypeEnum.SpaceShip | BodyTypeEnum.Probe;
 
 /** Turns the cockpit camera (which looks down -Z) to face the model's +Z forward. */
 const FACE_FORWARD = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
@@ -249,6 +247,8 @@ export class CockpitView {
             regime = 'LAUNCH CHG';
         } else if (ship.launchPhase === 'lifting') {
             regime = 'LIFT-OFF';
+        } else if (ship.landingPhase !== 'idle') {
+            regime = 'LANDING';
         } else if (ship.isGrounded) {
             regime = 'GROUNDED';
         } else {
@@ -258,21 +258,10 @@ export class CockpitView {
             }
         }
 
-        // Nearest body by surface distance.
-        let nearest: Body | null = null;
-        let nearestAlt = Infinity;
-        for (const body of this.getBodies()) {
-            if (!body || body === ship || body._isDisposed || !body.mesh) continue;
-            if (body.bodyType & NAV_EXCLUDED_TYPES) continue;
-            const alt = body.mesh.position.distanceTo(ship.mesh.position) - body.radius;
-            if (alt < nearestAlt) {
-                nearestAlt = alt;
-                nearest = body;
-            }
-        }
-        // Refine the winner to the hull-to-drawn-ground gap that ship contact uses, so a landed
-        // ship reads ~0 m instead of its centre height above the true (un-faceted) sphere.
-        if (nearest) nearestAlt = surfaceClearance(ship, nearest);
+        // Nearest body by surface distance (shared with the flight HUD altimeter).
+        const surface = findNearestSurface(ship, this.getBodies());
+        const nearest: Body | null = surface?.body ?? null;
+        const nearestAlt = surface ? surface.clearance : Infinity;
         const relSpeed = nearest ? _tmp.subVectors(ship.velocity, nearest.velocity).length() : 0;
 
         // Locked target: distance and closing rate.

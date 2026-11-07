@@ -8,6 +8,7 @@ import {
     SHIP_GROUND_SETTLE_TIME_MAX,
     SHIP_GROUND_SETTLE_TIME_MIN,
     SHIP_GROUNDED_CLEARANCE_FRACTION,
+    SHIP_GROUNDED_CLEARANCE_MIN,
 } from '../utilities/consts';
 import { surfaceClearance } from './collision';
 
@@ -33,12 +34,20 @@ const _IDENTITY = new THREE.Quaternion();
 const _LOCAL_UP = new THREE.Vector3(0, 1, 0);
 
 /**
+ * Hull clearance within which a ship that was resting on a body still counts as grounded: a
+ * fraction of its radius, never less than the SHIP_GROUNDED_CLEARANCE_MIN bounce tolerance.
+ */
+export function groundedClearanceTolerance(ship: Spaceship): number {
+    return Math.max(ship.radius * SHIP_GROUNDED_CLEARANCE_FRACTION, SHIP_GROUNDED_CLEARANCE_MIN);
+}
+
+/**
  * Rotates `ship` by the world-space rotation `q`, keeping every orientation that describes it in
  * step: the mesh, the control frame (mesh = frame × bank, so a world-space premultiply preserves
  * the bank), and — for the ship being flown — the flight camera frame, which
  * updateFlightControls() copies back into the control frame at the start of the next frame.
  */
-function rotateShip(ship: Spaceship, q: THREE.Quaternion): void {
+export function rotateShip(ship: Spaceship, q: THREE.Quaternion): void {
     ship.mesh.quaternion.premultiply(q).normalize();
     ship.controlFrameQuat.premultiply(q).normalize();
     if (flightState.activeShip === ship) flightState.flightCameraQuat.premultiply(q).normalize();
@@ -81,8 +90,9 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
         let state = _groundStates.get(ship);
         let ground: Body | null = contact;
         if (!ground && state && !state.body._isDisposed && state.body.mesh) {
-            const tolerance = ship.radius * SHIP_GROUNDED_CLEARANCE_FRACTION;
-            if (surfaceClearance(ship, state.body) <= tolerance) ground = state.body;
+            if (surfaceClearance(ship, state.body) <= groundedClearanceTolerance(ship)) {
+                ground = state.body;
+            }
         }
         if (!ground || ground._isDisposed || !ground.mesh) {
             ship.isGrounded = false;

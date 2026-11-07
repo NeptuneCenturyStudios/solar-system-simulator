@@ -29,6 +29,9 @@ export enum SoundEffect {
     AutopilotDestinationReached,
     GuidanceEnabled,
     GuidanceDisabled,
+    LandingInitiated,
+    LandingCanceled,
+    LandingComplete,
     // Weapon sounds
     WeaponFire,
     WeaponImpact,
@@ -125,6 +128,39 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     [SoundEffect.GuidanceDisabled]: {
         soundEffectBank: [
             new URL('../assets/sounds/voice/guidance-disabled.mp3', import.meta.url).href,
+        ],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        activeLoop: null,
+    },
+    [SoundEffect.LandingInitiated]: {
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/initiating-landing.mp3', import.meta.url).href,
+        ],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        activeLoop: null,
+    },
+    [SoundEffect.LandingCanceled]: {
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/landing-canceled.mp3', import.meta.url).href,
+        ],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        activeLoop: null,
+    },
+    [SoundEffect.LandingComplete]: {
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/landing-complete.mp3', import.meta.url).href,
         ],
         buffers: [],
         volume: 1.0,

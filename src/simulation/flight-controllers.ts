@@ -15,6 +15,7 @@ import {
 import { IFlightControlContext } from '../interfaces';
 import { applyWeaponInput } from './ship-weapon-input';
 import { cancelLaunchCharge, launchChargeFill, updateLaunchCharge } from './ship-launch';
+import { applyLandingAttitude } from './ship-landing';
 import { steeringDt } from './steering-clock';
 import { IBodyRayHit, muzzleWorldPosition, raycastBodies } from '../ship-effects/weapons/weapon';
 import { leadAimDirection } from '../ship-effects/weapons/intercept';
@@ -455,6 +456,10 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
         playerInput.fire = false;
         if (ship.warpCharging) ship.cancelWarpCharge();
 
+        // Landing procedure: the ship levels itself belly-down over the ground. Runs before
+        // applyFrameOrientation below, and turns the camera frame with it (see rotateShip).
+        if (ship.landingPhase !== 'idle') applyLandingAttitude(ship, steerDt);
+
         const manualLaunch = !autopilotState.isActive;
         if (updateLaunchCharge(ship, manualLaunch && keys.w, dt)) {
             ctx.addEvent({
@@ -620,10 +625,12 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     ctx.steeringEndMarker.position.set(noseScreenX + displayOffX, noseScreenY - displayOffY, 0);
     ctx.steeringEndMarker.visible = true;
 
-    // Hidden while the autopilot is flying (the player isn't steering), during ALT-orbit,
-    // and while shedding speed in a warp/boost/stop-brake deceleration.
+    // Hidden while the autopilot is flying (the player isn't steering), while the controls are
+    // locked (landing, grounded or lifting off), during ALT-orbit, and while shedding speed in a
+    // warp/boost/stop-brake deceleration.
     if (
         autopilotState.isActive ||
+        ship.controlsLocked ||
         flightState.altOrbitActive ||
         flightState.altOrbitYaw !== 0 ||
         flightState.altOrbitPitch !== 0

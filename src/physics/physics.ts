@@ -15,6 +15,7 @@ import { EffectiveGForce } from '../types';
 import { IFlightState, ISimulationState, IAutopilotState } from '../interfaces';
 import { flightState } from '../simulation/simulation';
 import { applyLaunchLiftSubsteps } from '../simulation/ship-launch';
+import { applyLandingSubsteps } from '../simulation/ship-landing';
 import { NBodyIntegrator, ISubstepHooks } from './nbody/integrator';
 import { getActiveSolver } from './nbody/solver-registry';
 
@@ -119,6 +120,8 @@ export function updateSimulation(
     _hooks.applyThrust = (substepDt: number) => {
         // Ships lifting off the ground climb on their own (their engines are locked meanwhile).
         applyLaunchLiftSubsteps(substepDt);
+        // Ships flying the landing procedure likewise (see simulation/ship-landing.ts).
+        applyLandingSubsteps(substepDt);
 
         flightState.activeShip?.applyFlightThrustSubstep?.(substepDt);
 

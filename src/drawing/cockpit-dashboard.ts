@@ -14,7 +14,7 @@ export interface ICockpitTelemetry {
     /** Top speed of the tier the ship is flying in, for the speed gauge. */
     speedGaugeMax: number;
     /**
-     * Flight regime label: CRUISE, BOOST, WARP, WARP CHG, GROUNDED, LAUNCH CHG, LIFT-OFF. Comes
+     * Flight regime label: CRUISE, BOOST, WARP, WARP CHG, LANDING, GROUNDED, LAUNCH CHG, LIFT-OFF. Comes
      * from the drive, not the speed.
      */
     regime: string;
