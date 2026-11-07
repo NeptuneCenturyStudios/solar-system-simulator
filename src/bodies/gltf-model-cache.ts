@@ -1,4 +1,5 @@
 import { GLTFLoader } from 'three/examples/jsm/Addons.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { measureModelFit } from './model-fit';
 import type { IModelTemplate } from './obj-model-cache';
 
@@ -37,6 +38,10 @@ export function loadGltfModelTemplate(spec: IGltfModelSpec): Promise<IModelTempl
 
 async function loadUncachedTemplate(spec: IGltfModelSpec): Promise<IModelTemplate> {
     const loader = new GLTFLoader();
+    // Heavy models (e.g. the Harbinger mothership) ship with EXT_meshopt_compression to keep
+    // the GLB small. The decoder is self-contained (WASM inlined in the JS module), so there
+    // are no extra decoder files to serve over http(s) or the desktop app:// scheme.
+    loader.setMeshoptDecoder(MeshoptDecoder);
     const gltf = await loader.loadAsync(spec.glbUrl);
     const group = gltf.scene;
 
