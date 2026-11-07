@@ -1063,8 +1063,8 @@ export const HUD_ALTIMETER_MAX_ALTITUDE = 500 / DIST_SCALE; // 500 km
 export const SHIP_LANDING_MAX_ALTITUDE = 10 / DIST_SCALE; // 10 km
 
 /**
- * Speed relative to the surface (sim units/s) at or below which the braking phase counts as
- * stopped, so — once level — the ship begins its descent.
+ * Sideways (and climbing) speed relative to the surface (sim units/s) at or below which the
+ * braking phase counts as stopped, so — once level — the ship begins its descent.
  */
 export const SHIP_LANDING_HOLD_SPEED = 1 / 1000 / DIST_SCALE; // 1 m/s
 

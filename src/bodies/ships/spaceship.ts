@@ -338,9 +338,10 @@ export class Spaceship extends Body {
     /**
      * Landing procedure state, driven by simulation/ship-landing.ts:
      * - 'idle': not landing.
-     * - 'braking': stopping relative to the surface under it and levelling belly-down, gravity
-     *   held off so it hovers.
-     * - 'descending': level and stopped; gravity pulls it down, thrust caps the descent rate.
+     * - 'braking': shedding sideways/climbing speed relative to the surface under it and
+     *   levelling belly-down, while gravity pulls it down (thrust caps the descent rate).
+     * - 'descending': level and stopped sideways; gravity pulls it down, thrust caps the descent
+     *   rate.
      * Touchdown hands over to the grounded state (isGrounded).
      */
     landingPhase: 'idle' | 'braking' | 'descending' = 'idle';

@@ -24,16 +24,20 @@ import { simulationState } from './simulation';
  * Every flight control is locked for the duration (Spaceship.controlsLocked); the procedure flies
  * the ship itself, with the ship's own tuning:
  *
- * 1. **Braking.** The ship sheds its speed relative to the surface beneath it — the body's
- *    co-rotating frame, v + ω × r, the same one its atmosphere uses — at the ship's band decel
- *    rates, while turning at its flightMaxTurnRate to bring its belly (−Y) level toward the ground
- *    with its heading kept. The body's gravity is held off, so once stopped it hovers over one
- *    spot on the ground. A body spinning fast enough that its surface frame accelerates harder than
- *    the ship can brake makes this slow or impossible; that is expected.
- * 2. **Descending.** Once stopped and level, gravity is let back in and pulls the ship straight
- *    down. Sideways drift is cancelled, and thrust opposes the fall only when it is faster than a
- *    profile that tapers to SHIP_LANDING_TOUCHDOWN_SPEED at the ground — slow enough that the
- *    contact model treats touchdown as resting contact, with no bounce.
+ * The body's gravity acts on the ship throughout; nothing holds it off. Speed is measured relative
+ * to the surface beneath the ship — the body's co-rotating frame, v + ω × r, the same one its
+ * atmosphere uses — so a ship at 0 m/s stays over one spot on the ground and simply falls.
+ *
+ * 1. **Braking.** The ship sheds its sideways and climbing speed at the ship's band decel rates,
+ *    while turning at its flightMaxTurnRate to bring its belly (−Y) level toward the ground with
+ *    its heading kept. Gravity pulls it down meanwhile; thrust opposes the fall only when it is
+ *    faster than the descent profile (below), so a ship braking low or over a heavy body loses
+ *    height but never falls dangerously fast. A body spinning fast enough that its surface frame
+ *    accelerates harder than the ship can brake makes this slow or impossible; that is expected.
+ * 2. **Descending.** Once stopped sideways and level, the same descent continues at the ship's
+ *    thrust decel. Sideways drift is cancelled, and thrust opposes the fall only when it is faster
+ *    than a profile that tapers to SHIP_LANDING_TOUCHDOWN_SPEED at the ground — slow enough that
+ *    the contact model treats touchdown as resting contact, with no bounce.
  * 3. **Touchdown.** When the hull touches the ground the ship is grounded (physics/
  *    ground-alignment.ts) and the procedure ends; a launch (simulation/ship-launch.ts) is the way
  *    back up.
@@ -239,50 +243,66 @@ export function applyLandingSubsteps(dt: number): void {
         surfaceVelocityAt(body, ship.mesh.position, _frameVel);
         _rel.subVectors(ship.velocity, _frameVel);
 
-        if (ship.landingPhase === 'braking') {
-            // Stop relative to the ground under the ship, at the decel rate for its speed band.
-            const speed = _rel.length();
-            if (speed > 0) {
-                const next = Math.max(0, speed - ship.decelRateForSpeed(speed, h) * dt);
-                _rel.multiplyScalar(next / speed);
-            }
-            ship.velocity.copy(_frameVel).add(_rel);
-            // Hold the body's gravity off so a stopped ship hovers.
-            ship.velocity.addScaledVector(_up, gravity * dt);
+        // Gravity acts throughout (the integrator has already applied it); thrust only sheds
+        // sideways and climbing motion and keeps the fall within the descent profile.
+        const braking = ship.landingPhase === 'braking';
+        // Braking runs at the ship's band decel for its speed; the descent at its thrust decel.
+        const decel = braking ? ship.decelRateForSpeed(_rel.length(), h) : h.flightThrustDecel;
+        const step = decel * dt;
 
-            if (_rel.length() <= SHIP_LANDING_HOLD_SPEED && ship.landingAligned) {
-                ship.landingPhase = 'descending';
-            }
-            continue;
-        }
-
-        // ── Descending: gravity pulls, thrust only keeps the fall in check ──
-        const vertical = _rel.dot(_up);
+        let vertical = _rel.dot(_up);
         _lateral.copy(_rel).addScaledVector(_up, -vertical);
         const lateralSpeed = _lateral.length();
         if (lateralSpeed > 0) {
-            const next = Math.max(0, lateralSpeed - h.flightThrustDecel * dt);
-            _lateral.multiplyScalar(next / lateralSpeed);
+            _lateral.multiplyScalar(Math.max(0, lateralSpeed - step) / lateralSpeed);
         }
 
-        const height = Math.max(0, surfaceClearance(ship, body));
-        const spareDecel = h.flightThrustDecel - gravity;
-        const profileDecel =
-            spareDecel > 0 ? Math.min(SHIP_LANDING_PROFILE_DECEL, 0.5 * spareDecel) : 0;
-        const allowedDescent = THREE.MathUtils.clamp(
-            Math.sqrt(2 * profileDecel * height),
-            SHIP_LANDING_TOUCHDOWN_SPEED,
-            SHIP_LANDING_MAX_DESCENT_SPEED
-        );
-
-        let newVertical = vertical;
-        const descent = -vertical;
-        if (descent > allowedDescent) {
-            newVertical += Math.min(descent - allowedDescent, h.flightThrustDecel * dt);
+        if (braking && vertical > 0) {
+            // Climbing: brake it toward zero (gravity helps).
+            vertical = Math.max(0, vertical - step);
+        } else {
+            vertical = limitDescent(vertical, allowedDescentSpeed(ship, body, gravity), step);
         }
 
-        ship.velocity.copy(_frameVel).add(_lateral).addScaledVector(_up, newVertical);
+        ship.velocity.copy(_frameVel).add(_lateral).addScaledVector(_up, vertical);
+
+        if (
+            braking &&
+            ship.landingAligned &&
+            _lateral.length() <= SHIP_LANDING_HOLD_SPEED &&
+            vertical <= SHIP_LANDING_HOLD_SPEED
+        ) {
+            ship.landingPhase = 'descending';
+        }
     }
+}
+
+/**
+ * Fastest a landing ship may fall at its current height: a profile √(2·a·h) that tapers to
+ * SHIP_LANDING_TOUCHDOWN_SPEED at the ground, with `a` limited to half the ship's thrust decel
+ * left over after the body's gravity, and capped at SHIP_LANDING_MAX_DESCENT_SPEED.
+ */
+function allowedDescentSpeed(ship: Spaceship, body: Body, gravity: number): number {
+    const height = Math.max(0, surfaceClearance(ship, body));
+    const spareDecel = ship.handling.flightThrustDecel - gravity;
+    const profileDecel =
+        spareDecel > 0 ? Math.min(SHIP_LANDING_PROFILE_DECEL, 0.5 * spareDecel) : 0;
+    return THREE.MathUtils.clamp(
+        Math.sqrt(2 * profileDecel * height),
+        SHIP_LANDING_TOUCHDOWN_SPEED,
+        SHIP_LANDING_MAX_DESCENT_SPEED
+    );
+}
+
+/**
+ * Thrust against a fall faster than `allowed`, by at most `maxStep` this substep. A slower fall
+ * (or a climb) is returned unchanged.
+ *
+ * @param vertical Velocity along the local up (negative = falling).
+ */
+function limitDescent(vertical: number, allowed: number, maxStep: number): number {
+    const excess = -vertical - allowed;
+    return excess > 0 ? vertical + Math.min(excess, maxStep) : vertical;
 }
 
 /**
