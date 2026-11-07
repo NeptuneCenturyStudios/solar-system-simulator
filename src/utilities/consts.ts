@@ -946,6 +946,39 @@ export const SHIP_LANDING_BOUNCE_SPEED = Math.sqrt(
  */
 export const SHIP_LANDING_BOUNCE_RESTITUTION = 0.25;
 
+/**
+ * Closing speed (sim units/s) below which a ship contact is treated as resting contact and hands
+ * back no rebound at all. Without it a grounded ship re-bounces every frame off the speed gravity
+ * adds in that frame, which reads as jitter. The effective threshold also scales up with the
+ * per-frame gravity speed (see resolveShipContact), so time warp does not turn resting into hopping.
+ */
+export const SHIP_LANDING_REST_SPEED = 0.5 / 1000 / DIST_SCALE; // 0.5 m/s
+
+/**
+ * Coulomb friction coefficient between a ship and whatever it is touching. The tangential impulse
+ * of a contact is capped at this × the normal impulse, so a ship skidding along the ground loses
+ * μ·g of sliding speed per second (≈10 m/s² on Earth at 1.0) and a steep crash, whose normal impulse
+ * is large, is stopped almost dead in a single contact.
+ */
+export const SHIP_SURFACE_FRICTION = 1.0;
+
+/**
+ * Sliding speed (sim units/s) at the contact point below which a ship simply sticks to the ground
+ * — its tangential motion relative to the surface (including the surface's spin) is cancelled
+ * outright. This is the static-friction stand-in that stops the last slow creep once Coulomb
+ * friction has done the heavy braking.
+ */
+export const SHIP_GROUND_STICK_SPEED = 2 / 1000 / DIST_SCALE; // 2 m/s
+
+/**
+ * Ship contacts are separated to exactly touching ((r₁ + r₂) × this) rather than
+ * COLLISION_SEPARATION_FACTOR. That factor is relative, so on an Earth-sized body its 0.1% is
+ * ~6 km — every ground contact would teleport the ship kilometres into the sky and gravity would
+ * turn that into a long fall and another impact. Touching exactly also lets a grounded ship
+ * re-contact every frame, which is what keeps friction acting on it.
+ */
+export const SHIP_CONTACT_SEPARATION_FACTOR = 1.0;
+
 // === Atmospheric drag & damage ===
 // A small/light body (satellite, ship, asteroid fragment) passing through a planet's
 // atmosphere is continuously slowed and, if moving fast enough, damaged; a large/massive one

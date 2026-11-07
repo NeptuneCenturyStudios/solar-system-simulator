@@ -763,7 +763,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     if (dx * dx + dy * dy + dz * dz < maxDist * maxDist) {
                         // Applies impact damage to both bodies (and bounces them apart if
                         // both survive); deaths are carried out below from the outcome.
-                        const outcome = resolveCollision(b1, b2);
+                        const outcome = resolveCollision(b1, b2, dtTotal);
 
                         // Both survived (or were only nudged out of overlap) — nothing dies.
                         if (outcome.type === 'bounce' || outcome.type === 'none') continue;

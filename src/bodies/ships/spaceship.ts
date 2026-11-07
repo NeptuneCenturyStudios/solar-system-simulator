@@ -56,6 +56,9 @@ const _guideRel = new THREE.Vector3();
 const _guideDir = new THREE.Vector3();
 /** Scratch: velocity the warp/dust effect is driven by (see effectVelocity). */
 const _effectVel = new THREE.Vector3();
+/** Scratch: world direction in hull-local space, and the inverse ship rotation (see hullExtentAlong). */
+const _hullDir = new THREE.Vector3();
+const _hullInvQuat = new THREE.Quaternion();
 
 /** Guidance status shown on the cockpit dashboard and HUD. */
 export type GuidanceStatus = 'off' | 'standby' | 'matching' | 'locked';
@@ -190,6 +193,36 @@ export class Spaceship extends Body {
     /** Weapons collide with the shield bubble, which hugs the hull rather than the full radius. */
     override get hitRadius(): number {
         return this.radius * SHIELD_RADIUS_FRACTION;
+    }
+
+    /**
+     * The loaded model's bounding box in ship-local space (centred on the origin), recorded by
+     * applyModelOffsets(). Null until the model has loaded.
+     */
+    private hullBounds: THREE.Box3 | null = null;
+
+    /**
+     * Distance from the ship's centre to the outermost point of its hull along the world-space
+     * unit direction `dir` — the support distance of the hull's oriented bounding box. This is
+     * what ground contact uses instead of `radius`: the model is scaled so its *longest*
+     * dimension equals `radius`, so the full radius would hold a flat-bellied ship most of a
+     * radius above the ground. Before the model loads it falls back to half the radius (the
+     * hull's furthest reach from the centre).
+     */
+    hullExtentAlong(dir: THREE.Vector3): number {
+        const bounds = this.hullBounds;
+        if (!bounds || !this.mesh) return this.radius * 0.5;
+
+        // World direction into ship-local axes, then through the mesh scale: the support of
+        // R·S·box along n is the support of the local box along S·Rᵀ·n.
+        _hullInvQuat.copy(this.mesh.quaternion).invert();
+        _hullDir.copy(dir).applyQuaternion(_hullInvQuat).multiply(this.mesh.scale);
+
+        return (
+            (_hullDir.x > 0 ? _hullDir.x * bounds.max.x : _hullDir.x * bounds.min.x) +
+            (_hullDir.y > 0 ? _hullDir.y * bounds.max.y : _hullDir.y * bounds.min.y) +
+            (_hullDir.z > 0 ? _hullDir.z * bounds.max.z : _hullDir.z * bounds.min.z)
+        );
     }
 
     /**
@@ -642,6 +675,8 @@ export class Spaceship extends Body {
      * @param localBbox Bounding box of the loaded model in mesh-local coordinates.
      */
     protected applyModelOffsets(localBbox: THREE.Box3): void {
+        this.hullBounds = localBbox.clone();
+
         // A subclass-provided cockpit offset is authoritative; only derive the
         // cockpit from the bbox when none was supplied explicitly.
         if (!this._cockpitCameraExplicit) {

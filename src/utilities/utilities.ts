@@ -138,9 +138,9 @@ export function buildBodySphereGeometry(
     heightSegments: number = 128
 ): THREE.SphereGeometry {
     // Calculate the number of segments based on radius to maintain visual fidelity
-    const minSegments = 64;
+    const minSegments = 128;
     const maxSegments = 128;
-    const segmentFactor = settingsStore.settings.textureQuality === 'low' ? 0.25 : 16; // Adjust this factor to control segment density
+    const segmentFactor = settingsStore.settings.textureQuality === 'low' ? 0.25 : 32; // Adjust this factor to control segment density
 
     if (!widthSegments) {
         widthSegments = Math.max(
@@ -152,7 +152,7 @@ export function buildBodySphereGeometry(
     if (!heightSegments) {
         heightSegments = Math.max(
             minSegments,
-            Math.min(maxSegments, Math.floor(radius * segmentFactor * 2))
+            Math.min(maxSegments, Math.floor(radius * segmentFactor))
         );
     }
 

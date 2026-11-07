@@ -57,6 +57,17 @@ export function formatDistance(simDist: number): string {
     return `${Math.round(km).toLocaleString()} km`;
 }
 
+/**
+ * Format a sim-space height above a surface. Same as {@link formatDistance} from 10 km up; closer
+ * in it switches to metres (one decimal below 100 m) so landing clearance is readable.
+ */
+export function formatAltitude(simDist: number): string {
+    const m = simDistanceToKm(simDist) * 1000;
+    if (Math.abs(m) >= 10000) return formatDistance(simDist);
+    if (Math.abs(m) >= 100) return `${Math.round(m).toLocaleString()} m`;
+    return `${m.toFixed(1)} m`;
+}
+
 /** Format a sim-space radius as "X,XXX km". */
 export function formatRadius(simRadius: number): string {
     return `${Math.round(simRadiusToKm(simRadius)).toLocaleString()} km`;

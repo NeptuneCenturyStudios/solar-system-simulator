@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { formatAU, formatDistance, formatSpeed } from '../utilities/display-format';
+import { formatAltitude, formatAU, formatDistance, formatSpeed } from '../utilities/display-format';
 
 /**
  * Everything the cockpit displays show, gathered once per refresh by CockpitView.
@@ -366,7 +366,7 @@ function paintNavScreen(
     row(
         ctx,
         'ALT',
-        t.nearestName ? formatDistance(Math.max(0, t.nearestAltitude)) : '—',
+        t.nearestName ? formatAltitude(Math.max(0, t.nearestAltitude)) : '—',
         x0,
         x1,
         y,

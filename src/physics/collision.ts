@@ -1,15 +1,23 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { BlackHole } from '../bodies/black-hole';
+import { CelestialBody } from '../bodies/celestial-body';
 import { Star } from '../bodies/star';
 import { Spaceship } from '../bodies/ships/spaceship';
+import { computeAtmosphereFrameVelocity } from './atmosphere-frame';
+import { sphereMeshSurfaceFactor } from './sphere-mesh-surface';
 import {
     COLLISION_DAMAGE_PER_ENERGY,
     COLLISION_MIN_DAMAGE_FRACTION,
     COLLISION_RESTITUTION,
     COLLISION_SEPARATION_FACTOR,
+    G,
+    SHIP_CONTACT_SEPARATION_FACTOR,
+    SHIP_GROUND_STICK_SPEED,
     SHIP_LANDING_BOUNCE_RESTITUTION,
     SHIP_LANDING_BOUNCE_SPEED,
+    SHIP_LANDING_REST_SPEED,
+    SHIP_SURFACE_FRICTION,
 } from '../utilities/consts';
 
 /**
@@ -34,15 +42,23 @@ export type CollisionOutcome =
 const _normal = new THREE.Vector3();
 const _relVel = new THREE.Vector3();
 const _damageRelVel = new THREE.Vector3();
+const _contactPoint = new THREE.Vector3();
+const _surfaceVel1 = new THREE.Vector3();
+const _surfaceVel2 = new THREE.Vector3();
+const _tangent = new THREE.Vector3();
+const _deltaRelVel = new THREE.Vector3();
+
+/** Damage below this (HP) is still applied but not logged — keeps a skidding ship from spamming. */
+const MIN_LOGGED_DAMAGE = 0.01;
 
 function safeMass(body: Body): number {
     return Math.max(0, body?.mass || 0);
 }
 
 /**
- * Whether either side of a contact is a ship. Ships are the one body class with their own impact
- * rules: they do not ricochet (see {@link contactRestitution}) and they are exempt from the
- * minimum-damage floor (see {@link computeCollisionDamage}).
+ * Whether either side of a contact is a ship. Ships are the one body class with their own contact
+ * model — they land rather than ricochet, with friction against the surface — see
+ * {@link resolveShipContact}.
  */
 function involvesShip(b1: Body, b2: Body): boolean {
     return b1 instanceof Spaceship || b2 instanceof Spaceship;
@@ -90,22 +106,17 @@ function claimVictim(winner: Body, victim: Body): CollisionOutcome {
 }
 
 /**
- * HP damage dealt to EACH body by an impact.
+ * HP damage dealt to EACH body by an impact between two non-ship bodies.
  *
  * Both bodies take the same damage: the kinetic energy of their relative motion in the
  * centre-of-mass frame, ½·μ·v_rel² with μ = m₁m₂ / (m₁ + m₂), scaled by
- * COLLISION_DAMAGE_PER_ENERGY.
+ * COLLISION_DAMAGE_PER_ENERGY — but never less than COLLISION_MIN_DAMAGE_FRACTION of the lighter
+ * body's max HP, so even a gentle contact wears the lighter body down and nothing can survive
+ * indefinitely against something heavier.
  *
- * For every body except a ship that damage never drops below COLLISION_MIN_DAMAGE_FRACTION of the
- * lighter body's max HP, so even a gentle contact wears the lighter body down and nothing can
- * survive indefinitely against something heavier.
- *
- * A ship is exempt from that floor, and the exemption is what makes landing possible. A landed
- * ship keeps touching the ground every frame, so the floor would drain a quarter of its HP per
- * frame and kill it in about four frames while it just sits there. Without the floor the damage is
- * exactly the impact energy: the touchdown frame hurts (the relative speed is real), and every
- * frame after it costs nothing because the contact has already cancelled the closing speed. See
- * {@link contactRestitution}.
+ * Ship contacts do not use this: a landed ship touches the ground every frame, so that floor would
+ * kill it in about four frames. They take damage from the energy their contact actually dissipates
+ * instead — see {@link resolveShipContact}.
  */
 export function computeCollisionDamage(b1: Body, b2: Body): number {
     const m1 = safeMass(b1);
@@ -114,8 +125,6 @@ export function computeCollisionDamage(b1: Body, b2: Body): number {
     const reducedMass = totalMass > 0 ? (m1 * m2) / totalMass : 0;
     const relSpeedSq = _damageRelVel.subVectors(b1.velocity, b2.velocity).lengthSq();
     const damage = 0.5 * reducedMass * relSpeedSq * COLLISION_DAMAGE_PER_ENERGY;
-
-    if (involvesShip(b1, b2)) return damage;
 
     const lighter = m1 <= m2 ? b1 : b2;
     const minDamage = COLLISION_MIN_DAMAGE_FRACTION * Math.max(0, lighter.maxHealthPoints);
@@ -147,9 +156,18 @@ function computeContactNormal(
     return distance;
 }
 
-/** Push overlapping bodies apart along the normal; the heavier body moves less. */
-function pushApart(b1: Body, b2: Body, normal: THREE.Vector3, distance: number): void {
-    const penetration = (b1.radius + b2.radius) * COLLISION_SEPARATION_FACTOR - distance;
+/**
+ * Push overlapping bodies apart along the normal until their centres are `targetDistance` apart
+ * (default (r₁ + r₂) × COLLISION_SEPARATION_FACTOR); the heavier body moves less.
+ */
+function pushApart(
+    b1: Body,
+    b2: Body,
+    normal: THREE.Vector3,
+    distance: number,
+    targetDistance: number = (b1.radius + b2.radius) * COLLISION_SEPARATION_FACTOR
+): void {
+    const penetration = targetDistance - distance;
     if (penetration <= 0) return;
 
     const m1 = safeMass(b1);
@@ -163,40 +181,8 @@ function pushApart(b1: Body, b2: Body, normal: THREE.Vector3, distance: number):
 }
 
 /**
- * Restitution (the fraction of the closing speed handed back) for one contact.
- *
- * Ordinary bodies use COLLISION_RESTITUTION — they genuinely bounce off each other. A ship does
- * not: it lands. Its contact returns the smaller of
- *
- *   SHIP_LANDING_BOUNCE_RESTITUTION × closing speed   (the settle term — energy lost per bounce)
- *   SHIP_LANDING_BOUNCE_SPEED                         (the cap — a fixed, tiny hop)
- *
- * Because the cap is a speed rather than a fraction of the impact, a fall from orbit and a gentle
- * touchdown both rebound at the same few metres per second, and gravity turns that speed into a
- * height: ~1.5 m on Earth, ~9 m on the Moon, ~0.6 m on Jupiter. The settle term is what makes the
- * hop shrink instead of repeating forever — the second bounce leaves at a fraction of the cap, the
- * third at a fraction of that, and the ship is resting on the ground after a bounce or two.
- *
- * @param normalSpeed Closing speed along the normal, (v₁ − v₂)·n — negative while approaching.
- */
-function contactRestitution(b1: Body, b2: Body, normalSpeed: number): number {
-    if (!involvesShip(b1, b2)) return COLLISION_RESTITUTION;
-
-    const closingSpeed = Math.abs(normalSpeed);
-    if (!(closingSpeed > 0)) return 0;
-
-    const reboundSpeed = Math.min(
-        closingSpeed * SHIP_LANDING_BOUNCE_RESTITUTION,
-        SHIP_LANDING_BOUNCE_SPEED
-    );
-
-    return reboundSpeed / closingSpeed;
-}
-
-/**
- * Bounce two surviving bodies off each other: a momentum-conserving impulse along the contact
- * normal with the contact's restitution (see {@link contactRestitution}), then separation so they
- * don't re-contact next frame.
+ * Bounce two surviving non-ship bodies off each other: a momentum-conserving impulse along the
+ * contact normal with COLLISION_RESTITUTION, then separation so they don't re-contact next frame.
  * @param normalSpeed Closing speed along the normal, (v₁ − v₂)·n — negative while approaching.
  */
 function bounceApart(
@@ -211,8 +197,7 @@ function bounceApart(
 
     if (m1 > 0 && m2 > 0) {
         const reducedMass = (m1 * m2) / (m1 + m2);
-        const restitution = contactRestitution(b1, b2, normalSpeed);
-        const impulse = -(1 + restitution) * normalSpeed * reducedMass;
+        const impulse = -(1 + COLLISION_RESTITUTION) * normalSpeed * reducedMass;
         b1.velocity.addScaledVector(normal, impulse / m1);
         b2.velocity.addScaledVector(normal, -impulse / m2);
     }
@@ -221,14 +206,188 @@ function bounceApart(
 }
 
 /**
+ * Velocity of `body`'s material at world-space `point`. A celestial body's surface is carried
+ * around by its spin as well as its translation (v + ω × r) — the same co-rotating frame its
+ * atmosphere uses, so ground and air agree on what "standing still" means. Anything else (a ship)
+ * is treated as a point moving with its centre.
+ */
+function surfaceVelocityAt(body: Body, point: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+    if (body instanceof CelestialBody) return computeAtmosphereFrameVelocity(body, point, out);
+    return out.copy(body.velocity);
+}
+
+/**
+ * How far `body` reaches from its centre toward world unit direction `dir` for contact purposes:
+ * a ship's actual hull extent that way (see Spaceship.hullExtentAlong); anything else its radius,
+ * pulled in to the drawn facet of its sphere mesh in that direction (see sphereMeshSurfaceFactor) —
+ * otherwise a ship rests on the true sphere, kilometres above a large body's flat facets.
+ */
+function contactReach(body: Body, dir: THREE.Vector3): number {
+    if (body instanceof Spaceship) return body.hullExtentAlong(dir);
+    return body.radius * sphereMeshSurfaceFactor(body.mesh, dir);
+}
+
+const _clearanceDir = new THREE.Vector3();
+const _clearanceDirNeg = new THREE.Vector3();
+
+/**
+ * Gap between `ship`'s hull and `body`'s drawn surface, in sim units, measured exactly the way ship
+ * contact is (see {@link resolveShipContact}): 0 (or a hair below, from the frame's gravity
+ * sinking in before the next push-out) while the ship is resting on the ground.
+ */
+export function surfaceClearance(ship: Spaceship, body: Body): number {
+    _clearanceDir.subVectors(ship.mesh.position, body.mesh.position);
+    const distance = _clearanceDir.length();
+    if (distance > 1e-12) _clearanceDir.divideScalar(distance);
+    else _clearanceDir.set(0, 1, 0);
+    _clearanceDirNeg.copy(_clearanceDir).negate();
+    return distance - contactReach(ship, _clearanceDirNeg) - contactReach(body, _clearanceDir);
+}
+
+/**
+ * Contact model for anything touching a ship: a landing with friction rather than a ricochet.
+ *
+ * Everything is measured at the contact point, relative to the *surface* there, so a spinning
+ * planet's ground carries a grounded ship around with it instead of turning underneath it. The
+ * relative velocity splits into a closing speed along the normal and a sliding speed along the
+ * surface, and one impulse handles both:
+ *
+ * - **Normal.** The ship rebounds at the smaller of SHIP_LANDING_BOUNCE_RESTITUTION × closing speed
+ *   and the fixed SHIP_LANDING_BOUNCE_SPEED hop, so a fall from orbit and a gentle touchdown both
+ *   leave the ground at a few m/s and successive hops shrink geometrically. At or below the rest
+ *   speed (the larger of SHIP_LANDING_REST_SPEED and twice the speed gravity adds this frame) there
+ *   is no rebound at all: that is resting contact, and it keeps a grounded ship from jittering —
+ *   including under time warp, where one frame of gravity is a lot of speed.
+ * - **Tangential.** Coulomb friction: the sliding speed removed is capped at
+ *   SHIP_SURFACE_FRICTION × the normal speed change. A steep crash (big normal impulse) is stopped
+ *   almost dead; a shallow skid decelerates at μ·g while gravity keeps pressing the ship down.
+ *   At or below SHIP_GROUND_STICK_SPEED the ship simply sticks.
+ *
+ * Damage is the kinetic energy the contact actually dissipates, ½·μ·(|v_rel|² − |v_rel'|²) in the
+ * centre-of-mass frame, applied equally to both bodies. A crash pays for its impact, a skid pays as
+ * it slows, and a ship resting on the ground — or riding a spinning planet, whose centre-relative
+ * speed is far from zero — costs nothing.
+ *
+ * Contact uses the ship's hull extent toward the other body (see {@link contactReach}), not its
+ * radius: the radius is the model's longest dimension, so it would hold a flat-bellied ship most of
+ * a radius above the ground. Separation is to exactly touching (SHIP_CONTACT_SEPARATION_FACTOR):
+ * the general relative factor would lift the ship kilometres off an Earth-sized body on every
+ * contact.
+ *
+ * Damage is decided before any velocity changes, so a body destroyed by the contact keeps its
+ * pre-impact velocity for the caller's death effects.
+ *
+ * @param dt Sim seconds covered by this collision pass, used to scale the resting threshold.
+ */
+function resolveShipContact(b1: Body, b2: Body, dt: number): CollisionOutcome {
+    _relVel.subVectors(b1.velocity, b2.velocity);
+    const distance = computeContactNormal(b1, b2, _relVel, _normal);
+
+    // The caller's sphere test used the full radii; a ship's hull is much smaller than its
+    // radius, so the real contact distance uses its hull extent facing the other body.
+    // (_normal points from b2 toward b1, so b1's contact face is along −n and b2's along +n.)
+    _tangent.copy(_normal).negate();
+    const reach1 = contactReach(b1, _tangent);
+    const reach2 = contactReach(b2, _normal);
+    const contactDistance = reach1 + reach2;
+
+    // Spheres overlap but the hull hasn't reached the surface yet — not touching.
+    if (distance >= contactDistance) return { type: 'none' };
+
+    // Contact point on the line of centres, split in proportion to the reaches.
+    const split = contactDistance > 0 ? reach2 / contactDistance : 0.5;
+    _contactPoint.copy(b2.mesh.position).addScaledVector(_normal, distance * split);
+
+    surfaceVelocityAt(b1, _contactPoint, _surfaceVel1);
+    surfaceVelocityAt(b2, _contactPoint, _surfaceVel2);
+    _relVel.subVectors(_surfaceVel1, _surfaceVel2);
+    const normalSpeed = _relVel.dot(_normal);
+
+    // Already separating (taking off, or mid-hop): clear the overlap, but it's not an impact.
+    if (normalSpeed > 0) {
+        pushApart(b1, b2, _normal, distance, contactDistance * SHIP_CONTACT_SEPARATION_FACTOR);
+        return { type: 'none' };
+    }
+
+    const m1 = safeMass(b1);
+    const m2 = safeMass(b2);
+    const totalMass = m1 + m2;
+    const reducedMass = m1 > 0 && m2 > 0 ? (m1 * m2) / totalMass : 0;
+
+    // ── Normal: a small landing hop, or nothing at all for resting contact ──
+    const closingSpeed = -normalSpeed;
+    const gravity = (G * totalMass) / Math.max(distance * distance, 1e-12);
+    const restSpeed = Math.max(SHIP_LANDING_REST_SPEED, 2 * gravity * Math.max(0, dt));
+    const isResting = closingSpeed <= restSpeed;
+    const reboundSpeed = isResting
+        ? 0
+        : Math.min(closingSpeed * SHIP_LANDING_BOUNCE_RESTITUTION, SHIP_LANDING_BOUNCE_SPEED);
+    const normalDelta = closingSpeed + reboundSpeed;
+
+    // ── Tangential: Coulomb friction, sticking once slow enough ──
+    _tangent.copy(_relVel).addScaledVector(_normal, -normalSpeed);
+    const slideSpeed = _tangent.length();
+    let slideDelta = 0;
+    if (slideSpeed > 0) {
+        _tangent.divideScalar(slideSpeed);
+        slideDelta =
+            slideSpeed <= SHIP_GROUND_STICK_SPEED
+                ? slideSpeed
+                : Math.min(slideSpeed, SHIP_SURFACE_FRICTION * normalDelta);
+    }
+
+    // ── Damage: the energy this contact dissipates (none once the ship has settled) ──
+    const isSettled = isResting && slideSpeed <= SHIP_GROUND_STICK_SPEED;
+    if (!isSettled && reducedMass > 0) {
+        const remainingSlide = slideSpeed - slideDelta;
+        const dissipatedSq =
+            closingSpeed * closingSpeed +
+            slideSpeed * slideSpeed -
+            reboundSpeed * reboundSpeed -
+            remainingSlide * remainingSlide;
+        const damage = 0.5 * reducedMass * Math.max(0, dissipatedSq) * COLLISION_DAMAGE_PER_ENERGY;
+        if (damage > 0) {
+            b1.takeDamage(damage);
+            b2.takeDamage(damage);
+            if (damage >= MIN_LOGGED_DAMAGE) {
+                console.info(
+                    '[body:collision]',
+                    `${b1.name} ↔ ${b2.name}: ${damage.toFixed(2)} HP each`
+                );
+            }
+        }
+    }
+
+    const alive1 = b1.healthPoints > 0;
+    const alive2 = b2.healthPoints > 0;
+    if (!alive1 && !alive2) return { type: 'destroy-both', victims: [b1, b2] };
+    if (alive1 && !alive2) return claimVictim(b1, b2);
+    if (alive2 && !alive1) return claimVictim(b2, b1);
+
+    // ── Apply Δv_rel = n·normalDelta − t̂·slideDelta, split by mass (momentum-conserving) ──
+    if (reducedMass > 0) {
+        _deltaRelVel.copy(_normal).multiplyScalar(normalDelta);
+        if (slideDelta > 0) _deltaRelVel.addScaledVector(_tangent, -slideDelta);
+        b1.velocity.addScaledVector(_deltaRelVel, reducedMass / m1);
+        b2.velocity.addScaledVector(_deltaRelVel, -reducedMass / m2);
+    }
+
+    pushApart(b1, b2, _normal, distance, contactDistance * SHIP_CONTACT_SEPARATION_FACTOR);
+    return { type: 'bounce' };
+}
+
+/**
  * Resolve a contact between two overlapping bodies.
  *
- * Black holes and stars swallow whatever they touch without taking damage. Every other
- * contact damages both bodies equally (see {@link computeCollisionDamage}): a body whose HP
- * drops to ≤ 0 is destroyed and, if the other survives, claimed by it; if both survive they
- * bounce apart. Damage is applied here, but deaths are left to the caller via the outcome.
+ * Black holes and stars swallow whatever they touch without taking damage. Contacts involving a
+ * ship use {@link resolveShipContact}. Every other contact damages both bodies equally (see
+ * {@link computeCollisionDamage}): a body whose HP drops to ≤ 0 is destroyed and, if the other
+ * survives, claimed by it; if both survive they bounce apart. Damage is applied here, but deaths
+ * are left to the caller via the outcome.
+ *
+ * @param dt Sim seconds covered by this collision pass (only ship contacts use it).
  */
-export function resolveCollision(b1: Body, b2: Body): CollisionOutcome {
+export function resolveCollision(b1: Body, b2: Body, dt: number = 0): CollisionOutcome {
     const isBH1 = b1 instanceof BlackHole;
     const isBH2 = b2 instanceof BlackHole;
 
@@ -249,6 +408,9 @@ export function resolveCollision(b1: Body, b2: Body): CollisionOutcome {
     if (isStar1) return claimVictim(b1, b2);
     if (isStar2) return claimVictim(b2, b1);
 
+    // Ships land, with friction, rather than ricochet.
+    if (involvesShip(b1, b2)) return resolveShipContact(b1, b2, dt);
+
     _relVel.subVectors(b1.velocity, b2.velocity);
     const distance = computeContactNormal(b1, b2, _relVel, _normal);
     const normalSpeed = _relVel.dot(_normal);
@@ -260,13 +422,9 @@ export function resolveCollision(b1: Body, b2: Body): CollisionOutcome {
     }
 
     const damage = computeCollisionDamage(b1, b2);
-    // A resting ship contacts its landing site every frame at ~zero closing speed, which is worth
-    // no damage at all — skip the whole block so it neither takes nor logs a hit.
-    if (damage > 0) {
-        b1.takeDamage(damage);
-        b2.takeDamage(damage);
-        console.info('[body:collision]', `${b1.name} ↔ ${b2.name}: ${damage.toFixed(2)} HP each`);
-    }
+    b1.takeDamage(damage);
+    b2.takeDamage(damage);
+    console.info('[body:collision]', `${b1.name} ↔ ${b2.name}: ${damage.toFixed(2)} HP each`);
 
     const alive1 = b1.healthPoints > 0;
     const alive2 = b2.healthPoints > 0;

@@ -7,6 +7,7 @@ import { BodyTypeEnum } from '../bodies/body-enums';
 import type { IFlightState } from '../interfaces';
 import { CockpitDashboard, ICockpitTelemetry } from '../drawing/cockpit-dashboard';
 import { CockpitGlass } from './cockpit-glass';
+import { surfaceClearance } from '../physics/collision';
 import { AU } from '../utilities/consts';
 
 /**
@@ -262,6 +263,9 @@ export class CockpitView {
                 nearest = body;
             }
         }
+        // Refine the winner to the hull-to-drawn-ground gap that ship contact uses, so a landed
+        // ship reads ~0 m instead of its centre height above the true (un-faceted) sphere.
+        if (nearest) nearestAlt = surfaceClearance(ship, nearest);
         const relSpeed = nearest ? _tmp.subVectors(ship.velocity, nearest.velocity).length() : 0;
 
         // Locked target: distance and closing rate.
