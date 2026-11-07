@@ -144,6 +144,16 @@ export function beginLanding(ship: Spaceship, body: Body): boolean {
     return true;
 }
 
+/**
+ * Append the body each landing ship is setting down on to `out`, so the physics substep loop can
+ * keep those bodies' positions and velocities live for {@link applyLandingSubsteps}.
+ */
+export function collectLandingBodies(out: Body[]): void {
+    for (const ship of _landing) {
+        if (ship.landingBody) out.push(ship.landingBody);
+    }
+}
+
 /** End a landing without touching the ship's velocity: gravity simply takes over again. */
 export function cancelLanding(ship: Spaceship): void {
     ship.landingPhase = 'idle';

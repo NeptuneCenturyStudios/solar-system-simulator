@@ -14,8 +14,9 @@ import { NotificationType } from '../event-log/event-log';
 import { EffectiveGForce } from '../types';
 import { IFlightState, ISimulationState, IAutopilotState } from '../interfaces';
 import { flightState } from '../simulation/simulation';
-import { applyLaunchLiftSubsteps } from '../simulation/ship-launch';
-import { applyLandingSubsteps } from '../simulation/ship-landing';
+import { applyLaunchLiftSubsteps, collectLaunchBodies } from '../simulation/ship-launch';
+import { applyLandingSubsteps, collectLandingBodies } from '../simulation/ship-landing';
+import { applyGroundSupportSubsteps, collectGroundBodies } from './ground-alignment';
 import { NBodyIntegrator, ISubstepHooks } from './nbody/integrator';
 import { getActiveSolver } from './nbody/solver-registry';
 
@@ -25,11 +26,15 @@ const EPS2 = SOFTENING_EPS * SOFTENING_EPS;
 /** The engine that owns the SoA mirror and carries acceleration state between frames. */
 const _integrator = new NBodyIntegrator();
 
+/** Surfaces ships are landing on or lifting off from, refilled every frame. */
+const _referenceBodies: Body[] = [];
+
 /** Reusable hook object so the substep loop never allocates. */
 const _hooks: ISubstepHooks = {
     applyThrust: () => {},
     updateAutopilot: null,
     autopilotTarget: null,
+    referenceBodies: _referenceBodies,
 };
 
 /**
@@ -122,6 +127,8 @@ export function updateSimulation(
         applyLaunchLiftSubsteps(substepDt);
         // Ships flying the landing procedure likewise (see simulation/ship-landing.ts).
         applyLandingSubsteps(substepDt);
+        // Resting ships are held on the ground continuously, not just at the frame's contact pass.
+        applyGroundSupportSubsteps(substepDt);
 
         flightState.activeShip?.applyFlightThrustSubstep?.(substepDt);
 
@@ -148,6 +155,11 @@ export function updateSimulation(
     // once per frame would let the ship sail through brake zones at high warp.
     _hooks.updateAutopilot = autopilotState.isActive ? updateAutopilot : null;
     _hooks.autopilotTarget = autopilotState.targetBody;
+    // Landing, launch and ground support read their surface's position and velocity every substep.
+    _referenceBodies.length = 0;
+    collectLandingBodies(_referenceBodies);
+    collectLaunchBodies(_referenceBodies);
+    collectGroundBodies(_referenceBodies);
 
     _integrator.step(simulationState.bodies, getActiveSolver(), gEff, EPS2, steps, dt, _hooks);
 }

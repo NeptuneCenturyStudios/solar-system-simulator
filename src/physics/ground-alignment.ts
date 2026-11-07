@@ -1,16 +1,19 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { Spaceship } from '../bodies/ships/spaceship';
-import { flightState } from '../simulation/simulation';
+import { flightState, simulationState } from '../simulation/simulation';
 import {
+    DIST_SCALE,
     G,
     SHIP_GROUND_SETTLE_TIME_FACTOR,
     SHIP_GROUND_SETTLE_TIME_MAX,
     SHIP_GROUND_SETTLE_TIME_MIN,
+    SHIP_GROUND_STICK_SPEED,
     SHIP_GROUNDED_CLEARANCE_FRACTION,
     SHIP_GROUNDED_CLEARANCE_MIN,
+    SHIP_SURFACE_FRICTION,
 } from '../utilities/consts';
-import { surfaceClearance } from './collision';
+import { surfaceClearance, surfaceVelocityAt } from './collision';
 
 /**
  * Per-ship grounded state: the body it rests on and that body's orientation when last seen, so
@@ -22,6 +25,21 @@ interface IGroundState {
 }
 
 const _groundStates = new WeakMap<Spaceship, IGroundState>();
+
+/** Ships grounded as of the last updateGroundAlignment, for the per-substep ground support. */
+const _grounded = new Set<Spaceship>();
+
+/**
+ * Hull clearance (sim units) within which a grounded ship counts as touching for the per-substep
+ * ground support. Contact separates to exactly touching, so this only absorbs rounding; a ship
+ * any higher (mid-hop) is left to fall back under gravity.
+ */
+const GROUND_SUPPORT_TOLERANCE = 0.05 / 1000 / DIST_SCALE; // 5 cm
+
+const _supportUp = new THREE.Vector3();
+const _supportFrame = new THREE.Vector3();
+const _supportRel = new THREE.Vector3();
+const _supportSlide = new THREE.Vector3();
 
 /** Scratch, so the per-frame pass never allocates. */
 const _delta = new THREE.Quaternion();
@@ -84,7 +102,10 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
         const ship = body;
         const contact = ship.groundContactBody;
         ship.groundContactBody = null;
-        if (ship._isDisposed || !ship.mesh) continue;
+        if (ship._isDisposed || !ship.mesh) {
+            _grounded.delete(ship);
+            continue;
+        }
 
         // ── Grounded? A contact this frame, or still touching the body it was resting on ──
         let state = _groundStates.get(ship);
@@ -98,10 +119,12 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
             ship.isGrounded = false;
             ship.groundBody = null;
             _groundStates.delete(ship);
+            _grounded.delete(ship);
             continue;
         }
         ship.isGrounded = true;
         ship.groundBody = ground;
+        _grounded.add(ship);
 
         // Newly grounded, or now resting on a different body: start tracking from here.
         if (!state || state.body !== ground) {
@@ -145,5 +168,79 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
         _delta.setFromUnitVectors(_shipUp, _targetUp);
         _settle.slerpQuaternions(_IDENTITY, _delta, alpha);
         rotateShip(ship, _settle);
+    }
+}
+
+/** Whether `ship` should get per-substep ground support (grounded and not driven by a procedure). */
+function isSupported(ship: Spaceship): boolean {
+    return ship.isGrounded && ship.launchPhase !== 'lifting' && ship.landingPhase === 'idle';
+}
+
+/**
+ * Append the body each grounded ship rests on to `out`, so the physics substep loop keeps those
+ * bodies' positions and velocities live for {@link applyGroundSupportSubsteps}.
+ */
+export function collectGroundBodies(out: Body[]): void {
+    for (const ship of _grounded) {
+        if (!ship._isDisposed && isSupported(ship) && ship.groundBody) out.push(ship.groundBody);
+    }
+}
+
+/**
+ * Continuous ground support for resting ships, once per physics substep.
+ *
+ * The collision pass runs once per frame, so without this a grounded ship falls through the
+ * ground for a whole frame of substeps — ½·g·T², worst on high-gravity bodies and under time warp
+ * — and is pushed back out at the end. Real ground pushes back continuously: while the hull is
+ * touching, any velocity into the surface (relative to the ground's own co-rotating velocity) is
+ * removed, and sliding is braked by Coulomb friction at μ·g, sticking outright at or below
+ * SHIP_GROUND_STICK_SPEED — the continuous form of resolveShipContact's resting contact.
+ *
+ * A ship lifting off or flying the landing procedure is left alone; their own substep passes
+ * drive it.
+ *
+ * @param dt Sim seconds in this substep.
+ */
+export function applyGroundSupportSubsteps(dt: number): void {
+    if (_grounded.size === 0 || !(dt > 0)) return;
+
+    for (const ship of _grounded) {
+        if (ship._isDisposed || !ship.mesh) {
+            _grounded.delete(ship);
+            continue;
+        }
+        if (!isSupported(ship)) continue;
+        const ground = ship.groundBody;
+        if (!ground || ground._isDisposed || !ground.mesh) continue;
+        // Mid-hop: gravity brings it back down; the collision pass handles the landing.
+        if (surfaceClearance(ship, ground) > GROUND_SUPPORT_TOLERANCE) continue;
+
+        _supportUp.subVectors(ship.mesh.position, ground.mesh.position);
+        const distance = _supportUp.length();
+        if (distance < 1e-12) continue;
+        _supportUp.divideScalar(distance);
+
+        surfaceVelocityAt(ground, ship.mesh.position, _supportFrame);
+        _supportRel.subVectors(ship.velocity, _supportFrame);
+
+        // Normal: the ground stops motion into it; leaving it (a hop) is untouched.
+        const normalSpeed = _supportRel.dot(_supportUp);
+        if (normalSpeed < 0) _supportRel.addScaledVector(_supportUp, -normalSpeed);
+
+        // Tangential: stick when slow, otherwise Coulomb friction at μ·g.
+        _supportSlide.copy(_supportRel).addScaledVector(_supportUp, -_supportRel.dot(_supportUp));
+        const slideSpeed = _supportSlide.length();
+        if (slideSpeed > 0) {
+            const gravity =
+                (G * simulationState.gMultiplier * Math.max(0, ground.mass)) /
+                (distance * distance);
+            const braked =
+                slideSpeed <= SHIP_GROUND_STICK_SPEED
+                    ? slideSpeed
+                    : Math.min(slideSpeed, SHIP_SURFACE_FRICTION * gravity * dt);
+            _supportRel.addScaledVector(_supportSlide, -braked / slideSpeed);
+        }
+
+        ship.velocity.copy(_supportFrame).add(_supportRel);
     }
 }

@@ -14,6 +14,12 @@ export interface ISubstepHooks {
     updateAutopilot: ((dt: number) => void) | null;
     /** Body the autopilot is steering toward, whose position it reads each substep. */
     autopilotTarget: Body | null;
+    /**
+     * Other bodies whose in-flight position and velocity the substep hooks read — the surfaces
+     * ships are landing on or lifting off from. Without this they would show their start-of-frame
+     * state while the ships move on, skewing the local vertical, height and ground frame.
+     */
+    referenceBodies: readonly Body[];
 }
 
 /**
@@ -68,7 +74,7 @@ export class NBodyIntegrator {
 
         if (store.count === 0) return;
 
-        this.buildLiveSlots(hooks.autopilotTarget);
+        this.buildLiveSlots(hooks.autopilotTarget, hooks.referenceBodies);
 
         // Opening acceleration for the first half-kick. Every later substep reuses the
         // acceleration produced by the previous substep's mid-step solve.
@@ -101,7 +107,7 @@ export class NBodyIntegrator {
         this.prevAcc.clear();
     }
 
-    private buildLiveSlots(autopilotTarget: Body | null): void {
+    private buildLiveSlots(autopilotTarget: Body | null, referenceBodies: readonly Body[]): void {
         const store = this.store;
 
         this.liveSlots.length = 0;
@@ -109,10 +115,13 @@ export class NBodyIntegrator {
             this.liveSlots.push(store.exactTargets[i]);
         }
 
-        const targetSlot = store.indexOf(autopilotTarget);
-        if (targetSlot >= 0 && !this.liveSlots.includes(targetSlot)) {
-            this.liveSlots.push(targetSlot);
-        }
+        this.addLiveSlot(autopilotTarget);
+        for (let i = 0; i < referenceBodies.length; i++) this.addLiveSlot(referenceBodies[i]);
+    }
+
+    private addLiveSlot(body: Body | null): void {
+        const slot = this.store.indexOf(body);
+        if (slot >= 0 && !this.liveSlots.includes(slot)) this.liveSlots.push(slot);
     }
 
     /** Copy the in-flight state of the live slots onto their Body objects. */

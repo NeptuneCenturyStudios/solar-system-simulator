@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Body } from '../bodies/body';
 import { Spaceship } from '../bodies/ships/spaceship';
 import { surfaceClearance, surfaceVelocityAt } from '../physics/collision';
 import { groundedClearanceTolerance } from '../physics/ground-alignment';
@@ -76,6 +77,16 @@ export function updateLaunchCharge(ship: Spaceship, wantLaunch: boolean, dt: num
     ship.launchBody = ground;
     _lifting.add(ship);
     return true;
+}
+
+/**
+ * Append the body each lifting ship is climbing away from to `out`, so the physics substep loop
+ * can keep those bodies' positions and velocities live for {@link applyLaunchLiftSubsteps}.
+ */
+export function collectLaunchBodies(out: Body[]): void {
+    for (const ship of _lifting) {
+        if (ship.launchBody) out.push(ship.launchBody);
+    }
 }
 
 /** End a lift and hand the controls back. */
