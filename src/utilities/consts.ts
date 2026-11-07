@@ -1033,7 +1033,7 @@ export const SHIP_LAUNCH_CHARGE_TIME = 1.5;
  * Height (km, scaled by DIST_SCALE) a launching ship rises above the ground before flight controls
  * are handed back. Raised for large hulls so it always clears the grounded tolerance above.
  */
-export const SHIP_LAUNCH_LIFT_HEIGHT = 6 / 1000 / DIST_SCALE; // 6 m
+export const SHIP_LAUNCH_LIFT_HEIGHT = 75 / 1000 / DIST_SCALE; // 200 m
 
 /** Sim seconds a launching ship takes to rise SHIP_LAUNCH_LIFT_HEIGHT (a steady vertical climb). */
 export const SHIP_LAUNCH_LIFT_TIME = 1.5;
