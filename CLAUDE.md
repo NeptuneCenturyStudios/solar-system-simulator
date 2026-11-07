@@ -136,14 +136,15 @@ For previous milestone info, see milestones.md
 - [x] Phase 1.4: Optional if possible - volumetric clouds (what do we need to do to support it and a fallback for lower end machines use the cloud texture in use today)
 - [x] Phase 1.5: We need to do something with the Kuiper belt. It is always visible and looks weird most of the time. I tried to hide it with a render distance option, but that actually didn't work because I realized that the kuiper belt is a points material that pretty much spans the entire solar system, so it is never out of visual range unless you actually zoom all the way out. Think of some ways to keep it but make it so that you can't really see it unless you zoom out far enough. You can't see the kuiper belt from earth.
 - **Phase 2 - New alien invasion scenario see designs\scenarios\alien-invasion.md**
-- [ ] Phase 2.1: Add new alien mothership model and class
-- [ ] Phase 2.2: Add new alien fighter model and class
+- [x] Phase 2.1: Add new alien mothership model and class
+- [x] Phase 2.2: Add new alien fighter model and class
 - [ ] Phase 2.3: Add alien invasion scenario (massive fleet battle). 
 - **Phase 3**
 - [ ] Phase 3.1: Review performance on slower machines after star update and add performance adjustment options as needed.
 - [ ] HDR output pipeline: the scene renders into the GravitationalLensingEffect's 8-bit `UnsignedByteType` render target, so three.js applies no tone mapping or sRGB conversion there (`renderer.toneMapping = ACESFilmicToneMapping` is effectively inert) and anything brighter than 1.0 clips to flat white. This causes hard day/night terminators (Earth surface, lit cloud tops) and blown-out highlights. Fix: make the capture target half-float and apply tone mapping and the sRGB output conversion in the final blit to the screen. This changes the look of the whole app, so star, glow, lens-flare, sun-ray and atmosphere constants will need retuning afterwards.
 - [ ] Phase 3.2: Fix more issues with surface cam mode (surface cam gets messed up when generating new system, deactivating leaves camera in weird state, body destroyed when in surface mode causes issues, etc...)
 - [ ] Phase 3.3: Add surface mode walking (WASD Sapce to jump). Camera sway.
+- [ ] Phase 3.4: Surface friction for ships falling and crashing to surface of planet/moon/asteroid, etc
 - **Phase 4**
 - [ ] Phase 4.1: Reorganize and refactor the custom/preset object creation panel (AddEditBodyPanel.vue) as it is combersome and overwhelming to look at. See designs\ui\new-add-edit-body-updates.md
 - [ ] Phase 4.2: Ability to save edits to a solar system or procedurally generated system. For app, this can be built in, for web version, user can select files from browser to load and save.

@@ -904,6 +904,48 @@ export const COLLISION_RESTITUTION = 0.3;
 /** Surviving bodies are pushed apart to (r₁ + r₂) × this factor so they don't re-contact next frame. */
 export const COLLISION_SEPARATION_FACTOR = 1.001;
 
+// === Ship landing bounce ===
+// Ships are the one body class that must not ricochet. A ship hitting anything is meant to settle
+// onto it — a ship that falls onto a planet should touch down, hop a little, and stay there under
+// gravity, not be flung back out into the sky the way COLLISION_RESTITUTION = 0.3 throws it (30%
+// of a km/s-scale fall is kilometres of rebound). The two constants below turn a ship contact into
+// a near-inelastic one that still reads as a landing rather than a snap-to-stop.
+
+/**
+ * Anchor height for a ship's touchdown hop, in metres — the height the bounce is tuned against on
+ * an Earth-like surface. Kept small on purpose: this is the settle-out of a landing, not a bounce.
+ *
+ * The push itself is a fixed speed (see SHIP_LANDING_BOUNCE_SPEED), so this height is what the
+ * ship gets under Earth-surface gravity and every other body scales off its own gravity: a lower-g
+ * surface lofts the ship higher (≈9 m on the Moon, ≈4 m on Mars), a higher-g one lower (≈0.6 m on
+ * Jupiter), which is exactly what a fixed impulse does under different gravity.
+ */
+export const SHIP_LANDING_BOUNCE_HEIGHT_M = 1.5;
+
+/** Earth-surface gravity in sim units/s² — the reference SHIP_LANDING_BOUNCE_SPEED is derived from. */
+const EARTH_SURFACE_GRAVITY = (G * EARTH_MASS) / EARTH_RADIUS ** 2;
+
+/**
+ * Hard cap on the speed a ship rebounds with after a collision, in sim units/s. Derived from
+ * SHIP_LANDING_BOUNCE_HEIGHT_M and Earth-surface gravity (v = √(2gh)), so it is exactly the launch
+ * speed for that hop on an Earth-like surface.
+ *
+ * A speed cap rather than a restitution factor, deliberately: a restitution factor scales with the
+ * impact speed, so the harder the fall the worse the rebound — which is the behaviour being removed
+ * here. Every ship landing, fast or slow, leaves the surface at no more than this.
+ */
+export const SHIP_LANDING_BOUNCE_SPEED = Math.sqrt(
+    2 * EARTH_SURFACE_GRAVITY * (SHIP_LANDING_BOUNCE_HEIGHT_M / 1000 / DIST_SCALE)
+);
+
+/**
+ * Fraction of a ship's incoming closing speed returned on a bounce, applied *before* the
+ * SHIP_LANDING_BOUNCE_SPEED cap. This is the energy loss that lets a ship settle instead of
+ * hopping forever: a hard landing rebounds at the cap (one hop), lands again and leaves at this
+ * fraction of that, so the arc shrinks geometrically and the ship is at rest after a bounce or two.
+ */
+export const SHIP_LANDING_BOUNCE_RESTITUTION = 0.25;
+
 // === Atmospheric drag & damage ===
 // A small/light body (satellite, ship, asteroid fragment) passing through a planet's
 // atmosphere is continuously slowed and, if moving fast enough, damaged; a large/massive one

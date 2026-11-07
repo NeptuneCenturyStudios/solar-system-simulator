@@ -8,6 +8,8 @@ import {
     COLLISION_MIN_DAMAGE_FRACTION,
     COLLISION_RESTITUTION,
     COLLISION_SEPARATION_FACTOR,
+    SHIP_LANDING_BOUNCE_RESTITUTION,
+    SHIP_LANDING_BOUNCE_SPEED,
 } from '../utilities/consts';
 
 /**
@@ -35,6 +37,15 @@ const _damageRelVel = new THREE.Vector3();
 
 function safeMass(body: Body): number {
     return Math.max(0, body?.mass || 0);
+}
+
+/**
+ * Whether either side of a contact is a ship. Ships are the one body class with their own impact
+ * rules: they do not ricochet (see {@link contactRestitution}) and they are exempt from the
+ * minimum-damage floor (see {@link computeCollisionDamage}).
+ */
+function involvesShip(b1: Body, b2: Body): boolean {
+    return b1 instanceof Spaceship || b2 instanceof Spaceship;
 }
 
 function collisionScoreEscapeVelocity(body: Body) {
@@ -83,8 +94,18 @@ function claimVictim(winner: Body, victim: Body): CollisionOutcome {
  *
  * Both bodies take the same damage: the kinetic energy of their relative motion in the
  * centre-of-mass frame, ½·μ·v_rel² with μ = m₁m₂ / (m₁ + m₂), scaled by
- * COLLISION_DAMAGE_PER_ENERGY. The damage never drops below COLLISION_MIN_DAMAGE_FRACTION of
- * the lighter body's max HP, so even a gentle contact wears the lighter body down.
+ * COLLISION_DAMAGE_PER_ENERGY.
+ *
+ * For every body except a ship that damage never drops below COLLISION_MIN_DAMAGE_FRACTION of the
+ * lighter body's max HP, so even a gentle contact wears the lighter body down and nothing can
+ * survive indefinitely against something heavier.
+ *
+ * A ship is exempt from that floor, and the exemption is what makes landing possible. A landed
+ * ship keeps touching the ground every frame, so the floor would drain a quarter of its HP per
+ * frame and kill it in about four frames while it just sits there. Without the floor the damage is
+ * exactly the impact energy: the touchdown frame hurts (the relative speed is real), and every
+ * frame after it costs nothing because the contact has already cancelled the closing speed. See
+ * {@link contactRestitution}.
  */
 export function computeCollisionDamage(b1: Body, b2: Body): number {
     const m1 = safeMass(b1);
@@ -92,12 +113,14 @@ export function computeCollisionDamage(b1: Body, b2: Body): number {
     const totalMass = m1 + m2;
     const reducedMass = totalMass > 0 ? (m1 * m2) / totalMass : 0;
     const relSpeedSq = _damageRelVel.subVectors(b1.velocity, b2.velocity).lengthSq();
-    const energy = 0.5 * reducedMass * relSpeedSq;
+    const damage = 0.5 * reducedMass * relSpeedSq * COLLISION_DAMAGE_PER_ENERGY;
+
+    if (involvesShip(b1, b2)) return damage;
 
     const lighter = m1 <= m2 ? b1 : b2;
     const minDamage = COLLISION_MIN_DAMAGE_FRACTION * Math.max(0, lighter.maxHealthPoints);
 
-    return Math.max(energy * COLLISION_DAMAGE_PER_ENERGY, minDamage);
+    return Math.max(damage, minDamage);
 }
 
 /**
@@ -140,8 +163,40 @@ function pushApart(b1: Body, b2: Body, normal: THREE.Vector3, distance: number):
 }
 
 /**
+ * Restitution (the fraction of the closing speed handed back) for one contact.
+ *
+ * Ordinary bodies use COLLISION_RESTITUTION — they genuinely bounce off each other. A ship does
+ * not: it lands. Its contact returns the smaller of
+ *
+ *   SHIP_LANDING_BOUNCE_RESTITUTION × closing speed   (the settle term — energy lost per bounce)
+ *   SHIP_LANDING_BOUNCE_SPEED                         (the cap — a fixed, tiny hop)
+ *
+ * Because the cap is a speed rather than a fraction of the impact, a fall from orbit and a gentle
+ * touchdown both rebound at the same few metres per second, and gravity turns that speed into a
+ * height: ~1.5 m on Earth, ~9 m on the Moon, ~0.6 m on Jupiter. The settle term is what makes the
+ * hop shrink instead of repeating forever — the second bounce leaves at a fraction of the cap, the
+ * third at a fraction of that, and the ship is resting on the ground after a bounce or two.
+ *
+ * @param normalSpeed Closing speed along the normal, (v₁ − v₂)·n — negative while approaching.
+ */
+function contactRestitution(b1: Body, b2: Body, normalSpeed: number): number {
+    if (!involvesShip(b1, b2)) return COLLISION_RESTITUTION;
+
+    const closingSpeed = Math.abs(normalSpeed);
+    if (!(closingSpeed > 0)) return 0;
+
+    const reboundSpeed = Math.min(
+        closingSpeed * SHIP_LANDING_BOUNCE_RESTITUTION,
+        SHIP_LANDING_BOUNCE_SPEED
+    );
+
+    return reboundSpeed / closingSpeed;
+}
+
+/**
  * Bounce two surviving bodies off each other: a momentum-conserving impulse along the contact
- * normal with COLLISION_RESTITUTION, then separation so they don't re-contact next frame.
+ * normal with the contact's restitution (see {@link contactRestitution}), then separation so they
+ * don't re-contact next frame.
  * @param normalSpeed Closing speed along the normal, (v₁ − v₂)·n — negative while approaching.
  */
 function bounceApart(
@@ -156,7 +211,8 @@ function bounceApart(
 
     if (m1 > 0 && m2 > 0) {
         const reducedMass = (m1 * m2) / (m1 + m2);
-        const impulse = -(1 + COLLISION_RESTITUTION) * normalSpeed * reducedMass;
+        const restitution = contactRestitution(b1, b2, normalSpeed);
+        const impulse = -(1 + restitution) * normalSpeed * reducedMass;
         b1.velocity.addScaledVector(normal, impulse / m1);
         b2.velocity.addScaledVector(normal, -impulse / m2);
     }
@@ -204,9 +260,13 @@ export function resolveCollision(b1: Body, b2: Body): CollisionOutcome {
     }
 
     const damage = computeCollisionDamage(b1, b2);
-    b1.takeDamage(damage);
-    b2.takeDamage(damage);
-    console.info('[body:collision]', `${b1.name} ↔ ${b2.name}: ${damage.toFixed(2)} HP each`);
+    // A resting ship contacts its landing site every frame at ~zero closing speed, which is worth
+    // no damage at all — skip the whole block so it neither takes nor logs a hit.
+    if (damage > 0) {
+        b1.takeDamage(damage);
+        b2.takeDamage(damage);
+        console.info('[body:collision]', `${b1.name} ↔ ${b2.name}: ${damage.toFixed(2)} HP each`);
+    }
 
     const alive1 = b1.healthPoints > 0;
     const alive2 = b2.healthPoints > 0;
