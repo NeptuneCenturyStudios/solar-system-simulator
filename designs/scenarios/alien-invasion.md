@@ -1,0 +1,21 @@
+**Alien Invasion scenario**
+This scenario will feature a massive fleet battle between human and alien ships and motherships.
+
+**How the scenario will play**
+- Player will start near mars.
+- Player will receive a distress call (text and voice message. Voice audio will be provided.)
+- A wormhole will spawn. This worm hole will NOT be connected or linked to another one, so will be the danger red color.
+- Player will have x amount of time to warp to the wormhole to help the fleet investigate (timer will be based on sim time). After so long, whether player is in range or not, another distress call will be played informing the player that there is an alien attack (audio will be provided). At this time, the team stat bar will show permenantly on screen showing who's winning (number of ships destroyed on each side)
+- If all player's team (including player) is destroyed, then the scenario fails. If all enemy ships are destroyed, scenario wins. (if player's ship is destroyed, offer to restart scenario OR if the battle is still going on (this is not a failure yet), then also offer choice to spectate. If player's team still wins, the scenario is successful)
+- How the battle will work
+    - There will be one capital ship per team and twenty fighters per team (player included). Player is on Team Earth.
+    - Motherships will focus fire on other motherships first. Team Earth mothership will focus on smaller fighters if the Team Alien mothership is destroyed. Team Alien mothership will focus on destroying Earth once the Team Earth mothership is destroyed.
+    - Small fighters will focus on fighters of the other team first before targetting motherships of the other team.
+    - Focus will not always be on the player or else the player would get overwhelmed (unless there are no other targets for the fighters to shoot at).
+
+**Things that need to be implemented before this can work (these must be implemented and user tested before working on the scenario)**
+- New alien mothership andd fighter ships need to be added.
+- Ship velocity reference frame. In High mode and when within a body's sphere of influence, the ship's guidance systems will automatically adjust it's base velocity to the velocity of the reference body. The ship's thrusters will then apply a +/- speed to that velocity based on the speed of the low mode normal and boost speeds. Thrust will not activate if the total speed of the ship is beyond the max of high mode/high mode boost. An example is this: If a ship is within the sphere of influence of Earth, and Earth's velocity is 30km per second, flying a ship manually at that speed for a space battle is nearly impossible as ships will be whizzing past each other at the slightest of thrust. So, instead, the ship's new guidance system will automatically adjust the ship's base velocity to that of Earth's so the ship will continuously probe Earth's velocity so it can adjust. The pilot, when thrusting, will then only apply the low mode normal and boost speeds/accel to the base speed up to the high mode's max boost/normal. So base velocity of 30km/s +/- up to 500m/s (normal) and +/- 2.5km/s (boost mode) (based on current tuning consts of the Zenith/Dart) This in theory should make it feel like the pilot is only traveling at normal flight speed for the dogfight, while the ship's guidance system keeps the relative velocity of the Earth or other body near 0. This will be an inflight toggle keyboard shortcut. But in certain scenarios, like the alien invasion one, it will be enabled by default and not able to be disabled. Update the cockpit view dashboard to show that the mode is on. (might need to adjust the model a bit if needed.)
+- AI ships and player ships will need a team tag so that other ships know not to target members of their own team. (friendly fire may still happen though)
+- All ships should have a ship type enum that will define what time they are, like fighter or mothership. This is so that motherships know which other team's motherships to target and fire at.
+- AI ships may need some updates to better work as a team when there are other ships in the sim with the same team tag.
