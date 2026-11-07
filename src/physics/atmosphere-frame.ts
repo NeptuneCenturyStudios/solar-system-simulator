@@ -14,6 +14,10 @@ const _spinAxisWorld = new THREE.Vector3();
 const _radius = new THREE.Vector3();
 /** Scratch: the local spin velocity ω × r. */
 const _spinVelocity = new THREE.Vector3();
+/** Scratch: tidal-lock target → body offset. */
+const _toBody = new THREE.Vector3();
+/** Scratch: body velocity relative to its tidal-lock target. */
+const _relVel = new THREE.Vector3();
 
 /**
  * Writes the velocity of `planet`'s co-rotating atmosphere at `point` into `out`.
@@ -30,9 +34,17 @@ const _spinVelocity = new THREE.Vector3();
  * under it.
  *
  * The spin term is skipped for a body whose `rotationSpeed` is zero or non-finite (a
- * non-rotating world), leaving pure translation. Tidal-locked bodies, whose orientation is
- * servoed rather than spun, likewise fall back to translation — capturing their true orbital
- * rotation is left for a later pass.
+ * non-rotating world), leaving pure translation.
+ *
+ * Tidal-locked bodies are servoed to face their target rather than spun, and their
+ * `rotationSpeed` is only an arbitrary construction-time seed (see
+ * `CelestialBody.getRotationPeriod`) — using it would make the surface frame sweep orders of
+ * magnitude too fast. Their spin is instead the live rate at which the direction to the target
+ * turns about `tidalLockSpinAxis` (the axis the servo rotates about):
+ *
+ *     ω = axis · ((r × v_rel) · axis) / |r_⊥|²,   r = body − target,   v_rel = v_body − v_target
+ *
+ * where r_⊥ is r projected onto the plane normal to the axis.
  *
  * @param planet The atmosphere-bearing body. Must have a valid `mesh`.
  * @param point  World-space sample point (the small body's position).
@@ -45,6 +57,30 @@ export function computeAtmosphereFrameVelocity(
     out: THREE.Vector3
 ): THREE.Vector3 {
     out.copy(planet.velocity);
+
+    const target = planet.tidalLockTarget;
+    if (
+        planet.tidalLockEnabled &&
+        planet._tidalLockConfigured &&
+        target &&
+        !target._isDisposed &&
+        target.mesh &&
+        planet.mesh
+    ) {
+        _spinAxisWorld.copy(planet.tidalLockSpinAxis).normalize();
+        _toBody.subVectors(planet.mesh.position, target.mesh.position);
+        _relVel.subVectors(planet.velocity, target.velocity);
+        const axial = _toBody.dot(_spinAxisWorld);
+        const planarSq = _toBody.lengthSq() - axial * axial;
+        if (!(planarSq > 1e-24)) return out;
+        const lockRate =
+            _spinVelocity.crossVectors(_toBody, _relVel).dot(_spinAxisWorld) / planarSq;
+        if (!Number.isFinite(lockRate) || lockRate === 0) return out;
+
+        _radius.subVectors(point, planet.mesh.position);
+        out.add(_spinVelocity.crossVectors(_spinAxisWorld, _radius).multiplyScalar(lockRate));
+        return out;
+    }
 
     const spinRate = planet.rotationSpeed;
     if (!Number.isFinite(spinRate) || spinRate === 0 || !planet.mesh) return out;
