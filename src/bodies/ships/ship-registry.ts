@@ -4,6 +4,8 @@ import { Zenith } from './zenith';
 import { Dart } from './dart';
 import { OsirisMothership } from './osirus-mothership';
 import { HarbingerMothership } from './harbinger-mothership';
+import { Wraith } from './wraith';
+import { Stinger } from './stinger';
 
 /**
  * Describes a selectable ship type for the Flight Controls ship dropdown.
@@ -53,6 +55,18 @@ export const SHIP_TYPES: IShipType[] = [
         label: 'Harbinger Mothership',
         create: (dependencies, scene, position, velocity, id) =>
             new HarbingerMothership(dependencies, scene, position, velocity, id),
+    },
+    {
+        id: 'wraith',
+        label: 'Wraith',
+        create: (dependencies, scene, position, velocity, id) =>
+            new Wraith(dependencies, scene, position, velocity, id),
+    },
+    {
+        id: 'stinger',
+        label: 'Stinger',
+        create: (dependencies, scene, position, velocity, id) =>
+            new Stinger(dependencies, scene, position, velocity, id),
     },
 ];
 

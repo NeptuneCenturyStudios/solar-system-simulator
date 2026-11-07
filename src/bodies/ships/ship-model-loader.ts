@@ -161,3 +161,26 @@ export function modelPointToShipLocal(
     model.updateMatrix();
     return out.copy(modelPoint).applyMatrix4(model.matrix);
 }
+
+/**
+ * Makes a loaded model's base-colour texture double as its emissive map, so bright painted
+ * details (e.g. the alien fighters' green hull panels) glow on the night side instead of going
+ * black. Dark hull areas stay near-black because the emission is the texture's own colour.
+ * Call after the load resolves; materials are cloned per ship by the loader, so this doesn't
+ * leak to other ships of the same type.
+ */
+export function applyBaseColorGlow(container: THREE.Object3D, intensity: number): void {
+    container.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const material of materials) {
+            if (material instanceof THREE.MeshStandardMaterial && material.map) {
+                material.emissiveMap = material.map;
+                material.emissive.setRGB(1, 1, 1);
+                material.emissiveIntensity = intensity;
+                material.needsUpdate = true;
+            }
+        }
+    });
+}
