@@ -63,6 +63,10 @@ export const HELP_SECTIONS: HelpSection[] = [
         note: 'Enter a ship from the Flight Controls panel, then these take over.',
         rows: [
             { action: 'Thrust / brake', keys: ['W', 'S'] },
+            {
+                action: 'Launch from the ground (all other controls are locked while landed)',
+                keys: ['Hold W'],
+            },
             { action: 'Roll left / right', keys: ['A', 'D'] },
             { action: 'Boost', keys: ['Shift'] },
             { action: 'Toggle speed mode (low / high)', keys: ['R'] },

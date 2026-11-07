@@ -13,7 +13,10 @@ export interface ICockpitTelemetry {
     reversing: boolean;
     /** Top speed of the tier the ship is flying in, for the speed gauge. */
     speedGaugeMax: number;
-    /** Flight regime label: CRUISE, BOOST, WARP, WARP CHG. Comes from the drive, not the speed. */
+    /**
+     * Flight regime label: CRUISE, BOOST, WARP, WARP CHG, GROUNDED, LAUNCH CHG, LIFT-OFF. Comes
+     * from the drive, not the speed.
+     */
     regime: string;
     /** LOW or HIGH speed tier. */
     speedTier: 'LOW' | 'HIGH';
@@ -23,6 +26,8 @@ export interface ICockpitTelemetry {
     guidanceBodyName: string | null;
     /** 0..1 while the warp drive is charging, otherwise 0. */
     warpCharge: number;
+    /** 0..1 while a grounded ship is charging its lift-off, otherwise 0. */
+    launchCharge: number;
 
     shieldFraction: number;
     hullFraction: number;
@@ -299,6 +304,8 @@ function paintSpeedScreen(
 
     if (t.warpCharge > 0) {
         bar(ctx, w * 0.2, h * 0.82, w * 0.6, h * 0.05, t.warpCharge, '#a070ff');
+    } else if (t.launchCharge > 0) {
+        bar(ctx, w * 0.2, h * 0.82, w * 0.6, h * 0.05, t.launchCharge, '#ffb040');
     }
 }
 

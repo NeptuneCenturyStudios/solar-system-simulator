@@ -14,6 +14,7 @@ import { NotificationType } from '../event-log/event-log';
 import { EffectiveGForce } from '../types';
 import { IFlightState, ISimulationState, IAutopilotState } from '../interfaces';
 import { flightState } from '../simulation/simulation';
+import { applyLaunchLiftSubsteps } from '../simulation/ship-launch';
 import { NBodyIntegrator, ISubstepHooks } from './nbody/integrator';
 import { getActiveSolver } from './nbody/solver-registry';
 
@@ -116,6 +117,9 @@ export function updateSimulation(
     // Thrust is applied per substep (rather than once per frame) so it stays correctly
     // interleaved with gravity at any time-warp factor — the same reason the old loop did it.
     _hooks.applyThrust = (substepDt: number) => {
+        // Ships lifting off the ground climb on their own (their engines are locked meanwhile).
+        applyLaunchLiftSubsteps(substepDt);
+
         flightState.activeShip?.applyFlightThrustSubstep?.(substepDt);
 
         for (const npc of simulationState.npcShips) {

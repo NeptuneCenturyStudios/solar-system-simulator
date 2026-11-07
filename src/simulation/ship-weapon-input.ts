@@ -20,7 +20,8 @@ export function applyWeaponInput(ship: Spaceship, simDt: number): void {
     const input = ship.controlInput;
     // aimDir is only meaningful while the trigger is held, and a ship that has never aimed still
     // carries a zero vector — firing on that would shoot along an undefined bearing.
-    if (input.fire && input.aimDir.lengthSq() > 0) {
+    // Weapons are locked out on the ground and during lift-off, along with every other control.
+    if (input.fire && input.aimDir.lengthSq() > 0 && !ship.controlsLocked) {
         ship.fireWeaponGroup(simDt, input.aimDir, input.aimDistance, input.target);
     } else {
         ship.stopFire();

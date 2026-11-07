@@ -14,6 +14,7 @@ import {
 } from './simulation';
 import { IFlightControlContext } from '../interfaces';
 import { applyWeaponInput } from './ship-weapon-input';
+import { cancelLaunchCharge, launchChargeFill, updateLaunchCharge } from './ship-launch';
 import { steeringDt } from './steering-clock';
 import { IBodyRayHit, muzzleWorldPosition, raycastBodies } from '../ship-effects/weapons/weapon';
 import { leadAimDirection } from '../ship-effects/weapons/intercept';
@@ -194,6 +195,7 @@ export function exitFlightMode(ctx: IFlightControlContext) {
         ship.boostDecelerating = false;
         ship.warpDecelerating = false;
         ship.cancelWarpCharge();
+        cancelLaunchCharge(ship);
     }
 
     flightState.isActive = false;
@@ -438,6 +440,32 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // Cruise control is an AI-pilot input; the player flies on the tier caps alone.
     playerInput.speedSetpoint = null;
     playerInput.warpSpeedCap = null;
+
+    // ── Grounded: every control locked; W charges a launch instead of thrusting ──
+    // The ship also refuses thrust, warp and weapons on its own while locked (see
+    // Spaceship.controlsLocked); zeroing the input here keeps the HUD and the engine trail honest.
+    if (ship.controlsLocked) {
+        playerInput.thrust = false;
+        playerInput.boost = false;
+        playerInput.brake = false;
+        playerInput.rollLeft = false;
+        playerInput.rollRight = false;
+        playerInput.steerX = 0;
+        playerInput.steerY = 0;
+        playerInput.fire = false;
+        if (ship.warpCharging) ship.cancelWarpCharge();
+
+        const manualLaunch = !autopilotState.isActive;
+        if (updateLaunchCharge(ship, manualLaunch && keys.w, dt)) {
+            ctx.addEvent({
+                message: '🚀 Lift-off! Flight controls return once clear of the ground.',
+                notificationType: NotificationType.Success,
+            });
+        }
+        if (ship.launchPhase === 'charging') {
+            ctx.flightHUD.setLaunchCharge(launchChargeFill(ship));
+        }
+    }
 
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
 
@@ -730,7 +758,13 @@ export function updateFlightControls(ctx: IFlightControlContext, dt: number, sim
     // When the ship exits warp (e.g. autopilot transitions WARP → APPROACH)
     // without going through warpDecelerating, the warp sprite stays visible.
     // Hide it whenever no warp state is active.
-    if (!ship.warpActive && !ship.warpDecelerating && !ship.warpCharging) {
+    // The launch charge shares the sprite, so leave it up while that is charging.
+    if (
+        !ship.warpActive &&
+        !ship.warpDecelerating &&
+        !ship.warpCharging &&
+        ship.launchPhase !== 'charging'
+    ) {
         ctx.flightHUD.hideWarpSprite();
     }
 

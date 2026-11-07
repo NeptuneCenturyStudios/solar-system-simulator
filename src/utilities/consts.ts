@@ -1004,6 +1004,40 @@ export const SHIP_GROUND_STICK_SPEED = 2 / 1000 / DIST_SCALE; // 2 m/s
  */
 export const SHIP_CONTACT_SEPARATION_FACTOR = 1.0;
 
+/**
+ * How quickly a grounded ship tips flat onto its belly (or back), as a multiple of its natural
+ * tipping time √(L / g) — L its half-length, g the local surface gravity. The remaining tilt decays
+ * as e^(−t/τ) with τ = this × √(L / g), so a fighter on Earth settles in about a second, while on
+ * a small moon or asteroid it rocks over slowly. Runs on sim time.
+ */
+export const SHIP_GROUND_SETTLE_TIME_FACTOR = 1.0;
+
+/** Bounds (sim seconds) on the settle time constant above, for extreme or degenerate gravity. */
+export const SHIP_GROUND_SETTLE_TIME_MIN = 0.1;
+export const SHIP_GROUND_SETTLE_TIME_MAX = 20;
+
+/**
+ * Hull clearance, as a fraction of the ship's radius, within which a ship that touched the ground
+ * on an earlier frame still counts as grounded on a frame with no contact. Resting contact sinks
+ * in by only one frame of gravity, which at very low time scales can round away to nothing.
+ */
+export const SHIP_GROUNDED_CLEARANCE_FRACTION = 0.02;
+
+/**
+ * Seconds W must be held on a grounded ship to charge its lift-off (see simulation/ship-launch.ts).
+ * Wall-clock, like the warp charge. Releasing early cancels the charge.
+ */
+export const SHIP_LAUNCH_CHARGE_TIME = 1.5;
+
+/**
+ * Height (km, scaled by DIST_SCALE) a launching ship rises above the ground before flight controls
+ * are handed back. Raised for large hulls so it always clears the grounded tolerance above.
+ */
+export const SHIP_LAUNCH_LIFT_HEIGHT = 6 / 1000 / DIST_SCALE; // 6 m
+
+/** Sim seconds a launching ship takes to rise SHIP_LAUNCH_LIFT_HEIGHT (a steady vertical climb). */
+export const SHIP_LAUNCH_LIFT_TIME = 1.5;
+
 // === Atmospheric drag & damage ===
 // A small/light body (satellite, ship, asteroid fragment) passing through a planet's
 // atmosphere is continuously slowed and, if moving fast enough, damaged; a large/massive one

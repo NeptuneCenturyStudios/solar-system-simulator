@@ -68,8 +68,39 @@ const SHIELD_BAR_COLOR = '#4fc3ff';
 // They used to be texture factories that built a fresh canvas and CanvasTexture on every
 // call — up to every frame for the warp bar and thermal gauge.
 
-/** Renders the charging progress bar (fill = 0..1) with label above. */
-function paintWarpCharge(ctx: CanvasRenderingContext2D, fill: number): void {
+/** Look of a charge bar: its label and colours. One per thing that charges (warp, launch). */
+export interface IChargeBarStyle {
+    /** Text above the bar; also part of the sprite's redraw key. */
+    label: string;
+    /** Label text colour. */
+    labelColor: string;
+    /** Glow behind the label and the fill. */
+    glowColor: string;
+    /** Fill gradient from the empty end to just before the (white) tip. */
+    fillStart: string;
+    fillEnd: string;
+}
+
+/** The warp drive charging (hold Space). */
+export const WARP_CHARGE_STYLE: IChargeBarStyle = {
+    label: 'INITIATING WARP',
+    labelColor: '#00ffcc',
+    glowColor: 'rgba(0,255,204,0.9)',
+    fillStart: 'rgba(0,200,180,0.9)',
+    fillEnd: 'rgba(0,255,220,1.0)',
+};
+
+/** A grounded ship charging its lift-off (hold W). */
+export const LAUNCH_CHARGE_STYLE: IChargeBarStyle = {
+    label: 'LAUNCH CHARGE',
+    labelColor: '#ffb040',
+    glowColor: 'rgba(255,170,60,0.9)',
+    fillStart: 'rgba(220,130,30,0.9)',
+    fillEnd: 'rgba(255,190,80,1.0)',
+};
+
+/** Renders a charging progress bar (fill = 0..1) with its label above. */
+function paintChargeBar(ctx: CanvasRenderingContext2D, fill: number, style: IChargeBarStyle): void {
     const W = WARP_CHARGE_W,
         H = WARP_CHARGE_H;
     ctx.clearRect(0, 0, W, H);
@@ -79,9 +110,9 @@ function paintWarpCharge(ctx: CanvasRenderingContext2D, fill: number): void {
     ctx.textBaseline = 'middle';
     ctx.font = 'bold 36px monospace';
     ctx.shadowBlur = 10;
-    ctx.fillStyle = '#00ffcc';
-    ctx.shadowColor = 'rgba(0,255,204,0.9)';
-    ctx.fillText('INITIATING WARP', W / 2, 34);
+    ctx.fillStyle = style.labelColor;
+    ctx.shadowColor = style.glowColor;
+    ctx.fillText(style.label, W / 2, 34);
 
     // Bar track
     const barX = 40,
@@ -90,16 +121,16 @@ function paintWarpCharge(ctx: CanvasRenderingContext2D, fill: number): void {
         barH = 28;
     drawGaugeTrack(ctx, barX, barY, barW, barH);
 
-    // Bar fill — gradient cyan→white at tip
+    // Bar fill — gradient to white at the tip
     if (fill > 0) {
         const fillW = barW * fill;
         const grad = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
-        grad.addColorStop(0, 'rgba(0,200,180,0.9)');
-        grad.addColorStop(0.8, 'rgba(0,255,220,1.0)');
+        grad.addColorStop(0, style.fillStart);
+        grad.addColorStop(0.8, style.fillEnd);
         grad.addColorStop(1, 'rgba(255,255,255,1.0)');
         ctx.fillStyle = grad;
         ctx.shadowBlur = 8;
-        ctx.shadowColor = 'rgba(0,255,204,0.9)';
+        ctx.shadowColor = style.glowColor;
         ctx.fillRect(barX, barY, fillW, barH);
         ctx.shadowBlur = 0;
     }
@@ -484,7 +515,7 @@ export class FlightHUD {
 
     private _initWarp(): void {
         this.warpSprite = new HudSprite(this.uiScene);
-        this.setWarpChargeContent(0);
+        this.setChargeBarContent(WARP_CHARGE_STYLE, 0);
         // Bottom-center of the screen
         this.warpSprite.setAnchor({ corner: 'bottom-center', offsetX: 0, offsetY: 50 });
     }
@@ -569,8 +600,21 @@ export class FlightHUD {
 
     /** Update warp sprite to show charge-bar state; makes it visible. */
     setWarpCharge(fill: number): void {
+        this.setChargeBar(WARP_CHARGE_STYLE, fill);
+    }
+
+    /** Show the grounded ship's launch charge in the charge-bar slot; makes it visible. */
+    setLaunchCharge(fill: number): void {
+        this.setChargeBar(LAUNCH_CHARGE_STYLE, fill);
+    }
+
+    /**
+     * Show a charge bar (fill = 0..1) in the bottom-centre slot the warp bar uses. Warp and
+     * launch can never charge together (warp is locked out on the ground), so they share it.
+     */
+    setChargeBar(style: IChargeBarStyle, fill: number): void {
         if (!this.warpSprite || this.cockpitDisplaysActive) return;
-        this.setWarpChargeContent(fill);
+        this.setChargeBarContent(style, fill);
         this.warpSprite.visible = true;
     }
 
@@ -589,11 +633,13 @@ export class FlightHUD {
         if (this.warpSprite) this.warpSprite.visible = false;
     }
 
-    private setWarpChargeContent(fill: number): void {
+    private setChargeBarContent(style: IChargeBarStyle, fill: number): void {
         const sprite = this.warpSprite!;
         sprite.setCanvasSize(WARP_CHARGE_W, WARP_CHARGE_H);
         // Keyed at 3 decimals — the bar is ~432 px wide, so this is sub-pixel.
-        sprite.draw(`charge|${fill.toFixed(3)}`, (ctx) => paintWarpCharge(ctx, fill));
+        sprite.draw(`charge|${style.label}|${fill.toFixed(3)}`, (ctx) =>
+            paintChargeBar(ctx, fill, style)
+        );
         // 512×128 canvas at 0.625 ratio → 320×80 screen pixels
         sprite.setScale(320, 80);
     }

@@ -300,6 +300,44 @@ export class Spaceship extends Body {
      *  for an AI ship it is the ship's own authoritative heading. */
     controlFrameQuat: THREE.Quaternion = new THREE.Quaternion();
 
+    /**
+     * The non-ship body this ship's hull touched in the latest collision pass, or null. Written
+     * by the ship contact model (physics/collision.ts) and consumed — and cleared — once per
+     * frame by updateGroundAlignment (physics/ground-alignment.ts), which keeps a grounded ship
+     * turning with the ground and settles it flat.
+     */
+    groundContactBody: Body | null = null;
+
+    /**
+     * True while the ship is resting on (or within a hair of) the ground, as decided once per frame
+     * by updateGroundAlignment. While grounded every flight control is locked (see
+     * {@link controlsLocked}); the only way off the ground is a launch (simulation/ship-launch.ts).
+     */
+    isGrounded: boolean = false;
+
+    /** The body this ship is grounded on (set with isGrounded), or null. */
+    groundBody: Body | null = null;
+
+    /**
+     * Lift-off state, driven by simulation/ship-launch.ts:
+     * - 'idle': not launching.
+     * - 'charging': the pilot is holding the launch input; launchChargeTimer is filling.
+     * - 'lifting': charged — the ship is rising straight up off launchBody, controls still locked.
+     */
+    launchPhase: 'idle' | 'charging' | 'lifting' = 'idle';
+    /** Seconds of launch charge accumulated (0 → SHIP_LAUNCH_CHARGE_TIME) while charging. */
+    launchChargeTimer: number = 0;
+    /** The body a lifting ship is rising off, or null. */
+    launchBody: Body | null = null;
+
+    /**
+     * Whether every flight control — steering, roll, thrust, boost, brake, warp and weapons — is
+     * ignored: the ship is sitting on the ground or still lifting off it.
+     */
+    get controlsLocked(): boolean {
+        return this.isGrounded || this.launchPhase !== 'idle';
+    }
+
     /** Pluggable AI controller piloting this ship, or null when player-controlled. */
     ai: ShipAI | null = null;
 
@@ -928,6 +966,8 @@ export class Spaceship extends Body {
         // The classic autopilot handles its own thrust — stay out of its way. (The Ship AI
         // autopilot flies through controlInput, so its thrust comes through here like a pilot's.)
         if (this.classicAutopilotActive) return;
+        // Grounded or lifting off: the engines are locked out (see simulation/ship-launch.ts).
+        if (this.controlsLocked) return;
         // Warp/boost/stop deceleration is handled frame-level; do not add thrust during those.
         if (this.warpActive || this.warpDecelerating || this.boostDecelerating || this.stopBraking)
             return;
@@ -1326,11 +1366,13 @@ export class Spaceship extends Body {
     /**
      * Apply roll with inertia for one frame, driven by this ship's controlInput.
      * @param dt  Steering-clock seconds (sim time by default, see `steeringDt`).
+     * @param locked  Ignore roll input this frame (see {@link controlsLocked}).
      * @returns The angular delta (radians) to apply to the control frame quaternion.
      */
-    applyRoll(dt: number): number {
+    applyRoll(dt: number, locked: boolean = false): number {
         const h = this.handling;
-        const { rollLeft, rollRight } = this.controlInput;
+        const rollLeft = !locked && this.controlInput.rollLeft;
+        const rollRight = !locked && this.controlInput.rollRight;
         const rollTarget = rollLeft ? -h.flightRollSpeed : rollRight ? h.flightRollSpeed : 0;
 
         if (rollLeft || rollRight) {
@@ -1357,16 +1399,21 @@ export class Spaceship extends Body {
      * Reads the (already normalised and deadzoned) steerX/steerY from this ship's
      * controlInput, so the player and an AI get identical smoothing and banking.
      * @param dt  Steering-clock seconds (sim time by default, see `steeringDt`).
+     * @param locked  Ignore steering input this frame (see {@link controlsLocked}); the bank
+     *   still eases back to level.
      * @returns yawDelta, pitchDelta, and a banking quaternion for the ship mesh.
      */
-    applySteering(dt: number): {
+    applySteering(
+        dt: number,
+        locked: boolean = false
+    ): {
         yawDelta: number;
         pitchDelta: number;
         bankQuat: THREE.Quaternion;
     } {
         const h = this.handling;
-        const rawX = this.controlInput.steerX;
-        const rawY = this.controlInput.steerY;
+        const rawX = locked ? 0 : this.controlInput.steerX;
+        const rawY = locked ? 0 : this.controlInput.steerY;
         const steerAlpha = 1 - Math.exp(-h.flightSteerSmoothRate * dt);
 
         this.steerX += (rawX - this.steerX) * steerAlpha;
@@ -1404,8 +1451,17 @@ export class Spaceship extends Body {
     applyFrameOrientation(dt: number): void {
         if (this._isDisposed || !this.mesh) return;
 
+        // On the ground or lifting off: no turning. Drop any roll or steering already under way
+        // (so it can't coast on), while the visual bank below still eases back to level.
+        const attitudeLocked = this.controlsLocked;
+        if (attitudeLocked) {
+            this.rollVelocity = 0;
+            this.steerX = 0;
+            this.steerY = 0;
+        }
+
         // ── Roll with inertia ────────────────────────────────────────────────
-        const rollDelta = this.applyRoll(dt);
+        const rollDelta = this.applyRoll(dt, attitudeLocked);
         if (rollDelta !== 0) {
             const dqRoll = new THREE.Quaternion().setFromAxisAngle(
                 new THREE.Vector3(0, 0, 1),
@@ -1415,7 +1471,7 @@ export class Spaceship extends Body {
         }
 
         // ── Steering (yaw + pitch) with smoothing and visual banking ─────────
-        const { yawDelta, pitchDelta, bankQuat } = this.applySteering(dt);
+        const { yawDelta, pitchDelta, bankQuat } = this.applySteering(dt, attitudeLocked);
 
         if (yawDelta !== 0) {
             const yawQuat = new THREE.Quaternion().setFromAxisAngle(
@@ -1514,7 +1570,8 @@ export class Spaceship extends Body {
                 !this.warpActive &&
                 !this.warpCharging &&
                 !this.warpDecelerating &&
-                !this.stopBraking
+                !this.stopBraking &&
+                !this.controlsLocked
             ) {
                 this.startWarpCharge();
             }

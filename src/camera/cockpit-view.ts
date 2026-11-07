@@ -8,6 +8,7 @@ import type { IFlightState } from '../interfaces';
 import { CockpitDashboard, ICockpitTelemetry } from '../drawing/cockpit-dashboard';
 import { CockpitGlass } from './cockpit-glass';
 import { surfaceClearance } from '../physics/collision';
+import { launchChargeFill } from '../simulation/ship-launch';
 import { AU } from '../utilities/consts';
 
 /**
@@ -244,6 +245,12 @@ export class CockpitView {
             gaugeMax = h.flightWarpSpeed;
         } else if (ship.warpCharging) {
             regime = 'WARP CHG';
+        } else if (ship.launchPhase === 'charging') {
+            regime = 'LAUNCH CHG';
+        } else if (ship.launchPhase === 'lifting') {
+            regime = 'LIFT-OFF';
+        } else if (ship.isGrounded) {
+            regime = 'GROUNDED';
         } else {
             if (ship.controlInput.boost) regime = 'BOOST';
             if (ship.controlInput.boost || speed > h.flightMaxSpeed * 1.001) {
@@ -309,6 +316,7 @@ export class CockpitView {
                 ship.warpCharging && warpChargeTime > 0
                     ? Math.min(1, ship.warpChargeTimer / warpChargeTime)
                     : 0,
+            launchCharge: launchChargeFill(ship),
             shieldFraction: ship.maxShieldPoints > 0 ? ship.shieldPoints / ship.maxShieldPoints : 0,
             hullFraction: ship.maxHealthPoints > 0 ? ship.healthPoints / ship.maxHealthPoints : 0,
             weaponName: weapon ? weapon.displayName : null,

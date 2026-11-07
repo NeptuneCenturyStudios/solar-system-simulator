@@ -187,9 +187,14 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
                 message: 'Warp disengaged. Decelerating...',
                 notificationType: NotificationType.Info,
             });
-        } else if (ship && !ship.warpDecelerating && !autopilotState.isActive) {
+        } else if (
+            ship &&
+            !ship.warpDecelerating &&
+            !autopilotState.isActive &&
+            !ship.controlsLocked
+        ) {
             // Only start charging when not already decelerating from a previous warp,
-            // and not under autopilot control.
+            // not under autopilot control, and not sitting on (or lifting off) the ground.
             ship.startWarpCharge();
         }
     };

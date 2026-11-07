@@ -211,7 +211,11 @@ function bounceApart(
  * atmosphere uses, so ground and air agree on what "standing still" means. Anything else (a ship)
  * is treated as a point moving with its centre.
  */
-function surfaceVelocityAt(body: Body, point: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+export function surfaceVelocityAt(
+    body: Body,
+    point: THREE.Vector3,
+    out: THREE.Vector3
+): THREE.Vector3 {
     if (body instanceof CelestialBody) return computeAtmosphereFrameVelocity(body, point, out);
     return out.copy(body.velocity);
 }
@@ -293,6 +297,11 @@ function resolveShipContact(b1: Body, b2: Body, dt: number): CollisionOutcome {
 
     // Spheres overlap but the hull hasn't reached the surface yet — not touching.
     if (distance >= contactDistance) return { type: 'none' };
+
+    // Touching: tell the ship what it is standing on, for orientation (see ground-alignment.ts).
+    // Ship-on-ship contact is not ground.
+    if (b1 instanceof Spaceship && !(b2 instanceof Spaceship)) b1.groundContactBody = b2;
+    else if (b2 instanceof Spaceship && !(b1 instanceof Spaceship)) b2.groundContactBody = b1;
 
     // Contact point on the line of centres, split in proportion to the reaches.
     const split = contactDistance > 0 ? reach2 / contactDistance : 0.5;

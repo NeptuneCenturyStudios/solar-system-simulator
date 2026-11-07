@@ -37,6 +37,7 @@ import { BodyTypeEnum } from '../bodies/body-enums';
 import { settingsStore } from '../settings/settings-store';
 import { absorbBody, destroyBody, updateSimulation } from '../physics/physics';
 import { resolveCollision } from '../physics/collision';
+import { updateGroundAlignment } from '../physics/ground-alignment';
 import { computeAtmosphericDensity } from '../physics/atmosphere-density';
 import { resolveAtmosphericPassage } from '../physics/atmospheric-drag';
 import { computeAtmosphereFrameVelocity } from '../physics/atmosphere-frame';
@@ -812,6 +813,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     }
                 }
             }
+
+            // Grounded ships turn with the ground and settle flat onto it. After the collision
+            // pass, which records what each ship is touching this frame.
+            updateGroundAlignment(ctx.simulationState.bodies, dtTotal);
 
             processWormholeInteractions(ctx.simulationState.bodies, _wormholePrevPositions);
 
