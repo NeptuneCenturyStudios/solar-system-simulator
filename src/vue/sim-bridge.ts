@@ -26,6 +26,7 @@ import {
     clampRenderDistanceAU,
     CloudQuality,
     PhysicsSolverMode,
+    ShadowQuality,
     SettingKey,
     settingsStore,
     TextureQuality,
@@ -387,6 +388,8 @@ export interface VueSimStore {
     auroraDetail: AuroraDetailMode;
     /** How cloud layers are drawn (flat or volumetric). */
     cloudQuality: CloudQuality;
+    /** How shadows are drawn. */
+    shadowQuality: ShadowQuality;
     /** Physics substeps per frame. */
     substeps: number;
     /** Gravity solver used by the n-body engine. */
@@ -473,6 +476,7 @@ const state = reactive<VueSimStore>({
     auroraEnabled: settingsStore.settings.auroraEnabled,
     auroraDetail: settingsStore.settings.auroraDetail,
     cloudQuality: settingsStore.settings.cloudQuality,
+    shadowQuality: settingsStore.settings.shadowQuality,
     substeps: settingsStore.settings.substeps,
     physicsSolver: settingsStore.settings.physicsSolver,
     barnesHutTheta: settingsStore.settings.barnesHutTheta,
@@ -1214,6 +1218,15 @@ export function setAuroraDetail(mode: AuroraDetailMode): void {
 export function setCloudQuality(quality: CloudQuality): void {
     settingsStore.update(SettingKey.CloudQuality, quality);
     state.cloudQuality = quality;
+}
+
+/**
+ * Select how shadows are drawn. Takes effect on the next frame: the shadow system reads the setting
+ * every tick and recompiles the lit materials when it changes.
+ */
+export function setShadowQuality(quality: ShadowQuality): void {
+    settingsStore.update(SettingKey.ShadowQuality, quality);
+    state.shadowQuality = quality;
 }
 
 /** Toggle the ship-AI obstacle avoidance debug overlay. */

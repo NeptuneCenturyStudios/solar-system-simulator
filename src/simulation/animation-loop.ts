@@ -75,6 +75,7 @@ import { stepShipAiAutopilot } from './autopilot';
 import { scenarioManager } from '../scenarios/scenario-manager';
 import type { Spaceship } from '../bodies/ships/spaceship';
 import { updateHillSpheres } from '../physics/sphere-of-influence';
+import { updateShadows } from '../effects/shadows/shadow-system';
 
 /** Scratch for the warp-sound speed lookup. */
 const _warpSoundVel = new THREE.Vector3();
@@ -1478,6 +1479,14 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // ── Render ──────────────────────────────────────────────────────────
         // A daytime sky around the camera hides the starfield behind it.
         _skyBackground.update(ctx.scene, ctx.camera.position, ctx.simulationState.bodies, wallDt);
+        // Eclipse occluders and the ship shadow atlas, from the camera's final pose this frame.
+        updateShadows(
+            ctx.renderer,
+            ctx.scene,
+            ctx.camera,
+            ctx.simulationState.bodies,
+            ctx.flightState.activeShip
+        );
         ctx.lensingEffect.beginCapture(ctx.renderer);
         try {
             ctx.renderer.render(ctx.scene, ctx.camera);

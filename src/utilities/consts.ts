@@ -633,6 +633,31 @@ export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
  */
 export const MAX_LIGHTING_STARS = 4;
 
+// === Shadows (see src/effects/shadows/) ===
+/** Most bodies cast eclipse shadows at once: the ones nearest the camera. */
+export const MAX_SHADOW_OCCLUDERS = 8;
+/** Most stars whose disc size the eclipse shader knows (any further ones cast hard-edged shadows). */
+export const MAX_SHADOW_STARS = 8;
+/** Most ships rendered into the ship shadow atlas at once (High); Low uses 1. */
+export const MAX_SHIP_SHADOW_CASTERS = 4;
+/** Ship shadow atlas edge in texels, per shadow quality. */
+export const SHIP_SHADOW_ATLAS_SIZE_LOW = 1024;
+export const SHIP_SHADOW_ATLAS_SIZE_HIGH = 2048;
+/** Ships farther than this from the camera (surface to camera) cast no shadow-map shadow. */
+export const SHIP_SHADOW_CASTER_RANGE = 5 / DIST_SCALE; // 5 km
+/**
+ * How far behind a ship (along the light) its shadow is drawn. A ship farther than this above the
+ * ground casts no shadow onto it — at that height the shadow is a faint smudge anyway.
+ */
+export const SHIP_SHADOW_THROW = 5 / DIST_SCALE; // 5 km
+/**
+ * Half-width of a ship's shadow tile as a fraction of its radius. The model's longest dimension
+ * equals the radius, so the hull reaches 0.5; the rest is margin for the penumbra kernel.
+ */
+export const SHIP_SHADOW_TILE_HALF_WIDTH = 0.6;
+/** Render layer the ship hulls are put on so the shadow pass draws only them. */
+export const SHADOW_CASTER_LAYER = 5;
+
 // === Sky / atmosphere lighting ===
 // A sky is lit by the exact irradiance each star's point light delivers to the body (its
 // intensity, STAR_LIGHT_DECAY and light distance), the same light the surface receives, with no

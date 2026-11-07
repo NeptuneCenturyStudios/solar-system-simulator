@@ -201,6 +201,11 @@ export class Spaceship extends Body {
      */
     private hullBounds: THREE.Box3 | null = null;
 
+    /** Whether the ship's model has loaded (and so has a hull to cast shadows and touch ground). */
+    get hasHullModel(): boolean {
+        return this.hullBounds !== null;
+    }
+
     /**
      * Distance from the ship's centre to the outermost point of its hull along the world-space
      * unit direction `dir` — the support distance of the hull's oriented bounding box. This is

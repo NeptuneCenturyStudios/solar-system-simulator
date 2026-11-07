@@ -3,6 +3,7 @@ import type { IRingSpec } from '../interfaces';
 import { SeededRandom } from '../utilities/prng';
 import { MAX_LIGHTING_STARS } from '../utilities/consts';
 import type { IStarLightingSet } from './star-illumination';
+import { STAR_OCCLUSION_GLSL } from './shadows/star-occlusion-glsl';
 
 export type PlanetRingsHandle = {
     dispose: () => void;
@@ -186,25 +187,7 @@ const RING_FRAGMENT_PARS = /* glsl */ `
     uniform float uPlanetRadius;
     varying vec3 vRingLocal;
 
-    // Fraction of a star's disc (angular radius a) hidden by the planet's disc (angular
-    // radius b) when their centres are an angle t apart, as seen from the fragment: the
-    // overlap area of two circles over the star's area. Covers the umbra (planet hides the
-    // whole star), the penumbra (partial overlap) and the antumbra (a planet smaller than
-    // the star in the sky, which can never hide all of it). Treats the sky patch as flat,
-    // which is accurate wherever the star's disc is small; the edge itself sits at the
-    // exact angular radius of the planet either way.
-    float ringStarOcclusion(float a, float b, float t) {
-        if (t >= a + b) return 0.0;
-        if (t <= abs(b - a)) return min(1.0, (b * b) / (a * a));
-        float a2 = a * a;
-        float b2 = b * b;
-        float t2 = t * t;
-        float ca = clamp((t2 + a2 - b2) / (2.0 * t * a), -1.0, 1.0);
-        float cb = clamp((t2 + b2 - a2) / (2.0 * t * b), -1.0, 1.0);
-        float k = max((-t + a + b) * (t + a - b) * (t - a + b) * (t + a + b), 0.0);
-        float area = a2 * acos(ca) + b2 * acos(cb) - 0.5 * sqrt(k);
-        return clamp(area / (PI * a2), 0.0, 1.0);
-    }
+    ${STAR_OCCLUSION_GLSL}
 `;
 
 const RING_FRAGMENT_CHUNK = /* glsl */ `
@@ -232,7 +215,7 @@ const RING_FRAGMENT_CHUNK = /* glsl */ `
             // to about one pixel of separation so the edge is antialiased, not jagged.
             float ringStarAngle = max(max(uRingStarAngle[s], fwidth(ringSep)), 1e-6);
 
-            float ringShadow = ringStarOcclusion(ringStarAngle, ringPlanetAngle, ringSep);
+            float ringShadow = starDiscOcclusion(ringStarAngle, ringPlanetAngle, ringSep);
             ringLight += uRingStarLight[s] * ringLit * (1.0 - ringShadow);
         }
         // Lambertian 1/pi, exactly as the lit surfaces scale their irradiance.

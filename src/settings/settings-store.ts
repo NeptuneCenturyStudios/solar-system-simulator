@@ -40,6 +40,7 @@ export const enum SettingKey {
     AutopilotOrbitMode = 'autopilotOrbitMode',
     AutopilotOrbitDistanceM = 'autopilotOrbitDistanceM',
     CloudQuality = 'cloudQuality',
+    ShadowQuality = 'shadowQuality',
 }
 
 /**
@@ -103,6 +104,14 @@ export type AuroraDetailMode = 'static' | 'dynamic';
  * Declared here rather than in the effects layer so the settings store stays dependency-free.
  */
 export type CloudQuality = 'low' | 'medium' | 'high';
+
+/**
+ * How shadows are drawn.
+ * - `off`  — no shadows (identical to having no shadow code at all).
+ * - `low`  — analytic eclipse shadows, plus a ship shadow map for the nearest ship.
+ * - `high` — eclipses, plus a larger ship shadow map for up to four ships with softer edges.
+ */
+export type ShadowQuality = 'off' | 'low' | 'high';
 
 export interface SpaceSimSettings {
     particleEffectsEnabled: boolean;
@@ -174,6 +183,8 @@ export interface SpaceSimSettings {
     autopilotOrbitDistanceM: number;
     /** How cloud layers are drawn (flat or volumetric). */
     cloudQuality: CloudQuality;
+    /** How shadows (eclipses, ship shadows) are drawn. */
+    shadowQuality: ShadowQuality;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -217,6 +228,7 @@ const defaultSettings: SpaceSimSettings = {
     autopilotOrbitMode: 'natural',
     autopilotOrbitDistanceM: AI_AUTOPILOT_ORBIT_DISTANCE_DEFAULT_M,
     cloudQuality: 'medium',
+    shadowQuality: 'low',
 };
 
 /** Normalise a stored texture quality, falling back to `low` for anything unrecognised. */
@@ -233,6 +245,11 @@ export function clampRenderDistanceAU(au: number): number {
 /** Normalise a stored cloud quality, falling back to `medium` for anything unrecognised. */
 export function normalizeCloudQuality(value: unknown): CloudQuality {
     return value === 'low' || value === 'high' ? value : 'medium';
+}
+
+/** Normalise a stored shadow quality, falling back to `low` for anything unrecognised. */
+export function normalizeShadowQuality(value: unknown): ShadowQuality {
+    return value === 'off' || value === 'high' ? value : 'low';
 }
 
 /** Normalise a stored autopilot mode, falling back to `classic` for anything unrecognised. */
@@ -266,6 +283,7 @@ class SettingsStore {
         this.data.cockpitView = this.data.cockpitView === true;
         this.data.autopilotMode = normalizeAutopilotMode(this.data.autopilotMode);
         this.data.cloudQuality = normalizeCloudQuality(this.data.cloudQuality);
+        this.data.shadowQuality = normalizeShadowQuality(this.data.shadowQuality);
         this.data.autopilotOrbitMode = normalizeAutopilotOrbitMode(this.data.autopilotOrbitMode);
         this.data.autopilotOrbitDistanceM = clampAutopilotOrbitDistanceM(
             this.data.autopilotOrbitDistanceM

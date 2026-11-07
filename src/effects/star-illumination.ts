@@ -6,7 +6,7 @@ import { DIST_SCALE, MAX_LIGHTING_STARS, RADIUS_SCALE } from '../utilities/const
  * The parts of a star this module reads. Structural, so it needs no import of Star (which
  * would close an import cycle through CelestialBody).
  */
-interface ILightingStar {
+export interface ILightingStar {
     readonly bodyType: number;
     readonly _isDisposed: boolean;
     readonly mesh: THREE.Object3D;
@@ -114,6 +114,11 @@ export function beginStarLightingFrame(bodies: readonly ILightingCandidate[]): v
     for (const body of bodies) {
         if (isLightingStar(body)) _frameStars.push(body);
     }
+}
+
+/** This frame's live stars, as collected by beginStarLightingFrame. */
+export function getFrameStars(): readonly ILightingStar[] {
+    return _frameStars;
 }
 
 /**

@@ -59,6 +59,21 @@
             <p class="solver-hint">{{ cloudQualityHint }}</p>
         </div>
 
+        <div class="control-group">
+            <label>Shadow Quality</label>
+            <select
+                class="solver-select"
+                :value="simStore.shadowQuality"
+                title="Eclipse shadows between planets, moons and ships, and shaped shadows cast by nearby ships onto the ground, each other and themselves."
+                @change="onShadowQualityChange"
+            >
+                <option value="off">Off</option>
+                <option value="low">Low</option>
+                <option value="high">High</option>
+            </select>
+            <p class="solver-hint">{{ shadowQualityHint }}</p>
+        </div>
+
         <label class="checkbox-row">
             <input type="checkbox" :checked="simStore.showAiDebug" @change="onShowAiDebugChange" />
             Show Ship AI Debug
@@ -260,6 +275,7 @@ import {
     setAuroraEnabled,
     setBarnesHutTheta,
     setCloudQuality,
+    setShadowQuality,
     setFrameRateLimit,
     setLensflareEnabled,
     setMusicVolume,
@@ -278,6 +294,7 @@ import type {
     AuroraDetailMode,
     CloudQuality,
     PhysicsSolverMode,
+    ShadowQuality,
     TextureQuality,
 } from '../../settings/settings-store';
 import { isHighQualityTextureAvailable } from '../../drawing/texture-quality';
@@ -345,6 +362,19 @@ const cloudQualityHint = computed(() => CLOUD_QUALITY_HINTS[simStore.cloudQualit
 
 function onCloudQualityChange(e: Event): void {
     setCloudQuality((e.target as HTMLSelectElement).value as CloudQuality);
+}
+
+/** One-line explanation of what each shadow quality level costs. */
+const SHADOW_QUALITY_HINTS: Record<ShadowQuality, string> = {
+    off: 'No shadows. Fastest.',
+    low: 'Eclipse shadows, plus a shadow for the nearest ship.',
+    high: 'Eclipse shadows, plus sharper, softer-edged shadows for up to four nearby ships.',
+};
+
+const shadowQualityHint = computed(() => SHADOW_QUALITY_HINTS[simStore.shadowQuality]);
+
+function onShadowQualityChange(e: Event): void {
+    setShadowQuality((e.target as HTMLSelectElement).value as ShadowQuality);
 }
 
 function onShowAiDebugChange(e: Event): void {
