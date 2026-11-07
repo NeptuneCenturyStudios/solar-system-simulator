@@ -65,6 +65,14 @@
                 <svg-icon type="mdi" :path="mdiTargetAccount"></svg-icon>
                 OSIRIS AMBUSH
             </button>
+            <button
+                class="old-ui btn-dark btn-with-icon"
+                type="button"
+                @click="selectScenario('teamSkirmish')"
+            >
+                <svg-icon type="mdi" :path="mdiAccountGroup"></svg-icon>
+                TEAM SKIRMISH (TEST)
+            </button>
             <button class="old-ui btn-with-icon btn-danger" type="button" @click="onCancel">
                 <svg-icon type="mdi" :path="mdiArrowLeft"></svg-icon>
                 CANCEL
@@ -84,6 +92,7 @@ import {
 } from '../../scenarios-modal-service';
 import SvgIcon from '@jamescoyle/vue-icon';
 import {
+    mdiAccountGroup,
     mdiAlertOutline,
     mdiArrowLeft,
     mdiCircle,

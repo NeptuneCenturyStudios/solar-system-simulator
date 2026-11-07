@@ -13,6 +13,7 @@ import type { CelestialBody } from './bodies/celestial-body';
 import { ITidalLockOptions } from './bodies/celestial-body';
 import { EffectiveCSpeed, EffectiveGForce } from './types';
 import { Spaceship } from './bodies/ships/spaceship';
+import type { ShipRole } from './bodies/ships/ship-team';
 import { ImpactShockwave } from './effects/impact-shockwave';
 import { FlightHUD } from './drawing/flight-hud';
 import type { HudSprite } from './drawing/hud/hud-sprite';
@@ -612,6 +613,9 @@ export interface ISpaceshipCreationOptions extends IBodyCreationOptions {
      *  Used to detect when the user selects a different ship class than the one
      *  currently spawned, so the old ship can be destroyed and replaced. */
     shipTypeId: string;
+
+    /** Fighter or capital ship — drives AI target priorities. */
+    role: ShipRole;
 
     /** Local-space offset for the 1st-person cockpit camera. When omitted, the
      *  offset is derived from the loaded model's bounding box after it loads. */

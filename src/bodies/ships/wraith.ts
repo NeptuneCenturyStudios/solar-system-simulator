@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { Spaceship } from './spaceship';
+import { ShipRole } from './ship-team';
 import {
     applyBaseColorGlow,
     createShipContainerMesh,
@@ -175,6 +176,7 @@ export class Wraith extends Spaceship {
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 2, rechargeTime: 30 },
             shipTypeId: 'wraith',
+            role: ShipRole.Fighter,
             thirdPersonOffset: THIRD_PERSON_OFFSET,
         });
 

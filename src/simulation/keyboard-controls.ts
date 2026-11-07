@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SoundEffect, playSoundEffect } from '../utilities/audio';
 import type { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import type { PositionIndicatorManager } from '../gizmos/position-indicator';
 import type { FlightHUD } from '../drawing/flight-hud';
@@ -210,6 +211,30 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         }
     };
 
+    /**
+     * V in flight: toggle the guidance system (velocity reference frame). Inside a planet's or
+     * moon's sphere of influence the ship's base velocity then tracks that body, and thrust adds
+     * only dogfight-tier speeds on top of it.
+     */
+    const toggleGuidance = (): void => {
+        const ship = flightState.activeShip;
+        if (!ship || ship._isDisposed) return;
+        if (ship.setGuidanceEnabled(!ship.guidanceEnabled)) {
+            playSoundEffect(
+                ship.guidanceEnabled ? SoundEffect.GuidanceEnabled : SoundEffect.GuidanceDisabled
+            );
+            ctx.addEvent({
+                message: `Guidance ${ship.guidanceEnabled ? 'on' : 'off'}`,
+                notificationType: NotificationType.Info,
+            });
+        } else {
+            ctx.addEvent({
+                message: 'Guidance is locked on for this scenario',
+                notificationType: NotificationType.Info,
+            });
+        }
+    };
+
     const isVelocityEditing = (): boolean =>
         interactionState.isChangingVelocity || interactionState.isMiddleMouseVelocity;
 
@@ -341,6 +366,9 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
 
     // R: flight-only — toggle low / high speed mode.
     bindings.set('r', { onDown: pressOnce(inFlight, toggleSpeedMode) });
+
+    // V: flight-only — toggle guidance (match velocity with the nearest planet/moon).
+    bindings.set('v', { onDown: pressOnce(inFlight, toggleGuidance) });
 
     bindings.set('shift', {
         onDown: () => {

@@ -27,6 +27,8 @@ export enum SoundEffect {
     AutopilotEngaged,
     AutopilotDisengaged,
     AutopilotDestinationReached,
+    GuidanceEnabled,
+    GuidanceDisabled,
     // Weapon sounds
     WeaponFire,
     WeaponImpact,
@@ -101,6 +103,28 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/autopilot-destination-reached.mp3', import.meta.url)
                 .href,
+        ],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        activeLoop: null,
+    },
+    [SoundEffect.GuidanceEnabled]: {
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/guidance-enabled.mp3', import.meta.url).href,
+        ],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        activeLoop: null,
+    },
+    [SoundEffect.GuidanceDisabled]: {
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/guidance-disabled.mp3', import.meta.url).href,
         ],
         buffers: [],
         volume: 1.0,

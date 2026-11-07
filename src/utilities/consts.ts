@@ -17,6 +17,8 @@ export enum SimulationStartMode {
     ExtinctionEvent = 8,
     /** Scenario: the player, in the Osiris, is hunted by a mixed force of AI Darts and Zeniths. Win by destroying them all; lose if the Osiris is destroyed. */
     OsirisAmbush = 9,
+    /** Test scenario: a small Team Earth vs Team Alien fleet battle near Earth, under locked guidance. */
+    TeamSkirmish = 10,
 }
 
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===
@@ -1661,6 +1663,20 @@ export const OSIRIS_AMBUSH_SPAWN_DISTANCE = 10 / DIST_SCALE;
 /** Minimum angle (degrees) between two ships' bearings from the player, so a wave arrives from
  *  several directions instead of in a clump. Best effort — relaxed if it can't be satisfied. */
 export const OSIRIS_AMBUSH_MIN_SEPARATION_DEG = 40;
+
+// === Team Skirmish test scenario ===
+/** Fixed time scale, so runs are comparable to each other. */
+export const TEAM_SKIRMISH_TIME_SCALE = 1;
+/** Distance of the battle's centre from Earth's centre, on the sunward side (≈38,000 km). */
+export const TEAM_SKIRMISH_EARTH_DISTANCE = EARTH_RADIUS * 6;
+/** Distance (sim units) between the two fleets' centres at spawn: 30 km. */
+export const TEAM_SKIRMISH_FLEET_SEPARATION = 30 / DIST_SCALE;
+/** Spacing (sim units) between fighters in the same fleet's spawn line: 1.5 km. */
+export const TEAM_SKIRMISH_FIGHTER_SPACING = 1.5 / DIST_SCALE;
+/** Offset (sim units) of each fleet's capital ship behind its fighter line: 6 km. */
+export const TEAM_SKIRMISH_CAPITAL_OFFSET = 6 / DIST_SCALE;
+/** AI fighters per team (the player flies an extra fighter for Team Earth). */
+export const TEAM_SKIRMISH_FIGHTERS_PER_TEAM = 3;
 
 // === Ship AI autopilot ===
 // The Ship AI autopilot (simulation/ai/autopilot-ship-ai.ts) flies only through controlInput, in

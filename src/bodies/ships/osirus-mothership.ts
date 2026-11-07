@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Spaceship } from './spaceship';
+import { ShipRole } from './ship-team';
 import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
@@ -156,6 +157,7 @@ export class OsirisMothership extends Spaceship {
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 4, rechargeTime: 150 },
             shipTypeId: 'osiris_mothership',
+            role: ShipRole.Capital,
             thirdPersonOffset: THIRD_PERSON_OFFSET,
         });
 

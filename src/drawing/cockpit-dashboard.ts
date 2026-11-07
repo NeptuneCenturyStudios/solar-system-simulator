@@ -17,6 +17,10 @@ export interface ICockpitTelemetry {
     regime: string;
     /** LOW or HIGH speed tier. */
     speedTier: 'LOW' | 'HIGH';
+    /** Guidance (velocity reference frame) status. */
+    guidance: 'off' | 'standby' | 'matching' | 'locked';
+    /** Name of the body guidance is tracking, when matching or locked. */
+    guidanceBodyName: string | null;
     /** 0..1 while the warp drive is charging, otherwise 0. */
     warpCharge: number;
 
@@ -63,6 +67,7 @@ const CYAN = '#00ffcc';
 const CYAN_DIM = 'rgba(0, 255, 204, 0.35)';
 const CYAN_FAINT = 'rgba(0, 255, 204, 0.12)';
 const AMBER = '#ffb020';
+const GREEN = '#40ff80';
 const RED = '#ff4030';
 const BG = '#02080c';
 const FONT = '"Consolas", "Menlo", "Courier New", monospace';
@@ -233,6 +238,7 @@ function paintSpeedScreen(
     t: ICockpitTelemetry
 ): void {
     frame(ctx, w, h, `FLIGHT  ·  ${t.speedTier} TIER`);
+    paintGuidanceTag(ctx, w, h, t);
 
     const cx = w / 2;
     const cy = h * 0.78;
@@ -294,6 +300,36 @@ function paintSpeedScreen(
     if (t.warpCharge > 0) {
         bar(ctx, w * 0.2, h * 0.82, w * 0.6, h * 0.05, t.warpCharge, '#a070ff');
     }
+}
+
+/**
+ * Guidance badge, right-aligned in the speed screen's title bar: GUIDE STBY while waiting for a
+ * sphere of influence, GUIDE MATCH while bleeding off relative speed, GUIDE <BODY> once locked.
+ * Nothing is drawn while guidance is off.
+ */
+function paintGuidanceTag(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    t: ICockpitTelemetry
+): void {
+    if (t.guidance === 'off') return;
+    // Mirrors frame()'s title-bar geometry.
+    const pad = h * 0.05;
+    const titleH = h * 0.11;
+    let label: string;
+    let color: string;
+    if (t.guidance === 'standby') {
+        label = 'GUIDE STBY';
+        color = CYAN_DIM;
+    } else if (t.guidance === 'matching') {
+        label = 'GUIDE MATCH';
+        color = AMBER;
+    } else {
+        label = `GUIDE ${(t.guidanceBodyName ?? '').toUpperCase()}`.trim();
+        color = GREEN;
+    }
+    text(ctx, label, w - pad * 2, pad + titleH / 2, titleH * 0.55, color, 'right', 'bold');
 }
 
 /** Left wing display: position and nearest body. */

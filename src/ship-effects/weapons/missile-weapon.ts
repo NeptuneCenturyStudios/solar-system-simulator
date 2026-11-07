@@ -544,6 +544,7 @@ export class MissileWeapon extends Weapon {
                                 position: m.position.clone(),
                                 damage: this.config.damage,
                                 effectiveness: this.effectiveness,
+                                shooter: owner,
                             },
                         })
                     );

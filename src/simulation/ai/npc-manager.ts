@@ -10,6 +10,8 @@ import { steeringDt } from '../steering-clock';
 import type { ShipAI } from './ship-ai';
 import { settingsStore } from '../../settings/settings-store';
 import { NotificationType } from '../../event-log/event-log';
+import type { ShipTeam } from '../../bodies/ships/ship-team';
+import { refreshThreatFlags } from '../teams';
 
 /** Event-log sink, matching the `addEvent` the flight control context already carries. */
 type NpcEventSink = (event: { message: string; notificationType: NotificationType }) => void;
@@ -44,6 +46,11 @@ export interface ICreateNpcShipOptions {
      * pass a different one and the ship flies to different rules with no other change.
      */
     ai?: (ship: Spaceship) => ShipAI;
+    /**
+     * Team allegiance. Omit (or `null`) for an unaligned ship — the legacy behaviour, where the
+     * AI attacks the player. Pass `'default'` to use the ship class's registry `defaultTeam`.
+     */
+    team?: ShipTeam | 'default' | null;
 }
 
 /** Add a ship to the NPC registry. Safe to call twice. */
@@ -51,6 +58,7 @@ export function registerNpcShip(ship: Spaceship): void {
     if (!simulationState.npcShips.includes(ship)) {
         simulationState.npcShips.push(ship);
     }
+    refreshThreatFlags();
 }
 
 /**
@@ -93,6 +101,8 @@ export function createNpcShip(options: ICreateNpcShipOptions): Spaceship {
     );
 
     if (options.name) ship.name = options.name;
+    if (options.team === 'default') ship.team = shipType.defaultTeam;
+    else if (options.team) ship.team = options.team;
 
     // Attach the controller. This is the whole pluggable-AI seam: pass a different factory and
     // the ship flies to different rules, with nothing else in the pipeline aware of the change.
@@ -147,6 +157,9 @@ export function stepNpcShips(dt: number, simDt: number, addEvent?: NpcEventSink)
     // decay and bolt lifetimes behind its own isPaused flag, so a ship paused mid-burst neither
     // heats up nor cools, and a laser beam stays frozen in space rather than winking out.
     if (simulationState.isPaused || simulationState.timeScale === 0) return;
+
+    // Keep team threat flags in sync with the player's current ship/team (cheap: one pass).
+    refreshThreatFlags();
 
     for (const ship of simulationState.npcShips) {
         if (!ship || ship._isDisposed || !ship.mesh || !ship.ai) continue;
@@ -212,6 +225,8 @@ export function stepShipController(ship: Spaceship, ai: ShipAI, dt: number, simD
         }
     }
 
+    // Team target selection runs ahead of the controller, which reads the pick.
+    if (ai instanceof FollowShipAI) ai.tickTargeting(simDt);
     ai.update(dt, simDt);
 
     // Turn the AI's warp intent into charge/engage/cancel/decel on the drive. After the

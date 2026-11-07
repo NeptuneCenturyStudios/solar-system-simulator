@@ -336,6 +336,7 @@ export class BoltWeapon extends Weapon {
                             position: p.position.clone(),
                             damage: this.config.damage,
                             effectiveness: this.effectiveness,
+                            shooter: owner,
                         },
                     })
                 );

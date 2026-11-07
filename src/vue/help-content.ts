@@ -66,6 +66,10 @@ export const HELP_SECTIONS: HelpSection[] = [
             { action: 'Roll left / right', keys: ['A', 'D'] },
             { action: 'Boost', keys: ['Shift'] },
             { action: 'Toggle speed mode (low / high)', keys: ['R'] },
+            {
+                action: 'Toggle guidance (fly relative to the nearest planet / moon)',
+                keys: ['V'],
+            },
             { action: 'Steer', keys: ['Mouse'] },
             { action: 'Toggle cockpit / third-person view', keys: ['C'] },
             {

@@ -90,6 +90,9 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         // Wormholes are indestructible — weapons can hit them but never damage them.
         if (body instanceof Wormhole) return;
 
+        if (body instanceof Spaceship && e.detail.shooter && e.detail.shooter !== body) {
+            body.lastDamagedBy = e.detail.shooter;
+        }
         body.takeDamage(e.detail.damage, e.detail.effectiveness);
 
         // Ripple the shield only while it still has points left after the hit; once it is down
@@ -108,6 +111,18 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         const body = e.detail.body;
         // Drop it from the NPC registry if it was an AI-piloted ship.
         unregisterNpcShip(body);
+        if (body instanceof Spaceship) {
+            window.dispatchEvent(
+                new CustomEvent('ship:destroyed', {
+                    detail: {
+                        ship: body,
+                        team: body.team,
+                        role: body.role,
+                        killer: body.lastDamagedBy,
+                    },
+                })
+            );
+        }
         if (body) {
             // If the dead body was the player's ship, disengage autopilot globally.
             // Do NOT clear flightState.activeShip or flightState.knownShip here —

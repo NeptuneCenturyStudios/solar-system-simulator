@@ -74,6 +74,10 @@ import { stepNpcShips } from './ai/npc-manager';
 import { stepShipAiAutopilot } from './autopilot';
 import { scenarioManager } from '../scenarios/scenario-manager';
 import type { Spaceship } from '../bodies/ships/spaceship';
+import { updateHillSpheres } from '../physics/sphere-of-influence';
+
+/** Scratch for the warp-sound speed lookup. */
+const _warpSoundVel = new THREE.Vector3();
 
 // ── Context interface ───────────────────────────────────────────────────────
 
@@ -231,6 +235,19 @@ function updateShipTrail(
         dtTotal,
         cameraPos
     );
+}
+
+/**
+ * Per-frame guidance update for every ship that can fly with guidance: the player's active and
+ * known ship plus all NPCs. Each ship de-duplicates nothing itself, so a ship listed twice simply
+ * recomputes the same frame.
+ */
+function updateShipGuidanceFrames(active: Spaceship | null, known: Spaceship | null): void {
+    active?.updateGuidanceFrame();
+    if (known && known !== active) known.updateGuidanceFrame();
+    for (const npc of simulationState.npcShips) {
+        if (npc !== active && npc !== known) npc.updateGuidanceFrame();
+    }
 }
 
 /**
@@ -489,6 +506,13 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // regardless. Frame-level only (decisions + steering/roll); their thrust
         // is applied per physics substep inside updateSimulation().
         stepNpcShips(wallDt, dtTotal, flightCtx.addEvent);
+
+        // ── Guidance reference frames ────────────────────────────────────
+        // Refresh every body's Hill sphere once, then let each ship with guidance on pick the
+        // body whose velocity its flight frame tracks. Before the physics step, so this frame's
+        // thrust substeps are governed in the up-to-date frame.
+        updateHillSpheres(ctx.simulationState.bodies);
+        updateShipGuidanceFrames(ctx.flightState.activeShip, ctx.flightState.knownShip);
 
         // Draw what those controllers just decided. After the step, so the overlay shows the
         // heading the ships are flying this frame rather than the previous one's.
@@ -1257,8 +1281,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // Warp sound follows the player's own ship alone — several ships warping at once would
         // stack the loop on top of itself.
         if (visShip && !visShip._isDisposed && visShip.mesh) {
+            // Same velocity the streaks follow, so under guidance or inside an atmosphere the
+            // warp hum tracks speed relative to that frame rather than the planet's orbital motion.
             const vol = visShip.warpEffect.warpOpacity(
-                visShip.velocity.length(),
+                visShip.effectVelocity(_warpSoundVel).length(),
                 visShip.handling.flightWarpSpeed
             );
             visShip.updateWarpSound(vol, wdf);
@@ -1365,6 +1391,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     shipThrustRate: thrustRate,
                     gravRate: gRate,
                     speedMode: classicAp || ship?.highSpeedMode ? 'HIGH' : 'LOW',
+                    guidance: ship?.guidanceStatus ?? 'off',
                 });
             }
 

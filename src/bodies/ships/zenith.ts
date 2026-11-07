@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { Spaceship } from './spaceship';
+import { ShipRole } from './ship-team';
 import { BoltWeapon } from '../../ship-effects/weapons/bolt-weapon';
 import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
@@ -158,6 +159,7 @@ export class Zenith extends Spaceship {
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 2, rechargeTime: 30 },
             shipTypeId: 'zenith',
+            role: ShipRole.Fighter,
             thirdPersonOffset: THIRD_PERSON_OFFSET,
         });
 

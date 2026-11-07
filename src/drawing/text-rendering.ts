@@ -47,6 +47,8 @@ export interface SpeedHudParams {
     gravRate: number;
     /** Which handling tier the ship is flying on (autopilot always flies HIGH). */
     speedMode: 'HIGH' | 'LOW';
+    /** Guidance (velocity reference frame) status; omitted = off. */
+    guidance?: 'off' | 'standby' | 'matching' | 'locked';
 }
 
 /**
@@ -56,6 +58,7 @@ export interface SpeedHudParams {
 export function paintSpeed(ctx: CanvasRenderingContext2D, params: SpeedHudParams): void {
     const { speed, isBoosting, pos, vel, isWarp, isBraking, shipThrustRate, gravRate, speedMode } =
         params;
+    const guidance = params.guidance ?? 'off';
     const hasExtra = !!(pos && vel);
     const W = SPEED_CANVAS_W;
     const H = speedCanvasHeight(hasExtra);
@@ -91,7 +94,20 @@ export function paintSpeed(ctx: CanvasRenderingContext2D, params: SpeedHudParams
         ctx.fillStyle = isHigh ? '#ffcc44' : dim;
         ctx.shadowColor = isHigh ? 'rgba(255,204,68,0.7)' : 'transparent';
         ctx.shadowBlur = isHigh ? 8 : 0;
-        ctx.fillText(speedMode, W - 24 - labelWidth - 18, labelY);
+        const modeX = W - 24 - labelWidth - 18;
+        ctx.fillText(speedMode, modeX, labelY);
+
+        // ── Guidance tag, left of the speed mode tag ──────────────────────────
+        // GUIDE in green once locked onto a body, amber while matching velocity, dim on standby.
+        if (guidance !== 'off') {
+            const modeWidth = ctx.measureText(speedMode).width;
+            const guideColor =
+                guidance === 'locked' ? '#40ff80' : guidance === 'matching' ? '#ffb020' : dim;
+            ctx.fillStyle = guideColor;
+            ctx.shadowColor = guidance === 'standby' ? 'transparent' : guideColor;
+            ctx.shadowBlur = guidance === 'standby' ? 0 : 8;
+            ctx.fillText('GUIDE', modeX - modeWidth - 18, labelY);
+        }
     }
 
     // ── Thrust rate vs Gravity rate ───────────────────────────────────────────

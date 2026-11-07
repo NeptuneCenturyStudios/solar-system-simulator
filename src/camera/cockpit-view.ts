@@ -299,6 +299,8 @@ export class CockpitView {
             speedGaugeMax: gaugeMax,
             regime,
             speedTier: ship.highSpeedMode ? 'HIGH' : 'LOW',
+            guidance: ship.guidanceStatus,
+            guidanceBodyName: ship.guidanceRefBody ? ship.guidanceRefBody.name : null,
             warpCharge:
                 ship.warpCharging && warpChargeTime > 0
                     ? Math.min(1, ship.warpChargeTimer / warpChargeTime)

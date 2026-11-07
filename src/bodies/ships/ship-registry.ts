@@ -6,6 +6,7 @@ import { OsirisMothership } from './osirus-mothership';
 import { HarbingerMothership } from './harbinger-mothership';
 import { Wraith } from './wraith';
 import { Stinger } from './stinger';
+import { ShipTeam, TEAM_ALIEN, TEAM_EARTH } from './ship-team';
 
 /**
  * Describes a selectable ship type for the Flight Controls ship dropdown.
@@ -17,6 +18,8 @@ export interface IShipType {
     id: string;
     /** Human-readable name shown in the dropdown. */
     label: string;
+    /** The team this ship class fights for by default (scenarios may override it). */
+    defaultTeam: ShipTeam;
     create(
         dependencies: object,
         scene: THREE.Scene,
@@ -35,36 +38,42 @@ export const SHIP_TYPES: IShipType[] = [
     {
         id: 'zenith',
         label: 'Zenith',
+        defaultTeam: TEAM_EARTH,
         create: (dependencies, scene, position, velocity, id) =>
             new Zenith(dependencies, scene, position, velocity, id),
     },
     {
         id: 'dart',
         label: 'Dart',
+        defaultTeam: TEAM_EARTH,
         create: (dependencies, scene, position, velocity, id) =>
             new Dart(dependencies, scene, position, velocity, id),
     },
     {
         id: 'osiris_mothership',
         label: 'Osiris Mothership',
+        defaultTeam: TEAM_EARTH,
         create: (dependencies, scene, position, velocity, id) =>
             new OsirisMothership(dependencies, scene, position, velocity, id),
     },
     {
         id: 'harbinger_mothership',
         label: 'Harbinger Mothership',
+        defaultTeam: TEAM_ALIEN,
         create: (dependencies, scene, position, velocity, id) =>
             new HarbingerMothership(dependencies, scene, position, velocity, id),
     },
     {
         id: 'wraith',
         label: 'Wraith',
+        defaultTeam: TEAM_ALIEN,
         create: (dependencies, scene, position, velocity, id) =>
             new Wraith(dependencies, scene, position, velocity, id),
     },
     {
         id: 'stinger',
         label: 'Stinger',
+        defaultTeam: TEAM_ALIEN,
         create: (dependencies, scene, position, velocity, id) =>
             new Stinger(dependencies, scene, position, velocity, id),
     },

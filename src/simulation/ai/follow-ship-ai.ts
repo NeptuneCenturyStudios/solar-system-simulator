@@ -19,6 +19,8 @@ import {
 } from '../../utilities/consts';
 import type { Spaceship } from '../../bodies/ships/spaceship';
 import type { ISpaceshipHandling } from '../../interfaces';
+import { TargetSelector } from './target-selector';
+import { applyFriendlySeparation } from './navigation/friendly-separation';
 
 // Scratch vectors — reused every frame to keep the per-frame allocation count at zero.
 const _toTarget = new THREE.Vector3();
@@ -83,14 +85,40 @@ export class FollowShipAI extends ShipAI {
         protected readonly followDistance: number = NPC_FOLLOW_DISTANCE
     ) {
         super(ship);
+        this.targetSelector = new TargetSelector(ship);
+    }
+
+    /** Team-aware target picker, used while this ship is on a team (see getTarget). */
+    readonly targetSelector: TargetSelector;
+
+    /** The ship this AI is currently engaging under team targeting, or null (also when unaligned). */
+    get currentTarget(): Spaceship | null {
+        return this.ship.team === null ? null : this.targetSelector.currentTarget;
     }
 
     /**
-     * Resolve the ship to follow: the ship the player is currently flying, or
-     * failing that the last ship they spawned (so the NPC still tails a parked
-     * ship the player has stepped out of).
+     * Advance team target selection. Called once per frame by the NPC manager before update();
+     * a no-op for unaligned ships.
+     */
+    tickTargeting(simDt: number): void {
+        if (this.ship.team !== null) this.targetSelector.tick(simDt);
+    }
+
+    /**
+     * Resolve the ship to follow / attack.
+     *
+     * On a team: the hostile ship chosen by the team target selector (role priorities, load
+     * balancing, player penalty — see target-selector.ts).
+     *
+     * Unaligned (legacy): the ship the player is currently flying, or failing that the last ship
+     * they spawned (so the NPC still tails a parked ship the player has stepped out of).
      */
     protected getTarget(): Spaceship | null {
+        if (this.ship.team !== null) {
+            const picked = this.targetSelector.currentTarget;
+            if (!picked || picked._isDisposed || !picked.mesh) return null;
+            return picked;
+        }
         const target = flightState.activeShip ?? flightState.knownShip;
         if (!target || target === this.ship) return null;
         if (target._isDisposed || !target.mesh) return null;
@@ -153,7 +181,12 @@ export class FollowShipAI extends ShipAI {
         const range = this.hullGap(target, ship.mesh.position.distanceTo(target.mesh.position));
         const handoff = this.highSpeedHandoffRange();
         const engage = AI_HIGH_SPEED_ENGAGE_RANGE * (handoff / AI_HIGH_SPEED_HANDOFF_RANGE);
-        const outruns = target.velocity.length() > ship.lowSpeedHandling.flightBoostMaxSpeed;
+        // Measured in the ship's active flight frame (guidance / atmosphere), so a target that is
+        // merely co-moving with Earth at ~30 km/s doesn't count as outrunning the low tier.
+        _relVel.copy(target.velocity);
+        const frame = ship.activeFrameVel;
+        if (frame) _relVel.sub(frame);
+        const outruns = _relVel.length() > ship.lowSpeedHandling.flightBoostMaxSpeed;
 
         if (ship.highSpeedMode) {
             if (range <= handoff && !outruns) ship.setHighSpeedMode(false);
@@ -301,6 +334,8 @@ export class FollowShipAI extends ShipAI {
         // Bend the straight line to the target around anything in the way. The result is still
         // just a heading and a speed cap, so everything below is unchanged — the ship flies the
         // detour under its own handling limits exactly as it flies the direct line.
+        // Spread out from teammates (team ships only) before hazards get the final say.
+        applyFriendlySeparation(ship, _dir);
         const avoid = this.avoidance.evaluate(_dir, simDt);
         _dir.copy(avoid.heading);
 

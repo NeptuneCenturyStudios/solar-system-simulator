@@ -21,6 +21,16 @@ declare global {
             /** Raw damage, before the weapon's shield/hull effectiveness is applied. */
             damage: number;
             effectiveness: IDamageEffectiveness;
+            /** The body that fired the weapon (credited with the kill), if known. */
+            shooter: Body | null;
+        }>;
+        /** Fired when a spaceship is destroyed, for any reason. */
+        'ship:destroyed': CustomEvent<{
+            ship: Spaceship;
+            team: ShipTeam | null;
+            role: ShipRole;
+            /** The body whose weapon last damaged the ship, if any. */
+            killer: Body | null;
         }>;
         'camera:focusChanged': CustomEvent<{
             body: Body | null;
@@ -179,6 +189,7 @@ import {
 } from './bodies/wormhole-link-state';
 
 import { Spaceship } from './bodies/ships/spaceship';
+import type { ShipRole, ShipTeam } from './bodies/ships/ship-team';
 import { EventLogEntry, LogMethods, NotificationType } from './event-log/event-log';
 import {
     IAutopilotContext,
@@ -366,6 +377,7 @@ import { AsteroidFieldGenerator } from './procedural/asteroid-field-generator';
 import { AsteroidDefenseGenerator } from './procedural/asteroid-defense-generator';
 import { ExtinctionEventGenerator } from './procedural/extinction-event-generator';
 import { OsirisAmbushGenerator } from './procedural/osiris-ambush-generator';
+import { TeamSkirmishGenerator } from './procedural/team-skirmish-generator';
 import { clearNpcShips, registerNpcShipsIn } from './simulation/ai/npc-manager';
 import { scenarioManager } from './scenarios/scenario-manager';
 import {
@@ -1852,6 +1864,9 @@ async function spawn(
         // Osiris ambush scenario: the player always flies the Osiris Mothership, hunted by a
         // wave of AI ships that only respawns once the whole wave is destroyed.
         generator = new OsirisAmbushGenerator(dependencies, scene, proceduralResult?.seed);
+    } else if (mode === SimulationStartMode.TeamSkirmish) {
+        // Team battle test bed: Team Earth vs Team Alien near Earth, all under locked guidance.
+        generator = new TeamSkirmishGenerator(dependencies, scene, proceduralResult?.seed);
     } else {
         // Empty system generator
         generator = new EmptySystemGenerator(dependencies, scene);
@@ -4717,6 +4732,9 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
             } else if (scenarioResult.scenario === 'osirisAmbush') {
                 // Osiris ambush scenario — fixed setup, no seed prompt; the player starts in flight mode.
                 await launchSystem(SimulationStartMode.OsirisAmbush);
+            } else if (scenarioResult.scenario === 'teamSkirmish') {
+                // Team battle test bed — fixed setup, no seed prompt; the player starts in flight.
+                await launchSystem(SimulationStartMode.TeamSkirmish);
             }
             break;
         }

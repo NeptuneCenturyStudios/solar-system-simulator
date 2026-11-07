@@ -38,6 +38,9 @@ import {
 } from '../../utilities/consts';
 import { triggerScreenFlash } from '../../effects/screen-flash';
 import { settingsStore } from '../../settings/settings-store';
+import { ShipRole, ShipTeam } from './ship-team';
+import type { CelestialBody } from '../celestial-body';
+import { findReferenceBody } from '../../physics/sphere-of-influence';
 
 /**
  * Scratch vectors for the flight governor. Module-level so the hot flight path — which runs up
@@ -48,6 +51,14 @@ import { settingsStore } from '../../settings/settings-store';
 const _govForward = new THREE.Vector3();
 const _govRel = new THREE.Vector3();
 const _govPerp = new THREE.Vector3();
+/** Scratch: guidance frame-relative velocity and gravity direction (see applyGuidanceSubstep). */
+const _guideRel = new THREE.Vector3();
+const _guideDir = new THREE.Vector3();
+/** Scratch: velocity the warp/dust effect is driven by (see effectVelocity). */
+const _effectVel = new THREE.Vector3();
+
+/** Guidance status shown on the cockpit dashboard and HUD. */
+export type GuidanceStatus = 'off' | 'standby' | 'matching' | 'locked';
 
 /**
  * Weapon hit sphere (and shield bubble) as a fraction of `radius`. The model is scaled so its
@@ -99,8 +110,52 @@ export class Spaceship extends Body {
      */
     downshiftDecelerating: boolean = false;
 
-    /** Handling for manual flight and ship AI: the tier selected by `highSpeedMode`. */
+    // ── Guidance (velocity reference frame) ──────────────────────────────────
+    /**
+     * Pilot's guidance toggle (V). While on and inside a planet's or moon's Hill sphere, the
+     * ship's base velocity tracks that body's velocity and thrust adds only low-tier (dogfight)
+     * speeds on top of it — see `updateGuidanceFrame` / `applyGuidanceSubstep`.
+     */
+    guidanceEnabled: boolean = false;
+    /** Set by scenarios that force guidance on: the pilot cannot toggle it off. */
+    guidanceLocked: boolean = false;
+    /** The body the guidance frame is tracking, or null when not engaged. */
+    guidanceRefBody: CelestialBody | null = null;
+    /** Velocity of the guidance reference frame (the ref body's velocity), or null when idle. */
+    guidanceFrameVel: THREE.Vector3 | null = null;
+    /** True while guidance is still bleeding off relative speed above the low-tier boost cap. */
+    guidanceMatching: boolean = false;
+
+    /**
+     * True while the guidance frame is the one governing flight — engaged, and not overridden
+     * by a (more specific) atmosphere frame.
+     */
+    get guidanceActive(): boolean {
+        return this.guidanceFrameVel !== null && this.atmosphereFrameVel === null;
+    }
+
+    /** Guidance status for displays. */
+    get guidanceStatus(): GuidanceStatus {
+        if (!this.guidanceEnabled) return 'off';
+        if (!this.guidanceFrameVel) return 'standby';
+        return this.guidanceMatching ? 'matching' : 'locked';
+    }
+
+    /**
+     * The reference-frame velocity flight is governed in: the captured atmosphere frame if any,
+     * else the guidance frame, else null (plain heliocentric world frame).
+     */
+    get activeFrameVel(): THREE.Vector3 | null {
+        return this.atmosphereFrameVel ?? this.guidanceFrameVel;
+    }
+
+    /**
+     * Handling for manual flight and ship AI: the tier selected by `highSpeedMode` — except that
+     * while guidance holds a reference frame, both tiers fly on the low (dogfight) tier relative
+     * to the reference body.
+     */
     get handling(): ISpaceshipHandling {
+        if (this.guidanceActive) return this.lowSpeedHandling;
         return this.highSpeedMode ? this.autopilotHandling : this.lowSpeedHandling;
     }
     /**
@@ -166,6 +221,17 @@ export class Spaceship extends Body {
      *  Used to detect when the user selects a different ship class than the one
      *  currently spawned, so the old ship can be destroyed and replaced. */
     readonly shipTypeId: string;
+
+    /** Fighter or capital ship (mothership). AI target selection prioritises by role. */
+    readonly role: ShipRole;
+    /**
+     * Team allegiance. Ships on different non-null teams are hostile to each other (see
+     * `simulation/teams.ts`). `null` = unaligned: the legacy behaviour where an AI ship attacks
+     * the player and threat flags are set by hand. Scenarios assign teams explicitly.
+     */
+    team: ShipTeam | null = null;
+    /** The body whose weapon most recently damaged this ship — credited with the kill. */
+    lastDamagedBy: Body | null = null;
 
     // ── Control input (player keys OR AI) ────────────────────────────────────
     /** This ship's virtual control surface. The player input path writes into the
@@ -404,6 +470,7 @@ export class Spaceship extends Body {
 
         // Registry id of this ship type (used for spawn/re-enter type matching).
         this.shipTypeId = options.shipTypeId;
+        this.role = options.role;
 
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3, 0.52);
@@ -636,9 +703,9 @@ export class Spaceship extends Body {
      * of being pinned at its enormous world speed. Outside any atmosphere the frame is absent and
      * this returns the plain world velocity — behaviour is unchanged there.
      */
-    private relativeVelocity(out: THREE.Vector3): THREE.Vector3 {
+    relativeVelocity(out: THREE.Vector3): THREE.Vector3 {
         out.copy(this.velocity);
-        const frame = this.atmosphereFrameVel;
+        const frame = this.activeFrameVel;
         if (frame) out.sub(frame);
         return out;
     }
@@ -648,7 +715,7 @@ export class Spaceship extends Body {
      * `relativeVelocity()`. When no frame is active this simply copies `rel` through.
      */
     private setRelativeVelocity(rel: THREE.Vector3): void {
-        const frame = this.atmosphereFrameVel;
+        const frame = this.activeFrameVel;
         if (frame) this.velocity.copy(frame).add(rel);
         else this.velocity.copy(rel);
     }
@@ -660,8 +727,98 @@ export class Spaceship extends Body {
      */
     forwardSpeedInFrame(forward: THREE.Vector3): number {
         const dot = this.velocity.dot(forward);
-        const frame = this.atmosphereFrameVel;
+        const frame = this.activeFrameVel;
         return frame ? dot - frame.dot(forward) : dot;
+    }
+
+    /**
+     * Toggle the pilot's guidance system. Refused (returns false) while a scenario has locked it.
+     */
+    setGuidanceEnabled(enabled: boolean): boolean {
+        if (this.guidanceLocked && !enabled) return false;
+        this.guidanceEnabled = enabled;
+        if (!enabled) this.releaseGuidanceFrame();
+        return true;
+    }
+
+    /** Drop the guidance frame; the ship's world velocity is untouched. */
+    private releaseGuidanceFrame(): void {
+        this.guidanceFrameVel = null;
+        this.guidanceRefBody = null;
+        this.guidanceMatching = false;
+    }
+
+    /**
+     * Per-frame guidance update: pick the reference body (innermost Hill sphere containing the
+     * ship) and copy its velocity into the frame. Re-basing onto a new body changes only the
+     * frame, never the ship's world velocity, so crossing an SOI boundary causes no jolt.
+     *
+     * Guidance stands down during warp (charge, cruise, decel), stop-brake and either autopilot,
+     * which all need the plain world frame. Requires `updateHillSpheres()` to have run this frame.
+     */
+    updateGuidanceFrame(): void {
+        if (
+            !this.guidanceEnabled ||
+            this._isDisposed ||
+            !this.mesh ||
+            this.warpCharging ||
+            this.warpActive ||
+            this.warpDecelerating ||
+            this.stopBraking ||
+            this.autopilotActive
+        ) {
+            this.releaseGuidanceFrame();
+            return;
+        }
+        const ref = findReferenceBody(this.mesh.position);
+        if (!ref) {
+            this.releaseGuidanceFrame();
+            return;
+        }
+        this.guidanceRefBody = ref;
+        if (!this.guidanceFrameVel) this.guidanceFrameVel = new THREE.Vector3();
+        this.guidanceFrameVel.copy(ref.velocity);
+    }
+
+    /**
+     * Per-substep guidance corrections while the guidance frame governs flight:
+     *
+     *  1. Velocity matching: relative speed above the low-tier boost cap (e.g. on first engaging
+     *     guidance while cruising) is bled off at the high tier's thrust-decel rate, so the ship's
+     *     base velocity converges onto the reference body's.
+     *  2. Station-keeping: the reference body's own gravity on the ship is cancelled, so with no
+     *     input the velocity relative to the body stays near zero instead of the ship slowly
+     *     falling toward it. (The star's pull acts on the ship and the body alike and is left
+     *     alone; it is what carries both around their orbit.)
+     */
+    private applyGuidanceSubstep(dt: number): void {
+        if (!this.guidanceActive || !this.guidanceFrameVel) return;
+        const ref = this.guidanceRefBody;
+
+        const rel = this.relativeVelocity(_guideRel);
+        const cap = this.lowSpeedHandling.flightBoostMaxSpeed;
+        const relSpeed = rel.length();
+        if (relSpeed > cap) {
+            const newSpeed = Math.max(
+                cap,
+                relSpeed - this.autopilotHandling.flightThrustDecel * dt
+            );
+            rel.multiplyScalar(newSpeed / relSpeed);
+            this.setRelativeVelocity(rel);
+            this.guidanceMatching = newSpeed > cap;
+        } else {
+            this.guidanceMatching = false;
+        }
+
+        if (ref && !ref._isDisposed && ref.mesh) {
+            const toRef = _guideDir.subVectors(ref.mesh.position, this.mesh.position);
+            const rSq = toRef.lengthSq();
+            if (rSq > 1e-20) {
+                const accel = (G * simulationState.gMultiplier * ref.mass) / rSq;
+                // Push away from the body by exactly its pull on the ship this substep.
+                this.velocity.addScaledVector(toRef, -(accel * dt) / Math.sqrt(rSq));
+            }
+        }
     }
 
     /**
@@ -735,6 +892,8 @@ export class Spaceship extends Body {
         if (this.warpActive || this.warpDecelerating || this.boostDecelerating || this.stopBraking)
             return;
 
+        this.applyGuidanceSubstep(dt);
+
         const input = this.controlInput;
         const forward = _govForward.set(0, 0, 1).applyQuaternion(this.controlFrameQuat);
 
@@ -744,6 +903,10 @@ export class Spaceship extends Body {
         // Outside any atmosphere the frame is absent and this is exactly the world velocity.
         const rel = this.relativeVelocity(_govRel);
         const fwdSpeed = rel.dot(forward);
+        // Under guidance, the low-tier caps limit the ship's *total* speed relative to the
+        // reference body (not just its forward component), so diagonal drift cannot stack
+        // thrust past the cap. Elsewhere the caps govern forward speed, as before.
+        const capSpeed = this.guidanceActive ? rel.length() : fwdSpeed;
 
         // While a thrust key is held: forward thrust is ADDED to the relative velocity so
         // gravity accumulates freely and is never overwritten.
@@ -762,14 +925,14 @@ export class Spaceship extends Body {
                 setpoint === null
                     ? this.handling.flightMaxSpeed
                     : Math.min(this.handling.flightMaxSpeed, setpoint);
-            const shiftEffective = input.boost && fwdSpeed < boostCap;
-            const wEffective = input.thrust && fwdSpeed < thrustCap;
+            const shiftEffective = input.boost && capSpeed < boostCap;
+            const wEffective = input.thrust && capSpeed < thrustCap;
 
             if (shiftEffective) {
-                const delta = Math.min(this.handling.flightBoostAccel * dt, boostCap - fwdSpeed);
+                const delta = Math.min(this.handling.flightBoostAccel * dt, boostCap - capSpeed);
                 rel.addScaledVector(forward, delta);
             } else if (wEffective && !input.boost) {
-                const delta = Math.min(this.handling.flightThrustAccel * dt, thrustCap - fwdSpeed);
+                const delta = Math.min(this.handling.flightThrustAccel * dt, thrustCap - capSpeed);
                 rel.addScaledVector(forward, delta);
             } else if (input.brake) {
                 const decelRate =
@@ -1881,13 +2044,24 @@ export class Spaceship extends Body {
     // ── Warp effect helpers ───────────────────────────────────────────────────
 
     /**
+     * The velocity the warp/dust streaks (and warp sound) follow, written into `out`: the
+     * velocity relative to whichever reference frame governs flight — the captured atmosphere
+     * frame (airspeed) or the guidance frame — so the dust streams past along the direction the
+     * pilot is actually flying rather than sideways along the planet's orbital motion. With no
+     * frame active it is the plain world velocity.
+     */
+    effectVelocity(out: THREE.Vector3): THREE.Vector3 {
+        return this.relativeVelocity(out);
+    }
+
+    /**
      * Update the warp tunnel visual.  Call once per frame while the ship exists.
      * Everything follows the ship's actual speed against fixed anchors taken from the
      * low-speed tier (never `this.handling`), so toggling high-speed mode doesn't move them.
      * @param dt        Delta time in seconds.
      */
     updateWarpEffect(dt: number): void {
-        this.warpEffect.update(dt, this.mesh.position, this.velocity, {
+        this.warpEffect.update(dt, this.mesh.position, this.effectVelocity(_effectVel), {
             streakStart: this.lowSpeedHandling.flightMaxSpeed,
             warp: this.lowSpeedHandling.flightWarpSpeed,
             shipRadius: this.radius,

@@ -54,6 +54,10 @@ import { INTERCEPT_EPSILON, interceptTime } from '../../ship-effects/weapons/int
 import type { Spaceship } from '../../bodies/ships/spaceship';
 import type { ISpaceshipHandling } from '../../interfaces';
 import { formatAngleFromCos, formatDistance, formatSpeed, formatThrottle } from './ai-debug-format';
+import { areFriendly, playerShip } from '../teams';
+import { applyFriendlySeparation } from './navigation/friendly-separation';
+import { simulationState } from '../simulation';
+import type { Body } from '../../bodies/body';
 
 // Scratch objects — reused every frame to keep the per-frame allocation count at zero, the
 // invariant the whole AI layer is written to.
@@ -68,6 +72,28 @@ const _dir = new THREE.Vector3();
 const _heading = new THREE.Vector3();
 const _targetFwd = new THREE.Vector3();
 const _side = new THREE.Vector3();
+const _toFriend = new THREE.Vector3();
+
+/**
+ * Clearance around a friendly's hit sphere that a shot must pass outside of. Above 1 so a lead
+ * shot that is slightly off (target jinks, bolt inherits our velocity) still misses teammates.
+ */
+const FRIENDLY_CLEARANCE_FACTOR = 1.5;
+
+/** True when `friend` sits on the segment from `origin` along unit `dir` out to `length`. */
+function blocksShot(
+    friend: Body,
+    origin: THREE.Vector3,
+    dir: THREE.Vector3,
+    length: number
+): boolean {
+    _toFriend.subVectors(friend.mesh.position, origin);
+    const along = _toFriend.dot(dir);
+    const clearance = friend.hitRadius * FRIENDLY_CLEARANCE_FACTOR;
+    if (along < -clearance || along > length + clearance) return false;
+    const perpSq = _toFriend.lengthSq() - along * along;
+    return perpSq < clearance * clearance;
+}
 const _evade = new THREE.Vector3();
 const _evadeU = new THREE.Vector3();
 const _evadeV = new THREE.Vector3();
@@ -110,7 +136,8 @@ type GunStatus =
     | 'no weapon in range'
     | 'out of range'
     | 'no intercept'
-    | 'outside cone';
+    | 'outside cone'
+    | 'friendly in line';
 
 /**
  * A ship AI that hunts the player: everything {@link FollowShipAI} does to pursue and hold
@@ -789,6 +816,8 @@ export class CombatShipAI extends FollowShipAI {
         const evading = evadeWeight > 0;
 
         // ── Obstacle avoidance ───────────────────────────────────────────────
+        // Spread out from teammates before hazards get the final say.
+        applyFriendlySeparation(this.ship, _heading);
         const avoid = this.avoidance.evaluate(_heading, simDt);
         if (avoid.flee) {
             this.dashing = false;
@@ -1021,11 +1050,40 @@ export class CombatShipAI extends FollowShipAI {
         this.debugAimCos = _forward.dot(_aim);
         if (this.debugAimCos < Math.cos(AI_AIM_CONE_ANGLE)) return 'outside cone';
 
+        // ── Friendly fire ────────────────────────────────────────────────────
+        // Friendly fire is real (weapons hit anything), so a team ship holds the trigger while
+        // a teammate is between it and the lead point.
+        if (ship.team !== null && this.friendlyInLine(_muzzle, _aim, aimDistance)) {
+            return 'friendly in line';
+        }
+
         ship.controlInput.aimDir.copy(_aim);
         ship.controlInput.aimDistance = aimDistance;
         ship.controlInput.target = target;
         ship.controlInput.fire = true;
         return 'FIRING';
+    }
+
+    /** True when a teammate (NPC or the player) is in the line of fire. */
+    private friendlyInLine(origin: THREE.Vector3, dir: THREE.Vector3, length: number): boolean {
+        const ship = this.ship;
+        for (const npc of simulationState.npcShips) {
+            if (npc === ship || npc._isDisposed || !npc.mesh || !areFriendly(ship, npc)) continue;
+            if (blocksShot(npc, origin, dir, length)) return true;
+        }
+        const player = playerShip();
+        if (
+            player &&
+            player !== ship &&
+            !player._isDisposed &&
+            player.mesh &&
+            !simulationState.npcShips.includes(player) &&
+            areFriendly(ship, player) &&
+            blocksShot(player, origin, dir, length)
+        ) {
+            return true;
+        }
+        return false;
     }
 
     override debugLines(): string[] {

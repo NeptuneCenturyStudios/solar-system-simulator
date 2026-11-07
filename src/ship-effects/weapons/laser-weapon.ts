@@ -354,6 +354,7 @@ export class LaserWeapon extends Weapon {
                         position: this.tip.clone(),
                         damage: this.config.damage * this.damageFalloffAt(hitT),
                         effectiveness: this.effectiveness,
+                        shooter: owner,
                     },
                 })
             );
