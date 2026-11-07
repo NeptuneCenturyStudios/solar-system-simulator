@@ -249,6 +249,20 @@ export function surfaceClearance(ship: Spaceship, body: Body): number {
 }
 
 /**
+ * Distance from world-space `point` (e.g. the camera) to `body`'s drawn surface, in sim units,
+ * using the same surface model as {@link surfaceClearance} — the faceted sphere mesh for planets
+ * and moons, the hull for ships — so a HUD readout measured from a point agrees with the altimeter.
+ * Clamped at 0 for a point inside the body.
+ */
+export function surfaceDistanceFromPoint(point: THREE.Vector3, body: Body): number {
+    _clearanceDir.subVectors(point, body.mesh.position);
+    const distance = _clearanceDir.length();
+    if (distance > 1e-12) _clearanceDir.divideScalar(distance);
+    else _clearanceDir.set(0, 1, 0);
+    return Math.max(0, distance - contactReach(body, _clearanceDir));
+}
+
+/**
  * Contact model for anything touching a ship: a landing with friction rather than a ricochet.
  *
  * Everything is measured at the contact point, relative to the *surface* there, so a spinning

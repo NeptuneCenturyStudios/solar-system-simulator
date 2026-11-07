@@ -63,6 +63,11 @@ export class ScreenProjector {
         this.tanHalfFovY = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
     }
 
+    /** World position of the camera primed by `beginFrame`, or null before the first frame. */
+    get cameraPosition(): THREE.Vector3 | null {
+        return this.camera ? this.camera.position : null;
+    }
+
     /** Half the viewport width in pixels, as cached for this frame. */
     get viewportHalfWidth(): number {
         return this.halfW;

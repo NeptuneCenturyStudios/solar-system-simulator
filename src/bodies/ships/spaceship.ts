@@ -156,9 +156,14 @@ export class Spaceship extends Body {
      * Handling for manual flight and ship AI: the tier selected by `highSpeedMode` — except that
      * while guidance holds a reference frame, both tiers fly on the low (dogfight) tier relative
      * to the reference body.
+     *
+     * This deliberately tests `guidanceFrameVel` rather than `guidanceActive`: inside an
+     * atmosphere the atmosphere frame takes over from guidance, but guidance is still engaged
+     * underneath it. Keeping the low tier through that handoff stops a ship boosting in
+     * high-speed mode from suddenly accelerating to high-tier airspeeds the moment it enters the air.
      */
     get handling(): ISpaceshipHandling {
-        if (this.guidanceActive) return this.lowSpeedHandling;
+        if (this.guidanceFrameVel !== null) return this.lowSpeedHandling;
         return this.highSpeedMode ? this.autopilotHandling : this.lowSpeedHandling;
     }
     /**

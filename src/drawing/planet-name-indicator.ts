@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Body } from '../bodies/body';
 import { IAutopilotState, ISimulationState } from '../interfaces';
-import { formatDistance } from '../utilities/display-format';
+import { formatAltitude } from '../utilities/display-format';
 import { HudSprite } from './hud/hud-sprite';
 import { HudSpritePool } from './hud/hud-sprite-pool';
 import {
@@ -20,6 +20,17 @@ import {
     panelThemeFor,
 } from './hud/hud-paint';
 import { probeScanStatusLabel } from '../bodies/probe-scan-status';
+import { surfaceDistanceFromPoint } from '../physics/collision';
+
+/**
+ * Camera-to-surface distance for a name panel, measured against the same drawn surface as the
+ * flight HUD altimeter (see surfaceDistanceFromPoint), so the two readouts agree near the ground.
+ * Falls back to the centre distance before the projector has a camera.
+ */
+function surfaceDistance(projector: ScreenProjector, body: Body, camDist: number): number {
+    const camPos = projector.cameraPosition;
+    return camPos ? surfaceDistanceFromPoint(camPos, body) : camDist;
+}
 
 // ── Layout constants ────────────────────────────────────────────────────────
 const PAD = 12;
@@ -341,7 +352,14 @@ export class PlanetNameIndicator {
             const p = this.visible.at(i);
             // Pass ring fill only for the hovered body
             const ringFill = isFlightHoverActive && p.body === hoveredBody ? computedRingFill : -1;
-            this.renderPanel(sprites[i], p.body, p.camDist, ringFill, p.uiX, p.uiY);
+            this.renderPanel(
+                sprites[i],
+                p.body,
+                surfaceDistance(projector, p.body, p.camDist),
+                ringFill,
+                p.uiX,
+                p.uiY
+            );
         }
 
         this.updateHoverSprite(
@@ -414,17 +432,17 @@ export class PlanetNameIndicator {
         return best;
     }
 
-    /** Size, paint and place one name panel. */
+    /** Size, paint and place one name panel. `surfaceDist` is camera-to-surface, in world units. */
     private renderPanel(
         sprite: HudSprite,
         body: Body,
-        camDist: number,
+        surfaceDist: number,
         ringFill: number,
         uiX: number,
         uiY: number
     ): void {
         const name = body.name;
-        const distLabel = formatDistance(camDist);
+        const distLabel = formatAltitude(surfaceDist);
         const isThreat = body.isThreat;
         const hasRing = ringFill >= 0;
 
@@ -471,7 +489,14 @@ export class PlanetNameIndicator {
             return;
         }
 
-        this.renderPanel(this.hoverSprite, hoveredBody, p.camDist, ringFill, p.uiX, p.uiY);
+        this.renderPanel(
+            this.hoverSprite,
+            hoveredBody,
+            surfaceDistance(projector, hoveredBody, p.camDist),
+            ringFill,
+            p.uiX,
+            p.uiY
+        );
     }
 
     /** The cancel-autopilot ring, shown whenever the active autopilot target is on screen. */
