@@ -4,7 +4,7 @@ import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts'
 import { Spaceship } from './spaceship';
 import { ShipRole } from './ship-team';
 import { BoltWeapon } from '../../ship-effects/weapons/bolt-weapon';
-import { createShipContainerMesh, loadShipModelInto } from './ship-model-loader';
+import { createShipContainerMesh, loadShipGltfInto } from './ship-model-loader';
 import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
 import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
 import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
@@ -116,7 +116,9 @@ export class Zenith extends Spaceship {
         };
 
         const containerMesh = createShipContainerMesh();
-        const MODEL_NAME = 'zenith/Lo_poly_Spaceship_01_by_Liz_Reddington';
+        // Model: zenith.glb, exported from the CGTrader "scifi fighter" .blend (single mesh,
+        // no animations; textures downscaled to 2K JPEG). Authored nose along +Z, +Y up.
+        const MODEL_URL = './assets/models/zenith/zenith.glb';
 
         // Custom laser weapon config
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
@@ -164,15 +166,12 @@ export class Zenith extends Spaceship {
         });
 
         // Kick off the async model load; offsets are applied once the bbox is known.
-        loadShipModelInto(containerMesh, MODEL_NAME, SPACESHIP_RADIUS)
+        loadShipGltfInto(containerMesh, MODEL_URL, SPACESHIP_RADIUS)
             .then((localBbox) => {
                 this.applyModelOffsets(localBbox);
             })
             .catch((e) => {
-                console.warn(
-                    `Zenith OBJ/MTL load failed for ${MODEL_NAME} — using placeholder mesh`,
-                    e
-                );
+                console.warn(`Zenith GLB load failed for ${MODEL_URL} — using placeholder mesh`, e);
             });
     }
 }

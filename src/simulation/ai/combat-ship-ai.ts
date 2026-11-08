@@ -8,6 +8,7 @@ import {
     AI_CAPITAL_MIN_STANDOFF,
     AI_CAPITAL_STANDOFF_FRACTION,
     AI_BURST_REST_TIME,
+    AI_BURST_TIME_JITTER,
     AI_CLOSING_SPEED_TOLERANCE,
     AI_COMBAT_CLOSING_TOLERANCE_RATE,
     AI_DASH_ALIGN_ANGLE,
@@ -205,10 +206,11 @@ type GunStatus =
 export class CombatShipAI extends FollowShipAI {
     readonly name: string = 'Combat';
 
-    /** Seconds remaining in the current burst or rest phase. */
-    private burstTimer = AI_BURST_FIRE_TIME;
+    /** Seconds remaining in the current burst or rest phase. Starts at a random point in the
+     *  cycle (see constructor) so a fleet built on one frame doesn't fire in lockstep. */
+    private burstTimer: number;
     /** True during the firing half of the burst cycle. */
-    private triggerOpen = true;
+    private triggerOpen: boolean;
 
     /** Current aim error, in radians of yaw/pitch off the firing solution. */
     private jitterYaw = 0;
@@ -288,6 +290,21 @@ export class CombatShipAI extends FollowShipAI {
         const isCapital = ship.role === ShipRole.Capital;
         super(ship, isCapital ? capitalStandoffDistance(ship) : NPC_COMBAT_FOLLOW_DISTANCE);
         this.isCapital = isCapital;
+
+        // Enter the burst cycle at a random phase: open with the probability the cycle spends
+        // open, part-way through a freshly rolled phase.
+        this.triggerOpen =
+            Math.random() < AI_BURST_FIRE_TIME / (AI_BURST_FIRE_TIME + AI_BURST_REST_TIME);
+        this.burstTimer = Math.random() * CombatShipAI.rollBurstPhase(this.triggerOpen);
+    }
+
+    /**
+     * Length of a new burst (`open`) or rest phase: the base time spread by ±AI_BURST_TIME_JITTER,
+     * so ships that ever fall into step drift back out of it.
+     */
+    private static rollBurstPhase(open: boolean): number {
+        const base = open ? AI_BURST_FIRE_TIME : AI_BURST_REST_TIME;
+        return base * (1 + (Math.random() * 2 - 1) * AI_BURST_TIME_JITTER);
     }
 
     /**
@@ -335,7 +352,7 @@ export class CombatShipAI extends FollowShipAI {
         this.burstTimer -= dt;
         if (this.burstTimer <= 0) {
             this.triggerOpen = !this.triggerOpen;
-            this.burstTimer = this.triggerOpen ? AI_BURST_FIRE_TIME : AI_BURST_REST_TIME;
+            this.burstTimer = CombatShipAI.rollBurstPhase(this.triggerOpen);
         }
 
         this.weaponDwell += dt;

@@ -27,7 +27,7 @@ export class HarbingerMothership extends Spaceship {
     ) {
         const SPACESHIP_MASS = 400_000_000 / MASS_SCALE;
         // The model's longest dimension (bow to stern) is fitted to this — ~1 km.
-        const SPACESHIP_RADIUS = 1000 / 1000 / RADIUS_SCALE;
+        const SPACESHIP_RADIUS = 600 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
         const SPACESHIP_HEALTH_POINTS = 600;

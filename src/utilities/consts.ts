@@ -1734,6 +1734,11 @@ export const AI_AIM_JITTER_PERIOD = 0.6;
 export const AI_BURST_FIRE_TIME = 1.0;
 /** Seconds the combat AI holds fire between bursts. */
 export const AI_BURST_REST_TIME = 0.5;
+/** Random spread (± fraction) applied to each burst and rest phase the combat AI rolls. A fleet
+ *  is built on one frame and stepped with one sim dt, so fixed-length phases would keep every
+ *  ship's trigger opening on the same frame forever — the whole fleet volleying in unison.
+ *  Symmetric, so the mean duty cycle (and the heat budget it was sized for) is unchanged. */
+export const AI_BURST_TIME_JITTER = 0.3;
 /** Weapon choice: target shield fraction at or below which the combat AI treats the shield as
  *  down and scores its weapons on hull effectiveness alone. Above 0 on purpose — on a Zenith
  *  (40 shield, 20 hull) a missile into the last 2 shield points still puts ~12 into the hull. */
