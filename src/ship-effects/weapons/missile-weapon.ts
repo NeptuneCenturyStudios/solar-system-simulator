@@ -184,7 +184,7 @@ export class MissileWeapon extends Weapon {
             lifetime: 30,
             damage: 15,
             shieldEffectiveness: 0.25,
-            hullEffectiveness: 1.75,
+            hullEffectiveness: 1.25,
             heatPerSalvo: 1,
             coolPerSecond: 0.2, // full cooldown in 5 s
             maxMissiles: 32,

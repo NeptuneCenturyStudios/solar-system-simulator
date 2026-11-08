@@ -30,7 +30,7 @@ export class HarbingerMothership extends Spaceship {
         const SPACESHIP_RADIUS = 600 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
-        const SPACESHIP_HEALTH_POINTS = 600;
+        const SPACESHIP_HEALTH_POINTS = 800;
 
         // The GLB's emissive maps are sparse window/light details. Blender authored them at
         // emission strength ~30, which clips to flat white through the sim's 8-bit capture

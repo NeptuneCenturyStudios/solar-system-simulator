@@ -189,7 +189,7 @@ export class LaserWeapon extends Weapon {
             new THREE.BufferAttribute(this.muzzlePositions, 3)
         );
         this.muzzleGeometry.setDrawRange(0, 0);
-        this.muzzleMaterial = this.createGlowPointMaterial(shipRadius * 1100, 0.95);
+        this.muzzleMaterial = this.createGlowPointMaterial(shipRadius * 4, 0.95);
         this.muzzlePoint = new THREE.Points(this.muzzleGeometry, this.muzzleMaterial);
         this.muzzlePoint.frustumCulled = false;
         this.muzzlePoint.renderOrder = 2;

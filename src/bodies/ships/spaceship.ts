@@ -851,15 +851,16 @@ export class Spaceship extends Body {
      * ship) and copy its velocity into the frame. Re-basing onto a new body changes only the
      * frame, never the ship's world velocity, so crossing an SOI boundary causes no jolt.
      *
-     * Guidance stands down during warp (charge, cruise, decel), stop-brake and either autopilot,
-     * which all need the plain world frame. Requires `updateHillSpheres()` to have run this frame.
+     * Guidance stands down during warp (cruise, decel), stop-brake and either autopilot, which
+     * all need the plain world frame. It stays engaged while the drive charges, so holding the
+     * charge gains no speed; `engageWarp()` releases it the moment warp lights. Requires
+     * `updateHillSpheres()` to have run this frame.
      */
     updateGuidanceFrame(): void {
         if (
             !this.guidanceEnabled ||
             this._isDisposed ||
             !this.mesh ||
-            this.warpCharging ||
             this.warpActive ||
             this.warpDecelerating ||
             this.stopBraking ||
@@ -2098,6 +2099,9 @@ export class Spaceship extends Body {
         this.warpActive = true;
         this.warpCharging = false;
         this.warpChargeTimer = 0;
+        // Guidance holds through the charge; drop it now, so the first warp step (possibly later
+        // this frame, after updateGuidanceFrame ran) already flies the world frame and high tier.
+        this.releaseGuidanceFrame();
 
         const isPlayerShip = flightState.activeShip === this || flightState.knownShip === this;
         if (isPlayerShip) {
