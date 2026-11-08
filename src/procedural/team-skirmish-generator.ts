@@ -17,6 +17,7 @@ import {
     MOON_MASS,
     MOON_RADIUS,
     TEAM_SKIRMISH_CAPITAL_OFFSET,
+    TEAM_SKIRMISH_CAPITAL_SPACING,
     TEAM_SKIRMISH_EARTH_DISTANCE,
     TEAM_SKIRMISH_FIGHTER_SPACING,
     TEAM_SKIRMISH_FIGHTERS_PER_TEAM,
@@ -33,11 +34,15 @@ import { ProceduralGenerationReporter } from './procedural-generation-progress';
 const EARTH_FIGHTERS = ['dart', 'zenith'];
 const ALIEN_FIGHTERS = ['wraith', 'stinger'];
 
+/** Capital ships for each team, lined up side by side behind the fighters. */
+const EARTH_CAPITALS = ['osiris_mothership', 'paladin_battleship'];
+const ALIEN_CAPITALS = ['harbinger_mothership'];
+
 /**
  * Test bed for team battles: the Sun, Earth (with its Moon) and two small fleets facing each
  * other a few Earth radii out on Earth's sunward side, all at rest relative to Earth.
  *
- *  - Team Earth: the Osiris Mothership, TEAM_SKIRMISH_FIGHTERS_PER_TEAM Darts/Zeniths and the
+ *  - Team Earth: the Osiris Mothership, the Paladin Battleship, TEAM_SKIRMISH_FIGHTERS_PER_TEAM Darts/Zeniths and the
  *    player's Zenith.
  *  - Team Alien: the Harbinger Mothership and TEAM_SKIRMISH_FIGHTERS_PER_TEAM Wraiths/Stingers.
  *
@@ -74,11 +79,12 @@ export class TeamSkirmishGenerator extends SolarSystemGenerator {
 
     /**
      * Build one fleet: a line of fighters across `side` at `centre`, facing `heading`, plus the
-     * capital ship behind them. Returns the AI ships (the player is added by the caller).
+     * capital ships side by side behind them. Returns the AI ships (the player is added by the
+     * caller).
      */
     private buildFleet(
         team: ShipTeam,
-        capitalTypeId: string,
+        capitalTypeIds: string[],
         fighterTypes: string[],
         centre: THREE.Vector3,
         heading: THREE.Vector3,
@@ -107,12 +113,14 @@ export class TeamSkirmishGenerator extends SolarSystemGenerator {
             return ship;
         };
 
-        ships.push(
-            spawn(
-                capitalTypeId,
-                centre.clone().addScaledVector(heading, -TEAM_SKIRMISH_CAPITAL_OFFSET)
-            )
-        );
+        // Capitals sit behind the fighter line, spread horizontally (fighters spread along
+        // `side`), centred on the fleet's axis.
+        const capitalRow = centre.clone().addScaledVector(heading, -TEAM_SKIRMISH_CAPITAL_OFFSET);
+        const across = new THREE.Vector3().crossVectors(heading, side).normalize();
+        capitalTypeIds.forEach((typeId, i) => {
+            const offset = (i - (capitalTypeIds.length - 1) / 2) * TEAM_SKIRMISH_CAPITAL_SPACING;
+            ships.push(spawn(typeId, capitalRow.clone().addScaledVector(across, offset)));
+        });
         fighterSlots.forEach((slot, i) => {
             const position = centre
                 .clone()
@@ -127,7 +135,8 @@ export class TeamSkirmishGenerator extends SolarSystemGenerator {
     ): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
         const fighters = TEAM_SKIRMISH_FIGHTERS_PER_TEAM;
-        const totalBodies = 3 + 1 + 2 * (fighters + 1); // Sun, Earth, Moon, player, two fleets
+        // Sun, Earth, Moon, player, two fleets
+        const totalBodies = 3 + 1 + 2 * fighters + EARTH_CAPITALS.length + ALIEN_CAPITALS.length;
         reporter?.setTotal(totalBodies);
 
         const sun = new Sun(this.dependencies, this.scene);
@@ -190,7 +199,7 @@ export class TeamSkirmishGenerator extends SolarSystemGenerator {
 
         const earthFleet = this.buildFleet(
             TEAM_EARTH,
-            'osiris_mothership',
+            EARTH_CAPITALS,
             EARTH_FIGHTERS,
             earthCentre,
             towardAliens,
@@ -200,7 +209,7 @@ export class TeamSkirmishGenerator extends SolarSystemGenerator {
         );
         const alienFleet = this.buildFleet(
             TEAM_ALIEN,
-            'harbinger_mothership',
+            ALIEN_CAPITALS,
             ALIEN_FIGHTERS,
             alienCentre,
             towardEarth,

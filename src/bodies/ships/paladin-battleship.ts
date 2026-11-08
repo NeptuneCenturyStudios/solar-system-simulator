@@ -1,0 +1,176 @@
+import * as THREE from 'three';
+import { Spaceship } from './spaceship';
+import { ShipRole } from './ship-team';
+import { ISpaceshipHandling } from '../../interfaces';
+import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
+import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
+import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
+import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
+import { createShipContainerMesh, loadShipGltfInto } from './ship-model-loader';
+
+/**
+ * The Paladin — a human battleship and capital ship, tuned to match the Osiris Mothership.
+ *
+ * Model: paladin_battleship.glb, exported from the CGTrader "Paladin Battleship" package (LOD0
+ * hull plus turret mounts; LOD1/LOD2 and the collision mesh are left out). Textures are
+ * downscaled from 4K to 2K JPEG. In Blender the bow faces -Y, which the glTF exporter's Y-up
+ * conversion turns into +Z, matching the ship convention, so no orientation correction is needed.
+ */
+export class PaladinBattleship extends Spaceship {
+    constructor(
+        dependencies: object,
+        scene: THREE.Scene,
+        position: THREE.Vector3,
+        velocity: THREE.Vector3,
+        id: string
+    ) {
+        const SPACESHIP_MASS = 80_000_000 / MASS_SCALE;
+        const SPACESHIP_RADIUS = 250 / 1000 / RADIUS_SCALE;
+        // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
+        // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
+        const SPACESHIP_HEALTH_POINTS = 250;
+
+        // Camera placement (ship-local space; +Z = forward, +Y = up).
+        const THIRD_PERSON_OFFSET = new THREE.Vector3(
+            0,
+            SPACESHIP_RADIUS * 0.2,
+            -SPACESHIP_RADIUS * 1
+        );
+
+        // Flight tuning constants — same as the Osiris: heavy and sluggish.
+        const FLIGHT_MAX_SPEED = 190 / 1000 / DIST_SCALE;
+        const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.004;
+        const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.6;
+        const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
+        const FLIGHT_BOOST_MAX_SPEED = 1.9 / DIST_SCALE; // 1.9 km/s
+        const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.2;
+        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL * 3;
+        const FLIGHT_WARP_SPEED = C * 5;
+        const FLIGHT_WARP_ACCEL = FLIGHT_WARP_SPEED * 0.04;
+        const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 4;
+        const FLIGHT_WARP_DECEL_TOLERANCE = FLIGHT_WARP_SPEED * 0.01;
+        const FLIGHT_PERP_DECAY = 0.5;
+        const FLIGHT_MAX_POINTER_OFFSET = 340;
+        const FLIGHT_MAX_TURN_RATE = 0.95;
+        const FLIGHT_STEER_SMOOTH_RATE = 0.55;
+        const FLIGHT_STEER_DEADZONE = 0.08;
+        const FLIGHT_ROLL_SPEED = 2.8;
+        const FLIGHT_ROLL_ACCEL = 0.62;
+        const FLIGHT_ROLL_FRICTION = 0.8;
+        const FLIGHT_BANK_LERP_SPEED = 10.5;
+        const FLIGHT_MAX_BANK_ANGLE = 0.18;
+        const FLIGHT_MAX_BANK_PITCH = 0.1;
+        const FLIGHT_MAX_BANK_YAW = 0.1;
+        const FLIGHT_WARP_CHARGE_TIME = 4.0;
+        // Autopilot tuning — same as the Osiris.
+        const PERFORMANCE_MAX_SPEED = 400 / DIST_SCALE; // 400 km/s
+        const PERFORMANCE_THRUST_ACCEL = PERFORMANCE_MAX_SPEED * 0.004;
+        const PERFORMANCE_THRUST_DECEL = PERFORMANCE_MAX_SPEED * 0.6;
+        const PERFORMANCE_BOOST_MAX_SPEED = 2000 / DIST_SCALE; // 2000 km/s
+        const PERFORMANCE_BOOST_ACCEL = PERFORMANCE_BOOST_MAX_SPEED * 0.2;
+        const PERFORMANCE_BOOST_DECEL = PERFORMANCE_BOOST_ACCEL * 3;
+
+        const battleshipHandling: ISpaceshipHandling = {
+            // Thrust / speed
+            flightMaxSpeed: FLIGHT_MAX_SPEED,
+            flightThrustAccel: FLIGHT_THRUST_ACCEL,
+            flightThrustDecel: FLIGHT_THRUST_DECEL,
+            flightThrustDecelTolerance: FLIGHT_THRUST_DECEL_TOLERANCE,
+
+            // Boost
+            flightBoostMaxSpeed: FLIGHT_BOOST_MAX_SPEED,
+            flightBoostAccel: FLIGHT_BOOST_ACCEL,
+            flightBoostDecel: FLIGHT_BOOST_DECEL,
+
+            // Autopilot
+            autopilotMaxSpeed: PERFORMANCE_MAX_SPEED,
+            autopilotThrustAccel: PERFORMANCE_THRUST_ACCEL,
+            autopilotThrustDecel: PERFORMANCE_THRUST_DECEL,
+            autopilotBoostMaxSpeed: PERFORMANCE_BOOST_MAX_SPEED,
+            autopilotBoostAccel: PERFORMANCE_BOOST_ACCEL,
+            autopilotBoostDecel: PERFORMANCE_BOOST_DECEL,
+
+            // Warp
+            flightWarpSpeed: FLIGHT_WARP_SPEED,
+            flightWarpAccel: FLIGHT_WARP_ACCEL,
+            flightWarpDecel: FLIGHT_WARP_DECEL,
+            flightWarpDecelTolerance: FLIGHT_WARP_DECEL_TOLERANCE,
+
+            // Perpendicular drift decay (simple mode)
+            flightPerpDecay: FLIGHT_PERP_DECAY,
+
+            // Steering feel
+            flightMaxPointerOffset: FLIGHT_MAX_POINTER_OFFSET,
+            flightMaxTurnRate: FLIGHT_MAX_TURN_RATE,
+            flightSteerSmoothRate: FLIGHT_STEER_SMOOTH_RATE,
+            flightSteerDeadzone: FLIGHT_STEER_DEADZONE,
+
+            // Roll
+            flightRollSpeed: FLIGHT_ROLL_SPEED,
+            flightRollAccel: FLIGHT_ROLL_ACCEL,
+            flightRollFriction: FLIGHT_ROLL_FRICTION,
+
+            // Visual banking
+            flightBankLerpSpeed: FLIGHT_BANK_LERP_SPEED,
+            flightMaxBankAngle: FLIGHT_MAX_BANK_ANGLE,
+            flightMaxBankPitch: FLIGHT_MAX_BANK_PITCH,
+            flightMaxBankYaw: FLIGHT_MAX_BANK_YAW,
+
+            // Misc
+            flightWarpChargeTime: FLIGHT_WARP_CHARGE_TIME,
+        };
+
+        const containerMesh = createShipContainerMesh();
+        const MODEL_URL = './assets/models/paladin-battleship/paladin_battleship.glb';
+
+        // The GLB is exported bow-along-+Z, so no orientation correction.
+        const MODEL_ROTATION = new THREE.Euler(0, 0, 0);
+
+        const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
+            beamColor: 0x40a0ff,
+            optimalRange: 100_000 / DIST_SCALE,
+            damage: 8,
+            coreWidth: 4,
+            haloWidth: 10,
+            damageInterval: 0.2,
+            coolPerSecond: 1.25,
+        };
+
+        super(dependencies, scene, {
+            position: position,
+            velocity: velocity,
+            mass: SPACESHIP_MASS,
+            radius: SPACESHIP_RADIUS,
+            mesh: containerMesh,
+            id: id,
+            name: 'Paladin Battleship',
+            handling: battleshipHandling,
+            weaponGroups: [
+                new WeaponGroup([new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)]),
+                new WeaponGroup([
+                    new MissileWeapon(scene, SPACESHIP_RADIUS, {
+                        salvoSize: 3,
+                        missileLength: 0.012 / RADIUS_SCALE, // 12 m
+                    }),
+                ]),
+            ],
+            healthPoints: SPACESHIP_HEALTH_POINTS,
+            shield: { hullMultiplier: 4, rechargeTime: 150 },
+            shipTypeId: 'paladin_battleship',
+            role: ShipRole.Capital,
+            thirdPersonOffset: THIRD_PERSON_OFFSET,
+        });
+
+        // Kick off the async model load; offsets are applied once the bbox is known.
+        loadShipGltfInto(containerMesh, MODEL_URL, SPACESHIP_RADIUS, MODEL_ROTATION)
+            .then((localBbox) => {
+                this.applyModelOffsets(localBbox);
+            })
+            .catch((e) => {
+                console.warn(
+                    `Paladin Battleship GLB load failed for ${MODEL_URL} — using placeholder mesh`,
+                    e
+                );
+            });
+    }
+}

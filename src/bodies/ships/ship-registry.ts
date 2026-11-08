@@ -3,6 +3,7 @@ import { Spaceship } from './spaceship';
 import { Zenith } from './zenith';
 import { Dart } from './dart';
 import { OsirisMothership } from './osirus-mothership';
+import { PaladinBattleship } from './paladin-battleship';
 import { HarbingerMothership } from './harbinger-mothership';
 import { Wraith } from './wraith';
 import { Stinger } from './stinger';
@@ -55,6 +56,13 @@ export const SHIP_TYPES: IShipType[] = [
         defaultTeam: TEAM_EARTH,
         create: (dependencies, scene, position, velocity, id) =>
             new OsirisMothership(dependencies, scene, position, velocity, id),
+    },
+    {
+        id: 'paladin_battleship',
+        label: 'Paladin Battleship',
+        defaultTeam: TEAM_EARTH,
+        create: (dependencies, scene, position, velocity, id) =>
+            new PaladinBattleship(dependencies, scene, position, velocity, id),
     },
     {
         id: 'harbinger_mothership',

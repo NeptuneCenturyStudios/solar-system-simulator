@@ -14,7 +14,7 @@ export enum ShipRole {
 /** A team identifier. Ships with different non-null teams are hostile to each other. */
 export type ShipTeam = string;
 
-/** Humanity's fleet: Zenith, Dart, Osiris. */
+/** Humanity's fleet: Zenith, Dart, Osiris, Paladin. */
 export const TEAM_EARTH: ShipTeam = 'earth';
 /** The alien invasion fleet: Harbinger, Wraith, Stinger. */
 export const TEAM_ALIEN: ShipTeam = 'alien';

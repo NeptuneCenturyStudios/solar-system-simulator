@@ -1880,6 +1880,8 @@ export const TEAM_SKIRMISH_FLEET_SEPARATION = 30 / DIST_SCALE;
 export const TEAM_SKIRMISH_FIGHTER_SPACING = 1.5 / DIST_SCALE;
 /** Offset (sim units) of each fleet's capital ship behind its fighter line: 6 km. */
 export const TEAM_SKIRMISH_CAPITAL_OFFSET = 6 / DIST_SCALE;
+/** Side-by-side spacing (sim units) between capital ships in the same fleet: 2 km. */
+export const TEAM_SKIRMISH_CAPITAL_SPACING = 2 / DIST_SCALE;
 /** AI fighters per team (the player flies an extra fighter for Team Earth). */
 export const TEAM_SKIRMISH_FIGHTERS_PER_TEAM = 3;
 
