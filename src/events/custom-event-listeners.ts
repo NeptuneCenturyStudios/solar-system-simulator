@@ -84,7 +84,14 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
 
         // Spawn impact flash: pass body centre so ImpactShockwave can snap to surface
         simulationState.impacts.push(
-            new ImpactShockwave(dependencies, scene, position, body.mesh.position, body.hitRadius)
+            new ImpactShockwave(
+                dependencies,
+                scene,
+                position,
+                body.mesh.position,
+                body.hitRadius,
+                body.velocity
+            )
         );
 
         // Wormholes are indestructible — weapons can hit them but never damage them.

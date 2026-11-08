@@ -17,7 +17,14 @@ export class ImpactShockwave implements IEffect {
     private scene: THREE.Scene;
     private sphere: THREE.Mesh;
     private mat: THREE.MeshBasicMaterial;
-    private readonly worldPos: THREE.Vector3;
+    private worldPos: THREE.Vector3;
+    /**
+     * Velocity the struck body had at the moment of impact (world units per sim-second). The flash
+     * drifts along it so a hit on a fast-moving target (~30 km/s under guidance lock near a planet)
+     * stays with the target instead of leaving a trail of flashes behind it. Captured once, not
+     * tracked, so a target that turns or accelerates during the flash pulls slightly away from it.
+     */
+    private readonly driftVelocity: THREE.Vector3;
     private age: number;
     private readonly maxAge = 30; // frames (~0.5 s at 60 fps)
     private readonly baseRadius: number;
@@ -27,9 +34,17 @@ export class ImpactShockwave implements IEffect {
         scene: THREE.Scene,
         hitPos: THREE.Vector3,
         bodyCenter: THREE.Vector3,
-        bodyRadius: number
+        bodyRadius: number,
+        inheritedVelocity?: THREE.Vector3
     ) {
         this.dependencies = dependencies;
+        this.driftVelocity =
+            inheritedVelocity &&
+            isFinite(inheritedVelocity.x) &&
+            isFinite(inheritedVelocity.y) &&
+            isFinite(inheritedVelocity.z)
+                ? inheritedVelocity.clone()
+                : new THREE.Vector3();
         this.active = true;
         this.scene = scene;
         this.age = 0;
@@ -67,6 +82,11 @@ export class ImpactShockwave implements IEffect {
     }
 
     update(dt: number) {
+        // Drift uses the signed dt so the flash stays with the world frame when time runs
+        // backwards; the expansion and fade always play forward.
+        this.worldPos.addScaledVector(this.driftVelocity, dt);
+        this.sphere.position.copy(this.worldPos);
+
         dt = Math.abs(dt);
         this.age += dt * 60;
 
