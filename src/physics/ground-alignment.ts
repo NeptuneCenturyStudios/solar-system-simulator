@@ -22,6 +22,11 @@ import { surfaceClearance, surfaceVelocityAt } from './collision';
 interface IGroundState {
     body: Body;
     prevBodyQuat: THREE.Quaternion;
+    /**
+     * Where the ship is parked, in the body's own (rotating) frame — the offset from its centre
+     * with the body's rotation removed — or null until it has come to rest. See pinToAnchor.
+     */
+    anchor: THREE.Vector3 | null;
 }
 
 const _groundStates = new WeakMap<Spaceship, IGroundState>();
@@ -77,9 +82,13 @@ export function rotateShip(ship: Spaceship, q: THREE.Quaternion): void {
  * the planet turns beneath it: over a few hours it appears to roll over and pivot on the ground.
  * Each frame, for every ship touching (or still within a hair of) the ground:
  *
+ * 0. **Parking.** Once a grounded ship has come to rest it is anchored to that spot of the body and
+ *    put back there every frame, moving with the ground (see pinToAnchor), until a launch lifts it
+ *    off. This keeps it from drifting under time warp. While parked it is immovable: something
+ *    shoving it is undone at the end of the frame.
  * 1. **Co-rotation.** The ship is turned by the same rotation the ground body made since the last
- *    frame. Friction already carries its *position* around with the spin (see resolveShipContact);
- *    this carries its *attitude*, so a parked ship keeps its heading relative to the ground.
+ *    frame. Parking carries its *position* around with the spin; this carries its *attitude*, so a
+ *    parked ship keeps its heading relative to the ground.
  *    It uses the body's actual quaternion change, so axial spin and tidal locking both work.
  * 2. **Settling.** Gravity acting on a hull resting at an angle tips it over onto a face. The ship
  *    is rotated, along the shortest arc, to bring its belly flat against the local surface — or its
@@ -107,10 +116,17 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
             continue;
         }
 
-        // ── Grounded? A contact this frame, or still touching the body it was resting on ──
+        // ── Grounded? Parked, a contact this frame, or still touching the body it rested on ──
         let state = _groundStates.get(ship);
+        // A launch lifting the ship off releases it from the ground.
+        if (state && ship.launchPhase === 'lifting') state.anchor = null;
         let ground: Body | null = contact;
-        if (!ground && state && !state.body._isDisposed && state.body.mesh) {
+        const anchored = !!state?.anchor && !state.body._isDisposed && !!state.body.mesh;
+        if (anchored && state) {
+            // Parked: carried rigidly by the ground, whatever the substeps did to it this frame.
+            pinToAnchor(ship, state);
+            ground = state.body;
+        } else if (!ground && state && !state.body._isDisposed && state.body.mesh) {
             if (surfaceClearance(ship, state.body) <= groundedClearanceTolerance(ship)) {
                 ground = state.body;
             }
@@ -128,9 +144,25 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
 
         // Newly grounded, or now resting on a different body: start tracking from here.
         if (!state || state.body !== ground) {
-            state = { body: ground, prevBodyQuat: ground.mesh.quaternion.clone() };
+            state = { body: ground, prevBodyQuat: ground.mesh.quaternion.clone(), anchor: null };
             _groundStates.set(ship, state);
             continue;
+        }
+
+        // Come to rest (not skidding or hopping away): park it where it is, set down onto the
+        // ground. Not gated on the hull touching: under time warp each frame's substeps leave a
+        // grounded ship up to metres off the surface, so it would never count as touching.
+        if (!state.anchor && ship.launchPhase !== 'lifting' && isResting(ship, ground, dt)) {
+            _anchorUp.subVectors(ship.mesh.position, ground.mesh.position);
+            const distance = _anchorUp.length();
+            if (distance > 1e-12) {
+                _anchorUp.divideScalar(distance);
+                ship.mesh.position.addScaledVector(_anchorUp, -surfaceClearance(ship, ground));
+                state.anchor = new THREE.Vector3()
+                    .subVectors(ship.mesh.position, ground.mesh.position)
+                    .applyQuaternion(_invPrev.copy(ground.mesh.quaternion).invert());
+                surfaceVelocityAt(ground, ship.mesh.position, ship.velocity);
+            }
         }
 
         // ── 1. Co-rotation: Δq = q_now · q_prev⁻¹ ──
@@ -169,6 +201,44 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
         _settle.slerpQuaternions(_IDENTITY, _delta, alpha);
         rotateShip(ship, _settle);
     }
+}
+
+const _anchorRel = new THREE.Vector3();
+const _anchorUp = new THREE.Vector3();
+
+/**
+ * Whether a grounded `ship` has come to rest on `ground`: its velocity relative to the ground under
+ * it is slower than the larger of SHIP_GROUND_STICK_SPEED and twice the speed gravity adds in a
+ * frame (the same frame-scaled allowance as the contact model's resting test, so time warp does
+ * not stop a ship from ever counting as at rest).
+ */
+function isResting(ship: Spaceship, ground: Body, dt: number): boolean {
+    _anchorUp.subVectors(ship.mesh.position, ground.mesh.position);
+    const distance = _anchorUp.length();
+    if (distance < 1e-12) return false;
+    const gravity =
+        (G * simulationState.gMultiplier * Math.max(0, ground.mass)) / (distance * distance);
+    const allowance = Math.max(SHIP_GROUND_STICK_SPEED, 2 * gravity * Math.max(0, dt));
+    surfaceVelocityAt(ground, ship.mesh.position, _anchorRel);
+    return _anchorRel.subVectors(ship.velocity, _anchorRel).length() <= allowance;
+}
+
+/**
+ * Put a parked ship back exactly where it was parked, moving with the ground there.
+ *
+ * Holding a resting ship by velocity alone (the per-substep support) lets it drift: each substep it
+ * moves in a straight line while the ground turns along an arc, and gravity only pulls it back
+ * approximately. At 1× that is invisible; under heavy time warp a substep covers minutes of the
+ * planet's spin, and the ship slides, lifts off and is carried away. Static friction holds a
+ * parked craft rigidly, so once at rest the ship is kept at a fixed point of the body's own frame
+ * — set from the body's end-of-frame position and orientation — with the ground's velocity there.
+ */
+function pinToAnchor(ship: Spaceship, state: IGroundState): void {
+    const anchor = state.anchor;
+    const body = state.body;
+    if (!anchor) return;
+    ship.mesh.position.copy(anchor).applyQuaternion(body.mesh.quaternion).add(body.mesh.position);
+    surfaceVelocityAt(body, ship.mesh.position, ship.velocity);
 }
 
 /** Whether `ship` should get per-substep ground support (grounded and not driven by a procedure). */
