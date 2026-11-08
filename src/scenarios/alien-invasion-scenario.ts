@@ -52,10 +52,11 @@ export interface IAlienInvasionSetup {
 /**
  * Alien Invasion: a full Team Earth vs Team Alien fleet battle at Earth.
  *
- * The player starts near Mars and receives a distress call: a red, unlinked wormhole has opened
- * near Earth and the fleet is investigating it. After ALIEN_INVASION_ARRIVAL_SECS (or once the
- * player is close) the alien fleet — two Harbinger motherships and their Wraiths and Stingers —
- * comes through, the wormhole collapses, and a second call reports that Earth is under attack.
+ * The player starts behind the Team Earth fleet and receives a distress call: a red, unlinked
+ * wormhole has opened near Earth and the fleet is investigating it. After
+ * ALIEN_INVASION_ARRIVAL_SECS (or once the player is close) the alien fleet — two Harbinger
+ * motherships and their Wraiths and Stingers — comes through, the wormhole collapses, and a
+ * second call reports that Earth is under attack.
  * A team score panel stays on screen from then on.
  *
  * Once every Team Earth capital ship is down, the Harbingers turn on Earth itself.
@@ -136,7 +137,7 @@ export class AlienInvasionScenario implements IScenario {
                 'Distress call: an unstable wormhole has opened near Earth. The fleet is investigating and requests assistance.',
             notificationType: NotificationType.Alert,
         });
-        triggerScenarioMessage('DISTRESS CALL — warp to the wormhole near Earth!', {
+        triggerScenarioMessage('DISTRESS CALL — join the fleet at the wormhole!', {
             holdSecs: 4,
             fontSizePx: 32,
         });

@@ -2,7 +2,7 @@
 This scenario will feature a massive fleet battle between human and alien ships and motherships.
 
 **How the scenario will play**
-- Player will start near mars.
+- Player will start about 50 km behind the Team Earth fleet (Mars is not in the scenario).
 - Player will receive a distress call (text on screen (scenario message) and voice message. Voice audio will be provided. "src\assets\sounds\voice\assistance-needed.mp3")
 - A wormhole will spawn. This worm hole will NOT be connected or linked to another one, so will be the danger red color.
 - Player will have x amount of time to warp to the wormhole to help the fleet investigate (timer will be based on sim time). After so long, whether player is in range or not, the alien Harbinger mothership and a fleet of Wraiths and Stingers will spawn from the wormhole. The wormhole will then disappear. Another distress call will be played informing the player that there is an alien attack on Earth (text and audio. audio will be provided: "src\assets\sounds\voice\earth-under-attack.mp3"). At this time, the team stat bar will show permenantly on screen showing who's winning (number of ships destroyed on each side)

@@ -3,11 +3,8 @@ import * as THREE from 'three';
 import { SolarSystemGenerator } from './solar-system-generator';
 import { Sun } from '../bodies/sun';
 import { Earth } from '../bodies/earth';
-import { Mars } from '../bodies/mars';
 import { Wormhole } from '../bodies/wormhole';
 import { createMoon, earthMoonOrbitElements } from '../bodies/create-moon';
-import { planetOrbitFromElements } from '../bodies/planet-orbit';
-import { orbitElementsFromApsides } from '../bodies/orbital-elements';
 import { getShipTypeById } from '../bodies/ships/ship-registry';
 import { TEAM_EARTH } from '../bodies/ships/ship-team';
 import { AlienInvasionScenario } from '../scenarios/alien-invasion-scenario';
@@ -21,19 +18,13 @@ import {
     ALIEN_INVASION_EARTH_HP,
     ALIEN_INVASION_FIGHTER_SPACING,
     ALIEN_INVASION_FLEET_STANDOFF,
-    ALIEN_INVASION_PLAYER_MARS_DISTANCE,
+    ALIEN_INVASION_PLAYER_FLEET_DISTANCE,
     ALIEN_INVASION_TIME_SCALE,
     ALIEN_INVASION_WORMHOLE_EARTH_DISTANCE,
     ALIEN_INVASION_WORMHOLE_RADIUS,
-    MARS_APHELION_DIST,
-    MARS_ARG_PERIHELION,
-    MARS_INCLINATION,
-    MARS_LONG_ASC_NODE,
-    MARS_PERIHELION_DIST,
     MOON_DIST_FROM_EARTH,
     MOON_MASS,
     MOON_RADIUS,
-    SUN_MASS,
 } from '../utilities/consts';
 import { MoonTypeEnum } from '../bodies/body-enums';
 import type { Body } from '../bodies/body';
@@ -60,17 +51,11 @@ const ALIEN_FIGHTERS = Array.from({ length: 20 }, (_, i) => (i % 2 === 0 ? 'wrai
 /** Fighter formation columns (the rest go into rows). */
 const FORMATION_COLUMNS = 5;
 
-/** Samples tried when lining Mars up with Earth. */
-const MARS_ALIGN_SAMPLES = 720;
-
 /**
- * Alien Invasion: the Sun, Earth (with its Moon) and Mars, an unlinked (red) wormhole a few
- * Earth radii out on Earth's sunward side, the Team Earth fleet parked facing it, and the player
- * in a Zenith near Mars. The alien fleet is not built here — it comes through the wormhole once
- * the scenario is running (see AlienInvasionScenario).
- *
- * Mars is placed at Earth's heliocentric longitude (opposition), so the trip to Earth is as
- * short as the real geometry allows.
+ * Alien Invasion: the Sun, Earth (with its Moon), an unlinked (red) wormhole a few Earth radii
+ * out on Earth's sunward side, the Team Earth fleet parked facing it, and the player in a Zenith
+ * behind the fleet. The alien fleet is not built here — it comes through the wormhole once the
+ * scenario is running (see AlienInvasionScenario).
  */
 export class AlienInvasionGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
@@ -84,31 +69,6 @@ export class AlienInvasionGenerator extends SolarSystemGenerator {
         const inputSeed = (seed ?? '').trim();
         this.masterSeed = inputSeed.length > 0 ? inputSeed : generateSeedString();
         this.seed = this.masterSeed;
-    }
-
-    /** Mars's true anomaly that puts it closest in heliocentric longitude to `direction`. */
-    private marsAnomalyToward(direction: THREE.Vector3): number {
-        const elements = orbitElementsFromApsides(
-            MARS_PERIHELION_DIST,
-            MARS_APHELION_DIST,
-            MARS_INCLINATION,
-            MARS_LONG_ASC_NODE,
-            MARS_ARG_PERIHELION
-        );
-        const mu = this.dependencies.getG() * SUN_MASS;
-        const target = new THREE.Vector2(direction.x, direction.z).normalize();
-        let best = 0;
-        let bestDot = -Infinity;
-        for (let i = 0; i < MARS_ALIGN_SAMPLES; i++) {
-            const anomaly = (i / MARS_ALIGN_SAMPLES) * Math.PI * 2;
-            const { pos } = planetOrbitFromElements(elements, anomaly, mu);
-            const dot = new THREE.Vector2(pos.x, pos.z).normalize().dot(target);
-            if (dot > bestDot) {
-                bestDot = dot;
-                best = anomaly;
-            }
-        }
-        return best;
     }
 
     /**
@@ -168,8 +128,8 @@ export class AlienInvasionGenerator extends SolarSystemGenerator {
         reporter?: ProceduralGenerationReporter
     ): Promise<ISolarSystemGenerationResult> {
         const bodies: Body[] = [];
-        // Sun, Earth, Moon, Mars, wormhole, player, Team Earth
-        const totalBodies = 6 + EARTH_CAPITALS.length + EARTH_FIGHTERS.length;
+        // Sun, Earth, Moon, wormhole, player, Team Earth
+        const totalBodies = 5 + EARTH_CAPITALS.length + EARTH_FIGHTERS.length;
         reporter?.setTotal(totalBodies);
 
         const sun = new Sun(this.dependencies, this.scene);
@@ -196,17 +156,10 @@ export class AlienInvasionGenerator extends SolarSystemGenerator {
         moon.orbitParent = earth;
         bodies.push(moon);
 
-        const mars = new Mars(
-            this.dependencies,
-            this.scene,
-            this.marsAnomalyToward(earth.mesh.position)
-        );
-        mars.orbitParent = sun;
-        bodies.push(mars);
         reporter?.report({
-            completed: 4,
+            completed: 3,
             total: totalBodies,
-            workUnit: { phase: 'planets', label: 'Creating Earth and Mars' },
+            workUnit: { phase: 'planets', label: 'Creating Earth and the Moon' },
         });
         await this.yieldToEventLoop();
 
@@ -241,21 +194,21 @@ export class AlienInvasionGenerator extends SolarSystemGenerator {
         const towardWormhole = exitNormal.clone().negate();
         const earthFleet = this.buildEarthFleet(fleetCentre, towardWormhole, earth.velocity);
 
-        // The player: a Zenith off Mars's Earth-facing side, pointed at Earth.
-        const towardEarth = new THREE.Vector3()
-            .subVectors(earth.mesh.position, mars.mesh.position)
-            .normalize();
+        // The player: a Zenith behind the fleet's capital row, facing the wormhole.
         const playerShip = getShipTypeById('zenith').create(
             this.dependencies,
             this.scene,
-            mars.mesh.position
+            fleetCentre
                 .clone()
-                .addScaledVector(towardEarth, ALIEN_INVASION_PLAYER_MARS_DISTANCE),
-            mars.velocity.clone(),
+                .addScaledVector(
+                    exitNormal,
+                    ALIEN_INVASION_CAPITAL_OFFSET + ALIEN_INVASION_PLAYER_FLEET_DISTANCE
+                ),
+            earth.velocity.clone(),
             createUniqueId('spaceship')
         );
         enlistShip(playerShip, TEAM_EARTH);
-        orientShipAlong(playerShip, towardEarth);
+        orientShipAlong(playerShip, towardWormhole);
 
         bodies.push(playerShip, ...earthFleet);
         reporter?.report({

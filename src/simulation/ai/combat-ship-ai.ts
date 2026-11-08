@@ -345,11 +345,14 @@ export class CombatShipAI extends FollowShipAI {
      * Order this ship to bombard `body` (a planet), or pass null to return to team targeting.
      *
      * While bombarding, the ship ignores enemy ships: it flies to a station `standoffFactor` × the
-     * body's radius from its centre — keep it above AI_AVOID_HAZARD_FACTOR, outside the obstacle
-     * avoidance hazard sphere, so avoidance never forbids the approach or the trigger — keeps its
-     * nose on the body, and fires whatever weapon reaches the surface from there (in practice its
+     * body's radius from its centre, keeps its nose on the body, and fires whatever weapon reaches the surface from there (in practice its
      * missiles: the laser's damage falls away long before then). The usual AI_FIRE_RANGE gate,
      * sized for ship-to-ship fights, does not apply.
+     *
+     * The body is excluded from obstacle avoidance (see avoidanceIgnore). Otherwise avoidance
+     * would see the heading to its centre as a collision course at any range and bend the nose
+     * onto the limb, so the ship never closed in or got the body inside its aim cone. Keeping the
+     * ship off the surface is the standoff's job instead: keep `standoffFactor` comfortably above 1.
      */
     setBombardTarget(body: Body | null, standoffFactor: number): void {
         this.bombardTarget = body;
@@ -371,6 +374,10 @@ export class CombatShipAI extends FollowShipAI {
 
     protected override getFlightTarget(): Body | null {
         return this.activeBombardTarget() ?? this.getTarget();
+    }
+
+    protected override avoidanceIgnore(): Body | null {
+        return this.activeBombardTarget();
     }
 
     /**
@@ -1209,22 +1216,31 @@ export class CombatShipAI extends FollowShipAI {
 
         // Geometry is measured live rather than recorded, so it is right in either regime.
         const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
-        const target = this.getTarget();
+        // While bombarding, the planet — not the team target the ship is ignoring.
+        const bombard = this.activeBombardTarget();
+        const shipTarget = bombard ? null : this.getTarget();
+        const target: Body | null = bombard ?? shipTarget;
         if (target) {
             const dir = new THREE.Vector3().subVectors(target.mesh.position, ship.mesh.position);
             const dist = dir.length();
             dir.divideScalar(Math.max(dist, INTERCEPT_EPSILON));
-            const targetFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(target.controlFrameQuat);
             const closing = -new THREE.Vector3()
                 .subVectors(target.velocity, ship.velocity)
                 .dot(dir);
 
             // Nose off: how far this ship has to turn to point at the target.
             // Aspect: angle off the target's nose — 0° it is pointing straight at us, 180° we
-            // are sitting on its tail.
+            // are sitting on its tail. A planet has no nose, so it has no aspect.
+            let geometry = `Nose off ${formatAngleFromCos(fwd.dot(dir))}`;
+            if (shipTarget) {
+                const targetFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(
+                    shipTarget.controlFrameQuat
+                );
+                geometry += `  aspect ${formatAngleFromCos(-targetFwd.dot(dir))}`;
+            }
             lines.push(
                 `Range ${formatDistance(this.hullGap(target, dist))} (hull)  closing ${formatSpeed(closing, true)}`,
-                `Nose off ${formatAngleFromCos(fwd.dot(dir))}  aspect ${formatAngleFromCos(-targetFwd.dot(dir))}`
+                geometry
             );
         }
 

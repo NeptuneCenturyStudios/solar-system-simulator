@@ -200,7 +200,7 @@ export class LaserWeapon extends Weapon {
         this.tipGeometry = new THREE.BufferGeometry();
         this.tipGeometry.setAttribute('position', new THREE.BufferAttribute(this.tipPositions, 3));
         this.tipGeometry.setDrawRange(0, 0);
-        this.tipMaterial = this.createGlowPointMaterial(shipRadius * 1800, 0.9);
+        this.tipMaterial = this.createGlowPointMaterial(shipRadius * 2, 0.9);
         this.tipPoint = new THREE.Points(this.tipGeometry, this.tipMaterial);
         this.tipPoint.frustumCulled = false;
         this.tipPoint.renderOrder = 2;

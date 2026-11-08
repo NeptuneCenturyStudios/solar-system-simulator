@@ -1885,7 +1885,7 @@ async function spawn(
         // Team battle test bed: Team Earth vs Team Alien near Earth, all under locked guidance.
         generator = new TeamSkirmishGenerator(dependencies, scene, proceduralResult?.seed);
     } else if (mode === SimulationStartMode.AlienInvasion) {
-        // Alien invasion: distress call near Mars, then a full fleet battle at Earth.
+        // Alien invasion: distress call at the wormhole, then a full fleet battle at Earth.
         generator = new AlienInvasionGenerator(dependencies, scene, proceduralResult?.seed);
     } else {
         // Empty system generator
@@ -4764,7 +4764,7 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
                 // Team battle test bed — fixed setup, no seed prompt; the player starts in flight.
                 await launchSystem(SimulationStartMode.TeamSkirmish);
             } else if (scenarioResult.scenario === 'alienInvasion') {
-                // Alien invasion — fixed setup, no seed prompt; the player starts in flight near Mars.
+                // Alien invasion — fixed setup, no seed prompt; the player starts in flight behind the Team Earth fleet.
                 await launchSystem(SimulationStartMode.AlienInvasion);
             }
             break;

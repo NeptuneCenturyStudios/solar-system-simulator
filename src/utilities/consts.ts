@@ -1905,8 +1905,8 @@ export const TEAM_SKIRMISH_FIGHTERS_PER_TEAM = 3;
 export const ALIEN_INVASION_TIME_SCALE = 1;
 /** Sim-seconds after the distress call before the alien fleet emerges, wherever the player is. */
 export const ALIEN_INVASION_ARRIVAL_SECS = 90;
-/** The fleet emerges early once the player is this close to the wormhole: 100,000 km. */
-export const ALIEN_INVASION_ARRIVAL_RANGE = 100000 / DIST_SCALE;
+/** The fleet emerges early once the player is this close to the wormhole: 25 km. */
+export const ALIEN_INVASION_ARRIVAL_RANGE = 25 / DIST_SCALE;
 /** Distance of the wormhole from Earth's centre, on the sunward side (≈38,000 km). */
 export const ALIEN_INVASION_WORMHOLE_EARTH_DISTANCE = EARTH_RADIUS * 6;
 /** Radius of the wormhole's mouth: 3 km — wide enough for a Harbinger to emerge through. */
@@ -1919,22 +1919,25 @@ export const ALIEN_INVASION_FIGHTER_SPACING = 1.5 / DIST_SCALE;
 export const ALIEN_INVASION_CAPITAL_OFFSET = 6 / DIST_SCALE;
 /** Side-by-side spacing between Team Earth capital ships: 3 km. */
 export const ALIEN_INVASION_CAPITAL_SPACING = 3 / DIST_SCALE;
-/** Distance of the player's spawn point from Mars's centre (≈20,000 km). */
-export const ALIEN_INVASION_PLAYER_MARS_DISTANCE = MARS_RADIUS * 6;
-/** How far past the wormhole's mouth (exit side) an emerging ship appears: 2 km. */
-export const ALIEN_INVASION_EMERGE_OFFSET = 2 / DIST_SCALE;
+/** Distance of the player's spawn point behind the Team Earth capital row: 50 km. */
+export const ALIEN_INVASION_PLAYER_FLEET_DISTANCE = 50 / DIST_SCALE;
+/** How far past the wormhole's mouth (exit side) an emerging ship appears: 8 km — enough
+ *  room that a ship turning or braking right after it emerges does not drift back across the
+ *  (lethal, unlinked) mouth, while staying well short of the Team Earth line (25 km). */
+export const ALIEN_INVASION_EMERGE_OFFSET = 8 / DIST_SCALE;
 /** Spread of emerging fighters across the wormhole's mouth: 1 km spacing. */
-export const ALIEN_INVASION_EMERGE_SPACING = 1 / DIST_SCALE;
+export const ALIEN_INVASION_EMERGE_SPACING = 2 / DIST_SCALE;
 /** Sim-seconds between groups of ships emerging from the wormhole. */
-export const ALIEN_INVASION_EMERGE_INTERVAL = 3;
+export const ALIEN_INVASION_EMERGE_INTERVAL = 0;
 /** Fighters per emerging group (the motherships come through first, on their own). */
 export const ALIEN_INVASION_EMERGE_GROUP_SIZE = 5;
 /** Sim-seconds the wormhole stays open after the last ship has emerged. */
 export const ALIEN_INVASION_WORMHOLE_LINGER = 4;
 /** Earth's hit points for this scenario (its default, mass-based HP is far beyond any fleet). */
 export const ALIEN_INVASION_EARTH_HP = 20000;
-/** Bombarding motherships hold this multiple of the target's radius from its centre — outside
- *  the AI's planetary hazard sphere (AI_AVOID_HAZARD_FACTOR = 1.3), so avoidance never trips. */
+/** Bombarding motherships hold this multiple of the target's radius from its centre. The target
+ *  is excluded from obstacle avoidance while bombarding, so this standoff is what keeps the ship
+ *  clear of the surface and atmosphere. */
 export const ALIEN_INVASION_BOMBARD_STANDOFF_FACTOR = 1.6;
 
 // === Ship AI autopilot ===

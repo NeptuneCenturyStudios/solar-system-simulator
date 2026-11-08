@@ -136,7 +136,7 @@ export class HarbingerMothership extends Spaceship {
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
             beamColor: 0x30ff60,
             optimalRange: 120_000 / DIST_SCALE,
-            damage: 10,
+            damage: 30,
             coreWidth: 6,
             haloWidth: 14,
             damageInterval: 0.2,
@@ -162,7 +162,7 @@ export class HarbingerMothership extends Spaceship {
                 ]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
-            shield: { hullMultiplier: 4, rechargeTime: 220 },
+            shield: { hullMultiplier: 4, rechargeTime: 170 },
             shipTypeId: 'harbinger_mothership',
             role: ShipRole.Capital,
             thirdPersonOffset: THIRD_PERSON_OFFSET,

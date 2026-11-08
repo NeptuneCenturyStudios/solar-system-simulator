@@ -137,6 +137,19 @@ export class FollowShipAI extends ShipAI {
     }
 
     /**
+     * A body obstacle avoidance must not steer around, or null. For a controller that flies to a
+     * body and owns its proximity to it itself — it holds a standoff from it, and the approach
+     * brakes to that station — the same way the autopilot ignores the body it orbits.
+     *
+     * Needed whenever the flight target is something avoidance counts as a hazard (a planet):
+     * the requested heading points straight at its centre, so it is always inside the hazard's
+     * silhouette cone, and avoidance would bend the nose onto the tangent at any range.
+     */
+    protected avoidanceIgnore(): Body | null {
+        return null;
+    }
+
+    /**
      * Clearance between this ship's hull and the target's, given the distance between their
      * centres. Negative once the hulls overlap.
      *
@@ -298,9 +311,16 @@ export class FollowShipAI extends ShipAI {
      *
      * @param dist Current hull-to-hull distance to the target, in sim units.
      */
-    private flyWarpCruise(dist: number, simDt: number): void {
+    private flyWarpCruise(dist: number, simDt: number, ignore: Body | null): void {
         this.boosting = false;
-        updateWarpCruise(this.ship, this.avoidance, dist - this.followDistance, _directDir, simDt);
+        updateWarpCruise(
+            this.ship,
+            this.avoidance,
+            dist - this.followDistance,
+            _directDir,
+            simDt,
+            ignore
+        );
     }
 
     update(_dt: number, simDt: number): void {
@@ -330,13 +350,14 @@ export class FollowShipAI extends ShipAI {
         }
         _dir.copy(_toTarget).divideScalar(dist);
         _directDir.copy(_dir);
+        const ignore = this.avoidanceIgnore();
 
         // ── Warp cruise ──────────────────────────────────────────────────────
         // Ahead of avoidance, because avoidance hands back a corrected heading and a speed
         // cap — and at warp the ship can act on neither. The only live control is the drive.
         if (ship.warpActive) {
             this.debugPhase = 'WARP CRUISE';
-            this.flyWarpCruise(range, simDt);
+            this.flyWarpCruise(range, simDt, ignore);
             return;
         }
 
@@ -346,7 +367,7 @@ export class FollowShipAI extends ShipAI {
         // detour under its own handling limits exactly as it flies the direct line.
         // Spread out from teammates (team ships only) before hazards get the final say.
         applyFriendlySeparation(ship, _dir);
-        const avoid = this.avoidance.evaluate(_dir, simDt);
+        const avoid = this.avoidance.evaluate(_dir, simDt, ignore);
         _dir.copy(avoid.heading);
 
         this.steerToward(_dir);
@@ -400,7 +421,7 @@ export class FollowShipAI extends ShipAI {
         // cancel calls the key handler makes. Normal flight controls stay live while the
         // charge spools, so the steering above keeps the nose on target the whole time — and
         // if it drifts off, this goes false again and the charge is abandoned.
-        input.warp = wantWarp(ship, this.avoidance, gap, _directDir, avoid, simDt);
+        input.warp = wantWarp(ship, this.avoidance, gap, _directDir, avoid, simDt, ignore);
 
         // Cap the approach at a speed we could still shed before reaching the hazard's surface.
         // Only ever a reduction: avoidance can slow the chase down, never speed it up.
