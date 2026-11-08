@@ -991,7 +991,7 @@ export const SHIP_LANDING_BOUNCE_SPEED = Math.sqrt(
  * hopping forever: a hard landing rebounds at the cap (one hop), lands again and leaves at this
  * fraction of that, so the arc shrinks geometrically and the ship is at rest after a bounce or two.
  */
-export const SHIP_LANDING_BOUNCE_RESTITUTION = 0.25;
+export const SHIP_LANDING_BOUNCE_RESTITUTION = 0.05;
 
 /**
  * Closing speed (sim units/s) below which a ship contact is treated as resting contact and hands
