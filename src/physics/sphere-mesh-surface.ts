@@ -15,9 +15,9 @@ const _qvec = new THREE.Vector3();
 
 /**
  * Writes vertex (iy, ix) of a THREE.SphereGeometry into `out`, using the same formula as
- * SphereGeometry's constructor.
+ * SphereGeometry's constructor — in float64, unlike the geometry's own float32 position buffer.
  */
-function sphereVertex(
+export function sphereVertex(
     params: THREE.SphereGeometry['parameters'],
     ix: number,
     iy: number,
@@ -67,39 +67,43 @@ function rayFromOriginToTriangle(
     return t > 0 ? t : Infinity;
 }
 
+/** Where a ray from a sphere geometry's centre meets its drawn (faceted) surface. */
+export interface ISphereSurfaceHit {
+    /** Distance from the centre to the drawn surface, in geometry units. */
+    distance: number;
+    /** Column of the quad the ray passes through. */
+    ix: number;
+    /** Row of the quad the ray passes through. */
+    iy: number;
+}
+
 /**
- * Fraction of a sphere mesh's nominal radius at which its *drawn* surface actually lies in world
- * direction `worldDir` (unit), i.e. |hit point| / radius for a ray from the centre.
+ * Finds where the ray from the centre of a SphereGeometry along geometry-space unit direction
+ * `localDir` meets the geometry's *drawn* surface — the flat facet it passes through, using
+ * SphereGeometry's own vertex layout — and which quad that facet belongs to.
  *
- * A UV sphere is a polyhedron inscribed in the true sphere: its vertices sit at the radius, but
- * every flat facet between them sags inward — up to ~0.13% for the 64 × 128 body meshes, which is
- * ~8 km on Earth. Anything resting on the true sphere therefore floats visibly above the ground.
- * This finds the triangle the direction passes through (using SphereGeometry's own vertex layout)
- * and returns the distance to it.
+ * This is the one "where is the ground in this direction" query shared by ship contact
+ * ({@link sphereMeshSurfaceFactor}) and the surface precision patch, so what a ship rests on and
+ * what is drawn under it always agree.
  *
- * @param mesh The body mesh (a scene-root object, like every body mesh); its quaternion maps
- *   `worldDir` into geometry space.
- * @returns 1 for a mesh that is not a SphereGeometry (nothing to correct).
+ * @returns false for a direction outside a partial sphere, or a degenerate geometry.
  */
-export function sphereMeshSurfaceFactor(mesh: THREE.Mesh, worldDir: THREE.Vector3): number {
-    const geometry = mesh.geometry;
-    if (!(geometry instanceof THREE.SphereGeometry)) return 1;
-
-    const params = geometry.parameters;
-    if (!(params.radius > 0) || params.widthSegments < 3 || params.heightSegments < 2) return 1;
-
-    _invQuat.copy(mesh.quaternion).invert();
-    _localDir.copy(worldDir).applyQuaternion(_invQuat).normalize();
+export function locateSphereSurface(
+    params: THREE.SphereGeometry['parameters'],
+    localDir: THREE.Vector3,
+    out: ISphereSurfaceHit
+): boolean {
+    if (!(params.radius > 0) || params.widthSegments < 3 || params.heightSegments < 2) return false;
 
     // Invert SphereGeometry's parameterisation: y = cos θ, (x, z) = (−cos φ, sin φ)·sin θ.
-    const theta = Math.acos(THREE.MathUtils.clamp(_localDir.y, -1, 1));
-    let phi = Math.atan2(_localDir.z, -_localDir.x);
+    const theta = Math.acos(THREE.MathUtils.clamp(localDir.y, -1, 1));
+    let phi = Math.atan2(localDir.z, -localDir.x);
     if (phi < 0) phi += Math.PI * 2;
 
     const u = (phi - params.phiStart) / params.phiLength;
     const v = (theta - params.thetaStart) / params.thetaLength;
-    // Partial spheres (not used for bodies) fall outside the mesh — treat as uncorrected.
-    if (u < 0 || u > 1 || v < 0 || v > 1) return 1;
+    // Partial spheres (not used for bodies) fall outside the mesh.
+    if (u < 0 || u > 1 || v < 0 || v > 1) return false;
 
     const W = params.widthSegments;
     const H = params.heightSegments;
@@ -109,7 +113,9 @@ export function sphereMeshSurfaceFactor(mesh: THREE.Mesh, worldDir: THREE.Vector
     // The (u, v) cell is only a first guess: facet edges are straight chords, not the curved
     // lines of constant φ/θ, so near a cell edge the ray can pass through a neighbouring quad.
     // Test the 3 × 3 block of quads around it.
-    let t = Infinity;
+    let best = Infinity;
+    let bestIx = ix0;
+    let bestIy = iy0;
     for (let dy = -1; dy <= 1; dy++) {
         const iy = iy0 + dy;
         if (iy < 0 || iy >= H) continue;
@@ -127,14 +133,48 @@ export function sphereMeshSurfaceFactor(mesh: THREE.Mesh, worldDir: THREE.Vector
             sphereVertex(params, ix, iy + 1, _c);
             sphereVertex(params, ix + 1, iy + 1, _d);
 
-            t = Math.min(
-                t,
-                rayFromOriginToTriangle(_localDir, _a, _b, _d),
-                rayFromOriginToTriangle(_localDir, _b, _c, _d)
+            const t = Math.min(
+                rayFromOriginToTriangle(localDir, _a, _b, _d),
+                rayFromOriginToTriangle(localDir, _b, _c, _d)
             );
+            if (t < best) {
+                best = t;
+                bestIx = ix;
+                bestIy = iy;
+            }
         }
     }
-    if (!Number.isFinite(t)) return 1;
+    if (!Number.isFinite(best)) return false;
 
-    return THREE.MathUtils.clamp(t / params.radius, 0.9, 1);
+    out.distance = best;
+    out.ix = bestIx;
+    out.iy = bestIy;
+    return true;
+}
+
+const _hit: ISphereSurfaceHit = { distance: 0, ix: 0, iy: 0 };
+
+/**
+ * Fraction of a sphere mesh's nominal radius at which its *drawn* surface actually lies in world
+ * direction `worldDir` (unit), i.e. |hit point| / radius for a ray from the centre.
+ *
+ * A UV sphere is a polyhedron inscribed in the true sphere: its vertices sit at the radius, but
+ * every flat facet between them sags inward — up to ~0.13% for the 64 × 128 body meshes, which is
+ * ~8 km on Earth. Anything resting on the true sphere therefore floats visibly above the ground.
+ * See {@link locateSphereSurface}.
+ *
+ * @param mesh The body mesh (a scene-root object, like every body mesh); its quaternion maps
+ *   `worldDir` into geometry space.
+ * @returns 1 for a mesh that is not a SphereGeometry (nothing to correct).
+ */
+export function sphereMeshSurfaceFactor(mesh: THREE.Mesh, worldDir: THREE.Vector3): number {
+    const geometry = mesh.geometry;
+    if (!(geometry instanceof THREE.SphereGeometry)) return 1;
+
+    const params = geometry.parameters;
+    _invQuat.copy(mesh.quaternion).invert();
+    _localDir.copy(worldDir).applyQuaternion(_invQuat).normalize();
+
+    if (!locateSphereSurface(params, _localDir, _hit)) return 1;
+    return THREE.MathUtils.clamp(_hit.distance / params.radius, 0.9, 1);
 }

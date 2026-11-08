@@ -12,6 +12,7 @@ import { SunRaysEffect } from '../effects/sun-rays';
 import { LensFlareEffect } from '../effects/lens-flare';
 import { beginStarLightingFrame } from '../effects/star-illumination';
 import { SkyBackgroundDimmer } from '../effects/sky-background';
+import { SurfacePrecisionPatch } from '../effects/surface-precision-patch';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { VelocityArcManager } from '../drawing/velocity-arc';
 import { OrbitPredictionManager } from '../drawing/orbit-prediction';
@@ -202,6 +203,7 @@ const _trailNozzle = new THREE.Vector3();
 const _trailExhaustDir = new THREE.Vector3();
 /** Dims the starfield under a daytime sky (see effects/sky-background.ts). */
 const _skyBackground = new SkyBackgroundDimmer();
+const _surfacePatch = new SurfacePrecisionPatch();
 
 /**
  * Whether a ship's main engine is firing this frame — the signal that drives the
@@ -1609,6 +1611,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.missileTrackerIndicator.update(ctx.screenProjector);
 
         // ── Render ──────────────────────────────────────────────────────────
+        // Redraw the ground under the camera in camera-local precision, so the nearest body's
+        // float32-rounded surface doesn't jitter against ships resting on it.
+        _surfacePatch.update(ctx.camera, ctx.simulationState.bodies);
         // A daytime sky around the camera hides the starfield behind it.
         _skyBackground.update(ctx.scene, ctx.camera.position, ctx.simulationState.bodies, wallDt);
         // Eclipse occluders and the ship shadow atlas, from the camera's final pose this frame.

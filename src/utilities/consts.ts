@@ -658,6 +658,28 @@ export const SHIP_SHADOW_TILE_HALF_WIDTH = 0.6;
 /** Render layer the ship hulls are put on so the shadow pass draws only them. */
 export const SHADOW_CASTER_LAYER = 5;
 
+// === Surface precision patch (effects/surface-precision-patch.ts) ===
+/**
+ * Camera altitude (sim units) above a body's drawn surface below which the ground under the
+ * camera is redrawn by the precision patch. Above it the body mesh's float32 rounding (≈ radius ×
+ * 6e-8: ~4 m on Jupiter) is far below a pixel.
+ */
+export const SURFACE_PATCH_MAX_ALTITUDE = 500 / DIST_SCALE; // 500 km
+/**
+ * The patch splits a triangle while its longest edge exceeds this × its distance from the camera,
+ * so triangles grow geometrically with distance and the vertices near the camera stay tiny.
+ */
+export const SURFACE_PATCH_SUBDIVIDE_RATIO = 1.0;
+/** Shortest triangle edge (sim units) the patch splits down to. */
+export const SURFACE_PATCH_MIN_EDGE = 1 / 1000 / DIST_SCALE; // 1 m
+/** Hard cap on the patch's triangle count; splitting stops once it is reached. */
+export const SURFACE_PATCH_MAX_TRIANGLES = 30000;
+/**
+ * The patch is rebuilt around a new origin once the point under the camera has moved more than
+ * this × the camera's altitude (or onto a different quad of the body mesh).
+ */
+export const SURFACE_PATCH_REBUILD_FRACTION = 0.25;
+
 // === Sky / atmosphere lighting ===
 // A sky is lit by the exact irradiance each star's point light delivers to the body (its
 // intensity, STAR_LIGHT_DECAY and light distance), the same light the surface receives, with no

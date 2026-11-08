@@ -2017,7 +2017,9 @@ function onMouseDown(event: MouseEvent) {
             if (cameraState.isFreeCameraMode) {
                 // Free camera: look at what's under the mouse
                 const allObjects = simulationState.bodies.map((b) => b.mesh);
-                const intersects = raycaster.intersectObjects(allObjects, false);
+                // Recursive, so the surface precision patch (a child drawing the ground under the
+                // camera, cut out of the body mesh) is hit too.
+                const intersects = raycaster.intersectObjects(allObjects, true);
 
                 let lookAtPoint;
                 if (intersects.length > 0) {
