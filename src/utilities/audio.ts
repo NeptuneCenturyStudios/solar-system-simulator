@@ -48,6 +48,9 @@ export enum SoundEffect {
     LandingInitiated,
     LandingCanceled,
     LandingComplete,
+    // Scenario voice lines
+    AssistanceNeeded,
+    EarthUnderAttack,
     // Weapon sounds
     WeaponFire,
     WeaponImpact,
@@ -211,6 +214,32 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     [SoundEffect.LandingComplete]: {
         soundEffectBank: [
             new URL('../assets/sounds/voice/landing-complete.mp3', import.meta.url).href,
+        ],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
+        activeLoop: null,
+    },
+    [SoundEffect.AssistanceNeeded]: {
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/assistance-needed.mp3', import.meta.url).href,
+        ],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
+        activeLoop: null,
+    },
+    [SoundEffect.EarthUnderAttack]: {
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/earth-under-attack.mp3', import.meta.url).href,
         ],
         buffers: [],
         volume: 1.0,

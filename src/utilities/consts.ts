@@ -19,6 +19,8 @@ export enum SimulationStartMode {
     OsirisAmbush = 9,
     /** Test scenario: a small Team Earth vs Team Alien fleet battle near Earth, under locked guidance. */
     TeamSkirmish = 10,
+    /** Scenario: a distress call, a red wormhole near Earth, and a full Team Earth vs alien fleet battle. */
+    AlienInvasion = 11,
 }
 
 // === Particle Alpha Range for Accretion Disk & Siphon Effects ===
@@ -1897,6 +1899,43 @@ export const TEAM_SKIRMISH_CAPITAL_OFFSET = 6 / DIST_SCALE;
 export const TEAM_SKIRMISH_CAPITAL_SPACING = 2 / DIST_SCALE;
 /** AI fighters per team (the player flies an extra fighter for Team Earth). */
 export const TEAM_SKIRMISH_FIGHTERS_PER_TEAM = 3;
+
+// === Alien Invasion scenario ===
+/** Fixed time scale for the scenario. */
+export const ALIEN_INVASION_TIME_SCALE = 1;
+/** Sim-seconds after the distress call before the alien fleet emerges, wherever the player is. */
+export const ALIEN_INVASION_ARRIVAL_SECS = 90;
+/** The fleet emerges early once the player is this close to the wormhole: 100,000 km. */
+export const ALIEN_INVASION_ARRIVAL_RANGE = 100000 / DIST_SCALE;
+/** Distance of the wormhole from Earth's centre, on the sunward side (≈38,000 km). */
+export const ALIEN_INVASION_WORMHOLE_EARTH_DISTANCE = EARTH_RADIUS * 6;
+/** Radius of the wormhole's mouth: 3 km — wide enough for a Harbinger to emerge through. */
+export const ALIEN_INVASION_WORMHOLE_RADIUS = 3 / DIST_SCALE;
+/** Distance from the wormhole to the centre of the Team Earth fleet's fighter line: 25 km. */
+export const ALIEN_INVASION_FLEET_STANDOFF = 25 / DIST_SCALE;
+/** Spacing between Team Earth fighters in their formation grid: 1.5 km. */
+export const ALIEN_INVASION_FIGHTER_SPACING = 1.5 / DIST_SCALE;
+/** Offset of the Team Earth capital row behind the fighters: 6 km. */
+export const ALIEN_INVASION_CAPITAL_OFFSET = 6 / DIST_SCALE;
+/** Side-by-side spacing between Team Earth capital ships: 3 km. */
+export const ALIEN_INVASION_CAPITAL_SPACING = 3 / DIST_SCALE;
+/** Distance of the player's spawn point from Mars's centre (≈20,000 km). */
+export const ALIEN_INVASION_PLAYER_MARS_DISTANCE = MARS_RADIUS * 6;
+/** How far past the wormhole's mouth (exit side) an emerging ship appears: 2 km. */
+export const ALIEN_INVASION_EMERGE_OFFSET = 2 / DIST_SCALE;
+/** Spread of emerging fighters across the wormhole's mouth: 1 km spacing. */
+export const ALIEN_INVASION_EMERGE_SPACING = 1 / DIST_SCALE;
+/** Sim-seconds between groups of ships emerging from the wormhole. */
+export const ALIEN_INVASION_EMERGE_INTERVAL = 3;
+/** Fighters per emerging group (the motherships come through first, on their own). */
+export const ALIEN_INVASION_EMERGE_GROUP_SIZE = 5;
+/** Sim-seconds the wormhole stays open after the last ship has emerged. */
+export const ALIEN_INVASION_WORMHOLE_LINGER = 4;
+/** Earth's hit points for this scenario (its default, mass-based HP is far beyond any fleet). */
+export const ALIEN_INVASION_EARTH_HP = 20000;
+/** Bombarding motherships hold this multiple of the target's radius from its centre — outside
+ *  the AI's planetary hazard sphere (AI_AVOID_HAZARD_FACTOR = 1.3), so avoidance never trips. */
+export const ALIEN_INVASION_BOMBARD_STANDOFF_FACTOR = 1.6;
 
 // === Ship AI autopilot ===
 // The Ship AI autopilot (simulation/ai/autopilot-ship-ai.ts) flies only through controlInput, in

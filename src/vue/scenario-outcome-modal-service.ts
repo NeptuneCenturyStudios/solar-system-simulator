@@ -11,7 +11,7 @@
  * that request so scenario code never has to know about UI wording.
  */
 
-import { mdiCheck, mdiRestart, mdiRocketLaunchOutline } from '@mdi/js';
+import { mdiCheck, mdiEye, mdiRestart, mdiRocketLaunchOutline } from '@mdi/js';
 
 import type { ScenarioOutcomeReport } from '../scenarios/scenario-outcome';
 
@@ -25,7 +25,7 @@ export interface ScenarioDialogStat {
 }
 
 /** Identifier of a dialog button; resolved back to the caller via the result. */
-export type ScenarioDialogActionId = 'restart' | 'newScenario' | 'ok';
+export type ScenarioDialogActionId = 'restart' | 'newScenario' | 'ok' | 'spectate';
 
 /** One button in the dialog footer. */
 export interface ScenarioDialogAction {
@@ -122,6 +122,26 @@ export function showScenarioInfoModal(options: {
         message: options.message,
         stats: options.stats,
         actions: [{ id: 'ok', label: 'OK', icon: mdiCheck }],
+    };
+    const instance = requireController();
+    if (!instance) return Promise.resolve(null);
+    return instance.show(request);
+}
+
+/**
+ * Shows the dialog for a player whose ship was destroyed while their team fights on: restart
+ * the scenario, or keep watching. Resolves with the chosen action, or `null` if the modal is
+ * not registered.
+ */
+export function showPlayerDownModal(scenarioName: string): Promise<ScenarioDialogResult | null> {
+    const request: ScenarioDialogRequest = {
+        variant: 'danger',
+        title: 'Your Ship Is Down',
+        message: `Your team is still fighting in ${scenarioName}. Restart, or spectate the rest of the battle?`,
+        actions: [
+            { id: 'restart', label: 'RESTART', icon: mdiRestart },
+            { id: 'spectate', label: 'SPECTATE', icon: mdiEye },
+        ],
     };
     const instance = requireController();
     if (!instance) return Promise.resolve(null);

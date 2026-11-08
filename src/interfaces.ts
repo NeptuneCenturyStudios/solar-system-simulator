@@ -637,6 +637,10 @@ export interface IStateDependencies {
     getC: () => EffectiveCSpeed;
     /** Show or hide the Vue PanelManager (toolbar + System Explorer/panels). */
     setPanelManagerVisible: (visible: boolean) => void;
+    /** Make `body` the selected body (stats panel, autopilot destination), without moving the camera. */
+    selectBody: (body: Body | null) => void;
+    /** Turn Look At on and follow `body` with the camera — used to spectate after the player dies. */
+    spectateBody: (body: Body) => void;
 }
 
 /**

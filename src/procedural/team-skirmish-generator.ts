@@ -6,9 +6,8 @@ import { Earth } from '../bodies/earth';
 import { createMoon, earthMoonOrbitElements } from '../bodies/create-moon';
 import { getShipTypeById } from '../bodies/ships/ship-registry';
 import { TEAM_ALIEN, TEAM_EARTH, type ShipTeam } from '../bodies/ships/ship-team';
-import { createNpcShip } from '../simulation/ai/npc-manager';
-import { CombatShipAI } from '../simulation/ai/combat-ship-ai';
 import { TeamSkirmishScenario } from '../scenarios/team-skirmish-scenario';
+import { enlistShip, orientShipAlong, spawnFleetShip } from '../scenarios/fleet-spawn';
 import { pickRandomSpaceTexture, generateSeedString } from './seed-utils';
 import { createUniqueId } from '../utilities/utilities';
 import { moonTexture } from '../drawing/textures';
@@ -62,21 +61,6 @@ export class TeamSkirmishGenerator extends SolarSystemGenerator {
         this.seed = this.masterSeed;
     }
 
-    /** Point a ship along `heading` (ships are +Z forward; lookAt aims -Z, hence the inversion). */
-    private orientAlong(ship: Spaceship, heading: THREE.Vector3): void {
-        const eye = ship.mesh.position.clone().add(heading);
-        const m = new THREE.Matrix4().lookAt(eye, ship.mesh.position, new THREE.Vector3(0, 1, 0));
-        ship.mesh.quaternion.setFromRotationMatrix(m);
-        ship.controlFrameQuat.copy(ship.mesh.quaternion);
-    }
-
-    /** Put a ship on a team, with guidance forced on. */
-    private enlist(ship: Spaceship, team: ShipTeam): void {
-        ship.team = team;
-        ship.guidanceEnabled = true;
-        ship.guidanceLocked = true;
-    }
-
     /**
      * Build one fleet: a line of fighters across `side` at `centre`, facing `heading`, plus the
      * capital ships side by side behind them. Returns the AI ships (the player is added by the
@@ -98,19 +82,16 @@ export class TeamSkirmishGenerator extends SolarSystemGenerator {
             const n = (counts.get(typeId) ?? 0) + 1;
             counts.set(typeId, n);
             const label = getShipTypeById(typeId).label;
-            const ship = createNpcShip({
+            return spawnFleetShip({
                 dependencies: this.dependencies,
                 scene: this.scene,
-                position,
-                velocity: velocity.clone(),
                 shipTypeId: typeId,
-                name: `${label} ${n}`,
+                position,
+                velocity,
+                heading,
                 team,
-                ai: (s) => new CombatShipAI(s),
+                name: `${label} ${n}`,
             });
-            this.enlist(ship, team);
-            this.orientAlong(ship, heading);
-            return ship;
         };
 
         // Capitals sit behind the fighter line, spread horizontally (fighters spread along
@@ -225,8 +206,8 @@ export class TeamSkirmishGenerator extends SolarSystemGenerator {
             velocity.clone(),
             createUniqueId('spaceship')
         );
-        this.enlist(playerShip, TEAM_EARTH);
-        this.orientAlong(playerShip, towardAliens);
+        enlistShip(playerShip, TEAM_EARTH);
+        orientShipAlong(playerShip, towardAliens);
 
         bodies.push(playerShip, ...earthFleet, ...alienFleet);
         reporter?.report({

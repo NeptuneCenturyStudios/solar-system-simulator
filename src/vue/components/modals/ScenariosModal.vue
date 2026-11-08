@@ -68,6 +68,14 @@
             <button
                 class="old-ui btn-dark btn-with-icon"
                 type="button"
+                @click="selectScenario('alienInvasion')"
+            >
+                <svg-icon type="mdi" :path="mdiAlien"></svg-icon>
+                ALIEN INVASION
+            </button>
+            <button
+                class="old-ui btn-dark btn-with-icon"
+                type="button"
                 @click="selectScenario('teamSkirmish')"
             >
                 <svg-icon type="mdi" :path="mdiAccountGroup"></svg-icon>
@@ -94,6 +102,7 @@ import SvgIcon from '@jamescoyle/vue-icon';
 import {
     mdiAccountGroup,
     mdiAlertOutline,
+    mdiAlien,
     mdiArrowLeft,
     mdiCircle,
     mdiGrain,

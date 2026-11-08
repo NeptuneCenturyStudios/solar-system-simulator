@@ -285,11 +285,23 @@ export class CombatShipAI extends FollowShipAI {
      * follow controller flies all of it — approach, braking, backing off when crowded.
      */
     private readonly isCapital: boolean;
+    /** Hold distance for ship targets, restored when a bombardment ends. */
+    private readonly shipFollowDistance: number;
+
+    /**
+     * A non-ship body (a planet) this ship has been ordered to bombard, or null. Set by a
+     * scenario through setBombardTarget; while it is alive it overrides team targeting.
+     */
+    private bombardTarget: Body | null = null;
 
     constructor(ship: Spaceship) {
         const isCapital = ship.role === ShipRole.Capital;
-        super(ship, isCapital ? capitalStandoffDistance(ship) : NPC_COMBAT_FOLLOW_DISTANCE);
+        const followDistance = isCapital
+            ? capitalStandoffDistance(ship)
+            : NPC_COMBAT_FOLLOW_DISTANCE;
+        super(ship, followDistance);
         this.isCapital = isCapital;
+        this.shipFollowDistance = followDistance;
 
         // Enter the burst cycle at a random phase: open with the probability the cycle spends
         // open, part-way through a freshly rolled phase.
@@ -327,6 +339,38 @@ export class CombatShipAI extends FollowShipAI {
             h.flightMaxSpeed * AI_CLOSING_SPEED_TOLERANCE
         );
         return Math.max(floor, Math.abs(desiredClosing) * AI_CLOSING_SPEED_TOLERANCE);
+    }
+
+    /**
+     * Order this ship to bombard `body` (a planet), or pass null to return to team targeting.
+     *
+     * While bombarding, the ship ignores enemy ships: it flies to a station `standoffFactor` × the
+     * body's radius from its centre — keep it above AI_AVOID_HAZARD_FACTOR, outside the obstacle
+     * avoidance hazard sphere, so avoidance never forbids the approach or the trigger — keeps its
+     * nose on the body, and fires whatever weapon reaches the surface from there (in practice its
+     * missiles: the laser's damage falls away long before then). The usual AI_FIRE_RANGE gate,
+     * sized for ship-to-ship fights, does not apply.
+     */
+    setBombardTarget(body: Body | null, standoffFactor: number): void {
+        this.bombardTarget = body;
+        this.followDistance = body
+            ? Math.max(this.shipFollowDistance, body.radius * (standoffFactor - 1))
+            : this.shipFollowDistance;
+    }
+
+    /** The live bombard target, or null. Drops the order once the body is gone. */
+    private activeBombardTarget(): Body | null {
+        const body = this.bombardTarget;
+        if (!body) return null;
+        if (body._isDisposed || !body.mesh || !simulationState.bodies.includes(body)) {
+            this.setBombardTarget(null, 1);
+            return null;
+        }
+        return body;
+    }
+
+    protected override getFlightTarget(): Body | null {
+        return this.activeBombardTarget() ?? this.getTarget();
     }
 
     /**
@@ -965,6 +1009,16 @@ export class CombatShipAI extends FollowShipAI {
         // dogfight clears it explicitly, and the base controller clears it on the normal path,
         // inside the warp cruise, and via resetControlInput() when there is no target — so what
         // follows starts from a released trigger and only has to decide whether to raise it.
+        // Bombarding: the follow controller holds station on the planet; there is no dogfight.
+        const bombard = this.activeBombardTarget();
+        if (bombard) {
+            this.dogfighting = false;
+            super.update(dt, simDt);
+            this.advanceTimers(simDt);
+            this.debugGun = this.updateGunnery();
+            return;
+        }
+
         const flightTarget = this.getTarget();
         // Ahead of the dogfight, which bypasses super.update() and reads `ship.handling` at its
         // top. If the target outruns the low tier the ship is still high here, and the dogfight
@@ -996,7 +1050,7 @@ export class CombatShipAI extends FollowShipAI {
      *
      * @param range Hull-to-hull distance from the muzzle.
      */
-    private updateWeaponChoice(target: Spaceship, range: number): boolean {
+    private updateWeaponChoice(target: Body, range: number): boolean {
         const ship = this.ship;
         const groups = ship.weaponGroups;
         const shieldW = shieldWeight(target);
@@ -1043,7 +1097,8 @@ export class CombatShipAI extends FollowShipAI {
         // Warp locks out weapons, the same as it does for the player.
         if (ship.warpActive || ship.warpCharging || ship.warpDecelerating) return 'warp';
 
-        const target = this.getTarget();
+        const bombard = this.activeBombardTarget();
+        const target: Body | null = bombard ?? this.getTarget();
         if (!target) return 'no target';
 
         // About to fly into something. Flying clear takes priority over shooting.
@@ -1054,9 +1109,10 @@ export class CombatShipAI extends FollowShipAI {
         _toTarget.subVectors(target.mesh.position, _muzzle);
         const dist = _toTarget.length();
         if (dist < INTERCEPT_EPSILON) return 'out of range';
-        // Range to the hull: a capital ship is in reach once its near side is.
+        // Range to the hull: a capital ship is in reach once its near side is. A bombardment
+        // is limited only by the weapons' own reach (checked by the weapon choice below).
         const range = dist - hullRadius(target);
-        if (range > AI_FIRE_RANGE) return 'out of range';
+        if (!bombard && range > AI_FIRE_RANGE) return 'out of range';
 
         // ── Weapon choice ────────────────────────────────────────────────────
         // Ahead of the burst gate, so a rest between bursts is also a chance to change mounts.
@@ -1139,11 +1195,13 @@ export class CombatShipAI extends FollowShipAI {
     override debugLines(): string[] {
         const ship = this.ship;
 
-        let header = this.dogfighting
-            ? `${this.name} · DOGFIGHT ${this.debugPhase}`
-            : this.isCapital
-              ? `${this.name} · STANDOFF ${this.debugPhase}  hold ${formatDistance(this.followDistance)}`
-              : `${this.name} · ${this.debugPhase}`;
+        let header = this.bombardTarget
+            ? `${this.name} · BOMBARD ${this.bombardTarget.name} ${this.debugPhase}  hold ${formatDistance(this.followDistance)}`
+            : this.dogfighting
+              ? `${this.name} · DOGFIGHT ${this.debugPhase}`
+              : this.isCapital
+                ? `${this.name} · STANDOFF ${this.debugPhase}  hold ${formatDistance(this.followDistance)}`
+                : `${this.name} · ${this.debugPhase}`;
         if (this.dogfighting && this.state === 'extend') {
             header += ` ${this.extendTimer.toFixed(1)}s`;
         }

@@ -4,15 +4,23 @@ import {
     AI_SHIELD_UP_FRACTION,
     AI_WEAPON_HEAT_PENALTY,
 } from '../../utilities/consts';
+import type { Body } from '../../bodies/body';
 import type { Spaceship } from '../../bodies/ships/spaceship';
 import type { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
+
+/** True for a body that carries a shield (a ship). Structural, to keep this module type-only. */
+function isShielded(target: Body): target is Spaceship {
+    return 'maxShieldPoints' in target;
+}
 
 /**
  * How much the target's shield should count when scoring weapons: 1 while it is up, 0 once it
  * is down, blending smoothly in between (see AI_SHIELD_DOWN_FRACTION / AI_SHIELD_UP_FRACTION).
- * A ship with no shield capacity is all hull.
+ * A ship with no shield capacity — or a target that isn't a ship at all, such as a planet — is
+ * all hull.
  */
-export function shieldWeight(target: Spaceship): number {
+export function shieldWeight(target: Body): number {
+    if (!isShielded(target)) return 0;
     const fraction = target.maxShieldPoints > 0 ? target.shieldPoints / target.maxShieldPoints : 0;
     return THREE.MathUtils.smoothstep(fraction, AI_SHIELD_DOWN_FRACTION, AI_SHIELD_UP_FRACTION);
 }

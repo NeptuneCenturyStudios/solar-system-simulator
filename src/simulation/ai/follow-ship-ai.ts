@@ -18,6 +18,7 @@ import {
     NPC_FOLLOW_DISTANCE,
 } from '../../utilities/consts';
 import type { Spaceship } from '../../bodies/ships/spaceship';
+import type { Body } from '../../bodies/body';
 import type { ISpaceshipHandling } from '../../interfaces';
 import { TargetSelector } from './target-selector';
 import { applyFriendlySeparation } from './navigation/friendly-separation';
@@ -32,9 +33,9 @@ const _directDir = new THREE.Vector3();
 const _relVel = new THREE.Vector3();
 const _forward = new THREE.Vector3();
 
-/** A ship's collision radius, or 0 when it has none that can be trusted. */
-export function hullRadius(ship: Spaceship): number {
-    return Number.isFinite(ship.radius) && ship.radius > 0 ? ship.radius : 0;
+/** A body's collision radius, or 0 when it has none that can be trusted. */
+export function hullRadius(body: Body): number {
+    return Number.isFinite(body.radius) && body.radius > 0 ? body.radius : 0;
 }
 
 /**
@@ -78,11 +79,12 @@ export class FollowShipAI extends ShipAI {
     /**
      * @param ship The ship this controller pilots.
      * @param followDistance Station-keeping distance in sim units. Defaults to
-     *   NPC_FOLLOW_DISTANCE (5,000 km / DIST_SCALE).
+     *   NPC_FOLLOW_DISTANCE (5,000 km / DIST_SCALE). Mutable so a subclass can hold a different
+     *   station for a different kind of target (see CombatShipAI.setBombardTarget).
      */
     constructor(
         ship: Spaceship,
-        protected readonly followDistance: number = NPC_FOLLOW_DISTANCE
+        protected followDistance: number = NPC_FOLLOW_DISTANCE
     ) {
         super(ship);
         this.targetSelector = new TargetSelector(ship);
@@ -127,6 +129,14 @@ export class FollowShipAI extends ShipAI {
     }
 
     /**
+     * The body the approach controller flies to and holds station on: the ship from getTarget(),
+     * unless a subclass points it at something else (a planet to bombard, say).
+     */
+    protected getFlightTarget(): Body | null {
+        return this.getTarget();
+    }
+
+    /**
      * Clearance between this ship's hull and the target's, given the distance between their
      * centres. Negative once the hulls overlap.
      *
@@ -136,7 +146,7 @@ export class FollowShipAI extends ShipAI {
      * 37 m fighter leaves plenty of room, but 500 m from the centre of a 500 m-radius capital ship
      * is its hull plating, and the follower holds station by ramming it.
      */
-    protected hullGap(target: Spaceship, centreDistance: number): number {
+    protected hullGap(target: Body, centreDistance: number): number {
         return centreDistance - hullRadius(target) - hullRadius(this.ship);
     }
 
@@ -171,7 +181,7 @@ export class FollowShipAI extends ShipAI {
      *
      * Must run before anything reads `ship.handling` this frame.
      */
-    protected updateSpeedMode(target: Spaceship | null): void {
+    protected updateSpeedMode(target: Body | null): void {
         const ship = this.ship;
         if (!target) {
             if (ship.highSpeedMode) ship.setHighSpeedMode(false);
@@ -297,7 +307,7 @@ export class FollowShipAI extends ShipAI {
         const ship = this.ship;
         const input = ship.controlInput;
 
-        const target = this.getTarget();
+        const target = this.getFlightTarget();
         // Before `ship.handling` is read: the tier picked here is the one flown this frame.
         this.updateSpeedMode(target);
         const h = ship.handling;

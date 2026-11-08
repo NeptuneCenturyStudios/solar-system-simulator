@@ -145,6 +145,7 @@ import { LeadAimIndicator } from './drawing/lead-aim-indicator';
 import { installKeyboardControls } from './simulation/keyboard-controls';
 import { ScreenFlashEffect, registerScreenFlash } from './effects/screen-flash';
 import { ScenarioMessageHud, registerScenarioMessageHud } from './drawing/scenario-message-hud';
+import { TeamScoreHud, registerTeamScoreHud } from './drawing/team-score-hud';
 import { VelocityArcManager } from './drawing/velocity-arc';
 import { OrbitPredictionManager } from './drawing/orbit-prediction';
 import { SurfaceCameraManager } from './camera/surface-camera';
@@ -238,7 +239,9 @@ import {
 import { aboutModalIsVisible } from './vue/about-modal-service';
 import { showScenariosModal, scenariosModalIsVisible } from './vue/scenarios-modal-service';
 import {
+    hideScenarioOutcomeModal,
     scenarioOutcomeModalIsVisible,
+    showPlayerDownModal,
     showScenarioOutcomeModal,
 } from './vue/scenario-outcome-modal-service';
 import {
@@ -378,10 +381,13 @@ import { AsteroidDefenseGenerator } from './procedural/asteroid-defense-generato
 import { ExtinctionEventGenerator } from './procedural/extinction-event-generator';
 import { OsirisAmbushGenerator } from './procedural/osiris-ambush-generator';
 import { TeamSkirmishGenerator } from './procedural/team-skirmish-generator';
+import { AlienInvasionGenerator } from './procedural/alien-invasion-generator';
 import { clearNpcShips, registerNpcShipsIn } from './simulation/ai/npc-manager';
 import { scenarioManager } from './scenarios/scenario-manager';
 import {
+    registerPlayerDownHandler,
     registerScenarioOutcomeHandler,
+    type PlayerDownChoice,
     type ScenarioOutcomeReport,
 } from './scenarios/scenario-outcome';
 
@@ -765,6 +771,15 @@ const dependencies: IStateDependencies = {
     // otherwise yield NaN effective lightspeed and poison every velocity.
     getC: () => (C * Math.sqrt(Math.max(0, simulationState.gMultiplier))) as EffectiveCSpeed,
     setPanelManagerVisible: setPanelManagerVisible,
+    selectBody: (body: Body | null) => {
+        selectedBody = body;
+        manuallySelectedBody = body;
+    },
+    spectateBody: (body: Body) => {
+        cameraState.isLookAtMode = true;
+        cameraState.isFreeCameraMode = false;
+        setFocusBody(body, { zoom: true });
+    },
 };
 
 // --- Velocity editing arc helpers ---
@@ -886,6 +901,8 @@ registerScreenFlash(screenFlash);
 // Rendered as a canvas-texture sprite in uiScene; advanced each frame by the animation loop.
 const scenarioMessageHud = new ScenarioMessageHud(uiScene);
 registerScenarioMessageHud(scenarioMessageHud);
+const teamScoreHud = new TeamScoreHud(uiScene);
+registerTeamScoreHud(teamScoreHud);
 
 // Backward-compatible let kept for basic module-level state
 let manuallySelectedBody = null as Body | null; // Track bodies clicked in space (without camera buttons)
@@ -1867,6 +1884,9 @@ async function spawn(
     } else if (mode === SimulationStartMode.TeamSkirmish) {
         // Team battle test bed: Team Earth vs Team Alien near Earth, all under locked guidance.
         generator = new TeamSkirmishGenerator(dependencies, scene, proceduralResult?.seed);
+    } else if (mode === SimulationStartMode.AlienInvasion) {
+        // Alien invasion: distress call near Mars, then a full fleet battle at Earth.
+        generator = new AlienInvasionGenerator(dependencies, scene, proceduralResult?.seed);
     } else {
         // Empty system generator
         generator = new EmptySystemGenerator(dependencies, scene);
@@ -4472,6 +4492,7 @@ window.addEventListener('resize', () => {
     sunRaysEffect.resize(window.innerWidth, window.innerHeight);
     screenFlash.resize(window.innerWidth, window.innerHeight);
     scenarioMessageHud.resize(window.innerWidth, window.innerHeight);
+    teamScoreHud.resize(window.innerWidth, window.innerHeight);
 });
 
 function handleBodyBecameInvalid(body: Body | null | undefined) {
@@ -4742,6 +4763,9 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
             } else if (scenarioResult.scenario === 'teamSkirmish') {
                 // Team battle test bed — fixed setup, no seed prompt; the player starts in flight.
                 await launchSystem(SimulationStartMode.TeamSkirmish);
+            } else if (scenarioResult.scenario === 'alienInvasion') {
+                // Alien invasion — fixed setup, no seed prompt; the player starts in flight near Mars.
+                await launchSystem(SimulationStartMode.AlienInvasion);
             }
             break;
         }
@@ -4765,6 +4789,9 @@ async function handleScenarioOutcome(report: ScenarioOutcomeReport): Promise<voi
     // steals focus — popping it up instantly feels jarring.
     await new Promise((resolve) => setTimeout(resolve, SCENARIO_OUTCOME_MODAL_DELAY_MS));
 
+    // A player-down dialog still open (the battle ended while the player was choosing) is
+    // dismissed so its pending choice resolves, then replaced by the outcome.
+    if (scenarioOutcomeModalIsVisible()) hideScenarioOutcomeModal();
     const result = await showScenarioOutcomeModal(report);
     if (!result) return;
 
@@ -4778,6 +4805,28 @@ async function handleScenarioOutcome(report: ScenarioOutcomeReport): Promise<voi
 registerScenarioOutcomeHandler((report) => {
     void handleScenarioOutcome(report);
 });
+
+/**
+ * The player's ship went down while their team fights on: offer a restart, or spectating the
+ * rest of the battle. Restart is handled here; 'spectate' is handed back to the scenario.
+ */
+async function handlePlayerDown(scenarioName: string): Promise<PlayerDownChoice | null> {
+    if (flightState.isActive) exitFlightMode(flightCtx);
+    // Let the explosion read before the dialog appears, as for a scenario outcome.
+    await new Promise((resolve) => setTimeout(resolve, SCENARIO_OUTCOME_MODAL_DELAY_MS));
+    // The scenario may have ended during the delay; its outcome dialog takes precedence.
+    if (scenarioOutcomeModalIsVisible()) return null;
+
+    const result = await showPlayerDownModal(scenarioName);
+    if (!result) return null;
+    if (result.action === 'restart') {
+        await launchSystem(lastLaunchedMode);
+        return 'restart';
+    }
+    return result.action === 'spectate' ? 'spectate' : null;
+}
+
+registerPlayerDownHandler(handlePlayerDown);
 
 // Block input while modal visible
 const _origOnMouseDown = onMouseDown;

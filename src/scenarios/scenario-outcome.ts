@@ -59,3 +59,29 @@ export function registerScenarioOutcomeHandler(next: ScenarioOutcomeHandler | nu
 export function reportScenarioOutcome(report: ScenarioOutcomeReport): void {
     handler?.(report);
 }
+
+// ── Player down (scenario still running) ──────────────────────────────────────
+// A scenario where the player's death is not yet a failure (their team fights on) asks the UI
+// what to do next through the same single-handler pattern.
+
+/** What the player chose after their ship went down mid-scenario. */
+export type PlayerDownChoice = 'restart' | 'spectate';
+
+/** Asks the player what to do; resolves with their choice, or null if the dialog was dropped. */
+export type PlayerDownHandler = (scenarioName: string) => Promise<PlayerDownChoice | null>;
+
+let playerDownHandler: PlayerDownHandler | null = null;
+
+/** Register (or clear) the single player-down handler. Called once by index.ts. */
+export function registerPlayerDownHandler(next: PlayerDownHandler | null): void {
+    playerDownHandler = next;
+}
+
+/**
+ * Offer the player a restart or to spectate the rest of the battle. Restart is carried out by
+ * the UI itself (it relaunches the scenario); the scenario only needs to act on 'spectate'.
+ * Resolves null when no handler is registered.
+ */
+export function requestPlayerDownChoice(scenarioName: string): Promise<PlayerDownChoice | null> {
+    return playerDownHandler ? playerDownHandler(scenarioName) : Promise.resolve(null);
+}

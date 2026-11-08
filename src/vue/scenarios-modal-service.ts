@@ -12,7 +12,8 @@ export type ScenarioAction =
     | 'asteroidDefense'
     | 'extinctionEvent'
     | 'osirisAmbush'
-    | 'teamSkirmish';
+    | 'teamSkirmish'
+    | 'alienInvasion';
 
 export interface ScenariosModalResult {
     scenario: ScenarioAction;

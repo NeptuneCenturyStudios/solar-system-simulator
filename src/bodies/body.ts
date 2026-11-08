@@ -37,7 +37,19 @@ export class Body {
     }
     /** Maximum hit-points at spawn (same initial value as healthPoints).
      *  Use healthPoints / maxHealthPoints for a [0–1] health percentage. */
-    readonly maxHealthPoints: number;
+    get maxHealthPoints(): number {
+        return this._maxHealthPoints;
+    }
+    private _maxHealthPoints: number;
+
+    /**
+     * Replace the body's hit-points with a fresh, full pool of `hp` — for a scenario that needs
+     * a body sturdier or frailer than its mass-based default. Call before the body takes damage.
+     */
+    resetHealthPoints(hp: number): void {
+        this._healthPoints = hp;
+        this._maxHealthPoints = hp;
+    }
     protected labelHeight = 0;
     tempAcc?: THREE.Vector3;
     /** Backward-streaming atmospheric-entry flame, or null when this body isn't currently inside an atmosphere. */
@@ -94,7 +106,7 @@ export class Body {
         this.name = name;
         this.bodyType = bodyType;
         this._healthPoints = healthPointsOverride ?? mass * HP_MASS_MULTIPLIER;
-        this.maxHealthPoints = this._healthPoints;
+        this._maxHealthPoints = this._healthPoints;
         this.mesh = mesh;
 
         if (position instanceof THREE.Vector3) {

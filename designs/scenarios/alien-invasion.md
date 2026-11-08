@@ -3,15 +3,17 @@ This scenario will feature a massive fleet battle between human and alien ships 
 
 **How the scenario will play**
 - Player will start near mars.
-- Player will receive a distress call (text and voice message. Voice audio will be provided.)
+- Player will receive a distress call (text on screen (scenario message) and voice message. Voice audio will be provided. "src\assets\sounds\voice\assistance-needed.mp3")
 - A wormhole will spawn. This worm hole will NOT be connected or linked to another one, so will be the danger red color.
-- Player will have x amount of time to warp to the wormhole to help the fleet investigate (timer will be based on sim time). After so long, whether player is in range or not, the alien Harbinger mothership and a fleet of Wraiths and Stingers will spawn from the wormhole. The wormhole will then disappear. Another distress call will be played informing the player that there is an alien attack on Earth (audio will be provided). At this time, the team stat bar will show permenantly on screen showing who's winning (number of ships destroyed on each side)
+- Player will have x amount of time to warp to the wormhole to help the fleet investigate (timer will be based on sim time). After so long, whether player is in range or not, the alien Harbinger mothership and a fleet of Wraiths and Stingers will spawn from the wormhole. The wormhole will then disappear. Another distress call will be played informing the player that there is an alien attack on Earth (text and audio. audio will be provided: "src\assets\sounds\voice\earth-under-attack.mp3"). At this time, the team stat bar will show permenantly on screen showing who's winning (number of ships destroyed on each side)
 - If all player's team (including player) is destroyed, then the scenario fails. If all enemy ships are destroyed, scenario wins. (if player's ship is destroyed, offer to restart scenario OR if the battle is still going on (this is not a failure yet), then also offer choice to spectate. If player's team still wins, the scenario is successful)
 - How the battle will work
-    - There will be one capital ship per team and twenty fighters per team (player included). Player is on Team Earth.
-    - Motherships will focus fire on other motherships first. Team Earth mothership will focus on smaller fighters if the Team Alien mothership is destroyed. Team Alien mothership will focus on destroying Earth once the Team Earth mothership is destroyed.
-    - Small fighters will focus on fighters of the other team first before targetting motherships of the other team.
-    - Focus will not always be on the player or else the player would get overwhelmed (unless there are no other targets for the fighters to shoot at).
+    - Team Earth will have 4 capitals, two paladins and two osiris motherships and twenty fighters (ten Zenith and ten Darts (player included and will be in a Zenith)).
+    - Team Alien will have two Harbingets and a twenty fighters, Stingers and Wraiths - ten each.
+    - Motherships will focus fire on other motherships first (already in the AI). Team Earth mothership will focus on smaller fighters if the Team Alien mothership is destroyed (Included in AI logic already). Team Alien motherships will focus on destroying Earth once the Team Earth capitals are destroyed. (Not in AI yet. Will need to be able to be given a target by the scenario runner)
+    - Small fighters will focus on fighters of the other team first before targetting motherships of the other team (should already be in AI - check).
+    - Focus will not always be on the player or else the player would get overwhelmed (unless there are no other targets for the fighters to shoot at). This may need to be adjusted based on play tests.
+    - All ships will have Guidance enabled and locked so it can't be turned off.
 
 **Things that need to be implemented before this can work (these must be implemented and user tested before working on the scenario) - COMPLETE**
 - New alien mothership andd fighter ships need to be added.
