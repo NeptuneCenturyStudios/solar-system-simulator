@@ -57,10 +57,8 @@ export class ShipFlame implements IShipEffect {
     private readonly MAX_PARTICLES = 120;
     /** Half-angle of the exhaust cone in radians. */
     private readonly EXHAUST_SPREAD = 0.22;
-    /** Minimum particles emitted per frame while thrusting. */
-    private readonly EMIT_MIN = 8;
-    /** Maximum particles emitted per frame. */
-    private readonly EMIT_MAX = 256;
+    /** Particles emitted per frame while thrusting. */
+    private readonly EMIT_MAX = 32;
     /** Sentinel: negative life means the slot is unused. */
     private readonly DEAD = -1;
 
@@ -173,8 +171,12 @@ export class ShipFlame implements IShipEffect {
      * randomised ±30% per particle so no batch deaths.
      *
      * @param nozzle       World-space nozzle position this frame.
-     * @param speed        Current ship speed — drives exhaust speed and brightness.
-     * @param maxSpeed     Active speed ceiling (normal or boost) — brightness reference.
+     * Brightness is thrust-driven, not speed-driven: normal thrust renders at 50% opacity,
+     * boost at 100%, regardless of the ship's actual speed or speed mode.
+     *
+     * @param _speed       Unused (kept for the IShipEffect signature).
+     * @param _maxSpeed    Unused (kept for the IShipEffect signature).
+     * @param boosting     True while boosting — selects colour scheme and full brightness.
      * @param thrusting    True while the ship's engine is firing (thrust or boost). When false
      *                     no new particles are emitted and the existing plume fades naturally.
      * @param shipVelocity  World-space ship velocity — added to each particle so they
@@ -185,8 +187,8 @@ export class ShipFlame implements IShipEffect {
      */
     update(
         nozzle: THREE.Vector3,
-        speed: number,
-        maxSpeed: number,
+        _speed: number,
+        _maxSpeed: number,
         boosting: boolean,
         thrusting: boolean,
         shipVelocity: THREE.Vector3,
@@ -201,12 +203,8 @@ export class ShipFlame implements IShipEffect {
         }
 
         const absDt = Math.abs(dt);
-        // speedFactor for brightness: 0 at rest, 1 at maxSpeed
-        const speedFactor = THREE.MathUtils.clamp(
-            Math.abs(speed) / Math.max(maxSpeed * 0.25, 1),
-            0,
-            1
-        );
+        // Flame brightness depends only on thrust state: 50% normal thrust, 100% boost.
+        const thrustLevel = boosting ? 0.1 : 0.05;
 
         // ── 1. Age live particles (sim-time based, comet pattern) ─────────────
         for (let i = 0; i < this.MAX_PARTICLES; i++) {
@@ -239,15 +237,10 @@ export class ShipFlame implements IShipEffect {
             const perp1 = new THREE.Vector3().crossVectors(exhaustDir, upRef).normalize();
             const perp2 = new THREE.Vector3().crossVectors(exhaustDir, perp1);
 
-            // Emit count scales with speed; no longer driven by travel distance so spawn
-            // positions always come from the nozzle regardless of ship movement direction.
-            const nEmit = Math.min(
-                this.EMIT_MAX,
-                Math.max(
-                    this.EMIT_MIN,
-                    Math.round(this.EMIT_MIN + (this.EMIT_MAX - this.EMIT_MIN) * speedFactor)
-                )
-            );
+            // Constant emit count while thrusting so plume density (and therefore additive
+            // brightness) doesn't vary with ship speed. Spawn positions always come from the
+            // nozzle regardless of ship movement direction.
+            const nEmit = this.EMIT_MAX;
 
             // Scale particle lifetime so pool stays under 50% full at any emit rate.
             const adjustedLifetime = Math.min(
@@ -327,7 +320,7 @@ export class ShipFlame implements IShipEffect {
             // Inner core — colour scheme depends on boost state.
             // Boosting: white-hot at birth → yellow → orange → dim red at death.
             // Normal:   white-cyan at birth → cyan → blue at death.
-            const hot = alive * speedFactor;
+            const hot = alive;
             if (boosting) {
                 this.gpuColorInner[n * 3] = hot; // R: full
                 this.gpuColorInner[n * 3 + 1] = hot * (0.6 + 0.4 * alive); // G: high when young (white/yellow), low when old (red)
@@ -340,7 +333,7 @@ export class ShipFlame implements IShipEffect {
 
             // Outer glow — colour scheme depends on boost state. Fades faster than inner.
             // Boosting: orange halo.  Normal: blue/cyan halo.
-            const warm = alive * alive * speedFactor;
+            const warm = alive * alive;
             if (boosting) {
                 this.gpuColorOuter[n * 3] = warm;
                 this.gpuColorOuter[n * 3 + 1] = warm * 0.35;
@@ -361,9 +354,9 @@ export class ShipFlame implements IShipEffect {
         this.innerGeo.setDrawRange(0, n);
         this.outerGeo.setDrawRange(0, n);
 
-        // Scale global opacity with speed so the trail dims at low speed
-        this.innerMat.opacity = 0.5 + 0.5 * speedFactor;
-        this.outerMat.opacity = 0.3 + 0.5 * speedFactor;
+        // Global opacity follows thrust state only (outer halo keeps its 0.8 ratio to the core).
+        this.innerMat.opacity = thrustLevel;
+        this.outerMat.opacity = 0.8 * thrustLevel;
 
         const showing = n > 0;
         this.glowInner.visible = showing;

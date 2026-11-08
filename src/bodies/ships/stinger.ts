@@ -3,7 +3,7 @@ import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 import { Spaceship } from './spaceship';
 import { ShipRole } from './ship-team';
-import { BoltWeapon } from '../../ship-effects/weapons/bolt-weapon';
+import { BoltWeapon, IBoltWeaponConfig } from '../../ship-effects/weapons/bolt-weapon';
 import {
     applyBaseColorGlow,
     createShipContainerMesh,
@@ -155,17 +155,11 @@ export class Stinger extends Spaceship {
         };
 
         // Custom bolt weapon config
-        // const boltWeaponConfig: Partial<IBoltWeaponConfig> = {
-        //     baseSpeed: 8000 / DIST_SCALE, // 4 km/s
-        //     particleLifetime: 4.0,
-        //     boltColor: 0x00eeff,
-        //     boltHeadSize: 100 / RADIUS_SCALE,
-        //     fireRate: 12,
-        //     maxProjectiles: 800,
-        //     damage: 1,
-        //     heatPerSecond: 0.1,
-        //     coolPerSecond: 0.8,
-        // }
+        const boltWeaponConfig: Partial<IBoltWeaponConfig> = {
+            boltColor: 0x00ee00,
+            fireRate: 6,
+            damage: 1.5,
+        }
 
         const noseLaser = new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig);
 
@@ -180,7 +174,7 @@ export class Stinger extends Spaceship {
             handling: fighterHandling,
             weaponGroups: [
                 new WeaponGroup([noseLaser]),
-                new WeaponGroup([new BoltWeapon(scene, SPACESHIP_RADIUS)]),
+                new WeaponGroup([new BoltWeapon(scene, SPACESHIP_RADIUS, boltWeaponConfig)]),
                 new WeaponGroup([new MissileWeapon(scene, SPACESHIP_RADIUS)]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
