@@ -1700,6 +1700,14 @@ export const AI_AVOID_PANIC_TIME = 2;
 // work against a 37 m fighter and a 500 m-radius capital ship.
 /** Station-keeping distance for the combat AI: 500 m expressed in sim units. */
 export const NPC_COMBAT_FOLLOW_DISTANCE = 0.5 / DIST_SCALE;
+/** Share of a capital ship's usable weapon reach (the smaller of AI_FIRE_RANGE and its
+ *  longest-reaching weapon group) that it holds station at, hull to hull. Capitals don't
+ *  dogfight; they stand off and trade fire. Kept low enough that the far edge of the follow
+ *  dead band (× 1 + NPC_FOLLOW_DEAD_BAND) is still inside that reach. */
+export const AI_CAPITAL_STANDOFF_FRACTION = 0.6;
+/** Floor (sim units, hull to hull) on a capital ship's standoff distance: 2 km, so a capital
+ *  armed only with short-range weapons still keeps well clear of the other hull. */
+export const AI_CAPITAL_MIN_STANDOFF = 2 / DIST_SCALE;
 /** Closing-speed tolerance floor for the combat AI, as a fraction of its hold distance per
  *  second. The follow AI's floor (flightMaxSpeed × AI_CLOSING_SPEED_TOLERANCE = 0.015 u/s on a
  *  Zenith) is six times the speed command at a 500 m hold, so the controller would read "on

@@ -5,6 +5,8 @@ import {
     AI_AIM_JITTER_ANGLE,
     AI_AIM_JITTER_PERIOD,
     AI_BURST_FIRE_TIME,
+    AI_CAPITAL_MIN_STANDOFF,
+    AI_CAPITAL_STANDOFF_FRACTION,
     AI_BURST_REST_TIME,
     AI_CLOSING_SPEED_TOLERANCE,
     AI_COMBAT_CLOSING_TOLERANCE_RATE,
@@ -52,6 +54,7 @@ import { muzzleWorldPosition } from '../../ship-effects/weapons/weapon';
 import { shieldWeight, weaponScore } from './weapon-choice';
 import { INTERCEPT_EPSILON, interceptTime } from '../../ship-effects/weapons/intercept';
 import type { Spaceship } from '../../bodies/ships/spaceship';
+import { ShipRole } from '../../bodies/ships/ship-team';
 import type { ISpaceshipHandling } from '../../interfaces';
 import { formatAngleFromCos, formatDistance, formatSpeed, formatThrottle } from './ai-debug-format';
 import { areFriendly, playerShip } from '../teams';
@@ -79,6 +82,18 @@ const _toFriend = new THREE.Vector3();
  * shot that is slightly off (target jinks, bolt inherits our velocity) still misses teammates.
  */
 const FRIENDLY_CLEARANCE_FACTOR = 1.5;
+
+/**
+ * Hull-to-hull distance a capital ship holds from its target: AI_CAPITAL_STANDOFF_FRACTION of
+ * the range it can actually fire at — the trigger gate (AI_FIRE_RANGE) or its longest-reaching
+ * weapon group, whichever is shorter — floored at AI_CAPITAL_MIN_STANDOFF.
+ */
+function capitalStandoffDistance(ship: Spaceship): number {
+    let reach = 0;
+    for (const group of ship.weaponGroups) reach = Math.max(reach, group.effectiveRange);
+    const usable = reach > 0 ? Math.min(AI_FIRE_RANGE, reach) : AI_FIRE_RANGE;
+    return Math.max(AI_CAPITAL_MIN_STANDOFF, usable * AI_CAPITAL_STANDOFF_FRACTION);
+}
 
 /** True when `friend` sits on the segment from `origin` along unit `dir` out to `length`. */
 function blocksShot(
@@ -262,8 +277,17 @@ export class CombatShipAI extends FollowShipAI {
     /** Score of each weapon group, by group index, on the last weapon choice. */
     private readonly debugWeaponScores: number[] = [];
 
+    /**
+     * True for a capital ship. Capitals never dogfight: they hold a standoff distance inside
+     * their weapons' reach (see capitalStandoffDistance) with the nose on the target, and the
+     * follow controller flies all of it — approach, braking, backing off when crowded.
+     */
+    private readonly isCapital: boolean;
+
     constructor(ship: Spaceship) {
-        super(ship, NPC_COMBAT_FOLLOW_DISTANCE);
+        const isCapital = ship.role === ShipRole.Capital;
+        super(ship, isCapital ? capitalStandoffDistance(ship) : NPC_COMBAT_FOLLOW_DISTANCE);
+        this.isCapital = isCapital;
     }
 
     /**
@@ -273,16 +297,19 @@ export class CombatShipAI extends FollowShipAI {
      * ship would coast straight through its target and back out again, never braking.
      *
      * Scaling the floor off the hold distance instead keeps the dead band proportionate to the
-     * approach it is actually damping.
+     * approach it is actually damping. It is capped at the inherited speed-based floor, though:
+     * a capital's multi-km standoff would otherwise give a floor above its own top speed, and it
+     * would read every speed as "on station" and coast.
      */
     protected override closingSpeedTolerance(
         desiredClosing: number,
-        _h: ISpaceshipHandling
+        h: ISpaceshipHandling
     ): number {
-        return Math.max(
+        const floor = Math.min(
             this.followDistance * AI_COMBAT_CLOSING_TOLERANCE_RATE,
-            Math.abs(desiredClosing) * AI_CLOSING_SPEED_TOLERANCE
+            h.flightMaxSpeed * AI_CLOSING_SPEED_TOLERANCE
         );
+        return Math.max(floor, Math.abs(desiredClosing) * AI_CLOSING_SPEED_TOLERANCE);
     }
 
     /**
@@ -337,7 +364,13 @@ export class CombatShipAI extends FollowShipAI {
      */
     private updateDogfightLatch(target: Spaceship | null): void {
         const ship = this.ship;
-        if (!target || ship.warpActive || ship.warpCharging || ship.warpDecelerating) {
+        if (
+            this.isCapital ||
+            !target ||
+            ship.warpActive ||
+            ship.warpCharging ||
+            ship.warpDecelerating
+        ) {
             this.dogfighting = false;
             this.dashing = false;
             return;
@@ -1091,7 +1124,9 @@ export class CombatShipAI extends FollowShipAI {
 
         let header = this.dogfighting
             ? `${this.name} · DOGFIGHT ${this.debugPhase}`
-            : `${this.name} · ${this.debugPhase}`;
+            : this.isCapital
+              ? `${this.name} · STANDOFF ${this.debugPhase}  hold ${formatDistance(this.followDistance)}`
+              : `${this.name} · ${this.debugPhase}`;
         if (this.dogfighting && this.state === 'extend') {
             header += ` ${this.extendTimer.toFixed(1)}s`;
         }
