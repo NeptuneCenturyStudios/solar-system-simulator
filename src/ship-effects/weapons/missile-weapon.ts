@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Body } from '../../bodies/body';
 import { IDamageEffectiveness } from '../../interfaces';
-import { SoundEffect, playSoundEffect } from '../../utilities/audio.js';
+import { SoundEffect, playSoundEffectAt } from '../../utilities/audio.js';
 import {
     IBodyRayHit,
     IWeaponOwner,
@@ -72,8 +72,8 @@ export interface IMissileWeaponConfig {
     smokeGrowth: number;
     /** Peak opacity of a smoke puff. */
     smokeOpacity: number;
-    /** Called once per missile launched. Defaults to playSoundEffect(SoundEffect.WeaponFire). */
-    fireSound?: () => void;
+    /** Called once per missile launched. Receives the launch position. Defaults to playSoundEffectAt(SoundEffect.WeaponFire, position). */
+    fireSound?: (position: THREE.Vector3) => void;
 }
 
 /**
@@ -199,7 +199,7 @@ export class MissileWeapon extends Weapon {
             smokeSize: 0.012 / RADIUS_SCALE, // 12 m
             smokeGrowth: 5,
             smokeOpacity: 0.55,
-            fireSound: () => playSoundEffect(SoundEffect.MissileLaunch),
+            fireSound: (position) => playSoundEffectAt(SoundEffect.MissileLaunch, position),
         };
 
         this.config = { ...DEFAULT_MISSILE_CONFIG, ...config };
@@ -209,7 +209,9 @@ export class MissileWeapon extends Weapon {
         };
 
         const weaponSound: IWeaponSound = {
-            fire: this.config.fireSound ?? (() => playSoundEffect(SoundEffect.WeaponFire)),
+            fire:
+                this.config.fireSound ??
+                ((position) => playSoundEffectAt(SoundEffect.WeaponFire, position)),
         };
         this.weaponSound = weaponSound;
 
@@ -417,7 +419,7 @@ export class MissileWeapon extends Weapon {
         // to the aim launches from rest.
         const launchSpeed = Math.max(0, shipVelocity.dot(direction));
 
-        this.beginSound();
+        this.beginSound(origin);
         object.visible = true;
         this.missiles.push({
             position: origin.clone(),

@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { createTextTexture } from '../drawing/text-texture.js';
 import { BodyTypeEnum } from './body-enums.js';
-import { HP_MASS_MULTIPLIER, NEUTRAL_DAMAGE_EFFECTIVENESS } from '../utilities/consts.js';
-import { SoundEffect, playSoundEffect } from '../utilities/audio.js';
+import {
+    HP_MASS_MULTIPLIER,
+    NEUTRAL_DAMAGE_EFFECTIVENESS,
+    RADIUS_SCALE,
+} from '../utilities/consts.js';
+import { SoundEffect, playSoundEffectAt } from '../utilities/audio.js';
 import { IDamageEffectiveness, IDeathOptions } from '../interfaces.js';
 import { EntryFlameEffect } from '../effects/entry-flame.js';
 
@@ -245,7 +249,13 @@ export class Body {
             this.scene.remove(this.mesh);
 
             if (!deathOptions || !deathOptions.skipImpactSound) {
-                playSoundEffect(SoundEffect.WeaponImpact);
+                // Pass the body's size so a planet's death is heard from far further away
+                // than a ship's (distance is measured from its surface).
+                playSoundEffectAt(
+                    SoundEffect.Explosion,
+                    this.mesh.position,
+                    this.radius * RADIUS_SCALE
+                );
             }
         }
 

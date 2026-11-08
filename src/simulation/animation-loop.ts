@@ -44,6 +44,7 @@ import { steeringDt } from './steering-clock';
 import { findNearestSurface } from '../physics/nearest-surface';
 import { surfaceVelocityAt } from '../physics/collision';
 import { SoundEffect, playSoundEffect } from '../utilities/audio';
+import { updateAudioListener } from '../utilities/spatial-audio';
 import {
     applyLandingAttitudes,
     beginLanding,
@@ -1227,6 +1228,13 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             ctx.surfaceCam.updateTransform();
         }
 
+        // ── Positional audio listener ──────────────────────────────────────
+        // Cache the camera's final pose for this frame so positional sound effects
+        // (weapons, impacts, explosions) fade, muffle and pan relative to what the
+        // player is looking at. Sounds triggered earlier in the frame use last
+        // frame's pose, which is inaudible.
+        updateAudioListener(ctx.camera);
+
         // ── Ship trails ─────────────────────────────────────────────────────
         // The player's ship, plus every AI-piloted ship.
         const playerTrailShip = !_shakeShip?.warpActive
@@ -1311,10 +1319,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 // The focused body was destroyed; keep orbiting the frozen last position
                 // instead of snapping back to the scene center. The camera rides along with
                 // the frozen point's drift, as it would with a live focus body.
-                if (
-                    !ctx.interactionState.isRepositioning &&
-                    !interactionState.isChangingVelocity
-                ) {
+                if (!ctx.interactionState.isRepositioning && !interactionState.isChangingVelocity) {
                     ctx.camera.position.add(_frozenDriftDelta);
                 }
                 ctx.controls.target.copy(ctx.cameraState.frozenFocusPosition);

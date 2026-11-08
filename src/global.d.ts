@@ -62,4 +62,10 @@ interface Window {
      * test this rather than the user agent.
      */
     readonly desktop?: IDesktopEnvironment;
+    /**
+     * Set to true from the dev-tools console to log every positional sound effect
+     * (effect, distance from the camera in km, distance gain, played/skipped).
+     * See logSpatialSound in utilities/audio.ts.
+     */
+    sfxDebug?: boolean;
 }

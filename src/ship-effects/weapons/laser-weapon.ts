@@ -4,7 +4,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Body } from '../../bodies/body';
 import { IDamageEffectiveness } from '../../interfaces';
-import { LoopSoundController, SoundEffect, playSoundEffect } from '../../utilities/audio.js';
+import { LoopSoundController, SoundEffect, playLoopSoundEffectAt } from '../../utilities/audio.js';
 import { C, DIST_SCALE } from '../../utilities/consts.js';
 import {
     IBodyRayHit,
@@ -54,11 +54,12 @@ export interface ILaserWeaponConfig {
     coolPerSecond: number;
     /**
      * Starts the continuous beam sound when the trigger is pulled.
-     * Defaults to playSoundEffect(SoundEffect.LaserBeam, true) (laser-beam.wav).
+     * Receives the muzzle position; the loop is then moved with the muzzle each frame.
+     * Defaults to playLoopSoundEffectAt(SoundEffect.LaserBeam, position) (laser-beam.wav).
      * The returned controller is stopped automatically on trigger release /
      * reset / dispose.
      */
-    loopSound?: () => LoopSoundController | null;
+    loopSound?: (position: THREE.Vector3) => LoopSoundController | null;
 }
 
 /**
@@ -131,7 +132,7 @@ export class LaserWeapon extends Weapon {
             damageInterval: 0.2,
             heatPerSecond: 0.25,
             coolPerSecond: 0.75,
-            loopSound: () => playSoundEffect(SoundEffect.LaserBeam, true),
+            loopSound: (position) => playLoopSoundEffectAt(SoundEffect.LaserBeam, position),
         };
 
         this.config = { ...DEFAULT_LASER_CONFIG, ...config };
@@ -141,7 +142,9 @@ export class LaserWeapon extends Weapon {
         };
 
         const weaponSound: IWeaponSound = {
-            loop: this.config.loopSound ?? (() => playSoundEffect(SoundEffect.LaserBeam, true)),
+            loop:
+                this.config.loopSound ??
+                ((position) => playLoopSoundEffectAt(SoundEffect.LaserBeam, position)),
         };
         this.weaponSound = weaponSound;
 
@@ -254,7 +257,7 @@ export class LaserWeapon extends Weapon {
      */
     tryFire(
         dt: number,
-        _origin: THREE.Vector3,
+        origin: THREE.Vector3,
         direction: THREE.Vector3,
         _shipVelocity: THREE.Vector3
     ): void {
@@ -266,7 +269,7 @@ export class LaserWeapon extends Weapon {
         this.addHeat(this.config.heatPerSecond * dt);
 
         if (!wasActive) {
-            this.beginSound();
+            this.beginSound(origin);
         }
     }
 
@@ -312,10 +315,6 @@ export class LaserWeapon extends Weapon {
             return;
         }
 
-        // If the beam sound buffer hadn't finished decoding when the trigger was
-        // pulled, retry every frame while the beam stays active.
-        this.updateLoopSound();
-
         this.beamFront = Math.min(this.beamFront + C * simDt, this.config.maxRange);
 
         this._flickerTime += simDt;
@@ -330,6 +329,11 @@ export class LaserWeapon extends Weapon {
         // mesh.  No extrapolation, so the beam stays pinned to the nose under
         // thrust/boost and while steering.
         muzzleWorldPosition(owner, this.curOrigin, this);
+
+        // Keep the beam sound at the muzzle so it fades and pans with the ship. If the
+        // buffer hadn't finished decoding when the trigger was pulled, this also retries
+        // starting the loop every frame while the beam stays active.
+        this.updateLoopSound(this.curOrigin);
 
         // ── Ray-sphere hit test along the beam ───────────────────────────
         const { t: hitT, body: hitBody } = raycastBodies(

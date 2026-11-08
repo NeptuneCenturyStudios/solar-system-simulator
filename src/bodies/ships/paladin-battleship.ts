@@ -25,10 +25,10 @@ export class PaladinBattleship extends Spaceship {
         id: string
     ) {
         const SPACESHIP_MASS = 80_000_000 / MASS_SCALE;
-        const SPACESHIP_RADIUS = 250 / 1000 / RADIUS_SCALE;
+        const SPACESHIP_RADIUS = 300 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
-        const SPACESHIP_HEALTH_POINTS = 250;
+        const SPACESHIP_HEALTH_POINTS = 300;
 
         // Camera placement (ship-local space; +Z = forward, +Y = up).
         const THIRD_PERSON_OFFSET = new THREE.Vector3(
@@ -38,11 +38,11 @@ export class PaladinBattleship extends Spaceship {
         );
 
         // Flight tuning constants — same as the Osiris: heavy and sluggish.
-        const FLIGHT_MAX_SPEED = 190 / 1000 / DIST_SCALE;
+        const FLIGHT_MAX_SPEED = 90 / 1000 / DIST_SCALE;
         const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.004;
         const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.6;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
-        const FLIGHT_BOOST_MAX_SPEED = 1.9 / DIST_SCALE; // 1.9 km/s
+        const FLIGHT_BOOST_MAX_SPEED = 1.1 / DIST_SCALE; // 1.1 km/s
         const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.2;
         const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL * 3;
         const FLIGHT_WARP_SPEED = C * 5;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Body } from '../../bodies/body';
 import { IDamageEffectiveness } from '../../interfaces';
-import { SoundEffect, playSoundEffect } from '../../utilities/audio.js';
+import { SoundEffect, playSoundEffectAt } from '../../utilities/audio.js';
 import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
 import { DIST_SCALE, RADIUS_SCALE } from '../../utilities/consts';
 
@@ -32,8 +32,8 @@ export interface IBoltWeaponConfig {
     heatPerSecond: number;
     /** Thermal load lost per second while the trigger is released (0..1 scale). */
     coolPerSecond: number;
-    /** Called once per bolt fired. Defaults to playSoundEffect(SoundEffect.WeaponFire). */
-    fireSound?: () => void;
+    /** Called once per bolt fired, at the muzzle. Defaults to playSoundEffectAt(SoundEffect.WeaponFire, position). */
+    fireSound?: (position: THREE.Vector3) => void;
 }
 
 /**
@@ -98,7 +98,7 @@ export class BoltWeapon extends Weapon {
             hullEffectiveness: 0.75,
             heatPerSecond: 0.1,
             coolPerSecond: 0.8,
-            fireSound: () => playSoundEffect(SoundEffect.WeaponFire),
+            fireSound: (position) => playSoundEffectAt(SoundEffect.WeaponFire, position),
         };
 
         this.config = { ...DEFAULT_BOLT_CONFIG, ...config };
@@ -109,7 +109,9 @@ export class BoltWeapon extends Weapon {
         this.maxProjectiles = this.config.maxProjectiles;
 
         const weaponSound: IWeaponSound = {
-            fire: this.config.fireSound ?? (() => playSoundEffect(SoundEffect.WeaponFire)),
+            fire:
+                this.config.fireSound ??
+                ((position) => playSoundEffectAt(SoundEffect.WeaponFire, position)),
         };
         this.weaponSound = weaponSound;
 
@@ -217,7 +219,7 @@ export class BoltWeapon extends Weapon {
         // normalize() safely yields (0,0,0) when speed is 0 — no NaN risk.
         const boltDirection = velocity.clone().normalize();
 
-        this.beginSound();
+        this.beginSound(origin);
         this.projectiles.push({
             position: origin.clone(),
             velocity,

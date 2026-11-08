@@ -16,16 +16,18 @@ export interface IWeaponOwner extends Body {
 /** Sound trigger lifecycle configurable per weapon. */
 export interface IWeaponSound {
     /**
-     * One-shot sound played on each trigger rising edge (e.g. the blaster).
+     * One-shot sound played on each trigger rising edge (e.g. the blaster), at the
+     * muzzle's world position so it attenuates with distance from the camera.
      * Mutually exclusive with `loop`.
      */
-    fire?: () => void;
+    fire?: (position: THREE.Vector3) => void;
     /**
-     * Loop sound started on the trigger rising edge and stopped when the
-     * trigger is released / reset / disposed (e.g. the laser beam).
+     * Loop sound started on the trigger rising edge at the muzzle's world position
+     * and stopped when the trigger is released / reset / disposed (e.g. the laser
+     * beam). Its position is refreshed each frame via updateLoopSound().
      * Mutually exclusive with `fire`.
      */
-    loop?: () => LoopSoundController | null;
+    loop?: (position: THREE.Vector3) => LoopSoundController | null;
 }
 
 /**
@@ -177,31 +179,39 @@ export abstract class Weapon {
      *     keeps it playing until stopFire()/reset()/dispose().
      *   - One-shot weapons (or silent weapons with no sound configured) play
      *     their sound immediately and return.
+     * @param position World-space muzzle position the sound is emitted from.
      */
-    protected beginSound(): void {
+    protected beginSound(position: THREE.Vector3): void {
         if (!this.soundEnabled) return;
         const loopFactory = this.weaponSound?.loop;
         if (loopFactory) {
             // Loop already running — nothing to do (prevents stack-ups on
             // rapid re-fire while the buffer is still loading).
             if (this.loopSound) return;
-            this.loopSound = loopFactory();
+            this.loopSound = loopFactory(position);
             return;
         }
-        this.weaponSound?.fire?.();
+        this.weaponSound?.fire?.(position);
     }
 
     /**
-     * Keep retrying to start a pending loop sound.  Call from update() while
-     * the trigger is held; the loop factory returns null until its audio
-     * buffer finishes decoding, so this picks it up mid-hold.  No-op once the
-     * loop is running or when the weapon has no loop sound.
+     * Keep a loop sound alive and placed while the trigger is held.  Call from
+     * update() every frame with the current muzzle position:
+     *   - while the loop is running, moves it to `position` (distance falloff
+     *     and panning follow the ship);
+     *   - otherwise retries starting it — the loop factory returns null until its
+     *     audio buffer finishes decoding, so this picks it up mid-hold.
+     * No-op when the weapon has no loop sound.
      */
-    protected updateLoopSound(): void {
+    protected updateLoopSound(position: THREE.Vector3): void {
         if (!this.soundEnabled) return;
         const loopFactory = this.weaponSound?.loop;
-        if (!loopFactory || this.loopSound) return;
-        this.loopSound = loopFactory();
+        if (!loopFactory) return;
+        if (this.loopSound) {
+            this.loopSound.setPosition(position);
+            return;
+        }
+        this.loopSound = loopFactory(position);
     }
 
     /** Stop the weapon's loop sound. Fades out briefly to avoid a click. */

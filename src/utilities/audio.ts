@@ -17,9 +17,25 @@
  *     then stop()/dispose() the controller when the loop should end.
  *   - effects with multiple files in their bank pick a random loaded buffer
  *     on every play (e.g. weapon impact).
+ *
+ * Positional effects (weapons, impacts, explosions) carry an `attenuation`
+ * profile and are played with `playSoundEffectAt` / `playLoopSoundEffectAt`.
+ * They fade, muffle and pan with distance from the camera (see spatial-audio.ts)
+ * and are skipped entirely when beyond the profile's `farKm`.
  */
 
+import * as THREE from 'three';
 import { settingsStore } from '../settings/settings-store';
+import {
+    EXPLOSION_PROFILE,
+    IAttenuationProfile,
+    IMPACT_PROFILE,
+    SpatialVoice,
+    WEAPON_FIRE_PROFILE,
+    distanceFromListenerKm,
+    distanceFromSourceKm,
+    scaleProfileForSource,
+} from './spatial-audio';
 
 export enum SoundEffect {
     // Voice prompts
@@ -36,6 +52,8 @@ export enum SoundEffect {
     WeaponFire,
     WeaponImpact,
     MissileLaunch,
+    /** A body being destroyed — same clips as WeaponImpact, but carries much further. */
+    Explosion,
     // Loop sounds
     WarpLoop,
     LaserBeam,
@@ -54,6 +72,15 @@ interface ISoundEffectState {
     loadStarted: boolean;
     /** True when a one-shot play was requested before the buffer finished decoding. */
     pendingPlay: boolean;
+    /** World position of the pending one-shot, or null for a non-positional request. */
+    pendingPosition: THREE.Vector3 | null;
+    /** Source radius (km) of the pending one-shot — see playSoundEffectAt. */
+    pendingSourceRadiusKm: number;
+    /**
+     * Distance falloff for positional plays. Effects without one never spatialise,
+     * even when played with a position (voice prompts, the player's warp loop).
+     */
+    attenuation?: IAttenuationProfile;
     /** The active loop controller, or null when no loop is playing. */
     activeLoop: LoopSoundController | null;
 }
@@ -62,6 +89,13 @@ let ctx: AudioContext | null = null;
 
 /** Base volume for weapon fire/impact (0–1) — multiplied by settingsStore.settings.sfxVolume. */
 const WEAPON_VOLUME = 0.8;
+
+/** Blast clips shared by WeaponImpact and Explosion (one is picked at random per play). */
+const WEAPON_BLAST_BANK: string[] = [
+    new URL('../assets/sounds/weapon-blast-1.mp3', import.meta.url).href,
+    new URL('../assets/sounds/weapon-blast-2.mp3', import.meta.url).href,
+    new URL('../assets/sounds/weapon-blast-3.mp3', import.meta.url).href,
+];
 
 /**
  * Contains the states for all sound effects, including their audio buffers,
@@ -78,6 +112,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     [SoundEffect.AutopilotEngaged]: {
@@ -89,6 +125,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     [SoundEffect.AutopilotDisengaged]: {
@@ -100,6 +138,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     [SoundEffect.AutopilotDestinationReached]: {
@@ -112,6 +152,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     [SoundEffect.GuidanceEnabled]: {
@@ -123,6 +165,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     [SoundEffect.GuidanceDisabled]: {
@@ -134,6 +178,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     [SoundEffect.LandingInitiated]: {
@@ -145,6 +191,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     [SoundEffect.LandingCanceled]: {
@@ -156,6 +204,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     [SoundEffect.LandingComplete]: {
@@ -167,6 +217,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     // Weapon sounds
@@ -177,20 +229,22 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
+        attenuation: WEAPON_FIRE_PROFILE,
     },
     [SoundEffect.WeaponImpact]: {
-        soundEffectBank: [
-            new URL('../assets/sounds/weapon-blast-1.mp3', import.meta.url).href,
-            new URL('../assets/sounds/weapon-blast-2.mp3', import.meta.url).href,
-            new URL('../assets/sounds/weapon-blast-3.mp3', import.meta.url).href,
-        ],
+        soundEffectBank: WEAPON_BLAST_BANK,
         buffers: [],
         volume: WEAPON_VOLUME,
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
+        attenuation: IMPACT_PROFILE,
     },
     [SoundEffect.MissileLaunch]: {
         soundEffectBank: [new URL('../assets/sounds/missile-launch.mp3', import.meta.url).href],
@@ -199,7 +253,22 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
+        attenuation: WEAPON_FIRE_PROFILE,
+    },
+    [SoundEffect.Explosion]: {
+        soundEffectBank: WEAPON_BLAST_BANK,
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
+        activeLoop: null,
+        attenuation: EXPLOSION_PROFILE,
     },
     // Loop sounds
     [SoundEffect.WarpLoop]: {
@@ -209,6 +278,8 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 1.5,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
     },
     [SoundEffect.LaserBeam]: {
@@ -218,7 +289,10 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         defaultFadeDuration: 0.15,
         loadStarted: false,
         pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
         activeLoop: null,
+        attenuation: WEAPON_FIRE_PROFILE,
     },
 };
 
@@ -236,18 +310,78 @@ function loadAndCache(ac: AudioContext, url: string, onReady: (buf: AudioBuffer)
         .catch(() => {});
 }
 
-function playBuffer(ac: AudioContext, buffer: AudioBuffer, baseGain = 0.8): void {
+/** Minimum wall-clock ms between debug log lines for one moving loop. */
+const SFX_DEBUG_LOOP_LOG_INTERVAL_MS = 1000;
+
+/**
+ * Debug trace for positional sounds, enabled by typing `sfxDebug = true` in the
+ * dev-tools console (`sfxDebug = false` turns it off). One line per one-shot
+ * played or skipped, per loop started, and about once a second per running loop:
+ *
+ *   [sfx] LaserBeam loop  distance=1,234.5 km  gain=0.0061 (-44.3 dB)
+ *
+ * `gain` is the distance gain only — the effect's base volume and the SFX
+ * volume setting multiply on top of it.
+ */
+function logSpatialSound(
+    effect: SoundEffect,
+    event: string,
+    distanceKm: number,
+    gain: number
+): void {
+    if (!window.sfxDebug) return;
+    const db = gain > 0 ? `${(20 * Math.log10(gain)).toFixed(1)} dB` : 'silent';
+    const km = distanceKm.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    console.info(
+        `[sfx] ${SoundEffect[effect]} ${event}  distance=${km} km  gain=${gain.toFixed(4)} (${db})`
+    );
+}
+
+/**
+ * Play one of the effect's decoded buffers once.  When `position` is given and
+ * the effect has an attenuation profile, the sound is placed in the world
+ * (distance gain, muffling, panning) and skipped outright if it is beyond the
+ * profile's farKm.
+ * @param sourceRadiusKm Radius of the emitting body: distance is measured from its
+ *   surface and the range is stretched for its size (see scaleProfileForSource).
+ */
+function playBuffer(
+    ac: AudioContext,
+    effect: SoundEffect,
+    buffer: AudioBuffer,
+    position: THREE.Vector3 | null,
+    sourceRadiusKm: number
+): void {
     // Respect global SFX volume: if 0, don't play anything
     const vol = settingsStore.settings.sfxVolume;
     if (vol <= 0) return;
+
+    const state = soundEffectStates[effect];
+    const attenuation = state.attenuation;
+    let voice: SpatialVoice | null = null;
+    if (position && attenuation) {
+        // Out of earshot — don't build any nodes (also keeps voice counts down in big battles).
+        const distanceKm = distanceFromSourceKm(position, sourceRadiusKm);
+        if (distanceKm >= scaleProfileForSource(attenuation, sourceRadiusKm).farKm) {
+            logSpatialSound(effect, 'skipped (out of range)', distanceKm, 0);
+            return;
+        }
+        voice = new SpatialVoice(ac, attenuation, sourceRadiusKm);
+        logSpatialSound(effect, 'play', distanceKm, voice.update(position, true));
+    }
 
     const t = ac.currentTime;
     const source = ac.createBufferSource();
     source.buffer = buffer;
     const gainNode = ac.createGain();
-    gainNode.gain.setValueAtTime(baseGain * vol, t);
+    gainNode.gain.setValueAtTime(state.volume * vol, t);
     source.connect(gainNode);
-    gainNode.connect(ac.destination);
+    gainNode.connect(voice ? voice.input : ac.destination);
+    source.onended = (): void => {
+        source.disconnect();
+        gainNode.disconnect();
+        voice?.disconnect();
+    };
     source.start(t);
 }
 
@@ -260,8 +394,8 @@ function pickRandomBuffer(state: ISoundEffectState): AudioBuffer | null {
 // ── Loopable sounds (warp drive, laser beam, ...) ────────────────────────────
 
 /**
- * Controller returned by `playSoundEffect(effect, true)` for managing
- * a looping sound.
+ * Controller returned by `playSoundEffect(effect, true)` /
+ * `playLoopSoundEffectAt(effect, position)` for managing a looping sound.
  */
 export interface LoopSoundController {
     /**
@@ -272,8 +406,14 @@ export interface LoopSoundController {
     /**
      * Set the current gain (0–1).  While a stop-fade is in progress
      * this value is ignored — the scheduled Web Audio ramp takes priority.
+     * Distance attenuation (positional loops) is applied on top of this.
      */
     setVolume(vol: number): void;
+    /**
+     * Move a positional loop to `position` (world space, sim units).  Call each
+     * frame while the source moves.  No-op for non-positional loops.
+     */
+    setPosition(position: THREE.Vector3): void;
     /**
      * True when stop() has been called but the fade-out has not yet completed.
      */
@@ -292,14 +432,21 @@ export type WarpSoundController = LoopSoundController;
  * Returns a controller or `null` while the buffer is still decoding — the
  * caller should retry next frame (mirrors the warp-loop pattern).
  *
- * Each call creates a new source + gain node pair so multiple loops can play
- * simultaneously (though the same effect's loop is tracked in `activeLoop` and
- * handing back the live controller prevents stack-ups on rapid re-trigger).
+ * Non-positional loops are tracked in `activeLoop`: re-triggering hands back the
+ * live controller so copies of the same loop don't stack up.  Positional loops
+ * (a `position` plus an attenuation profile) are per-instance instead — every
+ * ship's laser gets its own loop, so a distant AI beam never takes over or cuts
+ * off the player's.
  *
  * The effective gain is state.volume * settingsStore.settings.sfxVolume,
- * multiplied by the caller's volume passed via setVolume().
+ * multiplied by the caller's volume passed via setVolume(), multiplied by the
+ * distance gain for positional loops.
  */
-function startLoop(state: ISoundEffectState): LoopSoundController | null {
+function startLoop(
+    effect: SoundEffect,
+    state: ISoundEffectState,
+    position: THREE.Vector3 | null
+): LoopSoundController | null {
     try {
         const ac = getCtx();
 
@@ -307,12 +454,23 @@ function startLoop(state: ISoundEffectState): LoopSoundController | null {
         const buffer = pickRandomBuffer(state);
         if (!buffer) return null;
 
+        const attenuation = position ? state.attenuation : undefined;
+        const isPositional = attenuation !== undefined;
+
         // Loop already running — hand back the live controller so re-triggers
         // don't stack up copies of the same loop while it is active.
-        if (state.activeLoop) return state.activeLoop;
+        if (!isPositional && state.activeLoop) return state.activeLoop;
 
         const baseVolume = state.volume;
         const defaultFadeDuration = state.defaultFadeDuration;
+
+        let voice: SpatialVoice | null = null;
+        if (position && attenuation) {
+            voice = new SpatialVoice(ac, attenuation);
+            const gain = voice.update(position, true);
+            logSpatialSound(effect, 'loop start', distanceFromListenerKm(position), gain);
+        }
+        let lastDebugLogMs = performance.now();
 
         const t = ac.currentTime;
         const source = ac.createBufferSource();
@@ -323,7 +481,7 @@ function startLoop(state: ISoundEffectState): LoopSoundController | null {
         gainNode.gain.setValueAtTime(baseVolume * settingsStore.settings.sfxVolume, t);
 
         source.connect(gainNode);
-        gainNode.connect(ac.destination);
+        gainNode.connect(voice ? voice.input : ac.destination);
         source.start(t);
 
         let _isFadingOut = false;
@@ -332,6 +490,13 @@ function startLoop(state: ISoundEffectState): LoopSoundController | null {
 
         const clearActive = (): void => {
             if (state.activeLoop === activeController) state.activeLoop = null;
+        };
+
+        const release = (): void => {
+            source.disconnect();
+            gainNode.disconnect();
+            voice?.disconnect();
+            clearActive();
         };
 
         const controller: LoopSoundController = {
@@ -348,8 +513,22 @@ function startLoop(state: ISoundEffectState): LoopSoundController | null {
                 );
             },
 
+            setPosition(pos: THREE.Vector3): void {
+                if (_disposed || !voice) return;
+                const gain = voice.update(pos, false);
+                if (window.sfxDebug) {
+                    const now = performance.now();
+                    if (now - lastDebugLogMs >= SFX_DEBUG_LOOP_LOG_INTERVAL_MS) {
+                        lastDebugLogMs = now;
+                        logSpatialSound(effect, 'loop', distanceFromListenerKm(pos), gain);
+                    }
+                }
+            },
+
             stop(duration: number = defaultFadeDuration): void {
                 if (_disposed) return;
+                if (voice && window.sfxDebug)
+                    console.info(`[sfx] ${SoundEffect[effect]} loop stop`);
                 _isFadingOut = true;
                 const now = ac.currentTime;
                 // Schedule a linear ramp to 0, then stop + disconnect on completion.
@@ -362,9 +541,7 @@ function startLoop(state: ISoundEffectState): LoopSoundController | null {
                     () => {
                         if (_disposed) return;
                         _disposed = true;
-                        source.disconnect();
-                        gainNode.disconnect();
-                        clearActive();
+                        release();
                     },
                     (duration + 0.1) * 1000
                 );
@@ -372,6 +549,8 @@ function startLoop(state: ISoundEffectState): LoopSoundController | null {
 
             dispose(): void {
                 if (_disposed) return;
+                if (voice && window.sfxDebug)
+                    console.info(`[sfx] ${SoundEffect[effect]} loop dispose`);
                 _disposed = true;
                 _isFadingOut = true;
                 try {
@@ -379,14 +558,14 @@ function startLoop(state: ISoundEffectState): LoopSoundController | null {
                 } catch {
                     /* already stopped */
                 }
-                source.disconnect();
-                gainNode.disconnect();
-                clearActive();
+                release();
             },
         };
 
-        activeController = controller;
-        state.activeLoop = controller;
+        if (!isPositional) {
+            activeController = controller;
+            state.activeLoop = controller;
+        }
 
         return controller;
     } catch {
@@ -396,20 +575,19 @@ function startLoop(state: ISoundEffectState): LoopSoundController | null {
 }
 
 /**
- * Play a sound effect.
- *
- * @param effect  The sound effect to play.
- * @param loop    When true, starts the effect on a continuous loop and returns
- *                a `LoopSoundController` (or `null` while the buffer is still
- *                decoding — retry each frame until non-null).  When false,
- *                plays the one-shot and returns `null`.
+ * Shared implementation behind the public play functions.
  *
  * One-shot effects play immediately if their buffer is already decoded; if not,
- * they are marked pending and play automatically the moment the buffer becomes
- * ready.  Effects with multiple files in their bank pick a random loaded file
- * on each play.
+ * they are marked pending (with their position) and play automatically the
+ * moment the buffer becomes ready.  Effects with multiple files in their bank
+ * pick a random loaded file on each play.
  */
-export function playSoundEffect(effect: SoundEffect, loop = false): LoopSoundController | null {
+function playEffect(
+    effect: SoundEffect,
+    loop: boolean,
+    position: THREE.Vector3 | null,
+    sourceRadiusKm = 0
+): LoopSoundController | null {
     try {
         const ac = getCtx();
         // Get the sound effect state
@@ -427,25 +605,79 @@ export function playSoundEffect(effect: SoundEffect, loop = false): LoopSoundCon
                     if (!loop && state.pendingPlay) {
                         state.pendingPlay = false;
                         const ready = pickRandomBuffer(state);
-                        if (ready) playBuffer(ac, ready, state.volume);
+                        if (ready) {
+                            playBuffer(
+                                ac,
+                                effect,
+                                ready,
+                                state.pendingPosition,
+                                state.pendingSourceRadiusKm
+                            );
+                        }
+                        state.pendingPosition = null;
                     }
                 });
             }
         }
 
         if (loop) {
-            return startLoop(state);
+            return startLoop(effect, state, position);
         }
 
         const buffer = pickRandomBuffer(state);
         if (buffer) {
-            playBuffer(ac, buffer, state.volume);
+            playBuffer(ac, effect, buffer, position, sourceRadiusKm);
         } else {
             state.pendingPlay = true;
+            state.pendingPosition = position ? position.clone() : null;
+            state.pendingSourceRadiusKm = sourceRadiusKm;
         }
         return null;
     } catch {
         console.error(`Error playing sound effect: ${effect}`);
         return null;
     }
+}
+
+/**
+ * Play a non-positional sound effect (voice prompts, the player's warp loop).
+ *
+ * @param effect  The sound effect to play.
+ * @param loop    When true, starts the effect on a continuous loop and returns
+ *                a `LoopSoundController` (or `null` while the buffer is still
+ *                decoding — retry each frame until non-null).  When false,
+ *                plays the one-shot and returns `null`.
+ */
+export function playSoundEffect(effect: SoundEffect, loop = false): LoopSoundController | null {
+    return playEffect(effect, loop, null);
+}
+
+/**
+ * Play a one-shot sound effect at a world position (sim units).  Effects with an
+ * attenuation profile fade, muffle and pan with distance from the camera, and are
+ * not played at all beyond the profile's farKm.
+ *
+ * @param sourceRadiusKm Radius (km) of the emitting body, for big sources such as a
+ *   planet exploding: distance is then measured from its surface rather than its
+ *   centre, and the audible range grows with its size (see scaleProfileForSource).
+ *   Omit for point-like sources (ships, weapon fire, impacts).
+ */
+export function playSoundEffectAt(
+    effect: SoundEffect,
+    position: THREE.Vector3,
+    sourceRadiusKm = 0
+): void {
+    playEffect(effect, false, position, sourceRadiusKm);
+}
+
+/**
+ * Start a looping sound effect at a world position (sim units).  Returns a
+ * per-instance controller (or `null` while the buffer is still decoding — retry
+ * each frame); call `setPosition` on it each frame while the source moves.
+ */
+export function playLoopSoundEffectAt(
+    effect: SoundEffect,
+    position: THREE.Vector3
+): LoopSoundController | null {
+    return playEffect(effect, true, position);
 }

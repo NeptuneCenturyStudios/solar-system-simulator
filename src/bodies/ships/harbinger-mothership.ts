@@ -45,11 +45,11 @@ export class HarbingerMothership extends Spaceship {
         );
 
         // Flight tuning constants — heavier and more sluggish than the Osiris.
-        const FLIGHT_MAX_SPEED = 150 / 1000 / DIST_SCALE;
+        const FLIGHT_MAX_SPEED = 80 / 1000 / DIST_SCALE;
         const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.003;
         const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.5;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
-        const FLIGHT_BOOST_MAX_SPEED = 1.5 / DIST_SCALE; // 1.5 km/s
+        const FLIGHT_BOOST_MAX_SPEED = 1.0 / DIST_SCALE; // 1.0 km/s
         const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.15;
         const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL * 3;
         const FLIGHT_WARP_SPEED = C * 5;
@@ -162,7 +162,7 @@ export class HarbingerMothership extends Spaceship {
                 ]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
-            shield: { hullMultiplier: 4, rechargeTime: 240 },
+            shield: { hullMultiplier: 4, rechargeTime: 220 },
             shipTypeId: 'harbinger_mothership',
             role: ShipRole.Capital,
             thirdPersonOffset: THIRD_PERSON_OFFSET,

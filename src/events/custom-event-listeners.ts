@@ -10,7 +10,7 @@ import {
 } from '../bodies/wormhole-link-state';
 import { CoordinateGizmo } from '../gizmos/coordinate-gizmo';
 import { ImpactShockwave } from '../effects/impact-shockwave';
-import { SoundEffect, playSoundEffect } from '../utilities/audio.js';
+import { SoundEffect, playSoundEffectAt } from '../utilities/audio.js';
 import { IStateDependencies } from '../interfaces';
 import {
     autopilotState,
@@ -80,7 +80,7 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         const { body, position } = e.detail;
         if (body._isDisposed || !body.mesh) return;
 
-        playSoundEffect(SoundEffect.WeaponImpact);
+        playSoundEffectAt(SoundEffect.WeaponImpact, position);
 
         // Spawn impact flash: pass body centre so ImpactShockwave can snap to surface
         simulationState.impacts.push(
