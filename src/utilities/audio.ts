@@ -51,6 +51,9 @@ export enum SoundEffect {
     // Scenario voice lines
     AssistanceNeeded,
     EarthUnderAttack,
+    EarthDestroyed,
+    EarthSaved,
+    HostilesInbound,
     // Weapon sounds
     WeaponFire,
     WeaponImpact,
@@ -240,6 +243,43 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     [SoundEffect.EarthUnderAttack]: {
         soundEffectBank: [
             new URL('../assets/sounds/voice/earth-under-attack.mp3', import.meta.url).href,
+        ],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
+        activeLoop: null,
+    },
+    [SoundEffect.EarthDestroyed]: {
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/earth-destroyed.mp3', import.meta.url).href,
+        ],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
+        activeLoop: null,
+    },
+    [SoundEffect.EarthSaved]: {
+        soundEffectBank: [new URL('../assets/sounds/voice/earth-saved.mp3', import.meta.url).href],
+        buffers: [],
+        volume: 1.0,
+        defaultFadeDuration: 0.15,
+        loadStarted: false,
+        pendingPlay: false,
+        pendingPosition: null,
+        pendingSourceRadiusKm: 0,
+        activeLoop: null,
+    },
+    [SoundEffect.HostilesInbound]: {
+        soundEffectBank: [
+            new URL('../assets/sounds/voice/hostiles-inbound.mp3', import.meta.url).href,
         ],
         buffers: [],
         volume: 1.0,

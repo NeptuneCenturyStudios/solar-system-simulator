@@ -41,6 +41,7 @@ import { settingsStore } from '../../settings/settings-store';
 import { ShipRole, ShipTeam } from './ship-team';
 import type { CelestialBody } from '../celestial-body';
 import { findReferenceBody } from '../../physics/sphere-of-influence';
+import { modelPointToShipLocal } from './ship-model-loader';
 
 /**
  * Scratch vectors for the flight governor. Module-level so the hot flight path — which runs up
@@ -62,6 +63,14 @@ const _hullInvQuat = new THREE.Quaternion();
 
 /** Guidance status shown on the cockpit dashboard and HUD. */
 export type GuidanceStatus = 'off' | 'standby' | 'matching' | 'locked';
+
+/** One engine nozzle and the exhaust flame it emits. */
+export interface IEngineNozzle {
+    /** Ship-local position of the nozzle exit (+Z = forward, +Y = up). */
+    offset: THREE.Vector3;
+    /** The exhaust flame rendered from this nozzle. */
+    flame: IShipEffect;
+}
 
 /**
  * Weapon hit sphere (and shield bubble) as a fraction of `radius`. The model is scaled so its
@@ -91,12 +100,14 @@ export class Spaceship extends Body {
     cockpitOffset: THREE.Vector3;
     /** Local-space offset for 3rd-person chase camera. */
     thirdPersonOffset: THREE.Vector3;
-    /** Local-space offset to the engine nozzle (used for the trail origin). */
-    thrusterOffset: THREE.Vector3;
+    /**
+     * The ship's engine nozzles, each with its own exhaust flame. Starts as one bbox-derived
+     * nozzle at the stern (see applyModelOffsets); ships whose engines sit elsewhere, or that
+     * have several, replace the list with setEngineNozzles() once their model has loaded.
+     */
+    engineNozzles: IEngineNozzle[];
     /** Local-space offset to the weapon muzzle (nose). Weapon origins are anchored here. */
     muzzleOffset: THREE.Vector3;
-    /** Glowing engine exhaust trail rendered as a connected line in world space. */
-    trail: IShipEffect;
     /** Low-speed (dogfight) handling characteristics, as supplied by the ship subclass. */
     readonly lowSpeedHandling: ISpaceshipHandling;
     /**
@@ -241,6 +252,15 @@ export class Spaceship extends Body {
      */
     onShieldHit(worldPos: THREE.Vector3): void {
         this.shieldEffect.registerHit(worldPos);
+    }
+
+    /**
+     * Advance any procedural animation of the ship's model parts (spinning rings, rotating
+     * engines). Ships whose models have moving parts override this; the base ship has none.
+     * @param _dt Wall-clock seconds, or 0 while the simulation is paused.
+     */
+    updateModelAnimation(_dt: number): void {
+        // No animated parts by default.
     }
 
     /**
@@ -570,7 +590,6 @@ export class Spaceship extends Body {
 
         // Initial camera offsets (approximate; updated precisely after OBJ loads).
         this.cockpitOffset = new THREE.Vector3(0, 0.3, 0.52);
-        this.thrusterOffset = new THREE.Vector3(0, -0.1, -0.9);
 
         // Subclasses may supply explicit camera offsets. The chase-cam offset is
         // used as-is; an explicit cockpit offset is kept and skipped by
@@ -586,8 +605,10 @@ export class Spaceship extends Body {
         // Initial muzzle off the nose (approximate; updated precisely after OBJ loads).
         this.muzzleOffset = new THREE.Vector3(0, 0, options.radius);
 
-        // Engine exhaust trail (Line-based, no gaps at any speed)
-        this.trail = new ShipFlame(scene, this.radius);
+        // One engine nozzle with its exhaust flame (approximate; updated after the model loads).
+        this.engineNozzles = [
+            { offset: new THREE.Vector3(0, -0.1, -0.9), flame: new ShipFlame(scene, this.radius) },
+        ];
 
         // Warp tunnel effect — visibility is speed-driven (no explicit start/stop needed)
         this.warpEffect = new WarpEffect(scene);
@@ -745,9 +766,54 @@ export class Spaceship extends Body {
         if (!this._cockpitCameraExplicit) {
             this.cockpitOffset.set(0, localBbox.max.y * 0.5, localBbox.max.z * 0.75);
         }
-        this.thrusterOffset.set(0, localBbox.min.y * 0.3, localBbox.min.z);
+        // Default nozzle: the stern, slightly below centre. Ships whose engines sit elsewhere
+        // override this with setEngineNozzles() after calling applyModelOffsets().
+        this.engineNozzles[0].offset.set(0, localBbox.min.y * 0.3, localBbox.min.z);
         // Muzzle sits at the forward-most point of the hull (+Z = nose).
         this.muzzleOffset.set(0, localBbox.max.y * 0.25, localBbox.max.z);
+    }
+
+    /**
+     * Places the ship's engine flames at nozzle points read off the model in Blender, one flame
+     * per point. Points are in the model file's own coordinates (GLB/OBJ, Y-up), the same
+     * convention as weapon mounts, and go through the loader's orientation, scale and centring.
+     * Call after the model load resolves (and after applyModelOffsets); before that the model
+     * isn't attached and the call is ignored. Every flame exhausts along the ship's -Z.
+     * @param modelPoints Nozzle exits in model-file coordinates; at least one.
+     */
+    protected setEngineNozzles(modelPoints: readonly THREE.Vector3[]): void {
+        if (modelPoints.length === 0) return;
+        const offsets: THREE.Vector3[] = [];
+        for (const point of modelPoints) {
+            const offset = modelPointToShipLocal(this.mesh, point, new THREE.Vector3());
+            if (!offset) return;
+            offsets.push(offset);
+        }
+
+        // Reuse existing flames, add or dispose the difference.
+        while (this.engineNozzles.length > offsets.length) {
+            this.engineNozzles.pop()?.flame.dispose();
+        }
+        offsets.forEach((offset, index) => {
+            const nozzle = this.engineNozzles[index];
+            if (nozzle) {
+                nozzle.offset.copy(offset);
+            } else {
+                const flame = new ShipFlame(this.scene, this.radius);
+                flame.init();
+                this.engineNozzles.push({ offset, flame });
+            }
+        });
+    }
+
+    /** Resets every engine flame to its empty, hidden state (flight entry / spawn). */
+    initEngineFlames(): void {
+        for (const nozzle of this.engineNozzles) nozzle.flame.init();
+    }
+
+    /** Hides every engine flame immediately. */
+    hideEngineFlames(): void {
+        for (const nozzle of this.engineNozzles) nozzle.flame.hide();
     }
 
     /**
@@ -2229,7 +2295,7 @@ export class Spaceship extends Body {
         this.weapons = [];
         this.weaponGroups = [];
         this.resetAutopilotState();
-        this.trail.dispose();
+        for (const nozzle of this.engineNozzles) nozzle.flame.dispose();
         this.shieldEffect.dispose();
 
         // Capture the wreck site before super.die() detaches the mesh from the scene.

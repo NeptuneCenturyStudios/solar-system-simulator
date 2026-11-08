@@ -280,7 +280,7 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     // warpActive is intentionally NOT cleared here — if the ship is still warping,
     // the background updater continues its velocity and the tunnel animation.
     if (flightState.knownShip && !flightState.knownShip._isDisposed) {
-        flightState.knownShip.trail.hide();
+        flightState.knownShip.hideEngineFlames();
     }
     if (ctx.speedSprite) ctx.speedSprite.visible = false;
 

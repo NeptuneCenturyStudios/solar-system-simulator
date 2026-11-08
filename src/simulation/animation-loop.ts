@@ -220,7 +220,7 @@ function isEngineFiring(ship: Spaceship): boolean {
 }
 
 /**
- * Update one ship's engine trail.  Shared by the player's ship and every
+ * Update one ship's engine flames, one per engine nozzle.  Shared by the player's ship and every
  * AI-piloted ship so they render identically.
  *
  * @param ship      The ship whose trail to update.
@@ -241,24 +241,26 @@ function updateShipTrail(
     dtTotal: number,
     cameraPos: THREE.Vector3
 ): void {
-    _trailNozzle
-        .copy(ship.thrusterOffset)
-        .applyQuaternion(ship.mesh.quaternion)
-        .add(ship.mesh.position);
     _trailExhaustDir.set(0, 0, -1).applyQuaternion(ship.mesh.quaternion);
     const h = ship.classicAutopilotActive ? ship.autopilotHandling : ship.handling;
     const trailMax = boosting ? h.flightBoostMaxSpeed : h.flightMaxSpeed;
-    ship.trail.update(
-        _trailNozzle,
-        speed,
-        trailMax,
-        boosting,
-        thrusting,
-        ship.velocity,
-        _trailExhaustDir,
-        dtTotal,
-        cameraPos
-    );
+    for (const nozzle of ship.engineNozzles) {
+        _trailNozzle
+            .copy(nozzle.offset)
+            .applyQuaternion(ship.mesh.quaternion)
+            .add(ship.mesh.position);
+        nozzle.flame.update(
+            _trailNozzle,
+            speed,
+            trailMax,
+            boosting,
+            thrusting,
+            ship.velocity,
+            _trailExhaustDir,
+            dtTotal,
+            cameraPos
+        );
+    }
 }
 
 /**
@@ -586,15 +588,17 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             );
         }
 
-        // ── Shield effect ────────────────────────────────────────────────
+        // ── Shield effect + model part animation ─────────────────────────
         // (The warp effect is updated post-physics — see "Warp effect" below.)
         for (const body of ctx.simulationState.bodies) {
             if (!body || body.bodyType !== BodyTypeEnum.SpaceShip) continue;
             if (body._isDisposed || !body.mesh) continue;
             const ship = body as Spaceship;
-            // Wall-clock so the shield glow fades at the same pace at any time-warp, but held
-            // while paused.
-            ship.updateShieldEffect(simulationState.timeScale === 0 ? 0 : wallDt);
+            // Wall-clock so the shield glow fades (and model parts spin) at the same pace at any
+            // time-warp, but held while paused.
+            const shipWallDt = simulationState.timeScale === 0 ? 0 : wallDt;
+            ship.updateShieldEffect(shipWallDt);
+            ship.updateModelAnimation(shipWallDt);
         }
 
         // ── WASD camera movement ─────────────────────────────────────────

@@ -8,11 +8,12 @@ import type { IScenario, IStateDependencies } from '../interfaces';
 import { ScenarioLock } from '../interfaces';
 import type { Body } from '../bodies/body';
 import type { Spaceship } from '../bodies/ships/spaceship';
-import type { Wormhole } from '../bodies/wormhole';
+import { Wormhole } from '../bodies/wormhole';
 import { getShipTypeById } from '../bodies/ships/ship-registry';
 import { ShipRole, TEAM_ALIEN, TEAM_EARTH, teamDisplayName } from '../bodies/ships/ship-team';
 import { CombatShipAI } from '../simulation/ai/combat-ship-ai';
 import { SoundEffect, playSoundEffect } from '../utilities/audio';
+import { createUniqueId } from '../utilities/utilities';
 import {
     ALIEN_INVASION_ARRIVAL_RANGE,
     ALIEN_INVASION_ARRIVAL_SECS,
@@ -21,6 +22,7 @@ import {
     ALIEN_INVASION_EMERGE_INTERVAL,
     ALIEN_INVASION_EMERGE_OFFSET,
     ALIEN_INVASION_EMERGE_SPACING,
+    ALIEN_INVASION_WORLD_DESTROYER_DELAY,
     ALIEN_INVASION_WORMHOLE_LINGER,
 } from '../utilities/consts';
 import { addShipLive, spawnFleetShip } from './fleet-spawn';
@@ -36,6 +38,12 @@ import { reportScenarioOutcome, requestPlayerDownChoice } from './scenario-outco
  */
 type InvasionPhase = 'waiting' | 'emerging' | 'battle';
 
+/**
+ * Where the super capital (World Destroyer) is: not called in yet, on its way through the
+ * re-opened wormhole, or through it.
+ */
+type SuperCapitalState = 'none' | 'incoming' | 'arrived';
+
 /** Everything the scenario needs from its generator. */
 export interface IAlienInvasionSetup {
     playerShip: Spaceship;
@@ -45,6 +53,11 @@ export interface IAlienInvasionSetup {
     alienCapitals: string[];
     /** Ship type ids of the alien fighters, in emergence order. */
     alienFighters: string[];
+    /**
+     * Ship type id of the alien super capital. It is held back until the motherships turn on
+     * Earth, then comes through a re-opened wormhole and targets nothing but Earth.
+     */
+    alienSuperCapital: string;
     wormhole: Wormhole;
     earth: Body;
 }
@@ -59,7 +72,10 @@ export interface IAlienInvasionSetup {
  * second call reports that Earth is under attack.
  * A team score panel stays on screen from then on.
  *
- * Once every Team Earth capital ship is down, the Harbingers turn on Earth itself.
+ * Once every Team Earth capital ship is down, the Harbingers turn on Earth itself. At that moment
+ * the wormhole re-opens where it first appeared and, ALIEN_INVASION_WORLD_DESTROYER_DELAY later,
+ * the World Destroyer comes through it. It ignores every ship and bombards Earth; the wormhole
+ * collapses again behind it.
  *
  * Outcome:
  *  - fails when every Team Earth ship (the player included) is destroyed, or Earth is;
@@ -75,10 +91,20 @@ export class AlienInvasionScenario implements IScenario {
     private readonly scene: THREE.Scene;
     private readonly playerShip: Spaceship;
     private readonly earth: Body;
-    private readonly wormhole: Wormhole;
+    /** The current wormhole: the original, or the re-opened one once the super capital is called. */
+    private wormhole: Wormhole;
+    /** The original wormhole's placement, kept so it can re-open in the same spot. */
+    private readonly wormholeOffsetFromEarth: THREE.Vector3;
+    private readonly wormholeQuaternion: THREE.Quaternion;
+    private readonly wormholeRadius: number;
+    private readonly wormholeName: string;
     /** The whole alien fleet in emergence order: capitals, then fighters. */
     private readonly alienRoster: string[];
     private readonly alienCapitals: string[];
+    private readonly alienSuperCapital: string;
+    private superCapitalState: SuperCapitalState = 'none';
+    /** Sim-seconds until the super capital comes through, while it is incoming. */
+    private superCapitalTimer = 0;
 
     /** Team Earth ships, the player included. */
     private readonly earthShips: Spaceship[];
@@ -119,6 +145,13 @@ export class AlienInvasionScenario implements IScenario {
         this.playerShip = setup.playerShip;
         this.earth = setup.earth;
         this.wormhole = setup.wormhole;
+        this.wormholeOffsetFromEarth = setup.wormhole.mesh.position
+            .clone()
+            .sub(setup.earth.mesh.position);
+        this.wormholeQuaternion = setup.wormhole.mesh.quaternion.clone();
+        this.wormholeRadius = setup.wormhole.radius;
+        this.wormholeName = setup.wormhole.name;
+        this.alienSuperCapital = setup.alienSuperCapital;
         this.alienCapitals = [...setup.alienCapitals];
         this.alienRoster = [...setup.alienCapitals, ...setup.alienFighters];
         this.earthShips = [setup.playerShip, ...setup.earthFleet];
@@ -160,6 +193,7 @@ export class AlienInvasionScenario implements IScenario {
             if (near || this.elapsed >= ALIEN_INVASION_ARRIVAL_SECS) this.beginEmergence();
         }
         if (this.phase === 'emerging') this.updateEmergence(simDt);
+        if (this.superCapitalState === 'incoming') this.updateSuperCapitalArrival(simDt);
         this.updateWormholeClose(simDt);
 
         if (this.spectating && (!this.spectated || this.spectated._isDisposed)) {
@@ -220,7 +254,8 @@ export class AlienInvasionScenario implements IScenario {
      * side — so it never crosses the lethal plane — spread across the disc, heading out along
      * the exit normal toward the Team Earth fleet, at the wormhole's velocity.
      */
-    private spawnGroup(typeIds: string[]): void {
+    private spawnGroup(typeIds: string[]): Spaceship[] {
+        const spawned: Spaceship[] = [];
         const centre = this.wormhole.mesh.position;
         const normal = this.wormhole.getEntranceNormal();
         // Two axes spanning the mouth.
@@ -258,6 +293,77 @@ export class AlienInvasionScenario implements IScenario {
             ship.mesh.position.addScaledVector(normal, ship.radius);
             addShipLive(this.dependencies, ship);
             this.alienShips.push(ship);
+            spawned.push(ship);
+        });
+        return spawned;
+    }
+
+    // ── Super capital ────────────────────────────────────────────────────────
+
+    /**
+     * Re-open the wormhole where it first appeared (it keeps pace with Earth, so the same offset
+     * from Earth) and start the countdown to the super capital coming through.
+     */
+    private callSuperCapital(): void {
+        if (this.superCapitalState !== 'none') return;
+        this.superCapitalState = 'incoming';
+        this.superCapitalTimer = ALIEN_INVASION_WORLD_DESTROYER_DELAY;
+
+        if (this.wormhole._isDisposed) {
+            const wormhole = new Wormhole(
+                this.dependencies,
+                this.scene,
+                this.earth.mesh.position.clone().add(this.wormholeOffsetFromEarth),
+                this.wormholeRadius,
+                createUniqueId('wormhole'),
+                this.wormholeName
+            );
+            wormhole.mesh.quaternion.copy(this.wormholeQuaternion);
+            wormhole.velocity.copy(this.earth.velocity);
+            this.dependencies.addBody(wormhole);
+            this.wormhole = wormhole;
+        } else {
+            // Still lingering after the main fleet: keep it open for the super capital.
+            this.closeTimer = null;
+        }
+
+        this.dependencies.addEvent({
+            message: 'The wormhole is re-opening. Something massive is coming through!',
+            notificationType: NotificationType.Alert,
+        });
+        triggerScenarioMessage('WARNING — THE WORMHOLE IS RE-OPENING!', {
+            holdSecs: 3,
+            fontSizePx: 32,
+            queue: true,
+        });
+    }
+
+    /** Count down to the super capital's arrival, then bring it through, aimed at Earth. */
+    private updateSuperCapitalArrival(simDt: number): void {
+        this.superCapitalTimer -= simDt;
+        if (this.superCapitalTimer > 0) return;
+        this.superCapitalState = 'arrived';
+
+        // Earth died during the countdown: there is nothing left for it to do.
+        if (this.earth._isDisposed || this.wormhole._isDisposed) return;
+
+        for (const ship of this.spawnGroup([this.alienSuperCapital])) {
+            if (ship.ai instanceof CombatShipAI) {
+                ship.ai.setBombardTarget(this.earth, ALIEN_INVASION_BOMBARD_STANDOFF_FACTOR);
+            }
+        }
+        this.closeTimer = ALIEN_INVASION_WORMHOLE_LINGER;
+
+        playSoundEffect(SoundEffect.HostilesInbound);
+        const label = getShipTypeById(this.alienSuperCapital).label;
+        this.dependencies.addEvent({
+            message: `A ${label} has emerged from the wormhole and is targeting Earth!`,
+            notificationType: NotificationType.Alert,
+        });
+        triggerScenarioMessage(`ALERT — A ${label.toUpperCase()} IS TARGETING EARTH!`, {
+            holdSecs: 4,
+            fontSizePx: 36,
+            queue: true,
         });
     }
 
@@ -293,12 +399,19 @@ export class AlienInvasionScenario implements IScenario {
             this.finish('failed', 'Earth has been destroyed.');
         } else if (this.alive(this.earthShips).length === 0) {
             this.finish('failed', 'Team Earth has been wiped out.');
-        } else if (this.phase === 'battle' && this.alive(this.alienShips).length === 0) {
+        } else if (
+            this.phase === 'battle' &&
+            this.superCapitalState !== 'incoming' &&
+            this.alive(this.alienShips).length === 0
+        ) {
             this.finish('succeeded', 'The alien invasion has been repelled.');
         }
     }
 
-    /** Every Team Earth capital is down: the motherships turn their guns on Earth. */
+    /**
+     * Every Team Earth capital is down: the motherships turn their guns on Earth, and the
+     * wormhole re-opens for the super capital.
+     */
     private beginBombardment(): void {
         const motherships = this.alive(this.alienShips).filter((s) => s.role === ShipRole.Capital);
         if (motherships.length === 0) return;
@@ -317,6 +430,7 @@ export class AlienInvasionScenario implements IScenario {
             holdSecs: 3,
             fontSizePx: 32,
         });
+        this.callSuperCapital();
     }
 
     private alive(ships: Spaceship[]): Spaceship[] {
@@ -328,8 +442,9 @@ export class AlienInvasionScenario implements IScenario {
             earthAlive: this.alive(this.earthShips).length,
             earthTotal: this.earthShips.length,
             alienAlive: this.alive(this.alienShips).length,
-            // The whole roster, so the bar reads as the fleet still coming through.
-            alienTotal: this.alienRoster.length,
+            // The whole roster, so the bar reads as the fleet still coming through — plus the
+            // super capital once it has been called in.
+            alienTotal: this.alienRoster.length + (this.superCapitalState === 'none' ? 0 : 1),
             earthIntegrity: this.bombarding
                 ? Math.max(0, this.earth.healthPoints / this.earth.maxHealthPoints)
                 : null,
@@ -359,6 +474,7 @@ export class AlienInvasionScenario implements IScenario {
 
     private finish(outcome: 'failed' | 'succeeded', message: string): void {
         this.finished = true;
+        playSoundEffect(outcome === 'failed' ? SoundEffect.EarthDestroyed : SoundEffect.EarthSaved);
         const score = this.score();
         this.dependencies.addEvent({
             message,

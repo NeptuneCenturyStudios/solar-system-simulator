@@ -15,7 +15,6 @@ import { moonTexture } from '../drawing/textures';
 import {
     ALIEN_INVASION_CAPITAL_OFFSET,
     ALIEN_INVASION_CAPITAL_SPACING,
-    ALIEN_INVASION_EARTH_HP,
     ALIEN_INVASION_FIGHTER_SPACING,
     ALIEN_INVASION_FLEET_STANDOFF,
     ALIEN_INVASION_PLAYER_FLEET_DISTANCE,
@@ -47,6 +46,9 @@ const EARTH_FIGHTERS = [
 /** Team Alien: two Harbingers, then ten Wraiths and ten Stingers (interleaved). */
 const ALIEN_CAPITALS = ['harbinger_mothership', 'harbinger_mothership'];
 const ALIEN_FIGHTERS = Array.from({ length: 20 }, (_, i) => (i % 2 === 0 ? 'wraith' : 'stinger'));
+/** Team Alien's super capital: comes through a re-opened wormhole once the Harbingers turn on
+ *  Earth, and targets nothing but Earth. */
+const ALIEN_SUPER_CAPITAL = 'world_destroyer';
 
 /** Fighter formation columns (the rest go into rows). */
 const FORMATION_COLUMNS = 5;
@@ -136,7 +138,6 @@ export class AlienInvasionGenerator extends SolarSystemGenerator {
         bodies.push(sun);
         const earth = new Earth(this.dependencies, this.scene);
         earth.orbitParent = sun;
-        earth.resetHealthPoints(ALIEN_INVASION_EARTH_HP);
         bodies.push(earth);
         const moon = createMoon(earth, this.scene, {
             distance: MOON_DIST_FROM_EARTH,
@@ -233,6 +234,7 @@ export class AlienInvasionGenerator extends SolarSystemGenerator {
                 earthFleet,
                 alienCapitals: ALIEN_CAPITALS,
                 alienFighters: ALIEN_FIGHTERS,
+                alienSuperCapital: ALIEN_SUPER_CAPITAL,
                 wormhole,
                 earth,
             }),

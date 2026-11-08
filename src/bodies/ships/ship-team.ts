@@ -9,6 +9,7 @@
 export enum ShipRole {
     Fighter = 'fighter',
     Capital = 'capital',
+    SuperCapital = 'super_capital',
 }
 
 /** A team identifier. Ships with different non-null teams are hostile to each other. */

@@ -4072,7 +4072,7 @@ function enterFlightMode(ship: Spaceship) {
     }
 
     // Initialize the ship's trail (but it will be hidden until warp ends, to avoid showing a long trail from spawn point to first flight location)
-    ship.trail.init();
+    ship.initEngineFlames();
 
     // Show flight speed sprite
     refreshSpeedSprite({

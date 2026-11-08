@@ -1933,8 +1933,9 @@ export const ALIEN_INVASION_EMERGE_INTERVAL = 0;
 export const ALIEN_INVASION_EMERGE_GROUP_SIZE = 5;
 /** Sim-seconds the wormhole stays open after the last ship has emerged. */
 export const ALIEN_INVASION_WORMHOLE_LINGER = 4;
-/** Earth's hit points for this scenario (its default, mass-based HP is far beyond any fleet). */
-export const ALIEN_INVASION_EARTH_HP = 20000;
+/** Sim-seconds between the wormhole re-opening (when the motherships turn on Earth) and the
+ *  World Destroyer coming through it. */
+export const ALIEN_INVASION_WORLD_DESTROYER_DELAY = 5;
 /** Bombarding motherships hold this multiple of the target's radius from its centre. The target
  *  is excluded from obstacle avoidance while bombarding, so this standoff is what keeps the ship
  *  clear of the surface and atmosphere. */

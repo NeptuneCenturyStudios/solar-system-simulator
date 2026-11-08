@@ -114,7 +114,7 @@ export function createNpcShip(options: ICreateNpcShipOptions): Spaceship {
     if (ship.labelLine) ship.labelLine.visible = true;
 
     // Engine trail, same as the player's ship gets on flight entry.
-    ship.trail.init();
+    ship.initEngineFlames();
 
     return ship;
 }
