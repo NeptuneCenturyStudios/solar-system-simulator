@@ -2342,6 +2342,7 @@ function onMouseDown(event: MouseEvent) {
         if (!cameraState.isLookAtMode) {
             cameraState.focusBody = null;
             cameraState.frozenFocusPosition = null;
+            cameraState.frozenFocusVelocity = null;
         }
 
         gizmo.attach(null);
@@ -2953,6 +2954,7 @@ function setFocusBody(bodyOrNull: Body | null, { zoom = false } = {}) {
     // Selecting a new focus (or clearing it) replaces any frozen orbit position left
     // behind by a previously-destroyed focused body.
     cameraState.frozenFocusPosition = null;
+    cameraState.frozenFocusVelocity = null;
 
     // Maintain selection pointers used by UI/gizmo
     selectedBody = body;
@@ -4491,6 +4493,9 @@ function handleBodyBecameInvalid(body: Body | null | undefined) {
 
         cameraState.focusBody = null;
         cameraState.frozenFocusPosition = lastPos;
+        // The body's explosion inherits its velocity; drift the frozen orbit point (and the
+        // camera with it) along the same velocity so the explosion stays in view.
+        cameraState.frozenFocusVelocity = body.mesh?.position ? body.velocity.clone() : null;
 
         if (cameraState.isLookAtMode) {
             controls.target.copy(lastPos);

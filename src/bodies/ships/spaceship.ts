@@ -2230,6 +2230,9 @@ export class Spaceship extends Body {
 
         // Capture the wreck site before super.die() detaches the mesh from the scene.
         const deathPos = this.mesh.position.clone();
+        // ...and its velocity, so the explosion keeps moving with the fight instead of being
+        // left behind at the death point (at dogfight speeds that is gone in a fraction of a second).
+        const deathVel = this.velocity.clone();
 
         super.die(deathOptions);
 
@@ -2244,7 +2247,8 @@ export class Spaceship extends Body {
                         deathPos,
                         SHIP_EXPLOSION_COLOR,
                         this.radius,
-                        deathOptions?.impactSpeed
+                        deathOptions?.impactSpeed,
+                        deathVel
                     )
                 );
             } catch {

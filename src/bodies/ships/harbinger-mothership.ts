@@ -162,7 +162,7 @@ export class HarbingerMothership extends Spaceship {
                 ]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
-            shield: { hullMultiplier: 4, rechargeTime: 180 },
+            shield: { hullMultiplier: 4, rechargeTime: 240 },
             shipTypeId: 'harbinger_mothership',
             role: ShipRole.Capital,
             thirdPersonOffset: THIRD_PERSON_OFFSET,

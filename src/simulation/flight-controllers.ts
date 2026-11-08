@@ -136,6 +136,7 @@ export function exitFlightMode(ctx: IFlightControlContext) {
     // to the camera the player had before entering flight (which, for scenarios that start in
     // flight, is the zoomed-out scene overview).
     let deathPos: THREE.Vector3 | null = null;
+    let deathVel: THREE.Vector3 | null = null;
     let deathRadius = 0;
 
     // Preserve the ship reference so the user can re-enter later.
@@ -153,6 +154,8 @@ export function exitFlightMode(ctx: IFlightControlContext) {
             const lastPos = dead.mesh?.position ?? cameraState.frozenFocusPosition;
             if (lastPos) {
                 deathPos = lastPos.clone();
+                // The explosion inherits the ship's velocity; the camera drifts with it.
+                deathVel = dead.velocity.clone();
                 deathRadius = dead.radius;
             }
         }
@@ -259,6 +262,7 @@ export function exitFlightMode(ctx: IFlightControlContext) {
         // because the player may have focused something else mid-flight.
         cameraState.focusBody = null;
         cameraState.frozenFocusPosition = deathPos.clone();
+        cameraState.frozenFocusVelocity = deathVel;
         cameraState.isLookAtMode = true;
     } else {
         ctx.camera.position.copy(flightState.prevCameraPos);

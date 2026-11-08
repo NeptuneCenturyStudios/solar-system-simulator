@@ -793,6 +793,10 @@ export interface ICameraState {
     // camera keeps orbiting there instead of snapping to the scene center. Look At is
     // left enabled, and this is used as the orbit target until a new body is selected.
     frozenFocusPosition: THREE.Vector3 | null;
+    // Velocity the destroyed focus body had when it died (world units per sim-second). The
+    // frozen position — and the camera with it — drifts along this, keeping the explosion
+    // (which inherits the same velocity) in view. Null when there is nothing to drift with.
+    frozenFocusVelocity: THREE.Vector3 | null;
 
     offset: THREE.Vector3;
     lastPlanetAngle: number;

@@ -39,15 +39,34 @@ export class ParticleExplosion implements IEffect {
     private debrisCount: number = 32;
     private debrisComplete: boolean;
 
+    /**
+     * Velocity the destroyed body had when it blew up (world units per sim-second). The whole
+     * explosion — particles, debris and flash — drifts along it as a moving reference frame, so
+     * a wreck at orbital speed (~30 km/s in a guidance-locked dogfight) stays with the action
+     * instead of being left behind at its death point.
+     */
+    private driftVelocity: THREE.Vector3;
+    /** Current centre of the explosion; advances with the drift so cameras can track it. */
+    readonly center: THREE.Vector3;
+
     constructor(
         dependencies: IStateDependencies,
         scene: THREE.Scene,
         pos: THREE.Vector3,
         color: number,
         radius = 10,
-        impactSpeed?: number
+        impactSpeed?: number,
+        inheritedVelocity?: THREE.Vector3
     ) {
         this.dependencies = dependencies;
+        this.center = pos.clone();
+        this.driftVelocity =
+            inheritedVelocity &&
+            isFinite(inheritedVelocity.x) &&
+            isFinite(inheritedVelocity.y) &&
+            isFinite(inheritedVelocity.z)
+                ? inheritedVelocity.clone()
+                : new THREE.Vector3();
         // Particle count scales with the body, but with a floor: `radius * 50` yields literally
         // zero particles for a ship-sized hull, so a ship would explode into nothing at all.
         this.count = Math.round(
@@ -247,6 +266,15 @@ export class ParticleExplosion implements IEffect {
     }
 
     update(dt: number, cameraPosition?: THREE.Vector3) {
+        // Inherited drift uses the signed dt so the wreck stays with the world frame when time
+        // runs backwards; everything else (fade, outward spread) always plays forward.
+        const driftX = this.driftVelocity.x * dt;
+        const driftY = this.driftVelocity.y * dt;
+        const driftZ = this.driftVelocity.z * dt;
+        this.center.x += driftX;
+        this.center.y += driftY;
+        this.center.z += driftZ;
+
         // Use absolute value of dt so explosion always plays forward regardless of time direction
         dt = Math.abs(dt);
 
@@ -257,6 +285,9 @@ export class ParticleExplosion implements IEffect {
         // IMPORTANT: clean up as soon as it fades out, so we never leave a lingering white sphere
         // if the explosion particles stop updating for any reason.
         if (this.flashSphere) {
+            this.flashSphere.position.x += driftX;
+            this.flashSphere.position.y += driftY;
+            this.flashSphere.position.z += driftZ;
             if (this.flashOpacity > 0) {
                 this.flashOpacity -= 0.05 * (dt * 60);
                 (this.flashSphere.material as THREE.MeshBasicMaterial).opacity = Math.max(
@@ -291,9 +322,9 @@ export class ParticleExplosion implements IEffect {
             const chunk = this.debris[i];
             const dv = this.debrisVelocities[i];
 
-            chunk.position.x += dv.x * (dt * 60);
-            chunk.position.y += dv.y * (dt * 60);
-            chunk.position.z += dv.z * (dt * 60);
+            chunk.position.x += dv.x * (dt * 60) + driftX;
+            chunk.position.y += dv.y * (dt * 60) + driftY;
+            chunk.position.z += dv.z * (dt * 60) + driftZ;
 
             (chunk.material as THREE.MeshStandardMaterial).opacity = debrisFade;
 
@@ -314,9 +345,9 @@ export class ParticleExplosion implements IEffect {
 
         // Advance float64 world positions — keeps sub-km precision at any simulation distance.
         for (let i = 0; i < this.count; i++) {
-            this.worldPositions[i * 3] += this.velocities[i].x * (dt * 60);
-            this.worldPositions[i * 3 + 1] += this.velocities[i].y * (dt * 60);
-            this.worldPositions[i * 3 + 2] += this.velocities[i].z * (dt * 60);
+            this.worldPositions[i * 3] += this.velocities[i].x * (dt * 60) + driftX;
+            this.worldPositions[i * 3 + 1] += this.velocities[i].y * (dt * 60) + driftY;
+            this.worldPositions[i * 3 + 2] += this.velocities[i].z * (dt * 60) + driftZ;
         }
 
         // Write camera-relative float32 values to the GPU buffer.

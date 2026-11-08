@@ -170,6 +170,7 @@ export function registerCustomEventListeners(ctx: ICustomEventContext): void {
         manuallySelectedBody.value = null;
         cameraState.focusBody = null;
         cameraState.frozenFocusPosition = null;
+        cameraState.frozenFocusVelocity = null;
         cameraState.targetZoomDistance = null;
         cameraState.zoomPivotBody = null;
         cameraState.pendingFreeCamZoom = null;

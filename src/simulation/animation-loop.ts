@@ -98,6 +98,8 @@ const _warpSoundVel = new THREE.Vector3();
 /** Scratch for the altimeter: local vertical and the surface frame velocity under the ship. */
 const _altUp = new THREE.Vector3();
 const _altFrameVel = new THREE.Vector3();
+/** Scratch: this frame's drift of a destroyed focus body's frozen orbit point. */
+const _frozenDriftDelta = new THREE.Vector3();
 
 // ── Context interface ───────────────────────────────────────────────────────
 
@@ -1274,6 +1276,16 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             );
         }
 
+        // ── Frozen focus drift ──────────────────────────────────────────────
+        // A destroyed focus body's explosion inherits the body's velocity, so its frozen orbit
+        // point drifts along the same velocity. Advanced every frame (whatever the camera mode)
+        // so it never goes stale; the camera only rides along in the follow block below.
+        _frozenDriftDelta.set(0, 0, 0);
+        if (ctx.cameraState.frozenFocusPosition && ctx.cameraState.frozenFocusVelocity) {
+            _frozenDriftDelta.copy(ctx.cameraState.frozenFocusVelocity).multiplyScalar(dtTotal);
+            ctx.cameraState.frozenFocusPosition.add(_frozenDriftDelta);
+        }
+
         // ── Camera follow (non-flight) ──────────────────────────────────────
         if (!isSurfaceModeActive && !cameraState.isFreeCameraMode && !isFlightModeActive) {
             if (
@@ -1297,7 +1309,14 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 }
             } else if (ctx.cameraState.isLookAtMode && ctx.cameraState.frozenFocusPosition) {
                 // The focused body was destroyed; keep orbiting the frozen last position
-                // instead of snapping back to the scene center.
+                // instead of snapping back to the scene center. The camera rides along with
+                // the frozen point's drift, as it would with a live focus body.
+                if (
+                    !ctx.interactionState.isRepositioning &&
+                    !interactionState.isChangingVelocity
+                ) {
+                    ctx.camera.position.add(_frozenDriftDelta);
+                }
                 ctx.controls.target.copy(ctx.cameraState.frozenFocusPosition);
             } else {
                 ctx.controls.target.copy(ctx.NONE_FOCUS_POSITION);

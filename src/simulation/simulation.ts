@@ -122,6 +122,9 @@ export const cameraState: ICameraState = {
     // camera keeps orbiting there instead of snapping to the scene center. Look At
     // stays enabled; this is used as the orbit target until a new body is selected.
     frozenFocusPosition: null as THREE.Vector3 | null,
+    // Drift velocity for frozenFocusPosition (the dead body's velocity), so the camera follows
+    // the explosion, which inherits the same velocity.
+    frozenFocusVelocity: null as THREE.Vector3 | null,
     offset: new THREE.Vector3(),
     lastPlanetAngle: 0,
     speed: 10,

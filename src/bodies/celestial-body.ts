@@ -424,6 +424,11 @@ export class CelestialBody extends Body {
     die(deathOptions?: IDeathOptions) {
         if (this._isDisposed) return;
 
+        // Capture the death site and velocity before teardown so the explosion drifts with the
+        // body's motion (orbital speeds are tens of km/s) instead of pinning to its last position.
+        const deathPos = this.mesh.position.clone();
+        const deathVel = this.velocity.clone();
+
         super.die(deathOptions);
 
         if (typeof this.dependencies.addEvent !== 'undefined') {
@@ -438,10 +443,11 @@ export class CelestialBody extends Body {
                 const exp = new ParticleExplosion(
                     this.dependencies,
                     this.scene,
-                    this.mesh.position.clone(),
+                    deathPos,
                     this.color,
                     this.radius,
-                    deathOptions?.impactSpeed
+                    deathOptions?.impactSpeed,
+                    deathVel
                 );
 
                 this.dependencies.addExplosion(exp);
