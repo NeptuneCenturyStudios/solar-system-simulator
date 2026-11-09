@@ -10,14 +10,17 @@ import {
     loadShipGltfInto,
     modelPointToShipLocal,
 } from './ship-model-loader';
-import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
+import {
+    ILightningWeaponConfig,
+    LightningWeapon,
+} from '../../ship-effects/weapons/lightning-weapon';
 import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
 import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
 
 /**
  * Alien light fighter, the alien fleet's counterpart to the Zenith. Same flight tuning, hull,
  * shield and weapon loadout as the Zenith (values duplicated so each ship can be tweaked
- * independently): a single nose laser, a bolt cannon and a missile launcher.
+ * independently): a single nose lightning arc, a bolt cannon and a missile launcher.
  *
  * Model: stinger.glb, "spaceship3" from the CGTrader alien spaceship set (Fleet.blend). The source
  * is authored nose-along-+Y in Blender; it was exported with the mirror modifier applied, rotated
@@ -143,8 +146,9 @@ export class Stinger extends Spaceship {
         // long central spike, read off the model in Blender.
         const NOSE_GUN_MUZZLE = new THREE.Vector3(0, 0.006, 3.799);
 
-        // Custom laser weapon config
-        const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
+        // Custom lightning arc config — same alien-green beam, damage and heat budget as the
+        // laser it replaces, so the loadout's balance is unchanged.
+        const arcWeaponConfig: Partial<ILightningWeaponConfig> = {
             beamColor: 0x30ff60,
             damage: 1,
             coreWidth: 1,
@@ -159,9 +163,9 @@ export class Stinger extends Spaceship {
             boltColor: 0x00ee00,
             fireRate: 6,
             damage: 1.5,
-        }
+        };
 
-        const noseLaser = new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig);
+        const noseArc = new LightningWeapon(scene, SPACESHIP_RADIUS, arcWeaponConfig);
 
         super(dependencies, scene, {
             position: position,
@@ -173,7 +177,7 @@ export class Stinger extends Spaceship {
             name: 'Stinger',
             handling: fighterHandling,
             weaponGroups: [
-                new WeaponGroup([noseLaser]),
+                new WeaponGroup([noseArc]),
                 new WeaponGroup([new BoltWeapon(scene, SPACESHIP_RADIUS, boltWeaponConfig)]),
                 new WeaponGroup([new MissileWeapon(scene, SPACESHIP_RADIUS)]),
             ],
@@ -189,8 +193,8 @@ export class Stinger extends Spaceship {
             .then((localBbox) => {
                 this.applyModelOffsets(localBbox);
                 applyBaseColorGlow(containerMesh, EMISSIVE_INTENSITY);
-                // Until the model is in, the laser fires from the shared nose muzzle.
-                noseLaser.mountOffset = modelPointToShipLocal(
+                // Until the model is in, the arc fires from the shared nose muzzle.
+                noseArc.mountOffset = modelPointToShipLocal(
                     containerMesh,
                     NOSE_GUN_MUZZLE,
                     new THREE.Vector3()

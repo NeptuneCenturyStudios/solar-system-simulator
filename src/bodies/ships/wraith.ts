@@ -9,14 +9,17 @@ import {
     loadShipGltfInto,
     modelPointToShipLocal,
 } from './ship-model-loader';
-import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
+import {
+    ILightningWeaponConfig,
+    LightningWeapon,
+} from '../../ship-effects/weapons/lightning-weapon';
 import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
 import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
 
 /**
  * Alien light fighter, the alien fleet's counterpart to the Dart. Same flight tuning, hull and
  * shield as the Dart (values duplicated so each ship can be tweaked independently). Armed with a
- * pair of wingtip lasers that fire together, plus a missile launcher.
+ * pair of wingtip lightning arcs that fire together, plus a missile launcher.
  *
  * Model: wraith.glb, "spaceship1" from the CGTrader alien spaceship set (Fleet.blend). The source
  * is authored nose-along-+Y in Blender; it was exported with the mirror modifier applied, rotated
@@ -138,8 +141,9 @@ export class Wraith extends Spaceship {
         // The GLB is exported nose-along-+Z, so no orientation correction.
         const MODEL_ROTATION = new THREE.Euler(0, 0, 0);
 
-        // Custom laser weapon config
-        const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
+        // Custom lightning arc config — same alien-green beam, damage and heat budget as the
+        // lasers they replace, so a pair of mounts still deals double a single one.
+        const arcWeaponConfig: Partial<ILightningWeaponConfig> = {
             beamColor: 0x30ff60,
             damage: 1,
             coreWidth: 1,
@@ -151,13 +155,13 @@ export class Wraith extends Spaceship {
 
         // Wing gun muzzles in wraith.glb's own coordinates (+Z nose, +Y up): the tips of the
         // forward-pointing prongs on each wingtip, read off the model in Blender. Each one gets
-        // its own laser, and the pair fires together as one group.
+        // its own arc, and the pair fires together as one group.
         const WING_GUN_MUZZLES = [
             new THREE.Vector3(2.384, -0.068, 1.486),
             new THREE.Vector3(-2.384, -0.068, 1.486),
         ];
-        const wingLasers = WING_GUN_MUZZLES.map(
-            () => new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)
+        const wingArcs = WING_GUN_MUZZLES.map(
+            () => new LightningWeapon(scene, SPACESHIP_RADIUS, arcWeaponConfig)
         );
 
         super(dependencies, scene, {
@@ -170,7 +174,7 @@ export class Wraith extends Spaceship {
             name: 'Wraith',
             handling: fighterHandling,
             weaponGroups: [
-                new WeaponGroup(wingLasers),
+                new WeaponGroup(wingArcs),
                 new WeaponGroup([new MissileWeapon(scene, SPACESHIP_RADIUS)]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
@@ -185,9 +189,9 @@ export class Wraith extends Spaceship {
             .then((localBbox) => {
                 this.applyModelOffsets(localBbox);
                 applyBaseColorGlow(containerMesh, EMISSIVE_INTENSITY);
-                // Until the model is in, the lasers fire from the shared nose muzzle.
-                wingLasers.forEach((laser, i) => {
-                    laser.mountOffset = modelPointToShipLocal(
+                // Until the model is in, the arcs fire from the shared nose muzzle.
+                wingArcs.forEach((arc, i) => {
+                    arc.mountOffset = modelPointToShipLocal(
                         containerMesh,
                         WING_GUN_MUZZLES[i],
                         new THREE.Vector3()

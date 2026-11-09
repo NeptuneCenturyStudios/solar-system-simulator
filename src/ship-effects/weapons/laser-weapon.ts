@@ -2,18 +2,9 @@ import * as THREE from 'three';
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
-import { Body } from '../../bodies/body';
-import { IDamageEffectiveness } from '../../interfaces';
-import { LoopSoundController, SoundEffect, playLoopSoundEffectAt } from '../../utilities/audio.js';
+import { SoundEffect, playLoopSoundEffectAt } from '../../utilities/audio.js';
 import { C, DIST_SCALE } from '../../utilities/consts.js';
-import {
-    IBodyRayHit,
-    IWeaponOwner,
-    IWeaponSound,
-    Weapon,
-    muzzleWorldPosition,
-    raycastBodies,
-} from './weapon';
+import { BeamWeaponBase, IBeamWeaponConfig } from './beam-weapon-base';
 
 const LASER_FLICKER_FREQ_A = 9.1; // rad/s — incommensurate with B for non-repeating shimmer
 const LASER_FLICKER_FREQ_B = 17.3;
@@ -24,42 +15,15 @@ const LASER_OPTIMAL_RANGE_KM = 30_000;
 /**
  * Per-instance tuning for LaserWeapon.  Ships may pass a partial config to
  * override the class defaults; any omitted field keeps the class default.
+ *
+ * The reach/damage/heat half of this is {@link IBeamWeaponConfig} — shared with every other
+ * continuous beam. Only the straight-line look (two screen-pixel-width lines) is the laser's own.
  */
-export interface ILaserWeaponConfig {
-    /** Maximum beam reach in world units. */
-    maxRange: number;
-    /** Beam colour (outer glow). */
-    beamColor: number;
+export interface ILaserWeaponConfig extends IBeamWeaponConfig {
     /** Screen-pixel width of the white-hot core line. */
     coreWidth: number;
     /** Screen-pixel width of the coloured halo line. */
     haloWidth: number;
-    /** HP damage dealt per damage tick while the beam touches a body. */
-    damage: number;
-    /**
-     * Distance (world units) out to which the beam deals full damage.  Beyond it the
-     * beam has diverged into a wider spot, so damage falls off with the inverse square
-     * of distance: 2× optimal range = 25 %, 10× = 1 %.
-     */
-    optimalRange: number;
-    /** Damage multiplier against shields (1 = full damage). */
-    shieldEffectiveness: number;
-    /** Damage multiplier against hulls and unshielded bodies (1 = full damage). */
-    hullEffectiveness: number;
-    /** Minimum seconds between damage ticks on the same body. */
-    damageInterval: number;
-    /** Thermal load gained per second while the trigger is held (0..1 scale). */
-    heatPerSecond: number;
-    /** Thermal load lost per second while the trigger is released (0..1 scale). */
-    coolPerSecond: number;
-    /**
-     * Starts the continuous beam sound when the trigger is pulled.
-     * Receives the muzzle position; the loop is then moved with the muzzle each frame.
-     * Defaults to playLoopSoundEffectAt(SoundEffect.LaserBeam, position) (laser-beam.wav).
-     * The returned controller is stopped automatically on trigger release /
-     * reset / dispose.
-     */
-    loopSound?: (position: THREE.Vector3) => LoopSoundController | null;
 }
 
 /**
@@ -67,36 +31,18 @@ export interface ILaserWeaponConfig {
  * beam origin/direction every frame; `stopFire` cuts the beam.
  *
  * Rendered as two camera-relative `Line2` objects (thick screen-pixel-width
- * lines): a narrow white core + a wider coloured halo.  Camera-relative
+ * lines): a narrow white-hot core + a wider coloured halo.  Camera-relative
  * positioning avoids float32 precision collapse at interplanetary distances.
+ *
+ * Everything except the geometry — the hit test, damage ticks, heat build-up,
+ * the loop sound and the pause rules — is {@link BeamWeaponBase}'s.
  */
-export class LaserWeapon extends Weapon {
+export class LaserWeapon extends BeamWeaponBase {
     private readonly config: ILaserWeaponConfig;
-    /** Shield/hull damage multipliers sent with every hit — built once from config. */
-    private readonly effectiveness: IDamageEffectiveness;
 
-    /** True while the trigger is held (beam active). */
-    private active = false;
-    /** True if the beam was active on the previous update (edge detection). */
-    private prevBeamVisible = false;
-    /**
-     * Current-frame world-space muzzle position.  Re-read from the owner's
-     * live transform every update() so the beam stays glued to the nose
-     * regardless of thrust, boost, or steering.
-     */
-    private curOrigin = new THREE.Vector3();
-    /** Normalised world-space aim direction for the current frame. */
-    private direction = new THREE.Vector3(0, 0, 1);
-    /** Seconds until the next permitted damage tick. */
-    private hitCooldown = 0;
-    /** Grows from 0 to maxRange at C per sim-second; resets to 0 on each trigger pull. */
-    private beamFront = 0;
     /** Accumulates simDt while beam is active; drives dual-sine brightness/width shimmer. */
     private _flickerTime = 0;
-    /** World-space beam tip (impact point or max-range end). */
-    private tip = new THREE.Vector3();
-    /** Scratch for the per-frame beam hit test. */
-    private readonly hit: IBodyRayHit = { t: 0, body: null };
+
     // ── Rendering ────────────────────────────────────────────────────────────
     private readonly coreLineGeo: LineGeometry;
     private readonly coreLineMat: LineMaterial;
@@ -117,8 +63,6 @@ export class LaserWeapon extends Weapon {
     private tipPoint: THREE.Points;
 
     constructor(scene: THREE.Scene, shipRadius: number, config: Partial<ILaserWeaponConfig> = {}) {
-        super(scene);
-
         /** Class-level defaults — a ship wanting different behaviour passes a partial ILaserWeaponConfig. */
         const DEFAULT_LASER_CONFIG: ILaserWeaponConfig = {
             maxRange: C * 10.0,
@@ -135,18 +79,15 @@ export class LaserWeapon extends Weapon {
             loopSound: (position) => playLoopSoundEffectAt(SoundEffect.LaserBeam, position),
         };
 
-        this.config = { ...DEFAULT_LASER_CONFIG, ...config };
-        this.effectiveness = {
-            shield: this.config.shieldEffectiveness,
-            hull: this.config.hullEffectiveness,
-        };
+        const merged: ILaserWeaponConfig = { ...DEFAULT_LASER_CONFIG, ...config };
+        super(scene, merged);
+        this.config = merged;
 
-        const weaponSound: IWeaponSound = {
+        this.weaponSound = {
             loop:
                 this.config.loopSound ??
                 ((position) => playLoopSoundEffectAt(SoundEffect.LaserBeam, position)),
         };
-        this.weaponSound = weaponSound;
 
         // ── Core beam: narrow white-hot Line2 ─────────────────────────────
         this.coreLineGeo = new LineGeometry();
@@ -213,13 +154,9 @@ export class LaserWeapon extends Weapon {
         return 'Laser';
     }
 
-    override get damageEffectiveness(): Readonly<IDamageEffectiveness> {
-        return this.effectiveness;
-    }
-
-    /** Full-damage range: past it the beam still reaches, but falls off with distance². */
-    override get effectiveRange(): number {
-        return this.config.optimalRange;
+    /** Light: the leading edge crosses its whole range in a fraction of a sim-second. */
+    protected override get propagationSpeed(): number {
+        return C;
     }
 
     /** Build a round, soft-edged glow sprite that falls off radially. */
@@ -249,131 +186,37 @@ export class LaserWeapon extends Weapon {
         return material;
     }
 
-    // ── Firing ───────────────────────────────────────────────────────────────
-
-    /**
-     * Refresh the beam aim while the trigger is held.  Starts the beam loop
-     * sound on the rising edge only.
-     */
-    tryFire(
-        dt: number,
-        origin: THREE.Vector3,
-        direction: THREE.Vector3,
-        _shipVelocity: THREE.Vector3
-    ): void {
-        const wasActive = this.active;
-        this.active = true;
-        this.direction.copy(direction).normalize();
-
-        if (this.overheated) return;
-        this.addHeat(this.config.heatPerSecond * dt);
-
-        if (!wasActive) {
-            this.beginSound(origin);
-        }
-    }
-
-    /** Release the trigger — cuts the beam and fades out the beam sound. */
-    stopFire(): void {
-        this.active = false;
-        this.beamFront = 0;
-        super.stopFire();
-    }
-
-    /**
-     * Advance the beam: cast a ray-sphere hit test, position the beam tip,
-     * and dispatch throttled 'weapon:hit' events.  Renders camera-relative.
-     *
-     * @param isPaused True while the sim is paused — freezes cooldown/thermal decay,
-     *                 and defers the hide-on-release transition below so a beam that
-     *                 was visible when the sim was paused (e.g. via flight exit)
-     *                 stays on screen until the sim actually resumes.
-     */
-    update(
-        _wallDt: number,
-        simDt: number,
-        bodies: Body[],
-        cameraPosition: THREE.Vector3,
-        owner: IWeaponOwner,
-        isPaused: boolean
-    ): void {
-        if (!isPaused) {
-            this.hitCooldown -= simDt;
-            this.updateThermal(simDt, this.active, this.config.coolPerSecond);
-        }
-
-        if (!this.active || this.overheated) {
-            // Hide the beam when the trigger is released or the weapon overheats —
-            // but only once the sim is actually running, so a beam frozen by a pause
-            // (or left active by a flight-mode exit that happened while paused)
-            // stays visible until the sim resumes.
-            if (this.prevBeamVisible && !isPaused) {
-                this.setBeamVisible(false);
-                this.prevBeamVisible = false;
-                this.endLoopSound();
-            }
-            return;
-        }
-
-        this.beamFront = Math.min(this.beamFront + C * simDt, this.config.maxRange);
-
+    /** Advance the dual-sine shimmer that makes the beam breathe. */
+    protected override onBeamTick(simDt: number): void {
         this._flickerTime += simDt;
+    }
+
+    /**
+     * Draw the beam as a white-hot core inside a coloured halo, both camera-relative so the
+     * float32 precision of the vertex positions is as good at 1 AU as it is at 1 km.
+     */
+    protected override renderBeam(
+        origin: THREE.Vector3,
+        _direction: THREE.Vector3,
+        length: number,
+        cameraPosition: THREE.Vector3
+    ): void {
         const _shimmer =
             Math.sin(this._flickerTime * LASER_FLICKER_FREQ_A) * 0.6 +
             Math.sin(this._flickerTime * LASER_FLICKER_FREQ_B) * 0.4;
         const _opacityMult = 1 + _shimmer * LASER_FLICKER_OPACITY_AMP;
         const _widthMult = 1 + _shimmer * LASER_FLICKER_WIDTH_AMP;
 
-        // This update runs AFTER the physics step, so the owner's transform is
-        // already the post-physics one — read the muzzle straight off the live
-        // mesh.  No extrapolation, so the beam stays pinned to the nose under
-        // thrust/boost and while steering.
-        muzzleWorldPosition(owner, this.curOrigin, this);
-
-        // Keep the beam sound at the muzzle so it fades and pans with the ship. If the
-        // buffer hadn't finished decoding when the trigger was pulled, this also retries
-        // starting the loop every frame while the beam stays active.
-        this.updateLoopSound(this.curOrigin);
-
-        // ── Ray-sphere hit test along the beam ───────────────────────────
-        const { t: hitT, body: hitBody } = raycastBodies(
-            this.curOrigin,
-            this.direction,
-            this.config.maxRange,
-            bodies,
-            owner,
-            this.hit
-        );
-
-        // ── Beam tip in world space (drifts with the ship between frames) ──
-        const renderLength = Math.min(this.beamFront, hitT);
-        this.tip.copy(this.curOrigin).addScaledVector(this.direction, renderLength);
-
-        if (hitBody && this.beamFront >= hitT && this.hitCooldown <= 0) {
-            this.hitCooldown = this.config.damageInterval;
-            window.dispatchEvent(
-                new CustomEvent('weapon:hit', {
-                    detail: {
-                        body: hitBody,
-                        position: this.tip.clone(),
-                        damage: this.config.damage * this.damageFalloffAt(hitT),
-                        effectiveness: this.effectiveness,
-                        shooter: owner,
-                    },
-                })
-            );
-        }
-
         // ── Beam lines (camera-relative Line2 — avoids float32 collapse at scale) ────
         const cpx = cameraPosition.x;
         const cpy = cameraPosition.y;
         const cpz = cameraPosition.z;
-        const mRelX = this.curOrigin.x - cpx;
-        const mRelY = this.curOrigin.y - cpy;
-        const mRelZ = this.curOrigin.z - cpz;
-        const tRelX = this.tip.x - cpx;
-        const tRelY = this.tip.y - cpy;
-        const tRelZ = this.tip.z - cpz;
+        const mRelX = origin.x - cpx;
+        const mRelY = origin.y - cpy;
+        const mRelZ = origin.z - cpz;
+        const tRelX = origin.x + this.direction.x * length - cpx;
+        const tRelY = origin.y + this.direction.y * length - cpy;
+        const tRelZ = origin.z + this.direction.z * length - cpz;
         this.coreLineGeo.setPositions([mRelX, mRelY, mRelZ, tRelX, tRelY, tRelZ]);
         this.haloLineGeo.setPositions([mRelX, mRelY, mRelZ, tRelX, tRelY, tRelZ]);
         this.coreBeamLine.position.set(cpx, cpy, cpz);
@@ -387,40 +230,24 @@ export class LaserWeapon extends Weapon {
         this.muzzleMaterial.opacity = Math.max(0, 0.95 * _opacityMult);
         this.tipMaterial.opacity = Math.max(0, 0.9 * _opacityMult);
 
-        // ── Muzzle glow point ──────────────────────────────────────────────────────────────────
-        this.muzzlePositions[0] = this.curOrigin.x - cpx;
-        this.muzzlePositions[1] = this.curOrigin.y - cpy;
-        this.muzzlePositions[2] = this.curOrigin.z - cpz;
+        // ── Muzzle glow point ──────────────────────────────────────────────
+        this.muzzlePositions[0] = mRelX;
+        this.muzzlePositions[1] = mRelY;
+        this.muzzlePositions[2] = mRelZ;
         this.muzzleGeometry.attributes.position.needsUpdate = true;
         this.muzzleGeometry.setDrawRange(0, 1);
         this.muzzlePoint.position.set(cpx, cpy, cpz);
 
         // ── Tip glow point ────────────────────────────────────────────────
-        this.tipPositions[0] = this.tip.x - cpx;
-        this.tipPositions[1] = this.tip.y - cpy;
-        this.tipPositions[2] = this.tip.z - cpz;
+        this.tipPositions[0] = tRelX;
+        this.tipPositions[1] = tRelY;
+        this.tipPositions[2] = tRelZ;
         this.tipGeometry.attributes.position.needsUpdate = true;
         this.tipGeometry.setDrawRange(0, 1);
         this.tipPoint.position.set(cpx, cpy, cpz);
-
-        if (!this.prevBeamVisible) {
-            this.setBeamVisible(true);
-            this.prevBeamVisible = true;
-        }
     }
 
-    /**
-     * Damage multiplier for a hit at `distance` world units: 1 inside optimal range,
-     * then inverse-square (spot area grows with distance², so intensity drops with it).
-     */
-    override damageFalloffAt(distance: number): number {
-        const optimal = this.config.optimalRange;
-        if (distance <= optimal) return 1;
-        const ratio = optimal / distance;
-        return ratio * ratio;
-    }
-
-    private setBeamVisible(visible: boolean): void {
+    protected override setBeamVisible(visible: boolean): void {
         this.coreBeamLine.visible = visible;
         this.haloBeamLine.visible = visible;
         this.muzzlePoint.visible = visible;
@@ -428,17 +255,12 @@ export class LaserWeapon extends Weapon {
     }
 
     /** Cut the beam, stop the loop sound, and reset timers. Not called automatically on flight exit. */
-    reset(): void {
-        this.active = false;
-        this.prevBeamVisible = false;
-        this.hitCooldown = 0;
-        this.beamFront = 0;
+    override reset(): void {
         this._flickerTime = 0;
-        this.setBeamVisible(false);
         super.reset();
     }
 
-    dispose(): void {
+    override dispose(): void {
         super.dispose();
         this.scene.remove(this.coreBeamLine);
         this.scene.remove(this.haloBeamLine);

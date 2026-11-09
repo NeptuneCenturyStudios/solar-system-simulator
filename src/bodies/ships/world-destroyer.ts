@@ -3,7 +3,10 @@ import { Spaceship } from './spaceship';
 import { ShipRole } from './ship-team';
 import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
-import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
+import {
+    ILightningWeaponConfig,
+    LightningWeapon,
+} from '../../ship-effects/weapons/lightning-weapon';
 import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
 import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
 import {
@@ -155,12 +158,12 @@ export class WorldDestroyer extends Spaceship {
         // (top deck) becomes +Z (forward), so the ship flies upright with the engine trailing.
         const MODEL_ROTATION = new THREE.Euler(Math.PI / 2, 0, 0);
 
-        // Bow laser muzzle in world_destroyer.glb's own coordinates (Y-up): the lip of the
+        // Bow arc muzzle in world_destroyer.glb's own coordinates (Y-up): the lip of the
         // circular opening at the centre of the top deck, on the spin axis (Blender (0, 0, 0.167)).
         // The model pitch carries it to ship +Z, the bow.
         const BOW_GUN_MUZZLE = new THREE.Vector3(0, 0.167, 0);
 
-        const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
+        const arcWeaponConfig: Partial<ILightningWeaponConfig> = {
             beamColor: 0x30ff60,
             optimalRange: 150_000 / DIST_SCALE,
             damage: 500,
@@ -169,7 +172,7 @@ export class WorldDestroyer extends Spaceship {
             damageInterval: 0.2,
             coolPerSecond: 1.0,
         };
-        const bowLaser = new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig);
+        const bowArc = new LightningWeapon(scene, SPACESHIP_RADIUS, arcWeaponConfig);
 
         super(dependencies, scene, {
             position: position,
@@ -181,7 +184,7 @@ export class WorldDestroyer extends Spaceship {
             name: 'World Destroyer',
             handling: worldDestroyerHandling,
             weaponGroups: [
-                new WeaponGroup([bowLaser]),
+                new WeaponGroup([bowArc]),
                 new WeaponGroup([
                     new MissileWeapon(scene, SPACESHIP_RADIUS, {
                         salvoSize: 6,
@@ -200,8 +203,8 @@ export class WorldDestroyer extends Spaceship {
         loadShipGltfInto(containerMesh, MODEL_URL, SPACESHIP_RADIUS, MODEL_ROTATION)
             .then((localBbox) => {
                 this.applyModelOffsets(localBbox);
-                // Until the model is in, the laser fires from the shared default muzzle.
-                bowLaser.mountOffset = modelPointToShipLocal(
+                // Until the model is in, the arc fires from the shared default muzzle.
+                bowArc.mountOffset = modelPointToShipLocal(
                     containerMesh,
                     BOW_GUN_MUZZLE,
                     new THREE.Vector3()

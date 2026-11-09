@@ -3,7 +3,10 @@ import { Spaceship } from './spaceship';
 import { ShipRole } from './ship-team';
 import { ISpaceshipHandling } from '../../interfaces';
 import { C, DIST_SCALE, MASS_SCALE, RADIUS_SCALE } from '../../utilities/consts';
-import { ILaserWeaponConfig, LaserWeapon } from '../../ship-effects/weapons/laser-weapon';
+import {
+    ILightningWeaponConfig,
+    LightningWeapon,
+} from '../../ship-effects/weapons/lightning-weapon';
 import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
 import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
 import { createShipContainerMesh, loadShipGltfInto } from './ship-model-loader';
@@ -133,7 +136,7 @@ export class HarbingerMothership extends Spaceship {
         // The GLB is authored bow-along-+Z, so no orientation correction.
         const MODEL_ROTATION = new THREE.Euler(0, 0, 0);
 
-        const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
+        const arcWeaponConfig: Partial<ILightningWeaponConfig> = {
             beamColor: 0x30ff60,
             optimalRange: 120_000 / DIST_SCALE,
             damage: 30,
@@ -153,7 +156,7 @@ export class HarbingerMothership extends Spaceship {
             name: 'Harbinger Mothership',
             handling: harbingerHandling,
             weaponGroups: [
-                new WeaponGroup([new LaserWeapon(scene, SPACESHIP_RADIUS, laserWeaponConfig)]),
+                new WeaponGroup([new LightningWeapon(scene, SPACESHIP_RADIUS, arcWeaponConfig)]),
                 new WeaponGroup([
                     new MissileWeapon(scene, SPACESHIP_RADIUS, {
                         salvoSize: 4,
