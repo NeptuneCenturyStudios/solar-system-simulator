@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { STAR_NOISE_GLSL } from './star-noise-glsl';
 import { starSurfaceExposure, starSurfaceTint } from './star-tint';
-import { settingsStore } from '../settings/settings-store';
 
-/** Granulation detail for the procedural surface: fewer fBm octaves on low graphics quality. */
-function starSurfaceOctaves(): number {
-    return settingsStore.settings.textureQuality === 'low' ? 4 : 6;
-}
+/**
+ * Most fBm octaves the granulation uses. Octaves smaller than a pixel are dropped in the shader
+ * (see the footprint test), so the top ones only cost anything when the camera is close to the
+ * surface. Not tied to any setting: texture quality is about asset size, not shader cost.
+ */
+const STAR_SURFACE_OCTAVES = 6;
 
 /**
  * Largest per-frame advance of a star's animation clock, in sim seconds. Boiling follows sim
@@ -125,7 +126,7 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
             uSsTint: { value: tint },
             uSsExposure: { value: this._targetExposure },
             // Max fBm octaves for the granulation; follows the texture-quality setting.
-            uSsOctaves: { value: starSurfaceOctaves() },
+            uSsOctaves: { value: STAR_SURFACE_OCTAVES },
             uSsBoilRate: { value: 0.0045 },
             uSsWarp: { value: 0.012 },
             uSsCellLo: { value: 0.3 },
@@ -314,14 +315,9 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
         u.uSsExposure.value += (this._targetExposure - u.uSsExposure.value) * blend;
     }
 
-    /**
-     * Advances the boiling animation by `dt` sim seconds, and picks up texture-quality changes
-     * so existing stars follow the setting without being rebuilt.
-     */
+    /** Advances the boiling animation by `dt` sim seconds. */
     update(dt: number): void {
-        const u = this.surfaceUniforms;
-        u.uSsTime.value += Math.min(Math.abs(dt), MAX_STAR_CLOCK_STEP);
-        u.uSsOctaves.value = starSurfaceOctaves();
+        this.surfaceUniforms.uSsTime.value += Math.min(Math.abs(dt), MAX_STAR_CLOCK_STEP);
     }
 
     /** Sets the magnetic axis (object space) the polar hot spots sit on. */

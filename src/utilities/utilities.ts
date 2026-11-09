@@ -134,8 +134,8 @@ export function getBodyTypeLabel(b: Body) {
  */
 export function buildBodySphereGeometry(
     radius: number,
-    widthSegments: number = 64,
-    heightSegments: number = 128
+    widthSegments: number,
+    heightSegments: number
 ): THREE.SphereGeometry {
     // Calculate the number of segments based on radius to maintain visual fidelity
     const minSegments = 128;
