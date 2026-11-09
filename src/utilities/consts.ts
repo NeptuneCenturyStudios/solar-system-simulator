@@ -1029,6 +1029,39 @@ export const SHIP_GROUND_STICK_SPEED = 2 / 1000 / DIST_SCALE; // 2 m/s
 export const SHIP_CONTACT_SEPARATION_FACTOR = 1.0;
 
 /**
+ * Ship-vs-ship contact tests the actual model triangles (see ship-mesh-collision.ts). This caps
+ * how many touching triangle pairs one contact gathers for its normal and contact point — enough
+ * to average out a single sliver, without walking every triangle of a deep overlap.
+ */
+export const SHIP_MESH_MAX_CONTACT_PAIRS = 32;
+
+/**
+ * Bisection steps used to find how far two intersecting hulls must move apart along the contact
+ * normal. Each halves the error, so 6 steps resolve the depth to 1/64 of the hulls' box overlap.
+ */
+export const SHIP_MESH_PENETRATION_ITERATIONS = 6;
+
+/**
+ * Most poses a single frame's relative motion is sampled at when two ships close faster than the
+ * thinner hull's thickness per frame (continuous collision, so fast fighters can't tunnel
+ * through a hull between frames).
+ */
+export const SHIP_MESH_CCD_MAX_SAMPLES = 8;
+
+/**
+ * Spacing between CCD samples, as a fraction of the thinnest hull dimension of the two ships.
+ * Half the thickness means a hull can never fall entirely between two samples.
+ */
+export const SHIP_MESH_CCD_STEP_FRACTION = 0.5;
+
+/**
+ * Scale applied to each hull's bounding box for the cheap box-vs-box reject before the triangle
+ * test. A little slack keeps animated parts (e.g. the World Destroyer's spinning spiral) from
+ * poking outside the box they were measured in at load.
+ */
+export const SHIP_MESH_BOUNDS_PADDING = 1.05;
+
+/**
  * How quickly a grounded ship tips flat onto its belly (or back), as a multiple of its natural
  * tipping time √(L / g) — L its half-length, g the local surface gravity. The remaining tilt decays
  * as e^(−t/τ) with τ = this × √(L / g), so a fighter on Earth settles in about a second, while on

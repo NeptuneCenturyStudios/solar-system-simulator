@@ -223,6 +223,14 @@ export class Spaceship extends Body {
     }
 
     /**
+     * The loaded model's bounding box in container-local space (before the mesh's own scale and
+     * rotation), or null until the model has loaded. Read-only: callers must not mutate it.
+     */
+    get hullBoundsLocal(): Readonly<THREE.Box3> | null {
+        return this.hullBounds;
+    }
+
+    /**
      * Distance from the ship's centre to the outermost point of its hull along the world-space
      * unit direction `dir` — the support distance of the hull's oriented bounding box. This is
      * what ground contact uses instead of `radius`: the model is scaled so its *longest*

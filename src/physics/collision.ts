@@ -6,6 +6,8 @@ import { Star } from '../bodies/star';
 import { Spaceship } from '../bodies/ships/spaceship';
 import { computeAtmosphereFrameVelocity } from './atmosphere-frame';
 import { sphereMeshSurfaceFactor } from './sphere-mesh-surface';
+import { findShipHullContact, type ShipMeshContact } from './ship-mesh-collision';
+import { settingsStore } from '../settings/settings-store';
 import {
     COLLISION_DAMAGE_PER_ENERGY,
     COLLISION_MIN_DAMAGE_FRACTION,
@@ -47,6 +49,14 @@ const _surfaceVel1 = new THREE.Vector3();
 const _surfaceVel2 = new THREE.Vector3();
 const _tangent = new THREE.Vector3();
 const _deltaRelVel = new THREE.Vector3();
+const _rewind = new THREE.Vector3();
+const _separation = new THREE.Vector3();
+const _meshContact: ShipMeshContact = {
+    normal: new THREE.Vector3(),
+    point: new THREE.Vector3(),
+    penetration: 0,
+    rewind: new THREE.Vector3(),
+};
 
 /** Damage below this (HP) is still applied but not logged — keeps a skidding ship from spamming. */
 const MIN_LOGGED_DAMAGE = 0.01;
@@ -181,6 +191,30 @@ function pushApart(
 }
 
 /**
+ * Move a ship contact's bodies to exactly touching: b1 is displaced relative to b2 by `rewind`
+ * (non-zero only when a fast pass was caught by the mesh CCD sweep) plus `penetration` along
+ * `normal`, split by mass so the heavier body moves less and the centre of mass stays put.
+ */
+function separateShipContact(
+    b1: Body,
+    b2: Body,
+    normal: THREE.Vector3,
+    penetration: number,
+    rewind: THREE.Vector3
+): void {
+    _separation.copy(rewind).addScaledVector(normal, Math.max(0, penetration));
+    if (_separation.lengthSq() === 0) return;
+
+    const m1 = safeMass(b1);
+    const m2 = safeMass(b2);
+    const totalMass = m1 + m2;
+    const share1 = totalMass > 0 ? m2 / totalMass : 0.5;
+
+    b1.mesh.position.addScaledVector(_separation, share1);
+    b2.mesh.position.addScaledVector(_separation, -(1 - share1));
+}
+
+/**
  * Bounce two surviving non-ship bodies off each other: a momentum-conserving impulse along the
  * contact normal with COLLISION_RESTITUTION, then separation so they don't re-contact next frame.
  * @param normalSpeed Closing speed along the normal, (v₁ − v₂)·n — negative while approaching.
@@ -275,7 +309,8 @@ export function surfaceDistanceFromPoint(point: THREE.Vector3, body: Body): numb
  *   leave the ground at a few m/s and successive hops shrink geometrically. At or below the rest
  *   speed (the larger of SHIP_LANDING_REST_SPEED and twice the speed gravity adds this frame) there
  *   is no rebound at all: that is resting contact, and it keeps a grounded ship from jittering —
- *   including under time warp, where one frame of gravity is a lot of speed.
+ *   including under time warp, where one frame of gravity is a lot of speed. Two ships never
+ *   rebound off each other: the closing speed is cancelled and they slide or stick instead.
  * - **Tangential.** Coulomb friction: the sliding speed removed is capped at
  *   SHIP_SURFACE_FRICTION × the normal speed change. A steep crash (big normal impulse) is stopped
  *   almost dead; a shallow skid decelerates at μ·g while gravity keeps pressing the ship down.
@@ -286,7 +321,10 @@ export function surfaceDistanceFromPoint(point: THREE.Vector3, body: Body): numb
  * it slows, and a ship resting on the ground — or riding a spinning planet, whose centre-relative
  * speed is far from zero — costs nothing.
  *
- * Contact uses the ship's hull extent toward the other body (see {@link contactReach}), not its
+ * Ship-on-ship contact tests the hulls' actual triangles, or their oriented bounding boxes if the
+ * Ship Collision setting is `box` (see findShipHullContact), taking its normal, contact point and
+ * depth from where the hulls cross. Until both models have loaded, and for anything else touching a ship, contact uses the
+ * ship's hull extent toward the other body (see {@link contactReach}), not its
  * radius: the radius is the model's longest dimension, so it would hold a flat-bellied ship most of
  * a radius above the ground. Separation is to exactly touching (SHIP_CONTACT_SEPARATION_FACTOR):
  * the general relative factor would lift the ship kilometres off an Earth-sized body on every
@@ -296,30 +334,58 @@ export function surfaceDistanceFromPoint(point: THREE.Vector3, body: Body): numb
  * pre-impact velocity for the caller's death effects.
  *
  * @param dt Sim seconds covered by this collision pass, used to scale the resting threshold.
+ * @param frameStartPositions Each body's position (by id) before this frame's physics step, for the
+ *   ship-vs-ship sweep that catches fast ships passing through each other.
  */
-function resolveShipContact(b1: Body, b2: Body, dt: number): CollisionOutcome {
-    _relVel.subVectors(b1.velocity, b2.velocity);
-    const distance = computeContactNormal(b1, b2, _relVel, _normal);
+function resolveShipContact(
+    b1: Body,
+    b2: Body,
+    dt: number,
+    frameStartPositions?: ReadonlyMap<string, THREE.Vector3>
+): CollisionOutcome {
+    let distance: number;
+    // How far b1 must move along _normal (relative to b2) to be exactly touching.
+    let penetration: number;
+    _rewind.set(0, 0, 0);
 
-    // The caller's sphere test used the full radii; a ship's hull is much smaller than its
-    // radius, so the real contact distance uses its hull extent facing the other body.
-    // (_normal points from b2 toward b1, so b1's contact face is along −n and b2's along +n.)
-    _tangent.copy(_normal).negate();
-    const reach1 = contactReach(b1, _tangent);
-    const reach2 = contactReach(b2, _normal);
-    const contactDistance = reach1 + reach2;
+    if (b1 instanceof Spaceship && b2 instanceof Spaceship && b1.hasHullModel && b2.hasHullModel) {
+        // Ship on ship: test the hull triangles (or oriented boxes, per the Ship Collision setting).
+        const mode = settingsStore.settings.shipCollisionMode;
+        const start1 = frameStartPositions?.get(b1.id);
+        const start2 = frameStartPositions?.get(b2.id);
+        if (!findShipHullContact(b1, b2, start1, start2, mode, _meshContact)) {
+            return { type: 'none' };
+        }
+        _normal.copy(_meshContact.normal);
+        _contactPoint.copy(_meshContact.point);
+        _rewind.copy(_meshContact.rewind);
+        penetration = _meshContact.penetration;
+        distance = b1.mesh.position.distanceTo(b2.mesh.position);
+    } else {
+        _relVel.subVectors(b1.velocity, b2.velocity);
+        distance = computeContactNormal(b1, b2, _relVel, _normal);
 
-    // Spheres overlap but the hull hasn't reached the surface yet — not touching.
-    if (distance >= contactDistance) return { type: 'none' };
+        // The caller's sphere test used the full radii; a ship's hull is much smaller than its
+        // radius, so the real contact distance uses its hull extent facing the other body.
+        // (_normal points from b2 toward b1, so b1's contact face is along −n and b2's along +n.)
+        _tangent.copy(_normal).negate();
+        const reach1 = contactReach(b1, _tangent);
+        const reach2 = contactReach(b2, _normal);
+        const contactDistance = reach1 + reach2;
 
-    // Touching: tell the ship what it is standing on, for orientation (see ground-alignment.ts).
-    // Ship-on-ship contact is not ground.
-    if (b1 instanceof Spaceship && !(b2 instanceof Spaceship)) b1.groundContactBody = b2;
-    else if (b2 instanceof Spaceship && !(b1 instanceof Spaceship)) b2.groundContactBody = b1;
+        // Spheres overlap but the hull hasn't reached the surface yet — not touching.
+        if (distance >= contactDistance) return { type: 'none' };
 
-    // Contact point on the line of centres, split in proportion to the reaches.
-    const split = contactDistance > 0 ? reach2 / contactDistance : 0.5;
-    _contactPoint.copy(b2.mesh.position).addScaledVector(_normal, distance * split);
+        // Touching: tell the ship what it is standing on, for orientation (see
+        // ground-alignment.ts). Ship-on-ship contact is not ground.
+        if (b1 instanceof Spaceship && !(b2 instanceof Spaceship)) b1.groundContactBody = b2;
+        else if (b2 instanceof Spaceship && !(b1 instanceof Spaceship)) b2.groundContactBody = b1;
+
+        // Contact point on the line of centres, split in proportion to the reaches.
+        const split = contactDistance > 0 ? reach2 / contactDistance : 0.5;
+        _contactPoint.copy(b2.mesh.position).addScaledVector(_normal, distance * split);
+        penetration = contactDistance * SHIP_CONTACT_SEPARATION_FACTOR - distance;
+    }
 
     surfaceVelocityAt(b1, _contactPoint, _surfaceVel1);
     surfaceVelocityAt(b2, _contactPoint, _surfaceVel2);
@@ -328,7 +394,7 @@ function resolveShipContact(b1: Body, b2: Body, dt: number): CollisionOutcome {
 
     // Already separating (taking off, or mid-hop): clear the overlap, but it's not an impact.
     if (normalSpeed > 0) {
-        pushApart(b1, b2, _normal, distance, contactDistance * SHIP_CONTACT_SEPARATION_FACTOR);
+        separateShipContact(b1, b2, _normal, penetration, _rewind);
         return { type: 'none' };
     }
 
@@ -338,13 +404,17 @@ function resolveShipContact(b1: Body, b2: Body, dt: number): CollisionOutcome {
     const reducedMass = m1 > 0 && m2 > 0 ? (m1 * m2) / totalMass : 0;
 
     // ── Normal: a small landing hop, or nothing at all for resting contact ──
+    // Ship on ship never rebounds: the closing speed is cancelled and the hulls stay in contact,
+    // sliding (or sticking) against each other instead of bumping apart.
+    const isShipOnShip = b1 instanceof Spaceship && b2 instanceof Spaceship;
     const closingSpeed = -normalSpeed;
     const gravity = (G * totalMass) / Math.max(distance * distance, 1e-12);
     const restSpeed = Math.max(SHIP_LANDING_REST_SPEED, 2 * gravity * Math.max(0, dt));
     const isResting = closingSpeed <= restSpeed;
-    const reboundSpeed = isResting
-        ? 0
-        : Math.min(closingSpeed * SHIP_LANDING_BOUNCE_RESTITUTION, SHIP_LANDING_BOUNCE_SPEED);
+    const reboundSpeed =
+        isResting || isShipOnShip
+            ? 0
+            : Math.min(closingSpeed * SHIP_LANDING_BOUNCE_RESTITUTION, SHIP_LANDING_BOUNCE_SPEED);
     const normalDelta = closingSpeed + reboundSpeed;
 
     // ── Tangential: Coulomb friction, sticking once slow enough ──
@@ -395,7 +465,7 @@ function resolveShipContact(b1: Body, b2: Body, dt: number): CollisionOutcome {
         b2.velocity.addScaledVector(_deltaRelVel, -reducedMass / m2);
     }
 
-    pushApart(b1, b2, _normal, distance, contactDistance * SHIP_CONTACT_SEPARATION_FACTOR);
+    separateShipContact(b1, b2, _normal, penetration, _rewind);
     return { type: 'bounce' };
 }
 
@@ -409,8 +479,15 @@ function resolveShipContact(b1: Body, b2: Body, dt: number): CollisionOutcome {
  * are left to the caller via the outcome.
  *
  * @param dt Sim seconds covered by this collision pass (only ship contacts use it).
+ * @param frameStartPositions Each body's position (by id) before this frame's physics step. Only
+ *   ship-vs-ship contacts use it, to catch fast ships passing through each other.
  */
-export function resolveCollision(b1: Body, b2: Body, dt: number = 0): CollisionOutcome {
+export function resolveCollision(
+    b1: Body,
+    b2: Body,
+    dt: number = 0,
+    frameStartPositions?: ReadonlyMap<string, THREE.Vector3>
+): CollisionOutcome {
     const isBH1 = b1 instanceof BlackHole;
     const isBH2 = b2 instanceof BlackHole;
 
@@ -432,7 +509,7 @@ export function resolveCollision(b1: Body, b2: Body, dt: number = 0): CollisionO
     if (isStar2) return claimVictim(b2, b1);
 
     // Ships land, with friction, rather than ricochet.
-    if (involvesShip(b1, b2)) return resolveShipContact(b1, b2, dt);
+    if (involvesShip(b1, b2)) return resolveShipContact(b1, b2, dt, frameStartPositions);
 
     _relVel.subVectors(b1.velocity, b2.velocity);
     const distance = computeContactNormal(b1, b2, _relVel, _normal);

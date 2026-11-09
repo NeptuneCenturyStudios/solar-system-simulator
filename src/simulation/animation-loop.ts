@@ -390,8 +390,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
     const _animOldPos = new THREE.Vector3();
     const _prevCamPos = new THREE.Vector3();
     const _cameraVel = new THREE.Vector3();
-    // Pre-substep position snapshot, used for the swept wormhole-entrance test.
-    const _wormholePrevPositions = new Map<string, THREE.Vector3>();
+    // Pre-substep position snapshot, used for the swept wormhole-entrance test and the
+    // ship-vs-ship collision sweep.
+    const _framePrevPositions = new Map<string, THREE.Vector3>();
     // Flight hover context for the name indicator; fields are overwritten each frame.
     const _flightHoverCtx: IPlanetNameFlightContext = {
         isActive: true,
@@ -702,15 +703,16 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         const oldPos = _animOldPos;
 
         // ── Physics ──────────────────────────────────────────────────────
-        // Snapshot positions before the physics step so wormhole entrance detection can
-        // sweep each body's path across the frame instead of a static end-of-frame test
-        // (needed since a ship in warp can cross a thin wormhole mouth within one frame).
+        // Snapshot positions before the physics step so wormhole entrance detection and the
+        // ship-vs-ship collision sweep can follow each body's path across the frame instead of a
+        // static end-of-frame test (a ship in warp can cross a thin wormhole mouth, or a fast
+        // fighter another ship's hull, within one frame).
         for (const b of ctx.simulationState.bodies) {
             if (!b || b._isDisposed || !b.mesh) continue;
-            let snapshot = _wormholePrevPositions.get(b.id);
+            let snapshot = _framePrevPositions.get(b.id);
             if (!snapshot) {
                 snapshot = new THREE.Vector3();
-                _wormholePrevPositions.set(b.id, snapshot);
+                _framePrevPositions.set(b.id, snapshot);
             }
             snapshot.copy(b.mesh.position);
         }
@@ -803,7 +805,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     if (dx * dx + dy * dy + dz * dz < maxDist * maxDist) {
                         // Applies impact damage to both bodies (and bounces them apart if
                         // both survive); deaths are carried out below from the outcome.
-                        const outcome = resolveCollision(b1, b2, dtTotal);
+                        const outcome = resolveCollision(b1, b2, dtTotal, _framePrevPositions);
 
                         // Both survived (or were only nudged out of overlap) — nothing dies.
                         if (outcome.type === 'bounce' || outcome.type === 'none') continue;
@@ -879,7 +881,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 );
             }
 
-            processWormholeInteractions(ctx.simulationState.bodies, _wormholePrevPositions);
+            processWormholeInteractions(ctx.simulationState.bodies, _framePrevPositions);
 
             // Bezier particle streams between linked wormholes (once per frame, not per body).
             updateWormholeBridges(dtTotal);

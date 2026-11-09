@@ -49,6 +49,7 @@
         "marked": "^18.0.13",
         "noty": "^3.1.4",
         "three": "^0.184.0",
+        "three-mesh-bvh": "^0.9.17",
         "vue": "^3.5.41"
     },
     "allowScripts": {

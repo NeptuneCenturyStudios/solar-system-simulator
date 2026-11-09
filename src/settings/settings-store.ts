@@ -42,6 +42,7 @@ export const enum SettingKey {
     AutopilotOrbitDistanceM = 'autopilotOrbitDistanceM',
     CloudQuality = 'cloudQuality',
     ShadowQuality = 'shadowQuality',
+    ShipCollisionMode = 'shipCollisionMode',
 }
 
 /**
@@ -113,6 +114,17 @@ export type CloudQuality = 'low' | 'medium' | 'high';
  * - `high` — eclipses, plus a larger ship shadow map for up to four ships with softer edges.
  */
 export type ShadowQuality = 'off' | 'low' | 'high';
+
+/**
+ * How two ships' hulls are tested against each other once their bounding spheres overlap.
+ * - `triangle` — the models' actual triangles: ships only touch where they are drawn.
+ * - `box`      — each hull's oriented bounding box. Much cheaper against very detailed models
+ *                (e.g. the World Destroyer), but concave hulls collide with the empty space in
+ *                their box.
+ *
+ * Declared here rather than in the physics layer so the settings store stays dependency-free.
+ */
+export type ShipCollisionMode = 'triangle' | 'box';
 
 export interface SpaceSimSettings {
     particleEffectsEnabled: boolean;
@@ -189,6 +201,8 @@ export interface SpaceSimSettings {
     cloudQuality: CloudQuality;
     /** How shadows (eclipses, ship shadows) are drawn. */
     shadowQuality: ShadowQuality;
+    /** How ship-vs-ship contact tests the hulls (triangle mesh or oriented boxes). */
+    shipCollisionMode: ShipCollisionMode;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -234,6 +248,7 @@ const defaultSettings: SpaceSimSettings = {
     autopilotOrbitDistanceM: AI_AUTOPILOT_ORBIT_DISTANCE_DEFAULT_M,
     cloudQuality: 'medium',
     shadowQuality: 'low',
+    shipCollisionMode: 'triangle',
 };
 
 /** Normalise a stored texture quality, falling back to `low` for anything unrecognised. */
@@ -255,6 +270,11 @@ export function normalizeCloudQuality(value: unknown): CloudQuality {
 /** Normalise a stored shadow quality, falling back to `low` for anything unrecognised. */
 export function normalizeShadowQuality(value: unknown): ShadowQuality {
     return value === 'off' || value === 'high' ? value : 'low';
+}
+
+/** Normalise a stored ship collision mode, falling back to `triangle` for anything unrecognised. */
+export function normalizeShipCollisionMode(value: unknown): ShipCollisionMode {
+    return value === 'box' ? 'box' : 'triangle';
 }
 
 /** Normalise a stored autopilot mode, falling back to `classic` for anything unrecognised. */
@@ -289,6 +309,7 @@ class SettingsStore {
         this.data.autopilotMode = normalizeAutopilotMode(this.data.autopilotMode);
         this.data.cloudQuality = normalizeCloudQuality(this.data.cloudQuality);
         this.data.shadowQuality = normalizeShadowQuality(this.data.shadowQuality);
+        this.data.shipCollisionMode = normalizeShipCollisionMode(this.data.shipCollisionMode);
         this.data.autopilotOrbitMode = normalizeAutopilotOrbitMode(this.data.autopilotOrbitMode);
         this.data.autopilotOrbitDistanceM = clampAutopilotOrbitDistanceM(
             this.data.autopilotOrbitDistanceM

@@ -190,6 +190,20 @@
         </div>
 
         <div class="control-group">
+            <label>Ship Collision</label>
+            <select
+                class="solver-select"
+                :value="simStore.shipCollisionMode"
+                title="How two ships' hulls are tested against each other. Triangle uses the actual models; Box uses each hull's bounding box and is much cheaper against very detailed ships."
+                @change="onShipCollisionModeChange"
+            >
+                <option value="triangle">Triangle (exact hull)</option>
+                <option value="box">Box (fast)</option>
+            </select>
+            <p class="solver-hint">{{ shipCollisionHint }}</p>
+        </div>
+
+        <div class="control-group">
             <label>
                 Physics Accuracy
                 <span class="val-display">{{ simStore.substeps }}</span>
@@ -301,6 +315,7 @@ import {
     setBarnesHutTheta,
     setCloudQuality,
     setShadowQuality,
+    setShipCollisionMode,
     setFrameRateLimit,
     setLensflareEnabled,
     setMusicVolume,
@@ -321,6 +336,7 @@ import type {
     CloudQuality,
     PhysicsSolverMode,
     ShadowQuality,
+    ShipCollisionMode,
     TextureQuality,
 } from '../../settings/settings-store';
 import { isHighQualityTextureAvailable } from '../../drawing/texture-quality';
@@ -402,6 +418,19 @@ const shadowQualityHint = computed(() => SHADOW_QUALITY_HINTS[simStore.shadowQua
 
 function onShadowQualityChange(e: Event): void {
     setShadowQuality((e.target as HTMLSelectElement).value as ShadowQuality);
+}
+
+/** One-line explanation of what each ship collision mode costs. */
+const SHIP_COLLISION_HINTS: Record<ShipCollisionMode, string> = {
+    triangle:
+        'Ships only touch where their hulls are drawn. Can be slow against very detailed ships like the World Destroyer.',
+    box: "Each hull is treated as its bounding box. Fast, but ships can bump into the empty space around a hull's shape.",
+};
+
+const shipCollisionHint = computed(() => SHIP_COLLISION_HINTS[simStore.shipCollisionMode]);
+
+function onShipCollisionModeChange(e: Event): void {
+    setShipCollisionMode((e.target as HTMLSelectElement).value as ShipCollisionMode);
 }
 
 function onShowAiDebugChange(e: Event): void {

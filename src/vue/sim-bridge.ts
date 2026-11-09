@@ -27,6 +27,7 @@ import {
     CloudQuality,
     PhysicsSolverMode,
     ShadowQuality,
+    ShipCollisionMode,
     SettingKey,
     settingsStore,
     TextureQuality,
@@ -392,6 +393,8 @@ export interface VueSimStore {
     cloudQuality: CloudQuality;
     /** How shadows are drawn. */
     shadowQuality: ShadowQuality;
+    /** How ship-vs-ship contact tests the hulls (triangle mesh or oriented boxes). */
+    shipCollisionMode: ShipCollisionMode;
     /** Physics substeps per frame. */
     substeps: number;
     /** Gravity solver used by the n-body engine. */
@@ -481,6 +484,7 @@ const state = reactive<VueSimStore>({
     auroraDetail: settingsStore.settings.auroraDetail,
     cloudQuality: settingsStore.settings.cloudQuality,
     shadowQuality: settingsStore.settings.shadowQuality,
+    shipCollisionMode: settingsStore.settings.shipCollisionMode,
     substeps: settingsStore.settings.substeps,
     physicsSolver: settingsStore.settings.physicsSolver,
     barnesHutTheta: settingsStore.settings.barnesHutTheta,
@@ -1232,6 +1236,15 @@ export function setCloudQuality(quality: CloudQuality): void {
 export function setShadowQuality(quality: ShadowQuality): void {
     settingsStore.update(SettingKey.ShadowQuality, quality);
     state.shadowQuality = quality;
+}
+
+/**
+ * Select how ship-vs-ship contact tests the hulls. Takes effect on the next contact: the collision
+ * pass reads the setting every time two ships touch.
+ */
+export function setShipCollisionMode(mode: ShipCollisionMode): void {
+    settingsStore.update(SettingKey.ShipCollisionMode, mode);
+    state.shipCollisionMode = mode;
 }
 
 /** Toggle the ship-AI obstacle avoidance debug overlay. */
