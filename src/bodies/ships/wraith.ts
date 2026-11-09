@@ -13,8 +13,8 @@ import {
     ILightningWeaponConfig,
     LightningWeapon,
 } from '../../ship-effects/weapons/lightning-weapon';
-import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
 import { WeaponGroup } from '../../ship-effects/weapons/weapon-group';
+import { MissileWeapon } from '../../ship-effects/weapons/missile-weapon';
 
 /**
  * Alien light fighter, the alien fleet's counterpart to the Dart. Same flight tuning, hull and
@@ -146,8 +146,8 @@ export class Wraith extends Spaceship {
         const arcWeaponConfig: Partial<ILightningWeaponConfig> = {
             beamColor: 0x30ff60,
             damage: 1,
-            coreWidth: 1,
-            haloWidth: 4,
+            coreWidth: 0.002 / DIST_SCALE, // km
+            haloWidth: 0.008 / DIST_SCALE, // km
             heatPerSecond: 0.5,
             damageInterval: 0.2,
             coolPerSecond: 1.25,

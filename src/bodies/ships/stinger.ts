@@ -151,8 +151,8 @@ export class Stinger extends Spaceship {
         const arcWeaponConfig: Partial<ILightningWeaponConfig> = {
             beamColor: 0x30ff60,
             damage: 1,
-            coreWidth: 1,
-            haloWidth: 4,
+            coreWidth: 0.002 / DIST_SCALE, // km
+            haloWidth: 0.008 / DIST_SCALE, // km
             heatPerSecond: 0.5,
             damageInterval: 0.2,
             coolPerSecond: 1.25,

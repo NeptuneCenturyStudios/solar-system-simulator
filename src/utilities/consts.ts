@@ -1939,7 +1939,7 @@ export const ALIEN_INVASION_TIME_SCALE = 1;
 /** Sim-seconds after the distress call before the alien fleet emerges, wherever the player is. */
 export const ALIEN_INVASION_ARRIVAL_SECS = 90;
 /** The fleet emerges early once the player is this close to the wormhole: 25 km. */
-export const ALIEN_INVASION_ARRIVAL_RANGE = 25 / DIST_SCALE;
+export const ALIEN_INVASION_ARRIVAL_RANGE = 40 / DIST_SCALE;
 /** Distance of the wormhole from Earth's centre, on the sunward side (≈38,000 km). */
 export const ALIEN_INVASION_WORMHOLE_EARTH_DISTANCE = EARTH_RADIUS * 6;
 /** Radius of the wormhole's mouth: 3 km — wide enough for a Harbinger to emerge through. */

@@ -182,9 +182,9 @@ export class MissileWeapon extends Weapon {
             salvoSplay: THREE.MathUtils.degToRad(6),
             turnRate: 3,
             lifetime: 30,
-            damage: 15,
-            shieldEffectiveness: 0.25,
-            hullEffectiveness: 1.25,
+            damage: 10,
+            shieldEffectiveness: 0.1,
+            hullEffectiveness: 1,
             heatPerSalvo: 1,
             coolPerSecond: 0.2, // full cooldown in 5 s
             maxMissiles: 32,

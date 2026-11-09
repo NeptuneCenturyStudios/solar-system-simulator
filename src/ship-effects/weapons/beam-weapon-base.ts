@@ -190,12 +190,6 @@ export abstract class BeamWeaponBase extends Weapon {
             return;
         }
 
-        this.beamFront = Math.min(
-            this.beamFront + this.propagationSpeed * simDt,
-            this.beam.maxRange
-        );
-        this.onBeamTick(simDt);
-
         // This update runs AFTER the physics step, so the owner's transform is already the
         // post-physics one — read the muzzle straight off the live mesh. No extrapolation, so
         // the beam stays pinned to the nose under thrust/boost and while steering.
@@ -206,6 +200,8 @@ export abstract class BeamWeaponBase extends Weapon {
         // loop every frame while the beam stays active.
         this.updateLoopSound(this.curOrigin);
 
+        // The hit test doesn't depend on the leading edge, so it runs first: that lets the
+        // edge's advance know how far it actually has to go this shot.
         const { t: hitT, body: hitBody } = raycastBodies(
             this.curOrigin,
             this.direction,
@@ -214,6 +210,13 @@ export abstract class BeamWeaponBase extends Weapon {
             owner,
             this.hit
         );
+
+        const reach = Math.min(hitT, this.beam.maxRange);
+        this.beamFront = Math.min(
+            this.beamFront + this.advanceFront(simDt, reach),
+            this.beam.maxRange
+        );
+        this.onBeamTick(simDt);
 
         // The visible beam stops at the first body it reaches; the leading edge may still be
         // travelling toward it.
@@ -242,6 +245,17 @@ export abstract class BeamWeaponBase extends Weapon {
             this.setBeamVisible(true);
             this.prevBeamVisible = true;
         }
+    }
+
+    /**
+     * Distance the leading edge advances this frame. The default travels at
+     * {@link propagationSpeed}; a subclass can instead cover a fixed fraction of `reach` per
+     * second, so the beam lands in the same time however far away its target is.
+     * @param simDt Sim-time seconds advanced this frame.
+     * @param reach Distance to the first body hit, or to `maxRange` if nothing is in the way.
+     */
+    protected advanceFront(simDt: number, _reach: number): number {
+        return this.propagationSpeed * simDt;
     }
 
     /**

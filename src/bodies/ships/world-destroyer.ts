@@ -58,7 +58,7 @@ export class WorldDestroyer extends Spaceship {
         const SPACESHIP_RADIUS = 1500 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
-        const SPACESHIP_HEALTH_POINTS = 1000;
+        const SPACESHIP_HEALTH_POINTS = 700;
 
         // Camera placement (ship-local space; +Z = forward, +Y = up). The ship is tall rather
         // than long, so the camera sits further back and only slightly above centre.
@@ -165,12 +165,13 @@ export class WorldDestroyer extends Spaceship {
 
         const arcWeaponConfig: Partial<ILightningWeaponConfig> = {
             beamColor: 0x30ff60,
-            optimalRange: 150_000 / DIST_SCALE,
+            optimalRange: 35_000 / DIST_SCALE,
             damage: 500,
-            coreWidth: 10,
-            haloWidth: 22,
+            coreWidth: 0.06 / DIST_SCALE, // km
+            haloWidth: 0.13 / DIST_SCALE, // km
             damageInterval: 0.2,
             coolPerSecond: 1.0,
+            wobbleFraction: 0.05
         };
         const bowArc = new LightningWeapon(scene, SPACESHIP_RADIUS, arcWeaponConfig);
 
@@ -187,6 +188,7 @@ export class WorldDestroyer extends Spaceship {
                 new WeaponGroup([bowArc]),
                 new WeaponGroup([
                     new MissileWeapon(scene, SPACESHIP_RADIUS, {
+                        damage: 100,
                         salvoSize: 6,
                         missileLength: 0.02 / RADIUS_SCALE, // 20 m
                     }),

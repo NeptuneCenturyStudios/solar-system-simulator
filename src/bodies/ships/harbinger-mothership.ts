@@ -33,7 +33,7 @@ export class HarbingerMothership extends Spaceship {
         const SPACESHIP_RADIUS = 600 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
-        const SPACESHIP_HEALTH_POINTS = 800;
+        const SPACESHIP_HEALTH_POINTS = 600;
 
         // The GLB's emissive maps are sparse window/light details. Blender authored them at
         // emission strength ~30, which clips to flat white through the sim's 8-bit capture
@@ -138,12 +138,13 @@ export class HarbingerMothership extends Spaceship {
 
         const arcWeaponConfig: Partial<ILightningWeaponConfig> = {
             beamColor: 0x30ff60,
-            optimalRange: 120_000 / DIST_SCALE,
+            optimalRange: 31_000 / DIST_SCALE,
             damage: 30,
-            coreWidth: 6,
-            haloWidth: 14,
+            coreWidth: 0.03 / DIST_SCALE, // km
+            haloWidth: 0.07 / DIST_SCALE, // km
             damageInterval: 0.2,
             coolPerSecond: 1.25,
+            wobbleFraction: 0.05
         };
 
         super(dependencies, scene, {
@@ -165,7 +166,7 @@ export class HarbingerMothership extends Spaceship {
                 ]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
-            shield: { hullMultiplier: 4, rechargeTime: 170 },
+            shield: { hullMultiplier: 4, rechargeTime: 180 },
             shipTypeId: 'harbinger_mothership',
             role: ShipRole.Capital,
             thirdPersonOffset: THIRD_PERSON_OFFSET,

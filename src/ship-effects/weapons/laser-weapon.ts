@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { SoundEffect, playLoopSoundEffectAt } from '../../utilities/audio.js';
 import { C, DIST_SCALE } from '../../utilities/consts.js';
+import {
+    BeamLineMaterial,
+    DEFAULT_BEAM_LINE_CLAMPS,
+    IBeamLineWidthConfig,
+} from './beam-line-material';
 import { BeamWeaponBase, IBeamWeaponConfig } from './beam-weapon-base';
 
 const LASER_FLICKER_FREQ_A = 9.1; // rad/s — incommensurate with B for non-repeating shimmer
@@ -17,14 +21,10 @@ const LASER_OPTIMAL_RANGE_KM = 30_000;
  * override the class defaults; any omitted field keeps the class default.
  *
  * The reach/damage/heat half of this is {@link IBeamWeaponConfig} — shared with every other
- * continuous beam. Only the straight-line look (two screen-pixel-width lines) is the laser's own.
+ * continuous beam. Only the straight-line look (two world-width lines, see
+ * {@link IBeamLineWidthConfig}) is the laser's own.
  */
-export interface ILaserWeaponConfig extends IBeamWeaponConfig {
-    /** Screen-pixel width of the white-hot core line. */
-    coreWidth: number;
-    /** Screen-pixel width of the coloured halo line. */
-    haloWidth: number;
-}
+export interface ILaserWeaponConfig extends IBeamWeaponConfig, IBeamLineWidthConfig {}
 
 /**
  * Continuous laser weapon.  While the trigger is held, `tryFire` refreshes the
@@ -45,10 +45,10 @@ export class LaserWeapon extends BeamWeaponBase {
 
     // ── Rendering ────────────────────────────────────────────────────────────
     private readonly coreLineGeo: LineGeometry;
-    private readonly coreLineMat: LineMaterial;
+    private readonly coreLineMat: BeamLineMaterial;
     private readonly coreBeamLine: Line2;
     private readonly haloLineGeo: LineGeometry;
-    private readonly haloLineMat: LineMaterial;
+    private readonly haloLineMat: BeamLineMaterial;
     private readonly haloBeamLine: Line2;
 
     // Glow points at the muzzle and the beam tip.
@@ -65,14 +65,15 @@ export class LaserWeapon extends BeamWeaponBase {
     constructor(scene: THREE.Scene, shipRadius: number, config: Partial<ILaserWeaponConfig> = {}) {
         /** Class-level defaults — a ship wanting different behaviour passes a partial ILaserWeaponConfig. */
         const DEFAULT_LASER_CONFIG: ILaserWeaponConfig = {
-            maxRange: C * 10.0,
+            maxRange: C,
             beamColor: 0xff2244,
-            coreWidth: 1,
-            haloWidth: 4,
-            damage: 2,
+            coreWidth: 0.002 / DIST_SCALE,
+            haloWidth: 0.008 / DIST_SCALE,
+            ...DEFAULT_BEAM_LINE_CLAMPS,
+            damage: 1,
             optimalRange: LASER_OPTIMAL_RANGE_KM / DIST_SCALE,
-            shieldEffectiveness: 1.75,
-            hullEffectiveness: 0.25,
+            shieldEffectiveness: 1.0,
+            hullEffectiveness: 0.1,
             damageInterval: 0.2,
             heatPerSecond: 0.25,
             coolPerSecond: 0.75,
@@ -92,12 +93,12 @@ export class LaserWeapon extends BeamWeaponBase {
         // ── Core beam: narrow white-hot Line2 ─────────────────────────────
         this.coreLineGeo = new LineGeometry();
         this.coreLineGeo.setPositions([0, 0, 0, 0, 0, 1]);
-        this.coreLineMat = new LineMaterial({
+        this.coreLineMat = new BeamLineMaterial({
             color: 0xffffff,
-            linewidth: this.config.coreWidth,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
+            worldWidth: this.config.coreWidth,
+            minPixels: this.config.minCoreWidthPx,
+            maxPixels: this.config.maxWidthPx,
+            minFade: this.config.minFade,
         });
         this.coreLineMat.resolution.set(window.innerWidth, window.innerHeight);
         this.coreBeamLine = new Line2(this.coreLineGeo, this.coreLineMat);
@@ -109,12 +110,12 @@ export class LaserWeapon extends BeamWeaponBase {
         // ── Halo beam: wide coloured glow around the core ──────────────────
         this.haloLineGeo = new LineGeometry();
         this.haloLineGeo.setPositions([0, 0, 0, 0, 0, 1]);
-        this.haloLineMat = new LineMaterial({
+        this.haloLineMat = new BeamLineMaterial({
             color: this.config.beamColor,
-            linewidth: this.config.haloWidth,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
+            worldWidth: this.config.haloWidth,
+            minPixels: this.config.minHaloWidthPx,
+            maxPixels: this.config.maxWidthPx,
+            minFade: this.config.minFade,
         });
         this.haloLineMat.resolution.set(window.innerWidth, window.innerHeight);
         this.haloBeamLine = new Line2(this.haloLineGeo, this.haloLineMat);
@@ -225,8 +226,8 @@ export class LaserWeapon extends BeamWeaponBase {
         this.haloLineMat.resolution.set(window.innerWidth, window.innerHeight);
         this.coreLineMat.opacity = Math.max(0, Math.min(1, _opacityMult));
         this.haloLineMat.opacity = Math.max(0, Math.min(1, _opacityMult));
-        this.coreLineMat.linewidth = this.config.coreWidth * Math.max(0.1, _widthMult);
-        this.haloLineMat.linewidth = this.config.haloWidth * Math.max(0.1, _widthMult);
+        this.coreLineMat.worldWidth = this.config.coreWidth * Math.max(0.1, _widthMult);
+        this.haloLineMat.worldWidth = this.config.haloWidth * Math.max(0.1, _widthMult);
         this.muzzleMaterial.opacity = Math.max(0, 0.95 * _opacityMult);
         this.tipMaterial.opacity = Math.max(0, 0.9 * _opacityMult);
 

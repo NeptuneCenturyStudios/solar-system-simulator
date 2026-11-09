@@ -1,10 +1,14 @@
 import * as THREE from 'three';
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { Body } from '../../bodies/body';
 import { SoundEffect, playLoopSoundEffectAt } from '../../utilities/audio.js';
-import { C, DIST_SCALE } from '../../utilities/consts.js';
+import { DIST_SCALE } from '../../utilities/consts.js';
+import {
+    BeamLineMaterial,
+    DEFAULT_BEAM_LINE_CLAMPS,
+    IBeamLineWidthConfig,
+} from './beam-line-material';
 import { BeamWeaponBase, IBeamWeaponConfig } from './beam-weapon-base';
 import { LIGHTNING_SEGMENTS, LightningShape } from './lightning-path';
 
@@ -13,22 +17,39 @@ import { LIGHTNING_SEGMENTS, LightningShape } from './lightning-path';
  * bolt of lightning that zig-zags in three dimensions around its own axis, with a different
  * shape on every shot.
  *
- * The bolt grows out of the muzzle rather than appearing at full length, at
- * {@link ILightningWeaponConfig.propagationSpeed} — by default a small fraction of light speed.
- * That is still far too fast to see across a dogfight at 1×; the point is that at the slowest
- * time scale (1/128) a 10 km shot takes about a wall-clock second to reach out, so the arc can
- * actually be watched growing.
+ * The bolt strikes out of the muzzle rather than appearing at full length, but it always reaches
+ * whatever it is aimed at in {@link ILightningWeaponConfig.strikeTime} — a 10 km shot and a
+ * 150,000 km shot land in the same time. At 1× that is about a frame; at the slowest time scale
+ * (1/128) it is a couple of wall-clock seconds, so the arc can still be watched reaching out.
+ * Range is therefore a plain distance, and a short AI burst always connects.
  *
  * Damage never follows the zig-zag. The hitscan runs along the straight axis between muzzle and
  * tip exactly as the laser's does, so where the bolt is *drawn* and where it *hits* can never
  * disagree in a way the player has to think about.
  */
 
-/** Runs of light speed the bolt's leading edge covers per sim-second. */
-const LIGHTNING_PROPAGATION_DIVISOR = 250;
+/** Sim-seconds the bolt takes to strike out to whatever it is aimed at, however far. */
+const LIGHTNING_STRIKE_TIME = 0.02;
 
-/** Sim-seconds the bolt takes to reach its full range. Sets `maxRange`, see below. */
-const LIGHTNING_MAX_FLIGHT_TIME = 3;
+/**
+ * Default reach as a multiple of optimal range. Damage has fallen to 25 % there, so going further
+ * buys almost nothing, and it keeps the AI's `effectiveRange` (= optimal range) always in reach.
+ */
+const LIGHTNING_RANGE_PER_OPTIMAL = 2;
+
+/**
+ * Screen pixels per bolt point. The point count follows how big the bolt is on screen, not how
+ * long it is in the world: a 60,000 km miss seen from far away covers a few hundred pixels and
+ * gets a few dozen points, while the same bolt seen from the ship that fired it gets the full
+ * count. The noise follows point spacing, so kinks stay a constant size on screen.
+ */
+const LIGHTNING_PIXELS_PER_SEGMENT = 6;
+
+/** Vertical field of view the point count is estimated against (matches the main camera). */
+const LIGHTNING_ASSUMED_FOV_RAD = (60 * Math.PI) / 180;
+
+/** Cost ceiling on points per bolt. */
+const LIGHTNING_MAX_SEGMENTS = 1000;
 
 /**
  * Peak sideways displacement, as a fraction of the bolt's current drawn length. This is the width
@@ -51,28 +72,24 @@ const LIGHTNING_FLICKER_FREQ_A = 11.3; // rad/s — incommensurate with B for no
 const LIGHTNING_FLICKER_FREQ_B = 23.7;
 const LIGHTNING_FLICKER_OPACITY_AMP = 0.22;
 const LIGHTNING_FLICKER_WIDTH_AMP = 0.18;
-const LIGHTNING_OPTIMAL_RANGE_KM = 30_000;
+const LIGHTNING_OPTIMAL_RANGE_KM = 50;
 
 /**
  * Per-instance tuning for LightningWeapon. Ships may pass a partial config to override the class
  * defaults; any omitted field keeps the class default.
  *
- * `maxRange` is the one field ships should normally leave alone: when omitted it is derived from
- * `propagationSpeed × maxFlightTime`, so changing the bolt's speed automatically keeps its
- * flight time sane. (At light speed a fixed distance-based range would take thousands of
- * sim-seconds to grow into.)
+ * `maxRange` is normally left alone: when omitted it is `optimalRange × 2`, so a ship that
+ * changes its optimal range keeps a reach to match.
  */
-export interface ILightningWeaponConfig extends Omit<IBeamWeaponConfig, 'maxRange'> {
-    /** Maximum bolt reach. Derived from `propagationSpeed × maxFlightTime` when omitted. */
+export interface ILightningWeaponConfig
+    extends Omit<IBeamWeaponConfig, 'maxRange'>, IBeamLineWidthConfig {
+    /** Maximum bolt reach, world units. `optimalRange × 2` when omitted. */
     maxRange?: number;
-    /** Screen-pixel width of the white-hot core line. */
-    coreWidth: number;
-    /** Screen-pixel width of the coloured halo line. */
-    haloWidth: number;
-    /** Speed the leading edge advances at while firing, world units/s. */
-    propagationSpeed: number;
-    /** Sim-seconds the leading edge takes to reach full range. Ignored when `maxRange` is set. */
-    maxFlightTime: number;
+    /**
+     * Sim-seconds the bolt takes to strike out to whatever it is aimed at (or to `maxRange`),
+     * independent of distance. 0 makes it appear at full length instantly.
+     */
+    strikeTime: number;
     /**
      * Peak sideways displacement per axis, as a fraction of the bolt's current drawn length. This
      * is the width knob: lower is a tighter, straighter bolt. The whole displacement field is
@@ -80,13 +97,20 @@ export interface ILightningWeaponConfig extends Omit<IBeamWeaponConfig, 'maxRang
      * `lightning-path.ts` are changed.
      */
     wobbleFraction: number;
-    /** Hard ceiling on that displacement, world units. Only binds on very long bolts. */
+    /**
+     * Hard ceiling on the bolt's overall wander, world units. Only binds on very long bolts; the
+     * fine per-point jaggedness is not capped (it follows point spacing instead).
+     */
     wobbleMax: number;
     /**
-     * Points sampled along the bolt. This is the resolution knob: more points resolve finer
-     * structure, and cost one extra line segment each per frame.
+     * Screen pixels per bolt point — the resolution knob. Lower is finer and costlier. Clamped to
+     * `[minSegments, maxSegments]`; each point costs one line segment per frame.
      */
-    segments: number;
+    pixelsPerSegment: number;
+    /** Fewest points a bolt is drawn with, however short. */
+    minSegments: number;
+    /** Most points a bolt is drawn with, however long. Sizes the vertex buffer. */
+    maxSegments: number;
     /** Shape re-rolls per sim-second while the trigger is held. 0 freezes the bolt solid. */
     crackleHz: number;
 }
@@ -123,8 +147,8 @@ export class LightningWeapon extends BeamWeaponBase {
     private readonly pathGeo: LineSegmentsGeometry;
     /** Cached so the per-frame `needsUpdate` flip doesn't do an attribute lookup. */
     private readonly instanceStartAttr: THREE.InterleavedBufferAttribute;
-    private readonly coreMat: LineMaterial;
-    private readonly haloMat: LineMaterial;
+    private readonly coreMat: BeamLineMaterial;
+    private readonly haloMat: BeamLineMaterial;
     private readonly coreArc: LineSegments2;
     private readonly haloArc: LineSegments2;
 
@@ -147,37 +171,39 @@ export class LightningWeapon extends BeamWeaponBase {
         /** Class-level defaults — a ship wanting different behaviour passes a partial config. */
         const DEFAULT_LIGHTNING_CONFIG: ILightningWeaponConfig = {
             beamColor: 0x30ff60,
-            coreWidth: 1,
-            haloWidth: 5,
-            damage: 2,
+            coreWidth: 0.002 / DIST_SCALE,
+            haloWidth: 0.008 / DIST_SCALE,
+            ...DEFAULT_BEAM_LINE_CLAMPS,
+            damage: 1,
             optimalRange: LIGHTNING_OPTIMAL_RANGE_KM / DIST_SCALE,
-            shieldEffectiveness: 1.75,
-            hullEffectiveness: 0.25,
+            shieldEffectiveness: 1.1,
+            hullEffectiveness: 0.05,
             damageInterval: 0.2,
             heatPerSecond: 0.25,
             coolPerSecond: 0.75,
-            propagationSpeed: C / LIGHTNING_PROPAGATION_DIVISOR,
-            maxFlightTime: LIGHTNING_MAX_FLIGHT_TIME,
+            strikeTime: LIGHTNING_STRIKE_TIME,
             wobbleFraction: LIGHTNING_WOBBLE_FRACTION,
             wobbleMax: LIGHTNING_WOBBLE_MAX,
-            segments: LIGHTNING_SEGMENTS,
+            pixelsPerSegment: LIGHTNING_PIXELS_PER_SEGMENT,
+            minSegments: LIGHTNING_SEGMENTS,
+            maxSegments: LIGHTNING_MAX_SEGMENTS,
             crackleHz: LIGHTNING_CRACKLE_HZ,
             loopSound: (position) => playLoopSoundEffectAt(SoundEffect.LaserBeam, position),
         };
 
         const merged: ILightningWeaponConfig = { ...DEFAULT_LIGHTNING_CONFIG, ...config };
-        // Range is sized in flight time, not distance: the bolt's leading edge must actually
-        // finish travelling before the trigger is released, whatever speed it was given.
         const resolved: IResolvedLightningConfig = {
             ...merged,
-            maxRange: merged.maxRange ?? merged.propagationSpeed * merged.maxFlightTime,
+            maxRange: merged.maxRange ?? merged.optimalRange * LIGHTNING_RANGE_PER_OPTIMAL,
+            // A minimum above the maximum would make the clamp in renderBeam meaningless.
+            maxSegments: Math.max(2, merged.maxSegments, merged.minSegments),
         };
         super(scene, resolved);
         this.config = resolved;
 
         // Built here rather than as a field initializer, which would run before `this.config`
         // exists and so could not read the per-ship point count.
-        this.shape = new LightningShape(this.config.segments);
+        this.shape = new LightningShape(this.config.maxSegments);
 
         this.weaponSound = {
             loop:
@@ -186,9 +212,10 @@ export class LightningWeapon extends BeamWeaponBase {
         };
 
         // ── Shared jagged polyline ────────────────────────────────────────
-        this.vertexData = new Float32Array(this.shape.positionCount);
+        this.vertexData = new Float32Array(this.shape.maxPositionCount);
         this.pathGeo = new LineSegmentsGeometry();
-        // Sized once here; every later frame writes into the same buffer.
+        // Sized once here for the longest bolt; every later frame writes into the same buffer
+        // and draws only as many segments as that frame's length needs.
         this.pathGeo.setPositions(this.vertexData);
         this.pathGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity);
         this.instanceStartAttr = this.pathGeo.getAttribute(
@@ -196,12 +223,12 @@ export class LightningWeapon extends BeamWeaponBase {
         ) as THREE.InterleavedBufferAttribute;
 
         // ── Core arc: narrow white-hot line ──────────────────────────────
-        this.coreMat = new LineMaterial({
+        this.coreMat = new BeamLineMaterial({
             color: 0xffffff,
-            linewidth: this.config.coreWidth,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
+            worldWidth: this.config.coreWidth,
+            minPixels: this.config.minCoreWidthPx,
+            maxPixels: this.config.maxWidthPx,
+            minFade: this.config.minFade,
         });
         this.coreMat.resolution.set(window.innerWidth, window.innerHeight);
         this.coreArc = new LineSegments2(this.pathGeo, this.coreMat);
@@ -211,12 +238,12 @@ export class LightningWeapon extends BeamWeaponBase {
         scene.add(this.coreArc);
 
         // ── Halo arc: wide coloured glow around the core ──────────────────
-        this.haloMat = new LineMaterial({
+        this.haloMat = new BeamLineMaterial({
             color: this.config.beamColor,
-            linewidth: this.config.haloWidth,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
+            worldWidth: this.config.haloWidth,
+            minPixels: this.config.minHaloWidthPx,
+            maxPixels: this.config.maxWidthPx,
+            minFade: this.config.minFade,
         });
         this.haloMat.resolution.set(window.innerWidth, window.innerHeight);
         this.haloArc = new LineSegments2(this.pathGeo, this.haloMat);
@@ -256,9 +283,15 @@ export class LightningWeapon extends BeamWeaponBase {
         return 'Arc Lance';
     }
 
-    /** A fraction of light speed — see LIGHTNING_PROPAGATION_DIVISOR. */
+    /** Unused: the bolt advances by {@link advanceFront}, a fixed strike time to any distance. */
     protected override get propagationSpeed(): number {
-        return this.config.propagationSpeed;
+        return Infinity;
+    }
+
+    /** Cover the whole distance to the target in `strikeTime`, however far it is. */
+    protected override advanceFront(simDt: number, reach: number): number {
+        const strikeTime = this.config.strikeTime;
+        return strikeTime > 0 ? (reach * simDt) / strikeTime : Infinity;
     }
 
     // ── Firing ───────────────────────────────────────────────────────────────
@@ -344,8 +377,20 @@ export class LightningWeapon extends BeamWeaponBase {
         cameraPosition: THREE.Vector3
     ): void {
         // ── Vertices ──────────────────────────────────────────────────────
-        this.shape.build(
+        // Point count follows the bolt's size on screen — see LIGHTNING_PIXELS_PER_SEGMENT.
+        const pointCount = Math.min(
+            this.config.maxSegments,
+            Math.max(
+                this.config.minSegments,
+                Math.ceil(
+                    this.screenExtentPx(origin, direction, length, cameraPosition) /
+                        Math.max(1e-3, this.config.pixelsPerSegment)
+                ) + 1
+            )
+        );
+        const segmentCount = this.shape.build(
             this.vertexData,
+            pointCount,
             origin,
             direction,
             length,
@@ -353,7 +398,12 @@ export class LightningWeapon extends BeamWeaponBase {
             this.config.wobbleFraction,
             this.config.wobbleMax
         );
-        this.instanceStartAttr.data.needsUpdate = true;
+        this.pathGeo.instanceCount = segmentCount;
+        // Upload only the segments drawn this frame, not the whole max-size buffer.
+        const pathData = this.instanceStartAttr.data;
+        pathData.clearUpdateRanges();
+        pathData.addUpdateRange(0, segmentCount * 6);
+        pathData.needsUpdate = true;
 
         const shimmer =
             Math.sin(this.flickerTime * LIGHTNING_FLICKER_FREQ_A) * 0.6 +
@@ -370,8 +420,8 @@ export class LightningWeapon extends BeamWeaponBase {
         this.haloMat.resolution.set(window.innerWidth, window.innerHeight);
         this.coreMat.opacity = opacityMult;
         this.haloMat.opacity = opacityMult;
-        this.coreMat.linewidth = this.config.coreWidth * Math.max(0.1, widthMult);
-        this.haloMat.linewidth = this.config.haloWidth * Math.max(0.1, widthMult);
+        this.coreMat.worldWidth = this.config.coreWidth * Math.max(0.1, widthMult);
+        this.haloMat.worldWidth = this.config.haloWidth * Math.max(0.1, widthMult);
         this.muzzleMaterial.opacity = Math.max(
             0,
             0.95 * (1 + shimmer * LIGHTNING_FLICKER_OPACITY_AMP)
@@ -393,6 +443,34 @@ export class LightningWeapon extends BeamWeaponBase {
         this.tipGeometry.setDrawRange(0, 1);
         this.tipGeometry.attributes.position.needsUpdate = true;
         this.tipPoint.position.set(cpx, cpy, cpz);
+    }
+
+    /**
+     * Approximate on-screen length of the bolt's axis, in pixels: the angle it subtends at the
+     * camera, converted at the screen-centre pixel density. Exact enough to pick a point count;
+     * it doesn't need the camera's matrices.
+     */
+    private screenExtentPx(
+        origin: THREE.Vector3,
+        direction: THREE.Vector3,
+        length: number,
+        cameraPosition: THREE.Vector3
+    ): number {
+        const ax = origin.x - cameraPosition.x;
+        const ay = origin.y - cameraPosition.y;
+        const az = origin.z - cameraPosition.z;
+        const bx = ax + direction.x * length;
+        const by = ay + direction.y * length;
+        const bz = az + direction.z * length;
+        const cx = ay * bz - az * by;
+        const cy = az * bx - ax * bz;
+        const cz = ax * by - ay * bx;
+        const angle = Math.atan2(
+            Math.sqrt(cx * cx + cy * cy + cz * cz),
+            ax * bx + ay * by + az * bz
+        );
+        const pxPerRadian = window.innerHeight / 2 / Math.tan(LIGHTNING_ASSUMED_FOV_RAD / 2);
+        return angle * pxPerRadian;
     }
 
     protected override setBeamVisible(visible: boolean): void {

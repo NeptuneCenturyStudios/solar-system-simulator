@@ -21,8 +21,11 @@ import { SeededRandom } from '../../utilities/prng';
  * seed always produces the same bolt.
  */
 
-/** Points sampled along the beam. 48 gives a visibly jagged line without straining the geometry. */
-export const LIGHTNING_SEGMENTS = 96;
+/**
+ * Reference point count the noise amplitude is tuned against (see `build`). Also the weapon's
+ * default minimum point count.
+ */
+export const LIGHTNING_SEGMENTS = 10;
 
 /** Low harmonics that give a bolt its overall wander. */
 const MACRO_OCTAVES = 3;
@@ -112,22 +115,8 @@ function rollOctaves(
     }
 }
 
-/**
- * Sum the octaves at normalised position `s` (0 = muzzle, 1 = tip).
- *
- * The two perpendicular axes are sampled with the sine and the cosine of the same octaves, so
- * each one traces an ellipse around the beam axis instead of a flat zig-zag in a single plane.
- * That is what makes the bolt wander in all directions rather than back and forth across one
- * line.
- */
-function sampleOctaves(set: IOctaveSet, count: number, s: number, cosine: boolean): number {
-    let value = 0;
-    for (let i = 0; i < count; i++) {
-        const angle = set.cycles[i] * Math.PI * 2 * s + set.phase[i];
-        value += set.amplitude[i] * (cosine ? Math.cos(angle) : Math.sin(angle));
-    }
-    return value;
-}
+/** Every octave, macro then micro, as flat arrays the build loop can walk without branching. */
+const TOTAL_OCTAVES = MACRO_OCTAVES + MICRO_OCTAVES;
 
 /**
  * The shape of one bolt. Owned by a single weapon instance and reused every frame; nothing here
@@ -156,17 +145,37 @@ export class LightningShape {
     private readonly axisV = new THREE.Vector3();
 
     /**
-     * @param segments Points sampled along the bolt, including both endpoints.
+     * Per-octave phasor scratch for {@link build}: the current `(cos, sin)` of each octave's angle
+     * and the fixed rotation that advances it by one point. Stepping a phasor replaces a `sin` and
+     * a `cos` per octave per point with four multiplies.
+     */
+    private readonly phCos = new Float64Array(TOTAL_OCTAVES);
+    private readonly phSin = new Float64Array(TOTAL_OCTAVES);
+    private readonly stepCos = new Float64Array(TOTAL_OCTAVES);
+    private readonly stepSin = new Float64Array(TOTAL_OCTAVES);
+    private readonly octAmp = new Float64Array(TOTAL_OCTAVES);
+
+    /**
+     * Points the last {@link build} used. The crackle only re-rolls noise for this many points —
+     * a bolt drawn with 40 points doesn't need 1,000 fresh random pairs 20 times a second.
+     */
+    private lastCount: number;
+
+    /**
+     * @param maxSegments Most points {@link build} will ever be asked for, including both
+     *   endpoints. Every buffer is sized for this once; a frame may use fewer.
      * @param seed Seed for this bolt; {@link rerollMacro} can replace it.
      */
     constructor(
-        readonly segments: number = LIGHTNING_SEGMENTS,
+        readonly maxSegments: number = LIGHTNING_SEGMENTS,
         seed: string = generateSeedString()
     ) {
-        if (segments < 2) throw new Error('LightningShape needs at least two points');
+        if (maxSegments < 2) throw new Error('LightningShape needs at least two points');
 
-        this.points = new Float32Array(segments * 3);
-        this.noise = new Float32Array(segments * 2);
+        this.points = new Float32Array(maxSegments * 3);
+        this.noise = new Float32Array(maxSegments * 2);
+        // Fill every slot once, so a bolt that later grows past `lastCount` still has noise.
+        this.lastCount = maxSegments;
         this.macro = createOctaveSet(MACRO_OCTAVES);
         this.micro = createOctaveSet(MICRO_OCTAVES);
 
@@ -203,14 +212,18 @@ export class LightningShape {
 
     private rollMicro(): void {
         rollOctaves(this.micro, MICRO_HARMONIC_RANGES, MICRO_WEIGHTS, this.microRng);
-        for (let i = 0; i < this.noise.length; i++) {
+        const n = this.lastCount * 2;
+        for (let i = 0; i < n; i++) {
             this.noise[i] = this.microRng.range(-1, 1);
         }
     }
 
-    /** Number of floats {@link build} writes: two endpoints per segment, three floats each. */
-    get positionCount(): number {
-        return (this.segments - 1) * 6;
+    /**
+     * Floats needed to hold the longest bolt {@link build} can write: two endpoints per segment,
+     * three floats each.
+     */
+    get maxPositionCount(): number {
+        return (this.maxSegments - 1) * 6;
     }
 
     /**
@@ -221,7 +234,14 @@ export class LightningShape {
      * visibly snaps to a lattice, and the camera-relative form keeps the precision local. The
      * caller places the drawn object at the camera's world position.
      *
-     * @param out Destination array of at least {@link positionCount} floats, overwritten.
+     * The octaves (the bolt's overall wander) scale with `length` and are capped by `wobbleMax`.
+     * The per-point white noise instead scales with the spacing between points and is never
+     * capped, so each kink is the same shape whether the bolt is 1 km or 150,000 km long — a
+     * long bolt gets more kinks, not flatter ones.
+     *
+     * @param out Destination array of at least {@link maxPositionCount} floats; the first
+     *   `(count - 1) * 6` are overwritten.
+     * @param count Points to sample, including both endpoints. Clamped to `[2, maxSegments]`.
      * @param origin World-space muzzle position.
      * @param dir Unit direction from muzzle to tip — the straight axis the bolt is drawn around.
      * @param length World-space length to the current tip (may be shorter than the full range).
@@ -229,21 +249,29 @@ export class LightningShape {
      * @param wobbleFraction Peak sideways displacement per axis, as a fraction of `length`. The
      *   bolt's total offset from the axis can reach about √2× this where both perpendicular
      *   components peak together, which is rare.
-     * @param wobbleMax Hard ceiling on that displacement, world units.
+     * @param wobbleMax Hard ceiling on the octave displacement, world units.
+     * @returns The number of line segments written (`count - 1` after clamping).
      */
     build(
         out: Float32Array,
+        count: number,
         origin: THREE.Vector3,
         dir: THREE.Vector3,
         length: number,
         camera: THREE.Vector3,
         wobbleFraction: number,
         wobbleMax: number
-    ): void {
-        const count = this.segments;
+    ): number {
+        count = Math.max(2, Math.min(this.maxSegments, Math.floor(count)));
+        this.lastCount = count;
         // Normalised so this is really the peak sideways displacement: the raw sums reach
         // TOTAL_WEIGHT, so without the division the bolt wanders several times `wobbleFraction`.
         const amplitude = Math.min(length * wobbleFraction, wobbleMax) * DISPLACEMENT_NORM;
+        // Noise follows point spacing. At LIGHTNING_SEGMENTS points and no cap this equals
+        // `amplitude` exactly, so a short bolt looks the same as it always has.
+        const spacing = length / (count - 1);
+        const noiseAmplitude =
+            spacing * (LIGHTNING_SEGMENTS - 1) * wobbleFraction * DISPLACEMENT_NORM * NOISE_WEIGHT;
 
         // Perpendicular basis: the displacement happens in the plane these two span, which is what
         // makes the wiggle go in all directions around the axis rather than in one fixed plane.
@@ -254,39 +282,63 @@ export class LightningShape {
         this.axisU.normalize();
         this.axisV.crossVectors(dir, this.axisU).normalize();
 
-        const { points, noise, axisU, axisV } = this;
+        const { points, noise, axisU, axisV, phCos, phSin, stepCos, stepSin, octAmp } = this;
         const invLast = 1 / (count - 1);
         // Camera-relative origin, so only the per-point offsets are added in the loop.
         const camRelOX = origin.x - camera.x;
         const camRelOY = origin.y - camera.y;
         const camRelOZ = origin.z - camera.z;
 
+        // Seed each octave's phasor at s = 0 and its per-point rotation. The two perpendicular
+        // axes take the sine and the cosine of the same octave, so each traces an ellipse around
+        // the beam axis instead of a flat zig-zag in one plane.
+        for (let k = 0; k < TOTAL_OCTAVES; k++) {
+            const set = k < MACRO_OCTAVES ? this.macro : this.micro;
+            const j = k < MACRO_OCTAVES ? k : k - MACRO_OCTAVES;
+            const step = set.cycles[j] * Math.PI * 2 * invLast;
+            phCos[k] = Math.cos(set.phase[j]);
+            phSin[k] = Math.sin(set.phase[j]);
+            stepCos[k] = Math.cos(step);
+            stepSin[k] = Math.sin(step);
+            octAmp[k] = set.amplitude[j] * amplitude;
+        }
+
+        // Envelope sin(πs), stepped the same way. Pinned at both ends: the bolt must stay welded
+        // to the muzzle and to the tip, which is where the impact flash is drawn.
+        const envStep = Math.PI * invLast;
+        const envStepCos = Math.cos(envStep);
+        const envStepSin = Math.sin(envStep);
+        let envCos = 1;
+        let envSin = 0;
+
         for (let i = 0; i < count; i++) {
             const s = i * invLast;
+            const envelope = envSin > 0 ? Math.pow(envSin, ENVELOPE_EXPONENT) : 0;
 
-            // Signed offsets along the two perpendicular axes — the same octaves sampled with
-            // sine on one and cosine on the other.
-            const offsetU =
-                sampleOctaves(this.macro, MACRO_OCTAVES, s, false) +
-                sampleOctaves(this.micro, MICRO_OCTAVES, s, false) +
-                noise[i * 2] * NOISE_WEIGHT;
+            // Signed world-unit offsets along the two perpendicular axes: the length-scaled
+            // octaves plus the spacing-scaled noise.
+            let offsetU = noise[i * 2] * noiseAmplitude;
+            let offsetV = noise[i * 2 + 1] * noiseAmplitude;
+            for (let k = 0; k < TOTAL_OCTAVES; k++) {
+                const c = phCos[k];
+                const sn = phSin[k];
+                offsetU += octAmp[k] * sn;
+                offsetV += octAmp[k] * c;
+                phCos[k] = c * stepCos[k] - sn * stepSin[k];
+                phSin[k] = sn * stepCos[k] + c * stepSin[k];
+            }
 
-            const offsetV =
-                sampleOctaves(this.macro, MACRO_OCTAVES, s, true) +
-                sampleOctaves(this.micro, MICRO_OCTAVES, s, true) +
-                noise[i * 2 + 1] * NOISE_WEIGHT;
+            const dispU = (axisU.x * offsetU + axisV.x * offsetV) * envelope;
+            const dispV = (axisU.y * offsetU + axisV.y * offsetV) * envelope;
+            const dispW = (axisU.z * offsetU + axisV.z * offsetV) * envelope;
 
-            // Pinned at both ends: the bolt must stay welded to the muzzle and to the tip, which
-            // is where the impact flash is drawn.
-            const envelope = Math.pow(Math.sin(Math.PI * s), ENVELOPE_EXPONENT);
-            const scale = envelope * amplitude;
-            const dispU = axisU.x * offsetU + axisV.x * offsetV;
-            const dispV = axisU.y * offsetU + axisV.y * offsetV;
-            const dispW = axisU.z * offsetU + axisV.z * offsetV;
+            points[i * 3] = camRelOX + dir.x * length * s + dispU;
+            points[i * 3 + 1] = camRelOY + dir.y * length * s + dispV;
+            points[i * 3 + 2] = camRelOZ + dir.z * length * s + dispW;
 
-            points[i * 3] = camRelOX + dir.x * length * s + dispU * scale;
-            points[i * 3 + 1] = camRelOY + dir.y * length * s + dispV * scale;
-            points[i * 3 + 2] = camRelOZ + dir.z * length * s + dispW * scale;
+            const ec = envCos;
+            envCos = ec * envStepCos - envSin * envStepSin;
+            envSin = envSin * envStepCos + ec * envStepSin;
         }
 
         // Expand the point list into the endpoint-pair layout LineSegmentsGeometry expects:
@@ -302,5 +354,6 @@ export class LightningShape {
             out[o++] = points[b + 1];
             out[o++] = points[b + 2];
         }
+        return count - 1;
     }
 }
