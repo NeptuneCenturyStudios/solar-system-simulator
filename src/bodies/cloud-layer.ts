@@ -4,7 +4,10 @@ import {
     updateCloudStarLighting,
     type CloudUniforms,
 } from '../effects/cloud-coverage-glsl';
-import { cloudTransmittance } from '../effects/cloud-coverage-cpu';
+import {
+    createCloudProbeMaterial,
+    type ICloudProbeSource,
+} from '../effects/cloud-transmittance-probe';
 import { createFlatCloudMesh } from '../effects/flat-clouds';
 import type { IStarLightingSet } from '../effects/star-illumination';
 import {
@@ -43,11 +46,10 @@ export interface CloudLayerHandle {
     update: (lights: IStarLightingSet, dtTotal: number) => void;
     setRadius: (bodyRadius: number) => void;
     /**
-     * Fraction (0..1) of a star's light that gets through this cloud layer on the straight line
-     * from `from` to `to` (world space). 1 when the line misses the layer. CPU-side, a couple of
-     * dozen samples; meant for a handful of calls per frame (lens flares).
+     * What CloudTransmittanceProbe needs to measure how much light gets through this layer on a
+     * line of sight (lens flares dim stars behind clouds). Same GLSL and uniforms as the draw.
      */
-    lineTransmittance: (from: THREE.Vector3, to: THREE.Vector3) => number;
+    readonly probe: ICloudProbeSource;
     dispose: () => void;
 }
 
@@ -110,6 +112,9 @@ export function createCloudLayer(host: ICloudHost, profile: ICloudProfile): Clou
     };
     chainBeforeRender(flat, applyLod);
 
+    // The flat mesh's object space has the cloud top at radius 1, as the probe expects.
+    const probe: ICloudProbeSource = { material: createCloudProbeMaterial(uniforms), object: flat };
+
     return {
         group,
 
@@ -142,30 +147,13 @@ export function createCloudLayer(host: ICloudHost, profile: ICloudProfile): Clou
             group.scale.setScalar(bodyRadius);
         },
 
-        lineTransmittance: (from, to) => {
-            // Cheap reject: the segment never comes within the cloud top's radius.
-            _layerPos.setFromMatrixPosition(flat.matrixWorld);
-            const cloudTop = flat.matrixWorld.getMaxScaleOnAxis();
-            _seg.copy(to).sub(from);
-            const segLen = _seg.length();
-            if (segLen <= 0) return 1;
-            _seg.divideScalar(segLen);
-            _toLayer.copy(_layerPos).sub(from);
-            const along = THREE.MathUtils.clamp(_toLayer.dot(_seg), 0, segLen);
-            _closest.copy(_seg).multiplyScalar(along).add(from);
-            if (_closest.distanceToSquared(_layerPos) >= cloudTop * cloudTop) return 1;
-
-            // March in the layer's object space (cloud top = unit sphere).
-            _invWorld.copy(flat.matrixWorld).invert();
-            _ro.copy(from).applyMatrix4(_invWorld);
-            _rd.copy(to).applyMatrix4(_invWorld).sub(_ro).normalize();
-            return cloudTransmittance(uniforms, _ro, _rd);
-        },
+        probe,
 
         dispose: () => {
             group.parent?.remove(group);
             flat.geometry.dispose();
             (flat.material as THREE.Material).dispose();
+            probe.material.dispose();
             volumetric?.dispose();
             volumetric = null;
         },
@@ -174,12 +162,6 @@ export function createCloudLayer(host: ICloudHost, profile: ICloudProfile): Clou
 
 const _camPos = new THREE.Vector3();
 const _layerPos = new THREE.Vector3();
-const _seg = new THREE.Vector3();
-const _toLayer = new THREE.Vector3();
-const _closest = new THREE.Vector3();
-const _invWorld = new THREE.Matrix4();
-const _ro = new THREE.Vector3();
-const _rd = new THREE.Vector3();
 
 /** Runs `before(camera)` ahead of the mesh's existing onBeforeRender. */
 function chainBeforeRender(mesh: THREE.Mesh, before: (camera: THREE.Camera) => void): void {

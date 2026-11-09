@@ -13,13 +13,6 @@ import { CLOUD_COMMON_GLSL, syncCloudObjectSpace, type CloudUniforms } from './c
 export type VolumetricCloudTier = 'medium' | 'high';
 
 /**
- * The march stops a hair inside the faceted body mesh (see atmosphere-shell GROUND_CLIP_FACTOR).
- * This only saves work: what actually hides cloud behind the ground is the depth test against
- * the depth this shader writes.
- */
-const GROUND_CLIP = 0.998;
-
-/**
  * Transmittance at which the march records the depth it writes: where the cloud along the ray
  * first becomes noticeably opaque.
  */
@@ -109,7 +102,6 @@ export function createVolumetricCloudMesh(
                 varying vec3 vCloudViewPos;
                 // World units per object unit (the shell's scale), to turn ray distances into depth.
                 uniform float uCloudObjScale;
-                const float CLOUD_GROUND_CLIP = ${f(GROUND_CLIP)};
                 const float CLOUD_SHADOW_SOFT = ${f(SHADOW_SOFTNESS)};
 
                 // cloudDensity is in CLOUD_COMMON_GLSL.`
@@ -135,7 +127,8 @@ export function createVolumetricCloudMesh(
                 float t0 = max(-b - sq, tCam);
                 float t1 = -b + sq;
 
-                // Stop at the ground.
+                // Stop at the ground (CLOUD_GROUND_CLIP). This only saves work: what actually
+                // hides cloud behind the ground is the depth test against the depth written here.
                 float groundR = CLOUD_PLANET_R * CLOUD_GROUND_CLIP;
                 float discG = b * b - (roLenSq - groundR * groundR);
                 if (discG > 0.0) {

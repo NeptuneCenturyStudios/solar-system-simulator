@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { MAX_LIGHTING_STARS } from '../utilities/consts';
+import { CloudTransmittanceProbe, type ICloudProbeSource } from './cloud-transmittance-probe';
 
 /** Most stars that flare in one frame (the largest on screen win). */
 const MAX_FLARE_STARS = MAX_LIGHTING_STARS;
@@ -40,9 +41,7 @@ export interface ILensFlareBody {
     /** Star light colour (linear). Stars set it from their temperature. */
     baseColor?: THREE.Color;
     /** A cloud layer, which dims stars seen through it (bodies/cloud-layer.ts). */
-    cloudLayer?: {
-        lineTransmittance: (from: THREE.Vector3, to: THREE.Vector3) => number;
-    } | null;
+    cloudLayer?: { readonly probe: ICloudProbeSource } | null;
 }
 
 /** Brown dwarfs barely glow and do not flare. */
@@ -117,6 +116,7 @@ export class LensFlareEffect {
     private readonly _candidatePool: IFlareCandidate[] = [];
     private readonly _candidates: IFlareCandidate[] = [];
     private readonly _visibility = new Map<string, IVisibilityEntry>();
+    private readonly _cloudProbe = new CloudTransmittanceProbe();
     private _frame = 0;
 
     /** Overall flare brightness. */
@@ -365,6 +365,8 @@ export class LensFlareEffect {
 
         const count = this._collectStars(renderer, camera, bodies, wallDt);
         this._pruneVisibility();
+        // Measure the cloud lines of sight queried above; the answers land in a frame or two.
+        this._cloudProbe.flush(renderer);
         if (count === 0) return;
 
         const prevAutoClear = renderer.autoClear;
@@ -402,15 +404,17 @@ export class LensFlareEffect {
             const edgeFade = 1 - THREE.MathUtils.smoothstep(edge, 1, 1 + EDGE_FADE_NDC);
 
             // Ease toward the occlusion target; keep easing even while off screen so the
-            // flare doesn't pop when the star comes back.
+            // flare doesn't pop when the star comes back. A null target (cloud cover not
+            // measured yet) holds the current value; a star first seen then starts dark and
+            // fades in, rather than flashing through a cloud.
             const target =
                 edgeFade > 0 ? this._occlusion(body, bodies, camera, heightPx, tanHalfFov) : 0;
             let entry = this._visibility.get(body.id);
             if (!entry) {
-                entry = { value: target, frame: this._frame };
+                entry = { value: target ?? 0, frame: this._frame };
                 this._visibility.set(body.id, entry);
             }
-            entry.value += (target - entry.value) * ease;
+            if (target !== null) entry.value += (target - entry.value) * ease;
             entry.frame = this._frame;
 
             const visibility = entry.value * edgeFade;
@@ -475,7 +479,8 @@ export class LensFlareEffect {
      * How much of the star is visible past the bodies between it and the camera (0..1).
      * Each body in the way covers the star's disc (as seen at the body's distance) by how
      * close the line of sight passes to it, and any cloud layer the line crosses lets through
-     * only its transmittance; the factors multiply.
+     * only its transmittance; the factors multiply. Null while a cloud layer in the way has
+     * not been measured yet (CloudTransmittanceProbe answers a frame or two late).
      */
     private _occlusion(
         star: ILensFlareBody,
@@ -483,7 +488,7 @@ export class LensFlareEffect {
         camera: THREE.PerspectiveCamera,
         heightPx: number,
         tanHalfFov: number
-    ): number {
+    ): number | null {
         const cam = camera.position;
         _toStar.copy(star.mesh.position).sub(cam);
         const starDist = _toStar.length();
@@ -491,13 +496,21 @@ export class LensFlareEffect {
         _toStar.divideScalar(starDist);
 
         let visibility = 1;
+        let unknown = false;
         for (const body of bodies) {
             if (body === star || body._isDisposed || !body.mesh.visible) continue;
 
             // Clouds first: the camera may well be inside the deck (surface view, low flight),
             // which the solid-body test below rightly skips.
             if (body.cloudLayer) {
-                visibility *= body.cloudLayer.lineTransmittance(cam, star.mesh.position);
+                const t = this._cloudProbe.query(
+                    body.cloudLayer.probe,
+                    star.id,
+                    cam,
+                    star.mesh.position
+                );
+                if (t === null) unknown = true;
+                else visibility *= t;
                 if (visibility <= 0.001) return 0;
             }
 
@@ -515,7 +528,7 @@ export class LensFlareEffect {
             visibility *= THREE.MathUtils.smoothstep(perp - body.radius, -soft, soft);
             if (visibility <= 0) return 0;
         }
-        return visibility;
+        return unknown ? null : visibility;
     }
 
     /** Drops eased visibilities for stars no longer in the scene. */
@@ -531,5 +544,6 @@ export class LensFlareEffect {
             if (o instanceof THREE.Mesh) o.geometry.dispose();
         });
         this._visibility.clear();
+        this._cloudProbe.dispose();
     }
 }

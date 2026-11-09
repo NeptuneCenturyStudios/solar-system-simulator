@@ -18,9 +18,16 @@ import type { IStarLightingSet } from './star-illumination';
  * All maths runs in the cloud meshes' object space, where the cloud top is the unit sphere and
  * +Y is the spin axis (the layer is a child of the body mesh, which carries the axial tilt).
  *
- * cloud-coverage-cpu.ts mirrors cloudField / cloudErode / cloudCirrus / cloudDensity in
- * TypeScript (to dim lens flares behind clouds). Change them together.
+ * This GLSL is the only definition of the cloud shape. Lens flares measure how much cloud lies
+ * between the camera and a star with cloudLineTransmittance, run on the GPU by
+ * cloud-transmittance-probe.ts and read back, so there is no CPU copy to keep in step.
  */
+
+/**
+ * Marches stop a hair inside the faceted body mesh (see atmosphere-shell GROUND_CLIP_FACTOR), as
+ * a fraction of the planet radius.
+ */
+export const CLOUD_GROUND_CLIP = 0.998;
 
 /**
  * Detail-noise frequency in object space. The deck is ~0.02 units thick, and a Worley cell of
@@ -197,6 +204,7 @@ const float CLOUD_BASE_R = ${f(CLOUD_BASE_R)};
 const float CLOUD_DETAIL_SCALE = ${f(CLOUD_DETAIL_SCALE)};
 const float CLOUD_THICK = ${f(CLOUD_THICK)};
 const float CLOUD_SIGMA = ${f(CLOUD_SIGMA)};
+const float CLOUD_GROUND_CLIP = ${f(CLOUD_GROUND_CLIP)};
 
 uniform sampler3D uCloudNoise;
 uniform float uCloudScale;
@@ -358,6 +366,55 @@ float cloudDensity(vec3 p, vec3 up, float h, vec2 field, bool fine) {
         if (shape > 0.0) dens = cloudErode(shape, p, up, h, fine);
     }
     return dens + cloudCirrus(p, h, field.y);
+}
+
+// Fraction of light (0..1) that gets through the deck along a ray (object space, rd unit
+// length), from ro onward. Stops at the ground; whether the planet itself blocks the ray is the
+// caller's business. Same two-segment march as the volumetric view ray, skipping the clear
+// hole under the cloud base.
+float cloudLineTransmittance(vec3 ro, vec3 rd, int samples) {
+    float b = dot(ro, rd);
+    float roLenSq = dot(ro, ro);
+    float disc = b * b - (roLenSq - 1.0);
+    if (disc <= 0.0) return 1.0;
+    float sq = sqrt(disc);
+    float t0 = max(-b - sq, 0.0);
+    float t1 = -b + sq;
+    if (t1 <= t0) return 1.0;
+
+    float groundR = CLOUD_PLANET_R * CLOUD_GROUND_CLIP;
+    float discG = b * b - (roLenSq - groundR * groundR);
+    if (discG > 0.0) {
+        float tg = -b - sqrt(discG);
+        if (tg > t0) t1 = min(t1, tg);
+    }
+
+    float lenA = t1 - t0;
+    float startB = t1;
+    float lenB = 0.0;
+    float discI = b * b - (roLenSq - CLOUD_BASE_R * CLOUD_BASE_R);
+    if (discI > 0.0) {
+        float sqI = sqrt(discI);
+        lenA = max(min(t1, -b - sqI) - t0, 0.0);
+        startB = max(t0, -b + sqI);
+        lenB = max(t1 - startB, 0.0);
+    }
+    float total = lenA + lenB;
+    if (total <= 0.0) return 1.0;
+
+    float ds = total / float(samples);
+    float od = 0.0;
+    for (int i = 0; i < samples; i++) {
+        float s = (float(i) + 0.5) * ds;
+        float t = s < lenA ? t0 + s : startB + (s - lenA);
+        vec3 p = ro + rd * t;
+        float r = length(p);
+        float h = (r - CLOUD_BASE_R) / CLOUD_THICK;
+        if (h <= 0.0 || h >= 1.0) continue;
+        vec3 up = p / r;
+        od += cloudDensity(p, up, h, cloudField(up), true) * ds;
+    }
+    return exp(-od * CLOUD_SIGMA * uCloudDensityScale);
 }
 
 // Brightness variation inside the cloud, strongest in closed decks.
