@@ -227,13 +227,38 @@
                     max="100"
                     step="1"
                     :value="simStore.sfxVolumePercent"
-                    title="Controls the volume of weapon sounds, impacts, and warp loop effects."
+                    title="Controls the volume of weapon sounds, impacts, explosions, and warp loop effects."
                     @input="onSfxVolumeInput"
                 />
                 <button
                     class="old-ui btn-slider-reset"
-                    title="Reset to 100%"
+                    title="Reset to 50%"
                     @click="resetSfxVolume"
+                >
+                    <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
+                </button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>
+                Voice Volume
+                <span class="val-display">{{ simStore.voiceVolumePercent }}%</span>
+            </label>
+            <div class="slider-row">
+                <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    :value="simStore.voiceVolumePercent"
+                    title="Controls the volume of ship computer and scenario voice prompts."
+                    @input="onVoiceVolumeInput"
+                />
+                <button
+                    class="old-ui btn-slider-reset"
+                    title="Reset to 100%"
+                    @click="resetVoiceVolume"
                 >
                     <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
                 </button>
@@ -283,6 +308,7 @@ import {
     setPhysicsSolver,
     setRenderDistance,
     setSfxVolume,
+    setVoiceVolume,
     setSunRaysEnabled,
     setShowAiDebug,
     setSmoothZoomEnabled,
@@ -317,7 +343,8 @@ const SOLVER_HINTS: Record<PhysicsSolverMode, string> = {
     'barnes-hut':
         'Groups distant bodies into single point masses. Scales best for large clusters where many bodies have comparable mass.',
 };
-const DEFAULT_SFX_VOLUME_PERCENT = 100;
+const DEFAULT_SFX_VOLUME_PERCENT = 50;
+const DEFAULT_VOICE_VOLUME_PERCENT = 100;
 const DEFAULT_MUSIC_VOLUME_PERCENT = 50;
 /** Max frame-rate-limit value the Options panel permits. */
 const MAX_FRAME_RATE_LIMIT = 240;
@@ -461,6 +488,10 @@ function onSfxVolumeInput(e: Event): void {
     setSfxVolume(parseInt((e.target as HTMLInputElement).value, 10));
 }
 
+function onVoiceVolumeInput(e: Event): void {
+    setVoiceVolume(parseInt((e.target as HTMLInputElement).value, 10));
+}
+
 function onMusicVolumeInput(e: Event): void {
     setMusicVolume(parseInt((e.target as HTMLInputElement).value, 10));
 }
@@ -488,6 +519,10 @@ function resetSubsteps(): void {
 
 function resetSfxVolume(): void {
     setSfxVolume(DEFAULT_SFX_VOLUME_PERCENT);
+}
+
+function resetVoiceVolume(): void {
+    setVoiceVolume(DEFAULT_VOICE_VOLUME_PERCENT);
 }
 
 function resetMusicVolume(): void {

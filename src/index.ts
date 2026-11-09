@@ -3180,6 +3180,9 @@ registerVueSimHooks({
     setSfxVolume: (percent: number) => {
         settingsStore.update(SettingKey.SfxVolume, percent / 100);
     },
+    setVoiceVolume: (percent: number) => {
+        settingsStore.update(SettingKey.VoiceVolume, percent / 100);
+    },
     setMusicVolume: (percent: number) => {
         const normalized = percent / 100;
         settingsStore.update(SettingKey.MusicVolume, normalized);

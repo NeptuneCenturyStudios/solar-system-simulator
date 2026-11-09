@@ -51,7 +51,7 @@ export class WorldDestroyer extends Spaceship {
         const SPACESHIP_RADIUS = 1500 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
-        const SPACESHIP_HEALTH_POINTS = 600;
+        const SPACESHIP_HEALTH_POINTS = 1000;
 
         // Camera placement (ship-local space; +Z = forward, +Y = up). The ship is tall rather
         // than long, so the camera sits further back and only slightly above centre.
@@ -154,7 +154,7 @@ export class WorldDestroyer extends Spaceship {
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
             beamColor: 0x30ff60,
             optimalRange: 150_000 / DIST_SCALE,
-            damage: 1000,
+            damage: 500,
             coreWidth: 10,
             haloWidth: 22,
             damageInterval: 0.2,
@@ -180,7 +180,7 @@ export class WorldDestroyer extends Spaceship {
                 ]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
-            shield: { hullMultiplier: 5, rechargeTime: 200 },
+            shield: { hullMultiplier: 4, rechargeTime: 220 },
             shipTypeId: 'world_destroyer',
             role: ShipRole.Capital,
             thirdPersonOffset: THIRD_PERSON_OFFSET,

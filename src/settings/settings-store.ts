@@ -14,6 +14,7 @@ export const enum SettingKey {
     ParticleEffectsEnabled = 'particleEffectsEnabled',
     Substeps = 'substeps',
     SfxVolume = 'sfxVolume',
+    VoiceVolume = 'voiceVolume',
     MusicVolume = 'musicVolume',
     LensflareEnabled = 'lensflareEnabled',
     SunRaysEnabled = 'sunRaysEnabled',
@@ -116,7 +117,10 @@ export type ShadowQuality = 'off' | 'low' | 'high';
 export interface SpaceSimSettings {
     particleEffectsEnabled: boolean;
     substeps: number;
+    /** Sound effects volume (0–1): weapons, impacts, explosions, warp loop. */
     sfxVolume: number;
+    /** Voice prompt volume (0–1): ship computer and scenario voice lines. */
+    voiceVolume: number;
     musicVolume: number;
     lensflareEnabled: boolean;
     /** Screen-space rays streaming from stars that are large on screen. */
@@ -190,7 +194,8 @@ export interface SpaceSimSettings {
 const defaultSettings: SpaceSimSettings = {
     particleEffectsEnabled: true,
     substeps: 64,
-    sfxVolume: 1.0,
+    sfxVolume: 0.5,
+    voiceVolume: 1.0,
     musicVolume: 0.5,
     lensflareEnabled: true,
     sunRaysEnabled: true,

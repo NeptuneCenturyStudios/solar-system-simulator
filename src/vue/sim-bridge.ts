@@ -289,6 +289,8 @@ export interface VueSimHooks {
     setBarnesHutTheta?: (value: number) => void;
     /** Set sound effects volume, 0–100 percent (persisted via settingsStore). */
     setSfxVolume?: (percent: number) => void;
+    /** Set voice prompt volume, 0–100 percent (persisted via settingsStore). */
+    setVoiceVolume?: (percent: number) => void;
     /** Set background music volume, 0–100 percent. Also applied to the live
      *  AmbientSoundManager, which only picks up changes via setVolume(). */
     setMusicVolume?: (percent: number) => void;
@@ -398,6 +400,8 @@ export interface VueSimStore {
     barnesHutTheta: number;
     /** Sound effects volume as 0–100 percent. */
     sfxVolumePercent: number;
+    /** Voice prompt volume as 0–100 percent. */
+    voiceVolumePercent: number;
     /** Background music volume as 0–100 percent. */
     musicVolumePercent: number;
     /** Maximum frames per second (0 = unlimited). */
@@ -481,6 +485,7 @@ const state = reactive<VueSimStore>({
     physicsSolver: settingsStore.settings.physicsSolver,
     barnesHutTheta: settingsStore.settings.barnesHutTheta,
     sfxVolumePercent: Math.round(settingsStore.settings.sfxVolume * 100),
+    voiceVolumePercent: Math.round(settingsStore.settings.voiceVolume * 100),
     musicVolumePercent: Math.round(settingsStore.settings.musicVolume * 100),
     frameRateLimit: settingsStore.settings.frameRateLimit,
     showAiDebug: settingsStore.settings.showAiDebug,
@@ -1282,6 +1287,16 @@ export function setSfxVolume(percent: number): void {
         settingsStore.update(SettingKey.SfxVolume, percent / 100);
     }
     state.sfxVolumePercent = percent;
+}
+
+/** Set voice prompt volume, 0–100 percent. */
+export function setVoiceVolume(percent: number): void {
+    if (hookRegistry.setVoiceVolume) {
+        hookRegistry.setVoiceVolume(percent);
+    } else {
+        settingsStore.update(SettingKey.VoiceVolume, percent / 100);
+    }
+    state.voiceVolumePercent = percent;
 }
 
 /** Set background music volume, 0–100 percent (old panel's musicVolumeChange

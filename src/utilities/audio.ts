@@ -4,8 +4,10 @@
  * The AudioContext is created lazily so it is always triggered by a user
  * gesture, satisfying browser autoplay policy.
  *
- * Volume is controlled by the global settingsStore.settings.sfxVolume (0–1).
- * When sfxVolume is 0, no sounds play.
+ * Each effect belongs to a category with its own global volume (0–1):
+ * voice prompts use settingsStore.settings.voiceVolume, everything else uses
+ * settingsStore.settings.sfxVolume. When a category's volume is 0, its sounds
+ * don't play.
  *
  * Every effect is defined in the `soundEffectStates` table and plays through
  * the single `playSoundEffect(effect, loop?)` entry point:
@@ -65,12 +67,17 @@ export enum SoundEffect {
     LaserBeam,
 }
 
+/** Which global volume setting scales an effect. */
+type SoundCategory = 'sfx' | 'voice';
+
 interface ISoundEffectState {
     /** Resolved asset URLs for this effect. Effects with multiple files pick one at random per play. */
     soundEffectBank: string[];
+    /** Which global volume setting applies: `voice` → voiceVolume, `sfx` → sfxVolume. */
+    category: SoundCategory;
     /** Decoded buffers, one per bank entry, filled in as each file decodes. */
     buffers: AudioBuffer[];
-    /** Base gain (0–1), multiplied by settingsStore.settings.sfxVolume at play time. */
+    /** Base gain (0–1), multiplied by the category's global volume at play time. */
     volume: number;
     /** Fade-out duration in seconds used when a loop controller's stop() is called without an explicit duration. */
     defaultFadeDuration: number;
@@ -113,6 +120,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/warp-drive-active.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -126,6 +134,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/autopilot-engaged.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -139,6 +148,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/autopilot-disengaged.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -153,6 +163,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
             new URL('../assets/sounds/voice/autopilot-destination-reached.mp3', import.meta.url)
                 .href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -166,6 +177,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/guidance-enabled.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -179,6 +191,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/guidance-disabled.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -192,6 +205,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/initiating-landing.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -205,6 +219,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/landing-canceled.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -218,6 +233,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/landing-complete.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -231,6 +247,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/assistance-needed.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -244,6 +261,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/earth-under-attack.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -257,6 +275,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/earth-destroyed.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -268,6 +287,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     },
     [SoundEffect.EarthSaved]: {
         soundEffectBank: [new URL('../assets/sounds/voice/earth-saved.mp3', import.meta.url).href],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -281,6 +301,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         soundEffectBank: [
             new URL('../assets/sounds/voice/hostiles-inbound.mp3', import.meta.url).href,
         ],
+        category: 'voice',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -293,6 +314,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     // Weapon sounds
     [SoundEffect.WeaponFire]: {
         soundEffectBank: [new URL('../assets/sounds/spaceship-blaster.wav', import.meta.url).href],
+        category: 'sfx',
         buffers: [],
         volume: WEAPON_VOLUME,
         defaultFadeDuration: 0.15,
@@ -305,6 +327,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     },
     [SoundEffect.WeaponImpact]: {
         soundEffectBank: WEAPON_BLAST_BANK,
+        category: 'sfx',
         buffers: [],
         volume: WEAPON_VOLUME,
         defaultFadeDuration: 0.15,
@@ -317,6 +340,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     },
     [SoundEffect.MissileLaunch]: {
         soundEffectBank: [new URL('../assets/sounds/missile-launch.mp3', import.meta.url).href],
+        category: 'sfx',
         buffers: [],
         volume: WEAPON_VOLUME,
         defaultFadeDuration: 0.15,
@@ -329,6 +353,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     },
     [SoundEffect.Explosion]: {
         soundEffectBank: WEAPON_BLAST_BANK,
+        category: 'sfx',
         buffers: [],
         volume: 1.0,
         defaultFadeDuration: 0.15,
@@ -342,6 +367,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     // Loop sounds
     [SoundEffect.WarpLoop]: {
         soundEffectBank: [new URL('../assets/sounds/warp-loop.mp3', import.meta.url).href],
+        category: 'sfx',
         buffers: [],
         volume: 0.6,
         defaultFadeDuration: 1.5,
@@ -353,6 +379,7 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
     },
     [SoundEffect.LaserBeam]: {
         soundEffectBank: [new URL('../assets/sounds/laser-beam.wav', import.meta.url).href],
+        category: 'sfx',
         buffers: [],
         volume: 0.5,
         defaultFadeDuration: 0.15,
@@ -364,6 +391,12 @@ const soundEffectStates: Record<SoundEffect, ISoundEffectState> = {
         attenuation: WEAPON_FIRE_PROFILE,
     },
 };
+
+/** The global volume setting (0–1) for the effect's category, read live so slider changes apply. */
+function categoryVolume(state: ISoundEffectState): number {
+    const settings = settingsStore.settings;
+    return state.category === 'voice' ? settings.voiceVolume : settings.sfxVolume;
+}
 
 function getCtx(): AudioContext {
     if (!ctx) ctx = new AudioContext();
@@ -421,11 +454,11 @@ function playBuffer(
     position: THREE.Vector3 | null,
     sourceRadiusKm: number
 ): void {
-    // Respect global SFX volume: if 0, don't play anything
-    const vol = settingsStore.settings.sfxVolume;
+    // Respect the category's global volume: if 0, don't play anything
+    const state = soundEffectStates[effect];
+    const vol = categoryVolume(state);
     if (vol <= 0) return;
 
-    const state = soundEffectStates[effect];
     const attenuation = state.attenuation;
     let voice: SpatialVoice | null = null;
     if (position && attenuation) {
@@ -507,7 +540,7 @@ export type WarpSoundController = LoopSoundController;
  * ship's laser gets its own loop, so a distant AI beam never takes over or cuts
  * off the player's.
  *
- * The effective gain is state.volume * settingsStore.settings.sfxVolume,
+ * The effective gain is state.volume * the category's global volume,
  * multiplied by the caller's volume passed via setVolume(), multiplied by the
  * distance gain for positional loops.
  */
@@ -547,7 +580,7 @@ function startLoop(
         source.loop = true;
 
         const gainNode = ac.createGain();
-        gainNode.gain.setValueAtTime(baseVolume * settingsStore.settings.sfxVolume, t);
+        gainNode.gain.setValueAtTime(baseVolume * categoryVolume(state), t);
 
         source.connect(gainNode);
         gainNode.connect(voice ? voice.input : ac.destination);
@@ -575,9 +608,9 @@ function startLoop(
 
             setVolume(vol: number): void {
                 if (_disposed || _isFadingOut) return;
-                // Multiply caller's volume by the base volume and global SFX volume.
+                // Multiply caller's volume by the base volume and the category's global volume.
                 gainNode.gain.setValueAtTime(
-                    vol * baseVolume * settingsStore.settings.sfxVolume,
+                    vol * baseVolume * categoryVolume(state),
                     ac.currentTime
                 );
             },
