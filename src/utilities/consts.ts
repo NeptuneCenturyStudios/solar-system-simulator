@@ -119,6 +119,15 @@ export const RENDER_DISTANCE_MIN_AU = 0.1;
 export const RENDER_DISTANCE_MAX_AU = 100;
 export const RENDER_DISTANCE_DEFAULT_AU = 12;
 
+// === Render Scale (Options → Graphics) ===
+// Fraction of the window's resolution the 3D scene is drawn at before it is stretched to fill the
+// screen. Per-pixel cost (clouds, star surfaces, atmosphere, shadows) goes with its square, so
+// 0.75 does ~56% of the work and 0.5 ~25%. The HUD is always drawn at full resolution.
+export const RENDER_SCALE_MIN = 0.5;
+export const RENDER_SCALE_MAX = 1;
+export const RENDER_SCALE_STEP = 0.05;
+export const RENDER_SCALE_DEFAULT = 1;
+
 // === Mercury: Orbital Elements (J2000) ===
 // Mercury is the most eccentric of the eight planets (e = 0.2056): its distance from the Sun
 // swings from 46.0 to 69.8 million km over an 88-day year, a 52% change, and its orbit rides

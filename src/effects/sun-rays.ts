@@ -231,6 +231,7 @@ export class SunRaysEffect {
         if (count === 0) return;
 
         this.uniforms.tScene.value = sceneTexture;
+        this._matchSceneSize(sceneTexture);
 
         const prevTarget = renderer.getRenderTarget();
         const prevAutoClear = renderer.autoClear;
@@ -313,6 +314,18 @@ export class SunRaysEffect {
             u.uStarStrengths.value[i] = c.strength * this.intensity;
         }
         return count;
+    }
+
+    /**
+     * Keeps the rays target at RESOLUTION_SCALE of the captured scene, so lowering the render
+     * scale makes the rays cheaper too. Only resizes when the scene size has changed.
+     */
+    private _matchSceneSize(sceneTexture: THREE.Texture): void {
+        const image = sceneTexture.image as { width?: number; height?: number } | null;
+        if (!image?.width || !image.height) return;
+        const w = Math.max(1, Math.floor(image.width * RESOLUTION_SCALE));
+        const h = Math.max(1, Math.floor(image.height * RESOLUTION_SCALE));
+        if (this.rt.width !== w || this.rt.height !== h) this.rt.setSize(w, h);
     }
 
     /** Call from the window resize handler. */

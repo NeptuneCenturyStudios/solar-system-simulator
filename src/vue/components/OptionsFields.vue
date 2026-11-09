@@ -2,97 +2,60 @@
     <div class="vue-ui-options-fields">
         <div class="vue-ui-card-header">Graphics</div>
 
-        <label class="checkbox-row">
-            <input
-                type="checkbox"
-                :checked="simStore.particleEffectsEnabled"
-                @change="onParticleEffectsChange"
-            />
-            Enable Particle Effects
-        </label>
-
-        <label class="checkbox-row">
-            <input
-                type="checkbox"
-                :checked="simStore.lensflareEnabled"
-                @change="onLensflareChange"
-            />
-            Lens Flares
-        </label>
-
-        <label class="checkbox-row">
-            <input type="checkbox" :checked="simStore.sunRaysEnabled" @change="onSunRaysChange" />
-            Sun Rays
-        </label>
-
-        <label class="checkbox-row">
-            <input type="checkbox" :checked="simStore.auroraEnabled" @change="onAuroraChange" />
-            Aurorae
-        </label>
-
-        <div v-if="simStore.auroraEnabled" class="control-group">
-            <label>Aurora Detail</label>
-            <select
-                class="solver-select"
-                :value="simStore.auroraDetail"
-                title="How much per-pixel work the aurora curtains do. Dynamic animates each band's height, brightness and colour; Static gives every band its own fixed values and compiles a cheaper shader."
-                @change="onAuroraDetailChange"
-            >
-                <option value="static">Static Bands</option>
-                <option value="dynamic">Dynamic Bands</option>
-            </select>
-            <p class="solver-hint">{{ auroraDetailHint }}</p>
-        </div>
-
         <div class="control-group">
-            <label>Cloud Quality</label>
+            <label>Graphics Preset</label>
             <select
                 class="solver-select"
-                :value="simStore.cloudQuality"
-                title="How cloud layers are drawn. Every level shows the same clouds in the same places; higher levels give them depth and self-shadowing at a higher GPU cost."
-                @change="onCloudQualityChange"
+                :value="graphicsPreset"
+                title="Sets render scale, clouds, shadows, sun rays, lens flares, aurorae and particles in one go. Changing any of them afterwards shows Custom."
+                @change="onGraphicsPresetChange"
             >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
+                <option value="custom" disabled>Custom</option>
             </select>
-            <p class="solver-hint">{{ cloudQualityHint }}</p>
+            <p class="solver-hint">{{ graphicsPresetHint }}</p>
         </div>
-
-        <div class="control-group">
-            <label>Shadow Quality</label>
-            <select
-                class="solver-select"
-                :value="simStore.shadowQuality"
-                title="Eclipse shadows between planets, moons and ships, and shaped shadows cast by nearby ships onto the ground, each other and themselves."
-                @change="onShadowQualityChange"
-            >
-                <option value="off">Off</option>
-                <option value="low">Low</option>
-                <option value="high">High</option>
-            </select>
-            <p class="solver-hint">{{ shadowQualityHint }}</p>
-        </div>
-
-        <label class="checkbox-row">
-            <input type="checkbox" :checked="simStore.showAiDebug" @change="onShowAiDebugChange" />
-            Show Ship AI Debug
-        </label>
 
         <div class="control-group">
             <label>
-                Frame Rate Limit
-                <span class="val-display">{{ simStore.frameRateLimit || 'Unlimited' }}</span>
+                Render Scale
+                <span class="val-display">{{ renderScalePercent }}%</span>
             </label>
-            <input
-                class="text-input"
-                type="number"
-                min="0"
-                max="240"
-                :value="simStore.frameRateLimit"
-                title="Maximum frames per second. 0 or blank = unlimited."
-                @input="onFrameRateLimitInput"
-            />
+            <div class="slider-row">
+                <input
+                    type="range"
+                    :min="RENDER_SCALE_MIN * 100"
+                    :max="RENDER_SCALE_MAX * 100"
+                    :step="RENDER_SCALE_STEP * 100"
+                    :value="renderScalePercent"
+                    title="Resolution the 3D scene is drawn at, as a percentage of the window. Lower is faster but softer. The HUD always stays sharp."
+                    @input="onRenderScaleInput"
+                />
+                <button
+                    class="old-ui btn-slider-reset"
+                    :title="`Reset to ${RENDER_SCALE_DEFAULT * 100}%`"
+                    @click="resetRenderScale"
+                >
+                    <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
+                </button>
+            </div>
+            <p class="solver-hint">{{ renderScaleHint }}</p>
+        </div>
+
+        <div class="control-group">
+            <label>Texture Quality</label>
+            <select
+                class="solver-select"
+                :value="simStore.textureQuality"
+                :title="textureQualityTitle"
+                @change="onTextureQualityChange"
+            >
+                <option value="low">Low (standard)</option>
+                <option value="high" :disabled="!highQualityAvailable">High (up to 8K)</option>
+            </select>
+            <p class="solver-hint">{{ textureQualityHint }}</p>
         </div>
 
         <div class="control-group">
@@ -125,18 +88,94 @@
         </div>
 
         <div class="control-group">
-            <label>Texture Quality</label>
+            <label>
+                Frame Rate Limit
+                <span class="val-display">{{ simStore.frameRateLimit || 'Unlimited' }}</span>
+            </label>
+            <input
+                class="text-input"
+                type="number"
+                min="0"
+                max="240"
+                :value="simStore.frameRateLimit"
+                title="Maximum frames per second. 0 or blank = unlimited."
+                @input="onFrameRateLimitInput"
+            />
+        </div>
+
+        <div class="vue-ui-card-header">Effects</div>
+
+        <div class="control-group">
+            <label>Cloud Quality</label>
             <select
                 class="solver-select"
-                :value="simStore.textureQuality"
-                :title="textureQualityTitle"
-                @change="onTextureQualityChange"
+                :value="simStore.cloudQuality"
+                title="How cloud layers are drawn. Every level shows the same clouds in the same places; higher levels give them depth and self-shadowing at a higher GPU cost."
+                @change="onCloudQualityChange"
             >
-                <option value="low">Low (standard)</option>
-                <option value="high" :disabled="!highQualityAvailable">High (up to 8K)</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
             </select>
-            <p class="solver-hint">{{ textureQualityHint }}</p>
+            <p class="solver-hint">{{ cloudQualityHint }}</p>
         </div>
+
+        <div class="control-group">
+            <label>Shadow Quality</label>
+            <select
+                class="solver-select"
+                :value="simStore.shadowQuality"
+                title="Eclipse shadows between planets, moons and ships, and shaped shadows cast by nearby ships onto the ground, each other and themselves."
+                @change="onShadowQualityChange"
+            >
+                <option value="off">Off</option>
+                <option value="low">Low</option>
+                <option value="high">High</option>
+            </select>
+            <p class="solver-hint">{{ shadowQualityHint }}</p>
+        </div>
+
+        <label class="checkbox-row">
+            <input type="checkbox" :checked="simStore.sunRaysEnabled" @change="onSunRaysChange" />
+            Sun Rays
+        </label>
+
+        <label class="checkbox-row">
+            <input
+                type="checkbox"
+                :checked="simStore.lensflareEnabled"
+                @change="onLensflareChange"
+            />
+            Lens Flares
+        </label>
+
+        <label class="checkbox-row">
+            <input type="checkbox" :checked="simStore.auroraEnabled" @change="onAuroraChange" />
+            Aurorae
+        </label>
+
+        <div v-if="simStore.auroraEnabled" class="control-group">
+            <label>Aurora Detail</label>
+            <select
+                class="solver-select"
+                :value="simStore.auroraDetail"
+                title="How much per-pixel work the aurora curtains do. Dynamic animates each band's height, brightness and colour; Static gives every band its own fixed values and compiles a cheaper shader."
+                @change="onAuroraDetailChange"
+            >
+                <option value="static">Static Bands</option>
+                <option value="dynamic">Dynamic Bands</option>
+            </select>
+            <p class="solver-hint">{{ auroraDetailHint }}</p>
+        </div>
+
+        <label class="checkbox-row">
+            <input
+                type="checkbox"
+                :checked="simStore.particleEffectsEnabled"
+                @change="onParticleEffectsChange"
+            />
+            Enable Particle Effects
+        </label>
 
         <div class="vue-ui-card-header">Camera</div>
         <label class="checkbox-row">
@@ -303,6 +342,12 @@
                 </button>
             </div>
         </div>
+
+        <div class="vue-ui-card-header">Debug</div>
+        <label class="checkbox-row">
+            <input type="checkbox" :checked="simStore.showAiDebug" @change="onShowAiDebugChange" />
+            Show Ship AI Debug
+        </label>
     </div>
 </template>
 
@@ -310,6 +355,7 @@
 import { computed } from 'vue';
 
 import {
+    applyGraphicsPreset,
     setAuroraDetail,
     setAuroraEnabled,
     setBarnesHutTheta,
@@ -322,6 +368,7 @@ import {
     setParticleEffectsEnabled,
     setPhysicsSolver,
     setRenderDistance,
+    setRenderScale,
     setSfxVolume,
     setVoiceVolume,
     setSunRaysEnabled,
@@ -339,11 +386,20 @@ import type {
     ShipCollisionMode,
     TextureQuality,
 } from '../../settings/settings-store';
+import {
+    matchGraphicsPreset,
+    type GraphicsPreset,
+    type GraphicsPresetSelection,
+} from '../../settings/graphics-presets';
 import { isHighQualityTextureAvailable } from '../../drawing/texture-quality';
 import {
     RENDER_DISTANCE_DEFAULT_AU,
     RENDER_DISTANCE_MAX_AU,
     RENDER_DISTANCE_MIN_AU,
+    RENDER_SCALE_DEFAULT,
+    RENDER_SCALE_MAX,
+    RENDER_SCALE_MIN,
+    RENDER_SCALE_STEP,
 } from '../../utilities/consts';
 import SvgIcon from '@jamescoyle/vue-icon';
 import { mdiReplay } from '@mdi/js';
@@ -364,6 +420,54 @@ const DEFAULT_VOICE_VOLUME_PERCENT = 100;
 const DEFAULT_MUSIC_VOLUME_PERCENT = 50;
 /** Max frame-rate-limit value the Options panel permits. */
 const MAX_FRAME_RATE_LIMIT = 240;
+
+/** One-line summary of what each preset trades away. */
+const GRAPHICS_PRESET_HINTS: Record<GraphicsPresetSelection, string> = {
+    low: 'For integrated graphics: 75% render scale, flat clouds, no shadows, sun rays or lens flares.',
+    medium: "Volumetric clouds, eclipse shadows and the nearest ship's shadow, all effects on. The default.",
+    high: 'Detailed volumetric clouds and shadows for up to four ships. Highest GPU cost.',
+    custom: 'Your own mix of the settings below. Pick a preset to reset them all at once.',
+};
+
+/** The preset the current settings match, or Custom. */
+const graphicsPreset = computed<GraphicsPresetSelection>(() =>
+    matchGraphicsPreset({
+        renderScale: simStore.renderScale,
+        cloudQuality: simStore.cloudQuality,
+        shadowQuality: simStore.shadowQuality,
+        sunRaysEnabled: simStore.sunRaysEnabled,
+        lensflareEnabled: simStore.lensflareEnabled,
+        auroraEnabled: simStore.auroraEnabled,
+        auroraDetail: simStore.auroraDetail,
+        particleEffectsEnabled: simStore.particleEffectsEnabled,
+    })
+);
+
+const graphicsPresetHint = computed(() => GRAPHICS_PRESET_HINTS[graphicsPreset.value]);
+
+function onGraphicsPresetChange(e: Event): void {
+    const value = (e.target as HTMLSelectElement).value as GraphicsPresetSelection;
+    // Custom is display-only (its option is disabled), but guard anyway.
+    if (value !== 'custom') applyGraphicsPreset(value as GraphicsPreset);
+}
+
+const renderScalePercent = computed(() => Math.round(simStore.renderScale * 100));
+
+/** Pixel work goes with the square of the scale, which is the number worth knowing. */
+const renderScaleHint = computed(() => {
+    const scale = simStore.renderScale;
+    if (scale >= 1) return 'The scene is drawn at full window resolution.';
+    const work = Math.round(scale * scale * 100);
+    return `The scene is drawn at ${renderScalePercent.value}% resolution: about ${work}% of the pixel work, slightly softer. The HUD stays sharp.`;
+});
+
+function onRenderScaleInput(e: Event): void {
+    setRenderScale(parseInt((e.target as HTMLInputElement).value, 10) / 100);
+}
+
+function resetRenderScale(): void {
+    setRenderScale(RENDER_SCALE_DEFAULT);
+}
 
 function onParticleEffectsChange(e: Event): void {
     setParticleEffectsEnabled((e.target as HTMLInputElement).checked);

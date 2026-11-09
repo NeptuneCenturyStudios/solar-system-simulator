@@ -93,6 +93,7 @@ import { scenarioManager } from '../scenarios/scenario-manager';
 import type { Spaceship } from '../bodies/ships/spaceship';
 import { updateHillSpheres } from '../physics/sphere-of-influence';
 import { updateShadows } from '../effects/shadows/shadow-system';
+import { renderWithScaledPoints } from '../effects/render-scale-points';
 
 /** Scratch for the warp-sound speed lookup. */
 const _warpSoundVel = new THREE.Vector3();
@@ -1654,9 +1655,12 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             ctx.simulationState.bodies,
             ctx.flightState.activeShip
         );
+        // The scene is captured at the render scale; applyLensing stretches it to the canvas.
+        const renderScale = settingsStore.settings.renderScale;
+        ctx.lensingEffect.setRenderScale(renderScale);
         ctx.lensingEffect.beginCapture(ctx.renderer);
         try {
-            ctx.renderer.render(ctx.scene, ctx.camera);
+            renderWithScaledPoints(ctx.renderer, ctx.scene, ctx.camera, renderScale);
         } catch (e) {
             console.error('Error during rendering:', e);
         }

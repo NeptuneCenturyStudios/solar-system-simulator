@@ -23,6 +23,11 @@ const EINSTEIN_SCALE = 18.0;
  */
 export class GravitationalLensingEffect {
     private rt: THREE.WebGLRenderTarget;
+    /** Canvas size in pixels; the capture target is this times `renderScale`. */
+    private canvasWidth: number;
+    private canvasHeight: number;
+    /** Fraction of the canvas resolution the scene is captured at (see RENDER_SCALE_*). */
+    private renderScale = 1;
     private quadScene: THREE.Scene;
     private quadCamera: THREE.OrthographicCamera;
     private quadMesh: THREE.Mesh;
@@ -38,7 +43,10 @@ export class GravitationalLensingEffect {
     constructor(renderer: THREE.WebGLRenderer) {
         const w = renderer.domElement.width;
         const h = renderer.domElement.height;
+        this.canvasWidth = w;
+        this.canvasHeight = h;
 
+        // Linear filtering is what upscales the capture to the canvas when renderScale < 1.
         this.rt = new THREE.WebGLRenderTarget(w, h, {
             minFilter: THREE.LinearFilter,
             magFilter: THREE.LinearFilter,
@@ -188,10 +196,32 @@ export class GravitationalLensingEffect {
         return this.rt.texture;
     }
 
+    /**
+     * Sets the fraction of the canvas resolution the scene is captured at. The capture is
+     * stretched back to the full canvas by the lensing pass, so everything drawn after it (the
+     * HUD, lens flare, cockpit) stays sharp. Cheap to call every frame: it only resizes the
+     * target when the value actually changes.
+     */
+    setRenderScale(scale: number): void {
+        if (scale === this.renderScale) return;
+        this.renderScale = scale;
+        this.applyCaptureSize();
+    }
+
     /** Call from the window resize handler. */
     resize(width: number, height: number): void {
-        this.rt.setSize(width, height);
+        this.canvasWidth = width;
+        this.canvasHeight = height;
+        // Only the aspect ratio is read from it, so it stays at the canvas size.
         this.uniforms.uResolution.value.set(width, height);
+        this.applyCaptureSize();
+    }
+
+    private applyCaptureSize(): void {
+        this.rt.setSize(
+            Math.max(1, Math.round(this.canvasWidth * this.renderScale)),
+            Math.max(1, Math.round(this.canvasHeight * this.renderScale))
+        );
     }
 
     dispose(): void {

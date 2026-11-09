@@ -24,6 +24,7 @@ import {
     AutopilotOrbitMode,
     clampAutopilotOrbitDistanceM,
     clampRenderDistanceAU,
+    clampRenderScale,
     CloudQuality,
     PhysicsSolverMode,
     ShadowQuality,
@@ -32,6 +33,7 @@ import {
     settingsStore,
     TextureQuality,
 } from '../settings/settings-store';
+import { GRAPHICS_PRESETS, type GraphicsPreset } from '../settings/graphics-presets';
 import type { PlaylistEntry } from '../utilities/playlist';
 import { getLastPushedSeed } from '../utilities/url-seed';
 
@@ -415,6 +417,8 @@ export interface VueSimStore {
     smoothZoomEnabled: boolean;
     /** Render distance (camera far plane) in AU; bodies farther from the camera are not drawn. */
     renderDistanceAU: number;
+    /** Fraction of the window resolution the 3D scene is drawn at. */
+    renderScale: number;
     /** Hide the PanelManager while in flight mode, restoring it on exit. */
     hidePanelManagerInFlight: boolean;
     /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
@@ -495,6 +499,7 @@ const state = reactive<VueSimStore>({
     showAiDebug: settingsStore.settings.showAiDebug,
     smoothZoomEnabled: settingsStore.settings.smoothZoomEnabled,
     renderDistanceAU: settingsStore.settings.renderDistanceAU,
+    renderScale: settingsStore.settings.renderScale,
     hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
     chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
     coastDriftAlignEnabled: settingsStore.settings.coastDriftAlignEnabled,
@@ -1108,6 +1113,32 @@ export function setRenderDistance(au: number): void {
         settingsStore.update(SettingKey.RenderDistanceAU, clamped);
     }
     state.renderDistanceAU = clamped;
+}
+
+/**
+ * Set the render scale (Options panel): the fraction of the window resolution the 3D scene is
+ * drawn at. Takes effect on the next frame; the render loop reads the setting every frame.
+ */
+export function setRenderScale(scale: number): void {
+    const clamped = clampRenderScale(scale);
+    settingsStore.update(SettingKey.RenderScale, clamped);
+    state.renderScale = clamped;
+}
+
+/**
+ * Apply a graphics preset (Options panel): writes each of its values through the same setter the
+ * individual control uses, so every side effect (particle and aurora hooks) runs as usual.
+ */
+export function applyGraphicsPreset(preset: GraphicsPreset): void {
+    const values = GRAPHICS_PRESETS[preset];
+    setRenderScale(values.renderScale);
+    setCloudQuality(values.cloudQuality);
+    setShadowQuality(values.shadowQuality);
+    setSunRaysEnabled(values.sunRaysEnabled);
+    setLensflareEnabled(values.lensflareEnabled);
+    setAuroraEnabled(values.auroraEnabled);
+    setAuroraDetail(values.auroraDetail);
+    setParticleEffectsEnabled(values.particleEffectsEnabled);
 }
 
 /** Toggle hiding the PanelManager while in flight mode (Flight Controls panel). */

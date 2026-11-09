@@ -6,6 +6,10 @@ import {
     RENDER_DISTANCE_DEFAULT_AU,
     RENDER_DISTANCE_MAX_AU,
     RENDER_DISTANCE_MIN_AU,
+    RENDER_SCALE_DEFAULT,
+    RENDER_SCALE_MAX,
+    RENDER_SCALE_MIN,
+    RENDER_SCALE_STEP,
 } from '../utilities/consts';
 
 const STORAGE_KEY = 'spaceSimSettings';
@@ -33,6 +37,7 @@ export const enum SettingKey {
     CockpitView = 'cockpitView',
     SelectedShipTypeId = 'selectedShipTypeId',
     RenderDistanceAU = 'renderDistanceAU',
+    RenderScale = 'renderScale',
     TextureQuality = 'textureQuality',
     ShowOrbitTrails = 'showOrbitTrails',
     ShowOrbitPrediction = 'showOrbitPrediction',
@@ -183,6 +188,11 @@ export interface SpaceSimSettings {
     selectedShipTypeId: string;
     /** Camera far plane in AU. Anything farther from the camera than this is not drawn. */
     renderDistanceAU: number;
+    /**
+     * Fraction of the window resolution the 3D scene is drawn at (RENDER_SCALE_MIN..MAX). The HUD
+     * stays at full resolution.
+     */
+    renderScale: number;
     /** Body-texture quality tier. `high` is only honoured on desktop (see texture-quality.ts). */
     textureQuality: TextureQuality;
     /** Draw the orbit trail behind every celestial body (System Explorer). */
@@ -234,6 +244,7 @@ const defaultSettings: SpaceSimSettings = {
     cockpitView: false,
     selectedShipTypeId: 'zenith',
     renderDistanceAU: RENDER_DISTANCE_DEFAULT_AU,
+    renderScale: RENDER_SCALE_DEFAULT,
     // Low is the safe default: it is the only tier a browser can use, and installing the
     // desktop build should not silently jump to multi-megabyte textures nobody asked for.
     textureQuality: 'low',
@@ -260,6 +271,17 @@ export function normalizeTextureQuality(value: unknown): TextureQuality {
 export function clampRenderDistanceAU(au: number): number {
     if (!Number.isFinite(au)) return RENDER_DISTANCE_DEFAULT_AU;
     return Math.min(Math.max(au, RENDER_DISTANCE_MIN_AU), RENDER_DISTANCE_MAX_AU);
+}
+
+/**
+ * Clamp a render scale to the supported range and snap it to the slider step, falling back to the
+ * default for non-finite input.
+ */
+export function clampRenderScale(scale: number): number {
+    if (!Number.isFinite(scale)) return RENDER_SCALE_DEFAULT;
+    const snapped = Math.round(scale / RENDER_SCALE_STEP) * RENDER_SCALE_STEP;
+    // Rounded again so the stored value is 0.75, not 0.7500000000000001.
+    return Math.round(Math.min(Math.max(snapped, RENDER_SCALE_MIN), RENDER_SCALE_MAX) * 100) / 100;
 }
 
 /** Normalise a stored cloud quality, falling back to `medium` for anything unrecognised. */
@@ -304,6 +326,7 @@ class SettingsStore {
         this.data = raw ? { ...defaultSettings, ...JSON.parse(raw) } : { ...defaultSettings };
         // A hand-edited or stale save must not be able to put the far plane out of range.
         this.data.renderDistanceAU = clampRenderDistanceAU(this.data.renderDistanceAU);
+        this.data.renderScale = clampRenderScale(this.data.renderScale);
         this.data.textureQuality = normalizeTextureQuality(this.data.textureQuality);
         this.data.cockpitView = this.data.cockpitView === true;
         this.data.autopilotMode = normalizeAutopilotMode(this.data.autopilotMode);
