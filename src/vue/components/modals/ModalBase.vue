@@ -96,6 +96,8 @@ function onGlobalWheel(e: WheelEvent): void {
 // when `allowClose` is true.
 function onGlobalKeyDown(e: KeyboardEvent): void {
     if (!props.visible) return;
+    // A held Esc that opened this modal must not auto-repeat it closed again.
+    const isCancelKey = e.key === 'Escape' && props.allowClose && !e.repeat;
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (
         tag === 'INPUT' ||
@@ -104,7 +106,7 @@ function onGlobalKeyDown(e: KeyboardEvent): void {
         tag === 'BUTTON' ||
         tag === 'A'
     ) {
-        if (e.key === 'Escape' && props.allowClose) {
+        if (isCancelKey) {
             e.preventDefault();
             e.stopPropagation();
             emitCancel();
@@ -115,7 +117,7 @@ function onGlobalKeyDown(e: KeyboardEvent): void {
     }
     e.preventDefault();
     e.stopPropagation();
-    if (e.key === 'Escape' && props.allowClose) {
+    if (isCancelKey) {
         emitCancel();
     }
 }

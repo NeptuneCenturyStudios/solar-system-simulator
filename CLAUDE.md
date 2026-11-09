@@ -139,7 +139,7 @@ For previous milestone info, see milestones.md
 - [x] Phase 2.1: Add new alien mothership model and class
 - [x] Phase 2.2: Add new alien fighter model and class
 - [x] Phase 2.3: Fleet and AI fixes to prepare for fleet scenatio
-- [ ] Phase 2.4: Add alien invasion scenario (massive fleet battle). 
+- [x] Phase 2.4: Add alien invasion scenario (massive fleet battle). 
 - **Phase 3**
 - [ ] Phase 3.1: Review performance on slower machines after star update and add performance adjustment options as needed.
 - [ ] HDR output pipeline: the scene renders into the GravitationalLensingEffect's 8-bit `UnsignedByteType` render target, so three.js applies no tone mapping or sRGB conversion there (`renderer.toneMapping = ACESFilmicToneMapping` is effectively inert) and anything brighter than 1.0 clips to flat white. This causes hard day/night terminators (Earth surface, lit cloud tops) and blown-out highlights. Fix: make the capture target half-float and apply tone mapping and the sRGB output conversion in the final blit to the screen. This changes the look of the whole app, so star, glow, lens-flare, sun-ray and atmosphere constants will need retuning afterwards.

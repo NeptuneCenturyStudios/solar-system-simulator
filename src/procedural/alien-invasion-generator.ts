@@ -9,9 +9,9 @@ import { getShipTypeById } from '../bodies/ships/ship-registry';
 import { TEAM_EARTH } from '../bodies/ships/ship-team';
 import { AlienInvasionScenario } from '../scenarios/alien-invasion-scenario';
 import { enlistShip, orientShipAlong, spawnFleetShip } from '../scenarios/fleet-spawn';
-import { pickRandomSpaceTexture, generateSeedString } from './seed-utils';
+import { generateSeedString } from './seed-utils';
 import { createUniqueId } from '../utilities/utilities';
-import { moonTexture } from '../drawing/textures';
+import { moonTexture, spaceTextures } from '../drawing/textures';
 import {
     ALIEN_INVASION_CAPITAL_OFFSET,
     ALIEN_INVASION_CAPITAL_SPACING,
@@ -223,7 +223,7 @@ export class AlienInvasionGenerator extends SolarSystemGenerator {
             system: {
                 bodies,
                 features: [],
-                spaceTexture: pickRandomSpaceTexture(this.masterSeed),
+                spaceTexture: spaceTextures[0],
             },
             options: {
                 timeScale: ALIEN_INVASION_TIME_SCALE,

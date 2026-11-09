@@ -76,6 +76,8 @@ function isValidTarget(self: Spaceship, candidate: Spaceship | null): candidate 
 export class TargetSelector implements ITargetHolder {
     private _current: Spaceship | null = null;
     private timer = 0;
+    /** Ship to skip on the next pick only (see invalidate). */
+    private avoidOnce: Spaceship | null = null;
 
     constructor(
         private readonly self: Spaceship,
@@ -99,9 +101,15 @@ export class TargetSelector implements ITargetHolder {
         this._current = this.choose(valid ? this._current : null);
     }
 
-    /** Force a fresh pick on the next tick (e.g. after a scenario changes teams). */
-    invalidate(): void {
+    /**
+     * Force a fresh pick on the next tick (e.g. after a scenario changes teams).
+     *
+     * @param avoid A ship to pass over for that one pick, as long as anything else is available
+     *   (e.g. a target a teammate keeps screening).
+     */
+    invalidate(avoid: Spaceship | null = null): void {
         this.timer = 0;
+        this.avoidOnce = avoid;
     }
 
     private choose(current: Spaceship | null): Spaceship | null {
@@ -113,6 +121,17 @@ export class TargetSelector implements ITargetHolder {
         }
         if (player && !candidates.includes(player) && isValidTarget(self, player)) {
             candidates.push(player);
+        }
+
+        const avoid = this.avoidOnce;
+        this.avoidOnce = null;
+        if (avoid && candidates.length > 1) {
+            const i = candidates.indexOf(avoid);
+            if (i !== -1) {
+                candidates.splice(i, 1);
+                // No hysteresis toward a target we are deliberately leaving.
+                if (current === avoid) current = null;
+            }
         }
         if (candidates.length === 0) return null;
 

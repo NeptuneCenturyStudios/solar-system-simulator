@@ -220,6 +220,7 @@ import {
     setPanelManagerVisible,
     setInitializing,
     setSystemReady,
+    vueUiState,
 } from './vue/ui-store';
 import { environmentState } from './simulation/environment-state';
 import { clampRenderDistanceAU, SettingKey, settingsStore } from './settings/settings-store';
@@ -4040,10 +4041,27 @@ function spawnShip(targetShip?: Spaceship) {
 }
 
 /**
+ * F key: enter flight aboard the player's live ship (whatever type it is), or spawn a new one
+ * of the selected type when there is none. Spawning focuses the ship without entering flight,
+ * same as the Spawn button, so a second press boards it.
+ */
+function spawnOrEnterShip() {
+    if (!vueUiState.systemReady) return;
+    const known = flightState.knownShip;
+    const live = !!(known && !known._isDisposed && simulationState.bodies.includes(known));
+    if (live && known) spawnShip(known);
+    else spawnShip();
+}
+
+/**
  * Put the player into flight mode aboard `ship`. Used when re-entering a spawned ship and when
  * a scenario hands the player a ship at launch (see applySystemLaunchOptions).
  */
 function enterFlightMode(ship: Spaceship) {
+    // Never board behind a scenario outcome / player-down dialog: pointer lock would make its
+    // buttons unclickable.
+    if (scenarioOutcomeModalIsVisible()) return;
+
     // Snapshot camera / controls state so exit can restore it cleanly
     flightState.prevCameraPos.copy(camera.position);
     flightState.prevCameraUp.copy(camera.up);
@@ -4439,6 +4457,15 @@ installKeyboardControls({
     togglePause,
     stepTimeScale,
     dispatchSimStateChange,
+    openLaunchControl: () => {
+        if (!vueUiState.systemReady) return;
+        // Defer past this keydown: microtasks run between listeners of a real key event, so the
+        // modal would register its capture-phase Esc handler on `document` in time to see this
+        // same press and cancel itself immediately.
+        setTimeout(() => void startStartupFlow({ allowCancel: true }), 0);
+    },
+    spawnOrEnterShip,
+    surfaceCameraActive: () => surfaceCam.isActive,
 });
 
 window.addEventListener('mousedown', onMouseDown);
@@ -4776,6 +4803,16 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
 }
 
 /**
+ * Leave flight mode and drop any pointer lock (e.g. RMB mouse-look held at that moment) so the
+ * cursor is free for a scenario dialog's buttons.
+ */
+function releaseFlightForDialog(): void {
+    if (flightState.isActive) exitFlightMode(flightCtx);
+    interactionState.isMouseLookActive = false;
+    if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
+}
+
+/**
  * React to a scenario ending: show the themed outcome dialog, then either restart the same
  * scenario or open the startup flow to pick a different one. The dialog's overlay variant
  * (red on failure, green on success) supplies the scene-wide backdrop tint.
@@ -4786,7 +4823,7 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
 async function handleScenarioOutcome(report: ScenarioOutcomeReport): Promise<void> {
     // Leave flight mode so pointer lock / mouse capture is released, letting the player use
     // the mouse on the dialog's buttons.
-    if (flightState.isActive) exitFlightMode(flightCtx);
+    releaseFlightForDialog();
 
     // Let the outcome (explosion, victory state, etc.) read for a beat before the modal
     // steals focus — popping it up instantly feels jarring.
@@ -4795,6 +4832,9 @@ async function handleScenarioOutcome(report: ScenarioOutcomeReport): Promise<voi
     // A player-down dialog still open (the battle ended while the player was choosing) is
     // dismissed so its pending choice resolves, then replaced by the outcome.
     if (scenarioOutcomeModalIsVisible()) hideScenarioOutcomeModal();
+    // The player may have re-entered flight during the delay; leave it again so the dialog's
+    // buttons are clickable.
+    releaseFlightForDialog();
     const result = await showScenarioOutcomeModal(report);
     if (!result) return;
 
@@ -4820,6 +4860,7 @@ async function handlePlayerDown(scenarioName: string): Promise<PlayerDownChoice 
     // The scenario may have ended during the delay; its outcome dialog takes precedence.
     if (scenarioOutcomeModalIsVisible()) return null;
 
+    releaseFlightForDialog();
     const result = await showPlayerDownModal(scenarioName);
     if (!result) return null;
     if (result.action === 'restart') {

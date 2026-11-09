@@ -43,6 +43,8 @@ export const HELP_SECTIONS: HelpSection[] = [
             { action: 'Halve time scale', keys: ['-', '_'] },
             { action: 'Toggle object names', keys: ['N'] },
             { action: 'Delete selected object', keys: ['Delete'] },
+            { action: 'Spawn ship / enter your ship', keys: ['F'] },
+            { action: 'Open Launch Control', keys: ['Esc'] },
         ],
     },
     {
@@ -60,7 +62,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     },
     {
         title: 'Flight Mode',
-        note: 'Enter a ship from the Flight Controls panel, then these take over.',
+        note: 'Enter a ship from the Flight Controls panel (or press F), then these take over.',
         rows: [
             { action: 'Thrust / brake', keys: ['W', 'S'] },
             {

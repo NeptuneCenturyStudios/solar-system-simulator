@@ -20,10 +20,10 @@ export class OsirisMothership extends Spaceship {
         id: string
     ) {
         const SPACESHIP_MASS = 80_000_000 / MASS_SCALE;
-        const SPACESHIP_RADIUS = 400 / 1000 / RADIUS_SCALE;
+        const SPACESHIP_RADIUS = 500 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
-        const SPACESHIP_HEALTH_POINTS = 400;
+        const SPACESHIP_HEALTH_POINTS = 300;
 
         // Camera placement (ship-local space; +Z = forward, +Y = up). Tune these to
         // adjust how the chase cam frames the destroyer.
@@ -129,7 +129,7 @@ export class OsirisMothership extends Spaceship {
         const laserWeaponConfig: Partial<ILaserWeaponConfig> = {
             beamColor: 0x800080,
             optimalRange: 100_000 / DIST_SCALE,
-            damage: 8,
+            damage: 10,
             coreWidth: 0.02 / DIST_SCALE, // km
             haloWidth: 0.05 / DIST_SCALE, // km
             damageInterval: 0.2,
@@ -155,7 +155,7 @@ export class OsirisMothership extends Spaceship {
                 ]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
-            shield: { hullMultiplier: 4, rechargeTime: 150 },
+            shield: { hullMultiplier: 4, rechargeTime: 180 },
             shipTypeId: 'osiris_mothership',
             role: ShipRole.Capital,
             thirdPersonOffset: THIRD_PERSON_OFFSET,

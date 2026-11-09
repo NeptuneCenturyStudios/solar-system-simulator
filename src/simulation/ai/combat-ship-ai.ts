@@ -5,8 +5,10 @@ import {
     AI_AIM_JITTER_ANGLE,
     AI_AIM_JITTER_PERIOD,
     AI_BURST_FIRE_TIME,
+    AI_CAPITAL_DEAD_BAND,
     AI_CAPITAL_MIN_STANDOFF,
     AI_CAPITAL_STANDOFF_FRACTION,
+    AI_FRIENDLY_BLOCK_RETARGET_SECS,
     AI_BURST_REST_TIME,
     AI_BURST_TIME_JITTER,
     AI_CLOSING_SPEED_TOLERANCE,
@@ -77,6 +79,8 @@ const _heading = new THREE.Vector3();
 const _targetFwd = new THREE.Vector3();
 const _side = new THREE.Vector3();
 const _toFriend = new THREE.Vector3();
+const _stationTo = new THREE.Vector3();
+const _stationRel = new THREE.Vector3();
 
 /**
  * Clearance around a friendly's hit sphere that a shot must pass outside of. Above 1 so a lead
@@ -220,6 +224,9 @@ export class CombatShipAI extends FollowShipAI {
     private jitterTargetPitch = 0;
     /** Seconds until the next re-roll. */
     private jitterTimer = 0;
+
+    /** Sim-seconds the shot has been continuously blocked by a teammate (see updateFriendlyBlock). */
+    private friendlyBlockTime = 0;
 
     /** Wall-clock seconds since the last weapon switch (see updateWeaponChoice). */
     private weaponDwell = AI_WEAPON_MIN_DWELL;
@@ -370,6 +377,31 @@ export class CombatShipAI extends FollowShipAI {
             return null;
         }
         return body;
+    }
+
+    /** Capitals keep a tighter window around their standoff, so it can't drift out to the edge
+     *  of their reach. */
+    protected override deadBand(): number {
+        return this.isCapital ? AI_CAPITAL_DEAD_BAND : super.deadBand();
+    }
+
+    /**
+     * On station, point the nose at the firing solution for the selected weapon rather than the
+     * target's centre, so a held standoff keeps a moving target inside the aim cone. Falls back
+     * to the direct bearing when there is no intercept.
+     */
+    protected override stationHeading(
+        target: Body,
+        direct: THREE.Vector3,
+        out: THREE.Vector3
+    ): THREE.Vector3 {
+        _stationTo.subVectors(target.mesh.position, this.ship.mesh.position);
+        _stationRel.subVectors(target.velocity, this.ship.velocity);
+        const t = interceptTime(_stationTo, _stationRel, this.activeMuzzleSpeed());
+        if (t < 0) return out.copy(direct);
+        out.copy(_stationTo).addScaledVector(_stationRel, t);
+        if (out.lengthSq() < INTERCEPT_EPSILON * INTERCEPT_EPSILON) return out.copy(direct);
+        return out.normalize();
     }
 
     protected override getFlightTarget(): Body | null {
@@ -1023,6 +1055,7 @@ export class CombatShipAI extends FollowShipAI {
             super.update(dt, simDt);
             this.advanceTimers(simDt);
             this.debugGun = this.updateGunnery();
+            this.friendlyBlockTime = 0;
             return;
         }
 
@@ -1039,6 +1072,25 @@ export class CombatShipAI extends FollowShipAI {
         this.advanceTimers(simDt);
 
         this.debugGun = this.updateGunnery();
+        this.updateFriendlyBlock(flightTarget, simDt);
+    }
+
+    /**
+     * Give up on a target a teammate keeps screening. A ship holding station (a capital, above
+     * all) doesn't move, so a teammate parked in its line of fire would otherwise hold its
+     * trigger for good. After AI_FRIENDLY_BLOCK_RETARGET_SECS of continuous blocking, pick again,
+     * skipping this target for that pick.
+     */
+    private updateFriendlyBlock(target: Spaceship | null, simDt: number): void {
+        if (this.debugGun !== 'friendly in line' || !target) {
+            this.friendlyBlockTime = 0;
+            return;
+        }
+        this.friendlyBlockTime += simDt;
+        if (this.friendlyBlockTime >= AI_FRIENDLY_BLOCK_RETARGET_SECS) {
+            this.friendlyBlockTime = 0;
+            this.targetSelector.invalidate(target);
+        }
     }
 
     /**

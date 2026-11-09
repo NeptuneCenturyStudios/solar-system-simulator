@@ -1740,6 +1740,13 @@ export const NPC_COMBAT_FOLLOW_DISTANCE = 0.5 / DIST_SCALE;
  *  dogfight; they stand off and trade fire. Kept low enough that the far edge of the follow
  *  dead band (× 1 + NPC_FOLLOW_DEAD_BAND) is still inside that reach. */
 export const AI_CAPITAL_STANDOFF_FRACTION = 0.6;
+/** Half-width of a capital ship's slack zone around its standoff, as a fraction of it (the
+ *  NPC_FOLLOW_DEAD_BAND equivalent). Tighter than the default so a multi-km standoff doesn't
+ *  leave a window of kilometres in which the ship parks wherever it happens to stop. */
+export const AI_CAPITAL_DEAD_BAND = 0.1;
+/** Sim-seconds a combat AI's shot may stay blocked by a teammate before it picks a different
+ *  target. Ships on station don't move, so without this a screened shot is held forever. */
+export const AI_FRIENDLY_BLOCK_RETARGET_SECS = 4;
 /** Floor (sim units, hull to hull) on a capital ship's standoff distance: 2 km, so a capital
  *  armed only with short-range weapons still keeps well clear of the other hull. */
 export const AI_CAPITAL_MIN_STANDOFF = 2 / DIST_SCALE;

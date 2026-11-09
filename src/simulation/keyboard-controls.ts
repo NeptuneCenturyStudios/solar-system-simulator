@@ -43,6 +43,12 @@ export interface KeyboardControlsContext {
     /** Multiply the simulation time scale by `factor` (same action as the speed buttons). */
     stepTimeScale: (factor: number) => void;
     dispatchSimStateChange: () => void;
+    /** Open the Launch Control (startup) modal with Cancel enabled. */
+    openLaunchControl: () => void;
+    /** Spawn a player ship, or enter flight aboard the existing one. */
+    spawnOrEnterShip: () => void;
+    /** True while the surface camera is active. */
+    surfaceCameraActive: () => boolean;
 }
 
 interface KeyBinding {
@@ -400,8 +406,28 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         },
     });
 
+    // Esc: in flight, exit flight mode; otherwise open Launch Control. Left alone while a gizmo
+    // drag is in progress or the surface camera is active.
     bindings.set('escape', {
-        onDown: pressOnce(inFlight, () => exitFlightMode(ctx.flightCtx)),
+        onDown: pressOnce(
+            () =>
+                flightState.isActive ||
+                (!isVelocityEditing() &&
+                    !interactionState.isRepositioning &&
+                    !ctx.surfaceCameraActive()),
+            () => {
+                if (flightState.isActive) exitFlightMode(ctx.flightCtx);
+                else ctx.openLaunchControl();
+            }
+        ),
+    });
+
+    // F: spawn a ship, or enter the existing player ship. Does nothing while in flight.
+    bindings.set('f', {
+        onDown: pressOnce(
+            (e) => !flightState.isActive && !e.ctrlKey && !e.metaKey && !e.altKey,
+            ctx.spawnOrEnterShip
+        ),
     });
 
     // N: show/hide the body name panels. Persisted like the System Explorer checkbox that

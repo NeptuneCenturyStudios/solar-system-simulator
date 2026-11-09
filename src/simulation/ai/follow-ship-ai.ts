@@ -288,6 +288,30 @@ export class FollowShipAI extends ShipAI {
         steerToward(this.ship, heading);
     }
 
+    /**
+     * Half-width of the slack zone around the hold distance, as a fraction of it. Overridable so
+     * a ship holding a far-off station can keep a tighter window (see CombatShipAI).
+     */
+    protected deadBand(): number {
+        return NPC_FOLLOW_DEAD_BAND;
+    }
+
+    /**
+     * Heading to point the nose along while on station, written into `out`. Defaults to the
+     * direct bearing to the target; a combat ship points at its firing solution instead.
+     *
+     * @param target The flight target.
+     * @param direct Unit bearing from this ship to the target's centre.
+     */
+    protected stationHeading(
+        target: Body,
+        direct: THREE.Vector3,
+        out: THREE.Vector3
+    ): THREE.Vector3 {
+        void target;
+        return out.copy(direct);
+    }
+
     override debugLines(): string[] {
         return [
             `${this.name} · ${this.debugPhase}`,
@@ -369,20 +393,15 @@ export class FollowShipAI extends ShipAI {
         applyFriendlySeparation(ship, _dir);
         const avoid = this.avoidance.evaluate(_dir, simDt, ignore);
         _dir.copy(avoid.heading);
-
-        this.steerToward(_dir);
         input.fire = false;
-
-        // ── Throttle ─────────────────────────────────────────────────────────
-        // Only thrust while roughly nose-on. Off-axis, the ship just turns —
-        // otherwise it would accelerate sideways while still coming around.
         _forward.set(0, 0, 1).applyQuaternion(ship.controlFrameQuat);
-        const aligned = _forward.dot(_dir) > Math.cos(AI_THRUST_ALIGN_ANGLE);
 
         // About to hit something. Station-keeping is no longer the question: _dir already points
         // clear of the hazard, so get on that heading and run. Braking alone wouldn't do it —
         // a ship shedding speed inside a gravity well is still falling into it.
         if (avoid.flee) {
+            this.steerToward(_dir);
+            const aligned = _forward.dot(_dir) > Math.cos(AI_THRUST_ALIGN_ANGLE);
             this.debugPhase = 'FLEE';
             input.thrust = aligned;
             input.boost = aligned;
@@ -405,15 +424,27 @@ export class FollowShipAI extends ShipAI {
         // the slack zone's far edge sits just inside the handoff range — the proportional
         // approach only creeps up on that edge, and would otherwise stall outside the handoff
         // and never hand off.
+        const deadBand = this.deadBand();
         const standoff = ship.highSpeedMode
-            ? Math.max(
-                  this.followDistance,
-                  this.highSpeedHandoffRange() / (1 + 2 * NPC_FOLLOW_DEAD_BAND)
-              )
+            ? Math.max(this.followDistance, this.highSpeedHandoffRange() / (1 + 2 * deadBand))
             : this.followDistance;
-        const slack = standoff * NPC_FOLLOW_DEAD_BAND;
+        const slack = standoff * deadBand;
         const rawGap = range - standoff; // positive = too far away
         const gap = rawGap > slack ? rawGap - slack : rawGap < -slack ? rawGap + slack : 0;
+
+        // ── Steering ─────────────────────────────────────────────────────────
+        // On station with nothing in the way, point the nose at the target (or wherever
+        // stationHeading says) rather than along the separation-bent heading. Separation only
+        // acts through movement, and a ship on station is coasting — so bending the nose there
+        // gains nothing and, for a combat ship, holds the target outside its aim cone forever.
+        const onStation = gap === 0 && avoid.hazard === null;
+        if (onStation) this.stationHeading(target, _directDir, _dir);
+        this.steerToward(_dir);
+
+        // ── Throttle ─────────────────────────────────────────────────────────
+        // Only thrust while roughly nose-on. Off-axis, the ship just turns —
+        // otherwise it would accelerate sideways while still coming around.
+        const aligned = _forward.dot(_dir) > Math.cos(AI_THRUST_ALIGN_ANGLE);
 
         // ── Warp ─────────────────────────────────────────────────────────────
         // Held as a level, exactly like the player holding Space through the charge:
@@ -436,9 +467,13 @@ export class FollowShipAI extends ShipAI {
 
         this.debugPhase = ship.warpCharging
             ? 'WARP CHARGE'
-            : aligned
-              ? 'APPROACH'
-              : 'APPROACH · TURNING';
+            : onStation
+              ? aligned
+                  ? 'STATION'
+                  : 'STATION · TURNING'
+              : aligned
+                ? 'APPROACH'
+                : 'APPROACH · TURNING';
         this.debugClosing = closing;
         this.debugDesiredClosing = desiredClosing;
 

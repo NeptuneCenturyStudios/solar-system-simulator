@@ -165,7 +165,7 @@ export class Dart extends Spaceship {
                 new WeaponGroup([new MissileWeapon(scene, SPACESHIP_RADIUS)]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
-            shield: { hullMultiplier: 2, rechargeTime: 30 },
+            shield: { hullMultiplier: 1, rechargeTime: 90 },
             shipTypeId: 'dart',
             role: ShipRole.Fighter,
             thirdPersonOffset: THIRD_PERSON_OFFSET,

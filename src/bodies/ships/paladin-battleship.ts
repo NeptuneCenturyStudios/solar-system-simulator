@@ -28,7 +28,7 @@ export class PaladinBattleship extends Spaceship {
         const SPACESHIP_RADIUS = 400 / 1000 / RADIUS_SCALE;
         // Hull HP set explicitly — the ship's real-world mass scaled by MASS_SCALE
         // (calibrated for planetary bodies) would otherwise yield a near-zero HP pool.
-        const SPACESHIP_HEALTH_POINTS = 400;
+        const SPACESHIP_HEALTH_POINTS = 250;
 
         // Camera placement (ship-local space; +Z = forward, +Y = up).
         const THIRD_PERSON_OFFSET = new THREE.Vector3(
@@ -155,7 +155,7 @@ export class PaladinBattleship extends Spaceship {
                 ]),
             ],
             healthPoints: SPACESHIP_HEALTH_POINTS,
-            shield: { hullMultiplier: 4, rechargeTime: 150 },
+            shield: { hullMultiplier: 4, rechargeTime: 180 },
             shipTypeId: 'paladin_battleship',
             role: ShipRole.Capital,
             thirdPersonOffset: THIRD_PERSON_OFFSET,
