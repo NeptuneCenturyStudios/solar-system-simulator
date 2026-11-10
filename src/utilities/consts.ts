@@ -582,8 +582,39 @@ export const HYGIEA_MEAN_ANOMALY_J2000 = 339.214814; // degrees
 // == Asteroids: Axial Tilt ===
 export const CERES_AXIS = 4.0;
 
+// Pallas' spin pole sits at ecliptic (λ, β) = (30°, -16°) ± 5° (Carry et al. 2010, Icarus 205,
+// 460), which is an obliquity of ~84° to Pallas' own orbital plane. The tilt below is 90° - β,
+// matching how the planetary entries are derived: setRotation tilts a body against the +Y axis,
+// and Pallas' orbit is itself inclined 34.85°, so 106° is the value that reproduces the published
+// pole - the 84° headline figure would point the axis 22° away from it. The azimuth uses the same
+// λ_pole + 90° mapping documented in the rotation azimuth block above.
+export const PALLAS_AXIS = 106;
+export const PALLAS_AZIMUTH = 120;
+
+// Hygiea's pole points south of the ecliptic: Vernazza et al. 2019 (Nature Astronomy 4, 136) give
+// RA 319, Dec -46, which converts to ecliptic longitude 306.6, latitude -28.6 (published as 306,
+// -29). That is an obliquity of ~120 - a genuinely retrograde spinner whose axis really does lean
+// more than 90 degrees from the ecliptic normal, so an AXIS above 90 is correct, not a sign slip.
+export const HYGIEA_AXIS = 118.6;
+export const HYGIEA_AZIMUTH = 36.6;
+
+// Vesta's pole is the IAU/Dawn solution: RA 309.031, Dec +42.235 (IAU WGCCRE 2013, the "Claudia
+// Double-Prime" system; Dawn's gravity solution agrees to 0.01 deg). Converted to ecliptic that is
+// longitude 330.8, latitude 57.7, giving an obliquity of 27.5 deg to Vesta's orbit - which matches
+// the published 27.46 deg, so the conversion and the mapping below are cross-checked against an
+// independent number rather than just internally consistent.
+export const VESTA_AXIS = 32.3;
+export const VESTA_AZIMUTH = 60.8;
+
 // === Asteroids: Orbital Period ===
 export const CERES_ORBITAL_PERIOD_REAL = 1682.0 * 24 * 3600; // ~4.607 Earth years in seconds
+// Pallas: 4.62 Julian years (1,686.044 days). Keys its rotation speed to its orbit, exactly as
+// CERES_ORBITAL_PERIOD_REAL does, so the spin stays telescopically correct at any gravity setting.
+export const PALLAS_ORBITAL_PERIOD_REAL = 1686.044 * 24 * 3600;
+// Hygiea: 5.56 Julian years (2,031.01 days).
+export const HYGIEA_ORBITAL_PERIOD_REAL = 2031.01 * 24 * 3600;
+// Vesta: 3.63 Julian years (1,325.75 days).
+export const VESTA_ORBITAL_PERIOD_REAL = 1325.75 * 24 * 3600;
 
 // === Comet (Halley): Mass, Radius, Distance ===
 // Halley's Comet: 2.2e14 kg

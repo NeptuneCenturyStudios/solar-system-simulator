@@ -79,8 +79,21 @@ import {
     CHARON_RADIUS,
     VESTA_MASS,
     VESTA_RADIUS,
+    VESTA_DISTANCE,
+    VESTA_AXIS,
+    VESTA_AZIMUTH,
+    VESTA_ORBITAL_PERIOD_REAL,
     PALLAS_MASS,
     PALLAS_RADIUS,
+    PALLAS_DISTANCE,
+    PALLAS_AXIS,
+    PALLAS_AZIMUTH,
+    PALLAS_ORBITAL_PERIOD_REAL,
+    HYGIEA_DISTANCE,
+    HYGIEA_AXIS,
+    HYGIEA_AZIMUTH,
+    HYGIEA_ORBITAL_PERIOD_REAL,
+    calcSimOrbitalPeriod,
     HYGIEA_MASS,
     HYGIEA_RADIUS,
     MERCURY_PERIHELION_DIST,
@@ -385,6 +398,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             VESTA_ARG_PERIHELION,
             VESTA_MEAN_ANOMALY_J2000
         );
+        // Vesta spins in 5.3421276322 h about its IAU/Dawn pole (ecliptic longitude 330.8 deg,
+        // latitude 57.7 deg), an obliquity of 27.5 deg. Scaled through the real-to-sim orbital
+        // period ratio like every other real body, so the spin keeps the right number of turns
+        // per orbit at any gravity multiplier.
+        const vestaTimeScale =
+            VESTA_ORBITAL_PERIOD_REAL /
+            calcSimOrbitalPeriod(VESTA_DISTANCE, this.dependencies.getG(), SUN_MASS);
+        const vestaRotSpeed = ((2 * Math.PI) / (5.3421276322 * 3600)) * vestaTimeScale;
+
         const vesta = new Vesta(this.dependencies, this.scene, {
             radius: VESTA_RADIUS,
             pos: vestaOrbit.pos,
@@ -396,6 +418,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             trailColor: 0xc9b89a,
             maxTrail: 1500,
             orbitParent: sun,
+            rotation: { tilt: VESTA_AXIS, speed: vestaRotSpeed, azimuth: VESTA_AZIMUTH },
             attributes: {
                 coreType: { value: CoreTypeEnum.Metallic, discovered: true },
                 atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
@@ -429,6 +452,14 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             PALLAS_ARG_PERIHELION,
             PALLAS_MEAN_ANOMALY_J2000
         );
+        // Pallas spins in 7.8132214 h about its published pole (ecliptic longitude 30 deg,
+        // latitude -16 deg). Scaling through the real-to-sim orbital period ratio keeps the same
+        // number of turns per orbit at any gravity multiplier, as the Ceres and Mars classes do.
+        const pallasTimeScale =
+            PALLAS_ORBITAL_PERIOD_REAL /
+            calcSimOrbitalPeriod(PALLAS_DISTANCE, this.dependencies.getG(), SUN_MASS);
+        const pallasRotSpeed = ((2 * Math.PI) / (7.8132214 * 3600)) * pallasTimeScale;
+
         const pallas = new Asteroid(this.dependencies, this.scene, {
             radius: PALLAS_RADIUS,
             pos: pallasOrbit.pos,
@@ -440,6 +471,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             trailColor: 0x999999,
             maxTrail: 1500,
             orbitParent: sun,
+            rotation: { tilt: PALLAS_AXIS, speed: pallasRotSpeed, azimuth: PALLAS_AZIMUTH },
             attributes: {
                 coreType: { value: CoreTypeEnum.RubblePile, discovered: true },
                 atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
@@ -473,6 +505,15 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             HYGIEA_ARG_PERIHELION,
             HYGIEA_MEAN_ANOMALY_J2000
         );
+        // Hygiea spins in 13.828 h (Vernazza et al. 2019 measure 13.82559 h) about a pole 29 deg
+        // south of the ecliptic, so its spin is retrograde with respect to its orbit - published
+        // as an obliquity of ~120 deg. The rate stays positive: the body spins right-handed about
+        // the pole given, and that pole merely points below the ecliptic plane.
+        const hygieaTimeScale =
+            HYGIEA_ORBITAL_PERIOD_REAL /
+            calcSimOrbitalPeriod(HYGIEA_DISTANCE, this.dependencies.getG(), SUN_MASS);
+        const hygieaRotSpeed = ((2 * Math.PI) / (13.828 * 3600)) * hygieaTimeScale;
+
         const hygiea = new AsteroidPocked(this.dependencies, this.scene, {
             radius: HYGIEA_RADIUS,
             pos: hygieaOrbit.pos,
@@ -484,6 +525,7 @@ export class NormalSolarSystemGenerator extends SolarSystemGenerator {
             trailColor: 0x888888,
             maxTrail: 1500,
             orbitParent: sun,
+            rotation: { tilt: HYGIEA_AXIS, speed: hygieaRotSpeed, azimuth: HYGIEA_AZIMUTH },
             attributes: {
                 coreType: { value: CoreTypeEnum.RubblePile, discovered: true },
                 atmosphericComposition: { value: AtmosphericGasEnum.None, discovered: true },
