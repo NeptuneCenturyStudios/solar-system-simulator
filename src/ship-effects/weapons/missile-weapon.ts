@@ -12,6 +12,7 @@ import {
 } from './weapon';
 import { MissileSmoke } from './missile-smoke';
 import { DIST_SCALE, RADIUS_SCALE } from '../../utilities/consts';
+import { GLOW_SPRITE_FRAGMENT } from './glow-sprite-glsl';
 
 /**
  * Per-instance tuning for MissileWeapon.  Ships may pass a partial config to
@@ -255,14 +256,7 @@ export class MissileWeapon extends Weapon {
         this.exhaustMaterial.onBeforeCompile = (shader) => {
             shader.fragmentShader = shader.fragmentShader.replace(
                 'outgoingLight = diffuseColor.rgb;',
-                `outgoingLight = diffuseColor.rgb;
-                float _d  = length(gl_PointCoord - vec2(0.5));
-                if (_d > 0.5) discard;
-                float _r    = _d * 2.0;
-                float _glow = pow(1.0 - _r, 1.5);
-                outgoingLight = mix(outgoingLight, vec3(1.0),
-                                    pow(max(0.0, 1.0 - _r * 1.5), 2.5));
-                diffuseColor.a *= _glow;`
+                GLOW_SPRITE_FRAGMENT
             );
         };
 

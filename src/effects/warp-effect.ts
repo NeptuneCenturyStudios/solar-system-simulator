@@ -82,6 +82,17 @@ const POINT_OPACITY_GAIN = 1.5;
 // Cached unit vector — avoids allocating a new Vector3 every frame.
 const _FWD = new THREE.Vector3(0, 0, 1);
 const _dir = new THREE.Vector3();
+/** Scratch for decoding the authored (sRGB) streak colours to linear. */
+const _color = new THREE.Color();
+
+/**
+ * The opacities were tuned as display brightness (additive over black space). In the linear
+ * scene an additive layer at opacity `a` shows at roughly `a ^ (1/2.2)` after the output
+ * encode, so the authored value is decoded to keep faint dust and streaks as faint as designed.
+ */
+function displayOpacityToLinear(opacity: number): number {
+    return Math.pow(THREE.MathUtils.clamp(opacity, 0, 1), 2.2);
+}
 
 /**
  * Fixed, flight-mode-independent speed anchors (u/s) for the warp effect. They must not
@@ -331,16 +342,21 @@ export class WarpEffect {
 
             const [r3, g3, b3] = this.hslToRgb(this.hue[i], 1.0, 0.75);
 
+            // The colours are authored as display (sRGB) values; the scene is linear light,
+            // so each is decoded. Done per tip, after dimming, so the faint trailing end stays
+            // as dark as it was designed to look instead of being lifted by the output encode.
             // Leading tip: full brightness.
-            this.colors[i * 6] = r3;
-            this.colors[i * 6 + 1] = g3;
-            this.colors[i * 6 + 2] = b3;
+            _color.setRGB(r3, g3, b3, THREE.SRGBColorSpace);
+            this.colors[i * 6] = _color.r;
+            this.colors[i * 6 + 1] = _color.g;
+            this.colors[i * 6 + 2] = _color.b;
 
             // Trailing tip: nearly dark (fades into the tunnel ahead).
             const dimBrt = 0.06;
-            this.colors[i * 6 + 3] = r3 * dimBrt;
-            this.colors[i * 6 + 4] = g3 * dimBrt;
-            this.colors[i * 6 + 5] = b3 * dimBrt;
+            _color.setRGB(r3 * dimBrt, g3 * dimBrt, b3 * dimBrt, THREE.SRGBColorSpace);
+            this.colors[i * 6 + 3] = _color.r;
+            this.colors[i * 6 + 4] = _color.g;
+            this.colors[i * 6 + 5] = _color.b;
         }
 
         this.geo.attributes.position.needsUpdate = true;
@@ -490,8 +506,10 @@ export class WarpEffect {
             STREAK_FADE_START,
             STREAK_FADE_END
         );
-        this.mat.opacity = final * streakMix;
-        this.pointsMat.opacity = Math.min(1, final * (1 - streakMix) * POINT_OPACITY_GAIN);
+        this.mat.opacity = displayOpacityToLinear(final * streakMix);
+        this.pointsMat.opacity = displayOpacityToLinear(
+            final * (1 - streakMix) * POINT_OPACITY_GAIN
+        );
         this.lines.visible = final > 0.005;
     }
 

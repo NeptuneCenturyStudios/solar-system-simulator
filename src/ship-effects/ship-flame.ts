@@ -3,6 +3,22 @@ import { IShipEffect } from './ship-effect-base';
 import { settingsStore } from '../settings/settings-store.js';
 
 /**
+ * The flame's particle colours, gradient falloff and thrust opacity were tuned by eye on the
+ * pre-HDR output, which showed each value directly on screen. The scene is now linear light
+ * with an sRGB output encode, which lifted every faint particle edge into a broad glowing cone.
+ * Each particle's finished colour and alpha are therefore decoded (≈ power 2.2) so a single
+ * particle looks as tuned; dense stacks near the nozzle add past 1 and roll off in the tone
+ * curve instead of clipping.
+ */
+function decodeDisplayTunedPoints(shader: THREE.WebGLProgramParametersWithUniforms): void {
+    shader.fragmentShader = shader.fragmentShader.replace(
+        'outgoingLight = diffuseColor.rgb;',
+        `outgoingLight = pow( max( diffuseColor.rgb, vec3( 0.0 ) ), vec3( 2.2 ) );
+        diffuseColor.a = pow( clamp( diffuseColor.a, 0.0, 1.0 ), 2.2 );`
+    );
+}
+
+/**
  * Renders a glowing engine-exhaust trail modelled after the comet tail system.
  *
  * Architecture:
@@ -119,6 +135,8 @@ export class ShipFlame implements IShipEffect {
             alphaTest: 0.001,
         });
 
+        this.innerMat.onBeforeCompile = decodeDisplayTunedPoints;
+
         this.glowInner = new THREE.Points(this.innerGeo, this.innerMat);
         this.glowInner.frustumCulled = false;
         this.glowInner.renderOrder = 2;
@@ -142,6 +160,8 @@ export class ShipFlame implements IShipEffect {
             map: flameTex,
             alphaTest: 0.001,
         });
+
+        this.outerMat.onBeforeCompile = decodeDisplayTunedPoints;
 
         this.glowOuter = new THREE.Points(this.outerGeo, this.outerMat);
         this.glowOuter.frustumCulled = false;
@@ -205,7 +225,7 @@ export class ShipFlame implements IShipEffect {
 
         const absDt = Math.abs(dt);
         // Flame brightness depends only on thrust state: 50% normal thrust, 100% boost.
-        const thrustLevel = boosting ? 0.1 : 0.05;
+        const thrustLevel = boosting ? 0.3 : 0.2;
 
         // ── 1. Age live particles (sim-time based, comet pattern) ─────────────
         for (let i = 0; i < this.MAX_PARTICLES; i++) {

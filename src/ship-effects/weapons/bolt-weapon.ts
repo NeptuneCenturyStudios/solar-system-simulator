@@ -4,6 +4,7 @@ import { IDamageEffectiveness } from '../../interfaces';
 import { SoundEffect, playSoundEffectAt } from '../../utilities/audio.js';
 import { IWeaponOwner, IWeaponSound, Weapon } from './weapon';
 import { DIST_SCALE, RADIUS_SCALE } from '../../utilities/consts';
+import { GLOW_SPRITE_FRAGMENT } from './glow-sprite-glsl';
 
 /**
  * Per-instance tuning for BoltWeapon.  Ships may pass a partial config to
@@ -94,7 +95,7 @@ export class BoltWeapon extends Weapon {
             fireRate: 10,
             maxProjectiles: 800,
             damage: 1,
-            shieldEffectiveness: 0.80,
+            shieldEffectiveness: 0.8,
             hullEffectiveness: 0.75,
             heatPerSecond: 0.1,
             coolPerSecond: 0.8,
@@ -134,25 +135,11 @@ export class BoltWeapon extends Weapon {
             depthWrite: false,
         });
 
-        // Round, glowing point sprite via fragment shader injection.
-        // Replaces the square default sprite with a soft radial falloff:
-        //   - Outer ring  : fully transparent (circular clip)
-        //   - Mid falloff : bolt colour fading out (glow halo)
-        //   - Bright core : blends toward white for a hot-centre "plasma" look
+        // Round, glowing point sprite with a white-hot core (see GLOW_SPRITE_FRAGMENT).
         this.headMaterial.onBeforeCompile = (shader) => {
             shader.fragmentShader = shader.fragmentShader.replace(
                 'outgoingLight = diffuseColor.rgb;',
-                `outgoingLight = diffuseColor.rgb;
-
-                // Circular clip + radial glow
-                float _d  = length(gl_PointCoord - vec2(0.5));
-                if (_d > 0.5) discard;
-                float _r    = _d * 2.0;                              // 0 = centre, 1 = edge
-                float _glow = pow(1.0 - _r, 1.5);                   // smooth alpha falloff
-                // Brighten core toward white for a hot-plasma look
-                outgoingLight = mix(outgoingLight, vec3(1.0),
-                                    pow(max(0.0, 1.0 - _r * 1.5), 2.5));
-                diffuseColor.a *= _glow;`
+                GLOW_SPRITE_FRAGMENT
             );
         };
 

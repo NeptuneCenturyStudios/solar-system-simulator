@@ -11,6 +11,7 @@ import {
 } from './beam-line-material';
 import { BeamWeaponBase, IBeamWeaponConfig } from './beam-weapon-base';
 import { LIGHTNING_SEGMENTS, LightningShape } from './lightning-path';
+import { GLOW_SPRITE_FRAGMENT } from './glow-sprite-glsl';
 
 /**
  * An alien energy arc: a straight, hitscan beam like the laser, drawn instead as a procedural
@@ -334,14 +335,7 @@ export class LightningWeapon extends BeamWeaponBase {
         material.onBeforeCompile = (shader) => {
             shader.fragmentShader = shader.fragmentShader.replace(
                 'outgoingLight = diffuseColor.rgb;',
-                `outgoingLight = diffuseColor.rgb;
-                float _d  = length(gl_PointCoord - vec2(0.5));
-                if (_d > 0.5) discard;
-                float _r    = _d * 2.0;
-                float _glow = pow(1.0 - _r, 1.5);
-                outgoingLight = mix(outgoingLight, vec3(1.0),
-                                    pow(max(0.0, 1.0 - _r * 1.5), 2.5));
-                diffuseColor.a *= _glow;`
+                GLOW_SPRITE_FRAGMENT
             );
         };
         return material;

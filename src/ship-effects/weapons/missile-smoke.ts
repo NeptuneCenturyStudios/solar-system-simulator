@@ -210,7 +210,11 @@ export class MissileSmoke {
                 float _n = smokeFbm( vQuad * 3.5 + vSeedAge.x * vec2( 17.3, 41.7 ) + vSeedAge.y * 0.8 );
                 float _density = 1.0 - smoothstep( 0.0, 1.0, _r + ( _n - 0.5 ) * 0.8 );
                 diffuseColor.rgb = mix( diffuseColor.rgb * mix( 0.7, 1.15, _n ), uHotColor, vHeat );
-                diffuseColor.a *= _density * _density * vAlpha;`
+                diffuseColor.a *= _density * _density * vAlpha;
+                // Colour and opacity were tuned by eye on the pre-HDR output (value shown
+                // directly); decoded to linear so the smoke looks as tuned against dark space.
+                diffuseColor.rgb = pow( max( diffuseColor.rgb, vec3( 0.0 ) ), vec3( 2.2 ) );
+                diffuseColor.a = pow( clamp( diffuseColor.a, 0.0, 1.0 ), 2.2 );`
             );
         };
 

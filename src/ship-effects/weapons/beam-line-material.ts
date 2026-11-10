@@ -97,13 +97,21 @@ export class BeamLineMaterial extends LineMaterial {
 
         this.fragmentShader = patch(
             patch(
-                this.fragmentShader,
-                'uniform float linewidth;',
-                `uniform float linewidth;
+                patch(
+                    this.fragmentShader,
+                    'uniform float linewidth;',
+                    `uniform float linewidth;
                 varying float vWidthFade;`
+                ),
+                'float alpha = opacity;',
+                'float alpha = opacity * vWidthFade;'
             ),
-            'float alpha = opacity;',
-            'float alpha = opacity * vWidthFade;'
+            // Beam colours and opacities were tuned by eye on the pre-HDR output, which showed
+            // the value directly. The scene is now linear light with an sRGB output encode, so
+            // the finished colour and alpha are decoded (≈ power 2.2) to look as tuned.
+            'gl_FragColor = vec4( diffuseColor.rgb, alpha );',
+            `gl_FragColor = vec4( pow( max( diffuseColor.rgb, vec3( 0.0 ) ), vec3( 2.2 ) ),
+                    pow( clamp( alpha, 0.0, 1.0 ), 2.2 ) );`
         );
     }
 
