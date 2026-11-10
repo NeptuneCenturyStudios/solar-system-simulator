@@ -696,6 +696,9 @@ export const SHIP_SHADOW_TILE_HALF_WIDTH = 0.6;
 /** Render layer the ship hulls are put on so the shadow pass draws only them. */
 export const SHADOW_CASTER_LAYER = 5;
 
+/** How far beyond the hull of a landed ship the player rig is set down when stepping out (E). */
+export const DISEMBARK_DISTANCE = 0.01 / DIST_SCALE; // 10 m
+
 // === Surface precision patch (effects/surface-precision-patch.ts) ===
 /**
  * Camera altitude (sim units) above a body's drawn surface below which the ground under the

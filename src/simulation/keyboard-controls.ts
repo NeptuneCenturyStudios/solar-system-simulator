@@ -49,6 +49,8 @@ export interface KeyboardControlsContext {
     spawnOrEnterShip: () => void;
     /** True while the surface camera is active. */
     surfaceCameraActive: () => boolean;
+    /** Leave the landed player ship on foot (surface camera beside it). */
+    disembarkShip: () => void;
 }
 
 interface KeyBinding {
@@ -339,10 +341,15 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         ),
     });
 
-    // E: flight-only — hold to charge autopilot toward the hovered target.
+    // E: flight-only — while landed, step out onto the surface; otherwise land / hold to charge
+    // autopilot toward the hovered target.
     bindings.set('e', {
-        onDown: () => {
+        onDown: (e) => {
             if (!flightState.isActive) return false;
+            if (flightState.activeShip?.isGrounded) {
+                if (!e.repeat) ctx.disembarkShip();
+                return true;
+            }
             keys.e = true;
             return true;
         },

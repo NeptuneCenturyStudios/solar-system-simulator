@@ -86,6 +86,10 @@ export const HELP_SECTIONS: HelpSection[] = [
             { action: 'Lock / cycle threat target', keys: ['Tab', 'Shift+Tab'] },
             { action: 'Chase locked target (needs Chase Mode)', keys: ['Hold S'] },
             {
+                action: 'Step out onto the surface (while landed)',
+                keys: ['E'],
+            },
+            {
                 action: 'Land on the surface below (within 10 km; press again to abort)',
                 keys: ['E'],
             },

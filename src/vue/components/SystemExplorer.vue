@@ -16,6 +16,7 @@
                 class="old-ui btn-icon-only"
                 :class="{ active: simStore.isLookAtMode }"
                 :title="simStore.isLookAtMode ? 'Look At (On)' : 'Look At (Off)'"
+                :disabled="simStore.surfaceActive"
                 @click="toggleLookAtMode()"
             >
                 <svg-icon
@@ -27,6 +28,7 @@
                 class="old-ui btn-icon-only"
                 :class="{ active: simStore.isFreeCameraMode }"
                 :title="simStore.isFreeCameraMode ? 'Free Camera (On)' : 'Free Camera (Off)'"
+                :disabled="simStore.surfaceActive"
                 @click="toggleFreeCameraMode()"
             >
                 <svg-icon

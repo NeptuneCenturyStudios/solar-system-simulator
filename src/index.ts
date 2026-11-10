@@ -93,6 +93,7 @@ import {
     SMOOTH_ZOOM_FREE_CAM_STOP_MULT,
     AU,
     WORLD_AMBIENT_INTENSITY,
+    DISEMBARK_DISTANCE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -1775,6 +1776,10 @@ function createNewBody(
  * Resets the simulation state and notifies the UI of the reset.
  */
 function cleanUpSolarSystem() {
+    // Leave surface mode before the bodies are torn down, so their deaths below don't send the
+    // camera to Look At on the old system's death site.
+    if (surfaceCam.isActive) surfaceCam.exit();
+
     // Stop the running scenario first, so it never reacts to (or spawns into) a system
     // that is being torn down.
     scenarioManager.stop();
@@ -2949,6 +2954,11 @@ function onMouseUp(event: MouseEvent) {
 
 function calcFitDistanceForBody(body: Body | null) {
     const radius = body && !body._isDisposed && body.mesh ? Math.max(1e-6, body.radius || 1) : 1;
+    return calcFitDistanceForRadius(radius);
+}
+
+/** Camera distance that frames a sphere of `radius` (sim units) in the vertical FOV. */
+function calcFitDistanceForRadius(radius: number) {
     // Fit a sphere of size `radius` inside the camera's vertical FOV, with margin.
     const fovRad = THREE.MathUtils.degToRad(camera.fov || 60);
     const margin = 1.6;
@@ -3048,6 +3058,13 @@ registerVueSimHooks({
         dispatchSimStateChange();
     },
     selectBody: (body: Body) => {
+        // Picking a different body while standing on one leaves surface mode for Look At on
+        // the pick. Re-picking the body underfoot keeps the surface view.
+        if (surfaceCam.isActive && body !== surfaceCam.state.body) {
+            exitSurfaceCameraToLookAt(body);
+            dispatchSimStateChange();
+            return;
+        }
         setFocusBody(body, { zoom: cameraState.isLookAtMode });
         dispatchSimStateChange();
     },
@@ -3064,17 +3081,20 @@ registerVueSimHooks({
         dispatchSimStateChange();
     },
     toggleLookAtMode: () => {
+        // The surface camera owns the view; its button is the way out (the UI disables this one).
+        if (surfaceCam.isActive) return;
         cameraState.isLookAtMode = !cameraState.isLookAtMode;
         if (cameraState.isLookAtMode) cameraState.isFreeCameraMode = false;
         dispatchSimStateChange();
     },
     toggleFreeCameraMode: () => {
+        if (surfaceCam.isActive) return;
         cameraState.isFreeCameraMode = !cameraState.isFreeCameraMode;
         if (cameraState.isFreeCameraMode) cameraState.isLookAtMode = false;
         dispatchSimStateChange();
     },
     toggleSurfaceCamera: () => {
-        if (surfaceCam.isActive) surfaceCam.exit();
+        if (surfaceCam.isActive) exitSurfaceCameraToLookAt();
         else surfaceCam.enter(selectedBody || manuallySelectedBody);
         dispatchSimStateChange();
     },
@@ -3478,6 +3498,18 @@ const surfaceCam = new SurfaceCameraManager(
         cameraState.isFreeCameraMode = false;
     }
 );
+
+/**
+ * Leaves surface mode for Look At on `target` (default: the body the camera stood on), zoomed out
+ * along the line from the target through the spot the camera was standing on.
+ */
+function exitSurfaceCameraToLookAt(target: Body | null = surfaceCam.state.body): void {
+    const body = target;
+    surfaceCam.exit();
+    cameraState.isFreeCameraMode = false;
+    cameraState.isLookAtMode = true;
+    setFocusBody(body, { zoom: true });
+}
 
 // Surface camera enablement is selection-driven, so register the state
 // snapshot with the Vue bridge now that `surfaceCam` exists. (The bridge's
@@ -4062,6 +4094,36 @@ function spawnShip(targetShip?: Spaceship) {
  * of the selected type when there is none. Spawning focuses the ship without entering flight,
  * same as the Spawn button, so a second press boards it.
  */
+/**
+ * Leaves the landed player ship on foot: exits flight mode and stands the surface camera on the
+ * ground off the ship's starboard side, DISEMBARK_DISTANCE beyond its hull, facing the ship.
+ */
+function disembarkShip(): void {
+    const ship = flightState.activeShip;
+    if (!ship || ship._isDisposed || !ship.isGrounded) return;
+    if (ship.launchPhase !== 'idle' || ship.landingPhase !== 'idle') return;
+    const ground = ship.groundBody;
+    if (!ground || !surfaceCam.isEligibleBody(ground)) return;
+
+    const shipPos = ship.mesh.position.clone();
+    const up = shipPos.clone().sub(ground.mesh.position).normalize();
+    // Ships fly along local +Z with +Y up, so starboard (right) is local −X.
+    const starboard = new THREE.Vector3(-1, 0, 0)
+        .applyQuaternion(ship.mesh.quaternion)
+        .projectOnPlane(up);
+    if (starboard.lengthSq() < 1e-20) starboard.set(1, 0, 0).projectOnPlane(up);
+    starboard.normalize();
+
+    const standPoint = shipPos.addScaledVector(
+        starboard,
+        ship.hullExtentAlong(starboard) + DISEMBARK_DISTANCE
+    );
+
+    exitFlightMode(flightCtx);
+    surfaceCam.enter(ground, { worldPoint: standPoint, faceToward: ship.mesh.position });
+    dispatchSimStateChange();
+}
+
 function spawnOrEnterShip() {
     if (!vueUiState.systemReady) return;
     const known = flightState.knownShip;
@@ -4078,6 +4140,10 @@ function enterFlightMode(ship: Spaceship) {
     // Never board behind a scenario outcome / player-down dialog: pointer lock would make its
     // buttons unclickable.
     if (scenarioOutcomeModalIsVisible()) return;
+
+    // Boarding from on foot (e.g. after stepping out with E): leave surface mode first, so its
+    // per-frame camera placement stops and the restored up vector is what gets snapshotted.
+    if (surfaceCam.isActive) surfaceCam.exit();
 
     // Snapshot camera / controls state so exit can restore it cleanly
     flightState.prevCameraPos.copy(camera.position);
@@ -4483,6 +4549,7 @@ installKeyboardControls({
     },
     spawnOrEnterShip,
     surfaceCameraActive: () => surfaceCam.isActive,
+    disembarkShip,
 });
 
 window.addEventListener('mousedown', onMouseDown);
@@ -4544,6 +4611,25 @@ window.addEventListener('resize', () => {
 
 function handleBodyBecameInvalid(body: Body | null | undefined) {
     if (!body) return;
+
+    if (surfaceCam.isActive && surfaceCam.state.body === body) {
+        // The ground under the surface camera is gone. Leave surface mode, pull back from the
+        // death site along the direction the camera stood, and make the body the Look At focus
+        // so the branch below freezes the orbit at its death position (drifting with the
+        // explosion).
+        const deathPos = body.mesh?.position ? body.mesh.position.clone() : controls.target.clone();
+        const outward = camera.position.clone().sub(deathPos);
+        if (outward.lengthSq() < 1e-12) outward.set(0, 0, 1).applyQuaternion(camera.quaternion);
+        outward.normalize();
+
+        surfaceCam.exit();
+        cameraState.isFreeCameraMode = false;
+        cameraState.isLookAtMode = true;
+        cameraState.focusBody = body;
+        camera.position
+            .copy(deathPos)
+            .addScaledVector(outward, calcFitDistanceForRadius(Math.max(1e-6, body.radius || 1)));
+    }
 
     const wasLookAtTarget = cameraState.focusBody === body;
 

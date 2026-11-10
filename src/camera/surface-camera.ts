@@ -6,6 +6,21 @@ import { isBodyType } from '../utilities/utilities';
 import { FlightHUD } from '../drawing/flight-hud';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { DIST_SCALE } from '../utilities/consts';
+import { surfaceReachFactor } from '../physics/body-surface';
+
+/**
+ * Bodies the player rig can never stand on: stellar remnants (stars themselves are excluded
+ * separately, and deferred), and craft or portals rather than ground.
+ */
+const SURFACE_CAM_EXCLUDED_TYPES =
+    BodyTypeEnum.WhiteDwarf |
+    BodyTypeEnum.BrownDwarf |
+    BodyTypeEnum.Pulsar |
+    BodyTypeEnum.BlackHole |
+    BodyTypeEnum.SpaceShip |
+    BodyTypeEnum.Probe |
+    BodyTypeEnum.Satellite |
+    BodyTypeEnum.Wormhole;
 
 export interface SurfaceCameraState {
     isActive: boolean;
@@ -15,10 +30,8 @@ export interface SurfaceCameraState {
     anchorLocalNorth: THREE.Vector3;
     yaw: number;
     pitch: number;
-    prevCameraPos: THREE.Vector3;
-    prevCameraQuat: THREE.Quaternion;
     prevCameraUp: THREE.Vector3;
-    prevControlsTarget: THREE.Vector3;
+    /** Height of the eye above the drawn (faceted) ground, in sim units. */
     eyeHeight: number;
     lookSensitivity: number;
 }
@@ -31,10 +44,7 @@ export class SurfaceCameraManager {
         anchorLocalNorth: new THREE.Vector3(0, 0, 1),
         yaw: 0,
         pitch: 0,
-        prevCameraPos: new THREE.Vector3(),
-        prevCameraQuat: new THREE.Quaternion(),
         prevCameraUp: new THREE.Vector3(0, 1, 0),
-        prevControlsTarget: new THREE.Vector3(),
         eyeHeight: 0.0019 / DIST_SCALE,
         lookSensitivity: 0.002,
     };
@@ -74,7 +84,8 @@ export class SurfaceCameraManager {
             return false;
         if (isBodyType(body, BodyTypeEnum.Star)) return false;
         if (body instanceof BlackHole) return false;
-        return (body.radius || 0) >= 1.0;
+        if ((body.bodyType & SURFACE_CAM_EXCLUDED_TYPES) !== 0) return false;
+        return (body.radius || 0) > 0;
     }
 
     updateButtonEnabled(): void {
@@ -82,13 +93,13 @@ export class SurfaceCameraManager {
         // which reads isEligibleBody via the sim bridge.
     }
 
+    /**
+     * Leaves surface mode. The camera is left where it stood (only its up vector is restored, so
+     * OrbitControls rotation works again); the caller decides what to frame next — see
+     * exitSurfaceCameraToLookAt in index.ts.
+     */
     exit(): void {
-        this.camera.position.copy(this.state.prevCameraPos);
-        this.camera.quaternion.copy(this.state.prevCameraQuat);
         this.camera.up.copy(this.state.prevCameraUp);
-
-        this.controls.target.copy(this.state.prevControlsTarget);
-        this.controls.update();
 
         this.state.isActive = false;
         this.state.body = null;
@@ -102,14 +113,21 @@ export class SurfaceCameraManager {
         this.flightHUD.forceHintRefresh();
     }
 
-    enter(body: Body | null): void {
+    /**
+     * Enters surface mode on `body`.
+     *
+     * @param options.worldPoint Stand on the ground under this world point (default: under the
+     *   camera).
+     * @param options.faceToward Start facing this world point (default: world-axis "north").
+     */
+    enter(
+        body: Body | null,
+        options: { worldPoint?: THREE.Vector3; faceToward?: THREE.Vector3 } = {}
+    ): void {
         if (!body) return;
         if (!this.isEligibleBody(body)) return;
 
-        this.state.prevCameraPos.copy(this.camera.position);
-        this.state.prevCameraQuat.copy(this.camera.quaternion);
         this.state.prevCameraUp.copy(this.camera.up);
-        this.state.prevControlsTarget.copy(this.controls.target);
 
         if (this.cameraState.isFreeCameraMode) {
             this.cameraState.isFreeCameraMode = false;
@@ -128,7 +146,7 @@ export class SurfaceCameraManager {
 
         const bodyCenter = body.mesh!.position.clone();
         const fromBodyToCam = new THREE.Vector3()
-            .subVectors(this.camera.position, bodyCenter)
+            .subVectors(options.worldPoint ?? this.camera.position, bodyCenter)
             .normalize();
         const surfaceNormalWorld = fromBodyToCam.clone().normalize();
         const invQ = body.mesh!.quaternion.clone().invert();
@@ -136,7 +154,7 @@ export class SurfaceCameraManager {
 
         // Pick the starting heading from world axes once, then store it in the body's frame so
         // the view stays fixed to the surface as the body spins and tilts.
-        const northWorld = this.initialNorth(surfaceNormalWorld);
+        const northWorld = this.initialHeading(surfaceNormalWorld, options.faceToward);
         this.state.anchorLocalNorth = northWorld.applyQuaternion(invQ).normalize();
 
         this.updateTransform();
@@ -144,8 +162,21 @@ export class SurfaceCameraManager {
         this.flightHUD.forceHintRefresh();
     }
 
-    /** World-space "north" at the given surface normal: world +Y (or +Z near the poles) projected onto the tangent plane. */
-    private initialNorth(surfaceNormal: THREE.Vector3): THREE.Vector3 {
+    /**
+     * Starting heading at the given surface normal: toward `faceToward` when given, otherwise
+     * world-space "north" (world +Y, or +Z near the poles); projected onto the tangent plane.
+     */
+    private initialHeading(
+        surfaceNormal: THREE.Vector3,
+        faceToward?: THREE.Vector3
+    ): THREE.Vector3 {
+        if (faceToward && this.state.body?.mesh) {
+            const standPoint = this.state.body.mesh.position
+                .clone()
+                .addScaledVector(surfaceNormal, this.state.body.radius);
+            const toward = faceToward.clone().sub(standPoint).projectOnPlane(surfaceNormal);
+            if (toward.lengthSq() > 1e-20) return toward.normalize();
+        }
         const north = new THREE.Vector3(0, 1, 0).projectOnPlane(surfaceNormal);
         if (north.lengthSq() < 1e-10) {
             north.set(0, 0, 1).projectOnPlane(surfaceNormal);
@@ -168,11 +199,15 @@ export class SurfaceCameraManager {
 
         const gravityUp = s.anchorLocalDir.clone().applyQuaternion(b.mesh!.quaternion).normalize();
 
-        const worldRadius = (b.radius || 0) * (b.mesh?.scale?.x || 1);
+        // Stand on the drawn ground under the anchor, not the true sphere: a UV sphere's flat
+        // facets sag inward between vertices (~8 km on Earth), and a model body (asteroid, comet
+        // nucleus) is an irregular rock inside its bounding radius.
+        const groundRadius =
+            (b.radius || 0) * (b.mesh?.scale?.x || 1) * surfaceReachFactor(b, gravityUp);
 
         const surfacePoint = center
             .clone()
-            .add(gravityUp.clone().multiplyScalar(worldRadius + s.eyeHeight));
+            .add(gravityUp.clone().multiplyScalar(groundRadius + s.eyeHeight));
 
         // Heading is carried in the body's frame like the anchor, so it never drifts against the
         // surface. Re-orthogonalize against gravityUp to absorb numeric drift.
