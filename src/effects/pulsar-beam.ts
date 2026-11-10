@@ -1,5 +1,6 @@
 ﻿import * as THREE from 'three';
 import { STAR_NOISE_GLSL } from './star-noise-glsl';
+import { PULSAR_BEAM_HDR_SCALE, STAR_HDR_GAMMA } from './star-tint';
 
 /** Beam half-width at the star, in pulsar radii. */
 const BEAM_BASE_WIDTH_RADII = 0.6;
@@ -93,7 +94,6 @@ export class PulsarBeam {
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            toneMapped: false,
         });
 
         material.onBeforeCompile = (shader) => {
@@ -202,13 +202,16 @@ export class PulsarBeam {
 
                     glow = max(glow * uPbIntensity * 0.55, 0.0);
 
-                    // Filmic roll-off so the end-on flash saturates to white, not a hard clip.
-                    vec3 beam = 1.0 - exp(-uPbColor * glow * 2.2);
+                    // Linear HDR: the glow profile (authored in display terms) raised to the
+                    // display-to-linear power, so the faint column looks as before after the sRGB
+                    // encode and the end-on flash goes far above 1; the output pass's tone curve
+                    // saturates it to white.
+                    vec3 beam = uPbColor * pow(glow * ${PULSAR_BEAM_HDR_SCALE.toFixed(3)}, ${STAR_HDR_GAMMA.toFixed(2)});
                     vec4 diffuseColor = vec4(beam, 1.0);
                     `
                 );
         };
-        material.customProgramCacheKey = () => 'pulsar-beam-v7';
+        material.customProgramCacheKey = () => 'pulsar-beam-v8';
 
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.name = 'PulsarBeam';

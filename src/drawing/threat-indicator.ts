@@ -40,6 +40,7 @@ function createRedRingTexture(): THREE.CanvasTexture {
     ctx.stroke();
 
     const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
     return tex;
 }

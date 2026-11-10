@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { STAR_NOISE_GLSL } from './star-noise-glsl';
 import type { StarSurfaceMaterial } from './star-surface-material';
+import { STAR_HALO_HDR_SCALE, STAR_HDR_GAMMA } from './star-tint';
 
 /** Halo shell radius as a multiple of the star's radius. The glow is ~0 well before this. */
 const HALO_SHELL_SCALE = 3.0;
@@ -65,7 +66,6 @@ export class StarHalo {
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            toneMapped: false,
         });
 
         // Star radius in the shell's own (unit-sphere) object space.
@@ -134,12 +134,18 @@ export class StarHalo {
                     // Fade to zero before the shell's own silhouette so its edge never shows.
                     glow *= 1.0 - smoothstep(${(HALO_SHELL_SCALE * 0.7).toFixed(2)}, ${HALO_SHELL_SCALE.toFixed(2)}, x);
 
-                    vec3 halo = (1.0 - exp(-uShTint * uShExposure * 1.1)) * glow * uShIntensity;
+                    // The halo's colour: the surface tint saturated per channel (fixed per star).
+                    // The glow profile was authored in display terms, so it is raised to the
+                    // display-to-linear power: faint tails look as before after the sRGB encode,
+                    // while the limb band can exceed 1 and roll off in the tone curve.
+                    vec3 haloColor = 1.0 - exp(-uShTint * uShExposure * 1.1);
+                    float haloLum = pow(max(glow * uShIntensity, 0.0), ${STAR_HDR_GAMMA.toFixed(2)});
+                    vec3 halo = haloColor * haloLum * ${STAR_HALO_HDR_SCALE.toFixed(3)};
                     vec4 diffuseColor = vec4(halo, 1.0);
                     `
                 );
         };
-        material.customProgramCacheKey = () => 'star-halo-v3';
+        material.customProgramCacheKey = () => 'star-halo-v4';
 
         this.mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), material);
         this.mesh.name = 'StarHalo';

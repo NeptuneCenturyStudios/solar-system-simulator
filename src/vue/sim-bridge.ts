@@ -23,6 +23,7 @@ import {
     AutopilotMode,
     AutopilotOrbitMode,
     clampAutopilotOrbitDistanceM,
+    clampExposure,
     clampRenderDistanceAU,
     clampRenderScale,
     CloudQuality,
@@ -32,6 +33,7 @@ import {
     SettingKey,
     settingsStore,
     TextureQuality,
+    type ToneMappingMode,
 } from '../settings/settings-store';
 import { GRAPHICS_PRESETS, type GraphicsPreset } from '../settings/graphics-presets';
 import type { PlaylistEntry } from '../utilities/playlist';
@@ -419,6 +421,14 @@ export interface VueSimStore {
     renderDistanceAU: number;
     /** Fraction of the window resolution the 3D scene is drawn at. */
     renderScale: number;
+    /** Capture the scene in half-float HDR (ignored when hdrSupported is false). */
+    hdrEnabled: boolean;
+    /** Whether the GPU can render to half-float targets. Set once by index.ts at startup. */
+    hdrSupported: boolean;
+    /** Tone-mapping curve for the final image. */
+    toneMapping: ToneMappingMode;
+    /** Exposure multiplier applied before tone mapping. */
+    exposure: number;
     /** Hide the PanelManager while in flight mode, restoring it on exit. */
     hidePanelManagerInFlight: boolean;
     /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
@@ -500,6 +510,10 @@ const state = reactive<VueSimStore>({
     smoothZoomEnabled: settingsStore.settings.smoothZoomEnabled,
     renderDistanceAU: settingsStore.settings.renderDistanceAU,
     renderScale: settingsStore.settings.renderScale,
+    hdrEnabled: settingsStore.settings.hdrEnabled,
+    hdrSupported: true,
+    toneMapping: settingsStore.settings.toneMapping,
+    exposure: settingsStore.settings.exposure,
     hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
     chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
     coastDriftAlignEnabled: settingsStore.settings.coastDriftAlignEnabled,
@@ -1126,6 +1140,33 @@ export function setRenderScale(scale: number): void {
 }
 
 /**
+ * Toggle HDR rendering (Options panel): half-float scene capture instead of 8-bit. Takes effect on
+ * the next frame; the render loop reads the setting every frame and rebuilds its targets.
+ */
+export function setHdrEnabled(checked: boolean): void {
+    settingsStore.update(SettingKey.HdrEnabled, checked);
+    state.hdrEnabled = checked;
+}
+
+/** Record whether the GPU supports HDR rendering (index.ts, once at startup). */
+export function setHdrSupported(supported: boolean): void {
+    state.hdrSupported = supported;
+}
+
+/** Set the tone-mapping curve (Options panel). Read by the render loop each frame. */
+export function setToneMapping(mode: ToneMappingMode): void {
+    settingsStore.update(SettingKey.ToneMapping, mode);
+    state.toneMapping = mode;
+}
+
+/** Set the exposure multiplier (Options panel). Read by the render loop each frame. */
+export function setExposure(exposure: number): void {
+    const clamped = clampExposure(exposure);
+    settingsStore.update(SettingKey.Exposure, clamped);
+    state.exposure = clamped;
+}
+
+/**
  * Apply a graphics preset (Options panel): writes each of its values through the same setter the
  * individual control uses, so every side effect (particle and aurora hooks) runs as usual.
  */
@@ -1139,6 +1180,7 @@ export function applyGraphicsPreset(preset: GraphicsPreset): void {
     setAuroraEnabled(values.auroraEnabled);
     setAuroraDetail(values.auroraDetail);
     setParticleEffectsEnabled(values.particleEffectsEnabled);
+    setHdrEnabled(values.hdrEnabled);
 }
 
 /** Toggle hiding the PanelManager while in flight mode (Flight Controls panel). */

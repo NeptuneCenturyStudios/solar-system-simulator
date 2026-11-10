@@ -7,7 +7,7 @@
             <select
                 class="solver-select"
                 :value="graphicsPreset"
-                title="Sets render scale, clouds, shadows, sun rays, lens flares, aurorae and particles in one go. Changing any of them afterwards shows Custom."
+                title="Sets render scale, HDR, clouds, shadows, sun rays, lens flares, aurorae and particles in one go. Changing any of them afterwards shows Custom."
                 @change="onGraphicsPresetChange"
             >
                 <option value="low">Low</option>
@@ -42,6 +42,60 @@
                 </button>
             </div>
             <p class="solver-hint">{{ renderScaleHint }}</p>
+        </div>
+
+        <div class="control-group">
+            <label class="checkbox-row">
+                <input
+                    type="checkbox"
+                    :checked="simStore.hdrEnabled && simStore.hdrSupported"
+                    :disabled="!simStore.hdrSupported"
+                    title="Draw the scene with high dynamic range, so light brighter than white rolls off smoothly instead of clipping."
+                    @change="onHdrChange"
+                />
+                HDR Rendering
+            </label>
+            <p class="solver-hint">{{ hdrHint }}</p>
+        </div>
+
+        <div class="control-group">
+            <label>Tone Mapping</label>
+            <select
+                class="solver-select"
+                :value="simStore.toneMapping"
+                title="The curve that fits the scene's light onto the screen."
+                @change="onToneMappingChange"
+            >
+                <option value="agx">AgX</option>
+                <option value="aces">ACES Filmic</option>
+                <option value="neutral">Neutral</option>
+            </select>
+            <p class="solver-hint">{{ toneMappingHint }}</p>
+        </div>
+
+        <div class="control-group">
+            <label>
+                Exposure
+                <span class="val-display">{{ simStore.exposure.toFixed(2) }}×</span>
+            </label>
+            <div class="slider-row">
+                <input
+                    type="range"
+                    :min="EXPOSURE_MIN"
+                    :max="EXPOSURE_MAX"
+                    :step="EXPOSURE_STEP"
+                    :value="simStore.exposure"
+                    title="Brightens or darkens the whole scene before tone mapping. The HUD is unaffected."
+                    @input="onExposureInput"
+                />
+                <button
+                    class="old-ui btn-slider-reset"
+                    :title="`Reset to ${EXPOSURE_DEFAULT}×`"
+                    @click="resetExposure"
+                >
+                    <svg-icon type="mdi" :path="mdiReplay"></svg-icon>
+                </button>
+            </div>
         </div>
 
         <div class="control-group">
@@ -362,7 +416,9 @@ import {
     setCloudQuality,
     setShadowQuality,
     setShipCollisionMode,
+    setExposure,
     setFrameRateLimit,
+    setHdrEnabled,
     setLensflareEnabled,
     setMusicVolume,
     setParticleEffectsEnabled,
@@ -376,6 +432,7 @@ import {
     setSmoothZoomEnabled,
     setSubsteps,
     setTextureQuality,
+    setToneMapping,
     simStore,
 } from '../sim-bridge';
 import type {
@@ -385,6 +442,7 @@ import type {
     ShadowQuality,
     ShipCollisionMode,
     TextureQuality,
+    ToneMappingMode,
 } from '../../settings/settings-store';
 import {
     matchGraphicsPreset,
@@ -393,6 +451,10 @@ import {
 } from '../../settings/graphics-presets';
 import { isHighQualityTextureAvailable } from '../../drawing/texture-quality';
 import {
+    EXPOSURE_DEFAULT,
+    EXPOSURE_MAX,
+    EXPOSURE_MIN,
+    EXPOSURE_STEP,
     RENDER_DISTANCE_DEFAULT_AU,
     RENDER_DISTANCE_MAX_AU,
     RENDER_DISTANCE_MIN_AU,
@@ -423,7 +485,7 @@ const MAX_FRAME_RATE_LIMIT = 240;
 
 /** One-line summary of what each preset trades away. */
 const GRAPHICS_PRESET_HINTS: Record<GraphicsPresetSelection, string> = {
-    low: 'For integrated graphics: 75% render scale, flat clouds, no shadows, sun rays or lens flares.',
+    low: 'For integrated graphics: 75% render scale, no HDR, flat clouds, no shadows, sun rays or lens flares.',
     medium: "Volumetric clouds, eclipse shadows and the nearest ship's shadow, all effects on. The default.",
     high: 'Detailed volumetric clouds and shadows for up to four ships. Highest GPU cost.',
     custom: 'Your own mix of the settings below. Pick a preset to reset them all at once.',
@@ -440,6 +502,7 @@ const graphicsPreset = computed<GraphicsPresetSelection>(() =>
         auroraEnabled: simStore.auroraEnabled,
         auroraDetail: simStore.auroraDetail,
         particleEffectsEnabled: simStore.particleEffectsEnabled,
+        hdrEnabled: simStore.hdrEnabled,
     })
 );
 
@@ -467,6 +530,40 @@ function onRenderScaleInput(e: Event): void {
 
 function resetRenderScale(): void {
     setRenderScale(RENDER_SCALE_DEFAULT);
+}
+
+const hdrHint = computed(() => {
+    if (!simStore.hdrSupported) {
+        return 'Not supported by this graphics card or browser: bright light clips to white.';
+    }
+    return simStore.hdrEnabled
+        ? 'Bright light (stars, sunlit clouds, explosions) rolls off smoothly. Uses twice the memory bandwidth of the scene image.'
+        : 'Faster on integrated graphics, but anything brighter than white clips.';
+});
+
+function onHdrChange(e: Event): void {
+    setHdrEnabled((e.target as HTMLInputElement).checked);
+}
+
+/** One-line description of each tone-mapping curve. */
+const TONE_MAPPING_HINTS: Record<ToneMappingMode, string> = {
+    agx: 'Natural film-like roll-off that keeps bright star colours true. The default.',
+    aces: 'Punchier contrast; very bright colours shift toward white and yellow.',
+    neutral: 'Colours closest to how they were authored; only the highlights are compressed.',
+};
+
+const toneMappingHint = computed(() => TONE_MAPPING_HINTS[simStore.toneMapping]);
+
+function onToneMappingChange(e: Event): void {
+    setToneMapping((e.target as HTMLSelectElement).value as ToneMappingMode);
+}
+
+function onExposureInput(e: Event): void {
+    setExposure(parseFloat((e.target as HTMLInputElement).value));
+}
+
+function resetExposure(): void {
+    setExposure(EXPOSURE_DEFAULT);
 }
 
 function onParticleEffectsChange(e: Event): void {

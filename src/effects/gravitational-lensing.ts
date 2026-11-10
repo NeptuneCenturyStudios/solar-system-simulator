@@ -12,12 +12,23 @@ const MAX_LENSES = 4;
 const EINSTEIN_SCALE = 18.0;
 
 /**
- * Screen-space gravitational lensing post-processing effect.
+ * Scene capture plus the final output pass: gravitational lensing, the sun-ray composite, tone
+ * mapping and the sRGB output conversion.
+ *
+ * The scene is captured as linear light. In HDR mode the capture is half-float, so values above
+ * 1.0 survive until the tone-mapping curve rolls them off. The low-end fallback is an 8-bit sRGB
+ * target (SRGB8_ALPHA8: the hardware encodes on write, decodes on sample and blends in linear),
+ * which costs the same memory as a plain 8-bit target without dark-tone banding, but clips at 1.0.
+ *
+ * three.js only tone maps and sRGB-encodes when it draws to the screen, so this pass — the one
+ * that draws the scene to the screen — is where `renderer.toneMapping`, `toneMappingExposure`
+ * and `outputColorSpace` take effect for the whole scene.
  *
  * Usage each frame:
  *   1. `beginCapture(renderer)`      — redirects rendering into an internal render target
  *   2. `renderer.render(scene, cam)` — scene renders to the target instead of the canvas
- *   3. `applyLensing(renderer, cam, lenses)` — warps the captured image and draws to screen
+ *   3. (optional) sun rays read `sceneTexture` into their own target
+ *   4. `applyLensing(renderer, cam, lenses, rays)` — warps, adds rays, tone maps, draws to screen
  *
  * The UI overlay pass must happen AFTER applyLensing so it renders on top unwarped.
  */
@@ -28,6 +39,8 @@ export class GravitationalLensingEffect {
     private canvasHeight: number;
     /** Fraction of the canvas resolution the scene is captured at (see RENDER_SCALE_*). */
     private renderScale = 1;
+    /** Whether the capture target is half-float (HDR) rather than the 8-bit sRGB fallback. */
+    private hdr: boolean;
     private quadScene: THREE.Scene;
     private quadCamera: THREE.OrthographicCamera;
     private quadMesh: THREE.Mesh;
@@ -38,21 +51,17 @@ export class GravitationalLensingEffect {
         uLensPositions: { value: THREE.Vector2[] };
         uLensRadii: { value: number[] }; // actual projected event-horizon radius (black disc)
         uLensWarpRadii: { value: number[] }; // einstein warp radius (floored to MIN_WARP_RADIUS)
+        tRays: { value: THREE.Texture | null };
+        uRaysEnabled: { value: boolean };
     };
 
-    constructor(renderer: THREE.WebGLRenderer) {
+    constructor(renderer: THREE.WebGLRenderer, hdr: boolean) {
         const w = renderer.domElement.width;
         const h = renderer.domElement.height;
         this.canvasWidth = w;
         this.canvasHeight = h;
-
-        // Linear filtering is what upscales the capture to the canvas when renderScale < 1.
-        this.rt = new THREE.WebGLRenderTarget(w, h, {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            format: THREE.RGBAFormat,
-            type: THREE.UnsignedByteType,
-        });
+        this.hdr = hdr;
+        this.rt = createCaptureTarget(w, h, hdr);
 
         // Pre-allocate arrays for the fixed-size lens uniforms.
         const positions: THREE.Vector2[] = [];
@@ -71,6 +80,8 @@ export class GravitationalLensingEffect {
             uLensPositions: { value: positions },
             uLensRadii: { value: radii },
             uLensWarpRadii: { value: warpRadii },
+            tRays: { value: null },
+            uRaysEnabled: { value: false },
         };
 
         const material = new THREE.ShaderMaterial({
@@ -89,6 +100,8 @@ export class GravitationalLensingEffect {
                 uniform vec2  uLensPositions[${MAX_LENSES}];
                 uniform float uLensRadii[${MAX_LENSES}];      // event-horizon (black disc)
                 uniform float uLensWarpRadii[${MAX_LENSES}];  // einstein warp radius
+                uniform sampler2D tRays;
+                uniform bool  uRaysEnabled;
 
                 varying vec2 vUv;
 
@@ -107,7 +120,7 @@ export class GravitationalLensingEffect {
                         vec2  offset = (vUv - lensUV) * aspect;
                         float dist   = length(offset);
 
-                        // Hard black inside the event horizon.
+                        // Hard black inside the event horizon (black through any tone curve).
                         if (dist < horizonR) {
                             gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
                             return;
@@ -121,7 +134,16 @@ export class GravitationalLensingEffect {
                     }
 
                     vec2 warpedUV = clamp(vUv + totalWarp, 0.0, 1.0);
-                    gl_FragColor = texture2D(tScene, warpedUV);
+                    vec3 color = texture2D(tScene, warpedUV).rgb;
+                    // Sun rays are linear light too, so they join the scene before tone mapping.
+                    // They stay unwarped (sampled at the screen position), as before.
+                    if (uRaysEnabled) color += texture2D(tRays, vUv).rgb;
+                    gl_FragColor = vec4(max(color, vec3(0.0)), 1.0);
+
+                    // Drawn to the screen, so three injects renderer.toneMapping (with
+                    // toneMappingExposure) and the sRGB output conversion here.
+                    #include <tonemapping_fragment>
+                    #include <colorspace_fragment>
                 }
             `,
             depthTest: false,
@@ -146,16 +168,21 @@ export class GravitationalLensingEffect {
 
     /**
      * Call after the main scene has been rendered into the target.
-     * Projects each lens position to UV space, updates uniforms, and draws the
-     * warped image to the screen (render target = null).
+     * Projects each lens position to UV space, updates uniforms, and draws the warped,
+     * tone-mapped image to the screen (render target = null).
      *
      * @param lenses Array of { position: world-space Vector3, radius: event-horizon radius }
+     * @param rays   Linear sun-ray light to add before tone mapping, or null for none.
      */
     applyLensing(
         renderer: THREE.WebGLRenderer,
         camera: THREE.PerspectiveCamera,
-        lenses: { position: THREE.Vector3; radius: number }[]
+        lenses: { position: THREE.Vector3; radius: number }[],
+        rays: THREE.Texture | null = null
     ): void {
+        this.uniforms.tRays.value = rays;
+        this.uniforms.uRaysEnabled.value = rays !== null;
+
         const count = Math.min(lenses.length, MAX_LENSES);
         this.uniforms.uLensCount.value = count;
 
@@ -196,6 +223,24 @@ export class GravitationalLensingEffect {
         return this.rt.texture;
     }
 
+    /** Whether the capture is currently half-float HDR. */
+    get isHdr(): boolean {
+        return this.hdr;
+    }
+
+    /**
+     * Switches the capture between half-float HDR and the 8-bit sRGB fallback. Cheap to call
+     * every frame: the target is only rebuilt when the mode actually changes.
+     */
+    setHdr(enabled: boolean): void {
+        if (enabled === this.hdr) return;
+        this.hdr = enabled;
+        const { width, height } = this.rt;
+        this.rt.dispose();
+        this.rt = createCaptureTarget(width, height, enabled);
+        this.uniforms.tScene.value = this.rt.texture;
+    }
+
     /**
      * Sets the fraction of the canvas resolution the scene is captured at. The capture is
      * stretched back to the full canvas by the lensing pass, so everything drawn after it (the
@@ -229,4 +274,30 @@ export class GravitationalLensingEffect {
         this.quadMesh.geometry.dispose();
         (this.quadMesh.material as THREE.ShaderMaterial).dispose();
     }
+}
+
+/**
+ * The scene capture target. Linear filtering is what upscales the capture to the canvas when
+ * renderScale < 1.
+ */
+function createCaptureTarget(width: number, height: number, hdr: boolean): THREE.WebGLRenderTarget {
+    return new THREE.WebGLRenderTarget(width, height, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
+        // 8-bit fallback: stored sRGB-encoded (SRGB8_ALPHA8) so dark tones keep their precision.
+        colorSpace: hdr ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace,
+    });
+}
+
+/**
+ * True when the GPU can render into half-float targets (WebGL2 needs EXT_color_buffer_float or
+ * EXT_color_buffer_half_float). Without it, HDR falls back to the 8-bit capture.
+ */
+export function isHdrSupported(renderer: THREE.WebGLRenderer): boolean {
+    return (
+        renderer.extensions.has('EXT_color_buffer_float') ||
+        renderer.extensions.has('EXT_color_buffer_half_float')
+    );
 }

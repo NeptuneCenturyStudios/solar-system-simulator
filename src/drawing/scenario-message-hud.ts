@@ -82,6 +82,7 @@ function createBannerTexture(text: string, fontSizePx: number): THREE.CanvasText
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
     const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
     return texture;
 }

@@ -58,16 +58,15 @@ const _ndc = new THREE.Vector3();
  * Rays scale with the star's size on screen and fade out as it shrinks to a point, where the
  * lens-flare shine takes over.
  *
- * Usage each frame, after the scene has been captured (and drawn to the screen):
- *   `render(renderer, camera, sceneTexture, bodies)` — adds the rays on top of the screen.
+ * Usage each frame, after the scene has been captured and before the output pass:
+ *   `computeRays(renderer, camera, sceneTexture, bodies)` — returns the rays (linear light) for
+ *   the output pass to add to the scene before tone mapping, or null when there are none.
  */
 export class SunRaysEffect {
-    private readonly rt: THREE.WebGLRenderTarget;
+    private rt: THREE.WebGLRenderTarget;
     private readonly quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     private readonly raysScene = new THREE.Scene();
-    private readonly compositeScene = new THREE.Scene();
     private readonly raysMaterial: THREE.ShaderMaterial;
-    private readonly compositeMaterial: THREE.ShaderMaterial;
 
     private readonly uniforms: {
         tScene: THREE.IUniform<THREE.Texture | null>;
@@ -87,17 +86,11 @@ export class SunRaysEffect {
     /** Overall ray brightness. */
     intensity = 0.55;
 
-    constructor(width: number, height: number) {
-        this.rt = new THREE.WebGLRenderTarget(
+    constructor(width: number, height: number, hdr: boolean) {
+        this.rt = createRaysTarget(
             Math.max(1, Math.floor(width * RESOLUTION_SCALE)),
             Math.max(1, Math.floor(height * RESOLUTION_SCALE)),
-            {
-                minFilter: THREE.LinearFilter,
-                magFilter: THREE.LinearFilter,
-                format: THREE.RGBAFormat,
-                type: THREE.UnsignedByteType,
-                depthBuffer: false,
-            }
+            hdr
         );
 
         const centers: THREE.Vector2[] = [];
@@ -174,8 +167,12 @@ export class SunRaysEffect {
                             weightSum += source;
                         }
                         // Average, then stretch the contrast so streaks stand apart from the glow.
+                        // The scene is HDR, so compress first: otherwise squaring a star's
+                        // multi-unit radiance would explode. Below ~1 this tracks the old
+                        // light² stretch, above it the rays saturate smoothly.
                         vec3 light = sum / max(weightSum, 1.0);
-                        light = light * light * 1.6;
+                        light = light / (1.0 + light);
+                        light = light * light * 4.0;
 
                         // Long, soft falloff away from the limb; gentle inside the disc, so the
                         // rays sit around the star rather than washing out its surface.
@@ -192,43 +189,24 @@ export class SunRaysEffect {
             depthWrite: false,
         });
 
-        this.compositeMaterial = new THREE.ShaderMaterial({
-            uniforms: { tRays: { value: this.rt.texture } },
-            vertexShader: quadVertex,
-            fragmentShader: /* glsl */ `
-                uniform sampler2D tRays;
-                varying vec2 vUv;
-                void main() {
-                    gl_FragColor = vec4(texture2D(tRays, vUv).rgb, 1.0);
-                }
-            `,
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            depthTest: false,
-            depthWrite: false,
-        });
-
         const raysQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.raysMaterial);
         raysQuad.frustumCulled = false;
         this.raysScene.add(raysQuad);
-
-        const compositeQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.compositeMaterial);
-        compositeQuad.frustumCulled = false;
-        this.compositeScene.add(compositeQuad);
     }
 
     /**
-     * Works out the rays from `sceneTexture` and adds them over whatever is on the screen.
-     * Does nothing (and costs nothing) when no star is large enough on screen.
+     * Works out the rays from `sceneTexture` into the rays target and returns it, for the output
+     * pass to add to the scene before tone mapping. Returns null (and costs nothing) when no star
+     * is large enough on screen.
      */
-    render(
+    computeRays(
         renderer: THREE.WebGLRenderer,
         camera: THREE.PerspectiveCamera,
         sceneTexture: THREE.Texture,
         bodies: readonly ISunRayBody[]
-    ): void {
+    ): THREE.Texture | null {
         const count = this._collectStars(renderer, camera, bodies);
-        if (count === 0) return;
+        if (count === 0) return null;
 
         this.uniforms.tScene.value = sceneTexture;
         this._matchSceneSize(sceneTexture);
@@ -241,9 +219,20 @@ export class SunRaysEffect {
         renderer.render(this.raysScene, this.quadCamera);
 
         renderer.setRenderTarget(prevTarget);
-        renderer.render(this.compositeScene, this.quadCamera);
-
         renderer.autoClear = prevAutoClear;
+        return this.rt.texture;
+    }
+
+    /**
+     * Matches the rays target to the scene capture: half-float when HDR, so bright rays aren't
+     * clipped, 8-bit otherwise. Only rebuilds the target when the mode changes.
+     */
+    setHdr(enabled: boolean): void {
+        const type = enabled ? THREE.HalfFloatType : THREE.UnsignedByteType;
+        if (this.rt.texture.type === type) return;
+        const { width, height } = this.rt;
+        this.rt.dispose();
+        this.rt = createRaysTarget(width, height, enabled);
     }
 
     /**
@@ -340,11 +329,23 @@ export class SunRaysEffect {
     dispose(): void {
         this.rt.dispose();
         this.raysMaterial.dispose();
-        this.compositeMaterial.dispose();
-        for (const scene of [this.raysScene, this.compositeScene]) {
-            scene.traverse((o) => {
-                if (o instanceof THREE.Mesh) o.geometry.dispose();
-            });
-        }
+        this.raysScene.traverse((o) => {
+            if (o instanceof THREE.Mesh) o.geometry.dispose();
+        });
     }
+}
+
+/**
+ * The rays target. Linear light: half-float in HDR mode; in the 8-bit fallback it is stored
+ * sRGB-encoded (like the scene capture) so faint ray tails don't band.
+ */
+function createRaysTarget(width: number, height: number, hdr: boolean): THREE.WebGLRenderTarget {
+    return new THREE.WebGLRenderTarget(width, height, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
+        colorSpace: hdr ? THREE.LinearSRGBColorSpace : THREE.SRGBColorSpace,
+        depthBuffer: false,
+    });
 }

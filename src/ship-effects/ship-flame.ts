@@ -99,6 +99,7 @@ export class ShipFlame implements IShipEffect {
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, GS, GS);
         const flameTex = new THREE.CanvasTexture(tc);
+        flameTex.colorSpace = THREE.SRGBColorSpace;
 
         // ── Inner glow (tight, hot core) ─────────────────────────────────────
         this.innerGeo = new THREE.BufferGeometry();

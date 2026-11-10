@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { STAR_NOISE_GLSL } from './star-noise-glsl';
-import { starSurfaceExposure, starSurfaceTint } from './star-tint';
+import {
+    STAR_HDR_GAMMA,
+    STAR_SURFACE_HDR_SCALE,
+    starSurfaceExposure,
+    starSurfaceTint,
+} from './star-tint';
 
 /**
  * Most fBm octaves the granulation uses. Octaves smaller than a pixel are dropped in the shader
@@ -114,7 +119,6 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
 
     constructor(options: IStarSurfaceOptions) {
         super({ color: 0xffffff });
-        this.toneMapped = false;
 
         const tint = starSurfaceTint(options.temperature, new THREE.Color());
         this._targetTint.copy(tint);
@@ -293,16 +297,20 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
                     energy += uSsPoleStrength
                             * (pow(poleAlign, 60.0) * 2.0 + pow(poleAlign, 8.0) * 0.35);
 
-                    // Filmic per-channel curve: the dominant channel saturates first, so hot
-                    // areas roll off toward yellow, then white, just as Blender's Filmic view did.
-                    vec3 surface = 1.0 - exp(-uSsTint * energy * uSsExposure);
+                    // Linear HDR radiance: the tint sets the hue, and the energy, raised to the
+                    // display-to-linear power, sets the brightness. Convection lanes keep their
+                    // contrast after the sRGB encode while hot spots go well above 1, and the
+                    // output pass's tone curve rolls those toward yellow and white, as Blender's
+                    // Filmic view did.
+                    float lum = pow(max(energy * uSsExposure * ${STAR_SURFACE_HDR_SCALE.toFixed(3)}, 0.0), ${STAR_HDR_GAMMA.toFixed(2)});
+                    vec3 surface = uSsTint * lum;
                     vec4 diffuseColor = vec4(surface, opacity);
                     `
                 );
         };
 
         // All instances share one program; the uniforms are per-instance objects.
-        this.customProgramCacheKey = () => 'star-surface-v5';
+        this.customProgramCacheKey = () => 'star-surface-v6';
     }
 
     /** Retints the surface for a new temperature. Pass `blend` < 1 to ease toward it. */

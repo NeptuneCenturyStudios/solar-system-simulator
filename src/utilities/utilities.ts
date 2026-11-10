@@ -130,12 +130,14 @@ export function getBodyTypeLabel(b: Body) {
 /**
  * Creates a sphere geometry for a celestial body with a specified radius.
  * @param radius Radius of the sphere to create
+ * @param widthSegments Horizontal segments; omit to derive them from the radius and texture quality
+ * @param heightSegments Vertical segments; omit to derive them from the radius and texture quality
  * @returns
  */
 export function buildBodySphereGeometry(
     radius: number,
-    widthSegments: number,
-    heightSegments: number
+    widthSegments?: number,
+    heightSegments?: number
 ): THREE.SphereGeometry {
     // Calculate the number of segments based on radius to maintain visual fidelity
     const minSegments = 128;

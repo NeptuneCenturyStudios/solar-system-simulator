@@ -139,6 +139,7 @@ export class BlackHole extends CelestialBody implements IMassTransferBody {
         ctx.fillRect(0, 0, 256, 256);
 
         const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
         const spriteMat = new THREE.SpriteMaterial({
             map: texture,
             blending: THREE.AdditiveBlending,

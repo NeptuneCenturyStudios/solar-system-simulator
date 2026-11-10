@@ -172,6 +172,7 @@ function buildFlameSprite(): THREE.CanvasTexture {
 
     ctx.putImageData(image, 0, 0);
     const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
     // Repeat horizontally (the seam is a real uv wrap) but clamp vertically so scrolling cannot
     // smear the gradient past the base or tip.
     texture.wrapS = THREE.RepeatWrapping;

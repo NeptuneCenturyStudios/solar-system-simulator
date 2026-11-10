@@ -19,7 +19,8 @@ const BACKGROUND_EASE_RATE = 4;
 const SKY_COLUMN_SCALE_HEIGHT = 0.2;
 
 /**
- * Sky radiance (display units, as the shell outputs it) at which the starfield is fully hidden.
+ * Sky radiance (linear, as the shell outputs it, before tone mapping) at which the starfield is
+ * fully hidden.
  * Below it the stars fade in proportionally, so a faint sky only partly hides them.
  */
 const STAR_HIDE_SKY_RADIANCE = 0.15;

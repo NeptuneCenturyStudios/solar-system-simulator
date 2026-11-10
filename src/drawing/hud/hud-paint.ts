@@ -278,6 +278,7 @@ export function createChevronTexture(color: string, glow: string): THREE.CanvasT
     ctx.stroke();
 
     const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
     return tex;
 }
@@ -316,6 +317,7 @@ export function createTriangleTexture(color: string, glow: string): THREE.Canvas
     ctx.stroke();
 
     const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
     return tex;
 }

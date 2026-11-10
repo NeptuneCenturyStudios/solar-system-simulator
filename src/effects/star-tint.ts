@@ -43,12 +43,33 @@ function hexStop(temperature: number, hex: number): TemperatureStop {
 }
 
 /**
+ * Display-to-linear power for the star shaders' brightness profiles (surface energy, halo and
+ * pulsar glow), which were authored against the old raw, un-encoded output. Raising them to this
+ * power makes faint parts look as they did after the output pass's sRGB encode, while bright
+ * parts go above 1 and roll off in the tone curve.
+ */
+export const STAR_HDR_GAMMA = 2.2;
+
+/**
+ * Scales the star surface's energy before STAR_HDR_GAMMA. Raise it for brighter, more
+ * washed-out stars; lower it for darker convection lanes. With a Sun-like star's exposure (4.2)
+ * an average granule lands around 1.6 (bright), lanes around 0.1 and hot spots far above 1.
+ */
+export const STAR_SURFACE_HDR_SCALE = 0.3;
+
+/** Scales the star halo's linear brightness; its limb band peaks around 1 at the default. */
+export const STAR_HALO_HDR_SCALE = 1.5;
+
+/** Scales the pulsar beam's glow before STAR_HDR_GAMMA. */
+export const PULSAR_BEAM_HDR_SCALE = 1.6;
+
+/**
  * Hue stops for the procedural star surface.
  *
- * These are *shader tints*, not display colours: the surface shader runs them through a filmic
- * per-channel curve (`1 - exp(-tint * energy)`), so the dominant channel saturates first and
- * hot spots roll off toward yellow and then white. A tint of (1, 0.36, 0.08) therefore renders
- * as the orange-to-yellow sun from the original Blender model, not as a flat red.
+ * These are *shader tints* in linear RGB: the surface shader multiplies them by an HDR
+ * brightness, and the output pass's tone curve (AgX by default) desaturates the brightest
+ * areas toward yellow and then white. A tint of (1, 0.36, 0.08) therefore renders as the
+ * orange-to-yellow sun from the original Blender model, not as a flat red.
  */
 const TINT_STOPS: ReadonlyArray<TemperatureStop> = [
     rgbStop(1000, 1.0, 0.04, 0.01),

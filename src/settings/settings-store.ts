@@ -3,6 +3,10 @@ import {
     AI_AUTOPILOT_ORBIT_DISTANCE_DEFAULT_M,
     AI_AUTOPILOT_ORBIT_DISTANCE_MAX_M,
     AI_AUTOPILOT_ORBIT_DISTANCE_MIN_M,
+    EXPOSURE_DEFAULT,
+    EXPOSURE_MAX,
+    EXPOSURE_MIN,
+    EXPOSURE_STEP,
     RENDER_DISTANCE_DEFAULT_AU,
     RENDER_DISTANCE_MAX_AU,
     RENDER_DISTANCE_MIN_AU,
@@ -48,7 +52,23 @@ export const enum SettingKey {
     CloudQuality = 'cloudQuality',
     ShadowQuality = 'shadowQuality',
     ShipCollisionMode = 'shipCollisionMode',
+    HdrEnabled = 'hdrEnabled',
+    ToneMapping = 'toneMapping',
+    Exposure = 'exposure',
 }
+
+/**
+ * The curve that maps the linear HDR scene onto the screen.
+ *
+ * - `agx`     — keeps very bright, saturated colours (red dwarfs, blue giants) from skewing
+ *               toward white or yellow. Slightly desaturated overall.
+ * - `aces`    — ACES Filmic: punchier contrast, but bright colours shift hue.
+ * - `neutral` — Khronos PBR Neutral: colours closest to how they were authored; only the
+ *               highlights are compressed.
+ *
+ * Declared here rather than in the effects layer so the settings store stays dependency-free.
+ */
+export type ToneMappingMode = 'agx' | 'aces' | 'neutral';
 
 /**
  * Which autopilot flies the player's ship.
@@ -213,6 +233,16 @@ export interface SpaceSimSettings {
     shadowQuality: ShadowQuality;
     /** How ship-vs-ship contact tests the hulls (triangle mesh or oriented boxes). */
     shipCollisionMode: ShipCollisionMode;
+    /**
+     * Capture the scene in half-float, so light brighter than white rolls off through the tone
+     * curve instead of clipping. Off uses an 8-bit capture (half the bandwidth). Forced off when
+     * the GPU can't render to half-float targets.
+     */
+    hdrEnabled: boolean;
+    /** Tone-mapping curve for the final image. */
+    toneMapping: ToneMappingMode;
+    /** Exposure multiplier applied before tone mapping (EXPOSURE_MIN..MAX). */
+    exposure: number;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -260,7 +290,22 @@ const defaultSettings: SpaceSimSettings = {
     cloudQuality: 'medium',
     shadowQuality: 'low',
     shipCollisionMode: 'triangle',
+    hdrEnabled: true,
+    toneMapping: 'agx',
+    exposure: EXPOSURE_DEFAULT,
 };
+
+/** Normalise a stored tone-mapping curve, falling back to `agx` for anything unrecognised. */
+export function normalizeToneMapping(value: unknown): ToneMappingMode {
+    return value === 'aces' || value === 'neutral' ? value : 'agx';
+}
+
+/** Clamp an exposure to the supported range and snap it to the slider step. */
+export function clampExposure(exposure: number): number {
+    if (!Number.isFinite(exposure)) return EXPOSURE_DEFAULT;
+    const snapped = Math.round(exposure / EXPOSURE_STEP) * EXPOSURE_STEP;
+    return Math.round(Math.min(Math.max(snapped, EXPOSURE_MIN), EXPOSURE_MAX) * 100) / 100;
+}
 
 /** Normalise a stored texture quality, falling back to `low` for anything unrecognised. */
 export function normalizeTextureQuality(value: unknown): TextureQuality {
@@ -337,6 +382,9 @@ class SettingsStore {
         this.data.autopilotOrbitDistanceM = clampAutopilotOrbitDistanceM(
             this.data.autopilotOrbitDistanceM
         );
+        this.data.hdrEnabled = this.data.hdrEnabled !== false;
+        this.data.toneMapping = normalizeToneMapping(this.data.toneMapping);
+        this.data.exposure = clampExposure(this.data.exposure);
     }
 
     get settings(): SpaceSimSettings {

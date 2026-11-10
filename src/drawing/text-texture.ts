@@ -30,6 +30,8 @@ export function createTextTexture(text: string): THREE.CanvasTexture {
 
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
+    // Canvas pixels are sRGB; tagging them keeps the colours as painted after the output encode.
+    texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
 
     return texture;

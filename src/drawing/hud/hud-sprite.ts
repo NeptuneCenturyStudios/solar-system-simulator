@@ -185,6 +185,7 @@ export class HudSprite extends HudSpriteBase {
         canvas.height = 1;
 
         const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
         texture.needsUpdate = true;
 
         super(uiScene, texture, options);

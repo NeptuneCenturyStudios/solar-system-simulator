@@ -126,7 +126,7 @@ import type { SolarSystemFeature } from './features/solar-system-feature';
 import { PlanetaryNebula } from './effects/planetary-nebula';
 import { ParticleExplosion } from './effects/particle-explosion';
 import { AmbientSoundManager } from './utilities/ambient-sound';
-import { GravitationalLensingEffect } from './effects/gravitational-lensing';
+import { GravitationalLensingEffect, isHdrSupported } from './effects/gravitational-lensing';
 import { SunRaysEffect } from './effects/sun-rays';
 import { LensFlareEffect } from './effects/lens-flare';
 import { createBridgeForPair } from './effects/wormhole-link-bridge';
@@ -213,7 +213,13 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 
 // Vue UI overlay (new UI, developed in parallel with the existing UI)
 import { mountVueUi } from './vue/main';
-import { registerVueSimHooks, setDisplayState, simStore, stepTimeScale } from './vue/sim-bridge';
+import {
+    registerVueSimHooks,
+    setDisplayState,
+    setHdrSupported,
+    simStore,
+    stepTimeScale,
+} from './vue/sim-bridge';
 import {
     hidePanelManagerForFlight,
     restorePanelManagerAfterFlight,
@@ -308,11 +314,21 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuff
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 renderer.domElement.classList.add('webgl-canvas');
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// The tone-mapping curve and exposure are applied from the settings by the render loop each frame,
+// and only take effect in passes drawn to the screen: the scene's output pass (lensing), the lens
+// flare and the cockpit. The scene itself is captured as linear light (see GravitationalLensingEffect).
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const lensingEffect = new GravitationalLensingEffect(renderer);
-const sunRaysEffect = new SunRaysEffect(renderer.domElement.width, renderer.domElement.height);
+// Half-float capture needs EXT_color_buffer_(half_)float; without it HDR stays off whatever the setting.
+const hdrSupported = isHdrSupported(renderer);
+setHdrSupported(hdrSupported);
+const hdrAtStartup = hdrSupported && settingsStore.settings.hdrEnabled;
+const lensingEffect = new GravitationalLensingEffect(renderer, hdrAtStartup);
+const sunRaysEffect = new SunRaysEffect(
+    renderer.domElement.width,
+    renderer.domElement.height,
+    hdrAtStartup
+);
 const lensFlareEffect = new LensFlareEffect();
 
 // Create orthographic camera and scene for 2D UI overlay
@@ -5043,6 +5059,7 @@ const animCtx: AnimationContext = {
     planetaryNebulae: { value: planetaryNebulae },
     lensingEffect,
     sunRaysEffect,
+    hdrSupported,
     lensFlareEffect,
     gizmo,
     velArc,

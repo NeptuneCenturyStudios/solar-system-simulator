@@ -35,7 +35,7 @@ import { Wormhole } from '../bodies/wormhole';
 import { processWormholeInteractions } from '../physics/wormhole-collision';
 import { updateWormholeBridges } from '../effects/wormhole-link-bridge';
 import { BodyTypeEnum } from '../bodies/body-enums';
-import { settingsStore } from '../settings/settings-store';
+import { settingsStore, type ToneMappingMode } from '../settings/settings-store';
 import { absorbBody, destroyBody, updateSimulation } from '../physics/physics';
 import { resolveCollision } from '../physics/collision';
 import { updateGroundAlignment } from '../physics/ground-alignment';
@@ -96,6 +96,13 @@ import { updateShadows } from '../effects/shadows/shadow-system';
 import { renderWithScaledPoints } from '../effects/render-scale-points';
 
 /** Scratch for the warp-sound speed lookup. */
+/** The three.js curve for each tone-mapping setting. */
+const TONE_MAPPING_CURVES: Readonly<Record<ToneMappingMode, THREE.ToneMapping>> = {
+    agx: THREE.AgXToneMapping,
+    aces: THREE.ACESFilmicToneMapping,
+    neutral: THREE.NeutralToneMapping,
+};
+
 const _warpSoundVel = new THREE.Vector3();
 /** Scratch for the altimeter: local vertical and the surface frame velocity under the ship. */
 const _altUp = new THREE.Vector3();
@@ -139,6 +146,8 @@ export interface AnimationContext {
     // Managers & effects
     lensingEffect: GravitationalLensingEffect;
     sunRaysEffect: SunRaysEffect;
+    /** Whether the GPU can render to half-float targets (HDR capture). */
+    hdrSupported: boolean;
     lensFlareEffect: LensFlareEffect;
     gizmo: CoordinateGizmo;
     velArc: VelocityArcManager;
@@ -1655,8 +1664,16 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             ctx.simulationState.bodies,
             ctx.flightState.activeShip
         );
+        // Output settings. All cheap to set every frame: the targets are only rebuilt when HDR
+        // actually toggles, and three recompiles the screen passes when the curve changes.
+        const settings = settingsStore.settings;
+        const hdr = ctx.hdrSupported && settings.hdrEnabled;
+        ctx.lensingEffect.setHdr(hdr);
+        ctx.sunRaysEffect.setHdr(hdr);
+        ctx.renderer.toneMapping = TONE_MAPPING_CURVES[settings.toneMapping];
+        ctx.renderer.toneMappingExposure = settings.exposure;
         // The scene is captured at the render scale; applyLensing stretches it to the canvas.
-        const renderScale = settingsStore.settings.renderScale;
+        const renderScale = settings.renderScale;
         ctx.lensingEffect.setRenderScale(renderScale);
         ctx.lensingEffect.beginCapture(ctx.renderer);
         try {
@@ -1664,23 +1681,25 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         } catch (e) {
             console.error('Error during rendering:', e);
         }
+        // Sun rays read the captured scene; the output pass adds them before tone mapping.
+        const rays = settings.sunRaysEnabled
+            ? ctx.sunRaysEffect.computeRays(
+                  ctx.renderer,
+                  ctx.camera,
+                  ctx.lensingEffect.sceneTexture,
+                  ctx.simulationState.bodies
+              )
+            : null;
         const activeBHs = ctx.simulationState.bodies.filter(
             (b) => !b._isDisposed && !!(b.bodyType & BodyTypeEnum.BlackHole)
         );
+        // Lensing, tone mapping and the sRGB conversion, drawn to the screen.
         ctx.lensingEffect.applyLensing(
             ctx.renderer,
             ctx.camera,
-            activeBHs.map((b) => ({ position: b.mesh.position, radius: b.radius }))
+            activeBHs.map((b) => ({ position: b.mesh.position, radius: b.radius })),
+            rays
         );
-        // Sun rays read the captured scene and add on top of the (lensed) screen image.
-        if (settingsStore.settings.sunRaysEnabled) {
-            ctx.sunRaysEffect.render(
-                ctx.renderer,
-                ctx.camera,
-                ctx.lensingEffect.sceneTexture,
-                ctx.simulationState.bodies
-            );
-        }
         // Lens flare goes on last, straight to the screen, so the rays don't smear it and the
         // lensing doesn't warp it. Its shimmer runs on real time but freezes while paused.
         if (settingsStore.settings.lensflareEnabled) {
@@ -1696,7 +1715,13 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.cockpitView.render(ctx.renderer);
         ctx.renderer.autoClear = false;
         ctx.renderer.clearDepth();
+        // The HUD is flat UI art, not scene light: drawn untouched by the tone curve, so its
+        // colours are exactly as painted whichever curve and exposure are selected. Its
+        // materials always compile against NoToneMapping, so this switch never recompiles.
+        const sceneToneMapping = ctx.renderer.toneMapping;
+        ctx.renderer.toneMapping = THREE.NoToneMapping;
         ctx.renderer.render(ctx.uiScene, ctx.uiCamera);
+        ctx.renderer.toneMapping = sceneToneMapping;
         ctx.renderer.autoClear = true;
 
         lastT = now;

@@ -10,6 +10,7 @@ import type { AuroraDetailMode, CloudQuality, ShadowQuality } from './settings-s
  * - Texture quality: it is about download size and memory, not frame rate, and High only exists
  *   in the desktop build.
  * - Render distance and frame-rate limit: preferences rather than quality levels.
+ * - Tone mapping and exposure: a matter of taste, and free at any quality level.
  */
 export type GraphicsPreset = 'low' | 'medium' | 'high';
 
@@ -25,6 +26,7 @@ export interface IGraphicsPresetValues {
     auroraEnabled: boolean;
     auroraDetail: AuroraDetailMode;
     particleEffectsEnabled: boolean;
+    hdrEnabled: boolean;
 }
 
 /**
@@ -34,7 +36,9 @@ export interface IGraphicsPresetValues {
 export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphicsPresetValues>>> = {
     // For integrated graphics: drops the screen-filling per-pixel effects (volumetric clouds,
     // shadows, sun rays, lens flare) and draws the scene at 75% resolution, about 56% of the
-    // pixel work. Particles stay on: they are cheap and are combat feedback.
+    // pixel work. Particles stay on: they are cheap and are combat feedback. HDR off halves the
+    // capture's memory bandwidth (8-bit instead of half-float); highlights clip instead of
+    // rolling off.
     low: {
         renderScale: 0.75,
         cloudQuality: 'low',
@@ -44,6 +48,7 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
         auroraEnabled: true,
         auroraDetail: 'static',
         particleEffectsEnabled: true,
+        hdrEnabled: false,
     },
     medium: {
         renderScale: 1,
@@ -54,6 +59,7 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
         auroraEnabled: true,
         auroraDetail: 'dynamic',
         particleEffectsEnabled: true,
+        hdrEnabled: true,
     },
     high: {
         renderScale: 1,
@@ -64,6 +70,7 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
         auroraEnabled: true,
         auroraDetail: 'dynamic',
         particleEffectsEnabled: true,
+        hdrEnabled: true,
     },
 };
 

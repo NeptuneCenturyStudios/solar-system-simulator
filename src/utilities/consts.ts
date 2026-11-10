@@ -128,6 +128,13 @@ export const RENDER_SCALE_MAX = 1;
 export const RENDER_SCALE_STEP = 0.05;
 export const RENDER_SCALE_DEFAULT = 1;
 
+// === Exposure (Options → Graphics) ===
+// Multiplier applied to the linear scene before the tone-mapping curve (renderer.toneMappingExposure).
+export const EXPOSURE_MIN = 0.25;
+export const EXPOSURE_MAX = 4;
+export const EXPOSURE_STEP = 0.05;
+export const EXPOSURE_DEFAULT = 1;
+
 // === Mercury: Orbital Elements (J2000) ===
 // Mercury is the most eccentric of the eight planets (e = 0.2056): its distance from the Sun
 // swings from 46.0 to 69.8 million km over an 88-day year, a 52% change, and its orbit rides

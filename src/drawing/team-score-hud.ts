@@ -53,6 +53,7 @@ export class TeamScoreHud {
         this.ctx = ctx;
 
         this.texture = new THREE.CanvasTexture(this.canvas);
+        this.texture.colorSpace = THREE.SRGBColorSpace;
         this.material = new THREE.SpriteMaterial({
             map: this.texture,
             transparent: true,
