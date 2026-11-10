@@ -724,6 +724,24 @@ export const PLAYER_GROUND_TOLERANCE = 0.00005 / DIST_SCALE; // 5 cm
 /** Ground-relative speed at or below which a player with no input comes to rest and is parked. */
 export const PLAYER_STICK_SPEED = 0.0002 / DIST_SCALE; // 0.2 m/s
 
+// === Headlamp on foot (camera/headlamp.ts) ===
+/**
+ * Beam reach: the light fades smoothly to zero here. three.js clamps inverse-square falloff below
+ * 0.1 sim units (`max(d^decay, 0.01)`), far beyond human scale, so the lamp uses decay 0 and lets
+ * the cutoff window `(1 - (d / range)^4)^2` shape the fade instead.
+ */
+export const HEADLAMP_RANGE = 0.06 / DIST_SCALE; // 60 m
+/** Beam half-angle (radians). */
+export const HEADLAMP_ANGLE = (25 * Math.PI) / 180;
+/** Fraction of the cone that is soft edge (0 = hard rim, 1 = fully soft). */
+export const HEADLAMP_PENUMBRA = 0.5;
+/** Beam intensity, in the same irradiance units as star light (sunlight at 1 AU ≈ π). */
+export const HEADLAMP_INTENSITY = 0.3 * Math.PI;
+/** Beam colour: a warm white. */
+export const HEADLAMP_COLOR = 0xfff2e0;
+/** The lamp sits this far above the eye, so the lit ground is not perfectly flat-shaded. */
+export const HEADLAMP_EYE_OFFSET = 0.0001 / DIST_SCALE; // 10 cm
+
 // === Head bob / camera sway on foot (camera/head-bob.ts) ===
 /** Ground distance covered per full stride (two footfalls). */
 export const HEAD_BOB_STRIDE_LENGTH = 0.0016 / DIST_SCALE; // 1.6 m

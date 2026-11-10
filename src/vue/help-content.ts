@@ -109,6 +109,7 @@ export const HELP_SECTIONS: HelpSection[] = [
             { action: 'Walk (direction follows where you look)', keys: ['W', 'A', 'S', 'D'] },
             { action: 'Sprint', keys: ['Hold Shift'] },
             { action: 'Jump', keys: ['Space'] },
+            { action: 'Toggle headlamp (torch)', keys: ['T'] },
             { action: 'Capture the mouse to look and steer', keys: ['Left-click'] },
             { action: 'Look around without capturing', keys: ['Right-drag'] },
             { action: 'Release the mouse', keys: ['Esc'] },

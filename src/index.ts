@@ -3516,7 +3516,8 @@ const surfaceCam = new SurfaceCameraManager(
     cameraState,
     () => {
         cameraState.isFreeCameraMode = false;
-    }
+    },
+    scene
 );
 
 /**
@@ -4573,6 +4574,7 @@ installKeyboardControls({
     spawnOrEnterShip,
     surfaceCameraActive: () => surfaceCam.isActive,
     disembarkShip,
+    toggleHeadlamp: () => surfaceCam.toggleHeadlamp(),
 });
 
 window.addEventListener('mousedown', onMouseDown);

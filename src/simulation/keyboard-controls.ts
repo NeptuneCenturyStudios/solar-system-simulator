@@ -51,6 +51,8 @@ export interface KeyboardControlsContext {
     surfaceCameraActive: () => boolean;
     /** Leave the landed player ship on foot (surface camera beside it). */
     disembarkShip: () => void;
+    /** Switch the on-foot head lamp on or off. */
+    toggleHeadlamp: () => void;
 }
 
 interface KeyBinding {
@@ -434,6 +436,19 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         onDown: pressOnce(
             (e) => !flightState.isActive && !e.ctrlKey && !e.metaKey && !e.altKey,
             ctx.spawnOrEnterShip
+        ),
+    });
+
+    // T: surface mode only — toggle the head lamp (torch).
+    bindings.set('t', {
+        onDown: pressOnce(
+            (e) =>
+                ctx.surfaceCameraActive() &&
+                !flightState.isActive &&
+                !e.ctrlKey &&
+                !e.metaKey &&
+                !e.altKey,
+            ctx.toggleHeadlamp
         ),
     });
 

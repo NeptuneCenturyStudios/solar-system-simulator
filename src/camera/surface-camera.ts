@@ -11,6 +11,7 @@ import { surfaceVelocityAt } from '../physics/collision';
 import { PlayerRig } from '../bodies/player-rig';
 import { setActivePlayerRig } from '../physics/player-rig-physics';
 import { HeadBob } from './head-bob';
+import { Headlamp } from './headlamp';
 
 /**
  * Bodies the player rig can never stand on: stellar remnants (stars themselves are excluded
@@ -83,6 +84,8 @@ export class SurfaceCameraManager {
     private readonly onFreeCameraModeExit: () => void;
 
     private readonly headBob = new HeadBob();
+    /** The player's torch (T). Follows the view, head bob included; off when leaving surface mode. */
+    private readonly headlamp: Headlamp;
     /** Space held last frame, so a jump fires once per press. */
     private prevSpace = false;
 
@@ -102,8 +105,10 @@ export class SurfaceCameraManager {
         simulationState: { bodies: Body[] },
         flightHUD: FlightHUD,
         cameraState: { isFreeCameraMode: boolean; isLookAtMode: boolean },
-        onFreeCameraModeExit: () => void
+        onFreeCameraModeExit: () => void,
+        scene: THREE.Scene
     ) {
+        this.headlamp = new Headlamp(scene);
         this.camera = camera;
         this.controls = controls;
         this.renderer = renderer;
@@ -138,6 +143,7 @@ export class SurfaceCameraManager {
         this.state.isActive = false;
         this.state.body = null;
         this.removeRig();
+        this.headlamp.setOn(false);
 
         this.controls.enabled = true;
 
@@ -355,6 +361,15 @@ export class SurfaceCameraManager {
         this.camera.up.copy(up);
         if (bob.roll !== 0) this.camera.up.applyAxisAngle(forward, bob.roll);
         this.camera.lookAt(this._lookAt);
+
+        this.headlamp.update(this.camera.position, forward, this.camera.up);
+    }
+
+    /** Switch the head lamp on or off (T). Does nothing outside surface mode. */
+    toggleHeadlamp(): void {
+        if (!this.state.isActive) return;
+        this.headlamp.toggle();
+        this.flightHUD.forceHintRefresh();
     }
 
     /**
@@ -363,14 +378,15 @@ export class SurfaceCameraManager {
      */
     getHintLines(): string[] | null {
         if (!this.state.isActive) return null;
+        const lamp = `[T] Headlamp ${this.headlamp.isOn ? 'off' : 'on'}`;
         if (document.pointerLockElement !== this.renderer.domElement) {
             return [
                 'LMB: capture the mouse to look and steer (Esc releases it)',
-                'WASD Walk | Shift Sprint | Space Jump | Hold RMB to look without capturing',
+                `WASD Walk | Shift Sprint | Space Jump | ${lamp} | Hold RMB to look without capturing`,
             ];
         }
         return [
-            'WASD Walk | Shift Sprint | Space Jump | Mouse Look / Steer',
+            `WASD Walk | Shift Sprint | Space Jump | ${lamp} | Mouse Look / Steer`,
             '[F] Board ship | [Esc] Release mouse',
         ];
     }
