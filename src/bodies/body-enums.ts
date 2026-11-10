@@ -20,6 +20,8 @@ export enum BodyTypeEnum {
     Satellite = 1 << 13,
     Wormhole = 1 << 14,
     Probe = 1 << 15,
+    /** The player on foot (surface mode). Integrated by the physics, never in the body list. */
+    Player = 1 << 16,
 }
 
 /**

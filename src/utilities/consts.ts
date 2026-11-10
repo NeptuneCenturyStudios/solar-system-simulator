@@ -699,6 +699,51 @@ export const SHADOW_CASTER_LAYER = 5;
 /** How far beyond the hull of a landed ship the player rig is set down when stepping out (E). */
 export const DISEMBARK_DISTANCE = 0.01 / DIST_SCALE; // 10 m
 
+// === Player rig on foot (bodies/player-rig.ts, physics/player-rig-physics.ts) ===
+/** Mass of the player on foot (80 kg). Negligible gravity on anything else. */
+export const PLAYER_MASS = 80 / MASS_SCALE;
+/** Collision radius of the player's body: probe spheres against ship hulls. */
+export const PLAYER_RADIUS = 0.0003 / DIST_SCALE; // 0.3 m
+/** Eye height above the feet. */
+export const PLAYER_EYE_HEIGHT = 0.0017 / DIST_SCALE; // 1.7 m
+/** Heights above the feet of the probe spheres tested against ship hulls (knee, chest). */
+export const PLAYER_HULL_PROBE_HEIGHTS = [0.0005 / DIST_SCALE, 0.0013 / DIST_SCALE]; // 0.5 m, 1.3 m
+/** Walking speed over the ground (velocity convention: km/s / DIST_SCALE). */
+export const PLAYER_WALK_SPEED = 0.0014 / DIST_SCALE; // 1.4 m/s
+/** Sprinting speed over the ground (Shift). */
+export const PLAYER_SPRINT_SPEED = 0.006 / DIST_SCALE; // 6 m/s
+/** Take-off speed of a jump: ≈ 0.6 m high on Earth, ≈ 3.8 m on the Moon. */
+export const PLAYER_JUMP_SPEED = 0.0035 / DIST_SCALE; // 3.5 m/s
+/**
+ * Friction coefficient between feet and ground. Every change of ground speed (starting, stopping,
+ * turning) is limited to μ·g, so walking is sluggish where gravity is weak.
+ */
+export const PLAYER_TRACTION_MU = 1.0;
+/** Height above the drawn ground within which the player counts as standing on it. */
+export const PLAYER_GROUND_TOLERANCE = 0.00005 / DIST_SCALE; // 5 cm
+/** Ground-relative speed at or below which a player with no input comes to rest and is parked. */
+export const PLAYER_STICK_SPEED = 0.0002 / DIST_SCALE; // 0.2 m/s
+
+// === Head bob / camera sway on foot (camera/head-bob.ts) ===
+/** Ground distance covered per full stride (two footfalls). */
+export const HEAD_BOB_STRIDE_LENGTH = 0.0016 / DIST_SCALE; // 1.6 m
+/** Vertical bob amplitude at walking speed. */
+export const HEAD_BOB_VERTICAL_WALK = 0.00003 / DIST_SCALE; // 3 cm
+/** Vertical bob amplitude at sprinting speed. */
+export const HEAD_BOB_VERTICAL_SPRINT = 0.00008 / DIST_SCALE; // 8 cm
+/** Side-to-side sway amplitude, as a fraction of the vertical bob. */
+export const HEAD_BOB_LATERAL_RATIO = 0.6;
+/** Peak camera roll at sprinting speed, in radians (≈ 0.8°). */
+export const HEAD_BOB_ROLL_SPRINT = 0.014;
+/** Rate (1/s, wall clock) at which bob amplitude eases toward its target. */
+export const HEAD_BOB_EASE_RATE = 8;
+/** Landing dip: eye drop per unit of impact speed (sim units / (sim units/s)), in seconds. */
+export const HEAD_BOB_LANDING_DIP_PER_SPEED = 0.04;
+/** Largest landing dip. */
+export const HEAD_BOB_LANDING_DIP_MAX = 0.0004 / DIST_SCALE; // 40 cm
+/** Angular frequency (rad/s) of the critically damped spring that recovers the landing dip. */
+export const HEAD_BOB_LANDING_SPRING = 12;
+
 // === Surface precision patch (effects/surface-precision-patch.ts) ===
 /**
  * Camera altitude (sim units) above a body's drawn surface below which the ground under the

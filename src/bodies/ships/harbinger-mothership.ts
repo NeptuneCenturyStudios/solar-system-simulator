@@ -144,7 +144,7 @@ export class HarbingerMothership extends Spaceship {
             haloWidth: 0.07 / DIST_SCALE, // km
             damageInterval: 0.2,
             coolPerSecond: 1.25,
-            wobbleFraction: 0.05
+            wobbleFraction: 0.05,
         };
 
         super(dependencies, scene, {

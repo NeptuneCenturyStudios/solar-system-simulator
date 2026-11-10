@@ -475,3 +475,71 @@ export function findShipHullContact(
     out.rewind.copy(_offset).negate();
     return true;
 }
+
+// ── Closest hull point (player on foot vs a ship) ────────────────────────────────────────────
+
+const _hpLocal = new THREE.Vector3();
+const _hpQuery = new THREE.Vector3();
+const _hpBest = new THREE.Vector3();
+const _hpPart = new THREE.Matrix4();
+const _hpPartInv = new THREE.Matrix4();
+const _hpInvQuat = new THREE.Quaternion();
+const _hpHit = { point: new THREE.Vector3(), distance: 0, faceIndex: 0 };
+
+/**
+ * The point of `ship`'s hull nearest to world-space `point`, written to `out` (world space).
+ *
+ * Uses the hull's actual triangles (the same BVHs as ship-vs-ship contact) once the model has
+ * loaded, and its oriented bounding box before that. Worked in a ship-relative frame so a query at
+ * interplanetary coordinates keeps centimetre precision.
+ *
+ * @returns Distance from `point` to the hull (0 when inside the box fallback), or Infinity when the
+ *   ship has no hull to test yet.
+ */
+export function closestHullPoint(
+    ship: Spaceship,
+    point: THREE.Vector3,
+    out: THREE.Vector3
+): number {
+    const scale = ship.mesh.scale;
+    _hpInvQuat.copy(ship.mesh.quaternion).invert();
+    // Probe in the ship mesh's local frame (before its scale).
+    _hpLocal.subVectors(point, ship.mesh.position).applyQuaternion(_hpInvQuat).divide(scale);
+
+    let found = false;
+    const parts = getCollisionParts(ship);
+    if (parts.length > 0) {
+        let bestDistSq = Infinity;
+        for (const part of parts) {
+            partToContainer(part.mesh, ship.mesh, _hpPart);
+            _hpPartInv.copy(_hpPart).invert();
+            _hpQuery.copy(_hpLocal).applyMatrix4(_hpPartInv);
+            if (!part.bvh.closestPointToPoint(_hpQuery, _hpHit)) continue;
+            // Back to the ship's local frame, then to a world offset (scale, rotation) for a true
+            // world-space distance whatever the part and mesh scales.
+            _hpQuery.copy(_hpHit.point).applyMatrix4(_hpPart);
+            _tmp.copy(_hpQuery).sub(_hpLocal).multiply(scale).applyQuaternion(ship.mesh.quaternion);
+            const distSq = _tmp.lengthSq();
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                _hpBest.copy(_hpQuery);
+                found = true;
+            }
+        }
+        if (found) {
+            _hpBest.multiply(scale).applyQuaternion(ship.mesh.quaternion);
+            out.copy(ship.mesh.position).add(_hpBest);
+            return Math.sqrt(bestDistSq);
+        }
+    }
+
+    const bounds = ship.hullBoundsLocal;
+    if (!bounds) return Infinity;
+    _hpBest.copy(_hpLocal).clamp(bounds.min, bounds.max);
+    const inside = _hpBest.equals(_hpLocal);
+    _hpBest.multiply(scale).applyQuaternion(ship.mesh.quaternion);
+    out.copy(ship.mesh.position).add(_hpBest);
+    if (inside) return 0;
+    _tmp.copy(_hpLocal).multiply(scale).applyQuaternion(ship.mesh.quaternion);
+    return _tmp.distanceTo(_hpBest);
+}

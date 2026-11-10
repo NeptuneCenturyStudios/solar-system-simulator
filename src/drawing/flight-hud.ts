@@ -628,6 +628,8 @@ export class FlightHUD {
         altOrbitActive: boolean;
     };
     private getSelectedBody: () => Body | null;
+    /** Hint lines while on foot (surface mode), or null when not on foot. See setOnFootHintSource. */
+    private onFootHint: () => string[] | null = () => null;
 
     constructor(
         uiScene: THREE.Scene,
@@ -655,6 +657,14 @@ export class FlightHUD {
         this.simulationState = simulationState;
         this.flightState = flightState;
         this.getSelectedBody = getSelectedBody;
+    }
+
+    /**
+     * Where the on-foot (surface mode) hint comes from. The surface camera is created after the
+     * HUD, so it is wired in afterwards.
+     */
+    setOnFootHintSource(source: () => string[] | null): void {
+        this.onFootHint = source;
     }
 
     /** Create all HUD sprites and add them to uiScene. Call once after construction. */
@@ -1143,6 +1153,10 @@ export class FlightHUD {
                 ],
             };
         }
+
+        // On foot (surface mode): what the mouse and keys do.
+        const onFoot = this.onFootHint();
+        if (onFoot) return { visible: true, lines: onFoot };
 
         const selectedBody = this.getSelectedBody();
         const selected =

@@ -3,6 +3,7 @@ import { Body } from '../../bodies/body';
 import { CelestialBody } from '../../bodies/celestial-body';
 import { StaticBody } from '../../bodies/static-body';
 import { Spaceship } from '../../bodies/ships/spaceship';
+import { PlayerRig } from '../../bodies/player-rig';
 
 import { FLAG_EXACT_TARGET, FLAG_STATIC, IBodyArrays } from './store-view';
 
@@ -124,8 +125,9 @@ export class BodyStore implements IBodyArrays {
             if (body instanceof StaticBody) flags |= FLAG_STATIC;
 
             // Solver choice is a performance dial and must never change how a ship flies,
-            // so ships always receive exact forces from every source.
-            if (body instanceof Spaceship) {
+            // so ships always receive exact forces from every source. The player on foot too:
+            // solver error would jitter someone standing on the ground.
+            if (body instanceof Spaceship || body instanceof PlayerRig) {
                 flags |= FLAG_EXACT_TARGET;
                 this.exactTargets.push(n);
             }

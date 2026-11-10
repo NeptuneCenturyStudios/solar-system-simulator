@@ -37,17 +37,17 @@ npm run electron:build:linux # ...for Linux (AppImage + deb)
 ## Tooling
 
 - **ripgrep (`rg`)** is installed via a package manager, and each install places its binary on that machine's PATH. The absolute path differs per machine:
-    - **Chocolatey machine:** `C:\ProgramData\chocolatey\bin\rg.exe` (added to the *machine* PATH by Chocolatey)
-    - **WinGet machine:** `C:\Users\ebutler\AppData\Local\Microsoft\WinGet\Packages\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe\ripgrep-15.2.0-x86_64-pc-windows-msvc\rg.exe` (added to the *user* PATH by WinGet)
+    - **Chocolatey machine:** `C:\ProgramData\chocolatey\bin\rg.exe` (added to the _machine_ PATH by Chocolatey)
+    - **WinGet machine:** `C:\Users\ebutler\AppData\Local\Microsoft\WinGet\Packages\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe\ripgrep-15.2.0-x86_64-pc-windows-msvc\rg.exe` (added to the _user_ PATH by WinGet)
         - This path is version-pinned: the `ripgrep-<version>-x86_64-pc-windows-msvc` folder name changes on `winget upgrade`.
         - WinGet's stable, version-independent shim is `C:\Users\ebutler\AppData\Local\Microsoft\WinGet\Links\rg.exe`. It exists only when Developer Mode is enabled (WinGet creates it as a symlink), and that folder is not on PATH by default.
-    - A terminal opened *before* the install will not see `rg` — open a new terminal to pick up the PATH change.
+    - A terminal opened _before_ the install will not see `rg` — open a new terminal to pick up the PATH change.
     - CLI example: `rg "class.*Body" src/bodies/` or `rg "TODO|FIXME" src/`
     - Note: `choco install ripgrep` requires an elevated (Administrator) shell; without one it fails with `Access to the path 'C:\ProgramData\chocolatey\lib\ripgrep\tools' is denied`.
 
 ### `search_files` reports "Could not find ripgrep binary"
 
-**Setting `Search: Rg Path` does not fix this.** Verified against `sixth.sixth-ai-0.3.2`: the string `rgPath` appears nowhere in `dist/extension.js`, and the extension contributes no ripgrep setting (its only `contributes.configuration` keys are `sixth.telegram.*`). Its resolver looks *only* inside the VS Code install directory — never at `PATH`, and never at `search.rgPath`:
+**Setting `Search: Rg Path` does not fix this.** Verified against `sixth.sixth-ai-0.3.2`: the string `rgPath` appears nowhere in `dist/extension.js`, and the extension contributes no ripgrep setting (its only `contributes.configuration` keys are `sixth.telegram.*`). Its resolver looks _only_ inside the VS Code install directory — never at `PATH`, and never at `search.rgPath`:
 
 ```
 <vscode.env.appRoot>/node_modules/@vscode/ripgrep/bin/rg.exe
@@ -125,9 +125,11 @@ src/
 ```
 
 ## Previous milestones
+
 For previous milestone info, see milestones.md
 
 ## Current milestone
+
 - **Version 1.5.0**
 - **Phase 1**
 - [x] Phase 1.1: Complete star overhaul
@@ -139,7 +141,7 @@ For previous milestone info, see milestones.md
 - [x] Phase 2.1: Add new alien mothership model and class
 - [x] Phase 2.2: Add new alien fighter model and class
 - [x] Phase 2.3: Fleet and AI fixes to prepare for fleet scenatio
-- [x] Phase 2.4: Add alien invasion scenario (massive fleet battle). 
+- [x] Phase 2.4: Add alien invasion scenario (massive fleet battle).
 - **Phase 3**
 - [x] Phase 3.1: Review performance on slower machines after star update and add performance adjustment options as needed.
 - [x] Phase 3.2: HDR output pipeline: the scene renders into the GravitationalLensingEffect's 8-bit `UnsignedByteType` render target, so three.js applies no tone mapping or sRGB conversion there (`renderer.toneMapping = ACESFilmicToneMapping` is effectively inert) and anything brighter than 1.0 clips to flat white. This causes hard day/night terminators (Earth surface, lit cloud tops) and blown-out highlights. Fix: make the capture target half-float and apply tone mapping and the sRGB output conversion in the final blit to the screen. This changes the look of the whole app, so star, glow, lens-flare, sun-ray and atmosphere constants will need retuning afterwards.
@@ -164,7 +166,7 @@ For previous milestone info, see milestones.md
 
 ## Desktop builds (Electron)
 
-One renderer, two shells. `npm run build` still produces the web deploy; the desktop build runs the *same* `dist/` output inside Electron, so a fix in the web build is a fix in both.
+One renderer, two shells. `npm run build` still produces the web deploy; the desktop build runs the _same_ `dist/` output inside Electron, so a fix in the web build is a fix in both.
 
 - **Main process:** `electron/` (TypeScript), compiled to `electron-dist/` by `npm run electron:compile`. `tsconfig.electron.json` targets CommonJS; `electron/package.json` marks that folder CommonJS so the `node16` resolver emits `require()` despite the repo's `"type": "module"`.
 - **No code signing** anywhere. macOS uses `identity: null`; CI sets `CSC_IDENTITY_AUTO_DISCOVERY=false`.
@@ -204,6 +206,7 @@ node -e "console.log(require('@electron/asar').listPackage('release/win-unpacked
 - Mass should be expressed in kg and scaled with MASS_SCALE
 
 ## Keyboard Shortcuts
+
 - When adding a keyboard shortcut, the new shortcut shoud be listed in the HelpPanel as well.
 
 ## Code Conventions

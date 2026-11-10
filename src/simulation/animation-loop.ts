@@ -39,6 +39,7 @@ import { settingsStore, type ToneMappingMode } from '../settings/settings-store'
 import { absorbBody, destroyBody, updateSimulation } from '../physics/physics';
 import { resolveCollision } from '../physics/collision';
 import { updateGroundAlignment } from '../physics/ground-alignment';
+import { updatePlayerRigFrame } from '../physics/player-rig-physics';
 import { NotificationType } from '../event-log/event-log';
 import { steeringDt } from './steering-clock';
 import { findNearestSurface } from '../physics/nearest-surface';
@@ -612,8 +613,15 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             ship.updateModelAnimation(shipWallDt);
         }
 
+        // ── On foot: WASD / Shift / Space drive the player rig ───────────
+        // Before the physics step, so this frame's substeps walk and jump with them.
+        if (isSurfaceModeActive) {
+            ctx.surfaceCam.updateInput(ctx.keys);
+        }
+
         // ── WASD camera movement ─────────────────────────────────────────
-        if (!isFlightModeActive) {
+        // Not on foot: the same keys walk the player rig instead (above).
+        if (!isFlightModeActive && !isSurfaceModeActive) {
             const speed = ctx.keys.shift ? FREE_CAM_BOOST_SPEED : FREE_CAM_NORMAL_SPEED;
             ctx.camera.getWorldDirection(_animCamDirection);
             _animCamRight.crossVectors(ctx.camera.up, _animCamDirection).normalize();
@@ -867,6 +875,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             // Grounded ships turn with the ground and settle flat onto it. After the collision
             // pass, which records what each ship is touching this frame.
             updateGroundAlignment(ctx.simulationState.bodies, dtTotal);
+
+            // The player on foot: parking, ship hulls in the way, final ground snap.
+            updatePlayerRigFrame(ctx.simulationState.bodies, dtTotal);
 
             // Landings end here: a ship grounded this frame has touched down, and one whose
             // surface was destroyed mid-landing is cancelled with its controls handed back.
@@ -1241,7 +1252,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // jittered trying to catch up. Placed after warp shake so a warping ship
         // cannot shake the surface view.
         if (isSurfaceModeActive) {
-            ctx.surfaceCam.updateTransform();
+            ctx.surfaceCam.updateTransform(dtTotal, wallDt);
         }
 
         // ── Positional audio listener ──────────────────────────────────────

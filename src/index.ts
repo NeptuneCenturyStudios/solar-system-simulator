@@ -2086,6 +2086,20 @@ function onMouseDown(event: MouseEvent) {
     // Left mouse button for everything else
     if (event.button !== 0) return;
 
+    // On foot: a click on the scene captures the mouse for FPS-style aiming (Esc releases it).
+    // No selection or gizmo clicks while walking.
+    if (surfaceCam.isActive) {
+        if (
+            event.target === renderer.domElement &&
+            document.pointerLockElement !== renderer.domElement
+        ) {
+            renderer.domElement.requestPointerLock().catch((e: unknown) => {
+                console.warn('[surface] Pointer lock refused.', e);
+            });
+        }
+        return;
+    }
+
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
@@ -2858,8 +2872,13 @@ function onMouseUp(event: MouseEvent) {
     // Deactivate mouse look on right mouse button release
     if (event.button === 2) {
         interactionState.isMouseLookActive = false;
-        // Exit pointer lock (flight mode uses pointer lock for steering — leave it alone here)
-        if (!flightState.isActive && document.pointerLockElement === renderer.domElement) {
+        // Exit pointer lock (flight mode uses pointer lock for steering, and on foot it is the
+        // click-to-capture aim — leave it alone in both)
+        if (
+            !flightState.isActive &&
+            !surfaceCam.isActive &&
+            document.pointerLockElement === renderer.domElement
+        ) {
             document.exitPointerLock();
         }
     }
@@ -2891,7 +2910,8 @@ function onMouseUp(event: MouseEvent) {
                 .setRGB(0, 0.8, 1)
                 .multiplyScalar(0.2);
         }
-        controls.enabled = !cameraState.isFreeCameraMode;
+        // OrbitControls stay off on foot: the surface camera places the view every frame.
+        controls.enabled = !cameraState.isFreeCameraMode && !surfaceCam.isActive;
         posIndicator.hide();
 
         velArc.hideAll();
@@ -3510,6 +3530,9 @@ function exitSurfaceCameraToLookAt(target: Body | null = surfaceCam.state.body):
     cameraState.isLookAtMode = true;
     setFocusBody(body, { zoom: true });
 }
+
+// The on-foot controls hint (top of the screen) comes from the surface camera.
+flightHUD.setOnFootHintSource(() => surfaceCam.getHintLines());
 
 // Surface camera enablement is selection-driven, so register the state
 // snapshot with the Vue bridge now that `surfaceCam` exists. (The bridge's

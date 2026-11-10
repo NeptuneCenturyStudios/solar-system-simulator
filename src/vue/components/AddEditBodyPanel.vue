@@ -643,7 +643,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
-import { COMET_TAIL_COLOR_PALETTE, BASE_STAR_LIGHT_INTENSITY_MIN, BASE_STAR_LIGHT_INTENSITY_MAX } from '../../utilities/consts';
+import {
+    COMET_TAIL_COLOR_PALETTE,
+    BASE_STAR_LIGHT_INTENSITY_MIN,
+    BASE_STAR_LIGHT_INTENSITY_MAX,
+} from '../../utilities/consts';
 import { closeBodyEditor, openBodyEditor, vueUiState } from '../ui-store';
 import {
     applyBodyEdit,

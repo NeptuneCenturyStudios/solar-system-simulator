@@ -17,6 +17,11 @@ import { flightState } from '../simulation/simulation';
 import { applyLaunchLiftSubsteps, collectLaunchBodies } from '../simulation/ship-launch';
 import { applyLandingSubsteps, collectLandingBodies } from '../simulation/ship-landing';
 import { applyGroundSupportSubsteps, collectGroundBodies } from './ground-alignment';
+import {
+    applyPlayerRigSubsteps,
+    collectPlayerRigBodies,
+    getActivePlayerRig,
+} from './player-rig-physics';
 import { NBodyIntegrator, ISubstepHooks } from './nbody/integrator';
 import { getActiveSolver } from './nbody/solver-registry';
 
@@ -28,6 +33,12 @@ const _integrator = new NBodyIntegrator();
 
 /** Surfaces ships are landing on or lifting off from, refilled every frame. */
 const _referenceBodies: Body[] = [];
+
+/**
+ * The bodies handed to the integrator while the player is on foot: the simulation's bodies plus
+ * the player rig, which is kept out of `simulationState.bodies` (see bodies/player-rig.ts).
+ */
+const _integratedBodies: Body[] = [];
 
 /** Reusable hook object so the substep loop never allocates. */
 const _hooks: ISubstepHooks = {
@@ -129,6 +140,8 @@ export function updateSimulation(
         applyLandingSubsteps(substepDt);
         // Resting ships are held on the ground continuously, not just at the frame's contact pass.
         applyGroundSupportSubsteps(substepDt);
+        // The player on foot: ground contact, walking and jumping.
+        applyPlayerRigSubsteps(substepDt);
 
         flightState.activeShip?.applyFlightThrustSubstep?.(substepDt);
 
@@ -160,8 +173,19 @@ export function updateSimulation(
     collectLandingBodies(_referenceBodies);
     collectLaunchBodies(_referenceBodies);
     collectGroundBodies(_referenceBodies);
+    collectPlayerRigBodies(_referenceBodies);
 
-    _integrator.step(simulationState.bodies, getActiveSolver(), gEff, EPS2, steps, dt, _hooks);
+    const rig = getActivePlayerRig();
+    let bodies = simulationState.bodies;
+    if (rig) {
+        _integratedBodies.length = 0;
+        for (let i = 0; i < bodies.length; i++) _integratedBodies.push(bodies[i]);
+        _integratedBodies.push(rig);
+        bodies = _integratedBodies;
+    }
+
+    _integrator.step(bodies, getActiveSolver(), gEff, EPS2, steps, dt, _hooks);
+    _integratedBodies.length = 0;
 }
 
 /**

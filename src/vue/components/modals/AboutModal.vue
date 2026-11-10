@@ -2,9 +2,9 @@
     <ModalBase :visible="visible" title="About" :allow-close="true" @cancel="hide">
         <div class="modal-body">
             <p>
-                Solar System Simulator is a space simulation focused on physics,
-                exploration, and flight simulation. Build your own solar system or explore
-                procedurally generated systems. Fly spaceships and play through various scenarios.
+                Solar System Simulator is a space simulation focused on physics, exploration, and
+                flight simulation. Build your own solar system or explore procedurally generated
+                systems. Fly spaceships and play through various scenarios.
             </p>
 
             <div class="footer-note">© {{ new Date().getFullYear() }} Neptune Century</div>

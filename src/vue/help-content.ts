@@ -102,4 +102,17 @@ export const HELP_SECTIONS: HelpSection[] = [
             { action: 'Exit flight mode', keys: ['Esc'] },
         ],
     },
+    {
+        title: 'On Foot (Surface Mode)',
+        note: 'Step out of a landed ship (E) or use the surface camera from the System Explorer.',
+        rows: [
+            { action: 'Walk (direction follows where you look)', keys: ['W', 'A', 'S', 'D'] },
+            { action: 'Sprint', keys: ['Hold Shift'] },
+            { action: 'Jump', keys: ['Space'] },
+            { action: 'Capture the mouse to look and steer', keys: ['Left-click'] },
+            { action: 'Look around without capturing', keys: ['Right-drag'] },
+            { action: 'Release the mouse', keys: ['Esc'] },
+            { action: 'Board your ship', keys: ['F'] },
+        ],
+    },
 ];

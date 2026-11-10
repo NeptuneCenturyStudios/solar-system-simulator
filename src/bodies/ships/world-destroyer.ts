@@ -171,7 +171,7 @@ export class WorldDestroyer extends Spaceship {
             haloWidth: 0.13 / DIST_SCALE, // km
             damageInterval: 0.2,
             coolPerSecond: 1.0,
-            wobbleFraction: 0.05
+            wobbleFraction: 0.05,
         };
         const bowArc = new LightningWeapon(scene, SPACESHIP_RADIUS, arcWeaponConfig);
 

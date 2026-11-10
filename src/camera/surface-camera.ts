@@ -5,8 +5,12 @@ import { BlackHole } from '../bodies/black-hole';
 import { isBodyType } from '../utilities/utilities';
 import { FlightHUD } from '../drawing/flight-hud';
 import { BodyTypeEnum } from '../bodies/body-enums';
-import { DIST_SCALE } from '../utilities/consts';
+import { PLAYER_EYE_HEIGHT, PLAYER_SPRINT_SPEED, PLAYER_WALK_SPEED } from '../utilities/consts';
 import { surfaceReachFactor } from '../physics/body-surface';
+import { surfaceVelocityAt } from '../physics/collision';
+import { PlayerRig } from '../bodies/player-rig';
+import { setActivePlayerRig } from '../physics/player-rig-physics';
+import { HeadBob } from './head-bob';
 
 /**
  * Bodies the player rig can never stand on: stellar remnants (stars themselves are excluded
@@ -20,32 +24,49 @@ const SURFACE_CAM_EXCLUDED_TYPES =
     BodyTypeEnum.SpaceShip |
     BodyTypeEnum.Probe |
     BodyTypeEnum.Satellite |
-    BodyTypeEnum.Wormhole;
+    BodyTypeEnum.Wormhole |
+    BodyTypeEnum.Player;
+
+/** Keys the player rig reads (a view of the animation loop's keyboard state). */
+export interface PlayerMoveKeys {
+    w: boolean;
+    a: boolean;
+    s: boolean;
+    d: boolean;
+    space: boolean;
+    shift: boolean;
+}
 
 export interface SurfaceCameraState {
     isActive: boolean;
     body: Body | null;
-    anchorLocalDir: THREE.Vector3;
-    /** Heading (tangent to the surface at the anchor) in the body's local frame. */
+    /** The player on foot while surface mode is active (moved by the physics). */
+    rig: PlayerRig | null;
+    /**
+     * Heading reference (tangent to the surface under the player) in the body's local frame.
+     * Parallel-transported every frame as the player walks, so the view never skews.
+     */
     anchorLocalNorth: THREE.Vector3;
     yaw: number;
     pitch: number;
     prevCameraUp: THREE.Vector3;
-    /** Height of the eye above the drawn (faceted) ground, in sim units. */
-    eyeHeight: number;
     lookSensitivity: number;
 }
 
+/**
+ * Surface mode: the player on foot. Owns the {@link PlayerRig} (a physics body the n-body
+ * integrator moves — see physics/player-rig-physics.ts), turns WASD / Shift / Space into its walk
+ * and jump requests, and places the camera at its eye with head bob.
+ */
 export class SurfaceCameraManager {
     readonly state: SurfaceCameraState = {
         isActive: false,
         body: null,
-        anchorLocalDir: new THREE.Vector3(0, 1, 0),
+        rig: null,
         anchorLocalNorth: new THREE.Vector3(0, 0, 1),
         yaw: 0,
         pitch: 0,
         prevCameraUp: new THREE.Vector3(0, 1, 0),
-        eyeHeight: 0.0019 / DIST_SCALE,
         lookSensitivity: 0.002,
     };
 
@@ -60,6 +81,19 @@ export class SurfaceCameraManager {
     private readonly flightHUD: FlightHUD;
     private readonly cameraState: { isFreeCameraMode: boolean; isLookAtMode: boolean };
     private readonly onFreeCameraModeExit: () => void;
+
+    private readonly headBob = new HeadBob();
+    /** Space held last frame, so a jump fires once per press. */
+    private prevSpace = false;
+
+    /** Scratch, so the per-frame update never allocates. */
+    private readonly _up = new THREE.Vector3();
+    private readonly _north = new THREE.Vector3();
+    private readonly _forward = new THREE.Vector3();
+    private readonly _right = new THREE.Vector3();
+    private readonly _groundVel = new THREE.Vector3();
+    private readonly _lookAt = new THREE.Vector3();
+    private readonly _quat = new THREE.Quaternion();
 
     constructor(
         camera: THREE.PerspectiveCamera,
@@ -96,13 +130,14 @@ export class SurfaceCameraManager {
     /**
      * Leaves surface mode. The camera is left where it stood (only its up vector is restored, so
      * OrbitControls rotation works again); the caller decides what to frame next — see
-     * exitSurfaceCameraToLookAt in index.ts.
+     * exitSurfaceCameraToLookAt in index.ts. The player rig is removed from the physics.
      */
     exit(): void {
         this.camera.up.copy(this.state.prevCameraUp);
 
         this.state.isActive = false;
         this.state.body = null;
+        this.removeRig();
 
         this.controls.enabled = true;
 
@@ -114,7 +149,7 @@ export class SurfaceCameraManager {
     }
 
     /**
-     * Enters surface mode on `body`.
+     * Enters surface mode on `body`: the player rig is stood on the ground there, at rest.
      *
      * @param options.worldPoint Stand on the ground under this world point (default: under the
      *   camera).
@@ -144,18 +179,34 @@ export class SurfaceCameraManager {
         this.state.yaw = 0;
         this.state.pitch = 0;
 
-        const bodyCenter = body.mesh!.position.clone();
-        const fromBodyToCam = new THREE.Vector3()
+        const bodyCenter = body.mesh.position.clone();
+        const surfaceNormalWorld = new THREE.Vector3()
             .subVectors(options.worldPoint ?? this.camera.position, bodyCenter)
             .normalize();
-        const surfaceNormalWorld = fromBodyToCam.clone().normalize();
-        const invQ = body.mesh!.quaternion.clone().invert();
-        this.state.anchorLocalDir = surfaceNormalWorld.clone().applyQuaternion(invQ).normalize();
+        const invQ = body.mesh.quaternion.clone().invert();
 
         // Pick the starting heading from world axes once, then store it in the body's frame so
         // the view stays fixed to the surface as the body spins and tilts.
         const northWorld = this.initialHeading(surfaceNormalWorld, options.faceToward);
         this.state.anchorLocalNorth = northWorld.applyQuaternion(invQ).normalize();
+
+        // Stand on the drawn ground under that point, not the true sphere: a UV sphere's flat
+        // facets sag inward between vertices (~8 km on Earth), and a model body (asteroid, comet
+        // nucleus) is an irregular rock inside its bounding radius.
+        const reach = surfaceReachFactor(body, surfaceNormalWorld);
+        const groundRadius = (body.radius || 0) * (body.mesh.scale.x || 1) * reach;
+        const feet = bodyCenter.clone().addScaledVector(surfaceNormalWorld, groundRadius);
+        const velocity = surfaceVelocityAt(body, feet, new THREE.Vector3());
+
+        this.removeRig();
+        const rig = new PlayerRig(body.scene, body, feet, velocity);
+        rig.reachFactor = reach;
+        // Start parked: standing still exactly where we arrived until a key is pressed.
+        rig.anchorLocal = feet.clone().sub(bodyCenter).applyQuaternion(invQ);
+        this.state.rig = rig;
+        setActivePlayerRig(rig);
+        this.headBob.reset();
+        this.prevSpace = false;
 
         this.updateTransform();
 
@@ -184,59 +235,153 @@ export class SurfaceCameraManager {
         return north.normalize();
     }
 
-    updateTransform(): void {
+    /** Remove the player rig from the physics and the scene. */
+    private removeRig(): void {
+        const rig = this.state.rig;
+        if (!rig) return;
+        setActivePlayerRig(null);
+        rig.dispose();
+        this.state.rig = null;
+    }
+
+    /** The rig, while it and the ground under it are still usable. */
+    private liveRig(): PlayerRig | null {
         const s = this.state;
-        if (
-            !s.isActive ||
-            !s.body ||
-            !this.simulationState.bodies.includes(s.body) ||
-            s.body._isDisposed
-        )
-            return;
+        const rig = s.rig;
+        if (!s.isActive || !s.body || !rig || rig._isDisposed) return null;
+        if (!this.simulationState.bodies.includes(s.body) || s.body._isDisposed || !s.body.mesh) {
+            return null;
+        }
+        return rig;
+    }
 
-        const b = s.body;
-        const center = b.mesh!.position;
+    /**
+     * Writes the unit local up at the rig's feet into `_up`, and the heading reference — parallel-
+     * transported onto the current tangent plane and stored back in the body's frame — into
+     * `_north`.
+     */
+    private updateFrame(rig: PlayerRig, body: Body): void {
+        this._up.subVectors(rig.mesh.position, body.mesh.position);
+        if (this._up.lengthSq() < 1e-24) this._up.set(0, 1, 0);
+        this._up.normalize();
 
-        const gravityUp = s.anchorLocalDir.clone().applyQuaternion(b.mesh!.quaternion).normalize();
+        this._north
+            .copy(this.state.anchorLocalNorth)
+            .applyQuaternion(body.mesh.quaternion)
+            .projectOnPlane(this._up);
+        if (this._north.lengthSq() < 1e-20) {
+            // Degenerate (heading straight up): fall back to any tangent.
+            this._north.set(0, 1, 0).projectOnPlane(this._up);
+            if (this._north.lengthSq() < 1e-20) this._north.set(0, 0, 1).projectOnPlane(this._up);
+        }
+        this._north.normalize();
+        this.state.anchorLocalNorth
+            .copy(this._north)
+            .applyQuaternion(this._quat.copy(body.mesh.quaternion).invert());
+    }
 
-        // Stand on the drawn ground under the anchor, not the true sphere: a UV sphere's flat
-        // facets sag inward between vertices (~8 km on Earth), and a model body (asteroid, comet
-        // nucleus) is an irregular rock inside its bounding radius.
-        const groundRadius =
-            (b.radius || 0) * (b.mesh?.scale?.x || 1) * surfaceReachFactor(b, gravityUp);
+    /** Yawed heading on the ground plane into `_forward`, its right-hand side into `_right`. */
+    private updateHeading(): void {
+        this._forward.copy(this._north).applyAxisAngle(this._up, this.state.yaw).normalize();
+        this._right.crossVectors(this._forward, this._up).normalize();
+    }
 
-        const surfacePoint = center
-            .clone()
-            .add(gravityUp.clone().multiplyScalar(groundRadius + s.eyeHeight));
+    /**
+     * Feed this frame's WASD / Shift / Space to the player rig, before the physics step. Movement
+     * follows the yaw only: looking up or down never changes where or how fast you walk.
+     */
+    updateInput(keys: PlayerMoveKeys): void {
+        const rig = this.liveRig();
+        const body = this.state.body;
+        if (!rig || !body) return;
+        this.updateFrame(rig, body);
+        this.updateHeading();
 
-        // Heading is carried in the body's frame like the anchor, so it never drifts against the
-        // surface. Re-orthogonalize against gravityUp to absorb numeric drift.
-        const north = s.anchorLocalNorth
-            .clone()
-            .applyQuaternion(b.mesh!.quaternion)
-            .projectOnPlane(gravityUp)
-            .normalize();
+        rig.moveDir.set(0, 0, 0);
+        if (keys.w) rig.moveDir.add(this._forward);
+        if (keys.s) rig.moveDir.sub(this._forward);
+        if (keys.d) rig.moveDir.add(this._right);
+        if (keys.a) rig.moveDir.sub(this._right);
+        if (rig.moveDir.lengthSq() > 1e-12) {
+            rig.moveDir.normalize();
+            rig.moveSpeed = keys.shift ? PLAYER_SPRINT_SPEED : PLAYER_WALK_SPEED;
+        } else {
+            rig.moveDir.set(0, 0, 0);
+            rig.moveSpeed = 0;
+        }
 
-        const yawQuat = new THREE.Quaternion().setFromAxisAngle(gravityUp, s.yaw);
-        const forwardYawed = north.clone().applyQuaternion(yawQuat).normalize();
+        if (keys.space && !this.prevSpace && rig.isGrounded) rig.jumpQueued = true;
+        this.prevSpace = keys.space;
+    }
 
-        const right = new THREE.Vector3().crossVectors(forwardYawed, gravityUp).normalize();
-        const pitchQuat = new THREE.Quaternion().setFromAxisAngle(right, s.pitch);
-        const forward = forwardYawed.clone().applyQuaternion(pitchQuat).normalize();
+    /**
+     * Place the camera at the player's eye, after the physics step — so it uses the body's and the
+     * rig's end-of-frame transforms, the exact ones the renderer draws — with head bob applied.
+     *
+     * @param simDt Sim seconds this frame covered (0 while paused).
+     * @param wallDt Wall-clock seconds this frame took.
+     */
+    updateTransform(simDt = 0, wallDt = 0): void {
+        const rig = this.liveRig();
+        const body = this.state.body;
+        if (!rig || !body) return;
+        this.updateFrame(rig, body);
+        this.updateHeading();
+        const up = this._up;
 
-        const lookAtTarget = surfacePoint.clone().add(forward.multiplyScalar(1000));
+        // Ground speed for the sway: velocity relative to the surface, along the ground.
+        surfaceVelocityAt(body, rig.mesh.position, this._groundVel);
+        this._groundVel.subVectors(rig.velocity, this._groundVel);
+        this._groundVel.addScaledVector(up, -this._groundVel.dot(up));
+        const groundSpeed = rig.anchorLocal ? 0 : this._groundVel.length();
 
-        this.camera.position.copy(surfacePoint);
-        this.camera.up.copy(gravityUp);
-        this.camera.lookAt(lookAtTarget);
+        if (rig.lastImpactSpeed > 0) {
+            this.headBob.land(rig.lastImpactSpeed);
+            rig.lastImpactSpeed = 0;
+        }
+        const bob = this.headBob.update(groundSpeed, rig.isGrounded, simDt, wallDt);
+
+        const right = this._right;
+        this.camera.position
+            .copy(rig.mesh.position)
+            .addScaledVector(up, PLAYER_EYE_HEIGHT + bob.vertical)
+            .addScaledVector(right, bob.lateral);
+
+        // Pitch tilts the view only; _forward is reused as the view direction from here on.
+        const forward = this._forward.applyAxisAngle(right, this.state.pitch).normalize();
+        this._lookAt.copy(this.camera.position).addScaledVector(forward, 1000);
+
+        // Roll: tilt the camera's up about the view direction.
+        this.camera.up.copy(up);
+        if (bob.roll !== 0) this.camera.up.applyAxisAngle(forward, bob.roll);
+        this.camera.lookAt(this._lookAt);
+    }
+
+    /**
+     * Controls hint for the HUD while on foot, or null when not in surface mode. Until the mouse is
+     * captured it says what a left-click does; once captured, the walking controls.
+     */
+    getHintLines(): string[] | null {
+        if (!this.state.isActive) return null;
+        if (document.pointerLockElement !== this.renderer.domElement) {
+            return [
+                'LMB: capture the mouse to look and steer (Esc releases it)',
+                'WASD Walk | Shift Sprint | Space Jump | Hold RMB to look without capturing',
+            ];
+        }
+        return [
+            'WASD Walk | Shift Sprint | Space Jump | Mouse Look / Steer',
+            '[F] Board ship | [Esc] Release mouse',
+        ];
     }
 
     onMouseMove = (event: MouseEvent): void => {
         if (!this.state.isActive) return;
 
+        // Pointer locked (click to capture): the mouse always aims. Otherwise hold RMB to look.
+        const locked = document.pointerLockElement === this.renderer.domElement;
         const rmbDown = (event.buttons & 2) === 2;
-        if (!rmbDown) return;
-        if (document.pointerLockElement === this.renderer.domElement) return;
+        if (!locked && !rmbDown) return;
 
         const dx = event.movementX || 0;
         const dy = event.movementY || 0;

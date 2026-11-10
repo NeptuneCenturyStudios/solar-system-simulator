@@ -1,4 +1,5 @@
 ## previous milestones
+
 - **Version 1.4.0 - COMPLETE**
 - **Phase 1**
 - [x] Phase 1.1: Make codebase buildable to web and electron
@@ -12,12 +13,12 @@
 - **Phase 4**
 - [x] Phase 4.1: Improve gizmo. It currently doesn't scale to body size well and is still a pain to use.
 - [x] Phase 4.2: Improve orbital data for all other planets. Pluto and Nepture already done. Every major planet (Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto) now flies its real J2000 orbit: perihelion, aphelion, inclination, node and perihelion orientation come from the NASA planetary fact sheets, and `bodies/planet-orbit.ts` turns those elements into state vectors. The data lives in the `*_PERIHELION_DIST` / `*_APHELION_DIST` / `*_INCLINATION` / `*_LONG_ASC_NODE` / `*_ARG_PERIHELION` blocks in `consts.ts`.
-- [x] Phase 4.3: More work on ship AI. In progress: a Ship AI autopilot (`simulation/ai/autopilot-ship-ai.ts`), selectable in Flight Controls → Autopilot (Classic stays the default). It flies only through `controlInput`, in the world frame: warps/boosts/changes tier to reach any target (bodies or ships), then holds a natural (gravity) or artificial (powered) orbit; ships are always circled at the Flight Controls orbit distance. New ship AI *commands* are built from the shared pieces in `simulation/ai/navigation/` (steering, warp navigation, speed tier, `flyVelocity` — point the nose along the wanted world velocity and hold `controlInput.speedSetpoint`) and the maneuvers in `simulation/ai/maneuvers/` (approach, natural orbit, artificial orbit). Ship steering/roll/banking runs on sim time (`steeringDt()` in `simulation/steering-clock.ts`) so turn rate follows the time scale; Flight Controls → "Steering Follows Time Scale" (`steeringTimeScaleEnabled`, on by default) restores the fixed real-time rate.
+- [x] Phase 4.3: More work on ship AI. In progress: a Ship AI autopilot (`simulation/ai/autopilot-ship-ai.ts`), selectable in Flight Controls → Autopilot (Classic stays the default). It flies only through `controlInput`, in the world frame: warps/boosts/changes tier to reach any target (bodies or ships), then holds a natural (gravity) or artificial (powered) orbit; ships are always circled at the Flight Controls orbit distance. New ship AI _commands_ are built from the shared pieces in `simulation/ai/navigation/` (steering, warp navigation, speed tier, `flyVelocity` — point the nose along the wanted world velocity and hold `controlInput.speedSetpoint`) and the maneuvers in `simulation/ai/maneuvers/` (approach, natural orbit, artificial orbit). Ship steering/roll/banking runs on sim time (`steeringDt()` in `simulation/steering-clock.ts`) so turn rate follows the time scale; Flight Controls → "Steering Follows Time Scale" (`steeringTimeScaleEnabled`, on by default) restores the fixed real-time rate.
 
 - **Version 1.3.0 - COMPLETE**
 - **Phase 1**
 - [x] Phase 1.1: Add atmospheric drag
-- [x] Phase 1.2: Tweak visual appearance of entry flame effect to accomodate new atmospheric drag 
+- [x] Phase 1.2: Tweak visual appearance of entry flame effect to accomodate new atmospheric drag
 - [x] Phase 1.3: Add new shield layer of HP to ships which will gradually recharge over a fixed time for each ship (different shield hp amount and recharge rate per ship type)
 - **Phase 2**
 - [x] Phase 2: Add satellite station keeping to counter drag
@@ -36,4 +37,3 @@
 - [x] Phase 6.4: Update the comet/asteroid object assets
 - **Phase 7 - More ship AI updates**
 - [x] Phase 7.1: Test AI Ship scenario. Start user in ship (Zenith) like the Asteroid Defense scenario (no lockdowns required). NPC ship should approach player ship. Target distance to player is ~500m or about 0.5km / DIST_SCALE. NPC ship should pursue player ship and fire weapons. NPC ship will need an adaptation to aiming since player uses mouse to aim. NPC ship should have same range of aim that a player has (so it cannot fire behind itself and must steer toward player to get into aiming range.) If the player destroyes the NPC ship, then the NPC ship should respawn a distance from the player. All weapon behaviors should be the same (cooldown, rate of fire, heat, etc.)
-

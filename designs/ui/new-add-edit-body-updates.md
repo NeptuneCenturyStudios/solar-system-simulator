@@ -5,8 +5,9 @@ The problem:
 The layout of the component is overwhelming and not very intuitive. Code is repeated with edit and add components.
 
 The solution:
+
 - Preset body's doesn't contain all of the bodies that are created initially in the main solar system. We need to add all of them that are missing.
-Custom body layout:
+  Custom body layout:
 - We need to create one section for both add and edit, and depending on the mode and what is editable, enable or disable certain fields instead of having two separate add/edit inputs.
 - Reorganize the layout.
     - Adding New
@@ -28,4 +29,5 @@ Custom body layout:
             - Has Magnetic Field, Field Strength, Dipole Tilt, Dipole Azimuth, Dipole Offset, Reverse Polarity
 
 Other enhancements
+
 - If the selected body is destroyed while the edit panel is open. Close the edit panel
