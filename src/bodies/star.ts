@@ -5,6 +5,8 @@ import {
     STAR_LIGHT_INTENSITY_MIN,
     STAR_LIGHT_INTENSITY_MAX,
     STAR_LIGHT_DECAY,
+    STAR_LIGHT_EXPOSURE,
+    STAR_AMBIENT_INTENSITY,
 } from '../utilities/consts';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 import { CelestialBody } from './celestial-body';
@@ -88,7 +90,7 @@ export class Star extends CelestialBody {
 
         this.sunLight = this.createLight(options.pos, this.lightIntensity, options.lightDistance);
 
-        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
+        this.ambientLight = new THREE.AmbientLight(0xffffff, STAR_AMBIENT_INTENSITY);
         scene.add(this.ambientLight);
 
         this.setTemperature(options.temperature);
@@ -113,7 +115,8 @@ export class Star extends CelestialBody {
     }
 
     createLight(pos: THREE.Vector3, intensity: number, distance: number) {
-        const light = new THREE.PointLight(0xffffff, intensity, distance);
+        // `intensity` is the star's own value; the point light carries it at the HDR exposure.
+        const light = new THREE.PointLight(0xffffff, intensity * STAR_LIGHT_EXPOSURE, distance);
         light.position.copy(pos);
         light.decay = STAR_LIGHT_DECAY;
         light.userData.distance = distance;
@@ -147,7 +150,7 @@ export class Star extends CelestialBody {
     setLightIntensity(intensity: number) {
         this.lightIntensity = this._clampLightIntensity(intensity);
         if (this.sunLight) {
-            this.sunLight.intensity = this.lightIntensity;
+            this.sunLight.intensity = this.lightIntensity * STAR_LIGHT_EXPOSURE;
         }
     }
 

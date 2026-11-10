@@ -95,7 +95,6 @@ import { updateHillSpheres } from '../physics/sphere-of-influence';
 import { updateShadows } from '../effects/shadows/shadow-system';
 import { renderWithScaledPoints } from '../effects/render-scale-points';
 
-/** Scratch for the warp-sound speed lookup. */
 /** The three.js curve for each tone-mapping setting. */
 const TONE_MAPPING_CURVES: Readonly<Record<ToneMappingMode, THREE.ToneMapping>> = {
     agx: THREE.AgXToneMapping,
@@ -103,6 +102,7 @@ const TONE_MAPPING_CURVES: Readonly<Record<ToneMappingMode, THREE.ToneMapping>> 
     neutral: THREE.NeutralToneMapping,
 };
 
+/** Scratch for the warp-sound speed lookup. */
 const _warpSoundVel = new THREE.Vector3();
 /** Scratch for the altimeter: local vertical and the surface frame velocity under the ship. */
 const _altUp = new THREE.Vector3();

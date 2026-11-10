@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { atmosphereVisualDepthScale } from './atmosphere-shell';
 import { createStarLightingSet, gatherStarLighting } from './star-illumination';
-import { ATMOSPHERE_RAYLEIGH_ZENITH_DEPTH } from '../utilities/consts';
+import { ATMOSPHERE_RAYLEIGH_ZENITH_DEPTH, STAR_LIGHT_EXPOSURE } from '../utilities/consts';
 
 /** The parts of an atmosphere-bearing body the dimmer reads. */
 interface ISkyBody {
@@ -23,7 +23,7 @@ const SKY_COLUMN_SCALE_HEIGHT = 0.2;
  * fully hidden.
  * Below it the stars fade in proportionally, so a faint sky only partly hides them.
  */
-const STAR_HIDE_SKY_RADIANCE = 0.15;
+const STAR_HIDE_SKY_RADIANCE = 0.15 * STAR_LIGHT_EXPOSURE;
 
 /** Rough Rayleigh phase toward the zenith (3/(16π)·(1 + cos²)), for the overhead estimate. */
 const ZENITH_PHASE = 0.08;

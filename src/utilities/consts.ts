@@ -646,6 +646,26 @@ export const STAR_LIGHT_INTENSITY_MAX = BASE_STAR_LIGHT_INTENSITY_MAX * STAR_LIG
 export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
 
 /**
+ * Converts a star's light intensity (the value stored on the star and shown in the editor) into
+ * the intensity of its three.js point light. Chosen so the Sun delivers an irradiance of π at
+ * 1 AU: under three's Lambert shading a surface facing the Sun then shows exactly its texture's
+ * colour, which is the physically correct exposure for the HDR pipeline. (Unscaled, the Sun gave
+ * ≈13.4 at 1 AU, lighting everything about 4.3× too bright — hidden by the old 8-bit clip.)
+ *
+ * Every consumer of star light (surfaces, atmospheres, clouds, rings, Earth's day/night, the sky)
+ * reads the point light's intensity, so this one factor moves them all together. Irradiance
+ * thresholds (EARTH_*_IRRADIANCE, STAR_HIDE_SKY_RADIANCE) are expressed with it.
+ */
+export const STAR_LIGHT_EXPOSURE = Math.PI / (SUN_LIGHT_INTENSITY / Math.pow(AU, STAR_LIGHT_DECAY));
+
+/**
+ * Ambient fill light (the world's base plus each star's share). Scaled with STAR_LIGHT_EXPOSURE
+ * so unlit sides stay as dark as they always looked once the output is tone mapped.
+ */
+export const WORLD_AMBIENT_INTENSITY = 0.05 * STAR_LIGHT_EXPOSURE;
+export const STAR_AMBIENT_INTENSITY = 0.05 * STAR_LIGHT_EXPOSURE;
+
+/**
  * Most stars any star-lighting effect considers at once: the lens flare, sun rays, Earth's
  * day/night shader and the atmosphere shells. One constant so they always stay in sync.
  */
@@ -707,11 +727,12 @@ export const SURFACE_PATCH_REBUILD_FRACTION = 0.25;
  * the same units three.js lights the surface with. These are absolute visibility thresholds, not
  * an Earth reference: a spot receiving less than EARTH_NIGHT_IRRADIANCE shows the night texture
  * and city lights, more than EARTH_DAY_IRRADIANCE shows the day texture, smoothly in between.
- * For scale, with STAR_LIGHT_DECAY = 1 the Sun gives ≈13.4 at 1 AU, ≈1.4 at Saturn and ≈0.44
- * at Neptune; a white dwarf gives ≈0.0013 at 1 AU.
+ * For scale, with STAR_LIGHT_DECAY = 1 the Sun gives π (≈3.14) at 1 AU, ≈0.33 at Saturn and
+ * ≈0.10 at Neptune; a white dwarf gives ≈0.0003 at 1 AU. The thresholds were tuned before
+ * STAR_LIGHT_EXPOSURE (as 0.15 and 1.5), so they are scaled by it to switch at the same places.
  */
-export const EARTH_NIGHT_IRRADIANCE = 0.15;
-export const EARTH_DAY_IRRADIANCE = 1.5;
+export const EARTH_NIGHT_IRRADIANCE = 0.15 * STAR_LIGHT_EXPOSURE;
+export const EARTH_DAY_IRRADIANCE = 1.5 * STAR_LIGHT_EXPOSURE;
 /**
  * Surface pressure (bar) above which the visual atmosphere thickens quickly. The visual optical
  * depth grows with log(1 + pressure / knee), normalised to 1 at 1 bar. A very low knee makes even

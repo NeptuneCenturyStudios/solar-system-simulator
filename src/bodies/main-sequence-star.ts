@@ -10,6 +10,7 @@ import {
     MIN_NEUTRON_STAR_MASS,
     RED_GIANT_MIN_EXPANSION,
     RED_GIANT_MAX_EXPANSION,
+    STAR_LIGHT_EXPOSURE,
 } from '../utilities/consts';
 import { BlackHole } from './black-hole';
 import { WhiteDwarf } from './white-dwarf';
@@ -347,7 +348,7 @@ export class MainSequenceStar extends Star {
         this.halo?.setVisible(false);
 
         if (this.sunLight) {
-            this.sunLight.intensity = 0.002;
+            this.sunLight.intensity = 0.002 * STAR_LIGHT_EXPOSURE;
             this.sunLight.color.setHex(0xff6020);
         }
 

@@ -92,6 +92,7 @@ import {
     SMOOTH_ZOOM_DIST_EPSILON,
     SMOOTH_ZOOM_FREE_CAM_STOP_MULT,
     AU,
+    WORLD_AMBIENT_INTENSITY,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import {
@@ -288,7 +289,7 @@ if (window.desktop === undefined) {
 const scene = new THREE.Scene();
 
 // === Ambient light from stars (base level of illumination) ===
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+const ambientLight = new THREE.AmbientLight(0xffffff, WORLD_AMBIENT_INTENSITY);
 scene.add(ambientLight);
 
 // --- Camera and renderer setup ---

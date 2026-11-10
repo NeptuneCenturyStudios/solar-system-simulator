@@ -184,10 +184,12 @@ export class ParticleExplosion implements IEffect {
                 // Apply global cooling factor
                 heat *= uHeat;
 
-                // Color stops
-                vec3 hot  = vec3(1.0, 0.65, 0.10);
-                vec3 warm = vec3(1.0, 0.30, 0.05);
-                vec3 cool = vec3(0.55, 0.10, 0.05);
+                // Color stops, in linear RGB (the scene is linear light): the sRGB stops
+                // (1, 0.65, 0.1), (1, 0.3, 0.05), (0.55, 0.1, 0.05), (1, 0.25, 0.05) and
+                // (1, 0.15, 0.05) decoded, so they show as authored after the output encode.
+                vec3 hot  = vec3(1.0, 0.380, 0.010);
+                vec3 warm = vec3(1.0, 0.073, 0.004);
+                vec3 cool = vec3(0.263, 0.010, 0.004);
 
                 // Blend hot → warm → cool
                 vec3 tempColor = mix(warm, hot, heat);
@@ -196,12 +198,12 @@ export class ParticleExplosion implements IEffect {
                 outgoingLight = mix(outgoingLight, tempColor, heat);
 
                 // --- Red-hot core ---
-                vec3 hotCore = vec3(1.0, 0.25, 0.05);
+                vec3 hotCore = vec3(1.0, 0.051, 0.004);
                 outgoingLight = mix(outgoingLight, hotCore,
                                     pow(max(0.0, 1.0 - _r * 1.2), 2.0) * uHeat);
 
                 // --- Warm glow tint ---
-                vec3 warmTint = vec3(1.0, 0.15, 0.05);
+                vec3 warmTint = vec3(1.0, 0.020, 0.004);
                 outgoingLight = mix(outgoingLight, warmTint, _glow * 0.6 * uHeat);
                 `
             );

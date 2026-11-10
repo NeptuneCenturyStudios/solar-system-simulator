@@ -212,11 +212,15 @@ const AURORA_PARS_CHUNK = /* glsl */ `
     //
     // Sampled at absolute altitude, not altitude within the band — which is both physically
     // right and the reason a short band reads green while a tall one flares red at the tip.
+    //
+    // Linear RGB (the scene is linear light): the sRGB stops (0.47, 0.27, 0.86),
+    // (0.59, 0.35, 1.00), (0.24, 1.00, 0.55), (0.47, 1.00, 0.75) and (1.00, 0.27, 0.47)
+    // decoded, so they show as authored after the output encode.
     vec3 auroraRamp(float h) {
-        vec3 c = mix(vec3(0.47, 0.27, 0.86), vec3(0.59, 0.35, 1.00), smoothstep(0.00, 0.08, h));
-        c = mix(c, vec3(0.24, 1.00, 0.55), smoothstep(0.08, 0.25, h));
-        c = mix(c, vec3(0.47, 1.00, 0.75), smoothstep(0.25, 0.60, h));
-        c = mix(c, vec3(1.00, 0.27, 0.47), smoothstep(0.60, 0.82, h));
+        vec3 c = mix(vec3(0.187, 0.059, 0.711), vec3(0.307, 0.100, 1.000), smoothstep(0.00, 0.08, h));
+        c = mix(c, vec3(0.047, 1.000, 0.263), smoothstep(0.08, 0.25, h));
+        c = mix(c, vec3(0.187, 1.000, 0.523), smoothstep(0.25, 0.60, h));
+        c = mix(c, vec3(1.000, 0.059, 0.187), smoothstep(0.60, 0.82, h));
         return c;
     }
 `;
