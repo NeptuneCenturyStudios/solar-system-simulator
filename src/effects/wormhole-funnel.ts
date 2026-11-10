@@ -139,7 +139,10 @@ export class WormholeFunnelEffect implements IEffect {
         geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
 
         const mat = new THREE.PointsMaterial({
-            size: Math.max(this._mouthRadius * 0.02, 0.02),
+            // Purely proportional to the mouth. An absolute floor (it was 0.02) dwarfed small
+            // mouths: the Alien Invasion's 3 km wormhole (radius 0.03) got particles 33× too big,
+            // each two-thirds the width of the mouth, which merged into a white blob.
+            size: this._mouthRadius * 0.02,
             vertexColors: true,
             transparent: true,
             opacity: 1.0, // per-fragment alpha comes from the shader

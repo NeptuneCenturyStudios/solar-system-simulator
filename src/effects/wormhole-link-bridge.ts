@@ -207,7 +207,8 @@ export class WormholeLinkBridge implements IEffect {
         geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
 
         const mat = new THREE.PointsMaterial({
-            size: Math.max(Math.min(this._a.radius, this._b.radius) * 0.05, 0.03),
+            // Proportional to the smaller mouth; no absolute floor, which would swamp small gates.
+            size: Math.min(this._a.radius, this._b.radius) * 0.05,
             transparent: true,
             opacity: 1.0,
             depthWrite: false,
