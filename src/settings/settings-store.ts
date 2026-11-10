@@ -291,13 +291,13 @@ const defaultSettings: SpaceSimSettings = {
     shadowQuality: 'low',
     shipCollisionMode: 'triangle',
     hdrEnabled: true,
-    toneMapping: 'agx',
+    toneMapping: 'neutral',
     exposure: EXPOSURE_DEFAULT,
 };
 
-/** Normalise a stored tone-mapping curve, falling back to `agx` for anything unrecognised. */
+/** Normalise a stored tone-mapping curve, falling back to `neutral` for anything unrecognised. */
 export function normalizeToneMapping(value: unknown): ToneMappingMode {
-    return value === 'aces' || value === 'neutral' ? value : 'agx';
+    return value === 'aces' || value === 'neutral' ? value : 'neutral';
 }
 
 /** Clamp an exposure to the supported range and snap it to the slider step. */
