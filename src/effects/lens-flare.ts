@@ -47,6 +47,18 @@ export interface ILensFlareBody {
 /** Brown dwarfs barely glow and do not flare. */
 const NO_FLARE_STAR_TYPES = BodyTypeEnum.BrownDwarf;
 
+/**
+ * Bodies drawn from a model rather than a sphere. Their `radius` only bounds the model (a
+ * ship's longest dimension equals it), so the sphere test alone would hide a star that the
+ * line of sight passes well clear of the hull; a hit on the actual mesh confirms it.
+ */
+const MESH_SHAPED_TYPES =
+    BodyTypeEnum.SpaceShip |
+    BodyTypeEnum.Probe |
+    BodyTypeEnum.Satellite |
+    BodyTypeEnum.Asteroid |
+    BodyTypeEnum.Comet;
+
 /** A star that made the cut this frame. */
 interface IFlareCandidate {
     center: THREE.Vector2;
@@ -68,6 +80,50 @@ const _view = new THREE.Vector3();
 const _ndc = new THREE.Vector3();
 const _toStar = new THREE.Vector3();
 const _toBody = new THREE.Vector3();
+const _raycaster = new THREE.Raycaster();
+const _hits: THREE.Intersection[] = [];
+
+/**
+ * True if `material` can't hide a star: not drawn at all (the ship's placeholder container),
+ * or see-through / glow (shield bubble, flames, trails) rather than hull.
+ */
+function isNonBlockingMaterial(material: THREE.Material | THREE.Material[]): boolean {
+    const list = Array.isArray(material) ? material : [material];
+    return list.every((m) => !m.visible || m.transparent || m.blending === THREE.AdditiveBlending);
+}
+
+/**
+ * Whether the ray from `origin` along unit `dir` hits an opaque, visible mesh under `root`
+ * within `maxDist`. Only meshes are tested: a body's label sprite and label line hang off
+ * its mesh too, and Sprite.raycast throws without a camera on the raycaster.
+ */
+function rayHitsMesh(
+    root: THREE.Object3D,
+    origin: THREE.Vector3,
+    dir: THREE.Vector3,
+    maxDist: number
+): boolean {
+    _raycaster.set(origin, dir);
+    _raycaster.near = 0;
+    _raycaster.far = maxDist;
+    return meshHit(root);
+}
+
+/** Depth-first over visible descendants of `object`, raycasting the opaque meshes. */
+function meshHit(object: THREE.Object3D): boolean {
+    if (!object.visible) return false;
+    if (object instanceof THREE.Mesh && !isNonBlockingMaterial(object.material)) {
+        _hits.length = 0;
+        object.raycast(_raycaster, _hits);
+        const hit = _hits.length > 0;
+        _hits.length = 0;
+        if (hit) return true;
+    }
+    for (const child of object.children) {
+        if (meshHit(child)) return true;
+    }
+    return false;
+}
 
 /** Stable 0..1 hash of a body id, so each star keeps its own ray pattern. */
 function hashId(id: string): number {
@@ -516,11 +572,22 @@ export class LensFlareEffect {
 
             _toBody.copy(body.mesh.position).sub(cam);
             const along = _toBody.dot(_toStar);
-            if (along <= 0 || along >= starDist) continue;
             const distSq = _toBody.lengthSq();
+            const perp = Math.sqrt(Math.max(distSq - along * along, 0));
+
+            if (body.bodyType & MESH_SHAPED_TYPES) {
+                // The bounding sphere is only a broad phase: the chase camera often sits
+                // inside it (its centre may even be behind the camera), and the hull fills
+                // little of it. The star is hidden only if the line of sight hits the hull.
+                if (along <= -body.radius || along >= starDist + body.radius) continue;
+                if (perp > body.radius) continue;
+                if (rayHitsMesh(body.mesh, cam, _toStar, starDist)) return 0;
+                continue;
+            }
+
+            if (along <= 0 || along >= starDist) continue;
             // The camera is inside this body: it can't be judged as an occluder.
             if (distSq <= body.radius * body.radius) continue;
-            const perp = Math.sqrt(Math.max(distSq - along * along, 0));
 
             // The star's disc, and one pixel, measured at the occluder's distance.
             const pixel = (2 * along * tanHalfFov) / heightPx;
