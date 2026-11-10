@@ -334,6 +334,8 @@ export class SurfaceCameraManager {
         this.updateFrame(rig, body);
         this.updateHeading();
         const up = this._up;
+        // Before pitch is folded into _forward below: the figure faces the walking heading.
+        rig.orientShadow(up, this._forward);
 
         // Ground speed for the sway: velocity relative to the surface, along the ground.
         surfaceVelocityAt(body, rig.mesh.position, this._groundVel);

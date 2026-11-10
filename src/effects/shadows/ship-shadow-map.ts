@@ -1,12 +1,10 @@
 import * as THREE from 'three';
-import type { Spaceship } from '../../bodies/ships/spaceship';
 import {
     MAX_SHIP_SHADOW_CASTERS,
     SHADOW_CASTER_LAYER,
     SHIP_SHADOW_ATLAS_SIZE_HIGH,
     SHIP_SHADOW_ATLAS_SIZE_LOW,
     SHIP_SHADOW_THROW,
-    SHIP_SHADOW_TILE_HALF_WIDTH,
 } from '../../utilities/consts';
 import { getFrameStars, starIrradiance, type ILightingStar } from '../star-illumination';
 import { shadowUniforms } from './shadow-receiver';
@@ -19,6 +17,16 @@ const _viewPos = new THREE.Vector3();
 const _tileFromNdc = new THREE.Matrix4();
 const _UP_Y = new THREE.Vector3(0, 1, 0);
 const _UP_X = new THREE.Vector3(1, 0, 0);
+
+/**
+ * One shadow caster's tile framing: what the tile is centred on, how far the caster reaches from
+ * that centre, and the half-width of the square the tile covers across the light.
+ */
+export interface IShadowCaster {
+    readonly center: THREE.Vector3;
+    radius: number;
+    halfWidth: number;
+}
 
 /** The star lighting a point most strongly, with its point light. */
 interface IDominantStar {
@@ -54,7 +62,8 @@ function dominantStarAt(position: THREE.Vector3): IDominantStar | null {
  *
  * Only the hull meshes are drawn (they are put on SHADOW_CASTER_LAYER), so flames, trails and
  * shields cast nothing. Every tile also sees any other ship inside its frustum, which is what gives
- * ship-on-ship shadows; each ship also shadows itself.
+ * ship-on-ship shadows; each ship also shadows itself. In surface mode the player rig's shadow-only
+ * figure is a caster too (see PlayerRig), with a tile of its own.
  *
  * Receivers look the tiles up in view space (see shadow-receiver.ts): each tile's matrix takes a
  * main-camera view-space position straight to (atlas u, atlas v, depth). It is composed in float64
@@ -77,17 +86,21 @@ export class ShipShadowMap {
      * Renders the atlas for `casters` (nearest first; anything past the quality's tile count is
      * ignored) and uploads the tiles to the shared receiver uniforms.
      * @param high High quality: a 2048² atlas with up to four 1024² tiles; low is one 1024² tile.
+     * @param splitLow Low quality only: split the 1024² atlas into two 512² tiles instead of one, so
+     *   the player on foot and the nearest ship both get a shadow.
      */
     render(
         renderer: THREE.WebGLRenderer,
         scene: THREE.Scene,
         mainCamera: THREE.Camera,
-        casters: readonly Spaceship[],
-        high: boolean
+        casters: readonly IShadowCaster[],
+        high: boolean,
+        splitLow = false
     ): void {
         const uniforms = shadowUniforms;
-        const tilesPerRow = high ? 2 : 1;
-        const maxTiles = Math.min(tilesPerRow * tilesPerRow, MAX_SHIP_SHADOW_CASTERS);
+        const split = splitLow && !high;
+        const tilesPerRow = high || split ? 2 : 1;
+        const maxTiles = Math.min(split ? 2 : tilesPerRow * tilesPerRow, MAX_SHIP_SHADOW_CASTERS);
         if (casters.length === 0) {
             uniforms.uSimShipTileCount.value = 0;
             return;
@@ -112,20 +125,20 @@ export class ShipShadowMap {
 
         let tile = 0;
         try {
-            for (const ship of casters) {
+            for (const caster of casters) {
                 if (tile >= maxTiles) break;
-                const dominant = dominantStarAt(ship.mesh.position);
+                const dominant = dominantStarAt(caster.center);
                 if (!dominant) continue;
 
-                const radius = ship.radius;
-                const halfWidth = radius * SHIP_SHADOW_TILE_HALF_WIDTH;
-                _shipPos.copy(ship.mesh.position);
+                const radius = caster.radius;
+                const halfWidth = caster.halfWidth;
+                _shipPos.copy(caster.center);
                 _starPos.setFromMatrixPosition(dominant.light.matrixWorld);
                 const starDistance = _lightDir.subVectors(_starPos, _shipPos).length();
                 if (!(starDistance > 0)) continue;
                 _lightDir.divideScalar(starDistance);
 
-                // The camera sits one radius sunward of the ship, looking away from the star.
+                // The camera sits one radius sunward of the caster, looking away from the star.
                 const cam = this.shadowCamera;
                 cam.position.copy(_shipPos).addScaledVector(_lightDir, radius);
                 cam.up.copy(Math.abs(_lightDir.y) > 0.99 ? _UP_X : _UP_Y);

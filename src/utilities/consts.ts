@@ -765,6 +765,14 @@ export const PLAYER_TRACTION_MU = 1.0;
 export const PLAYER_GROUND_TOLERANCE = 0.00005 / DIST_SCALE; // 5 cm
 /** Ground-relative speed at or below which a player with no input comes to rest and is parked. */
 export const PLAYER_STICK_SPEED = 0.0002 / DIST_SCALE; // 0.2 m/s
+/** Height of the shadow-only figure the player casts on the ground (feet to top of head). */
+export const PLAYER_SHADOW_HEIGHT = 0.0018 / DIST_SCALE; // 1.8 m
+/** Shoulder width of the player's shadow figure. */
+export const PLAYER_SHADOW_WIDTH = 0.00045 / DIST_SCALE; // 45 cm
+/** Front-to-back depth of the player's shadow figure. */
+export const PLAYER_SHADOW_DEPTH = 0.00025 / DIST_SCALE; // 25 cm
+/** Radius of the shadow figure's head. */
+export const PLAYER_SHADOW_HEAD_RADIUS = 0.00012 / DIST_SCALE; // 12 cm
 
 // === Headlamp on foot (camera/headlamp.ts) ===
 /**
