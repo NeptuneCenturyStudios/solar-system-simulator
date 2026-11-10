@@ -50,7 +50,9 @@ export class Pluto extends DwarfPlanet {
         const gEff = dependencies.getG();
         const timeScale =
             PLUTO_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(PLUTO_DIST, gEff, SUN_MASS);
-        const rotSpeed = ((-2 * Math.PI) / (153.3 * 3600)) * timeScale; // retrograde
+        // Positive: the retrograde sense comes from PLUTO_AXIS > 90° (spin pole south of the
+        // ecliptic). A negative speed here would cancel it and spin Pluto prograde.
+        const rotSpeed = ((2 * Math.PI) / (153.3 * 3600)) * timeScale;
 
         // Pluto's orbit is highly eccentric (it crosses inside Neptune's orbit near perihelion)
         // and inclined 17° out of the ecliptic, so it is built from real orbital elements.

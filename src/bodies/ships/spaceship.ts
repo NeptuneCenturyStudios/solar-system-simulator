@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ECLIPTIC_NORTH } from '../../camera/north-up';
 import { Body } from '../body';
 import { IShipEffect } from '../../ship-effects/ship-effect-base.js';
 import { ShipFlame } from '../../ship-effects/ship-flame.js';
@@ -60,6 +61,9 @@ const _effectVel = new THREE.Vector3();
 /** Scratch: world direction in hull-local space, and the inverse ship rotation (see hullExtentAlong). */
 const _hullDir = new THREE.Vector3();
 const _hullInvQuat = new THREE.Quaternion();
+/** Default-orientation check and the nose axis the north-up default turns about. */
+const _IDENTITY_QUAT = new THREE.Quaternion();
+const _NOSE_AXIS = new THREE.Vector3(0, 0, 1);
 
 /** Guidance status shown on the cockpit dashboard and HUD. */
 export type GuidanceStatus = 'off' | 'standby' | 'matching' | 'locked';
@@ -624,6 +628,13 @@ export class Spaceship extends Body {
         // Shield bubble sized to the weapon hit sphere, so the glow sits where a shot stops.
         this.shieldEffect = new ShipShield(this, this.hitRadius);
 
+        // Default to north-up: a ship with no explicit orientation would otherwise have its top
+        // (+Y) on ecliptic south. A half-turn about the nose (+Z) puts the top on ecliptic north
+        // (−Y) without changing the heading. Spawners that orient the ship override this.
+        if (this.mesh.quaternion.equals(_IDENTITY_QUAT)) {
+            this.mesh.quaternion.setFromAxisAngle(_NOSE_AXIS, Math.PI);
+        }
+
         // Seed the control frame from the mesh's starting orientation so thrust
         // and steering begin from wherever the ship was placed.
         this.controlFrameQuat.copy(this.mesh.quaternion);
@@ -1015,7 +1026,7 @@ export class Spaceship extends Body {
         if (fwdLen < 1e-10) return;
         const fwd = worldDirection.clone().normalize();
         const eye = this.mesh.position.clone().add(fwd);
-        const m = new THREE.Matrix4().lookAt(eye, this.mesh.position, new THREE.Vector3(0, 1, 0));
+        const m = new THREE.Matrix4().lookAt(eye, this.mesh.position, ECLIPTIC_NORTH);
         const targetQuat = new THREE.Quaternion().setFromRotationMatrix(m);
         this.mesh.quaternion.rotateTowards(targetQuat, this.handling.flightMaxTurnRate * dt);
     }

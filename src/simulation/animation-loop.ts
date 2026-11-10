@@ -631,8 +631,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             if (ctx.keys.s) _animCamMovement.addScaledVector(_animCamDirection, -speed);
             if (ctx.keys.a) _animCamMovement.addScaledVector(_animCamRight, speed);
             if (ctx.keys.d) _animCamMovement.addScaledVector(_animCamRight, -speed);
-            if (ctx.keys.space) _animCamMovement.y += speed;
-            if (ctx.keys.c) _animCamMovement.y -= speed;
+            // Rise/sink along the camera's up (ecliptic north outside flight/surface modes).
+            if (ctx.keys.space) _animCamMovement.addScaledVector(ctx.camera.up, speed);
+            if (ctx.keys.c) _animCamMovement.addScaledVector(ctx.camera.up, -speed);
 
             if (_animCamMovement.lengthSq() > 0) {
                 ctx.camera.position.add(_animCamMovement);

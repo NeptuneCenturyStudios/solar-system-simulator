@@ -5,6 +5,7 @@ import {
     GRAV_ARROW_MAX_GIZMO_MULTIPLE,
 } from '../utilities/consts.js';
 import { Body } from '../bodies/body.js';
+import { spinPoleDirection, spinPoleLeanDirection } from '../utilities/spin-pole.js';
 
 // ── Base (scale-1) dimensions ─────────────────────────────────────────────────
 // Every dimension below is expressed for a gizmo scale factor of 1 and multiplied by the
@@ -375,32 +376,21 @@ export class CoordinateGizmo {
     updateGimbalKnobs() {
         if (!this.target || !('rotation' in this.target)) return;
         const rot = (this.target as { rotation: { tilt: number; azimuth?: number } }).rotation;
-        const tiltRad = THREE.MathUtils.degToRad(rot.tilt ?? 0);
-        const azimuthRad = THREE.MathUtils.degToRad(rot.azimuth ?? 0);
-        const Rt = this._tiltRingRadius;
-        const Ra = this._azimuthRingRadius;
+        const tilt = rot.tilt ?? 0;
+        const azimuth = rot.azimuth ?? 0;
+        const azimuthRad = THREE.MathUtils.degToRad(azimuth);
 
-        // Keep the tilt ring aligned with the current azimuth so it always contains the spin axis.
-        // TorusGeometry normal is local Z; after rotation.y = PI/2 it points along world X (YZ plane).
-        // Adding azimuthRad swings it to the correct vertical plane.
-        this.tiltRing.rotation.y = Math.PI / 2 + azimuthRad;
+        // Keep the tilt ring in the vertical plane that contains the spin axis: the plane through
+        // world Y and the lean direction (sin a, 0, −cos a), whose normal is (cos a, 0, sin a).
+        // TorusGeometry's normal is local Z, which rotation.y = θ turns to (sin θ, 0, cos θ).
+        this.tiltRing.rotation.y = Math.PI / 2 - azimuthRad;
 
-        // Tilt knob: position on the rotated tilt ring at the tilt angle.
-        // Offset outward along the radial direction (away from body centre) by the tube
-        // radius so the knob sits proud on the surface of the ring tube.
-        const sinAz = Math.sin(azimuthRad);
-        const cosAz = Math.cos(azimuthRad);
-        const sinTilt = Math.sin(tiltRad);
-        const cosTilt = Math.cos(tiltRad);
-        // Radial unit vector on the tilt ring at the knob position
-        const tiltRadialX = sinTilt * sinAz;
-        const tiltRadialY = cosTilt;
-        const tiltRadialZ = sinTilt * cosAz;
-        this.tiltKnob.position.set(Rt * tiltRadialX, Rt * tiltRadialY, Rt * tiltRadialZ);
-
-        // Azimuth knob: centered on the ring tube centerline in the XZ plane.
-        const azRadialX = sinAz;
-        const azRadialZ = cosAz;
-        this.azimuthKnob.position.set(Ra * azRadialX, 0, Ra * azRadialZ);
+        // Tilt knob sits on the spin axis itself; azimuth knob on the lean direction.
+        spinPoleDirection(tilt, azimuth, this.tiltKnob.position).multiplyScalar(
+            this._tiltRingRadius
+        );
+        spinPoleLeanDirection(azimuth, this.azimuthKnob.position).multiplyScalar(
+            this._azimuthRingRadius
+        );
     }
 }

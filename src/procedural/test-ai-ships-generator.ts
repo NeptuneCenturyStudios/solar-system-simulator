@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ECLIPTIC_NORTH } from '../camera/north-up';
 import { SolarSystemGenerator } from './solar-system-generator';
 import { Sun } from '../bodies/sun';
 import { createNpcShip } from '../simulation/ai/npc-manager';
@@ -62,7 +63,7 @@ export class TestAiShipsGenerator extends SolarSystemGenerator {
         if (heading.lengthSq() < 1e-12) return;
         const dir = heading.clone().normalize();
         const eye = ship.mesh.position.clone().add(dir);
-        const m = new THREE.Matrix4().lookAt(eye, ship.mesh.position, new THREE.Vector3(0, 1, 0));
+        const m = new THREE.Matrix4().lookAt(eye, ship.mesh.position, ECLIPTIC_NORTH);
         ship.mesh.quaternion.setFromRotationMatrix(m);
         ship.controlFrameQuat.copy(ship.mesh.quaternion);
     }

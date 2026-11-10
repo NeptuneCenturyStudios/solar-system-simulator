@@ -250,7 +250,7 @@ export class AsteroidFieldGenerator extends SolarSystemGenerator {
                 camera: {
                     focusBody: earth,
                     distance: ASTEROID_FIELD_CAMERA_DISTANCE,
-                    viewDirection: new THREE.Vector3(0.35, 0.45, 1),
+                    viewDirection: new THREE.Vector3(0.35, -0.45, 1), // y < 0: above the plane on the north side
                 },
             },
             scenario: new AsteroidFieldScenario(this.dependencies),

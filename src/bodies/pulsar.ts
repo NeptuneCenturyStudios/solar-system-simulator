@@ -12,6 +12,7 @@ import {
 import { SUN_MASS, EARTH_DIST, DIST_SCALE } from '../utilities/consts';
 import { rollMagneticField, computeMagneticAxis } from '../procedural/magnetic-field';
 import { SeededRandom } from '../utilities/prng';
+import { spinPoleDirection } from '../utilities/spin-pole';
 import { PulsarBeam } from '../effects/pulsar-beam';
 import { AccretionDiskEffect, PULSAR_DISK_COLORS } from '../effects/accretion-disk';
 import { PulsarMagneticField } from '../effects/pulsar-magnetic-field';
@@ -126,9 +127,8 @@ export class Pulsar extends Star implements IMassTransferBody {
             haloWisps: 0,
         });
 
-        // Compute spin axis from tilt (YZ plane, as in CelestialBody)
-        const tiltRad = (newRotation.tilt * Math.PI) / 180;
-        const spinAxis = new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad));
+        // World spin axis, built exactly as CelestialBody.setRotation orients the mesh.
+        const spinAxis = spinPoleDirection(newRotation.tilt, newRotation.azimuth ?? 0);
 
         // Magnetic axis from the real per-body field (tilt/azimuth relative to the spin axis),
         // taken into the mesh's object space. The hot spots, beams and field loops are all

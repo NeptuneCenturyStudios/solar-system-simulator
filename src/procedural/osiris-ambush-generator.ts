@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ECLIPTIC_NORTH } from '../camera/north-up';
 import { SolarSystemGenerator } from './solar-system-generator';
 import { Sun } from '../bodies/sun';
 import { getShipTypeById } from '../bodies/ships/ship-registry';
@@ -81,11 +82,7 @@ export class OsirisAmbushGenerator extends SolarSystemGenerator {
         // at its target, so the eye is placed one unit along the heading and aimed back.
         const heading = velocity.clone().normalize();
         const eye = playerShip.mesh.position.clone().add(heading);
-        const m = new THREE.Matrix4().lookAt(
-            eye,
-            playerShip.mesh.position,
-            new THREE.Vector3(0, 1, 0)
-        );
+        const m = new THREE.Matrix4().lookAt(eye, playerShip.mesh.position, ECLIPTIC_NORTH);
         playerShip.mesh.quaternion.setFromRotationMatrix(m);
         playerShip.controlFrameQuat.copy(playerShip.mesh.quaternion);
         bodies.push(playerShip);

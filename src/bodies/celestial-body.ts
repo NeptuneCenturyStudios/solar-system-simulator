@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Body } from './body';
+import { spinPoleQuaternion } from '../utilities/spin-pole';
 import {
     IAtmosphereOptions,
     ICelestialBodyCreationOptions,
@@ -271,6 +272,12 @@ export class CelestialBody extends Body {
 
             this.tidalLockAngularSpeed = options.tidalLock.angularSpeed;
             this._tidalLockConfigured = true;
+
+            // A locked body spins about its lock axis, so that axis is its spin pole: put local +Y
+            // on it. The lock servo only turns about this axis, so it can only aim a face axis
+            // that is perpendicular to it — any component along the axis would never be
+            // corrected, and the face would miss the target by the orbit's inclination.
+            this.mesh.quaternion.setFromUnitVectors(_Y_AXIS, this.tidalLockSpinAxis);
         }
 
         this.attributes = options.attributes;
@@ -519,22 +526,12 @@ export class CelestialBody extends Body {
         }
     }
 
+    /**
+     * Orients the mesh so its local +Y (the spin pole) points at the ecliptic spin pole that
+     * `rotation.tilt` / `rotation.azimuth` describe. See `utilities/spin-pole.ts` for the convention.
+     */
     setRotation(rotation: IRotation) {
-        const tiltRad = (rotation.tilt * Math.PI) / 180;
-        const azimuthRad = ((rotation.azimuth ?? 0) * Math.PI) / 180;
-
-        const spinAxis = new THREE.Vector3(0, Math.cos(tiltRad), Math.sin(tiltRad)); // YZ plane
-        const up = new THREE.Vector3(0, 1, 0);
-
-        this.mesh.quaternion.setFromUnitVectors(up, spinAxis);
-
-        if (azimuthRad !== 0) {
-            const azimuthQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(0, 1, 0),
-                azimuthRad
-            );
-            this.mesh.quaternion.premultiply(azimuthQuat);
-        }
+        spinPoleQuaternion(rotation.tilt, rotation.azimuth ?? 0, this.mesh.quaternion);
 
         this.rotationAxis = new THREE.Vector3(0, 1, 0);
         this.rotationSpeed = rotation.speed;
@@ -713,7 +710,10 @@ export class CelestialBody extends Body {
                         Math.min(maxCorrectionRad, angle)
                     );
 
-                    this.mesh.rotateOnAxis(spinAxis, correctionAngle);
+                    // spinAxis is a WORLD axis. rotateOnAxis would read it in the mesh's local
+                    // frame, which turns the wrong way whenever the mesh is tilted (a tilt-0 body
+                    // has local +Y on world −Y) and locks the body facing away from its target.
+                    this.mesh.rotateOnWorldAxis(spinAxis, correctionAngle);
                 }
             }
         } else {

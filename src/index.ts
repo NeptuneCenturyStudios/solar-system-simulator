@@ -104,6 +104,12 @@ import {
 } from './utilities/utilities';
 import { generateCustomBodyName } from './procedural/custom-body-naming';
 import { SeededRandom } from './utilities/prng';
+import { ECLIPTIC_NORTH, freeLook, orbitOffset } from './camera/north-up';
+import {
+    spinPoleDirection,
+    spinPoleLeanDirection,
+    spinPoleQuaternion,
+} from './utilities/spin-pole';
 import { generateSeedString } from './procedural/seed-utils';
 import { resetPhysicsState, setBodyRadius } from './physics/physics';
 import {
@@ -526,8 +532,12 @@ steeringOriginMarker.frustumCulled = false;
 steeringOriginMarker.visible = false;
 uiScene.add(steeringOriginMarker);
 
+// View the system from ecliptic north (world −Y): Earth north-up, orbits counterclockwise.
+// Must be set before OrbitControls, which reads camera.up once in its constructor.
+camera.up.copy(ECLIPTIC_NORTH);
 const controls = new OrbitControls(camera, renderer.domElement);
-camera.position.set(INITIAL_CAMERA_DISTANCE, SUN_RADIUS * 3, INITIAL_CAMERA_DISTANCE); // Scaled for new world size
+// Start slightly above the plane on the north (−Y) side.
+camera.position.set(INITIAL_CAMERA_DISTANCE, -SUN_RADIUS * 3, INITIAL_CAMERA_DISTANCE);
 // Start in "center scene" orbit mode (NONE_FOCUS_POSITION is defined later)
 controls.target.set(0, 0, 0);
 controls.update();
@@ -571,25 +581,17 @@ function applyOrbitRotationDelta(dx: number, dy: number) {
     const rotSpeed = cameraState.rotationSpeed;
 
     if (cameraState.isFreeCameraMode) {
-        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-        euler.setFromQuaternion(camera.quaternion);
-        euler.y -= dx * rotSpeed;
-        euler.x -= dy * rotSpeed;
-        euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
-        camera.quaternion.setFromEuler(euler);
+        freeLook(camera.quaternion, -dx * rotSpeed, -dy * rotSpeed);
         return;
     }
 
-    const spherical = new THREE.Spherical();
-
     if (!cameraState.isLookAtMode) {
         const target = NONE_FOCUS_POSITION.clone();
-        const offset = camera.position.clone().sub(target);
-        spherical.setFromVector3(offset);
-        spherical.theta -= dx * rotSpeed;
-        spherical.phi -= dy * rotSpeed;
-        spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-        offset.setFromSpherical(spherical);
+        const offset = orbitOffset(
+            camera.position.clone().sub(target),
+            -dx * rotSpeed,
+            -dy * rotSpeed
+        );
 
         camera.position.copy(target).add(offset);
         camera.lookAt(target);
@@ -608,12 +610,7 @@ function applyOrbitRotationDelta(dx: number, dy: number) {
         return NONE_FOCUS_POSITION.clone();
     })();
 
-    const offset = camera.position.clone().sub(target);
-    spherical.setFromVector3(offset);
-    spherical.theta -= dx * rotSpeed;
-    spherical.phi -= dy * rotSpeed;
-    spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-    offset.setFromSpherical(spherical);
+    const offset = orbitOffset(camera.position.clone().sub(target), -dx * rotSpeed, -dy * rotSpeed);
 
     camera.position.copy(target).add(offset);
     camera.lookAt(target);
@@ -977,8 +974,8 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
         flatForward.normalize();
     }
 
-    // Camera-relative horizontal right vector.
-    const flatRight = new THREE.Vector3().crossVectors(flatForward, new THREE.Vector3(0, 1, 0));
+    // Camera-relative horizontal right vector (forward × up, with ecliptic north as up).
+    const flatRight = new THREE.Vector3().crossVectors(flatForward, ECLIPTIC_NORTH);
     if (flatRight.lengthSq() < 1e-10) {
         flatRight.set(1, 0, 0);
     } else {
@@ -990,10 +987,10 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
     } else if (directionKey === 'arrowright') {
         movement.addScaledVector(flatRight, step);
     } else if (directionKey === 'arrowup') {
-        if (ctrlKey) movement.y += step;
+        if (ctrlKey) movement.addScaledVector(ECLIPTIC_NORTH, step);
         else movement.addScaledVector(flatForward, step);
     } else if (directionKey === 'arrowdown') {
-        if (ctrlKey) movement.y -= step;
+        if (ctrlKey) movement.addScaledVector(ECLIPTIC_NORTH, -step);
         else movement.addScaledVector(flatForward, -step);
     } else {
         if (wasRunning) togglePause();
@@ -1720,17 +1717,7 @@ function createNewBody(
                 createAzimuth !== null ? createAzimuth : (newBody.rotation.azimuth ?? 0);
             newBody.rotation.tilt = tilt;
             newBody.rotation.azimuth = azimuth;
-            const tiltRad = THREE.MathUtils.degToRad(tilt);
-            const azRad = THREE.MathUtils.degToRad(azimuth);
-            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(1, 0, 0),
-                tiltRad
-            );
-            const azQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(0, 1, 0),
-                azRad
-            );
-            newBody.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
+            spinPoleQuaternion(tilt, azimuth, newBody.mesh.quaternion);
         }
 
         simulationState.bodies.push(newBody);
@@ -2206,11 +2193,11 @@ function onMouseDown(event: MouseEvent) {
             isTilting = true;
             controls.enabled = false;
             // Drag plane normal is perpendicular to the tilt ring's plane.
-            // The tilt ring's plane contains world-Y and the azimuth forward direction.
-            // Normal = worldX rotated by azimuth around Y = (cos(az), 0, -sin(az)).
+            // The tilt ring's plane contains world-Y and the lean direction (sin az, 0, −cos az),
+            // so its normal is (cos az, 0, sin az).
             const az = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
             interactionState.dragPlane.setFromNormalAndCoplanarPoint(
-                new THREE.Vector3(Math.cos(az), 0, -Math.sin(az)),
+                new THREE.Vector3(Math.cos(az), 0, Math.sin(az)),
                 gizmo.target.mesh.position
             );
             // Highlight ring while dragging
@@ -2583,25 +2570,18 @@ function onMouseMove(event: MouseEvent) {
     if (isTilting && gizmo.target instanceof CelestialBody) {
         const W = window.innerWidth,
             H = window.innerHeight;
-        const tiltRad = THREE.MathUtils.degToRad(gizmo.target.rotation.tilt);
-        const azRad = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
+        const tiltDeg = gizmo.target.rotation.tilt;
+        const azDeg = gizmo.target.rotation.azimuth ?? 0;
         const Rt = gizmo._tiltRingRadius;
         const bodyPos = gizmo.target.mesh.position;
         const eps = 0.002; // radians; large enough to avoid float noise
+        const epsDeg = THREE.MathUtils.radToDeg(eps);
 
         // Two knob positions straddling the current tilt angle
-        const makeKnob = (t: number) =>
-            bodyPos
-                .clone()
-                .add(
-                    new THREE.Vector3(
-                        Math.sin(azRad) * Math.sin(t) * Rt,
-                        Math.cos(t) * Rt,
-                        Math.cos(azRad) * Math.sin(t) * Rt
-                    )
-                );
-        const n1 = makeKnob(tiltRad - eps).project(camera);
-        const n2 = makeKnob(tiltRad + eps).project(camera);
+        const makeKnob = (tDeg: number) =>
+            spinPoleDirection(tDeg, azDeg).multiplyScalar(Rt).add(bodyPos);
+        const n1 = makeKnob(tiltDeg - epsDeg).project(camera);
+        const n2 = makeKnob(tiltDeg + epsDeg).project(camera);
 
         // Screen pixels per radian along the tangent
         const tsx = ((n2.x - n1.x) * (W / 2)) / (2 * eps);
@@ -2616,18 +2596,7 @@ function onMouseMove(event: MouseEvent) {
             const deltaDeg = THREE.MathUtils.radToDeg(movement / tsLen);
 
             const newTiltDeg = gizmo.target.rotation.tilt + deltaDeg;
-            const newTiltRad = THREE.MathUtils.degToRad(newTiltDeg);
-            // Use setFromAxisAngle (not setFromUnitVectors) to avoid the antiparallel
-            // singularity at tilt = ±180° where setFromUnitVectors picks the wrong axis.
-            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(1, 0, 0),
-                newTiltRad
-            );
-            const azQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(0, 1, 0),
-                azRad
-            );
-            gizmo.target.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
+            spinPoleQuaternion(newTiltDeg, azDeg, gizmo.target.mesh.quaternion);
             gizmo.target.rotation.tilt = newTiltDeg;
         }
         if (!cameraState.isFreeCameraMode) return;
@@ -2641,16 +2610,17 @@ function onMouseMove(event: MouseEvent) {
     if (isAzimuthDragging && gizmo.target instanceof CelestialBody) {
         const W = window.innerWidth,
             H = window.innerHeight;
-        const tiltRad = THREE.MathUtils.degToRad(gizmo.target.rotation.tilt);
-        const azRad = THREE.MathUtils.degToRad(gizmo.target.rotation.azimuth ?? 0);
+        const tiltDeg = gizmo.target.rotation.tilt;
+        const azDeg = gizmo.target.rotation.azimuth ?? 0;
         const Ra = gizmo._azimuthRingRadius;
         const bodyPos = gizmo.target.mesh.position;
         const eps = 0.002;
+        const epsDeg = THREE.MathUtils.radToDeg(eps);
 
-        const makeKnob = (a: number) =>
-            bodyPos.clone().add(new THREE.Vector3(Math.sin(a) * Ra, 0, Math.cos(a) * Ra));
-        const n1 = makeKnob(azRad - eps).project(camera);
-        const n2 = makeKnob(azRad + eps).project(camera);
+        const makeKnob = (aDeg: number) =>
+            spinPoleLeanDirection(aDeg).multiplyScalar(Ra).add(bodyPos);
+        const n1 = makeKnob(azDeg - epsDeg).project(camera);
+        const n2 = makeKnob(azDeg + epsDeg).project(camera);
 
         const tsx = ((n2.x - n1.x) * (W / 2)) / (2 * eps);
         const tsy = (-(n2.y - n1.y) * (H / 2)) / (2 * eps);
@@ -2662,17 +2632,8 @@ function onMouseMove(event: MouseEvent) {
             const movement = event.movementX * tx + event.movementY * ty;
             const deltaDeg = THREE.MathUtils.radToDeg(movement / tsLen);
 
-            const newAzimuthDeg = (gizmo.target.rotation.azimuth ?? 0) + deltaDeg;
-            const newAzRad = THREE.MathUtils.degToRad(newAzimuthDeg);
-            const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(1, 0, 0),
-                tiltRad
-            );
-            const azQuat = new THREE.Quaternion().setFromAxisAngle(
-                new THREE.Vector3(0, 1, 0),
-                newAzRad
-            );
-            gizmo.target.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
+            const newAzimuthDeg = azDeg + deltaDeg;
+            spinPoleQuaternion(tiltDeg, newAzimuthDeg, gizmo.target.mesh.quaternion);
             gizmo.target.rotation.azimuth = newAzimuthDeg;
         }
         if (!cameraState.isFreeCameraMode) return;
@@ -2721,36 +2682,21 @@ function onMouseMove(event: MouseEvent) {
         const movementY = event.movementY || 0;
 
         if (cameraState.isFreeCameraMode) {
-            // Free camera mode: rotate camera in place
-            const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-            euler.setFromQuaternion(camera.quaternion);
-
-            euler.y -= movementX * cameraRotationSpeed;
-            euler.x -= movementY * cameraRotationSpeed;
-
-            // Clamp vertical rotation to prevent flipping
-            euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
-
-            camera.quaternion.setFromEuler(euler);
+            // Free camera mode: rotate camera in place (pitch clamped so it never flips)
+            freeLook(
+                camera.quaternion,
+                -movementX * cameraRotationSpeed,
+                -movementY * cameraRotationSpeed
+            );
         } else if (!cameraState.isLookAtMode) {
             // Look At OFF: always orbit around solar system center [0,0,0]
             // (selection should not change the orbit anchor)
             const target = NONE_FOCUS_POSITION.clone();
-            const offset = camera.position.clone().sub(target);
-
-            // Convert to spherical coordinates
-            const spherical = new THREE.Spherical();
-            spherical.setFromVector3(offset);
-
-            // Update angles based on mouse movement
-            spherical.theta -= movementX * cameraRotationSpeed;
-            spherical.phi -= movementY * cameraRotationSpeed;
-
-            // Clamp phi to prevent flipping
-            spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-
-            // Convert back to cartesian
-            offset.setFromSpherical(spherical);
+            const offset = orbitOffset(
+                camera.position.clone().sub(target),
+                -movementX * cameraRotationSpeed,
+                -movementY * cameraRotationSpeed
+            );
             camera.position.copy(target).add(offset);
             camera.lookAt(target);
             controls.target.copy(target);
@@ -2769,15 +2715,11 @@ function onMouseMove(event: MouseEvent) {
                 target = NONE_FOCUS_POSITION.clone();
             }
 
-            const offset = camera.position.clone().sub(target);
-            const spherical = new THREE.Spherical();
-            spherical.setFromVector3(offset);
-
-            spherical.theta -= movementX * cameraRotationSpeed;
-            spherical.phi -= movementY * cameraRotationSpeed;
-            spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-
-            offset.setFromSpherical(spherical);
+            const offset = orbitOffset(
+                camera.position.clone().sub(target),
+                -movementX * cameraRotationSpeed,
+                -movementY * cameraRotationSpeed
+            );
             camera.position.copy(target).add(offset);
             camera.lookAt(target);
             controls.target.copy(target);
@@ -4461,14 +4403,7 @@ function applyBodyEditToBody(body: Body, params: IApplyBodyEditParams): void {
         const newAzimuth = editAzimuth !== null ? editAzimuth : (body.rotation.azimuth ?? 0);
         body.rotation.tilt = newTilt;
         body.rotation.azimuth = newAzimuth;
-        const tiltRad = THREE.MathUtils.degToRad(newTilt);
-        const azRad = THREE.MathUtils.degToRad(newAzimuth);
-        const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(1, 0, 0),
-            tiltRad
-        );
-        const azQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), azRad);
-        body.mesh.quaternion.multiplyQuaternions(azQuat, tiltQuat);
+        spinPoleQuaternion(newTilt, newAzimuth, body.mesh.quaternion);
         if (body === selectedBody && cameraState.isTargetMode) gizmo.attach(body);
     }
 }

@@ -395,35 +395,45 @@ export const CHARON_LONG_ASC_NODE = 227.3916867008565; // degrees (Ω)
 export const CHARON_ARG_PERIAPSIS = 172.5855027165132; // degrees (ω)
 export const CHARON_MEAN_ANOMALY_J2000 = 148.6651344828103; // degrees
 
-// === Planetary System: Rotation Axis (degrees) ===
-export const SUN_AXIS = 7.25;
-export const MERCURY_AXIS = 0.034;
-export const VENUS_AXIS = 177.4;
-export const EARTH_AXIS = 23.44;
-export const MARS_AXIS = 25.19;
-export const JUPITER_AXIS = 3.13;
-export const SATURN_AXIS = 26.73;
-export const URANUS_AXIS = 97.77;
-export const NEPTUNE_AXIS = 28.32;
-export const PLUTO_AXIS = 119.61;
+// === Planetary System: Spin Pole (degrees) ===
+// Each body's *_AXIS / *_AZIMUTH pair names its spin pole — the end its angular momentum points
+// out of (right-hand rule) — in J2000 ecliptic coordinates, consumed by spinPoleQuaternion()
+// (utilities/spin-pole.ts):
+//
+//     *_AXIS    = 90° − β_pole   (angle from ecliptic north; > 90° means a retrograde spinner)
+//     *_AZIMUTH = λ_pole + 90°   (mod 360°)
+//
+// *_AXIS is therefore measured from the ECLIPTIC normal, not the body's own orbit normal, so it
+// is not the textbook obliquity (Mercury's is 0.03° to its orbit but 7.0° to the ecliptic,
+// because its orbit is inclined 7°).
+//
+// Source: IAU WGCCRE 2015 (Archinal et al. 2018, Celest. Mech. Dyn. Astr. 130:22), J2000
+// constant terms of α₀/δ₀ (the T-rate and periodic terms are < 1° and dropped), converted to the
+// ecliptic with ε = 23.4393°. The IAU gives the NORTH pole for planets (north side of the
+// invariable plane) but the POSITIVE (right-hand) pole for dwarf planets; Venus and Uranus spin
+// retrograde (negative W), so their spin pole is the antipode of the listed north pole.
+export const SUN_AXIS = 7.25; //     α₀=286.13°, δ₀= 63.87° → λ=345.8°, β=+82.75°
+export const MERCURY_AXIS = 7.04; // α₀=281.01°, δ₀= 61.45° → λ=318.2°, β=+82.96°
+export const VENUS_AXIS = 178.76; // α₀=272.76°, δ₀= 67.16° (north) → spin pole λ=210.2°, β=−88.76°
+export const EARTH_AXIS = 23.44; //  α₀=  0.00°, δ₀= 90.00° → λ= 90.0°, β=+66.56°
+export const MARS_AXIS = 26.72; //   α₀=317.68°, δ₀= 52.89° → λ=352.9°, β=+63.28°
+export const JUPITER_AXIS = 2.22; // α₀=268.06°, δ₀= 64.50° → λ=247.8°, β=+87.78°
+export const SATURN_AXIS = 28.05; // α₀= 40.59°, δ₀= 83.54° → λ= 79.5°, β=+61.95°
+export const URANUS_AXIS = 97.72; // α₀=257.31°, δ₀=−15.18° (north) → spin pole λ=77.7°, β=−7.72°
+export const NEPTUNE_AXIS = 28.03; // α₀=299.36°, δ₀= 43.46° → λ=319.2°, β=+61.97°
+export const PLUTO_AXIS = 112.82; // α₀=132.99°, δ₀= −6.16° (positive pole) → λ=137.4°, β=−22.82°
 
-// === Planetary System: Rotation Azimuth (degrees) ===
-// Direction the north pole points within the orbital (ecliptic) plane, derived from the IAU
-// north-pole right ascension (α₀) and declination (δ₀) converted to ecliptic coordinates.
-// Mapping: azimuth = (ecliptic longitude of pole) − 270°  (mod 360°)
-// At azimuth=0 the tilt faces +Z; azimuth=90 faces +X (vernal equinox direction).
-// Source: IAU 2015 Cartographic Coordinates and Rotational Elements.
-export const SUN_AZIMUTH = 76; // IAU α₀=286.13°, δ₀= 63.87° → λ_pole≈346°
-export const MERCURY_AZIMUTH = 48; // IAU α₀=281.01°, δ₀= 61.45° → λ_pole≈318°
-export const VENUS_AZIMUTH = 119; // IAU α₀=272.76°, δ₀= 67.16° → λ_pole≈  29°
-export const EARTH_AZIMUTH = 180; // IAU α₀=  0.00°, δ₀= 90.00° → λ_pole≈  90°
-export const MARS_AZIMUTH = 83; // IAU α₀=317.68°, δ₀= 52.89° → λ_pole≈353°
-export const JUPITER_AZIMUTH = 23; // IAU α₀=268.06°, δ₀= 64.50° → λ_pole≈293°
-export const SATURN_AZIMUTH = 171; // IAU α₀= 40.59°, δ₀= 83.54° → λ_pole≈  81°
-export const URANUS_AZIMUTH = 348; // IAU α₀=257.31°, δ₀=-15.18° → λ_pole≈258°
-export const NEPTUNE_AZIMUTH = 49; // IAU α₀=299.36°, δ₀= 43.46° → λ_pole≈319°
-export const PLUTO_AZIMUTH = 227; // IAU α₀=132.99°, δ₀= -6.16° → λ_pole≈137°
-export const CERES_AZIMUTH = 101; // IAU α₀=291.42°, δ₀= 66.76° → λ_pole≈  11°
+export const SUN_AZIMUTH = 75.8;
+export const MERCURY_AZIMUTH = 48.2;
+export const VENUS_AZIMUTH = 300.2;
+export const EARTH_AZIMUTH = 180;
+export const MARS_AZIMUTH = 82.9;
+export const JUPITER_AZIMUTH = 337.8;
+export const SATURN_AZIMUTH = 169.5;
+export const URANUS_AZIMUTH = 167.7;
+export const NEPTUNE_AZIMUTH = 49.2;
+export const PLUTO_AZIMUTH = 227.4;
+export const CERES_AZIMUTH = 101.2; // α₀=291.42°, δ₀= 66.76° (positive pole) → λ=11.2°, β=+81.55°
 
 // === Planetary System: Magnetic Fields ===
 // Dipole parameters for the bodies with a global intrinsic magnetic field. Attribute-only data,
@@ -518,7 +528,7 @@ export const ISS_MASS = 419725 / MASS_SCALE;
 export const ISS_RADIUS = 0.1 / RADIUS_SCALE;
 
 // === Satellites: Inclination ===
-export const ISS_INCLINATION = 51.64;
+export const ISS_INCLINATION = 51.64; // to Earth's equator (createSatellite builds it there)
 
 // === Satellites: Distance from Earth ===
 export const ISS_DIST_FROM_EARTH = EARTH_RADIUS + 410 / DIST_SCALE;
@@ -580,14 +590,15 @@ export const HYGIEA_ARG_PERIHELION = 314.368234; // degrees (ω)
 export const HYGIEA_MEAN_ANOMALY_J2000 = 339.214814; // degrees
 
 // == Asteroids: Axial Tilt ===
-export const CERES_AXIS = 4.0;
+// Ecliptic spin pole, same convention as the planetary block (Ceres' azimuth lives there).
+export const CERES_AXIS = 8.45;
 
 // Pallas' spin pole sits at ecliptic (λ, β) = (30°, -16°) ± 5° (Carry et al. 2010, Icarus 205,
 // 460), which is an obliquity of ~84° to Pallas' own orbital plane. The tilt below is 90° - β,
-// matching how the planetary entries are derived: setRotation tilts a body against the +Y axis,
-// and Pallas' orbit is itself inclined 34.85°, so 106° is the value that reproduces the published
-// pole - the 84° headline figure would point the axis 22° away from it. The azimuth uses the same
-// λ_pole + 90° mapping documented in the rotation azimuth block above.
+// measured from the ecliptic normal like every *_AXIS here, and Pallas' orbit is itself inclined
+// 34.85°, so 106° is the value that reproduces the published pole - the 84° headline figure would
+// point the axis 22° away from it. The azimuth uses the same λ_pole + 90° mapping documented in
+// the spin pole block above.
 export const PALLAS_AXIS = 106;
 export const PALLAS_AZIMUTH = 120;
 

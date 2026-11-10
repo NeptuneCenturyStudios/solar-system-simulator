@@ -6,6 +6,7 @@ import { ISS } from '../bodies/iss';
 import { BodyTypeEnum } from '../bodies/body-enums';
 import { ISatelliteCreationOptions } from '../interfaces';
 import { settingsStore } from '../settings/settings-store';
+import { ECLIPTIC_NORTH } from '../camera/north-up';
 
 // Shared body-type helper. Checks bodyType flags only.
 export function isBodyType(body: Body, type: BodyTypeEnum) {
@@ -35,25 +36,35 @@ export function createSatellite(
 
     // Default angle is 0, but can be specified for multiple moons
     const angle = config.angle !== undefined ? config.angle : 0;
+    const speed = trajectory.vel.length();
 
-    // Calculate position and velocity in orbital plane
-    const localPos = new THREE.Vector3(
-        Math.cos(angle) * config.distance,
-        0,
-        Math.sin(angle) * config.distance
-    );
-    const localVel = new THREE.Vector3(
-        -Math.sin(angle) * trajectory.vel.z,
-        0,
-        Math.cos(angle) * trajectory.vel.z
-    );
+    // Orbit in the parent's EQUATORIAL frame: satellite inclinations (the ISS's 51.64°) are
+    // measured from the parent's equator, not the ecliptic. The parent's spin pole is its
+    // mesh's local +Y; the node line is where the equator crosses the ecliptic.
+    const pole = new THREE.Vector3(0, 1, 0).applyQuaternion(parent.mesh.quaternion).normalize();
+    const node = new THREE.Vector3().crossVectors(ECLIPTIC_NORTH, pole);
+    if (node.lengthSq() < 1e-12) node.set(1, 0, 0);
+    else node.normalize();
+    const nodeQuarter = new THREE.Vector3().crossVectors(pole, node); // node × pole = 90° ahead
 
-    // Apply inclination rotation if specified
+    // Prograde circular orbit in the equator (node × nodeQuarter = pole, so it turns with the
+    // parent's spin), starting `angle` past the node.
+    const localPos = new THREE.Vector3()
+        .addScaledVector(node, Math.cos(angle) * config.distance)
+        .addScaledVector(nodeQuarter, Math.sin(angle) * config.distance);
+    const localVel = new THREE.Vector3()
+        .addScaledVector(node, -Math.sin(angle) * speed)
+        .addScaledVector(nodeQuarter, Math.cos(angle) * speed);
+
+    // Tilt the orbit about the node line; a positive angle makes the satellite ascend there.
     if (config.inclinationDeg !== undefined) {
         const inclinationRad = THREE.MathUtils.degToRad(config.inclinationDeg);
-        localPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), inclinationRad);
-        localVel.applyAxisAngle(new THREE.Vector3(1, 0, 0), inclinationRad);
+        localPos.applyAxisAngle(node, inclinationRad);
+        localVel.applyAxisAngle(node, inclinationRad);
     }
+
+    // The satellite stays face-on to its parent by spinning about its own orbit normal.
+    const orbitNormal = new THREE.Vector3().crossVectors(localPos, localVel).normalize();
     // Optionally add random yVariation
     if (config.yVariation !== undefined) {
         localPos.y += (Math.random() - 0.5) * config.yVariation;
@@ -94,7 +105,7 @@ export function createSatellite(
         rotation: { tilt: 0, speed: 0 },
         tidalLock: {
             target: parent,
-            spinAxisWorld: new THREE.Vector3(0, 1, 0),
+            spinAxisWorld: orbitNormal,
             faceAxisLocal: new THREE.Vector3(0, 0, 1),
             angularSpeed: omega,
         },

@@ -47,7 +47,9 @@ export class Venus extends Planet {
         const gEff = dependencies.getG();
         const timeScale =
             VENUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(VENUS_DIST, gEff, SUN_MASS);
-        const rotSpeed = ((-2 * Math.PI) / (5832.6 * 3600)) * timeScale; // retrograde
+        // Positive: the retrograde sense comes from VENUS_AXIS > 90° (spin pole south of the
+        // ecliptic). A negative speed here would cancel it and spin Venus prograde.
+        const rotSpeed = ((2 * Math.PI) / (5832.6 * 3600)) * timeScale;
 
         // Venus has the roundest orbit of the eight planets (e ≈ 0.0068) and only 3.4° of
         // inclination, but both are real: the Sun distance still varies by 1.46 million km over the

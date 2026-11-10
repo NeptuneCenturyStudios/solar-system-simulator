@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ECLIPTIC_NORTH } from '../camera/north-up';
 
 import { SolarSystemGenerator } from './solar-system-generator';
 import { Sun } from '../bodies/sun';
@@ -71,7 +72,7 @@ export class AsteroidDefenseGenerator extends SolarSystemGenerator {
 
         // Point the ship along its orbit so it doesn't start flying backwards.
         const eye = ship.mesh.position.clone().add(tangent);
-        const m = new THREE.Matrix4().lookAt(eye, ship.mesh.position, new THREE.Vector3(0, 1, 0));
+        const m = new THREE.Matrix4().lookAt(eye, ship.mesh.position, ECLIPTIC_NORTH);
         ship.mesh.quaternion.setFromRotationMatrix(m);
         ship.controlFrameQuat.copy(ship.mesh.quaternion);
 

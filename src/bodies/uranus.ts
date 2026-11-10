@@ -50,7 +50,9 @@ export class Uranus extends Planet {
         const gEff = dependencies.getG();
         const timeScale =
             URANUS_ORBITAL_PERIOD_REAL / calcSimOrbitalPeriod(URANUS_DIST, gEff, SUN_MASS);
-        const rotSpeed = ((-2 * Math.PI) / (17.24 * 3600)) * timeScale; // retrograde
+        // Positive: the retrograde sense comes from URANUS_AXIS > 90° (spin pole south of the
+        // ecliptic). A negative speed here would cancel it and spin Uranus prograde.
+        const rotSpeed = ((2 * Math.PI) / (17.24 * 3600)) * timeScale;
 
         // Uranus's orbit is close to circular (e ≈ 0.0472) and barely tilted (0.77°), but at 19 AU
         // that small eccentricity still moves the Sun distance by 269 million km over the 84-year

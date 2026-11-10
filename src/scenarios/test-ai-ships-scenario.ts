@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ECLIPTIC_NORTH } from '../camera/north-up';
 
 import { NotificationType } from '../event-log/event-log';
 import type { IScenario, IStateDependencies } from '../interfaces';
@@ -159,7 +160,7 @@ export class TestAiShipsScenario implements IScenario {
         // system generators use.
         const heading = new THREE.Vector3().subVectors(anchor.mesh.position, position).normalize();
         const eye = position.clone().add(heading);
-        const m = new THREE.Matrix4().lookAt(eye, position, new THREE.Vector3(0, 1, 0));
+        const m = new THREE.Matrix4().lookAt(eye, position, ECLIPTIC_NORTH);
         ship.mesh.quaternion.setFromRotationMatrix(m);
         ship.controlFrameQuat.copy(ship.mesh.quaternion);
         ship.isThreat = true;
