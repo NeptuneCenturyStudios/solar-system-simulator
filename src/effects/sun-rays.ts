@@ -134,6 +134,17 @@ export class SunRaysEffect {
                     return fract((p3.x + p3.y) * p3.z);
                 }
 
+                // The rays were tuned on screen values, so they are worked out in display terms
+                // and converted to linear light at the end (standard sRGB curves).
+                vec3 raysLinearToDisplay(vec3 c) {
+                    return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055,
+                               step(vec3(0.0031308), c));
+                }
+                vec3 raysDisplayToLinear(vec3 c) {
+                    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)),
+                               step(vec3(0.04045), c));
+                }
+
                 void main() {
                     vec2 aspect = vec2(uAspect, 1.0);
                     vec3 rays = vec3(0.0);
@@ -162,17 +173,17 @@ export class SunRaysEffect {
                             float pRho = rho * (1.0 - f);
                             float source = smoothstep(0.55, 0.95, pRho)
                                          * (1.0 - smoothstep(1.0, 1.35, pRho));
-                            vec3 c = texture2D(tScene, p).rgb;
-                            sum += c * source;
+                            // What this sample showed as on screen before HDR: compressed below
+                            // 1 (as the old 8-bit capture clipped it) and display-encoded. A
+                            // blazing highlight on a ship or planet in front of the limb can
+                            // therefore add no more than it used to.
+                            vec3 c = max(texture2D(tScene, p).rgb, vec3(0.0));
+                            sum += raysLinearToDisplay(c / (1.0 + c)) * source;
                             weightSum += source;
                         }
                         // Average, then stretch the contrast so streaks stand apart from the glow.
-                        // The scene is HDR, so compress first: otherwise squaring a star's
-                        // multi-unit radiance would explode. Below ~1 this tracks the old
-                        // light² stretch, above it the rays saturate smoothly.
                         vec3 light = sum / max(weightSum, 1.0);
-                        light = light / (1.0 + light);
-                        light = light * light * 4.0;
+                        light = light * light * 1.6;
 
                         // Long, soft falloff away from the limb; gentle inside the disc, so the
                         // rays sit around the star rather than washing out its surface.
@@ -182,7 +193,11 @@ export class SunRaysEffect {
                         rays += light * falloff * inner * uStarStrengths[s];
                     }
 
-                    gl_FragColor = vec4(rays, 1.0);
+                    // To linear light for the output pass. Faint tails decode to almost nothing
+                    // (0.05 -> 0.004), as they looked before, so the rays fade out smoothly with
+                    // no visible edge or march grain; strong cores keep their brightness and may
+                    // exceed 1 (the HDR rays target holds them).
+                    gl_FragColor = vec4(raysDisplayToLinear(rays), 1.0);
                 }
             `,
             depthTest: false,
