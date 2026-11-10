@@ -245,6 +245,7 @@ export class LightningWeapon extends BeamWeaponBase {
             minPixels: this.config.minHaloWidthPx,
             maxPixels: this.config.maxWidthPx,
             minFade: this.config.minFade,
+            softEdge: true,
         });
         this.haloMat.resolution.set(window.innerWidth, window.innerHeight);
         this.haloArc = new LineSegments2(this.pathGeo, this.haloMat);

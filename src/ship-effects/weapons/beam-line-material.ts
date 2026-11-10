@@ -48,6 +48,12 @@ export interface IBeamLineMaterialOptions {
      * still visible.
      */
     minFade: number;
+    /**
+     * Fade the line's alpha across its width with the same radial profile as the weapon glow
+     * sprites (`pow(1 - r, 1.5)`, then decoded to linear), instead of drawing a flat,
+     * full-opacity band. Used for the coloured halo so it reads as a glow around the core.
+     */
+    softEdge?: boolean;
 }
 
 /**
@@ -110,7 +116,8 @@ export class BeamLineMaterial extends LineMaterial {
             // the value directly. The scene is now linear light with an sRGB output encode, so
             // the finished colour and alpha are decoded (≈ power 2.2) to look as tuned.
             'gl_FragColor = vec4( diffuseColor.rgb, alpha );',
-            `gl_FragColor = vec4( pow( max( diffuseColor.rgb, vec3( 0.0 ) ), vec3( 2.2 ) ),
+            `${options.softEdge ? SOFT_EDGE_GLSL : ''}
+                gl_FragColor = vec4( pow( max( diffuseColor.rgb, vec3( 0.0 ) ), vec3( 2.2 ) ),
                     pow( clamp( alpha, 0.0, 1.0 ), 2.2 ) );`
         );
     }
@@ -124,6 +131,15 @@ export class BeamLineMaterial extends LineMaterial {
         this.uniforms.worldWidth.value = value;
     }
 }
+
+/**
+ * Cross-width falloff for a soft-edged beam, matching the glow sprite profile. In LineMaterial's
+ * screen-space mode `vUv.x` runs -1..1 across the line and `|vUv.y| > 1` marks the round caps,
+ * where the distance from the cap centre is used instead.
+ */
+const SOFT_EDGE_GLSL = /* glsl */ `float _b = ( vUv.y > 0.0 ) ? vUv.y - 1.0 : vUv.y + 1.0;
+                float _r = ( abs( vUv.y ) > 1.0 ) ? length( vec2( vUv.x, _b ) ) : abs( vUv.x );
+                alpha *= pow( max( 1.0 - _r, 0.0 ), 1.5 );`;
 
 /** Replace `anchor` in `source`, throwing if three.js no longer contains it. */
 function patch(source: string, anchor: string, replacement: string): string {

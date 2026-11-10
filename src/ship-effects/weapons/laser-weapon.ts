@@ -117,6 +117,7 @@ export class LaserWeapon extends BeamWeaponBase {
             minPixels: this.config.minHaloWidthPx,
             maxPixels: this.config.maxWidthPx,
             minFade: this.config.minFade,
+            softEdge: true,
         });
         this.haloLineMat.resolution.set(window.innerWidth, window.innerHeight);
         this.haloBeamLine = new Line2(this.haloLineGeo, this.haloLineMat);
