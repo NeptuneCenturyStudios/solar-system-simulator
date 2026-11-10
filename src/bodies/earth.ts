@@ -58,6 +58,15 @@ const earthSpecularTexture = getBodyTexture('earth_specular_map.png', 'linear');
 const LAND_ROUGHNESS = 0.9;
 const OCEAN_ROUGHNESS = 0.25;
 
+/**
+ * City lights from the night texture, in linear luminance. Below CITY_LIGHT_FLOOR (the
+ * texture's dim navy ocean and land base, ≈0.005–0.02) nothing glows; from CITY_LIGHT_FULL up
+ * the lights glow at full strength. CITY_LIGHT_INTENSITY scales their emitted brightness.
+ */
+const CITY_LIGHT_FLOOR = 0.03;
+const CITY_LIGHT_FULL = 0.2;
+const CITY_LIGHT_INTENSITY = 1.6;
+
 type EarthUniforms = {
     nightTexture: { value: THREE.Texture };
     specularTexture: { value: THREE.Texture };
@@ -132,9 +141,10 @@ varying vec3 vEarthWorldNormal;`
     }
     earthDayFactor = smoothstep(EARTH_NIGHT_IRRADIANCE, EARTH_DAY_IRRADIANCE, illuminance);
 
-    vec3 dayColor   = texture2D(map, vMapUv).rgb;
-    vec3 nightColor = texture2D(nightTexture, vMapUv).rgb;
-    diffuseColor.rgb *= mix(nightColor, dayColor, earthDayFactor);
+    // The surface is the day texture everywhere: the night side is dark because little light
+    // reaches it, not because its albedo changes. Ambient light or a faint star shows the real
+    // surface dimly (as moonlight does); the night texture only supplies the city lights below.
+    diffuseColor.rgb *= texture2D(map, vMapUv).rgb;
 }`
         );
 
@@ -154,8 +164,12 @@ roughnessFactor = mix(${LAND_ROUGHNESS.toFixed(2)}, ${OCEAN_ROUGHNESS.toFixed(2)
             '#include <emissivemap_fragment>',
             `#include <emissivemap_fragment>
 {
+    // Only the lights glow. The night texture's dim navy ocean and land base is picture styling,
+    // not emitted light, so it is masked out by luminance.
     vec3 nightColor = texture2D(nightTexture, vMapUv).rgb;
-    totalEmissiveRadiance += nightColor * (1.0 - earthDayFactor) * 1.6;
+    float nightLum = dot(nightColor, vec3(0.2126, 0.7152, 0.0722));
+    vec3 cityLights = nightColor * smoothstep(${CITY_LIGHT_FLOOR.toFixed(3)}, ${CITY_LIGHT_FULL.toFixed(3)}, nightLum);
+    totalEmissiveRadiance += cityLights * (1.0 - earthDayFactor) * ${CITY_LIGHT_INTENSITY.toFixed(3)};
 }`
         );
     };

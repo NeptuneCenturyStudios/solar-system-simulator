@@ -741,8 +741,13 @@ export const EARTH_DAY_IRRADIANCE = 1.5 * STAR_LIGHT_EXPOSURE;
  * Venus (≈1.39) thickens without blowing out. Lower it to make thin skies more opaque.
  */
 export const ATMOSPHERE_VISUAL_PRESSURE_KNEE_BAR = 1e-5;
-/** Rayleigh (tinted) vertical optical depth of a 1-bar atmosphere, on the tint's brightest channel. */
-export const ATMOSPHERE_RAYLEIGH_ZENITH_DEPTH = 0.4;
+/**
+ * Rayleigh (tinted) vertical optical depth of a 1-bar atmosphere, on the tint's brightest channel.
+ * 0.25 is close to Earth's real blue-channel depth. (It was 0.4 under the old un-encoded output;
+ * with correct output that veiled the whole disc in pale blue. The limb glow barely changes,
+ * because grazing rays are optically thick at either value.)
+ */
+export const ATMOSPHERE_RAYLEIGH_ZENITH_DEPTH = 0.25;
 /**
  * Absorption of the colours a tint lacks, as a vertical optical depth per decade of surface
  * pressure above 1 bar (× log10(pressure); 0 at or below Earth's pressure, ≈1.18 for Venus).
