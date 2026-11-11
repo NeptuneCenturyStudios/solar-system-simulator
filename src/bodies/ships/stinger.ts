@@ -54,13 +54,13 @@ export class Stinger extends Spaceship {
         );
 
         // Flight tuning constants
-        const FLIGHT_MAX_SPEED = 500 / 1000 / DIST_SCALE; // 500 m/s
+        const FLIGHT_MAX_SPEED = 500 / 1000 / DIST_SCALE;
         const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.1;
-        const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.75;
+        const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
-        const FLIGHT_BOOST_MAX_SPEED = 2.5 / DIST_SCALE; // 2.5 km/s
+        const FLIGHT_BOOST_MAX_SPEED = 5 / DIST_SCALE;
         const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.2;
-        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL * 5;
+        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL;
         const FLIGHT_WARP_SPEED = C * 5;
         const FLIGHT_WARP_ACCEL = FLIGHT_WARP_SPEED * 0.1;
         const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 5;

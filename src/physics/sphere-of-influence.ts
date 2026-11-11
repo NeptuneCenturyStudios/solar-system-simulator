@@ -26,7 +26,8 @@ const REFERENCE_BODY_TYPES =
     BodyTypeEnum.DwarfPlanet |
     BodyTypeEnum.GasGiant |
     BodyTypeEnum.IceGiant |
-    BodyTypeEnum.Asteroid;
+    BodyTypeEnum.Asteroid |
+    BodyTypeEnum.Comet;
 
 interface IHillSphere {
     body: CelestialBody;

@@ -33,13 +33,13 @@ export class Zenith extends Spaceship {
         );
 
         // Flight tuning constants
-        const FLIGHT_MAX_SPEED = 500 / 1000 / DIST_SCALE; // 500 m/s
+        const FLIGHT_MAX_SPEED = 500 / 1000 / DIST_SCALE;
         const FLIGHT_THRUST_ACCEL = FLIGHT_MAX_SPEED * 0.1;
-        const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.75;
+        const FLIGHT_THRUST_DECEL = FLIGHT_MAX_SPEED * 0.1;
         const FLIGHT_THRUST_DECEL_TOLERANCE = FLIGHT_MAX_SPEED * 0.01;
-        const FLIGHT_BOOST_MAX_SPEED = 2.5 / DIST_SCALE; // 2.5 km/s
+        const FLIGHT_BOOST_MAX_SPEED = 5 / DIST_SCALE;
         const FLIGHT_BOOST_ACCEL = FLIGHT_BOOST_MAX_SPEED * 0.2;
-        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL * 5;
+        const FLIGHT_BOOST_DECEL = FLIGHT_BOOST_ACCEL;
         const FLIGHT_WARP_SPEED = C * 5;
         const FLIGHT_WARP_ACCEL = FLIGHT_WARP_SPEED * 0.1;
         const FLIGHT_WARP_DECEL = FLIGHT_WARP_SPEED * 5;
@@ -60,10 +60,10 @@ export class Zenith extends Spaceship {
         // High speed tuning — normal flight and boost are tuned low for dogfights
         const PERFORMANCE_MAX_SPEED = 500 / DIST_SCALE; // 500 km/s
         const PERFORMANCE_THRUST_ACCEL = PERFORMANCE_MAX_SPEED * 0.1;
-        const PERFORMANCE_THRUST_DECEL = PERFORMANCE_MAX_SPEED * 0.75;
+        const PERFORMANCE_THRUST_DECEL = PERFORMANCE_MAX_SPEED;
         const PERFORMANCE_BOOST_MAX_SPEED = 2500 / DIST_SCALE; // 2500 km/s
         const PERFORMANCE_BOOST_ACCEL = PERFORMANCE_BOOST_MAX_SPEED * 0.2;
-        const PERFORMANCE_BOOST_DECEL = PERFORMANCE_BOOST_ACCEL * 5;
+        const PERFORMANCE_BOOST_DECEL = PERFORMANCE_BOOST_ACCEL;
 
         const fighterHandling: ISpaceshipHandling = {
             // Thrust / speed
