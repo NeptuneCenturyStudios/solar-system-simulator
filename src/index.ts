@@ -89,6 +89,7 @@ import {
     SMOOTH_ZOOM_DIST_EPSILON,
     SMOOTH_ZOOM_FREE_CAM_STOP_MULT,
     AU,
+    BODY_LOD_HIDDEN_LAYER,
     WORLD_AMBIENT_INTENSITY,
     DISEMBARK_DISTANCE,
 } from './utilities/consts';
@@ -368,6 +369,8 @@ import {
     FPS_CANVAS_H,
     FPS_CANVAS_W,
     paintFPS,
+    RENDER_INFO_CANVAS_H,
+    RENDER_INFO_CANVAS_W,
     paintSpeed,
     paintStats,
     SPEED_CANVAS_W,
@@ -377,6 +380,7 @@ import {
     type SpeedHudParams,
 } from './drawing/text-rendering';
 import { HudSprite } from './drawing/hud/hud-sprite';
+import { BodyLodSystem } from './drawing/body-lod';
 import { ScreenProjector } from './drawing/hud/screen-projection';
 import { ProceduralGenerator } from './procedural/procedural-generator';
 import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
@@ -725,6 +729,8 @@ document.addEventListener('touchcancel', endTouch, { passive: true });
 // Don't let OrbitControls listen to keyboard - we handle WASD ourselves
 
 const raycaster = new THREE.Raycaster();
+// Bodies the screen-size LOD hides from the camera stay pickable (see body-lod.ts).
+raycaster.layers.enable(BODY_LOD_HIDDEN_LAYER);
 const mouse = new THREE.Vector2();
 
 /**
@@ -850,8 +856,38 @@ function refreshSpeedSprite(params: SpeedHudParams): void {
     speedSprite.draw('', (ctx) => paintSpeed(ctx, params));
 }
 
+// Render-info readout — under the FPS counter, shown by the Options "Show Render Info" checkbox.
+// Canvas → sprite at the FPS counter's 0.625 pixel density.
+const renderInfoSprite = new HudSprite(uiScene);
+renderInfoSprite.setCanvasSize(RENDER_INFO_CANVAS_W, RENDER_INFO_CANVAS_H);
+const RENDER_INFO_SPRITE_W = RENDER_INFO_CANVAS_W * 0.625;
+const RENDER_INFO_SPRITE_H = RENDER_INFO_CANVAS_H * 0.625;
+renderInfoSprite.setScale(RENDER_INFO_SPRITE_W, RENDER_INFO_SPRITE_H);
+// Right-aligned with the FPS counter, its top edge at the counter's bottom edge (y = -50).
+renderInfoSprite.setAnchor({
+    corner: 'top-right',
+    offsetX: -10 - RENDER_INFO_SPRITE_W / 2,
+    offsetY: -50 - RENDER_INFO_SPRITE_H / 2,
+});
+
+/** The stats panel's anchor, pushed down below the render-info readout while that is shown. */
+const STATS_ANCHOR_Y = -270;
+let statsBelowRenderInfo = false;
+function setStatsBelowRenderInfo(below: boolean): void {
+    if (below === statsBelowRenderInfo) return;
+    statsBelowRenderInfo = below;
+    statsSprite.setAnchor({
+        corner: 'top-right',
+        offsetX: -255,
+        offsetY: below ? STATS_ANCHOR_Y - RENDER_INFO_SPRITE_H : STATS_ANCHOR_Y,
+    });
+}
+
+// Screen-size LOD: low-poly proxies and dots for bodies that are small on screen.
+const bodyLod = new BodyLodSystem(scene);
+
 /** Every HUD sprite pinned to a viewport corner, re-laid-out on window resize. */
-const anchoredHudSprites: HudSprite[] = [fpsSprite, statsSprite, speedSprite];
+const anchoredHudSprites: HudSprite[] = [fpsSprite, statsSprite, speedSprite, renderInfoSprite];
 
 const ambientMusic = new AmbientSoundManager();
 // Start ambient music immediately. If the browser blocks autoplay,
@@ -5307,7 +5343,10 @@ const animCtx: AnimationContext = {
     screenFlash,
     scenarioMessageHud,
     screenProjector,
+    bodyLod,
     fpsSprite,
+    renderInfoSprite,
+    setStatsBelowRenderInfo,
     statsSprite,
     refreshStatsSprite,
     speedSprite,

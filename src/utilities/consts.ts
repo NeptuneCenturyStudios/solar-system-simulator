@@ -737,6 +737,65 @@ export const SHIP_SHADOW_THROW = 5 / DIST_SCALE; // 5 km
 export const SHIP_SHADOW_TILE_HALF_WIDTH = 0.6;
 /** Render layer the ship hulls are put on so the shadow pass draws only them. */
 export const SHADOW_CASTER_LAYER = 5;
+/**
+ * Render layer that body nodes are moved to (off layer 0) while the screen-size LOD hides them
+ * from the main camera (drawing/body-lod.ts). The click-picking raycaster enables it, so a hidden
+ * body stays clickable and its velocity-snap target stays hittable.
+ */
+export const BODY_LOD_HIDDEN_LAYER = 6;
+
+/**
+ * How often a body name panel re-formats its distance text, per Name Panel Updates setting, in
+ * milliseconds (0 = every frame). Panel position follows the body every frame regardless.
+ */
+export const NAME_PANEL_TEXT_INTERVAL_MS = Object.freeze({ low: 250, medium: 100, high: 0 });
+
+/**
+ * Screen-size LOD for bodies (drawing/body-lod.ts). Sizes are the body's apparent radius in
+ * pixels. Each boundary has an `enter` size (drop to the coarser tier below it) and a larger
+ * `exit` size (return above it), so a body hovering at a boundary does not flicker.
+ *
+ *   Full    — the body as built: full sphere, atmosphere, clouds, rings.
+ *   Reduced — the sphere is drawn with a low-poly proxy (child effects unchanged; they already
+ *             reduce themselves when small). Physics, eclipses and the surface patch still read
+ *             the full geometry, which is never swapped.
+ *   Dot     — the body and everything attached to it is hidden from the main camera and drawn
+ *             as one point in a shared Points buffer.
+ *
+ * A dot's brightness is the light the body really reflects toward the camera: star irradiance at
+ * the body (normalized by STAR_LIGHT_EXPOSURE, so the Sun gives π at 1 AU) × DOT_ALBEDO × the
+ * body's angular radius² (radians). That flux is placed on a log scale like a magnitude, because
+ * a few-pixel dot cannot be lit physically: Venus and Mars differ ~100× in flux, yet both are
+ * naked-eye objects. Reference fluxes (log10) seen from Earth: Venus −8.6…−7.6, Jupiter −8.7,
+ * Mercury −9.2, Mars −8.9…−9.9, Saturn −9.7, Uranus −11.4, Vesta −12.9, Charon −15.3.
+ */
+export const BODY_LOD_TUNING = Object.freeze({
+    /** Full ↔ Reduced boundary. */
+    REDUCED: Object.freeze({ enter: 24, exit: 32 }),
+    /** Reduced ↔ Dot boundary. */
+    DOT: Object.freeze({ enter: 1.5, exit: 2.25 }),
+    /** Segments of the shared low-poly proxy sphere. */
+    REDUCED_WIDTH_SEGMENTS: 32,
+    REDUCED_HEIGHT_SEGMENTS: 16,
+    /** Point size of a distant-body dot, in pixels (scaled with the render scale). */
+    DOT_SIZE_PX: 2.5,
+    /** Dots past the far plane are pulled in along their view ray to this fraction of it, so
+     *  they stay visible beyond the Render Distance without moving on screen. */
+    DOT_FAR_FRACTION: 0.95,
+    /** Threshold multiplier per Distant Body Detail setting. Higher = coarser sooner. */
+    DETAIL_SCALE: Object.freeze({ low: 2, medium: 1, high: 0.5 }),
+    /** Reflectivity assumed for every body's dot (bodies carry no albedo of their own). */
+    DOT_ALBEDO: 0.3,
+    /** log10 flux at which a dot fades out completely under a dark sky. Lower = fainter bodies
+     *  show (about Uranus seen from Earth by default). */
+    DOT_LIMIT_LOG_FLUX: -11.7,
+    /** Decades of flux above the limit at which a dot reaches full brightness (about Venus and
+     *  Jupiter from Earth). Larger = a gentler fade between faint and bright bodies. */
+    DOT_SPAN_DECADES: 3,
+    /** How many decades a full daytime sky raises the limit. 4.5 hides even Venus at its
+     *  closest; lower it to let the brightest planets show through the day. */
+    DOT_DAY_LIMIT_DECADES: 4.5,
+});
 
 /** How far beyond the hull of a landed ship the player rig is set down when stepping out (E). */
 export const DISEMBARK_DISTANCE = 0.01 / DIST_SCALE; // 10 m
@@ -856,7 +915,7 @@ export const EARTH_DAY_IRRADIANCE = 1.5 * STAR_LIGHT_EXPOSURE;
  * Earth's), while near-vacuum ones (Pluto, 1e-5 bar ≈ 0.06) stay clear enough to show stars, and
  * Venus (≈1.39) thickens without blowing out. Lower it to make thin skies more opaque.
  */
-export const ATMOSPHERE_VISUAL_PRESSURE_KNEE_BAR = 1e-5;
+export const ATMOSPHERE_VISUAL_PRESSURE_KNEE_BAR = 1e-12;
 /**
  * Rayleigh (tinted) vertical optical depth of a 1-bar atmosphere, on the tint's brightest channel.
  * 0.25 is close to Earth's real blue-channel depth. (It was 0.4 under the old un-encoded output;

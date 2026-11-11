@@ -48,6 +48,11 @@ function isSkyBody(body: object): body is ISkyBody {
 export class SkyBackgroundDimmer {
     private _intensity = 1;
 
+    /** How bright the sky at the camera is, eased: 0 at night or in space, 1 in full daylight. */
+    get skyBrightness(): number {
+        return 1 - this._intensity;
+    }
+
     /**
      * @param wallDt Real seconds since the last frame (the ease runs on the wall clock).
      */

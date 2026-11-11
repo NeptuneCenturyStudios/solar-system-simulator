@@ -1,4 +1,9 @@
-import type { AuroraDetailMode, CloudQuality, ShadowQuality } from './settings-store';
+import type {
+    AuroraDetailMode,
+    CloudQuality,
+    NamePanelUpdateRate,
+    ShadowQuality,
+} from './settings-store';
 
 /**
  * One-click bundles of the GPU-heavy graphics settings. A preset is not stored: choosing one
@@ -27,6 +32,8 @@ export interface IGraphicsPresetValues {
     auroraDetail: AuroraDetailMode;
     particleEffectsEnabled: boolean;
     hdrEnabled: boolean;
+    /** Name panels redraw their distance text less often on lower presets. */
+    namePanelUpdateRate: NamePanelUpdateRate;
 }
 
 /**
@@ -49,6 +56,7 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
         auroraDetail: 'static',
         particleEffectsEnabled: true,
         hdrEnabled: false,
+        namePanelUpdateRate: 'low',
     },
     medium: {
         renderScale: 1,
@@ -60,6 +68,7 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
         auroraDetail: 'dynamic',
         particleEffectsEnabled: true,
         hdrEnabled: true,
+        namePanelUpdateRate: 'medium',
     },
     high: {
         renderScale: 1,
@@ -71,6 +80,7 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
         auroraDetail: 'dynamic',
         particleEffectsEnabled: true,
         hdrEnabled: true,
+        namePanelUpdateRate: 'high',
     },
 };
 

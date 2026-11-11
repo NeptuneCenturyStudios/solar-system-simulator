@@ -15,6 +15,8 @@ import {
     RENDER_SCALE_MIN,
     RENDER_SCALE_STEP,
 } from '../utilities/consts';
+// Value import is safe: graphics-presets only imports types from this module.
+import { matchGraphicsPreset } from './graphics-presets';
 
 const STORAGE_KEY = 'spaceSimSettings';
 
@@ -55,6 +57,10 @@ export const enum SettingKey {
     HdrEnabled = 'hdrEnabled',
     ToneMapping = 'toneMapping',
     Exposure = 'exposure',
+    DistantBodyDetail = 'distantBodyDetail',
+    ShowFps = 'showFps',
+    ShowRenderInfo = 'showRenderInfo',
+    NamePanelUpdateRate = 'namePanelUpdateRate',
 }
 
 /**
@@ -151,6 +157,26 @@ export type ShadowQuality = 'off' | 'low' | 'high';
  */
 export type ShipCollisionMode = 'triangle' | 'box';
 
+/**
+ * How early bodies that are small on screen drop to cheaper rendering (see drawing/body-lod.ts).
+ * - `low`    — switches early: bodies become dots and low-poly spheres at twice the usual size.
+ * - `medium` — the default thresholds.
+ * - `high`   — keeps full detail down to half the usual size.
+ *
+ * Declared here rather than in the drawing layer so the settings store stays dependency-free.
+ */
+export type DistantBodyDetail = 'low' | 'medium' | 'high';
+
+/**
+ * How often body name panels refresh their distance text (NAME_PANEL_TEXT_INTERVAL_MS). Panel
+ * position always follows its body every frame; only the text, and so the canvas repaint and
+ * texture upload, is throttled.
+ * - `low`    — 4× a second.
+ * - `medium` — 10× a second.
+ * - `high`   — every frame.
+ */
+export type NamePanelUpdateRate = 'low' | 'medium' | 'high';
+
 export interface SpaceSimSettings {
     particleEffectsEnabled: boolean;
     substeps: number;
@@ -243,6 +269,14 @@ export interface SpaceSimSettings {
     toneMapping: ToneMappingMode;
     /** Exposure multiplier applied before tone mapping (EXPOSURE_MIN..MAX). */
     exposure: number;
+    /** How early small-on-screen bodies drop to low-poly spheres and dots. */
+    distantBodyDetail: DistantBodyDetail;
+    /** Show the FPS counter in the top-right corner. */
+    showFps: boolean;
+    /** Show the render-info readout (frame time, draw calls, triangles, LOD counts) under the FPS counter. */
+    showRenderInfo: boolean;
+    /** How often body name panels refresh their distance text. */
+    namePanelUpdateRate: NamePanelUpdateRate;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -293,6 +327,11 @@ const defaultSettings: SpaceSimSettings = {
     hdrEnabled: true,
     toneMapping: 'neutral',
     exposure: EXPOSURE_DEFAULT,
+    distantBodyDetail: 'medium',
+    // The counter has always been shown; the detailed readout is for diagnosing performance.
+    showFps: true,
+    showRenderInfo: false,
+    namePanelUpdateRate: 'medium',
 };
 
 /** Normalise a stored tone-mapping curve, falling back to `neutral` for anything unrecognised. */
@@ -337,6 +376,29 @@ export function normalizeCloudQuality(value: unknown): CloudQuality {
 /** Normalise a stored shadow quality, falling back to `low` for anything unrecognised. */
 export function normalizeShadowQuality(value: unknown): ShadowQuality {
     return value === 'off' || value === 'high' ? value : 'low';
+}
+
+/** Normalise a stored distant-body detail level, falling back to `medium` for anything unrecognised. */
+export function normalizeDistantBodyDetail(value: unknown): DistantBodyDetail {
+    return value === 'low' || value === 'high' ? value : 'medium';
+}
+
+/** Normalise a stored name-panel update rate, or null when it is missing or unrecognised. */
+export function normalizeNamePanelUpdateRate(value: unknown): NamePanelUpdateRate | null {
+    return value === 'low' || value === 'medium' || value === 'high' ? value : null;
+}
+
+/**
+ * The name-panel update rate for a save made before the setting existed: the level of the
+ * graphics preset the save's other values match, so a Low or High preset still shows as that
+ * preset (rather than Custom) now that the rate is part of the presets. Custom gets `medium`.
+ */
+function namePanelUpdateRateForPreset(data: SpaceSimSettings): NamePanelUpdateRate {
+    for (const preset of ['low', 'medium', 'high'] as const) {
+        const candidate = { ...data, namePanelUpdateRate: preset };
+        if (matchGraphicsPreset(candidate) === preset) return preset;
+    }
+    return 'medium';
 }
 
 /** Normalise a stored ship collision mode, falling back to `triangle` for anything unrecognised. */
@@ -385,6 +447,13 @@ class SettingsStore {
         this.data.hdrEnabled = this.data.hdrEnabled !== false;
         this.data.toneMapping = normalizeToneMapping(this.data.toneMapping);
         this.data.exposure = clampExposure(this.data.exposure);
+        this.data.distantBodyDetail = normalizeDistantBodyDetail(this.data.distantBodyDetail);
+        this.data.showFps = this.data.showFps !== false;
+        this.data.showRenderInfo = this.data.showRenderInfo === true;
+        // Normalised last: the preset fallback compares the other (already normalised) values.
+        this.data.namePanelUpdateRate =
+            normalizeNamePanelUpdateRate(this.data.namePanelUpdateRate) ??
+            namePanelUpdateRateForPreset(this.data);
     }
 
     get settings(): SpaceSimSettings {

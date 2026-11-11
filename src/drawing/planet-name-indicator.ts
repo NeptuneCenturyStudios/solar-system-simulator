@@ -21,6 +21,8 @@ import {
 } from './hud/hud-paint';
 import { probeScanStatusLabel } from '../bodies/probe-scan-status';
 import { surfaceDistanceFromPoint } from '../physics/collision';
+import { settingsStore } from '../settings/settings-store';
+import { NAME_PANEL_TEXT_INTERVAL_MS } from '../utilities/consts';
 
 /**
  * Camera-to-surface distance for a name panel, measured against the same drawn surface as the
@@ -61,6 +63,17 @@ const CANCEL_PANEL_H = 56;
 
 /** Minimum apparent screen radius for hover detection, so small distant bodies stay selectable. */
 const MIN_HOVER_APPARENT_R = 50;
+
+/** Per-body cache of a panel's distance text and its measured canvas size. */
+interface PanelTextCache {
+    distLabel: string;
+    /** `performance.now()` at which `distLabel` was formatted. */
+    formattedAt: number;
+    /** Everything that affects the panel size; the size is re-measured only when it changes. */
+    layoutKey: string;
+    width: number;
+    height: number;
+}
 
 // ── Reference sprite scale ───────────────────────────────────────────────────
 const REF_CANVAS_W = 512;
@@ -256,6 +269,21 @@ export class PlanetNameIndicator {
     /** Scratch projection struct for the hover / cancel probes, which look at one body at a time. */
     private readonly probe: ScreenProjection = createScreenProjection();
 
+    /** Throttled distance text per body. Weak, so disposed bodies drop out on their own. */
+    private readonly textCache = new WeakMap<Body, PanelTextCache>();
+    /** Timestamp of the current update(), shared by every panel drawn this frame. */
+    private frameNow = 0;
+    /**
+     * Minimum ms between distance-text refreshes this frame (Name Panel Updates setting). Only
+     * the text is throttled: panel position and scale follow the body every frame, so panels
+     * never jitter. Between refreshes the text, and with it the sprite's content key, is
+     * unchanged, so the canvas is not repainted and its texture is not re-uploaded.
+     */
+    private textIntervalMs = 0;
+
+    /** Name panels drawn in the most recent frame (for the render-info readout). */
+    public visibleCount = 0;
+
     /**
      * Set each frame by update(). The body whose projected position is nearest
      * the steering-line tip (within its apparent screen radius). Null when none.
@@ -285,6 +313,9 @@ export class PlanetNameIndicator {
     ): void {
         const bodies = this.simulationState.bodies;
         const showNames = this.simulationState.showNames;
+        this.frameNow = performance.now();
+        this.textIntervalMs =
+            NAME_PANEL_TEXT_INTERVAL_MS[settingsStore.settings.namePanelUpdateRate];
 
         // ── Hover detection (always runs in flight mode, independent of showNames) ──
         const isFlightHoverActive = !!(
@@ -340,26 +371,21 @@ export class PlanetNameIndicator {
                 if (isFlightHoverActive && body === flightContext!.activeShip) continue;
 
                 const slot = this.visible.next();
-                if (!projector.project(body, slot) || !slot.onScreen) {
+                // inViewport, not onScreen: keep the label for a body beyond the Render Distance
+                if (!projector.project(body, slot) || !slot.inViewport) {
                     this.visible.rollback();
                 }
             }
         }
 
         const sprites = this.pool.acquire(this.visible.length);
+        this.visibleCount = this.visible.length;
 
         for (let i = 0; i < this.visible.length; i++) {
             const p = this.visible.at(i);
             // Pass ring fill only for the hovered body
             const ringFill = isFlightHoverActive && p.body === hoveredBody ? computedRingFill : -1;
-            this.renderPanel(
-                sprites[i],
-                p.body,
-                surfaceDistance(projector, p.body, p.camDist),
-                ringFill,
-                p.uiX,
-                p.uiY
-            );
+            this.renderPanel(sprites[i], projector, p.body, p.camDist, ringFill, p.uiX, p.uiY);
         }
 
         this.updateHoverSprite(
@@ -414,7 +440,9 @@ export class PlanetNameIndicator {
 
             const p = this.probe;
             if (!projector.project(body, p)) continue;
-            if (p.nz >= 1) continue; // behind camera or beyond the render distance (not drawn)
+            // Behind the camera. A body beyond the Render Distance stays hoverable: its label
+            // (and its distant-body dot) are still drawn.
+            if (p.behind) continue;
 
             const apparentR = projector.apparentRadius(
                 body.radius,
@@ -432,26 +460,50 @@ export class PlanetNameIndicator {
         return best;
     }
 
-    /** Size, paint and place one name panel. `surfaceDist` is camera-to-surface, in world units. */
+    /**
+     * Size, paint and place one name panel. `camDist` is the camera-to-centre distance; the
+     * camera-to-surface distance shown on the panel is derived from it at most every
+     * {@link NAME_PANEL_TEXT_INTERVAL_MS} (per the Name Panel Updates setting). Placement runs
+     * every frame.
+     */
     private renderPanel(
         sprite: HudSprite,
+        projector: ScreenProjector,
         body: Body,
-        surfaceDist: number,
+        camDist: number,
         ringFill: number,
         uiX: number,
         uiY: number
     ): void {
         const name = body.name;
-        const distLabel = formatAltitude(surfaceDist);
         const isThreat = body.isThreat;
         const hasRing = ringFill >= 0;
+
+        let cache = this.textCache.get(body);
+        if (!cache) {
+            cache = { distLabel: '', formattedAt: -Infinity, layoutKey: '', width: 0, height: 0 };
+            this.textCache.set(body, cache);
+        }
+        if (this.frameNow - cache.formattedAt >= this.textIntervalMs) {
+            cache.distLabel = formatAltitude(surfaceDistance(projector, body, camDist));
+            cache.formattedAt = this.frameNow;
+        }
+        const distLabel = cache.distLabel;
 
         // Probe scan status ("Scanning… 12s" / "Scan complete" / "Out of scan range"),
         // or null for any non-probe body. Shared with the System Explorer body list so
         // this panel's countdown and that list's status line always agree.
         const scanLabel = probeScanStatusLabel(body);
 
-        const [fullW, totalH] = measureNamePanel(name, distLabel, hasRing, scanLabel);
+        const layoutKey = `${name}|${distLabel}|${hasRing}|${scanLabel}`;
+        if (layoutKey !== cache.layoutKey) {
+            const [w, h] = measureNamePanel(name, distLabel, hasRing, scanLabel);
+            cache.layoutKey = layoutKey;
+            cache.width = w;
+            cache.height = h;
+        }
+        const fullW = cache.width;
+        const totalH = cache.height;
         sprite.setCanvasSize(fullW, totalH);
         sprite.draw(
             `${name}|${distLabel}|${ringFill.toFixed(3)}|${isThreat}|${scanLabel}`,
@@ -491,8 +543,9 @@ export class PlanetNameIndicator {
 
         this.renderPanel(
             this.hoverSprite,
+            projector,
             hoveredBody,
-            surfaceDistance(projector, hoveredBody, p.camDist),
+            p.camDist,
             ringFill,
             p.uiX,
             p.uiY
@@ -520,7 +573,7 @@ export class PlanetNameIndicator {
         }
 
         // Show as long as the target is in front of the camera and roughly on screen
-        if (p.nz >= 1 || Math.abs(p.nx) > 1.1 || Math.abs(p.ny) > 1.1) {
+        if (p.behind || Math.abs(p.nx) > 1.1 || Math.abs(p.ny) > 1.1) {
             if (this.cancelSprite) this.cancelSprite.visible = false;
             return;
         }

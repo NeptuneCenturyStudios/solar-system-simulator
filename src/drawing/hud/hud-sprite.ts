@@ -207,8 +207,14 @@ export class HudSprite extends HudSpriteBase {
      * Resize the backing canvas. No-op when the dimensions already match, so callers can
      * invoke this unconditionally each frame. A real resize invalidates the content key,
      * because assigning `canvas.width` clears the canvas.
+     *
+     * Sizes are rounded up to whole pixels first. Callers often pass a width straight from
+     * `measureText`, which is fractional; the canvas truncates it, so comparing the raw value
+     * never matched and every such panel was resized, repainted and re-uploaded every frame.
      */
     setCanvasSize(width: number, height: number): void {
+        width = Math.max(1, Math.ceil(width));
+        height = Math.max(1, Math.ceil(height));
         if (this.canvas.width === width && this.canvas.height === height) return;
 
         // Clear the old area before resizing so no stale pixels survive into the new buffer.

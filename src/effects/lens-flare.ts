@@ -586,13 +586,17 @@ export class LensFlareEffect {
             }
 
             if (along <= 0 || along >= starDist) continue;
-            // The camera is inside this body: it can't be judged as an occluder.
-            if (distSq <= body.radius * body.radius) continue;
+            // The camera can be inside the body's radius while standing on it: the sphere's
+            // facets sag inward between vertices (~8 km on Earth), and the surface camera and
+            // landed ships rest on those facets. Shrink the occluder to the camera's own distance
+            // from the centre, so the star sets at the local horizon instead of shining through
+            // the ground.
+            const occluderRadius = Math.min(body.radius, Math.sqrt(distSq));
 
             // The star's disc, and one pixel, measured at the occluder's distance.
             const pixel = (2 * along * tanHalfFov) / heightPx;
             const soft = Math.max((star.radius * along) / starDist, pixel);
-            visibility *= THREE.MathUtils.smoothstep(perp - body.radius, -soft, soft);
+            visibility *= THREE.MathUtils.smoothstep(perp - occluderRadius, -soft, soft);
             if (visibility <= 0) return 0;
         }
         return unknown ? null : visibility;

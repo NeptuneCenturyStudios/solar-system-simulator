@@ -26,6 +26,12 @@ export interface ScreenProjection {
     behind: boolean;
     /** True when the body is inside the view frustum: in front of the camera, within the far plane, inside the NDC box. */
     onScreen: boolean;
+    /**
+     * True when the body is in front of the camera and inside the NDC box, regardless of the far
+     * plane. The perspective divide does not depend on `far`, so the NDC x/y of a body beyond the
+     * Render Distance are still its true screen position — labels use this to stay visible.
+     */
+    inViewport: boolean;
 }
 
 /** Placement of an off-screen edge marker (the autopilot and threat chevrons). */
@@ -122,7 +128,9 @@ export class ScreenProjector {
         out.uiY = ny * this.halfH;
         out.camDist = camera.position.distanceTo(worldPos);
         out.behind = behind;
-        out.onScreen = nz < 1 && Math.abs(nx) <= 1 && Math.abs(ny) <= 1;
+        const inBox = Math.abs(nx) <= 1 && Math.abs(ny) <= 1;
+        out.onScreen = nz < 1 && inBox;
+        out.inViewport = !behind && inBox;
 
         return true;
     }
@@ -175,6 +183,7 @@ export function createScreenProjection(): ScreenProjection {
         camDist: 0,
         behind: false,
         onScreen: false,
+        inViewport: false,
     };
 }
 

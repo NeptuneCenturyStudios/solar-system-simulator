@@ -7,7 +7,7 @@
             <select
                 class="solver-select"
                 :value="graphicsPreset"
-                title="Sets render scale, HDR, clouds, shadows, sun rays, lens flares, aurorae and particles in one go. Changing any of them afterwards shows Custom."
+                title="Sets render scale, HDR, clouds, shadows, sun rays, lens flares, aurorae, particles and name panel updates in one go. Changing any of them afterwards shows Custom."
                 @change="onGraphicsPresetChange"
             >
                 <option value="low">Low</option>
@@ -136,9 +136,39 @@
                 </button>
             </div>
             <p class="solver-hint">
-                Objects farther than this from the camera are not drawn. The default shows out to
-                Saturn from Earth.
+                Objects farther than this from the camera are not drawn, but their names and
+                distant-body dots still are. The default shows out to Saturn from Earth.
             </p>
+        </div>
+
+        <div class="control-group">
+            <label>Distant Body Detail</label>
+            <select
+                class="solver-select"
+                :value="simStore.distantBodyDetail"
+                title="Bodies that look small on screen are drawn as low-poly spheres, and tiny ones as dots, so a distant cluster of bodies costs almost nothing to draw."
+                @change="onDistantBodyDetailChange"
+            >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+            <p class="solver-hint">{{ distantBodyDetailHint }}</p>
+        </div>
+
+        <div class="control-group">
+            <label>Name Panel Updates</label>
+            <select
+                class="solver-select"
+                :value="simStore.namePanelUpdateRate"
+                title="How often body name panels redraw their distance. Panels always follow their bodies smoothly; only the number updates less often on lower settings."
+                @change="onNamePanelUpdateRateChange"
+            >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+            <p class="solver-hint">{{ namePanelUpdateRateHint }}</p>
         </div>
 
         <div class="control-group">
@@ -399,6 +429,19 @@
 
         <div class="vue-ui-card-header">Debug</div>
         <label class="checkbox-row">
+            <input type="checkbox" :checked="simStore.showFps" @change="onShowFpsChange" />
+            Show FPS
+        </label>
+        <label class="checkbox-row">
+            <input
+                type="checkbox"
+                :checked="simStore.showRenderInfo"
+                title="Frame time, draw calls, triangles, GPU memory objects and how many bodies are drawn at each detail level."
+                @change="onShowRenderInfoChange"
+            />
+            Show Render Info
+        </label>
+        <label class="checkbox-row">
             <input type="checkbox" :checked="simStore.showAiDebug" @change="onShowAiDebugChange" />
             Show Ship AI Debug
         </label>
@@ -429,6 +472,10 @@ import {
     setVoiceVolume,
     setSunRaysEnabled,
     setShowAiDebug,
+    setDistantBodyDetail,
+    setNamePanelUpdateRate,
+    setShowFps,
+    setShowRenderInfo,
     setSmoothZoomEnabled,
     setSubsteps,
     setTextureQuality,
@@ -438,6 +485,8 @@ import {
 import type {
     AuroraDetailMode,
     CloudQuality,
+    DistantBodyDetail,
+    NamePanelUpdateRate,
     PhysicsSolverMode,
     ShadowQuality,
     ShipCollisionMode,
@@ -485,9 +534,9 @@ const MAX_FRAME_RATE_LIMIT = 240;
 
 /** One-line summary of what each preset trades away. */
 const GRAPHICS_PRESET_HINTS: Record<GraphicsPresetSelection, string> = {
-    low: 'For integrated graphics: 75% render scale, no HDR, flat clouds, no shadows, sun rays or lens flares.',
+    low: 'For integrated graphics: 75% render scale, no HDR, flat clouds, no shadows, sun rays or lens flares, slower name panel updates.',
     medium: "Volumetric clouds, eclipse shadows and the nearest ship's shadow, all effects on. The default.",
-    high: 'Detailed volumetric clouds and shadows for up to four ships. Highest GPU cost.',
+    high: 'Detailed volumetric clouds, shadows for up to four ships and name panels updated every frame. Highest GPU cost.',
     custom: 'Your own mix of the settings below. Pick a preset to reset them all at once.',
 };
 
@@ -503,6 +552,7 @@ const graphicsPreset = computed<GraphicsPresetSelection>(() =>
         auroraDetail: simStore.auroraDetail,
         particleEffectsEnabled: simStore.particleEffectsEnabled,
         hdrEnabled: simStore.hdrEnabled,
+        namePanelUpdateRate: simStore.namePanelUpdateRate,
     })
 );
 
@@ -636,6 +686,42 @@ function onShipCollisionModeChange(e: Event): void {
 
 function onShowAiDebugChange(e: Event): void {
     setShowAiDebug((e.target as HTMLInputElement).checked);
+}
+
+function onShowFpsChange(e: Event): void {
+    setShowFps((e.target as HTMLInputElement).checked);
+}
+
+function onShowRenderInfoChange(e: Event): void {
+    setShowRenderInfo((e.target as HTMLInputElement).checked);
+}
+
+/** One-line explanation of each distant-body detail level. */
+const DISTANT_BODY_DETAIL_HINTS: Record<DistantBodyDetail, string> = {
+    low: 'Bodies switch to low-poly spheres and dots early. Fastest with many bodies in view.',
+    medium: 'Bodies smaller than a few pixels are drawn as dots, and small ones as low-poly spheres. The default.',
+    high: 'Keeps full detail until bodies are very small on screen.',
+};
+
+const distantBodyDetailHint = computed(() => DISTANT_BODY_DETAIL_HINTS[simStore.distantBodyDetail]);
+
+function onDistantBodyDetailChange(e: Event): void {
+    setDistantBodyDetail((e.target as HTMLSelectElement).value as DistantBodyDetail);
+}
+
+/** One-line explanation of each name panel update rate. */
+const NAME_PANEL_UPDATE_HINTS: Record<NamePanelUpdateRate, string> = {
+    low: 'Distance text updates 4× a second. Fastest with many panels on screen.',
+    medium: 'Distance text updates 10× a second. The default.',
+    high: 'Distance text updates every frame.',
+};
+
+const namePanelUpdateRateHint = computed(
+    () => NAME_PANEL_UPDATE_HINTS[simStore.namePanelUpdateRate]
+);
+
+function onNamePanelUpdateRateChange(e: Event): void {
+    setNamePanelUpdateRate((e.target as HTMLSelectElement).value as NamePanelUpdateRate);
 }
 
 /**

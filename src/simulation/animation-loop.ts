@@ -83,7 +83,14 @@ import {
     FLIGHT_AUTOPILOT_CHARGE_TIME,
     HUD_ALTIMETER_MAX_ALTITUDE,
 } from '../utilities/consts';
-import { paintFPS, type SpeedHudParams } from '../drawing/text-rendering';
+import {
+    paintFPS,
+    paintRenderInfo,
+    renderInfoKey,
+    type IRenderInfoStats,
+    type SpeedHudParams,
+} from '../drawing/text-rendering';
+import type { BodyLodSystem } from '../drawing/body-lod';
 import type { HudSprite } from '../drawing/hud/hud-sprite';
 import type { ScreenProjector } from '../drawing/hud/screen-projection';
 import { interactionState, simulationState, cameraState } from './simulation';
@@ -173,7 +180,13 @@ export interface AnimationContext {
     // Overlay HUD
     /** Shared body→screen projector for the overlay indicators; primed once per frame. */
     screenProjector: ScreenProjector;
+    /** Screen-size LOD: low-poly proxies and dots for bodies small on screen. */
+    bodyLod: BodyLodSystem;
     fpsSprite: HudSprite;
+    /** Render-info readout under the FPS counter (Options → Show Render Info). */
+    renderInfoSprite: HudSprite;
+    /** Moves the selected-body stats panel below the render-info readout while it is shown. */
+    setStatsBelowRenderInfo: (below: boolean) => void;
     statsSprite: HudSprite;
     refreshStatsSprite: (body: Body) => void;
     speedSprite: HudSprite;
@@ -417,6 +430,24 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
     let fpsLastUpdate = 0;
     let lastT = performance.now();
+    // The frame renders several passes (scene capture, lensing, flare, cockpit, HUD). Counters are
+    // reset once per frame instead of per render() call, so they add up the whole frame.
+    ctx.renderer.info.autoReset = false;
+    // Last complete frame's counters, shown by the render-info readout.
+    const _renderInfo: IRenderInfoStats = {
+        frameMs: 0,
+        calls: 0,
+        triangles: 0,
+        points: 0,
+        lines: 0,
+        geometries: 0,
+        textures: 0,
+        programs: 0,
+        lodFull: 0,
+        lodReduced: 0,
+        lodDot: 0,
+        labels: 0,
+    };
     // Set once an E press has done something (engaged or cancelled the autopilot, started or
     // aborted a landing), so holding E on afterwards does nothing more until it is released.
     let _ePressConsumed = false;
@@ -1455,9 +1486,22 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // ── HUD sprites (FPS / stats / speed) ──────────────────────────────
         // Updated BEFORE the overlay render below. This block used to run after it,
         // so every HUD readout showed the previous frame's values.
+        const hudSettings = settingsStore.settings;
+        ctx.fpsSprite.visible = hudSettings.showFps;
+        ctx.renderInfoSprite.visible = hudSettings.showRenderInfo;
+        ctx.setStatsBelowRenderInfo(hudSettings.showRenderInfo);
         if (now - fpsLastUpdate > 100) {
-            const fps = Math.round(1000 / (now - lastT));
-            ctx.fpsSprite.draw(String(fps), (c) => paintFPS(c, fps));
+            const frameMs = now - lastT;
+            if (hudSettings.showFps) {
+                const fps = Math.round(1000 / frameMs);
+                ctx.fpsSprite.draw(String(fps), (c) => paintFPS(c, fps));
+            }
+            if (hudSettings.showRenderInfo) {
+                _renderInfo.frameMs = frameMs;
+                ctx.renderInfoSprite.draw(renderInfoKey(_renderInfo), (c) =>
+                    paintRenderInfo(c, _renderInfo)
+                );
+            }
 
             const spd = ctx.speedSprite;
             if (spd.visible && ctx.flightState.isActive) {
@@ -1572,6 +1616,18 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         // Tan(fov/2) and the viewport half-sizes are computed once here for all indicators.
         ctx.screenProjector.beginFrame(ctx.camera);
 
+        // Screen-size LOD, from the camera's final pose: small bodies drop to low-poly proxies,
+        // tiny ones to dots. Before the indicators and the render, after the last camera move.
+        ctx.bodyLod.update(
+            ctx.camera,
+            ctx.screenProjector,
+            ctx.simulationState.bodies,
+            settingsStore.settings.distantBodyDetail,
+            isFlightModeActive ? ctx.flightState.activeShip : null,
+            // Last frame's eased value: the dimmer updates later in the frame.
+            _skyBackground.skyBrightness
+        );
+
         // ── Planet name indicators (replaces old text labels) ───────────
         // One reused context object instead of a fresh literal every frame.
         let flightHoverCtx: IPlanetNameFlightContext | undefined;
@@ -1669,6 +1725,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.missileTrackerIndicator.update(ctx.screenProjector);
 
         // ── Render ──────────────────────────────────────────────────────────
+        // Everything from here to the HUD render counts toward this frame's render info.
+        ctx.renderer.info.reset();
         // Redraw the ground under the camera in camera-local precision, so the nearest body's
         // float32-rounded surface doesn't jitter against ships resting on it.
         _surfacePatch.update(ctx.camera, ctx.simulationState.bodies);
@@ -1741,6 +1799,20 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
         ctx.renderer.render(ctx.uiScene, ctx.uiCamera);
         ctx.renderer.toneMapping = sceneToneMapping;
         ctx.renderer.autoClear = true;
+
+        // Snapshot this frame's counters for the render-info readout (painted next frame).
+        const info = ctx.renderer.info;
+        _renderInfo.calls = info.render.calls;
+        _renderInfo.triangles = info.render.triangles;
+        _renderInfo.points = info.render.points;
+        _renderInfo.lines = info.render.lines;
+        _renderInfo.geometries = info.memory.geometries;
+        _renderInfo.textures = info.memory.textures;
+        _renderInfo.programs = info.programs?.length ?? 0;
+        _renderInfo.lodFull = ctx.bodyLod.counts.full;
+        _renderInfo.lodReduced = ctx.bodyLod.counts.reduced;
+        _renderInfo.lodDot = ctx.bodyLod.counts.dot;
+        _renderInfo.labels = ctx.planetNameIndicator.visibleCount;
 
         lastT = now;
     }

@@ -210,6 +210,69 @@ export function paintFPS(context: CanvasRenderingContext2D, fps: number): void {
     context.fillText(`FPS: ${fps}`, FPS_CANVAS_W - 10, FPS_CANVAS_H / 2);
 }
 
+// ── Render info panel ────────────────────────────────────────────────────────
+
+export const RENDER_INFO_CANVAS_W = 512;
+export const RENDER_INFO_CANVAS_H = 256;
+
+/** One frame's rendering counters, as shown by the render-info readout under the FPS counter. */
+export interface IRenderInfoStats {
+    /** Wall time of the frame, in ms. */
+    frameMs: number;
+    /** Draw calls / primitives over every render pass of the frame. */
+    calls: number;
+    triangles: number;
+    points: number;
+    lines: number;
+    /** GPU objects currently alive. */
+    geometries: number;
+    textures: number;
+    programs: number;
+    /** Bodies on each screen-size LOD tier (drawing/body-lod.ts). */
+    lodFull: number;
+    lodReduced: number;
+    lodDot: number;
+    /** Body name panels drawn. */
+    labels: number;
+}
+
+/** Compact count: 1234 → "1,234", 2_500_000 → "2.50M". */
+function formatCount(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+    return getNumberFormatter(0, 0).format(n);
+}
+
+/** Content key for the render-info sprite, so an unchanged readout is not repainted. */
+export function renderInfoKey(s: IRenderInfoStats): string {
+    return `${s.frameMs.toFixed(1)}|${s.calls}|${s.triangles}|${s.points}|${s.lines}|${s.geometries}|${s.textures}|${s.programs}|${s.lodFull}|${s.lodReduced}|${s.lodDot}|${s.labels}`;
+}
+
+/** Draw the render-info readout. The canvas must already be `RENDER_INFO_CANVAS_W × _H`. */
+export function paintRenderInfo(context: CanvasRenderingContext2D, s: IRenderInfoStats): void {
+    context.clearRect(0, 0, RENDER_INFO_CANVAS_W, RENDER_INFO_CANVAS_H);
+
+    context.font = '22px monospace';
+    context.fillStyle = '#00ffcc';
+    context.textAlign = 'right';
+    context.textBaseline = 'middle';
+    context.shadowColor = 'rgba(0, 255, 204, 0.6)';
+    context.shadowBlur = 6;
+
+    const lines = [
+        `Frame ${s.frameMs.toFixed(1)} ms`,
+        `Draw calls ${formatCount(s.calls)}`,
+        `Triangles ${formatCount(s.triangles)}`,
+        `Points ${formatCount(s.points)}  Lines ${formatCount(s.lines)}`,
+        `Geo ${s.geometries}  Tex ${s.textures}  Prog ${s.programs}`,
+        `LOD full ${s.lodFull} · low ${s.lodReduced} · dot ${s.lodDot}`,
+        `Name panels ${s.labels}`,
+    ];
+    const lineH = RENDER_INFO_CANVAS_H / (lines.length + 0.5);
+    for (let i = 0; i < lines.length; i++) {
+        context.fillText(lines[i], RENDER_INFO_CANVAS_W - 10, lineH * (i + 0.75));
+    }
+}
+
 // ── Stats panel ──────────────────────────────────────────────────────────────
 
 const STATS_LINE_HEIGHT = 40;

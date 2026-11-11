@@ -34,6 +34,10 @@ import {
     settingsStore,
     TextureQuality,
     type ToneMappingMode,
+    type DistantBodyDetail,
+    normalizeDistantBodyDetail,
+    type NamePanelUpdateRate,
+    normalizeNamePanelUpdateRate,
 } from '../settings/settings-store';
 import { GRAPHICS_PRESETS, type GraphicsPreset } from '../settings/graphics-presets';
 import type { PlaylistEntry } from '../utilities/playlist';
@@ -442,6 +446,14 @@ export interface VueSimStore {
     toneMapping: ToneMappingMode;
     /** Exposure multiplier applied before tone mapping. */
     exposure: number;
+    /** How early small-on-screen bodies drop to low-poly spheres and dots. */
+    distantBodyDetail: DistantBodyDetail;
+    /** How often body name panels refresh their distance text. */
+    namePanelUpdateRate: NamePanelUpdateRate;
+    /** Show the FPS counter. */
+    showFps: boolean;
+    /** Show the render-info readout under the FPS counter. */
+    showRenderInfo: boolean;
     /** Hide the PanelManager while in flight mode, restoring it on exit. */
     hidePanelManagerInFlight: boolean;
     /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
@@ -527,6 +539,10 @@ const state = reactive<VueSimStore>({
     hdrSupported: true,
     toneMapping: settingsStore.settings.toneMapping,
     exposure: settingsStore.settings.exposure,
+    distantBodyDetail: settingsStore.settings.distantBodyDetail,
+    namePanelUpdateRate: settingsStore.settings.namePanelUpdateRate,
+    showFps: settingsStore.settings.showFps,
+    showRenderInfo: settingsStore.settings.showRenderInfo,
     hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
     chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
     coastDriftAlignEnabled: settingsStore.settings.coastDriftAlignEnabled,
@@ -1184,6 +1200,32 @@ export function setExposure(exposure: number): void {
     state.exposure = clamped;
 }
 
+/** Set how early small-on-screen bodies drop to cheaper rendering (Options panel). Read every frame. */
+export function setDistantBodyDetail(detail: DistantBodyDetail): void {
+    const normalized = normalizeDistantBodyDetail(detail);
+    settingsStore.update(SettingKey.DistantBodyDetail, normalized);
+    state.distantBodyDetail = normalized;
+}
+
+/** Set how often body name panels refresh their distance text (Options panel). Read every frame. */
+export function setNamePanelUpdateRate(rate: NamePanelUpdateRate): void {
+    const normalized = normalizeNamePanelUpdateRate(rate) ?? 'medium';
+    settingsStore.update(SettingKey.NamePanelUpdateRate, normalized);
+    state.namePanelUpdateRate = normalized;
+}
+
+/** Toggle the FPS counter (Options panel). Read by the render loop each frame. */
+export function setShowFps(checked: boolean): void {
+    settingsStore.update(SettingKey.ShowFps, checked);
+    state.showFps = checked;
+}
+
+/** Toggle the render-info readout (Options panel). Read by the render loop each frame. */
+export function setShowRenderInfo(checked: boolean): void {
+    settingsStore.update(SettingKey.ShowRenderInfo, checked);
+    state.showRenderInfo = checked;
+}
+
 /**
  * Apply a graphics preset (Options panel): writes each of its values through the same setter the
  * individual control uses, so every side effect (particle and aurora hooks) runs as usual.
@@ -1199,6 +1241,7 @@ export function applyGraphicsPreset(preset: GraphicsPreset): void {
     setAuroraDetail(values.auroraDetail);
     setParticleEffectsEnabled(values.particleEffectsEnabled);
     setHdrEnabled(values.hdrEnabled);
+    setNamePanelUpdateRate(values.namePanelUpdateRate);
 }
 
 /** Toggle hiding the PanelManager while in flight mode (Flight Controls panel). */
