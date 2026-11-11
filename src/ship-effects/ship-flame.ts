@@ -224,7 +224,7 @@ export class ShipFlame implements IShipEffect {
         }
 
         const absDt = Math.abs(dt);
-        // Flame brightness depends only on thrust state: 50% normal thrust, 100% boost.
+        // Flame brightness depends only on thrust state.
         const thrustLevel = boosting ? 0.3 : 0.2;
 
         // ── 1. Age live particles (sim-time based, comet pattern) ─────────────
