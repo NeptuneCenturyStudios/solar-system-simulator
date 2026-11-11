@@ -23,10 +23,9 @@ import {
 } from '../utilities/consts';
 
 /**
- * 'absorb': winner merges every victim's mass/radius (black holes, stars, and a surviving
- *   celestial body after its impact destroyed the other).
+ * 'absorb': winner merges every victim's mass/radius (only black holes and stars absorb).
  * 'destroy': winner survives and all victims are removed, but no mass/radius is transferred
- *   (spaceships can claim a kill without ever "absorbing" anything).
+ *   (a planet, moon, asteroid or spaceship whose impact destroyed the other only claims the kill).
  * 'destroy-both': the impact destroyed both bodies — no winner.
  * 'bounce': both bodies survived the impact; their velocities and positions have already been
  *   updated to bounce them apart.
@@ -107,12 +106,18 @@ function resolveByEscapeVelocity(b1: Body, b2: Body): { winner: Body; victim: Bo
     return { winner: b2, victim: b1 };
 }
 
-/** Winner takes the victim — spaceships never absorb mass, they can only claim a kill. */
+/**
+ * Winner takes the victim. Only stars and black holes absorb it (gaining its mass, radius and
+ * momentum). Anything else — a planet, moon or asteroid that survived the impact, or a ship — only
+ * claims the kill: absorbing would grow a planet's radius by tens of metres per asteroid, burying
+ * anything standing on it.
+ */
 function claimVictim(winner: Body, victim: Body): CollisionOutcome {
-    if (winner instanceof Spaceship || victim instanceof Spaceship) {
-        return { type: 'destroy', winner, victims: [victim] };
+    if (victim instanceof Spaceship) return { type: 'destroy', winner, victims: [victim] };
+    if (winner instanceof Star || winner instanceof BlackHole) {
+        return { type: 'absorb', winner, victims: [victim] };
     }
-    return { type: 'absorb', winner, victims: [victim] };
+    return { type: 'destroy', winner, victims: [victim] };
 }
 
 /**

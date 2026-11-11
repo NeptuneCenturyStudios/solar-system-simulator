@@ -85,6 +85,28 @@ function heightAboveGround(rig: PlayerRig, ground: Body): number {
     return distance - groundRadius;
 }
 
+/**
+ * Move the player with the ground when the home body's radius has changed since the physics last
+ * saw it (a radius edit from the Add/Edit Body panel): the feet shift along the local up by the
+ * change in ground height, keeping their height above it — standing stays standing, mid-jump stays
+ * mid-jump. A parked anchor moves the same way. Runs from both the per-substep and the per-frame
+ * pass, so it applies on the first one after the change, paused included.
+ */
+function followGroundRadius(rig: PlayerRig, ground: Body): void {
+    const groundRadius = ground.radius * (ground.mesh.scale.x || 1);
+    const change = groundRadius - rig.lastGroundRadius;
+    rig.lastGroundRadius = groundRadius;
+    if (change === 0 || !Number.isFinite(change)) return;
+
+    const shift = change * rig.reachFactor;
+    _up.subVectors(rig.mesh.position, ground.mesh.position);
+    if (_up.lengthSq() < 1e-24) return;
+    rig.mesh.position.addScaledVector(_up.normalize(), shift);
+    if (rig.anchorLocal) {
+        rig.anchorLocal.setLength(Math.max(0, rig.anchorLocal.length() + shift));
+    }
+}
+
 /** Surface gravity of `ground` at the rig's feet (sim units / s²). */
 function gravityAt(rig: PlayerRig, ground: Body): number {
     const distanceSq = rig.mesh.position.distanceToSquared(ground.mesh.position);
@@ -117,6 +139,7 @@ export function applyPlayerRigSubsteps(dt: number): void {
     if (!rig || !(dt > 0)) return;
     const ground = rig.homeBody;
     if (!isLiveGround(ground)) return;
+    followGroundRadius(rig, ground);
     // Any input wakes a parked player; otherwise it is carried rigidly by the ground each frame
     // (updatePlayerRigFrame).
     if (rig.anchorLocal) {
@@ -177,6 +200,7 @@ export function updatePlayerRigFrame(bodies: readonly Body[], dt: number): void 
     if (!rig) return;
     const ground = rig.homeBody;
     if (!isLiveGround(ground)) return;
+    followGroundRadius(rig, ground);
 
     if (rig.anchorLocal) {
         // Parked: put the feet back exactly where they were parked, moving with the ground.

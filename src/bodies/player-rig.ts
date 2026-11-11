@@ -80,6 +80,12 @@ export class PlayerRig extends Body {
     reachFactor = 1;
 
     /**
+     * The home body's scaled radius (radius × mesh scale) when the physics last saw it, so a resize
+     * (e.g. from the Add/Edit Body panel) can move the player with the ground.
+     */
+    lastGroundRadius: number;
+
+    /**
      * Speed (into the ground) removed by the most recent touchdown, for the camera's landing dip.
      * The camera reads and clears it.
      */
@@ -118,6 +124,7 @@ export class PlayerRig extends Body {
             BodyTypeEnum.Player
         );
         this.homeBody = homeBody;
+        this.lastGroundRadius = homeBody.radius * (homeBody.mesh?.scale.x || 1);
 
         // A visible material: three.js skips any object whose own material is invisible, even when
         // the shadow pass draws with an override material.
