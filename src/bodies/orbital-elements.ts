@@ -157,8 +157,8 @@ function toDegreesSigned(angleDeg: number): number {
  * Invert {@link stateVectorsFromElements}: recover the classical orbital elements from a state
  * vector relative to the orbital reference frame.
  *
- * @param relPos  Position relative to the parent/barycentre, in simulation distance units.
- * @param relVel  Velocity relative to the parent/barycentre, in simulation distance units/s.
+ * @param relPos  Position relative to the parent/barycenter, in simulation distance units.
+ * @param relVel  Velocity relative to the parent/barycenter, in simulation distance units/s.
  * @param mu      Standard gravitational parameter of the parent: effective G × parent mass.
  * @returns The live elements, or null when they cannot be derived (a body sitting exactly on
  *          the reference point, a non-positive μ, or a radial trajectory with no orbital plane).

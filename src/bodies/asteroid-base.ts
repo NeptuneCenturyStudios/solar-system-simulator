@@ -76,7 +76,7 @@ export abstract class AsteroidBase extends CelestialBody {
                 attributes: options.attributes,
                 orbitParent: options.orbitParent,
                 referenceOrbitElements: options.referenceOrbitElements,
-                orbitBarycenterMass: options.orbitBarycenterMass,
+                orbitsSystemBarycenter: options.orbitsSystemBarycenter,
             },
             BodyTypeEnum.Asteroid
         );

@@ -15,6 +15,7 @@ import {
     buildUnitPositionDirection,
     computeMaxEccentricity,
     computeMinPeriapsis,
+    computePlacementBarycenter,
     pickOrbitType,
     sanitizeOrbitCreations,
     safeUnitCross,
@@ -41,7 +42,8 @@ export function generateProceduralAsteroids(params: {
     const maxDistAU = 4.0;
 
     const maxStarRadius = Math.max(...starParams.map((s) => s.radius));
-    const totalStarMass = starParams.reduce((sum, s) => sum + s.mass, 0);
+    // P-type orbits circle the system barycenter (at the origin for generated placements).
+    const barycenter = computePlacementBarycenter(starParams, starPlacements);
 
     const binarySeparation =
         starCount > 1 ? starPlacements[0]!.pos.distanceTo(starPlacements[1]!.pos) : 0;
@@ -75,9 +77,9 @@ export function generateProceduralAsteroids(params: {
             pZoneValid,
         });
 
-        const hostMass = isSType ? starParams[hostStarIndex]!.mass : totalStarMass;
-        const hostPos = isSType ? starPlacements[hostStarIndex]!.pos : new THREE.Vector3(0, 0, 0);
-        const hostVel = isSType ? starPlacements[hostStarIndex]!.vel : new THREE.Vector3(0, 0, 0);
+        const hostMass = isSType ? starParams[hostStarIndex]!.mass : barycenter.mass;
+        const hostPos = isSType ? starPlacements[hostStarIndex]!.pos : barycenter.pos;
+        const hostVel = isSType ? starPlacements[hostStarIndex]!.vel : barycenter.vel;
 
         const zoneMin = isSType ? sMinDist : pMinDist;
         const zoneMax = isSType ? sMaxDist : pMaxDist;

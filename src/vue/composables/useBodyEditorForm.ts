@@ -1,4 +1,12 @@
-import { computed, inject, provide, reactive, type ComputedRef, type InjectionKey } from 'vue';
+import {
+    computed,
+    inject,
+    provide,
+    reactive,
+    watch,
+    type ComputedRef,
+    type InjectionKey,
+} from 'vue';
 
 import { COMET_TAIL_COLOR_PALETTE, RADIUS_SCALE } from '../../utilities/consts';
 import type { IMagneticFieldOptions } from '../../interfaces';
@@ -34,7 +42,10 @@ export const ATM_PRESSURE_MIN = 0.00001;
 
 const DEFAULT_TAIL_COLOR = '#7ab8ff';
 
-export type OrbitType = 'circular' | 'elliptical';
+/** Add-form body types that can orbit the system barycenter (moons need a parent). */
+const BARYCENTER_BODY_TYPES: ReadonlySet<string> = new Set(['sun', 'planet', 'asteroid', 'comet']);
+
+export type OrbitType = 'circular' | 'elliptical' | 'binary';
 
 export interface BodyFormState {
     /** Add-form body type key; '' until the user picks one. */
@@ -51,6 +62,8 @@ export interface BodyFormState {
     hasRings: boolean;
     /** Orbit parent body id; '' means "the default parent" (see `view.orbitParentId`). */
     orbitParentId: string;
+    /** Orbit the system barycenter instead of the orbit parent. */
+    orbitSystemBarycenter: boolean;
     orbitType: OrbitType;
     inclination: number;
     /** Edit-only: current speed. */
@@ -96,6 +109,12 @@ export interface BodyFormView {
     /** The parent the new body will orbit (explicit choice or the default), or null. */
     orbitParentId: string | null;
     orbitParentName: string | null;
+    /** A new star orbiting another star can join it in a true binary (shared barycenter). */
+    binaryAvailable: boolean;
+    /** The "Orbit system barycenter" checkbox is offered (stars, planets, asteroids, comets). */
+    barycenterAvailable: boolean;
+    /** The new body will orbit the system barycenter instead of a parent. */
+    usesSystemBarycenter: boolean;
     showAtmosphereSection: boolean;
     /** The "Has Atmosphere" checkbox can be toggled (add mode, optional-atmosphere subtypes). */
     atmosphereToggleEnabled: boolean;
@@ -181,6 +200,7 @@ function createInitialState(): BodyFormState {
         tailColor: DEFAULT_TAIL_COLOR,
         hasRings: false,
         orbitParentId: '',
+        orbitSystemBarycenter: false,
         orbitType: 'circular',
         inclination: 0,
         velocity: 0,
@@ -256,9 +276,19 @@ export function useBodyEditorForm(isEdit: () => boolean) {
         const orbitParentId = edit
             ? null
             : (resolveOrbitParentId(form.orbitParentId || null) ?? defaultOrbitParentId.value);
+        const orbitParent = edit
+            ? null
+            : (candidateParents.value.find((b) => b.id === orbitParentId) ?? null);
+        const barycenterAvailable =
+            !edit &&
+            BARYCENTER_BODY_TYPES.has(type) &&
+            candidateParents.value.some((b) => b.isStar);
+        const usesSystemBarycenter = barycenterAvailable && form.orbitSystemBarycenter;
         const orbitParentName = edit
             ? (snap?.orbitParentName ?? null)
-            : (candidateParents.value.find((b) => b.id === orbitParentId)?.name ?? null);
+            : usesSystemBarycenter
+              ? 'System barycenter'
+              : (orbitParent?.name ?? null);
 
         // Atmosphere: edit mode can tune an existing atmosphere but never add or remove one.
         const forcesAtmosphere =
@@ -287,6 +317,11 @@ export function useBodyEditorForm(isEdit: () => boolean) {
             orbitParentOptions: candidateParents.value,
             orbitParentId,
             orbitParentName,
+            // Binary pairs with a parent star, so it's off while the barycenter box is ticked.
+            binaryAvailable:
+                !edit && type === 'sun' && !usesSystemBarycenter && !!orbitParent?.isStar,
+            barycenterAvailable,
+            usesSystemBarycenter,
             showAtmosphereSection: edit ? !!snap?.atmosphere : type === 'planet' || type === 'moon',
             atmosphereToggleEnabled: !edit && canToggleAtmosphere,
             atmosphereActive: edit
@@ -307,6 +342,15 @@ export function useBodyEditorForm(isEdit: () => boolean) {
     });
 
     provide(BODY_EDITOR_KEY, { form, view });
+
+    // One rule for every way Binary can stop applying (body type, parent, barycenter box,
+    // selection change): fall back to Circular rather than leave a hidden radio selected.
+    watch(
+        () => view.value.binaryAvailable,
+        (available) => {
+            if (!available && form.orbitType === 'binary') form.orbitType = 'circular';
+        }
+    );
 
     /** Back to an empty Add form ("< Select >" body type, nothing else shown). */
     function resetForAdd(): void {
@@ -356,6 +400,7 @@ export function useBodyEditorForm(isEdit: () => boolean) {
     function onBodyTypeChanged(): void {
         form.subtype = '';
         form.orbitParentId = '';
+        form.orbitSystemBarycenter = false;
         if (!view.value.needsSubtype) randomize();
     }
 
@@ -397,7 +442,9 @@ export function useBodyEditorForm(isEdit: () => boolean) {
             // Empty means "let the sim generate one procedurally".
             customName: form.name.trim() || null,
             planetType: form.subtype || 'solid',
-            orbitType: form.orbitType,
+            // Binary only applies to a star orbiting a star; anything else falls back.
+            orbitType:
+                form.orbitType === 'binary' && !v.binaryAvailable ? 'circular' : form.orbitType,
             inclination: form.inclination,
             atmosphere: v.atmosphereActive
                 ? { radiusFactor: form.atmRadiusFactor, surfacePressureBar: form.atmPressure }
@@ -408,6 +455,7 @@ export function useBodyEditorForm(isEdit: () => boolean) {
             customLightIntensity: v.showStarFields ? form.lightIntensity : null,
             customRadius: kmToSimRadius(form.radiusKm),
             orbitParentId: v.orbitParentId,
+            orbitSystemBarycenter: v.usesSystemBarycenter,
             createTilt: v.showTilt ? form.tilt : null,
             createAzimuth: v.showTilt ? form.azimuth : null,
             magneticField: v.showMagneticSection ? magneticFieldFromForm(form) : null,

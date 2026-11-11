@@ -11,6 +11,7 @@
                     v-if="!view.isEdit"
                     id="bodyEditorOrbitParent"
                     :value="view.orbitParentId ?? ''"
+                    :disabled="view.usesSystemBarycenter"
                     @change="onParentChange"
                 >
                     <option v-if="!view.orbitParentId" value="">&lt; Select &gt;</option>
@@ -23,9 +24,14 @@
                 </select>
             </div>
 
+            <label v-if="view.barycenterAvailable" class="checkbox-row">
+                <input v-model="form.orbitSystemBarycenter" type="checkbox" />
+                Orbit system barycenter
+            </label>
+
             <div v-if="!view.isEdit" class="radio-group">
                 <label>Orbit Type</label>
-                <div class="radio-options">
+                <div class="radio-options vertical">
                     <div class="radio-option">
                         <input
                             id="bodyEditorOrbitCircular"
@@ -43,6 +49,15 @@
                             value="elliptical"
                         />
                         <label for="bodyEditorOrbitElliptical">Elliptical</label>
+                    </div>
+                    <div v-if="view.binaryAvailable" class="radio-option">
+                        <input
+                            id="bodyEditorOrbitBinary"
+                            v-model="form.orbitType"
+                            type="radio"
+                            value="binary"
+                        />
+                        <label for="bodyEditorOrbitBinary">Binary (shared barycenter)</label>
                     </div>
                 </div>
             </div>

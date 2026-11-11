@@ -175,7 +175,7 @@ export const VENUS_MEAN_ANOMALY_J2000 = 50.114772; // degrees
 // points that ellipse the correct way round the ecliptic.
 // These are JPL Horizons (Earth 399, Sun-centred, J2000 ecliptic) osculating elements at exactly
 // J2000 (JD 2451545.0 TDB). Body-centre elements wobble with the Moon (Earth's centre circles the
-// Earth–Moon barycentre monthly), so the perihelion and aphelion differ from the long-run
+// Earth–Moon barycenter monthly), so the perihelion and aphelion differ from the long-run
 // fact-sheet values by up to ~0.1%.
 // EARTH_DIST above is the long-run mean semi-major axis (it keys the time scale to the real
 // period); the osculating one here, (perihelion + aphelion) / 2 = 1.0004 AU, is very slightly larger.
@@ -373,7 +373,7 @@ export const NEPTUNE_MEAN_ANOMALY_J2000 = 266.105016; // degrees
 // directly, at exactly JD 2451545.0 TDB.
 // PLUTO_DIST above is Pluto's long-run mean semi-major axis (it keys the time scale to the real
 // period); the osculating one here, (perihelion + aphelion) / 2 = 39.57 AU, is slightly larger.
-// Body-centre elements wobble with Charon (Pluto's centre circles the system barycentre every
+// Body-centre elements wobble with Charon (Pluto's centre circles the system barycenter every
 // 6.4 days), so e, i, Ω and ω swing noticeably from day to day (their sum ϖ + M, which fixes the
 // position, stays put).
 export const PLUTO_PERIHELION_DIST = 4443097133 / DIST_SCALE; // 4,443,097,133 km (29.7003 AU)

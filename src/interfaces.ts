@@ -393,13 +393,11 @@ export interface ICelestialBodyCreationOptions extends IOrbitalBodyCreationOptio
      */
     orbitParent?: CelestialBody | null;
     /**
-     * Mass of the system barycenter, for bodies on a P-type (circumbinary) orbit with no
-     * single physical parent body. Used by getOrbitalPeriod() only when `orbitParent` is
-     * omitted/null; the barycenter itself is treated as fixed at the world origin with zero
-     * velocity, matching the existing "P-type orbits use the system barycenter (always at
-     * origin)" convention already used for orbital-speed calculation in planet-generator.ts.
+     * True for bodies on a P-type (circumbinary) orbit around the system barycenter rather than
+     * one parent body. getOrbitReference() then measures the orbit against the live barycenter
+     * of the system's stars and black holes (see computeSystemBarycenter).
      */
-    orbitBarycenterMass?: number;
+    orbitsSystemBarycenter?: boolean;
     /**
      * The Keplerian elements this body was placed on, when it was placed on known ones (the real
      * solar-system bodies, whose elements come from the NASA fact sheets). Purely descriptive:

@@ -36,7 +36,7 @@ export class DwarfPlanet extends CelestialBody {
                     magneticField: options.magneticField,
                     attributes: options.attributes,
                     orbitParent: options.orbitParent,
-                    orbitBarycenterMass: options.orbitBarycenterMass,
+                    orbitsSystemBarycenter: options.orbitsSystemBarycenter,
                 },
                 BodyTypeEnum.DwarfPlanet
             );

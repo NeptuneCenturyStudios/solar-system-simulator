@@ -164,6 +164,8 @@ export interface CreateBodyPayload {
     customRadius: number | null;
     /** Parent body id for orbit (moon parent / custom orbit parent). */
     orbitParentId: string | null;
+    /** Orbit the live system barycenter instead of `orbitParentId`. */
+    orbitSystemBarycenter?: boolean;
     createTilt: number | null;
     createAzimuth: number | null;
     /** Dipole magnetic field, or null when the checkbox is unchecked / not applicable. */

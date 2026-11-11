@@ -169,7 +169,7 @@ export function stateVectorsFromElements(params: {
 
 /**
  * Computes centre-of-mass binary orbit placements for two bodies.
- * Both bodies orbit their shared barycentre; their positions and velocities
+ * Both bodies orbit their shared barycenter; their positions and velocities
  * are expressed relative to the origin (0,0,0).
  *
  * @param masses        [m1, m2] — masses of the two bodies
@@ -185,17 +185,39 @@ export function generateBinaryPlacements(
     inclinationRad: number,
     gForce: number = G
 ): [BinaryPlacement, BinaryPlacement] {
-    const [m1, m2] = masses;
-    const mSum = m1 + m2;
-
-    const r1 = separationDistance * (m2 / mSum);
-    const r2 = separationDistance * (m1 / mSum);
-
     const u = buildUnitPositionDirection(0, yawRad, inclinationRad);
 
     const normalBase = new THREE.Vector3(0, 1, 0);
     const normalYaw = applyYawY(normalBase, yawRad);
     const normal = applyInclinationX(normalYaw, inclinationRad).normalize();
+
+    return generateBinaryPlacementsFromBasis(masses, separationDistance, u, normal, gForce);
+}
+
+/**
+ * Centre-of-mass binary placements from an explicit orbital basis, for callers that already
+ * know the line between the two bodies (e.g. a star created next to an existing one).
+ * Body 1 sits at `+u·r1` and body 2 at `−u·r2` from the barycenter (origin); body 1 moves
+ * along `normal × u` and body 2 the opposite way.
+ *
+ * @param masses             [m1, m2] — masses of the two bodies
+ * @param separationDistance Distance between the two bodies
+ * @param u                  Unit direction from the barycenter toward body 1
+ * @param normal             Unit orbit normal (perpendicular to `u`)
+ * @param gForce             Effective gravitational constant (G × gMultiplier). Defaults to raw G.
+ */
+export function generateBinaryPlacementsFromBasis(
+    masses: [number, number],
+    separationDistance: number,
+    u: THREE.Vector3,
+    normal: THREE.Vector3,
+    gForce: number = G
+): [BinaryPlacement, BinaryPlacement] {
+    const [m1, m2] = masses;
+    const mSum = m1 + m2;
+
+    const r1 = separationDistance * (m2 / mSum);
+    const r2 = separationDistance * (m1 / mSum);
 
     const velDir = safeUnitCross(normal, u);
 
@@ -214,6 +236,66 @@ export function generateBinaryPlacements(
 }
 
 // ---------------------------------------------------------------------------
+// System barycenter
+// ---------------------------------------------------------------------------
+
+/** One mass contributing to a barycenter: a star placement, or a live body's state. */
+export interface IBarycenterMass {
+    mass: number;
+    pos: THREE.Vector3;
+    vel: THREE.Vector3;
+}
+
+/** A barycenter's position, velocity and the total mass it represents. */
+export interface IBarycenter {
+    pos: THREE.Vector3;
+    vel: THREE.Vector3;
+    mass: number;
+}
+
+/**
+ * Mass-weighted centre of `members`, with its velocity and total mass. This is the single
+ * definition of "system barycenter" shared by procedural generation (where it comes out at the
+ * world origin by construction) and live/custom systems (where it can be anywhere).
+ * Returns null when the members carry no mass.
+ */
+export function computeBarycenter(members: readonly IBarycenterMass[]): IBarycenter | null {
+    let mass = 0;
+    const pos = new THREE.Vector3();
+    const vel = new THREE.Vector3();
+    for (const m of members) {
+        if (!(m.mass > 0)) continue;
+        mass += m.mass;
+        pos.addScaledVector(m.pos, m.mass);
+        vel.addScaledVector(m.vel, m.mass);
+    }
+    if (!(mass > 0)) return null;
+    return { pos: pos.divideScalar(mass), vel: vel.divideScalar(mass), mass };
+}
+
+/**
+ * {@link computeBarycenter} over a generator's star params and their placements (paired by
+ * index). Falls back to a massless origin, which generators never hit since they bail out
+ * before planning orbits for a starless system.
+ */
+export function computePlacementBarycenter(
+    stars: readonly { mass: number }[],
+    placements: readonly { pos: THREE.Vector3; vel: THREE.Vector3 }[]
+): IBarycenter {
+    const members: IBarycenterMass[] = [];
+    for (let i = 0; i < stars.length && i < placements.length; i++) {
+        members.push({ mass: stars[i]!.mass, pos: placements[i]!.pos, vel: placements[i]!.vel });
+    }
+    return (
+        computeBarycenter(members) ?? {
+            pos: new THREE.Vector3(),
+            vel: new THREE.Vector3(),
+            mass: 0,
+        }
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Shared orbit planning utilities
 // ---------------------------------------------------------------------------
 
@@ -226,7 +308,7 @@ interface OrbitTypeRng {
  * Selects S-type vs P-type orbit and, for S-type, which host star to orbit.
  *
  * S-type: body orbits one star (stable within ~0.3 × binary separation).
- * P-type: body orbits the system barycentre (stable beyond ~2.0 × binary separation).
+ * P-type: body orbits the system barycenter (stable beyond ~2.0 × binary separation).
  */
 export function pickOrbitType(params: {
     rng: OrbitTypeRng;

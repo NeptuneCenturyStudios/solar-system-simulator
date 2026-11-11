@@ -26,6 +26,7 @@ import { BodyTypeEnum } from './body-enums';
 import { buildBodySphereGeometry } from '../utilities/utilities';
 import { IPlanetaryAttributes } from './body-attributes';
 import { settingsStore } from '../settings/settings-store';
+import { computeSystemBarycenter } from './system-barycenter';
 import {
     orbitalElementsFromStateVectors,
     type IBodyOrbitElements,
@@ -34,9 +35,6 @@ import {
 
 // Reusable Y-axis constant — avoids allocating a new Vector3 on every rotation substep.
 const _Y_AXIS = new THREE.Vector3(0, 1, 0);
-// Shared, never-mutated scratch values for the P-type (barycentric) branch of getOrbitalPeriod.
-const _ORIGIN = new THREE.Vector3(0, 0, 0);
-const _ZERO_VELOCITY = new THREE.Vector3(0, 0, 0);
 
 /**
  * Tidal locking options
@@ -53,7 +51,7 @@ export const BARYCENTER_REFERENCE_LABEL = 'System barycenter';
 
 /**
  * The frame a body's orbit is measured against: the parent body it orbits, or the system
- * barycentre at the origin for a P-type/circumbinary orbit with no single parent.
+ * barycenter at the origin for a P-type/circumbinary orbit with no single parent.
  */
 export interface ICelestialOrbitReference {
     /** Human-readable name of the frame, for display. */
@@ -144,11 +142,18 @@ export class CelestialBody extends Body {
     orbitParent: CelestialBody | null = null;
 
     /**
-     * Mass of the system barycenter, used by getOrbitalPeriod() only when `orbitParent` is
-     * null (P-type/circumbinary orbits with no single physical parent). The barycenter itself
-     * is treated as fixed at the world origin with zero velocity.
+     * True when this body orbits the system barycenter (P-type/circumbinary) rather than a
+     * single parent. getOrbitReference() then uses the live barycenter of the system's stars
+     * and black holes, from the same helper procedural generation places orbits with.
      */
-    orbitBarycenterMass?: number;
+    orbitsSystemBarycenter = false;
+
+    /**
+     * The other member of a binary pair built in the add-body panel, whose barycenter is not at
+     * the world origin. When live, getOrbitReference() measures the relative orbit against it
+     * (mass m1 + m2), which gives both stars the same, exact period.
+     */
+    binaryPartner: CelestialBody | null = null;
 
     /**
      * The Keplerian elements this body was placed on, when it was placed on known ones (the real
@@ -281,7 +286,7 @@ export class CelestialBody extends Body {
         }
 
         this.attributes = options.attributes;
-        this.orbitBarycenterMass = options.orbitBarycenterMass;
+        this.orbitsSystemBarycenter = options.orbitsSystemBarycenter ?? false;
         this.referenceOrbitElements = options.referenceOrbitElements ?? null;
         this.orbitParent = options.orbitParent ?? this.tidalLockTarget ?? null;
 
@@ -816,8 +821,7 @@ export class CelestialBody extends Body {
 
     /**
      * Orbital period derived live from the current position/velocity relative to
-     * `orbitParent` (or `orbitBarycenterMass` at the world origin for P-type/circumbinary
-     * orbits), via the vis-viva equation. Returns simulation seconds — not real-world
+     * getOrbitReference() (a binary partner, the live system barycenter, or `orbitParent`), via the vis-viva equation. Returns simulation seconds — not real-world
      * seconds — and null when there's no usable reference or the orbit isn't bound
      * (parabolic/hyperbolic). Never cached: recomputed fresh from current physics state
      * on every call, since this is an n-body sim where orbits can drift over time.
@@ -847,24 +851,38 @@ export class CelestialBody extends Body {
     /**
      * The frame this body's orbit is measured against, resolved once and shared by
      * getOrbitalPeriod() and the attributes modal so the two can never disagree. Null when the
-     * body orbits nothing and has no barycentre mass (the system's central star).
+     * body orbits nothing and isn't on a barycentric orbit (the system's central star).
      */
     getOrbitReference(): ICelestialOrbitReference | null {
+        const partner = this.binaryPartner;
+        if (partner && !partner._isDisposed) {
+            return {
+                label: partner.name || 'Binary partner',
+                mass: this.mass + partner.mass,
+                pos: partner.mesh.position,
+                vel: partner.velocity,
+            };
+        }
+
+        if (this.orbitsSystemBarycenter) {
+            // A star in a multi-star system counts itself, as the generators' placement did.
+            const barycenter = computeSystemBarycenter(this.dependencies.getBodies());
+            if (barycenter) {
+                return {
+                    label: BARYCENTER_REFERENCE_LABEL,
+                    mass: barycenter.mass,
+                    pos: barycenter.pos,
+                    vel: barycenter.vel,
+                };
+            }
+        }
+
         if (this.orbitParent && !this.orbitParent._isDisposed) {
             return {
                 label: this.orbitParent.name || 'Orbit parent',
                 mass: this.orbitParent.mass,
                 pos: this.orbitParent.mesh.position,
                 vel: this.orbitParent.velocity,
-            };
-        }
-
-        if (typeof this.orbitBarycenterMass === 'number') {
-            return {
-                label: BARYCENTER_REFERENCE_LABEL,
-                mass: this.orbitBarycenterMass,
-                pos: _ORIGIN,
-                vel: _ZERO_VELOCITY,
             };
         }
 

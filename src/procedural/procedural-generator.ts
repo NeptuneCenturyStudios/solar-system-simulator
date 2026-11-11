@@ -82,7 +82,6 @@ export class ProceduralGenerator extends SolarSystemGenerator {
         // Downstream generators need raw StarParams and placement arrays.
         const starParams = starCreations.map((c) => c.starParams);
         const placements = starCreations.map((c) => ({ pos: c.pos, vel: c.vel }));
-        const totalStarMass = starParams.reduce((sum, s) => sum + s.mass, 0);
 
         // Precompute creation descriptors so total can be set before bodies are instantiated.
         const planetCreations = generateProceduralPlanets({
@@ -153,11 +152,10 @@ export class ProceduralGenerator extends SolarSystemGenerator {
                 this.scene,
                 creation
             );
-            // Binary/triple members orbit their shared barycentre (world origin, per
-            // generateBinaryPlacements/generateTriplePlacements), matching how planets orbiting
-            // a P-type/circumbinary configuration get their orbitBarycenterMass below.
+            // Binary/triple members orbit their shared barycenter, like the P-type/circumbinary
+            // planets below.
             if (starCount > 1) {
-                starBody.orbitBarycenterMass = totalStarMass;
+                starBody.orbitsSystemBarycenter = true;
             }
 
             starBodies.push(starBody);
@@ -173,7 +171,7 @@ export class ProceduralGenerator extends SolarSystemGenerator {
             if (hostStarIndex !== undefined && hostStarIndex >= 0 && starBodies[hostStarIndex]) {
                 body.orbitParent = starBodies[hostStarIndex]!;
             } else {
-                body.orbitBarycenterMass = totalStarMass;
+                body.orbitsSystemBarycenter = true;
             }
         };
 

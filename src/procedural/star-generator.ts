@@ -21,7 +21,7 @@ type StarPlacement = {
 
 /**
  * Computes positions and velocities for three stars orbiting their shared
- * barycentre (approximate — treats each star as if orbiting the full system mass).
+ * barycenter (approximate — treats each star as if orbiting the full system mass).
  */
 function generateTriplePlacements(
     masses: [number, number, number],
@@ -162,8 +162,8 @@ export function generateProceduralStars(params: {
             vel: placement.vel,
             starParams,
             rotation,
-            // A lone star has no orbit; binary/triple members orbit the shared barycentre
-            // (see the orbitBarycenterMass assignment in procedural-generator.ts).
+            // A lone star has no orbit; binary/triple members orbit the shared barycenter
+            // (see the orbitsSystemBarycenter assignment in procedural-generator.ts).
             hasOrbitalPeriod: starCount > 1,
         };
     });

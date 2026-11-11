@@ -14,6 +14,7 @@ import {
     buildUnitPositionDirection,
     computeMaxEccentricity,
     computeMinPeriapsis,
+    computePlacementBarycenter,
     pickOrbitType,
     safeUnitCross,
 } from './orbital-math';
@@ -112,11 +113,12 @@ export function generateProceduralPlanets(params: {
     if (starCount === 0) return [];
 
     const maxStarRadius = Math.max(...starParams.map((s) => s.radius));
-    const totalStarMass = starParams.reduce((sum, s) => sum + s.mass, 0);
+    // P-type orbits circle the system barycenter (at the origin for generated placements).
+    const barycenter = computePlacementBarycenter(starParams, starPlacements);
 
     // For multi-star systems, compute the binary separation to classify orbit types.
     // S-type: planet orbits one star, stable within ~0.3 × binarySeparation of that star.
-    // P-type: planet orbits the barycentre, stable beyond ~2.0 × binarySeparation.
+    // P-type: planet orbits the barycenter, stable beyond ~2.0 × binarySeparation.
     const binarySeparation =
         starCount > 1 ? starPlacements[0]!.pos.distanceTo(starPlacements[1]!.pos) : 0;
 
@@ -185,15 +187,11 @@ export function generateProceduralPlanets(params: {
 
         const customTypeString = planetSubtypeToCustomPlanetTypeString(subtype);
         // S-type orbits use one star as the gravitational anchor;
-        // P-type orbits use the system barycenter (always at origin).
+        // P-type orbits use the system barycenter.
         const hostStarIndex = plan.isSType ? plan.hostStarIndex : -1;
-        const hostMass = plan.isSType ? starParams[plan.hostStarIndex]!.mass : totalStarMass;
-        const hostPos = plan.isSType
-            ? starPlacements[plan.hostStarIndex]!.pos
-            : new THREE.Vector3(0, 0, 0);
-        const hostVel = plan.isSType
-            ? starPlacements[plan.hostStarIndex]!.vel
-            : new THREE.Vector3(0, 0, 0);
+        const hostMass = plan.isSType ? starParams[plan.hostStarIndex]!.mass : barycenter.mass;
+        const hostPos = plan.isSType ? starPlacements[plan.hostStarIndex]!.pos : barycenter.pos;
+        const hostVel = plan.isSType ? starPlacements[plan.hostStarIndex]!.vel : barycenter.vel;
 
         const subSeed = `${masterSeed}|planet:${i}|orbit:${plan.isSType ? `stype:${hostStarIndex}` : 'ptype'}|type:${customTypeString}|t:${distanceT01.toFixed(3)}`;
 

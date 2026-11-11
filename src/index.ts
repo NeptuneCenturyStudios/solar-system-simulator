@@ -100,6 +100,8 @@ import {
     buildBodySphereGeometry,
 } from './utilities/utilities';
 import { generateCustomBodyName } from './procedural/custom-body-naming';
+import { generateBinaryPlacementsFromBasis } from './procedural/orbital-math';
+import { computeSystemBarycenter } from './bodies/system-barycenter';
 import { SeededRandom } from './utilities/prng';
 import { ECLIPTIC_NORTH, freeLook, orbitOffset } from './camera/north-up';
 import {
@@ -1158,6 +1160,76 @@ function computeOrbitVelocityAtPos(
 }
 
 /**
+ * Velocity for a body at `spawnPos` orbiting the live system barycenter (the same helper
+ * procedural generation places P-type orbits with), carried along with the barycenter's drift.
+ * Null when the system has no stars or black holes to define one.
+ */
+function systemBarycenterOrbitVelocity(
+    spawnPos: THREE.Vector3,
+    orbitType: string,
+    eccentricity: number,
+    inclinationDeg: number
+): THREE.Vector3 | null {
+    const barycenter = computeSystemBarycenter(simulationState.bodies);
+    if (!barycenter) return null;
+    return barycenter.vel
+        .clone()
+        .add(
+            computeOrbitVelocityAtPos(
+                spawnPos,
+                barycenter.pos,
+                barycenter.mass,
+                orbitType,
+                eccentricity,
+                inclinationDeg
+            )
+        );
+}
+
+/**
+ * Velocities that put a new star (at `newPos`, mass `newMass`) and an existing star into a true
+ * binary orbit around their shared barycenter. Neither body moves: the barycenter is the
+ * mass-weighted point between where they already are. The pair keeps the parent's current
+ * velocity as its barycenter drift. The orbit plane follows the same prograde convention as
+ * computeOrbitVelocityAtPos, tilted about the line between the stars by `inclinationDeg`.
+ */
+function computeBinaryVelocities(
+    parent: CelestialBody,
+    newPos: THREE.Vector3,
+    newMass: number,
+    inclinationDeg: number
+): { parentVel: THREE.Vector3; newVel: THREE.Vector3 } | null {
+    const toParent = parent.mesh.position.clone().sub(newPos);
+    const separation = toParent.length();
+    if (!(separation > 0) || !(parent.mass + newMass > 0)) return null;
+    const u = toParent.divideScalar(separation);
+
+    // Prograde direction for the parent around the barycenter (perpendicular to u in XZ),
+    // with a fallback when the stars are stacked vertically.
+    const velDir = new THREE.Vector3(-u.z, 0, u.x);
+    if (velDir.lengthSq() < 1e-12) velDir.set(1, 0, 0);
+    velDir.normalize();
+    velDir.applyAxisAngle(u, (inclinationDeg * Math.PI) / 180);
+
+    // generateBinaryPlacementsFromBasis moves body 1 along normal × u, so normal = u × velDir.
+    const normal = new THREE.Vector3().crossVectors(u, velDir).normalize();
+
+    const [parentPlacement, newPlacement] = generateBinaryPlacementsFromBasis(
+        [parent.mass, newMass],
+        separation,
+        u,
+        normal,
+        G * simulationState.gMultiplier
+    );
+
+    const drift = parent.velocity.clone();
+    return {
+        parentVel: parentPlacement.vel.add(drift),
+        newVel: newPlacement.vel.add(drift),
+    };
+}
+
+/**
  * Parent each preset moon/satellite orbits, keyed by preset key. The parent is found by name
  * (or created from its own preset when missing) before the child is built around it.
  */
@@ -1346,9 +1418,20 @@ function createNewBody(
     magneticField: IMagneticFieldOptions | null | undefined = undefined,
     // Optional name supplied by the add form. Null/empty means "generate one procedurally
     // from the new body's id" (kept last so existing positional callers are unaffected).
-    customName: string | null = null
+    customName: string | null = null,
+    // Orbit the live system barycenter instead of `orbitParent` (stars, planets, asteroids,
+    // comets). Falls back to the parent path when the system has no stars or black holes.
+    orbitSystemBarycenter = false
 ) {
     let newBody;
+    let usedSystemBarycenter = false;
+    /** Barycentric orbit velocity at `spawnPos`, or null to use the parent-based path. */
+    const barycenterVelocity = (spawnPos: THREE.Vector3, eccentricity: number) => {
+        if (!orbitSystemBarycenter) return null;
+        const vel = systemBarycenterOrbitVelocity(spawnPos, orbitType, eccentricity, inclination);
+        if (vel) usedSystemBarycenter = true;
+        return vel;
+    };
     let moonCreationParent: Body | null = null; // tracked so post-creation can re-focus the parent
 
     if (bodyType === 'sun') {
@@ -1374,24 +1457,49 @@ function createNewBody(
         const id = createUniqueId('star');
         const name = customName ?? generateCustomBodyName('sun', id);
 
+        const liveParent = orbitParent && !orbitParent._isDisposed ? orbitParent : null;
+        const baryVel = barycenterVelocity(starPos, 0.3);
+        const binary =
+            !baryVel &&
+            orbitType === 'binary' &&
+            liveParent instanceof CelestialBody &&
+            !!(liveParent.bodyType & BodyTypeEnum.Star)
+                ? computeBinaryVelocities(liveParent, starPos, starParams.mass, inclination)
+                : null;
+
+        let starVel: THREE.Vector3;
+        if (baryVel) {
+            starVel = baryVel;
+        } else if (binary) {
+            starVel = binary.newVel;
+        } else if (liveParent) {
+            starVel = computeOrbitVelocityAtPos(
+                starPos,
+                liveParent.mesh.position.clone(),
+                liveParent.mass,
+                orbitType,
+                0.3,
+                inclination
+            );
+        } else {
+            starVel = new THREE.Vector3(0, 0, 0);
+        }
+
         newBody = createMainSequenceStarFromParams(dependencies, scene, starParams, {
             id,
             name,
             pos: starPos,
-            vel:
-                orbitParent && !orbitParent._isDisposed
-                    ? computeOrbitVelocityAtPos(
-                          starPos,
-                          orbitParent.mesh.position.clone(),
-                          orbitParent.mass,
-                          orbitType,
-                          0.3,
-                          inclination
-                      )
-                    : new THREE.Vector3(0, 0, 0),
+            vel: starVel,
             rotation: { tilt: rotationTilt, speed: rotationSpeed },
             magneticField,
         });
+
+        // Binary: the parent now swings around the shared barycenter too.
+        if (binary && liveParent instanceof CelestialBody) {
+            liveParent.velocity.copy(binary.parentVel);
+            liveParent.binaryPartner = newBody;
+            newBody.binaryPartner = liveParent;
+        }
     } else if (bodyType === 'planet') {
         // Create a new planet near the camera with appropriate orbital velocity
         const planetParentBody =
@@ -1402,14 +1510,9 @@ function createNewBody(
         const starMass = planetParentBody ? planetParentBody.mass : SUN_MASS;
 
         const spawnPos = getNearCameraSpawnPos();
-        const spawnVel = computeOrbitVelocityAtPos(
-            spawnPos,
-            starPos,
-            starMass,
-            orbitType,
-            0.3,
-            inclination
-        );
+        const spawnVel =
+            barycenterVelocity(spawnPos, 0.3) ??
+            computeOrbitVelocityAtPos(spawnPos, starPos, starMass, orbitType, 0.3, inclination);
 
         // Custom mode: never create dwarfs (UI dropdown has only planet subtypes).
         const resolvedPlanetType = (planetType || 'solid') as
@@ -1638,14 +1741,16 @@ function createNewBody(
             ? asteroidParentBody.mesh.position.clone()
             : new THREE.Vector3(0, 0, 0);
         const asteroidStarMass = asteroidParentBody ? asteroidParentBody.mass : SUN_MASS;
-        const asteroidVel = computeOrbitVelocityAtPos(
-            asteroidSpawnPos,
-            asteroidStarPos,
-            asteroidStarMass,
-            orbitType,
-            0.3,
-            inclination
-        );
+        const asteroidVel =
+            barycenterVelocity(asteroidSpawnPos, 0.3) ??
+            computeOrbitVelocityAtPos(
+                asteroidSpawnPos,
+                asteroidStarPos,
+                asteroidStarMass,
+                orbitType,
+                0.3,
+                inclination
+            );
 
         const { mass: asteroidMass, radius: asteroidRadius } = randomAsteroidParams({
             mass: customMass,
@@ -1670,14 +1775,16 @@ function createNewBody(
             ? cometParentBody.mesh.position.clone()
             : new THREE.Vector3(0, 0, 0);
         const cometStarMass = cometParentBody ? cometParentBody.mass : SUN_MASS;
-        const cometOrbitVel = computeOrbitVelocityAtPos(
-            cometSpawnPos,
-            cometStarPos,
-            cometStarMass,
-            orbitType,
-            0.4,
-            inclination
-        );
+        const cometOrbitVel =
+            barycenterVelocity(cometSpawnPos, 0.4) ??
+            computeOrbitVelocityAtPos(
+                cometSpawnPos,
+                cometStarPos,
+                cometStarMass,
+                orbitType,
+                0.4,
+                inclination
+            );
 
         const { mass: cometMass, radius: cometRadius } = randomCometParams({
             mass: customMass,
@@ -1753,6 +1860,10 @@ function createNewBody(
     }
 
     if (newBody) {
+        if (usedSystemBarycenter && newBody instanceof CelestialBody) {
+            newBody.orbitsSystemBarycenter = true;
+        }
+
         // Apply axial tilt/azimuth from create sliders if the body supports rotation
         if (
             (createTilt !== null || createAzimuth !== null) &&
@@ -3739,7 +3850,8 @@ registerVueSimHooks({
             payload.createAzimuth,
             payload.tailColor,
             payload.magneticField,
-            payload.customName ?? null
+            payload.customName ?? null,
+            payload.orbitSystemBarycenter ?? false
         );
         return body && !body._isDisposed ? body.id : null;
     },

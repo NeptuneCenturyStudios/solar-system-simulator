@@ -16,7 +16,7 @@ import { ProceduralGenerationReporter } from './procedural-generation-progress';
 /**
  * Generates a black hole system: one procedurally-named black hole + 1–3 procedurally-named stars.
  * The black hole and first star share a true binary (centre-of-mass) orbit.
- * Any additional stars orbit the barycentre on simple circular paths within the siphon range (≤ 1 AU).
+ * Any additional stars orbit the barycenter on simple circular paths within the siphon range (≤ 1 AU).
  */
 export class BlackHoleSystemGenerator extends SolarSystemGenerator {
     private readonly dependencies: IStateDependencies;
@@ -51,7 +51,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
         const totalBodies = 1 + starCount; // 1 black hole + number of stars
         reporter?.setTotal(totalBodies);
 
-        // --- Binary orbit: black hole + first star around shared barycentre ---
+        // --- Binary orbit: black hole + first star around shared barycenter ---
         const primaryStarParams = randomStarParams({ seed: `${this.masterSeed}|star:0` });
 
         const binMinSep = Math.max(
@@ -127,9 +127,9 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
                 hasOrbitalPeriod: true,
             }
         );
-        // True binary orbit with the black hole around their shared barycentre (world origin,
-        // per generateBinaryPlacements), so its orbital period is a real, discoverable value.
-        primaryStar.orbitBarycenterMass = bhParams.mass + primaryStarParams.mass;
+        // True binary orbit with the black hole around their shared barycenter, so its orbital
+        // period is a real, discoverable value.
+        primaryStar.orbitsSystemBarycenter = true;
         bodies.push(primaryStar);
 
         // Report completion of black hole creation
@@ -142,7 +142,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
 
         await this.yieldToEventLoop();
 
-        // --- Additional stars (i ≥ 1): simple circular orbits around the barycentre (origin) ---
+        // --- Additional stars (i ≥ 1): simple circular orbits around the barycenter (origin) ---
         for (let i = 1; i < starCount; i++) {
             const params = randomStarParams({ seed: `${this.masterSeed}|star:${i}` });
 
@@ -155,7 +155,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
             const inclinationDeg = rngFor(this.masterSeed, 'starInclination', i).range(-25, 25);
             const inclinationRad = (inclinationDeg * Math.PI) / 180;
 
-            // Orbit around the system barycentre using combined mass for correct orbital speed.
+            // Orbit around the system barycenter using combined mass for correct orbital speed.
             const totalMass = bhParams.mass + primaryStarParams.mass;
             const { pos, vel } = calculateTrajectory(gForce, orbitDist, totalMass, orbitAngle);
 
@@ -182,8 +182,7 @@ export class BlackHoleSystemGenerator extends SolarSystemGenerator {
                 },
                 hasOrbitalPeriod: true,
             });
-            // Matches the totalMass used for this star's own trajectory above.
-            star.orbitBarycenterMass = totalMass;
+            star.orbitsSystemBarycenter = true;
 
             bodies.push(star);
 

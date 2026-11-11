@@ -522,6 +522,11 @@ button.old-ui.btn-danger:active {
     margin-top: 6px;
 }
 
+.radio-options.vertical {
+    flex-direction: column;
+    gap: 6px;
+}
+
 .radio-option {
     display: flex;
     align-items: center;
