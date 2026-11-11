@@ -57,9 +57,6 @@ import {
     G,
     SUN_MASS,
     PLUTO_DIST,
-    MOON_MASS,
-    MOON_DIST_FROM_EARTH,
-    MOON_RADIUS,
     GIZMO_TUNING,
     SimulationStartMode,
 
@@ -126,7 +123,6 @@ import {
     showSpaceBackground,
     getRoughnessForMoonTexture,
     getMetalnessForMoonTexture,
-    moonTexture,
 } from './drawing/textures';
 import { reloadBodyTextures } from './drawing/texture-registry';
 import { Supernova } from './effects/supernova';
@@ -162,7 +158,19 @@ import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
 import { Probe } from './bodies/probe';
 import { Moon } from './bodies/moon';
-import { createMoon, earthMoonOrbitElements } from './bodies/create-moon';
+import {
+    createCallistoBody,
+    createCharonBody,
+    createEarthMoonBody,
+    createEuropaBody,
+    createGanymedeBody,
+    createHygieaBody,
+    createIoBody,
+    createIssBody,
+    createPallasBody,
+    createTitanBody,
+    createVestaBody,
+} from './procedural/real-solar-system-bodies';
 import { Planet } from './bodies/planet';
 import { DwarfPlanet } from './bodies/dwarf-planet';
 import { buildBasicRows, buildScienceRows, hasScienceData } from './bodies/body-attribute-display';
@@ -182,6 +190,7 @@ import { Uranus } from './bodies/uranus';
 import { Neptune } from './bodies/neptune';
 import { Pluto } from './bodies/pluto';
 import { Ceres } from './bodies/ceres';
+import { Halley } from './bodies/halley';
 import { BlackHole } from './bodies/black-hole';
 import { Star } from './bodies/star';
 import { MainSequenceStar } from './bodies/main-sequence-star';
@@ -1063,6 +1072,21 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
 
 // Velocity arrow is now part of CoordinateGizmo (gizmo.velocityArrow)
 
+/** Maps a body onto the Add/Edit panel's body-type keys (see BodyEditSnapshot.bodyTypeKey). */
+function bodyEditTypeKey(body: Body): string {
+    const checks: [BodyTypeEnum, string][] = [
+        [BodyTypeEnum.BlackHole, 'black_hole'],
+        [BodyTypeEnum.Wormhole, 'wormhole'],
+        [BodyTypeEnum.Star, 'sun'],
+        [BodyTypeEnum.Moon, 'moon'],
+        [BodyTypeEnum.DwarfPlanet, 'dwarf_planet'],
+        [BodyTypeEnum.Planet | BodyTypeEnum.GasGiant | BodyTypeEnum.IceGiant, 'planet'],
+        [BodyTypeEnum.Asteroid, 'asteroid'],
+        [BodyTypeEnum.Comet, 'comet'],
+    ];
+    return checks.find(([flag]) => isBodyType(body, flag))?.[1] ?? 'other';
+}
+
 function getPrimaryStar() {
     return (
         (simulationState.bodies.find((b) => b && !b._isDisposed && b instanceof Star) as Star) ||
@@ -1133,98 +1157,120 @@ function computeOrbitVelocityAtPos(
     return perp;
 }
 
-function createPresetBody(presetKey: string) {
+/**
+ * Parent each preset moon/satellite orbits, keyed by preset key. The parent is found by name
+ * (or created from its own preset when missing) before the child is built around it.
+ */
+const PRESET_CHILD_BODIES: Record<
+    string,
+    {
+        parentName: string;
+        parentPresetKey: string;
+        build: (parent: CelestialBody, scene: THREE.Scene, id: string) => Body;
+    }
+> = {
+    earth_moon: { parentName: 'Earth', parentPresetKey: 'earth', build: createEarthMoonBody },
+    iss: { parentName: 'Earth', parentPresetKey: 'earth', build: createIssBody },
+    io: { parentName: 'Jupiter', parentPresetKey: 'jupiter', build: createIoBody },
+    europa: { parentName: 'Jupiter', parentPresetKey: 'jupiter', build: createEuropaBody },
+    ganymede: { parentName: 'Jupiter', parentPresetKey: 'jupiter', build: createGanymedeBody },
+    callisto: { parentName: 'Jupiter', parentPresetKey: 'jupiter', build: createCallistoBody },
+    titan: { parentName: 'Saturn', parentPresetKey: 'saturn', build: createTitanBody },
+    charon: { parentName: 'Pluto', parentPresetKey: 'pluto', build: createCharonBody },
+};
+
+function createPresetBody(presetKey: string): Body | undefined {
     const key = String(presetKey).toLowerCase();
 
-    // Helper: find the current primary star (first star in bodies)
-    const primaryStar = getPrimaryStar();
-
     // Presets assume a star exists. If launching empty mode, guide the user by creating a small star.
-    if (!primaryStar && key !== 'sun') {
+    if (!getPrimaryStar() && key !== 'sun') {
         createNewBody('sun');
     }
 
-    const ensureEarth = () =>
-        simulationState.bodies.find((b) => b && !b._isDisposed && b.name === 'Earth');
-    let newBody: CelestialBody | null;
+    // Moons and satellites orbit a specific parent: reuse a live one with the right name, or
+    // create it from its own preset first (which places it near the camera like any preset).
+    const childSpec = PRESET_CHILD_BODIES[key];
+    const primaryStar = getPrimaryStar();
+    let newBody: Body | null;
 
-    switch (key) {
-        case 'sun': {
-            newBody = new Sun(dependencies, scene);
-
-            break;
+    if (childSpec) {
+        const existing = simulationState.bodies.find(
+            (b): b is CelestialBody =>
+                !!b &&
+                !b._isDisposed &&
+                b.name === childSpec.parentName &&
+                b instanceof CelestialBody
+        );
+        const created = existing ? null : createPresetBody(childSpec.parentPresetKey);
+        const parent = existing ?? (created instanceof CelestialBody ? created : null);
+        if (!parent) return;
+        newBody = childSpec.build(parent, scene, createUniqueId(key));
+    } else {
+        switch (key) {
+            case 'sun':
+                newBody = new Sun(dependencies, scene);
+                break;
+            case 'mercury':
+                newBody = new Mercury(dependencies, scene);
+                break;
+            case 'venus':
+                newBody = new Venus(dependencies, scene);
+                break;
+            case 'earth':
+                newBody = new Earth(dependencies, scene);
+                break;
+            case 'mars':
+                newBody = new Mars(dependencies, scene);
+                break;
+            case 'jupiter':
+                newBody = new Jupiter(dependencies, scene);
+                break;
+            case 'saturn':
+                newBody = new Saturn(dependencies, scene);
+                break;
+            case 'uranus':
+                newBody = new Uranus(dependencies, scene);
+                break;
+            case 'neptune':
+                newBody = new Neptune(dependencies, scene);
+                break;
+            case 'pluto':
+                newBody = new Pluto(dependencies, scene);
+                break;
+            case 'ceres':
+                newBody = new Ceres(dependencies, scene);
+                break;
+            case 'vesta':
+                newBody = createVestaBody(
+                    dependencies,
+                    scene,
+                    primaryStar,
+                    createUniqueId('vesta')
+                );
+                break;
+            case 'pallas':
+                newBody = createPallasBody(
+                    dependencies,
+                    scene,
+                    primaryStar,
+                    createUniqueId('pallas')
+                );
+                break;
+            case 'hygiea':
+                newBody = createHygieaBody(
+                    dependencies,
+                    scene,
+                    primaryStar,
+                    createUniqueId('hygiea')
+                );
+                break;
+            case 'halley':
+                newBody = new Halley(dependencies, scene);
+                break;
+            default:
+                console.warn('Unknown presetKey:', presetKey);
+                return;
         }
-        case 'mercury': {
-            newBody = new Mercury(dependencies, scene);
-
-            break;
-        }
-        case 'venus': {
-            newBody = new Venus(dependencies, scene);
-
-            break;
-        }
-        case 'earth': {
-            newBody = new Earth(dependencies, scene);
-
-            break;
-        }
-        case 'earth_moon': {
-            // Ensure Earth exists; create it if not.
-            let earth = ensureEarth() as Earth;
-            if (!earth) {
-                earth = new Earth(dependencies, scene);
-                simulationState.bodies.push(earth);
-            }
-
-            // Real J2000 lunar orbit (eccentric, inclined 5.145°), matching the default system.
-            newBody = createMoon(earth, scene, {
-                distance: MOON_DIST_FROM_EARTH,
-                radius: MOON_RADIUS,
-                mass: MOON_MASS,
-                pos: new THREE.Vector3(0, 0, 0), // Will be overridden
-                vel: new THREE.Vector3(0, 0, 0), // Will be overridden
-                id: createUniqueId('moon'),
-                name: 'Moon',
-                moonType: MoonTypeEnum.Terrestrial,
-                texture: moonTexture,
-                trailColor: 0xffffff,
-                maxTrail: 1500,
-                orbitElements: earthMoonOrbitElements(),
-            });
-            break;
-        }
-        case 'mars': {
-            newBody = new Mars(dependencies, scene);
-            break;
-        }
-        case 'jupiter': {
-            newBody = new Jupiter(dependencies, scene);
-            break;
-        }
-        case 'saturn': {
-            newBody = new Saturn(dependencies, scene);
-            break;
-        }
-        case 'uranus': {
-            newBody = new Uranus(dependencies, scene);
-            break;
-        }
-        case 'neptune': {
-            newBody = new Neptune(dependencies, scene);
-            break;
-        }
-        case 'pluto': {
-            newBody = new Pluto(dependencies, scene);
-            break;
-        }
-        case 'ceres': {
-            newBody = new Ceres(dependencies, scene);
-            break;
-        }
-        default:
-            console.warn('Unknown presetKey:', presetKey);
-            return;
     }
 
     if (!newBody) return;
@@ -1232,7 +1278,8 @@ function createPresetBody(presetKey: string) {
     // Reposition preset bodies near the camera (like custom bodies), so the user sees them
     // immediately rather than spawning at their preset orbital distance (e.g. Pluto at the
     // edge of the system). The Sun stays at the origin.
-    if (key !== 'sun') {
+    // Moons and satellites keep the orbit they were built on around their parent.
+    if (key !== 'sun' && !childSpec) {
         const star = getPrimaryStar();
         if (star && star.mesh) {
             const spawnPos = getNearCameraSpawnPos();
@@ -3586,6 +3633,18 @@ registerVueSimHooks({
                 body.attributes?.coreType?.value === CoreTypeEnum.GasFluid,
             colorHex: toHexColor(colorValue),
             tailColorHex: isCometBody ? toHexColor((body as unknown as Comet).tailColor) : null,
+            bodyTypeKey: bodyEditTypeKey(body),
+            subtypeKey:
+                body instanceof Planet || body instanceof DwarfPlanet
+                    ? body.planetType
+                    : body instanceof Moon
+                      ? body.moonType
+                      : null,
+            hasRings: body instanceof CelestialBody && body.rings !== null,
+            orbitParentName:
+                body instanceof CelestialBody && body.orbitParent && !body.orbitParent._isDisposed
+                    ? body.orbitParent.name
+                    : null,
         };
     },
 

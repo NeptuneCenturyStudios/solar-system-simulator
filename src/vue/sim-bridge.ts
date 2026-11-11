@@ -53,6 +53,8 @@ export interface BodySnapshot {
     radius: number;
     speed: number;
     isShip: boolean;
+    /** True for stars of every kind (main sequence, white/brown dwarf, pulsar). */
+    isStar: boolean;
     /** True for "real" celestial bodies — excludes ships, satellites, and probes. Drives both
      *  the probe-mission target dropdown and the System Explorer's attributes (info) button,
      *  since "can be probed" and "can be scanned" are the same set. */
@@ -106,6 +108,15 @@ export interface BodyEditSnapshot {
     tailColorHex: string | null;
     /** Readable type label e.g. "Planet". */
     typeLabel: string;
+    /** Add-form body type key this body corresponds to ('sun', 'planet', 'moon', 'asteroid',
+     *  'comet', 'black_hole', 'wormhole'), 'dwarf_planet', or 'other' for anything else. */
+    bodyTypeKey: string;
+    /** Planet/moon subtype key (e.g. 'gas_giant'), or null for bodies without one. */
+    subtypeKey: string | null;
+    /** True when the body carries a ring system. */
+    hasRings: boolean;
+    /** Name of the body this one orbits, or null when it has no orbit parent. */
+    orbitParentName: string | null;
 }
 
 /** Rich snapshot backng the Phase 3.3 attributes modal. Built on the sim side (which owns the
@@ -630,6 +641,7 @@ function snapshotBodies(): void {
             radius: b.radius,
             speed: b.velocity ? b.velocity.length() : 0,
             isShip: b.bodyType === BodyTypeEnum.SpaceShip,
+            isStar: !!(b.bodyType & BodyTypeEnum.Star),
             isProbeTarget: !(
                 b.bodyType &
                 (BodyTypeEnum.SpaceShip | BodyTypeEnum.Satellite | BodyTypeEnum.Probe)
@@ -1028,12 +1040,16 @@ function resolveMoonSequenceNumber(parentName: string): number | undefined {
 
 /**
  * Fresh procedural name for the add form's Name box. Moons are named relative to their
- * orbit parent (the current selection), matching how the sim names them at creation.
+ * orbit parent (`orbitParentId`, defaulting to the current selection), matching how the sim
+ * names them at creation.
  */
-export function generateAddFormBodyName(bodyType: string): string {
+export function generateAddFormBodyName(
+    bodyType: string,
+    orbitParentId: string | null = state.selectedId
+): string {
     if (bodyType !== 'moon') return generateRandomCustomBodyName(bodyType);
 
-    const parentId = resolveOrbitParentId(state.selectedId);
+    const parentId = resolveOrbitParentId(orbitParentId);
     const parent = parentId
         ? simulationState.bodies.find((b) => b && b.id === parentId && !b._isDisposed)
         : undefined;

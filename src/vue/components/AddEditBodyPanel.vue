@@ -1,337 +1,99 @@
 <template>
     <PanelBase :title="isEditMode ? 'Edit Object' : 'Add Object'">
         <div class="vue-ui-body-editor-fields">
-            <!-- ══════════════════════════ ADD MODE ══════════════════════════ -->
-            <template v-if="!isEditMode">
-                <div class="control-group">
-                    <label for="vueAddModeSelect">Add Mode</label>
-                    <select id="vueAddModeSelect" v-model="addMode">
+            <p v-if="isEditMode && !snapshot" class="vue-ui-empty">No body selected.</p>
+
+            <template v-else>
+                <!-- ── Preset / custom (add only) ── -->
+                <div v-if="!isEditMode" class="control-group">
+                    <label for="bodyEditorAddMode">Add Mode</label>
+                    <select id="bodyEditorAddMode" v-model="addMode">
                         <option value="preset">Preset</option>
                         <option value="custom">Custom</option>
                     </select>
                 </div>
 
-                <div v-if="addMode === 'preset'" class="control-group">
-                    <label for="vuePresetBodySelect">Presets</label>
-                    <select id="vuePresetBodySelect" v-model="presetKey">
-                        <option v-for="p in PRESET_BODIES" :key="p.value" :value="p.value">
-                            {{ p.label }}
-                        </option>
+                <div v-if="isPresetMode" class="control-group">
+                    <label for="bodyEditorPreset">Preset</label>
+                    <select id="bodyEditorPreset" v-model="presetKey">
+                        <optgroup v-for="g in PRESET_BODY_GROUPS" :key="g.label" :label="g.label">
+                            <option v-for="p in g.options" :key="p.value" :value="p.value">
+                                {{ p.label }}
+                            </option>
+                        </optgroup>
                     </select>
                 </div>
 
                 <template v-else>
+                    <!-- ── Type pickers: drive which fields exist ── -->
                     <div class="control-group">
-                        <label for="vueBodyTypeSelect">Body Type</label>
+                        <label for="bodyEditorBodyType">Body Type</label>
                         <select
-                            id="vueBodyTypeSelect"
-                            v-model="bodyType"
-                            @change="applyRandomDefaults()"
+                            v-if="!isEditMode"
+                            id="bodyEditorBodyType"
+                            v-model="form.bodyType"
+                            @change="onBodyTypeChanged"
                         >
-                            <option value="sun">Star</option>
-                            <option value="planet">Planet</option>
-                            <option value="moon">Moon</option>
-                            <option value="asteroid">Asteroid</option>
-                            <option value="comet">Comet</option>
-                            <option value="black_hole">Black Hole</option>
-                            <option value="wormhole">Wormhole</option>
+                            <option value="" disabled>&lt; Select &gt;</option>
+                            <option v-for="t in BODY_TYPE_OPTIONS" :key="t.value" :value="t.value">
+                                {{ t.label }}
+                            </option>
+                        </select>
+                        <select v-else id="bodyEditorBodyType" disabled>
+                            <option>{{ snapshot?.typeLabel }}</option>
                         </select>
                     </div>
 
-                    <div class="control-group">
-                        <label for="vueBodyNameInput">Name</label>
-                        <input
-                            id="vueBodyNameInput"
-                            v-model="bodyName"
-                            type="text"
-                            class="text-input"
-                            placeholder="Body name"
-                        />
-                    </div>
-
-                    <div v-if="showMass" class="control-group">
-                        <label
-                            >Mass <span class="val-display">{{ formatNumber(mass) }}</span></label
-                        >
-                        <input
-                            v-model.number="mass"
-                            type="number"
-                            class="text-input"
-                            :min="massMin"
-                            step="any"
-                        />
-                    </div>
-
-                    <div v-if="bodyType === 'sun'" class="control-group">
-                        <label
-                            >Temperature
-                            <span class="val-display">{{ Math.round(temperature) }}K</span></label
-                        >
-                        <input
-                            v-model.number="temperature"
-                            type="range"
-                            min="2000"
-                            max="30000"
-                            step="100"
-                        />
-                    </div>
-
-                    <div v-if="bodyType === 'sun'" class="control-group">
-                        <label
-                            >Light Intensity
-                            <span class="val-display">{{
-                                formatNumber(lightIntensity)
-                            }}</span></label
-                        >
-                        <input
-                            v-model.number="lightIntensity"
-                            type="range"
-                            :min="BASE_STAR_LIGHT_INTENSITY_MIN"
-                            :max="BASE_STAR_LIGHT_INTENSITY_MAX"
-                            step="100"
-                        />
-                    </div>
-
-                    <div v-if="showRadius" class="control-group">
-                        <label
-                            >Size (Radius)
-                            <span class="val-display">{{ formatNumber(radius) }}</span></label
-                        >
-                        <input
-                            v-model.number="radius"
-                            type="number"
-                            class="text-input"
-                            :min="radiusMin"
-                            :step="radiusStep"
-                        />
-                    </div>
-
-                    <div v-if="showOrbitControls" class="control-group">
-                        <label
-                            >Orbit Parent
-                            <span class="val-display">{{ orbitParentName }}</span></label
-                        >
-                    </div>
-
-                    <div v-if="showOrbitControls" class="radio-group">
-                        <label>Orbit Type</label>
-                        <div class="radio-options">
-                            <div class="radio-option">
-                                <input
-                                    id="vueOrbitCircular"
-                                    v-model="orbitType"
-                                    type="radio"
-                                    value="circular"
-                                />
-                                <label for="vueOrbitCircular">Circular</label>
-                            </div>
-                            <div class="radio-option">
-                                <input
-                                    id="vueOrbitElliptical"
-                                    v-model="orbitType"
-                                    type="radio"
-                                    value="elliptical"
-                                />
-                                <label for="vueOrbitElliptical">Elliptical</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div v-if="showOrbitControls" class="control-group">
-                        <label
-                            >Inclination <span class="val-display">{{ inclination }}°</span></label
-                        >
-                        <input
-                            v-model.number="inclination"
-                            type="range"
-                            min="0"
-                            max="90"
-                            step="1"
-                        />
-                    </div>
-
-                    <div v-if="showTilt" class="control-group">
-                        <label
-                            >Axial Tilt <span class="val-display">{{ tilt }}°</span></label
-                        >
-                        <input v-model.number="tilt" type="range" min="-180" max="180" step="1" />
-                    </div>
-
-                    <div v-if="showTilt" class="control-group">
-                        <label
-                            >Tilt Azimuth <span class="val-display">{{ azimuth }}°</span></label
-                        >
-                        <input
-                            v-model.number="azimuth"
-                            type="range"
-                            min="-180"
-                            max="180"
-                            step="1"
-                        />
-                    </div>
-
-                    <div v-if="bodyType === 'planet'" class="control-group">
-                        <label for="vuePlanetTypeSelect">Planet Type</label>
+                    <div v-if="showSubtypePicker" class="control-group">
+                        <label for="bodyEditorSubtype">{{ subtypePickerLabel }}</label>
                         <select
-                            id="vuePlanetTypeSelect"
-                            v-model="planetType"
-                            @change="applyRandomDefaults(true)"
+                            v-if="!isEditMode"
+                            id="bodyEditorSubtype"
+                            v-model="form.subtype"
+                            @change="onSubtypeChanged"
                         >
-                            <option value="solid">Solid</option>
-                            <option value="gas_giant">Gas Giant</option>
-                            <option value="ice_giant">Ice Giant</option>
-                            <option value="temperate">Temperate</option>
-                            <option value="volcanic">Volcanic</option>
-                            <option value="frozen">Frozen</option>
-                            <option value="ocean">Ocean</option>
-                            <option value="desert">Desert</option>
+                            <option value="" disabled>&lt; Select &gt;</option>
+                            <option v-for="t in subtypeOptions" :key="t.value" :value="t.value">
+                                {{ t.label }}
+                            </option>
+                        </select>
+                        <select v-else id="bodyEditorSubtype" disabled>
+                            <option>{{ subtypeLabel(form.subtype) }}</option>
                         </select>
                     </div>
 
-                    <div v-if="bodyType === 'moon'" class="control-group">
-                        <label for="vueMoonTypeSelect">Moon Type</label>
-                        <select
-                            id="vueMoonTypeSelect"
-                            v-model="moonType"
-                            @change="applyRandomDefaults(true)"
-                        >
-                            <option value="solid">Solid</option>
-                            <option value="temperate">Temperate</option>
-                            <option value="volcanic">Volcanic</option>
-                            <option value="ocean">Ocean</option>
-                            <option value="frozen">Frozen</option>
-                            <option value="desert">Desert</option>
-                        </select>
-                    </div>
-
-                    <label v-if="canHaveAtmosphere" class="checkbox-row">
-                        <input v-model="hasAtmosphere" type="checkbox" /> Has Atmosphere
-                    </label>
-
-                    <template v-if="willHaveAtmosphere">
-                        <div class="control-group">
-                            <label
-                                >Atmosphere Radius
-                                <span class="val-display">{{ atmRadiusFactor }} R</span></label
-                            >
-                            <input
-                                v-model.number="atmRadiusFactor"
-                                type="range"
-                                :min="ATM_RADIUS_FACTOR_MIN"
-                                :max="ATM_RADIUS_FACTOR_MAX"
-                                step="0.01"
-                            />
+                    <!-- ── Field groups, once the type is settled ── -->
+                    <template v-if="view.fieldsReady">
+                        <div v-if="!isEditMode" class="body-editor-randomize">
+                            <button class="old-ui btn-with-icon" type="button" @click="randomize">
+                                <svg-icon type="mdi" :path="mdiShuffleVariant"></svg-icon>
+                                RANDOMIZE
+                            </button>
                         </div>
 
-                        <div class="control-group">
-                            <label
-                                >{{ addIsGiant ? 'Cloud-top Pressure' : 'Surface Pressure' }}
-                                <span class="val-display">{{ atmPressure }} bar</span></label
-                            >
-                            <input
-                                v-model.number="atmPressure"
-                                type="number"
-                                class="text-input"
-                                :min="ATM_PRESSURE_MIN"
-                                step="any"
-                            />
-                        </div>
+                        <BasicInfoSection v-model:open="sectionOpen.basic" />
+                        <OrbitSection
+                            v-if="view.showOrbitFields || view.showTilt"
+                            v-model:open="sectionOpen.orbit"
+                            @parent-changed="onOrbitParentChanged"
+                        />
+                        <AtmosphereSection
+                            v-if="view.showAtmosphereSection"
+                            v-model:open="sectionOpen.atmosphere"
+                        />
+                        <MagneticFieldSection
+                            v-if="view.showMagneticSection"
+                            v-model:open="sectionOpen.magnetic"
+                        />
+
+                        <p v-if="view.validationMessage" class="validation-message visible">
+                            {{ view.validationMessage }}
+                        </p>
                     </template>
-
-                    <label v-if="bodyType === 'planet'" class="checkbox-row">
-                        <input v-model="hasRings" type="checkbox" /> Has Rings
-                    </label>
-
-                    <label v-if="showMagneticField" class="checkbox-row">
-                        <input v-model="hasMagneticField" type="checkbox" /> Has Magnetic Field
-                    </label>
-
-                    <template v-if="showMagneticField && hasMagneticField">
-                        <div class="control-group">
-                            <label
-                                >Field Strength
-                                <span class="val-display">{{ magStrength }} G</span></label
-                            >
-                            <input
-                                v-model.number="magStrength"
-                                type="number"
-                                class="text-input"
-                                min="0.0001"
-                                step="any"
-                            />
-                        </div>
-
-                        <div class="control-group">
-                            <label
-                                >Dipole Tilt <span class="val-display">{{ magTilt }}°</span></label
-                            >
-                            <input
-                                v-model.number="magTilt"
-                                type="range"
-                                min="0"
-                                max="90"
-                                step="1"
-                            />
-                        </div>
-
-                        <div class="control-group">
-                            <label
-                                >Dipole Azimuth
-                                <span class="val-display">{{ magAzimuth }}°</span></label
-                            >
-                            <input
-                                v-model.number="magAzimuth"
-                                type="range"
-                                min="-180"
-                                max="180"
-                                step="1"
-                            />
-                        </div>
-
-                        <div class="control-group">
-                            <label
-                                >Dipole Offset
-                                <span class="val-display">{{ magOffset }} R</span></label
-                            >
-                            <input
-                                v-model.number="magOffset"
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                            />
-                        </div>
-
-                        <label class="checkbox-row">
-                            <input v-model="magReversed" type="checkbox" /> Reversed Polarity
-                        </label>
-                    </template>
-
-                    <p
-                        v-if="bodyType === 'moon' && !canCreateMoon"
-                        class="validation-message visible"
-                    >
-                        Please select a body first to create a moon
-                    </p>
-
-                    <div v-if="bodyType === 'comet'" class="control-group">
-                        <label for="vueAddTailColor">Tail Color</label>
-                        <input id="vueAddTailColor" v-model="addTailColor" type="color" />
-                    </div>
-
-                    <div class="d-flex gap-3 mb-3">
-                        <button
-                            class="old-ui btn-with-icon"
-                            type="button"
-                            @click="applyRandomDefaults()"
-                        >
-                            <svg-icon type="mdi" :path="mdiShuffleVariant"></svg-icon>
-                            RANDOMIZE
-                        </button>
-                    </div>
                 </template>
 
-                <div class="button-group">
+                <!-- ── Actions ── -->
+                <div v-if="!isEditMode" class="button-group">
                     <button
                         class="old-ui btn-with-icon"
                         type="button"
@@ -346,254 +108,8 @@
                         CLOSE
                     </button>
                 </div>
-            </template>
 
-            <!-- ══════════════════════════ EDIT MODE ══════════════════════════ -->
-            <template v-else>
-                <p v-if="!snapshot" class="vue-ui-empty">No body selected.</p>
                 <template v-else>
-                    <div class="control-group">
-                        <label>Name</label>
-                        <input
-                            v-model="editName"
-                            type="text"
-                            class="text-input"
-                            placeholder="Body name"
-                        />
-                    </div>
-
-                    <div v-if="snapshot.isComet" class="control-group">
-                        <label>Tail Color</label>
-                        <input v-model="editTailColor" type="color" />
-                    </div>
-
-                    <div class="control-group">
-                        <label
-                            >Mass
-                            <span class="val-display">{{ formatNumber(editMass) }}</span></label
-                        >
-                        <input
-                            v-model.number="editMass"
-                            type="number"
-                            class="text-input"
-                            :min="editMassMin"
-                            step="any"
-                        />
-                    </div>
-
-                    <div v-if="snapshot.isStar" class="control-group">
-                        <label
-                            >Temperature
-                            <span class="val-display"
-                                >{{ Math.round(editTemperature) }}K</span
-                            ></label
-                        >
-                        <input
-                            v-model.number="editTemperature"
-                            type="range"
-                            min="2000"
-                            max="30000"
-                            step="100"
-                        />
-                    </div>
-
-                    <div v-if="snapshot.isStar" class="control-group">
-                        <label
-                            >Light Intensity
-                            <span class="val-display">{{
-                                formatNumber(editLightIntensity)
-                            }}</span></label
-                        >
-                        <input
-                            v-model.number="editLightIntensity"
-                            type="range"
-                            :min="BASE_STAR_LIGHT_INTENSITY_MIN"
-                            :max="BASE_STAR_LIGHT_INTENSITY_MAX"
-                            step="100"
-                        />
-                    </div>
-
-                    <div class="control-group">
-                        <label
-                            >Size (Radius)
-                            <span class="val-display">{{ formatNumber(editRadius) }}</span></label
-                        >
-                        <input
-                            v-model.number="editRadius"
-                            type="number"
-                            class="text-input"
-                            :min="editRadiusMin"
-                            :step="editRadiusStep"
-                        />
-                    </div>
-
-                    <div class="control-group">
-                        <label
-                            >Velocity
-                            <span class="val-display">{{ editVelocity.toFixed(1) }}</span></label
-                        >
-                        <input
-                            v-model.number="editVelocity"
-                            class="text-input"
-                            type="number"
-                            min="0"
-                        />
-                    </div>
-
-                    <div class="control-group">
-                        <label
-                            >Orbital Angle
-                            <span class="val-display">{{ editOrbitalAngle }}°</span></label
-                        >
-                        <input
-                            v-model.number="editOrbitalAngle"
-                            type="range"
-                            min="0"
-                            max="360"
-                            step="1"
-                        />
-                    </div>
-
-                    <div class="control-group">
-                        <label
-                            >Inclination
-                            <span class="val-display">{{ editInclination }}°</span></label
-                        >
-                        <input
-                            v-model.number="editInclination"
-                            type="range"
-                            min="0"
-                            max="90"
-                            step="1"
-                        />
-                    </div>
-
-                    <div v-if="snapshot.hasTilt" class="control-group">
-                        <label
-                            >Axial Tilt <span class="val-display">{{ editTilt }}°</span></label
-                        >
-                        <input
-                            v-model.number="editTilt"
-                            type="range"
-                            min="-180"
-                            max="180"
-                            step="1"
-                        />
-                    </div>
-
-                    <div v-if="snapshot.hasTilt" class="control-group">
-                        <label
-                            >Tilt Azimuth <span class="val-display">{{ editAzimuth }}°</span></label
-                        >
-                        <input
-                            v-model.number="editAzimuth"
-                            type="range"
-                            min="-180"
-                            max="180"
-                            step="1"
-                        />
-                    </div>
-
-                    <template v-if="snapshot.atmosphere">
-                        <div class="control-group">
-                            <label
-                                >Atmosphere Radius
-                                <span class="val-display">{{ editAtmRadiusFactor }} R</span></label
-                            >
-                            <input
-                                v-model.number="editAtmRadiusFactor"
-                                type="range"
-                                :min="ATM_RADIUS_FACTOR_MIN"
-                                :max="ATM_RADIUS_FACTOR_MAX"
-                                step="0.01"
-                            />
-                        </div>
-
-                        <div class="control-group">
-                            <label
-                                >{{
-                                    snapshot.atmosphereIsCloudTop
-                                        ? 'Cloud-top Pressure'
-                                        : 'Surface Pressure'
-                                }}
-                                <span class="val-display">{{ editAtmPressure }} bar</span></label
-                            >
-                            <input
-                                v-model.number="editAtmPressure"
-                                type="number"
-                                class="text-input"
-                                :min="ATM_PRESSURE_MIN"
-                                step="any"
-                            />
-                        </div>
-                    </template>
-
-                    <label v-if="snapshot.canHaveMagneticField" class="checkbox-row">
-                        <input v-model="editHasMagneticField" type="checkbox" /> Has Magnetic Field
-                    </label>
-
-                    <template v-if="snapshot.canHaveMagneticField && editHasMagneticField">
-                        <div class="control-group">
-                            <label
-                                >Field Strength
-                                <span class="val-display">{{ editMagStrength }} G</span></label
-                            >
-                            <input
-                                v-model.number="editMagStrength"
-                                type="number"
-                                class="text-input"
-                                min="0.0001"
-                                step="any"
-                            />
-                        </div>
-
-                        <div class="control-group">
-                            <label
-                                >Dipole Tilt
-                                <span class="val-display">{{ editMagTilt }}°</span></label
-                            >
-                            <input
-                                v-model.number="editMagTilt"
-                                type="range"
-                                min="0"
-                                max="90"
-                                step="1"
-                            />
-                        </div>
-
-                        <div class="control-group">
-                            <label
-                                >Dipole Azimuth
-                                <span class="val-display">{{ editMagAzimuth }}°</span></label
-                            >
-                            <input
-                                v-model.number="editMagAzimuth"
-                                type="range"
-                                min="-180"
-                                max="180"
-                                step="1"
-                            />
-                        </div>
-
-                        <div class="control-group">
-                            <label
-                                >Dipole Offset
-                                <span class="val-display">{{ editMagOffset }} R</span></label
-                            >
-                            <input
-                                v-model.number="editMagOffset"
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                            />
-                        </div>
-
-                        <label class="checkbox-row">
-                            <input v-model="editMagReversed" type="checkbox" /> Reversed Polarity
-                        </label>
-                    </template>
-
                     <div class="button-group">
                         <button
                             class="old-ui btn-with-icon"
@@ -641,34 +157,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
-import {
-    COMET_TAIL_COLOR_PALETTE,
-    BASE_STAR_LIGHT_INTENSITY_MIN,
-    BASE_STAR_LIGHT_INTENSITY_MAX,
-} from '../../utilities/consts';
-import { closeBodyEditor, openBodyEditor, vueUiState } from '../ui-store';
-import {
-    applyBodyEdit,
-    bodyEditorStore,
-    clearBodyEditSnapshot,
-    createCustomBody,
-    createPresetBodyByKey,
-    deleteBodyById,
-    formatNumber,
-    generateAddFormBodyName,
-    getRandomizedCreateDefaults,
-    loadBodyEditSnapshot,
-    resolveOrbitParentId,
-    simStore,
-} from '../sim-bridge';
-import { isActionLocked } from '../sim-bridge';
-import type { ApplyBodyEditPayload, CreateBodyPayload } from '../sim-bridge';
-import type { IMagneticFieldOptions } from '../../interfaces';
-import type { IAtmosphereProfile } from '../../procedural/atmosphere-profile';
-import { subtypeForcesAtmosphere } from '../../procedural/atmosphere-profile';
-import { ScenarioLock } from '../../interfaces';
 import SvgIcon from '@jamescoyle/vue-icon';
 import {
     mdiCheck,
@@ -678,471 +168,153 @@ import {
     mdiPlus,
     mdiShuffleVariant,
 } from '@mdi/js';
+
+import { ScenarioLock } from '../../interfaces';
+import { closeBodyEditor, openBodyEditor, vueUiState } from '../ui-store';
+import {
+    applyBodyEdit,
+    bodyEditorStore,
+    clearBodyEditSnapshot,
+    createCustomBody,
+    createPresetBodyByKey,
+    deleteBodyById,
+    isActionLocked,
+    loadBodyEditSnapshot,
+    simStore,
+} from '../sim-bridge';
+import { useBodyEditorForm } from '../composables/useBodyEditorForm';
 import PanelBase from './PanelBase.vue';
-
-/** Floor for asteroid/comet mass and radius inputs, which run far below planetary scale. */
-const SMALL_BODY_MIN = '0.000001';
-
-const PRESET_BODIES = [
-    { value: 'sun', label: 'Sun' },
-    { value: 'mercury', label: 'Mercury' },
-    { value: 'venus', label: 'Venus' },
-    { value: 'earth', label: 'Earth' },
-    { value: 'earth_moon', label: 'Moon (Earth)' },
-    { value: 'mars', label: 'Mars' },
-    { value: 'jupiter', label: 'Jupiter' },
-    { value: 'saturn', label: 'Saturn' },
-    { value: 'uranus', label: 'Uranus' },
-    { value: 'neptune', label: 'Neptune' },
-    { value: 'pluto', label: 'Pluto' },
-];
+import AtmosphereSection from './body-editor/AtmosphereSection.vue';
+import BasicInfoSection from './body-editor/BasicInfoSection.vue';
+import MagneticFieldSection from './body-editor/MagneticFieldSection.vue';
+import OrbitSection from './body-editor/OrbitSection.vue';
+import {
+    BODY_TYPE_OPTIONS,
+    MOON_TYPE_OPTIONS,
+    PLANET_TYPE_OPTIONS,
+    PRESET_BODY_GROUPS,
+    subtypeLabel,
+} from './body-editor/body-editor-options';
 
 const isEditMode = computed(() => vueUiState.bodyEditor?.mode === 'edit');
 const snapshot = computed(() => bodyEditorStore.snapshot);
 
-// ── Add-mode form state ───────────────────────────────────────────────────
+const {
+    form,
+    view,
+    resetForAdd,
+    randomize,
+    onBodyTypeChanged,
+    onSubtypeChanged,
+    onOrbitParentChanged,
+    loadFromSnapshot,
+    buildCreatePayload,
+    buildApplyPayload,
+} = useBodyEditorForm(() => isEditMode.value);
+
+// ── Add-mode choices (kept across opens so repeated custom adds stay in Custom) ──
 const addMode = ref<'preset' | 'custom'>('preset');
-const addTailColor = ref('#7ab8ff');
 const presetKey = ref('sun');
-const bodyType = ref('sun');
-/** Name shown in the add form; pre-filled procedurally and editable before CREATE. */
-const bodyName = ref('');
-const planetType = ref('solid');
-const moonType = ref('solid');
-const orbitType = ref<'circular' | 'elliptical'>('circular');
-const inclination = ref(0);
-const hasAtmosphere = ref(false);
-/** Atmosphere radius as a multiple of the body's radius. */
-const atmRadiusFactor = ref(1.07);
-/** Surface (or cloud-top) pressure in bar. */
-const atmPressure = ref(1);
-const hasRings = ref(false);
-const mass = ref(0);
-const radius = ref(0);
-const temperature = ref(5778);
-const lightIntensity = ref(15000);
-const tilt = ref(0);
-const azimuth = ref(0);
-const hasMagneticField = ref(false);
-const magStrength = ref(0.3);
-const magTilt = ref(0);
-const magAzimuth = ref(0);
-const magOffset = ref(0);
-const magReversed = ref(false);
+const isPresetMode = computed(() => !isEditMode.value && addMode.value === 'preset');
 
-const showMassRadius = computed(
-    () =>
-        bodyType.value === 'sun' ||
-        bodyType.value === 'planet' ||
-        bodyType.value === 'moon' ||
-        bodyType.value === 'black_hole' ||
-        bodyType.value === 'asteroid' ||
-        bodyType.value === 'comet'
-);
-const showMass = computed(() => showMassRadius.value);
-const showRadius = computed(() => showMassRadius.value || bodyType.value === 'wormhole');
+/** Basic Info starts expanded, the detail groups collapsed; kept while the panel is open. */
+const sectionOpen = reactive({ basic: true, orbit: false, atmosphere: false, magnetic: false });
 
-/**
- * Asteroids and comets live orders of magnitude below planetary scale (asteroid mass runs
- * from ~1e-6, radius from ~0.005), so the planet-scale input bounds would reject or
- * stomp on legitimate values.
- */
-const isSmallBodyType = computed(() => bodyType.value === 'asteroid' || bodyType.value === 'comet');
-const massMin = computed(() => (isSmallBodyType.value ? SMALL_BODY_MIN : '0.001'));
-const radiusMin = computed(() => (isSmallBodyType.value ? SMALL_BODY_MIN : '0.01'));
-const radiusStep = computed(() => (isSmallBodyType.value ? 'any' : '1'));
-const showOrbitControls = computed(
-    () => bodyType.value !== 'black_hole' && bodyType.value !== 'wormhole'
+// ── Type pickers ──────────────────────────────────────────────────────────
+const showSubtypePicker = computed(() =>
+    isEditMode.value ? !!snapshot.value?.subtypeKey : view.value.needsSubtype
 );
-const showTilt = computed(
-    () =>
-        bodyType.value === 'sun' ||
-        bodyType.value === 'planet' ||
-        bodyType.value === 'moon' ||
-        bodyType.value === 'wormhole'
+const subtypePickerLabel = computed(() =>
+    (isEditMode.value ? snapshot.value?.bodyTypeKey : form.bodyType) === 'moon'
+        ? 'Moon Type'
+        : 'Planet Type'
 );
-const canHaveAtmosphere = computed(() => {
-    if (bodyType.value === 'planet') {
-        return ['solid', 'volcanic', 'ocean', 'frozen', 'desert'].includes(planetType.value);
-    }
-    if (bodyType.value === 'moon') {
-        return moonType.value !== 'temperate';
-    }
-    return false;
-});
-/** Subtypes that always have an atmosphere (no checkbox): Temperate and gas/ice giants. */
-const forcesAtmosphere = computed(() => {
-    if (bodyType.value === 'planet') return subtypeForcesAtmosphere(planetType.value);
-    if (bodyType.value === 'moon') return subtypeForcesAtmosphere(moonType.value);
-    return false;
-});
-/** Whether the body being created will have an atmosphere — shows the atmosphere controls. */
-const willHaveAtmosphere = computed(
-    () => forcesAtmosphere.value || (canHaveAtmosphere.value && hasAtmosphere.value)
+const subtypeOptions = computed(() =>
+    form.bodyType === 'moon' ? MOON_TYPE_OPTIONS : PLANET_TYPE_OPTIONS
 );
-/** Gas/ice giants' "surface" is their cloud deck, so the pressure reads as cloud-top pressure. */
-const addIsGiant = computed(
-    () =>
-        bodyType.value === 'planet' &&
-        (planetType.value === 'gas_giant' || planetType.value === 'ice_giant')
-);
-/** Stars, planets, and moons can carry a magnetic field; nothing else can. */
-const showMagneticField = computed(
-    () => bodyType.value === 'sun' || bodyType.value === 'planet' || bodyType.value === 'moon'
-);
-const orbitParentName = computed(() => {
-    const body = simStore.bodies.find((b) => b.id === simStore.selectedId);
-    return body ? body.name : 'None';
-});
-const canCreateMoon = computed(
-    () => bodyType.value !== 'moon' || !!resolveOrbitParentId(simStore.selectedId)
-);
-const canCreate = computed(
-    () =>
-        !isActionLocked(ScenarioLock.AddBody) && (addMode.value === 'preset' || canCreateMoon.value)
-);
+
+// ── Locks ─────────────────────────────────────────────────────────────────
 const addLocked = computed(() => isActionLocked(ScenarioLock.AddBody));
 const editLocked = computed(() => isActionLocked(ScenarioLock.EditBody));
 const deleteLocked = computed(() => isActionLocked(ScenarioLock.DeleteBody));
+const canCreate = computed(
+    () =>
+        !addLocked.value &&
+        (isPresetMode.value || (view.value.fieldsReady && !view.value.validationMessage))
+);
 
-// Hidden fields shouldn't silently keep a stale "on" value (mirrors the old panel forcing
-// these off when their row is hidden).
-watch(canHaveAtmosphere, (val) => {
-    if (!val) hasAtmosphere.value = false;
-});
+// ── Mode / snapshot sync ──────────────────────────────────────────────────
 watch(
-    () => bodyType.value === 'planet',
-    (isPlanet) => {
-        if (!isPlanet) hasRings.value = false;
+    () => bodyEditorStore.snapshot,
+    (snap) => {
+        if (isEditMode.value) loadFromSnapshot(snap);
     }
 );
-watch(showMagneticField, (val) => {
-    if (!val) hasMagneticField.value = false;
-});
-
-function resetAddForm(): void {
-    addMode.value = 'preset';
-    addTailColor.value = '#7ab8ff';
-    presetKey.value = 'sun';
-    bodyType.value = 'sun';
-    bodyName.value = '';
-    planetType.value = 'solid';
-    moonType.value = 'solid';
-    orbitType.value = 'circular';
-    inclination.value = 0;
-    hasAtmosphere.value = false;
-    hasRings.value = false;
-    tilt.value = 0;
-    azimuth.value = 0;
-    hasMagneticField.value = false;
-    magStrength.value = 0.3;
-    magTilt.value = 0;
-    magAzimuth.value = 0;
-    magOffset.value = 0;
-    magReversed.value = false;
-}
-
-/**
- * Re-rolls the add-form preview values. With `keepSubtype`, the currently selected planet/moon
- * type is preserved (and the other values are rolled for that type) instead of re-rolled.
- */
-function applyRandomDefaults(keepSubtype = false): void {
-    // Re-roll the name alongside the other preview values, so the Name box always shows a
-    // procedural name the user can accept or edit before creating.
-    bodyName.value = generateAddFormBodyName(bodyType.value);
-
-    const subtype = !keepSubtype
-        ? undefined
-        : bodyType.value === 'planet'
-          ? planetType.value
-          : bodyType.value === 'moon'
-            ? moonType.value
-            : undefined;
-    const defaults = getRandomizedCreateDefaults(bodyType.value, subtype);
-    if (!defaults) return;
-    if (defaults.mass !== null) mass.value = defaults.mass;
-    if (defaults.radius !== null) radius.value = defaults.radius;
-    if (defaults.temperature !== null) temperature.value = defaults.temperature;
-    if (defaults.lightIntensity !== null) lightIntensity.value = defaults.lightIntensity;
-    if (defaults.tilt !== null) tilt.value = defaults.tilt;
-    if (defaults.azimuth !== null) azimuth.value = defaults.azimuth;
-    if (defaults.inclination !== null) inclination.value = defaults.inclination;
-    hasAtmosphere.value = defaults.hasAtmosphere;
-    if (defaults.atmosphere) {
-        atmRadiusFactor.value = roundRadiusFactor(defaults.atmosphere.radiusFactor);
-        atmPressure.value = roundPressure(defaults.atmosphere.surfacePressureBar);
-    }
-    hasRings.value = defaults.hasRings;
-
-    // A null field means this body type never has one, so the checkbox comes up unchecked.
-    hasMagneticField.value = defaults.magneticField !== null;
-    if (defaults.magneticField) {
-        magStrength.value = roundStrength(defaults.magneticField.strength);
-        magTilt.value = Math.round(defaults.magneticField.tilt);
-        magAzimuth.value = Math.round(normalizeAzimuth(defaults.magneticField.azimuth));
-        magOffset.value = roundOffset(defaults.magneticField.offset ?? 0);
-        magReversed.value = defaults.magneticField.reversed ?? false;
-    }
-
-    if (defaults.planetType) planetType.value = defaults.planetType;
-    if (defaults.moonType) moonType.value = defaults.moonType;
-
-    // Comets get a randomized tail color from the shared procedural palette.
-    if (bodyType.value === 'comet') {
-        addTailColor.value = randomCometTailColorHex();
-    }
-}
-
-// ── Magnetic field helpers ────────────────────────────────────────────────
-// The procedural roll produces azimuth over 0–360 and full-precision floats; the
-// sliders want -180..180 and something readable. These convert between the two.
-
-/** Wraps an angle into the -180..180 range the azimuth slider uses. */
-function normalizeAzimuth(deg: number): number {
-    const wrapped = ((deg % 360) + 360) % 360;
-    return wrapped > 180 ? wrapped - 360 : wrapped;
-}
-
-/** Field strengths span 0.001–100 G, so keep enough significant digits at the low end. */
-function roundStrength(gauss: number): number {
-    return Number(gauss.toPrecision(3));
-}
-
-/** Dipole offset is a 0–1 fraction of radius shown at slider (0.01) resolution. */
-function roundOffset(fraction: number): number {
-    return Math.round(fraction * 100) / 100;
-}
-
-// ── Atmosphere helpers ────────────────────────────────────────────────────
-const ATM_RADIUS_FACTOR_MIN = 1.01;
-const ATM_RADIUS_FACTOR_MAX = 2;
-const ATM_PRESSURE_MIN = 0.00001;
-
-/** Radius factor at slider (0.01) resolution, kept inside the slider's range. */
-function roundRadiusFactor(factor: number): number {
-    const clamped = Math.min(ATM_RADIUS_FACTOR_MAX, Math.max(ATM_RADIUS_FACTOR_MIN, factor));
-    return Math.round(clamped * 100) / 100;
-}
-
-/** Pressures span µbar to ~100 bar, so keep significant digits rather than decimals. */
-function roundPressure(bar: number): number {
-    return Number(bar.toPrecision(3));
-}
-
-/** Builds the atmosphere payload from form values, or null when the body will be airless. */
-function buildAtmospherePayload(
-    enabled: boolean,
-    radiusFactor: number,
-    pressureBar: number
-): IAtmosphereProfile | null {
-    if (!enabled) return null;
-    return { radiusFactor, surfacePressureBar: pressureBar };
-}
-
-/** Picks a random comet-tail color from the shared procedural palette, as a hex string. */
-function randomCometTailColorHex(): string {
-    const color =
-        COMET_TAIL_COLOR_PALETTE[Math.floor(Math.random() * COMET_TAIL_COLOR_PALETTE.length)];
-    return '#' + color.toString(16).padStart(6, '0');
-}
-
-// ── Edit-mode form state ──────────────────────────────────────────────────
-const editName = ref('');
-const editTailColor = ref('#7ab8ff');
-const editMass = ref(0);
-const editRadius = ref(0);
-const editTemperature = ref(5778);
-const editLightIntensity = ref(15000);
-const editVelocity = ref(0);
-const editOrbitalAngle = ref(0);
-const editInclination = ref(0);
-const editTilt = ref(0);
-const editAzimuth = ref(0);
-const editHasMagneticField = ref(false);
-const editMagStrength = ref(0.3);
-const editMagTilt = ref(0);
-const editMagAzimuth = ref(0);
-const editMagOffset = ref(0);
-const editMagReversed = ref(false);
-const editAtmRadiusFactor = ref(1.07);
-const editAtmPressure = ref(1);
-
-/** Same small-body bounds as the add form, driven off the selected body's snapshot. */
-const isSmallBodySnapshot = computed(
-    () => !!snapshot.value?.isAsteroid || !!snapshot.value?.isComet
-);
-const editMassMin = computed(() => (isSmallBodySnapshot.value ? SMALL_BODY_MIN : '0.001'));
-const editRadiusMin = computed(() => (isSmallBodySnapshot.value ? SMALL_BODY_MIN : '0.01'));
-const editRadiusStep = computed(() => (isSmallBodySnapshot.value ? 'any' : '1'));
-
-/** Builds the IMagneticFieldOptions payload from a set of form refs, or null when unchecked. */
-function buildMagneticFieldPayload(
-    enabled: boolean,
-    strength: number,
-    fieldTilt: number,
-    fieldAzimuth: number,
-    offset: number,
-    reversed: boolean
-): IMagneticFieldOptions | null {
-    if (!enabled) return null;
-    return { strength, tilt: fieldTilt, azimuth: fieldAzimuth, offset, reversed };
-}
-
-function syncEditFormFromSnapshot(): void {
-    const snap = bodyEditorStore.snapshot;
-    if (!snap) return;
-    editName.value = snap.name;
-    editTailColor.value = snap.tailColorHex ?? '#7ab8ff';
-    editMass.value = snap.mass;
-    editRadius.value = snap.radius;
-    editTemperature.value = snap.temperature ?? 5778;
-    editLightIntensity.value = snap.lightIntensity ?? 15000;
-    editVelocity.value = snap.velocity;
-    editOrbitalAngle.value = Math.round(snap.orbitalAngle);
-    editInclination.value = Math.round(snap.inclination);
-    editTilt.value = Math.round(snap.tilt);
-    editAzimuth.value = Math.round(snap.azimuth);
-
-    if (snap.atmosphere) {
-        editAtmRadiusFactor.value = roundRadiusFactor(snap.atmosphere.radiusFactor);
-        editAtmPressure.value = roundPressure(snap.atmosphere.surfacePressureBar);
-    }
-
-    editHasMagneticField.value = snap.magneticField !== null;
-    if (snap.magneticField) {
-        editMagStrength.value = roundStrength(snap.magneticField.strength);
-        editMagTilt.value = Math.round(snap.magneticField.tilt);
-        editMagAzimuth.value = Math.round(normalizeAzimuth(snap.magneticField.azimuth));
-        editMagOffset.value = roundOffset(snap.magneticField.offset ?? 0);
-        editMagReversed.value = snap.magneticField.reversed ?? false;
-    }
-}
-
-watch(() => bodyEditorStore.snapshot, syncEditFormFromSnapshot);
 
 // Drives mode switches within the same mounted instance (edit -> edit on a new id after
-// Create, or a fresh Add open triggered by the System Explorer buttons). Syncs the edit form
-// synchronously here too — `loadBodyEditSnapshot` mutates `bodyEditorStore.snapshot` inside this
-// same immediate callback, and the snapshot watcher above only picks that up on the next tick.
+// Create, or a fresh Add open triggered by the System Explorer buttons). Loads the edit form
+// synchronously here too — `loadBodyEditSnapshot` mutates `bodyEditorStore.snapshot` inside
+// this same immediate callback, and the snapshot watcher above only picks that up next tick.
 watch(
     () => vueUiState.bodyEditor,
     (val) => {
         if (!val) return;
         if (val.mode === 'edit' && val.bodyId) {
             loadBodyEditSnapshot(val.bodyId);
-            syncEditFormFromSnapshot();
+            loadFromSnapshot(bodyEditorStore.snapshot);
         } else {
             clearBodyEditSnapshot();
-            resetAddForm();
-            applyRandomDefaults();
+            resetForAdd();
         }
     },
     { immediate: true }
 );
 
+// Close the editor when the body being edited is destroyed (collision, absorption, star death,
+// a new system replacing this one...). The id must have been seen in the body list first: a
+// body created a moment ago only shows up there on the bridge's next refresh.
+let editedBodySeen = false;
+watch(
+    () => vueUiState.bodyEditor?.bodyId,
+    () => {
+        editedBodySeen = false;
+    }
+);
+watch(
+    () => simStore.bodies,
+    (bodies) => {
+        const bodyId = vueUiState.bodyEditor?.bodyId;
+        if (!isEditMode.value || !bodyId) return;
+        if (bodies.some((b) => b.id === bodyId)) {
+            editedBodySeen = true;
+        } else if (editedBodySeen) {
+            onClose();
+        }
+    }
+);
+
+// ── Actions ───────────────────────────────────────────────────────────────
 function onCreate(): void {
-    let newId: string | null;
-
-    if (addMode.value === 'preset') {
-        newId = createPresetBodyByKey(presetKey.value);
-    } else {
-        if (bodyType.value === 'moon' && !canCreateMoon.value) return;
-        const hidesMass = bodyType.value === 'wormhole';
-        const payload: CreateBodyPayload = {
-            bodyType: bodyType.value,
-            // Empty means "let the sim generate one procedurally".
-            customName: bodyName.value.trim() || null,
-            planetType: bodyType.value === 'moon' ? moonType.value : planetType.value,
-            orbitType: orbitType.value,
-            inclination: inclination.value,
-            atmosphere: buildAtmospherePayload(
-                willHaveAtmosphere.value,
-                atmRadiusFactor.value,
-                atmPressure.value
-            ),
-            hasRings: hasRings.value,
-            customMass: hidesMass ? null : mass.value,
-            customTemperature: bodyType.value === 'sun' ? temperature.value : null,
-            customLightIntensity: bodyType.value === 'sun' ? lightIntensity.value : null,
-            customRadius: radius.value,
-            orbitParentId: resolveOrbitParentId(simStore.selectedId),
-            createTilt: showTilt.value ? tilt.value : null,
-            createAzimuth: showTilt.value ? azimuth.value : null,
-            magneticField: buildMagneticFieldPayload(
-                showMagneticField.value && hasMagneticField.value,
-                magStrength.value,
-                magTilt.value,
-                magAzimuth.value,
-                magOffset.value,
-                magReversed.value
-            ),
-            tailColor: bodyType.value === 'comet' ? addTailColor.value : null,
-        };
-        newId = createCustomBody(payload);
-    }
-
-    if (newId) {
-        openBodyEditor('edit', newId);
-    }
+    if (!canCreate.value) return;
+    const newId = isPresetMode.value
+        ? createPresetBodyByKey(presetKey.value)
+        : createCustomBody(buildCreatePayload());
+    if (newId) openBodyEditor('edit', newId);
 }
 
 function onApply(): void {
     const bodyId = vueUiState.bodyEditor?.bodyId;
     const snap = bodyEditorStore.snapshot;
     if (!bodyId || !snap) return;
-
-    const payload: ApplyBodyEditPayload = {
-        name: editName.value,
-        mass: editMass.value,
-        temperature: snap.isStar ? editTemperature.value : null,
-        lightIntensity: snap.isStar ? editLightIntensity.value : null,
-        radius: editRadius.value,
-        velocity: editVelocity.value,
-        orbitalAngle: editOrbitalAngle.value,
-        inclination: editInclination.value,
-        tailColor: snap.isComet ? editTailColor.value : null,
-        isStarBody: snap.isStar,
-        editTilt: snap.hasTilt ? editTilt.value : null,
-        editAzimuth: snap.hasTilt ? editAzimuth.value : null,
-        // Undefined leaves the field untouched for body types that can't carry one.
-        magneticField: snap.canHaveMagneticField
-            ? buildMagneticFieldPayload(
-                  editHasMagneticField.value,
-                  editMagStrength.value,
-                  editMagTilt.value,
-                  editMagAzimuth.value,
-                  editMagOffset.value,
-                  editMagReversed.value
-              )
-            : undefined,
-        // Only sent when a control actually moved, so APPLY on an untouched form doesn't snap the
-        // body's exact atmosphere to the controls' rounded values.
-        atmosphere: editedAtmosphere(snap.atmosphere),
-    };
-
-    applyBodyEdit(bodyId, payload);
+    applyBodyEdit(bodyId, buildApplyPayload(snap));
     loadBodyEditSnapshot(bodyId);
-}
-
-/** The edited atmosphere, or undefined when the body has none or neither control changed. */
-function editedAtmosphere(original: IAtmosphereProfile | null): IAtmosphereProfile | undefined {
-    if (!original) return undefined;
-    const unchanged =
-        editAtmRadiusFactor.value === roundRadiusFactor(original.radiusFactor) &&
-        editAtmPressure.value === roundPressure(original.surfacePressureBar);
-    if (unchanged) return undefined;
-    return {
-        radiusFactor: editAtmRadiusFactor.value,
-        surfacePressureBar: editAtmPressure.value,
-    };
 }
 
 function onDelete(): void {
     const bodyId = vueUiState.bodyEditor?.bodyId;
     if (!bodyId) return;
     deleteBodyById(bodyId);
-    clearBodyEditSnapshot();
-    closeBodyEditor();
+    onClose();
 }
 
 function onClose(): void {
@@ -1152,15 +324,19 @@ function onClose(): void {
 </script>
 
 <style scoped>
-.vue-ui-body-editor {
-    flex: 1;
-    min-height: 0;
-}
-
 .vue-ui-body-editor-fields {
     flex: 1;
     min-height: 0;
     overflow: auto;
     min-width: 0;
+}
+
+.body-editor-randomize {
+    margin-bottom: var(--new-ui-gap-3);
+}
+
+.vue-ui-body-editor-fields :deep(.checkbox-row.is-disabled) {
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 </style>
