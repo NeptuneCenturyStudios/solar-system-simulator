@@ -149,7 +149,7 @@ For previous milestone info, see milestones.md
 - [x] Phase 3.4: Add surface mode walking (WASD Sapce to jump (affected by gravity. Make surface cam player rig integrated with physics)). Camera sway. For testing, I will be using my ship to guage distances and depth/jumps (later we'll add some surface flora)
 - [x] Phase 3.5: Surface friction for ships falling and crashing to surface of planet/moon/asteroid, etc
 - **Phase 4**
-- [ ] Phase 4.1: Reorganize and refactor the custom/preset object creation panel (AddEditBodyPanel.vue) as it is combersome and overwhelming to look at. See designs\ui\new-add-edit-body-updates.md
+- [x] Phase 4.1: Reorganize and refactor the custom/preset object creation panel (AddEditBodyPanel.vue) as it is combersome and overwhelming to look at. See designs\ui\new-add-edit-body-updates.md
 - [ ] Phase 4.2: Ability to save edits to a solar system or procedurally generated system. For app, this can be built in, for web version, user can select files from browser to load and save.
 - **Phase 5**
 - [x] Implement ship landing on body surfaces
@@ -211,6 +211,8 @@ node -e "console.log(require('@electron/asar').listPackage('release/win-unpacked
 
 ## Code Conventions
 
+- Favor Enums instead of string types. e.g ExampleEnum.ExampleValue instead of 'example_value'
+- Copy and code should use en-US spellings. e.g barycenter isntead of barycentre
 - **Strict TypeScript** — no `any`. Use explicit types everywhere.
 - **ES modules** — all files use `import`/`export`
 - **One file per component/class** — keep files focused
