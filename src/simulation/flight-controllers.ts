@@ -243,6 +243,10 @@ export function exitFlightMode(ctx: IFlightControlContext) {
                 : flightState.prevCameraPos.distanceTo(flightState.prevControlsTarget);
         ctx.camera.position.copy(shipPos).addScaledVector(prevDir, dist);
         ctx.controls.target.copy(shipPos);
+        // Always land in Look At on the ship. Without this the camera mode and focus stay
+        // whatever they were before flight (Look At off, free camera, another focused body),
+        // so the orbit either stays behind as the ship flies off or snaps back to that body.
+        ctx.focusShipAfterFlight(flightState.knownShip);
     } else if (deathPos) {
         // The ship was destroyed: keep the flight camera where it is (beside the wreck) and
         // orbit the death site, so the explosion stays in view.

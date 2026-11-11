@@ -100,7 +100,7 @@ export function findLandingSurface(ship: Spaceship, bodies: readonly Body[]): Bo
         if (body === ship || !isLandable(body)) continue;
         // Cheap reject on the bounding spheres before the hull/facet-accurate clearance.
         const centreGap =
-            body.mesh.position.distanceTo(ship.mesh.position) - body.radius - ship.radius;
+            body.mesh.position.distanceTo(ship.mesh.position) - body.contactRadius - ship.radius;
         if (centreGap > SHIP_LANDING_MAX_ALTITUDE) continue;
         const clearance = surfaceClearance(ship, body);
         if (clearance <= bestClearance) {

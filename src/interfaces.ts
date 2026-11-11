@@ -933,6 +933,13 @@ export interface IFlightControlContext {
      * the hull) and can't be kept.
      */
     calcFitDistanceForBody: (body: Body) => number;
+
+    /**
+     * Leaving flight with the ship still alive: switch the camera to Look At mode focused on
+     * the ship (Look At on, free camera off, ship selected), whatever the camera mode and
+     * focus were before flight or were changed to during it.
+     */
+    focusShipAfterFlight: (ship: Body) => void;
 }
 
 export interface IAutopilotContext {

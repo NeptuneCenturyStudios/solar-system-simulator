@@ -13,9 +13,10 @@ import { isBodyType } from '../utilities/utilities';
  * body's mass and M the parent's. Only the mass *ratio* matters, so the result is in scene
  * units with no scaling needed.
  *
- * Only planets, moons and dwarf planets qualify as reference bodies — stars are deliberately
- * excluded (inside a star's Hill sphere alone the ship just flies heliocentric high mode), as
- * are small bodies such as asteroids and satellites.
+ * Planets, moons, dwarf planets and asteroids qualify as reference bodies — stars are
+ * deliberately excluded (inside a star's Hill sphere alone the ship just flies heliocentric high
+ * mode), as are comets and satellites. Asteroids get a Hill sphere of their own but never act as
+ * the parent of another body.
  */
 
 /** Body types that may serve as a guidance reference frame. */
@@ -24,7 +25,8 @@ const REFERENCE_BODY_TYPES =
     BodyTypeEnum.Moon |
     BodyTypeEnum.DwarfPlanet |
     BodyTypeEnum.GasGiant |
-    BodyTypeEnum.IceGiant;
+    BodyTypeEnum.IceGiant |
+    BodyTypeEnum.Asteroid;
 
 interface IHillSphere {
     body: CelestialBody;
@@ -95,6 +97,8 @@ export function updateHillSpheres(bodies: readonly Body[]): void {
             let found = false;
             for (const candidate of _ordered) {
                 if (candidate === body) break; // only heavier (already resolved) bodies
+                // Asteroids are never parents; skipping them keeps a dense asteroid field cheap.
+                if (isBodyType(candidate, BodyTypeEnum.Asteroid)) continue;
                 const h = _hill.get(candidate) ?? 0;
                 if (h <= 0) continue;
                 const inside =

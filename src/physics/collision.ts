@@ -5,7 +5,7 @@ import { CelestialBody } from '../bodies/celestial-body';
 import { Star } from '../bodies/star';
 import { Spaceship } from '../bodies/ships/spaceship';
 import { computeAtmosphereFrameVelocity } from './atmosphere-frame';
-import { sphereMeshSurfaceFactor } from './sphere-mesh-surface';
+import { surfaceReach } from './body-surface';
 import { findShipHullContact, type ShipMeshContact } from './ship-mesh-collision';
 import { settingsStore } from '../settings/settings-store';
 import {
@@ -256,13 +256,14 @@ export function surfaceVelocityAt(
 
 /**
  * How far `body` reaches from its centre toward world unit direction `dir` for contact purposes:
- * a ship's actual hull extent that way (see Spaceship.hullExtentAlong); anything else its radius,
- * pulled in to the drawn facet of its sphere mesh in that direction (see sphereMeshSurfaceFactor) —
- * otherwise a ship rests on the true sphere, kilometres above a large body's flat facets.
+ * a ship's actual hull extent that way (see Spaceship.hullExtentAlong); anything else its drawn
+ * surface that way (see surfaceReach) — the facet of a sphere mesh, or the ray-cast rock of a model
+ * body. Otherwise a ship rests on the bounding sphere: kilometres above a large planet's flat
+ * facets, and visibly floating over an irregular asteroid.
  */
 function contactReach(body: Body, dir: THREE.Vector3): number {
     if (body instanceof Spaceship) return body.hullExtentAlong(dir);
-    return body.radius * sphereMeshSurfaceFactor(body.mesh, dir);
+    return surfaceReach(body, dir);
 }
 
 const _clearanceDir = new THREE.Vector3();

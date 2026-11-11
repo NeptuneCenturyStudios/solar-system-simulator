@@ -3923,6 +3923,14 @@ const flightCtx: IFlightControlContext = {
     // Exit hook: every exit path funnels through exitFlightMode(), which calls this last.
     onFlightModeExited: restorePanelManagerAfterFlight,
     calcFitDistanceForBody,
+    focusShipAfterFlight: (ship: Body) => {
+        cameraState.isLookAtMode = true;
+        cameraState.isFreeCameraMode = false;
+        controls.enabled = true;
+        // No zoom: exitFlightMode has already placed the camera at the in-flight distance.
+        setFocusBody(ship);
+        dispatchSimStateChange();
+    },
 };
 
 const autopilotCtx: IAutopilotContext = {

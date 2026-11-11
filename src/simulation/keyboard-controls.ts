@@ -227,8 +227,8 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
     };
 
     /**
-     * V in flight: toggle the guidance system (velocity reference frame). Inside a planet's or
-     * moon's sphere of influence the ship's base velocity then tracks that body, and thrust adds
+     * V in flight: toggle the guidance system (velocity reference frame). Inside a planet's, moon's or
+     * asteroid's sphere of influence the ship's base velocity then tracks that body, and thrust adds
      * only dogfight-tier speeds on top of it.
      */
     const toggleGuidance = (): void => {
@@ -387,7 +387,7 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
     // R: flight-only — toggle low / high speed mode.
     bindings.set('r', { onDown: pressOnce(inFlight, toggleSpeedMode) });
 
-    // V: flight-only — toggle guidance (match velocity with the nearest planet/moon).
+    // V: flight-only — toggle guidance (match velocity with the nearest planet/moon/asteroid).
     bindings.set('v', { onDown: pressOnce(inFlight, toggleGuidance) });
 
     bindings.set('shift', {

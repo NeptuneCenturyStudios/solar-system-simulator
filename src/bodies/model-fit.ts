@@ -9,7 +9,15 @@ export interface IModelFit {
     longestDim: number;
     /** Centre of the unscaled bounding box, in the model's own space. */
     center: THREE.Vector3;
+    /**
+     * Farthest vertex from `center`, as a multiple of half the longest axis (≥ 1). Once fitted,
+     * the model reaches out to `radius × maxReach` — an irregular rock can poke a little past its
+     * radius off the long axis — so this is what a contact broad phase must allow for.
+     */
+    maxReach: number;
 }
+
+const _vertex = new THREE.Vector3();
 
 /**
  * Measures a freshly loaded model group so it can later be fitted to any radius.
@@ -29,7 +37,22 @@ export function measureModelFit(group: THREE.Object3D): IModelFit {
     const center = new THREE.Vector3();
     bbox.getCenter(center);
 
-    return { longestDim: Math.max(size.x, size.y, size.z), center };
+    const longestDim = Math.max(size.x, size.y, size.z);
+
+    let maxDistSq = 0;
+    group.traverse((child) => {
+        const position = (child as THREE.Mesh).isMesh
+            ? (child as THREE.Mesh).geometry?.attributes.position
+            : undefined;
+        if (!position) return;
+        for (let i = 0; i < position.count; i++) {
+            _vertex.fromBufferAttribute(position, i).applyMatrix4(child.matrixWorld);
+            maxDistSq = Math.max(maxDistSq, _vertex.distanceToSquared(center));
+        }
+    });
+    const maxReach = longestDim > 0 ? Math.max(1, Math.sqrt(maxDistSq) / (longestDim * 0.5)) : 1;
+
+    return { longestDim, center, maxReach };
 }
 
 /**

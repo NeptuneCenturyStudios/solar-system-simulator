@@ -73,7 +73,7 @@ export const HELP_SECTIONS: HelpSection[] = [
             { action: 'Boost', keys: ['Shift'] },
             { action: 'Toggle speed mode (low / high)', keys: ['R'] },
             {
-                action: 'Toggle guidance (fly relative to the nearest planet / moon)',
+                action: 'Toggle guidance (fly relative to the nearest planet / moon / asteroid)',
                 keys: ['V'],
             },
             { action: 'Steer', keys: ['Mouse'] },

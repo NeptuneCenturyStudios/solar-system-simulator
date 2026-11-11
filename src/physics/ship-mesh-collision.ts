@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { MeshBVH, type ExtendedTriangle } from 'three-mesh-bvh';
+import type { MeshBVH, ExtendedTriangle } from 'three-mesh-bvh';
+import { getMeshBVH } from './mesh-bvh-cache';
 import type { Spaceship } from '../bodies/ships/spaceship';
 import type { ShipCollisionMode } from '../settings/settings-store';
 import {
@@ -57,19 +58,12 @@ interface HullBox {
     axes: [THREE.Vector3, THREE.Vector3, THREE.Vector3];
 }
 
-/**
- * BVHs keyed by geometry. GLB ships share geometry across every clone of the type, so one BVH
- * serves the whole fleet. Entries go away with their geometry, so no explicit cleanup is needed.
- */
-const bvhCache = new WeakMap<THREE.BufferGeometry, MeshBVH>();
-
 /** Collision parts per loaded model group (a reloaded model gets a fresh entry). */
 const partsCache = new WeakMap<THREE.Object3D, CollisionPart[]>();
 
 /**
- * The drawn meshes of `ship`'s model, building each geometry's BVH the first time it is needed,
- * so ships that never come close to another ship never pay for one. `indirect` keeps the BVH
- * from reordering the index buffer the renderer draws from.
+ * The drawn meshes of `ship`'s model, building each geometry's BVH the first time it is needed
+ * (see getMeshBVH), so ships that never come close to another ship never pay for one.
  */
 function getCollisionParts(ship: Spaceship): CollisionPart[] {
     const model = ship.mesh.children.find((child) => child.userData.isShipModel === true);
@@ -82,12 +76,7 @@ function getCollisionParts(ship: Spaceship): CollisionPart[] {
     model.traverse((child) => {
         const mesh = child as THREE.Mesh;
         if (!mesh.isMesh || !mesh.geometry?.attributes.position) return;
-        let bvh = bvhCache.get(mesh.geometry);
-        if (!bvh) {
-            bvh = new MeshBVH(mesh.geometry, { indirect: true });
-            bvhCache.set(mesh.geometry, bvh);
-        }
-        parts.push({ mesh, bvh });
+        parts.push({ mesh, bvh: getMeshBVH(mesh.geometry) });
     });
     partsCache.set(model, parts);
     return parts;

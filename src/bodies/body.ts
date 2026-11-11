@@ -134,6 +134,15 @@ export class Body {
         return this.radius;
     }
 
+    /**
+     * Radius the contact broad phase tests against: the farthest the drawn body reaches from its
+     * centre. Defaults to the body radius; model bodies (asteroids, comets) override it because an
+     * irregular rock can poke a little past `radius` off its long axis.
+     */
+    get contactRadius(): number {
+        return this.radius;
+    }
+
     protected getLabelHeight() {
         return this.labelHeight || 10;
     }

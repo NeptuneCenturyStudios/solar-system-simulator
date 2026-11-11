@@ -817,7 +817,13 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     const dx = b1.mesh.position.x - b2.mesh.position.x;
                     const dy = b1.mesh.position.y - b2.mesh.position.y;
                     const dz = b1.mesh.position.z - b2.mesh.position.z;
-                    const maxDist = b1.radius + b2.radius;
+                    // Ship contact measures the drawn surface, which on a model body (an
+                    // irregular rock) can reach a little past its radius; widen the sphere test
+                    // to match so that rock is never skipped. Other pairs keep their radii.
+                    const shipPair = ((b1.bodyType | b2.bodyType) & BodyTypeEnum.SpaceShip) !== 0;
+                    const maxDist = shipPair
+                        ? b1.contactRadius + b2.contactRadius
+                        : b1.radius + b2.radius;
                     if (Math.abs(dx) > maxDist || Math.abs(dy) > maxDist || Math.abs(dz) > maxDist)
                         continue;
 

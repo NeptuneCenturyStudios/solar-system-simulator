@@ -97,6 +97,11 @@ export abstract class CometBase extends Comet {
         // Intentionally empty: the visible shape is the OBJ model, rescaled in setRadius.
     }
 
+    /** The loaded nucleus's farthest point from the centre (see IModelFit.maxReach). */
+    override get contactRadius(): number {
+        return this.radius * (this.modelFit?.maxReach ?? 1);
+    }
+
     override setRadius(newRadius: number) {
         super.setRadius(newRadius);
 

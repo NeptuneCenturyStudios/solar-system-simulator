@@ -130,7 +130,7 @@ export class Spaceship extends Body {
 
     // ── Guidance (velocity reference frame) ──────────────────────────────────
     /**
-     * Pilot's guidance toggle (V). While on and inside a planet's or moon's Hill sphere, the
+     * Pilot's guidance toggle (V). While on and inside a planet's, moon's or asteroid's Hill sphere, the
      * ship's base velocity tracks that body's velocity and thrust adds only low-tier (dogfight)
      * speeds on top of it — see `updateGuidanceFrame` / `applyGuidanceSubstep`.
      */
