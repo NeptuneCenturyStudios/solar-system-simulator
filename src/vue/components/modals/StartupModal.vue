@@ -41,6 +41,10 @@
                 <svg-icon type="mdi" :path="mdiAutoFix"></svg-icon>
                 GENERATE
             </button>
+            <button class="old-ui btn-with-icon" type="button" @click="launch('loadSystem')">
+                <svg-icon type="mdi" :path="mdiFolderOpenOutline"></svg-icon>
+                LOAD SYSTEM
+            </button>
             <button
                 class="old-ui btn-dark btn-with-icon badge-anchor"
                 type="button"
@@ -91,6 +95,7 @@ import {
     mdiAutoFix,
     mdiClose,
     mdiCog,
+    mdiFolderOpenOutline,
     mdiGamepadVariantOutline,
     mdiOrbit,
     mdiWrenchOutline,

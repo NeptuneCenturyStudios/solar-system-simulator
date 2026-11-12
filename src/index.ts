@@ -4170,8 +4170,11 @@ async function saveCurrentSystem(): Promise<boolean> {
     }
 }
 
-/** Opens a saved system: pick a file, confirm leaving the running system, then rebuild it. */
-async function openSystemFromFile(): Promise<void> {
+/**
+ * Opens a saved system: pick a file, confirm leaving the running system, then rebuild it.
+ * Resolves true only when the saved system was restored.
+ */
+async function openSystemFromFile(): Promise<boolean> {
     let opened: { name: string; contents: string } | null;
     try {
         opened = await systemFileIO.open();
@@ -4181,9 +4184,9 @@ async function openSystemFromFile(): Promise<void> {
             message: 'The file could not be read.',
             notificationType: NotificationType.Error,
         });
-        return;
+        return false;
     }
-    if (!opened) return;
+    if (!opened) return false;
 
     let file: ISystemSaveFile;
     try {
@@ -4193,10 +4196,10 @@ async function openSystemFromFile(): Promise<void> {
             message: e instanceof SaveFileError ? e.message : 'The file could not be opened.',
             notificationType: NotificationType.Error,
         });
-        return;
+        return false;
     }
 
-    if (!(await confirmLeaveCurrentSystem())) return;
+    if (!(await confirmLeaveCurrentSystem())) return false;
 
     releaseFlightForDialog();
     try {
@@ -4209,12 +4212,14 @@ async function openSystemFromFile(): Promise<void> {
             ),
             notificationType: NotificationType.Success,
         });
+        return true;
     } catch (e) {
         console.error('Error opening system:', e);
         addEvent({
             message: 'The saved system could not be opened.',
             notificationType: NotificationType.Error,
         });
+        return false;
     }
 }
 
@@ -4254,6 +4259,14 @@ async function startStartupFlow(options: { allowCancel?: boolean } = {}): Promis
                 return;
             }
             await launchSystem(SimulationStartMode.Procedural, seedResult);
+            break;
+        }
+        case 'loadSystem': {
+            hideStartupModal();
+            if (!(await openSystemFromFile())) {
+                // Cancelled or failed: back to Launch Control (nothing would be on screen at startup).
+                void startStartupFlow({ allowCancel: startupModalAllowsCancel() });
+            }
             break;
         }
         case 'scenarios': {
