@@ -16,7 +16,6 @@ import {
     CERES_ORBITAL_PERIOD_REAL,
     CERES_RADIUS,
     SUN_MASS,
-    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { IStateDependencies } from '../interfaces.js';
 
@@ -31,6 +30,7 @@ import {
     SoilCompositionEnum,
     VegetationEnum,
 } from './body-attributes.js';
+import { calcSimOrbitalPeriod } from '../procedural/orbital-math.js';
 
 /**
  * Represents the dwarf planet Ceres in the simulation.

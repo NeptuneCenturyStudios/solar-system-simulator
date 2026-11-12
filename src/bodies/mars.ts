@@ -11,8 +11,7 @@ import {
     MARS_APHELION_DIST,
     MARS_INCLINATION,
     MARS_LONG_ASC_NODE,
-    MARS_ARG_PERIHELION,
-    calcSimOrbitalPeriod,
+    MARS_ARG_PERIHELION
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
@@ -29,6 +28,7 @@ import {
     SoilCompositionEnum,
     VegetationEnum,
 } from './body-attributes.js';
+import { calcSimOrbitalPeriod } from '../procedural/orbital-math.js';
 
 /**
  * Represents the planet Mars in the simulation, including its texture and orbital properties.

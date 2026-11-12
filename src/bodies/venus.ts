@@ -12,7 +12,6 @@ import {
     VENUS_INCLINATION,
     VENUS_LONG_ASC_NODE,
     VENUS_ARG_PERIHELION,
-    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
@@ -30,6 +29,7 @@ import {
     SoilCompositionEnum,
     VegetationEnum,
 } from './body-attributes.js';
+import { calcSimOrbitalPeriod } from '../procedural/orbital-math.js';
 
 /**
  * Represents the planet Venus in the simulation, including its surface and cloud layer.

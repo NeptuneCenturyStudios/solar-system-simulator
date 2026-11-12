@@ -17,7 +17,6 @@ import {
     MERCURY_LONG_ASC_NODE,
     MERCURY_ARG_PERIHELION,
     SUN_MASS,
-    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { buildBodySphereGeometry, createUniqueId } from '../utilities/utilities.js';
 import { getBodyTexture } from '../drawing/texture-registry.js';
@@ -34,6 +33,7 @@ import {
     SoilCompositionEnum,
     VegetationEnum,
 } from './body-attributes.js';
+import { calcSimOrbitalPeriod } from '../procedural/orbital-math.js';
 
 /**
  * Represents the planet Mercury in the simulation, including its texture and orbital properties.

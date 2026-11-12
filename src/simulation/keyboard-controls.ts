@@ -45,6 +45,10 @@ export interface KeyboardControlsContext {
     dispatchSimStateChange: () => void;
     /** Open the Launch Control (startup) modal with Cancel enabled. */
     openLaunchControl: () => void;
+    /** Ctrl+S: save the current system to a file. */
+    saveSystem: () => void;
+    /** Ctrl+O: open a saved system from a file. */
+    openSystem: () => void;
     /** Spawn a player ship, or enter flight aboard the existing one. */
     spawnOrEnterShip: () => void;
     /** True while the surface camera is active. */
@@ -485,6 +489,22 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         onDown: pressOnce(() => true, ctx.deleteSelectedBody, false),
     });
 
+    // Ctrl/Cmd+S saves the system and Ctrl/Cmd+O opens one. Both are matched before the
+    // bindings, so Ctrl+S never also counts as a press of the S movement key. The browser's own
+    // save/open dialogs are always suppressed; in flight the shortcuts do nothing.
+    const fileShortcuts: Record<string, () => void> = {
+        s: () => ctx.saveSystem(),
+        o: () => ctx.openSystem(),
+    };
+    const handleFileShortcut = (e: KeyboardEvent): boolean => {
+        if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
+        const action = fileShortcuts[e.key.toLowerCase()];
+        if (!action) return false;
+        e.preventDefault();
+        if (!e.repeat && !flightState.isActive) action();
+        return true;
+    };
+
     const onKeyDown = (e: KeyboardEvent): void => {
         // While a modal is open, let it own the keyboard entirely.
         if (ctx.modalBlocksInput()) return;
@@ -492,6 +512,8 @@ export function installKeyboardControls(ctx: KeyboardControlsContext): () => voi
         // Never hijack keys while the user is typing in a form control
         // (System Explorer search box, ship-type dropdown, etc.).
         if (isEditableTarget(e.target)) return;
+
+        if (handleFileShortcut(e)) return;
 
         if (bindings.get(keyId(e))?.onDown?.(e)) e.preventDefault();
     };

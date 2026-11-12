@@ -13,7 +13,6 @@ import {
     PLUTO_INCLINATION,
     PLUTO_LONG_ASC_NODE,
     PLUTO_ARG_PERIHELION,
-    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
 import { orbitElementsFromApsides } from './orbital-elements.js';
@@ -29,6 +28,7 @@ import {
     SoilCompositionEnum,
     VegetationEnum,
 } from './body-attributes.js';
+import { calcSimOrbitalPeriod } from '../procedural/orbital-math.js';
 
 /**
  * Represents the dwarf planet Pluto in the simulation, including its texture and orbital properties.

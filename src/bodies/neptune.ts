@@ -18,7 +18,6 @@ import {
     NEPTUNE_INCLINATION,
     NEPTUNE_LONG_ASC_NODE,
     NEPTUNE_ARG_PERIHELION,
-    calcSimOrbitalPeriod,
 } from '../utilities/consts.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
 import { orbitElementsFromApsides } from './orbital-elements.js';
@@ -33,6 +32,7 @@ import {
     LifeformBaseEnum,
     VegetationEnum,
 } from './body-attributes.js';
+import { calcSimOrbitalPeriod } from '../procedural/orbital-math.js';
 
 /**
  * Represents the planet Neptune in the simulation, including its texture and orbital properties.

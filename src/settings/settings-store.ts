@@ -60,6 +60,7 @@ export const enum SettingKey {
     DistantBodyDetail = 'distantBodyDetail',
     ShowFps = 'showFps',
     ShowRenderInfo = 'showRenderInfo',
+    AlwaysCloseWithoutAsking = 'alwaysCloseWithoutAsking',
     NamePanelUpdateRate = 'namePanelUpdateRate',
 }
 
@@ -277,6 +278,8 @@ export interface SpaceSimSettings {
     showRenderInfo: boolean;
     /** How often body name panels refresh their distance text. */
     namePanelUpdateRate: NamePanelUpdateRate;
+    /** Leave a saveable system without the "time since your last save" prompt. */
+    alwaysCloseWithoutAsking: boolean;
 }
 
 const defaultSettings: SpaceSimSettings = {
@@ -332,6 +335,7 @@ const defaultSettings: SpaceSimSettings = {
     showFps: true,
     showRenderInfo: false,
     namePanelUpdateRate: 'medium',
+    alwaysCloseWithoutAsking: false,
 };
 
 /** Normalise a stored tone-mapping curve, falling back to `neutral` for anything unrecognised. */
@@ -450,6 +454,7 @@ class SettingsStore {
         this.data.distantBodyDetail = normalizeDistantBodyDetail(this.data.distantBodyDetail);
         this.data.showFps = this.data.showFps !== false;
         this.data.showRenderInfo = this.data.showRenderInfo === true;
+        this.data.alwaysCloseWithoutAsking = this.data.alwaysCloseWithoutAsking === true;
         // Normalised last: the preset fallback compares the other (already normalised) values.
         this.data.namePanelUpdateRate =
             normalizeNamePanelUpdateRate(this.data.namePanelUpdateRate) ??

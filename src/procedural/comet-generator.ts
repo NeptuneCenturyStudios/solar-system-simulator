@@ -21,6 +21,7 @@ import {
 } from './orbital-math';
 import { rngFor } from './seed-utils';
 import { computeCometAttributes } from './small-body-attributes';
+import { sampleCometSpinSpeed } from '../utilities/small-body-spin';
 
 export function generateProceduralComets(params: {
     dependencies: IStateDependencies;
@@ -135,20 +136,16 @@ export function generateProceduralComets(params: {
         const radiusRng = rngFor(masterSeed, 'cometRadius', i);
         const radius = 1 + radiusRng.next() * 2;
 
-        // Comets tumble chaotically: random tilt (0–180° for full 3D tumbling), azimuth
-        // (0–360°), and a spin speed that increases as mass decreases (smaller bodies
-        // spin faster, like real asteroids/comets).
+        // Comets tumble chaotically: random tilt (0–180° for full 3D tumbling) and azimuth
+        // (0–360°). The spin period is drawn from measured comet nuclei (see small-body-spin.ts).
         const tiltRng = rngFor(masterSeed, 'cometRotationTilt', i);
         const rotationTilt = tiltRng.range(0, 180);
 
         const azimuthRng = rngFor(masterSeed, 'cometRotationAzimuth', i);
         const rotationAzimuth = azimuthRng.range(0, 360);
 
-        // Spin speed: base of 0.3–1.0 rad/s, multiplied by inverse-mass factor so smaller
-        // comets spin faster. Clamped to sensible visual range [0.2, 4.0].
         const speedRng = rngFor(masterSeed, 'cometRotationSpeed', i);
-        const massFactor = Math.max(0.5, 2.0 / Math.max(0.1, mass));
-        const rotationSpeed = Math.min(4.0, Math.max(0.2, speedRng.range(0.3, 1.0) * massFactor));
+        const rotationSpeed = sampleCometSpinSpeed(dependencies, () => speedRng.next());
 
         const id = `proc_comet_${i}_${subSeed}`;
         const name = generateProceduralBodyName(BodyTypeEnum.Comet, {

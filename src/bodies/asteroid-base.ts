@@ -5,6 +5,7 @@ import { ICelestialBodyCreationOptions, IDeathOptions, IStateDependencies } from
 import { BodyTypeEnum } from './body-enums';
 import { applyModelFit, type IModelFit } from './model-fit';
 import type { IModelTemplate } from './obj-model-cache';
+import { sampleAsteroidSpinSpeed } from '../utilities/small-body-spin';
 
 /**
  * The per-variant configuration an asteroid subclass hands to {@link AsteroidBase}.
@@ -109,7 +110,8 @@ export abstract class AsteroidBase extends CelestialBody {
                 console.warn('Asteroid OBJ load failed - using placeholder mesh', e);
             });
 
-        // When no explicit rotation was provided, randomize a tumbling axis and speed.
+        // When no explicit rotation was provided, randomize a tumbling axis and a realistic
+        // spin period for this size (see small-body-spin.ts).
         if (!options.rotation) {
             const rotationAxis = new THREE.Vector3(
                 Math.random() - 0.5,
@@ -117,7 +119,7 @@ export abstract class AsteroidBase extends CelestialBody {
                 Math.random() - 0.5
             ).normalize();
 
-            const rotationSpeed = 0.6 + Math.random() * 1.2;
+            const rotationSpeed = sampleAsteroidSpinSpeed(deps, Math.random, options.radius);
 
             this.updateRotation(rotationAxis, rotationSpeed);
         }

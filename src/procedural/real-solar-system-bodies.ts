@@ -121,8 +121,8 @@ import {
     HYGIEA_LONG_ASC_NODE,
     HYGIEA_ARG_PERIHELION,
     HYGIEA_MEAN_ANOMALY_J2000,
-    calcSimOrbitalPeriod,
 } from '../utilities/consts';
+import { scaledSpinSpeed } from './orbital-math';
 
 /**
  * Builders for the real solar-system bodies that have no class of their own (the minor
@@ -162,18 +162,7 @@ function j2000HeliocentricOrbit(
     return { elements, pos, vel };
 }
 
-/** Rotation speed (rad/s) for a real spin period, scaled through the real-to-sim orbital
- *  period ratio so the body keeps the right number of turns per orbit at any gravity. */
-function scaledSpinSpeed(
-    dependencies: IStateDependencies,
-    spinPeriodHours: number,
-    realOrbitalPeriod: number,
-    orbitDistance: number
-): number {
-    const timeScale =
-        realOrbitalPeriod / calcSimOrbitalPeriod(orbitDistance, dependencies.getG(), SUN_MASS);
-    return ((2 * Math.PI) / (spinPeriodHours * 3600)) * timeScale;
-}
+
 
 /** Vesta (~2.36 AU) on its real J2000 orbit. */
 export function createVestaBody(

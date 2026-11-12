@@ -54,6 +54,10 @@ interface IDesktopEnvironment {
     readonly platform: string;
     /** Electron runtime version. */
     readonly electronVersion: string;
+    /** Shows a native save dialog and writes `contents`; false when cancelled. */
+    saveSystemFile(defaultName: string, contents: string): Promise<boolean>;
+    /** Shows a native open dialog and reads the picked file; null when cancelled. */
+    openSystemFile(): Promise<{ name: string; contents: string } | null>;
 }
 
 interface Window {

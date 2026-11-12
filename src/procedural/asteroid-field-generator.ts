@@ -9,6 +9,7 @@ import { calculateOrbitalSpeed } from '../physics/physics';
 import { generateProceduralBodyName } from './body-naming';
 import { pickRandomSpaceTexture, generateSeedString, rngFor } from './seed-utils';
 import { createUniqueId } from '../utilities/utilities';
+import { sampleAsteroidSpinSpeed } from '../utilities/small-body-spin';
 import { moonTexture } from '../drawing/textures';
 import {
     ASTEROID_FIELD_ORBIT_RADIUS,
@@ -155,7 +156,11 @@ export class AsteroidFieldGenerator extends SolarSystemGenerator {
                     rotation: {
                         tilt: tiltRng.range(0, 180),
                         azimuth: azimuthRng.range(0, 360),
-                        speed: spinRng.range(0.3, 1.0),
+                        speed: sampleAsteroidSpinSpeed(
+                            this.dependencies,
+                            () => spinRng.next(),
+                            size
+                        ),
                     },
                     maxTrail: ASTEROID_FIELD_TRAIL_LENGTH,
                 },

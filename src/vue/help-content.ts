@@ -45,6 +45,8 @@ export const HELP_SECTIONS: HelpSection[] = [
             { action: 'Delete selected object', keys: ['Delete'] },
             { action: 'Spawn ship / enter your ship', keys: ['F'] },
             { action: 'Open Launch Control', keys: ['Esc'] },
+            { action: 'Save system to a file', keys: ['Ctrl + S'] },
+            { action: 'Open a saved system', keys: ['Ctrl + O'] },
         ],
     },
     {

@@ -22,6 +22,7 @@ import {
 } from './orbital-math';
 import { rngFor } from './seed-utils';
 import { computeAsteroidAttributes } from './small-body-attributes';
+import { sampleAsteroidSpinSpeed } from '../utilities/small-body-spin';
 
 export function generateProceduralAsteroids(params: {
     dependencies: IStateDependencies;
@@ -137,8 +138,8 @@ export function generateProceduralAsteroids(params: {
             sequenceNumber: i + 1,
         });
 
-        // Asteroids tumble chaotically: random tilt (0–180°), azimuth (0–360°), and
-        // spin speed that increases for smaller bodies.
+        // Asteroids tumble chaotically: random tilt (0–180°) and azimuth (0–360°). The spin
+        // period is drawn from real asteroid statistics for this size (see small-body-spin.ts).
         const tiltRng = rngFor(masterSeed, 'asteroidRotationTilt', i);
         const rotationTilt = tiltRng.range(0, 180);
 
@@ -146,8 +147,11 @@ export function generateProceduralAsteroids(params: {
         const rotationAzimuth = azimuthRng.range(0, 360);
 
         const speedRng = rngFor(masterSeed, 'asteroidRotationSpeed', i);
-        const massFactor = Math.max(0.5, 2.0 / Math.max(0.1, asteroidParams.mass));
-        const rotationSpeed = Math.min(4.0, Math.max(0.2, speedRng.range(0.3, 1.0) * massFactor));
+        const rotationSpeed = sampleAsteroidSpinSpeed(
+            dependencies,
+            () => speedRng.next(),
+            asteroidParams.radius
+        );
 
         const distanceAU = distance / EARTH_DIST;
         const attributes = computeAsteroidAttributes({ id, distanceAU });

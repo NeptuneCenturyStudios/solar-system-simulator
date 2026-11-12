@@ -169,11 +169,29 @@ import { registerCustomEventListeners } from './events/custom-event-listeners';
 import { mountVueUi } from './vue/main';
 import {
     registerVueSimHooks,
+    setAlwaysCloseWithoutAsking,
+    setCanSaveSystem,
     setDisplayState,
     setHdrSupported,
     simStore,
     stepTimeScale,
 } from './vue/sim-bridge';
+import { SystemPersistence } from './persistence/system-persistence';
+import { getSystemFileIO } from './persistence/file-io';
+import { fromKmTuple, toKmTuple, toQuatTuple } from './persistence/body-state';
+import {
+    SaveFileError,
+    defaultSaveFileName,
+    parseSaveFile,
+    type ISystemSaveFile,
+    type SaveableStartMode,
+} from './persistence/save-file';
+import {
+    ExitPromptChoice,
+    buildExitPromptMessage,
+    confirmExitModalIsVisible,
+    showConfirmExitModal,
+} from './vue/confirm-exit-modal-service';
 import {
     hidePanelManagerForFlight,
     restorePanelManagerAfterFlight,
@@ -1083,6 +1101,51 @@ const bodyCreator = new BodyCreator({
     setFocusBody,
 });
 
+// Saving and opening systems (toolbar Save/Open, Ctrl+S / Ctrl+O, the exit prompt).
+const systemPersistence = new SystemPersistence({
+    dependencies,
+    scene,
+    bodyCreator,
+    spawnBase: launchSavedBase,
+    readSimSettings: () => ({
+        timeScale: simulationState.timeScale,
+        savedTimeScale: simulationState.savedTimeScale,
+        isPaused: simulationState.isPaused,
+        gMultiplier: simulationState.gMultiplier,
+        spaceTextureFilename: environmentState.spaceTextureFilename,
+        focusedBodyId: cameraState.focusBody?.id ?? null,
+        camera: {
+            posKm: toKmTuple(camera.position),
+            quaternion: toQuatTuple(camera.quaternion),
+            targetKm: toKmTuple(controls.target),
+        },
+    }),
+    applySimSettings: async (sim, focusBody) => {
+        simulationState.timeScale = sim.timeScale;
+        simulationState.savedTimeScale = sim.savedTimeScale;
+        simulationState.isPaused = sim.isPaused;
+        dispatchSimStateChange();
+        const texture = sim.spaceTextureFilename;
+        if (texture && texture !== environmentState.spaceTextureFilename) {
+            await loadSpaceTexture(scene, texture);
+            environmentState.spaceTextureFilename = texture;
+        }
+        // Zoom to the focused body only when the save has no camera to put back.
+        if (focusBody && !focusBody._isDisposed) {
+            setFocusBody(focusBody, { zoom: !sim.camera });
+        }
+        if (sim.camera) {
+            fromKmTuple(sim.camera.posKm, camera.position);
+            fromKmTuple(sim.camera.targetKm, controls.target);
+            controls.update();
+            // After update(): it re-aims the camera at the target, which would drop any roll.
+            const [qx, qy, qz, qw] = sim.camera.quaternion;
+            camera.quaternion.set(qx, qy, qz, qw);
+        }
+    },
+});
+const systemFileIO = getSystemFileIO();
+
 /**
  * Spawn point/velocity for a newly launched probe: near the player's active ship when in flight
  * mode (so the launch reads as coming from the player), otherwise near the free camera.
@@ -1184,6 +1247,9 @@ function cleanUpSolarSystem() {
     selectedBody = null;
 }
 
+/** URL of the running system, restored when the user declines leaving it via back/forward. */
+let lastSystemUrl = window.location.href;
+
 /**
  * Spawns a new simulation based on the specified mode and seed. Initializes the environment, cleans up existing bodies and effects,
  * and sets up the initial state for the simulation.
@@ -1251,6 +1317,13 @@ async function spawn(
 
     // Set the bodies
     simulationState.bodies = solarSystem.bodies;
+    // Remember the base system (and which bodies it generated) for saving.
+    systemPersistence.onSystemSpawned(
+        mode,
+        mode === SimulationStartMode.Procedural ? generator.seed : null,
+        simulationState.bodies
+    );
+    setCanSaveSystem(systemPersistence.canSave);
     solarSystemFeatures.push(...solarSystem.features);
     // Scenario generators may include AI-piloted ships; pick them up now that the
     // system is live, so the registry never holds a ship the physics loop can't see.
@@ -1274,6 +1347,7 @@ async function spawn(
         triggerZoomToBody(simulationState.bodies[0]);
     }
 
+    lastSystemUrl = window.location.href;
     return result;
 }
 
@@ -2379,6 +2453,8 @@ registerVueSimHooks({
         // Auto-close management UI and show launcher with Cancel
         void startStartupFlow({ allowCancel: true });
     },
+    saveSystem: () => void saveCurrentSystem(),
+    openSystem: () => void openSystemFromFile(),
 
     // ── System Explorer: direct sim state ──
     toggleTargetMode: () => {
@@ -3712,6 +3788,14 @@ installKeyboardControls({
         // same press and cancel itself immediately.
         setTimeout(() => void startStartupFlow({ allowCancel: true }), 0);
     },
+    saveSystem: () => {
+        if (vueUiState.systemReady) void saveCurrentSystem();
+    },
+    openSystem: () => {
+        if (!vueUiState.systemReady) return;
+        // Deferred for the same reason as openLaunchControl.
+        setTimeout(() => void openSystemFromFile(), 0);
+    },
     spawnOrEnterShip,
     surfaceCameraActive: () => surfaceCam.isActive,
     disembarkShip,
@@ -3964,6 +4048,10 @@ async function launchSystem(
     mode: SimulationStartMode,
     proceduralResult?: IProceduralGeneratorPromptResult
 ) {
+    // Launch Control is done with either way; if the user stays, they return to the running system.
+    hideStartupModal();
+    if (!(await confirmLeaveCurrentSystem())) return;
+
     lastLaunchedMode = mode;
 
     applyStartupGMultiplier();
@@ -3993,6 +4081,150 @@ async function launchSystem(
     applySystemLaunchOptions(result.options);
 
     setSystemReady(true);
+}
+
+/**
+ * Launches the base of a saved system (Default / Empty / a procedural seed) for
+ * SystemPersistence.restore, the same way launchSystem would but without the exit prompt
+ * (the caller has already asked).
+ */
+async function launchSavedBase(
+    mode: SaveableStartMode,
+    seed: string | null,
+    gMultiplier: number
+): Promise<void> {
+    lastLaunchedMode = mode;
+    simulationState.gMultiplier = gMultiplier;
+    dispatchSimStateChange();
+
+    hideStartupModal();
+    const progressReporter =
+        mode === SimulationStartMode.Empty
+            ? undefined
+            : showProceduralProgress({ title: 'Open System' });
+    try {
+        await spawn(mode, seed !== null ? { seed } : undefined, progressReporter);
+        applyDefaultCameraTogglesAfterSpawn();
+    } finally {
+        if (progressReporter) hideProceduralModal();
+    }
+    setSystemReady(true);
+}
+
+/**
+ * Before the running system is replaced: when it can be saved, remind the user how long it
+ * has been since the last save and let them leave, save first, or stay. Resolves true when
+ * the caller may go ahead.
+ */
+async function confirmLeaveCurrentSystem(): Promise<boolean> {
+    if (!systemPersistence.canSave || !vueUiState.systemReady) return true;
+    if (settingsStore.settings.alwaysCloseWithoutAsking) return true;
+
+    const result = await showConfirmExitModal({
+        message: buildExitPromptMessage(
+            systemPersistence.msSinceLastSave(),
+            systemPersistence.hasSaved
+        ),
+    });
+    switch (result?.choice) {
+        case ExitPromptChoice.Exit:
+            // The checkbox is only remembered when the user actually leaves without saving.
+            if (result.alwaysCloseWithoutAsking) setAlwaysCloseWithoutAsking(true);
+            return true;
+        case ExitPromptChoice.SaveAndExit:
+            return saveCurrentSystem();
+        default:
+            return false;
+    }
+}
+
+/** Saves the running system to a file the user picks. Resolves true once it is written. */
+async function saveCurrentSystem(): Promise<boolean> {
+    if (!systemPersistence.canSave) {
+        addEvent({
+            message: 'Scenarios cannot be saved.',
+            notificationType: NotificationType.Warning,
+        });
+        return false;
+    }
+    try {
+        const { file, report } = systemPersistence.buildSaveFile();
+        const saved = await systemFileIO.save(
+            defaultSaveFileName(systemPersistence.systemLabel()),
+            JSON.stringify(file)
+        );
+        if (!saved) return false;
+        systemPersistence.markSaved();
+        addEvent({
+            message: withSkippedNote('System saved.', report.skippedBodies, 'not saved'),
+            notificationType: NotificationType.Success,
+        });
+        return true;
+    } catch (e) {
+        console.error('Error saving system:', e);
+        addEvent({
+            message: 'The system could not be saved.',
+            notificationType: NotificationType.Error,
+        });
+        return false;
+    }
+}
+
+/** Opens a saved system: pick a file, confirm leaving the running system, then rebuild it. */
+async function openSystemFromFile(): Promise<void> {
+    let opened: { name: string; contents: string } | null;
+    try {
+        opened = await systemFileIO.open();
+    } catch (e) {
+        console.error('Error reading system file:', e);
+        addEvent({
+            message: 'The file could not be read.',
+            notificationType: NotificationType.Error,
+        });
+        return;
+    }
+    if (!opened) return;
+
+    let file: ISystemSaveFile;
+    try {
+        file = parseSaveFile(opened.contents);
+    } catch (e) {
+        addEvent({
+            message: e instanceof SaveFileError ? e.message : 'The file could not be opened.',
+            notificationType: NotificationType.Error,
+        });
+        return;
+    }
+
+    if (!(await confirmLeaveCurrentSystem())) return;
+
+    releaseFlightForDialog();
+    try {
+        const report = await systemPersistence.restore(file);
+        addEvent({
+            message: withSkippedNote(
+                `Opened ${opened.name}.`,
+                report.skippedBodies,
+                'not restored'
+            ),
+            notificationType: NotificationType.Success,
+        });
+    } catch (e) {
+        console.error('Error opening system:', e);
+        addEvent({
+            message: 'The saved system could not be opened.',
+            notificationType: NotificationType.Error,
+        });
+    }
+}
+
+/** Appends "N objects <verb>: a, b, c" to `message` when some bodies were left out. */
+function withSkippedNote(message: string, skipped: readonly string[], verb: string): string {
+    if (skipped.length === 0) return message;
+    const shown = skipped.slice(0, 3).join(', ');
+    const more = skipped.length > 3 ? ', ...' : '';
+    const noun = skipped.length === 1 ? 'object' : 'objects';
+    return `${message} ${skipped.length} ${noun} ${verb}: ${shown}${more}`;
 }
 
 /**
@@ -4153,7 +4385,8 @@ function modalBlocksInput() {
         aboutModalIsVisible() ||
         whatsNewModalIsVisible() ||
         scenariosModalIsVisible() ||
-        scenarioOutcomeModalIsVisible()
+        scenarioOutcomeModalIsVisible() ||
+        confirmExitModalIsVisible()
     );
 }
 
@@ -4243,6 +4476,10 @@ window.addEventListener('popstate', async () => {
     if (!currentSeed) {
         // Only reload if we were previously showing a seeded system
         if (getLastPushedSeed() !== null) {
+            if (!(await confirmLeaveCurrentSystem())) {
+                history.pushState(null, '', lastSystemUrl);
+                return;
+            }
             resetLastPushedSeed();
             applyStartupGMultiplier();
 
@@ -4258,6 +4495,10 @@ window.addEventListener('popstate', async () => {
     // Avoid re-generating the same system
     const fullValue = buildSeedValue(currentSeed.type, currentSeed.seed);
     if (fullValue === getLastPushedSeed()) return;
+    if (!(await confirmLeaveCurrentSystem())) {
+        history.pushState(null, '', lastSystemUrl);
+        return;
+    }
     setLastPushedSeed(fullValue);
 
     applyStartupGMultiplier();

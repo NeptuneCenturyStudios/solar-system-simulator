@@ -17,6 +17,7 @@
     <AboutModal />
     <ProbeMissionModal />
     <BodyAttributesModal />
+    <ConfirmExitModal />
 </template>
 
 <script setup lang="ts">
@@ -31,6 +32,7 @@ import ScenarioOutcomeModal from './components/modals/ScenarioOutcomeModal.vue';
 import AboutModal from './components/modals/AboutModal.vue';
 import ProbeMissionModal from './components/modals/ProbeMissionModal.vue';
 import BodyAttributesModal from './components/modals/BodyAttributesModal.vue';
+import ConfirmExitModal from './components/modals/ConfirmExitModal.vue';
 
 import { vueUiState } from './ui-store';
 </script>

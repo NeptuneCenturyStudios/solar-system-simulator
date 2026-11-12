@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { G } from '../utilities/consts';
+import { G, SUN_MASS } from '../utilities/consts';
+import { IStateDependencies } from '../interfaces';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -389,6 +390,33 @@ export function computeMinPeriapsis(params: {
  */
 export function computeMaxEccentricity(distance: number, minPeriapsis: number): number {
     return Math.max(0, (distance - minPeriapsis) / (distance + minPeriapsis));
+}
+
+/**
+ * Calculates the simulated orbital period for a circular orbit.
+ * 
+ * @param r_sim Simulated orbital radius.
+ * @param G Effective gravitational constant.
+ * @param M_sun Solar mass.
+ * @returns Simulated orbital period.
+ */
+export function calcSimOrbitalPeriod(r_sim: number, G: number, M_sun: number): number {
+    // T_sim = 2 * PI * sqrt(r_sim^3 / (G * M_sun))
+    return 2 * Math.PI * Math.sqrt(Math.pow(r_sim, 3) / (G * M_sun));
+}
+
+/** Rotation speed (rad/s) for a real spin period, scaled through the real-to-sim orbital
+ *  period ratio so the body keeps the right number of turns per orbit at any gravity.
+ */
+export function scaledSpinSpeed(
+    dependencies: IStateDependencies,
+    spinPeriodHours: number,
+    realOrbitalPeriod: number,
+    orbitDistance: number
+): number {
+    const timeScale =
+        realOrbitalPeriod / calcSimOrbitalPeriod(orbitDistance, dependencies.getG(), SUN_MASS);
+    return ((2 * Math.PI) / (spinPeriodHours * 3600)) * timeScale;
 }
 
 /**

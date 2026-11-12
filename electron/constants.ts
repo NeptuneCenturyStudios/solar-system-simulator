@@ -37,3 +37,12 @@ export const WINDOW_WIDTH = 1600;
 export const WINDOW_HEIGHT = 900;
 export const WINDOW_MIN_WIDTH = 1024;
 export const WINDOW_MIN_HEIGHT = 640;
+
+/** File extension (without the dot) of saved solar systems. Matches the renderer's. */
+export const SYSTEM_FILE_EXTENSION = 'ssim';
+
+/** IPC channels for opening and saving solar system files. preload.ts repeats these strings. */
+export const SAVE_FILE_CHANNELS = {
+    save: 'system-file:save',
+    open: 'system-file:open',
+} as const;

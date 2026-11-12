@@ -427,6 +427,17 @@
             </div>
         </div>
 
+        <div class="vue-ui-card-header">Saving</div>
+        <label class="checkbox-row">
+            <input
+                type="checkbox"
+                :checked="simStore.alwaysCloseWithoutAsking"
+                title="Leave the current system without being reminded how long it has been since your last save."
+                @change="onAlwaysCloseWithoutAskingChange"
+            />
+            Always close without asking
+        </label>
+
         <div class="vue-ui-card-header">Debug</div>
         <label class="checkbox-row">
             <input type="checkbox" :checked="simStore.showFps" @change="onShowFpsChange" />
@@ -475,6 +486,7 @@ import {
     setDistantBodyDetail,
     setNamePanelUpdateRate,
     setShowFps,
+    setAlwaysCloseWithoutAsking,
     setShowRenderInfo,
     setSmoothZoomEnabled,
     setSubsteps,
@@ -686,6 +698,10 @@ function onShipCollisionModeChange(e: Event): void {
 
 function onShowAiDebugChange(e: Event): void {
     setShowAiDebug((e.target as HTMLInputElement).checked);
+}
+
+function onAlwaysCloseWithoutAskingChange(e: Event): void {
+    setAlwaysCloseWithoutAsking((e.target as HTMLInputElement).checked);
 }
 
 function onShowFpsChange(e: Event): void {

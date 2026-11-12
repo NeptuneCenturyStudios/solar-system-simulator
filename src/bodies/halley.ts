@@ -9,6 +9,8 @@ import {
     COMET_ARG_PERIHELION,
     COMET_RADIUS,
     COMET_MASS,
+    HALLEY_ORBITAL_PERIOD_REAL,
+    HALLEY_SEMI_MAJOR_AXIS,
 } from '../utilities/consts.js';
 import { planetOrbitFromElements } from './planet-orbit.js';
 import { orbitElementsFromApsides } from './orbital-elements.js';
@@ -24,6 +26,7 @@ import {
     SoilCompositionEnum,
     VegetationEnum,
 } from './body-attributes.js';
+import { scaledSpinSpeed } from '../procedural/orbital-math.js';
 
 /** Neutral grey motion trail. */
 const HALLEY_TRAIL_COLOR = 0xaaaaaa;
@@ -69,6 +72,14 @@ export class Halley extends CometBase {
             dependencies.getG() * SUN_MASS
         );
 
+        // Halley spins in 177.6 h
+        const rotSpeed = scaledSpinSpeed(
+            dependencies,
+            177.6,
+            HALLEY_ORBITAL_PERIOD_REAL,
+            HALLEY_SEMI_MAJOR_AXIS
+        );
+
         super(
             dependencies,
             scene,
@@ -80,7 +91,7 @@ export class Halley extends CometBase {
                 id: 'halley',
                 name: 'Halley',
                 radius: COMET_RADIUS,
-                rotation: { tilt: 0, speed: 0.05 },
+                rotation: { tilt: 0, speed: rotSpeed },
                 maxTrail: 2000,
                 attributes: {
                     coreType: { value: CoreTypeEnum.Icy, discovered: true },

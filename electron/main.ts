@@ -12,6 +12,7 @@
 
 import { app, BrowserWindow } from 'electron';
 
+import { registerFileDialogHandlers } from './file-dialogs';
 import { installApplicationMenu } from './menu';
 import { registerAppProtocolHandler, registerAppScheme } from './protocol';
 import { createMainWindow, devServerUrl } from './window';
@@ -52,6 +53,7 @@ if (!app.requestSingleInstanceLock()) {
 
     void app.whenReady().then(() => {
         registerAppProtocolHandler();
+        registerFileDialogHandlers();
         installApplicationMenu(isDevelopment);
         focusOrCreateWindow();
 

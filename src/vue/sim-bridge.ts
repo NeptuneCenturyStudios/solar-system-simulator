@@ -272,6 +272,10 @@ export interface VueSimHooks {
     exitFlightMode?: () => void;
     /** Re-launch the system by showing the StartupModal with Cancel enabled. */
     relaunch?: () => void;
+    /** Save the current system to a file (no-op for scenarios). */
+    saveSystem?: () => void;
+    /** Open a saved system from a file. */
+    openSystem?: () => void;
 
     // ── Add/Edit Body (same sim paths as the old management panel) ─────────
     /** Load a rich edit snapshot for the given body (used in edit mode). */
@@ -413,6 +417,8 @@ export interface VueSimStore {
     /** Seed of the running system, or null when it wasn't generated from a user-enterable seed
      *  (Normal Mode and the fixed scenarios have none). */
     systemSeed: string | null;
+    /** True when the running system can be saved (not a scenario). */
+    canSaveSystem: boolean;
 
     // ── Options (persisted user settings, mirrored from settingsStore) ─────
     particleEffectsEnabled: boolean;
@@ -465,6 +471,8 @@ export interface VueSimStore {
     showFps: boolean;
     /** Show the render-info readout under the FPS counter. */
     showRenderInfo: boolean;
+    /** Leave a saveable system without the "time since your last save" prompt. */
+    alwaysCloseWithoutAsking: boolean;
     /** Hide the PanelManager while in flight mode, restoring it on exit. */
     hidePanelManagerInFlight: boolean;
     /** Holding S with a locked target pursues it instead of braking; Shift+S pursues at boost speed. */
@@ -525,6 +533,7 @@ const state = reactive<VueSimStore>({
     spaceTextureFilename: null as string | null,
     starDeathEnabled: false,
     systemSeed: null as string | null,
+    canSaveSystem: false,
     // Options mirror settingsStore (persisted in localStorage) at startup; the
     // Vue Options panel is the only live writer afterwards.
     particleEffectsEnabled: settingsStore.settings.particleEffectsEnabled,
@@ -554,6 +563,7 @@ const state = reactive<VueSimStore>({
     namePanelUpdateRate: settingsStore.settings.namePanelUpdateRate,
     showFps: settingsStore.settings.showFps,
     showRenderInfo: settingsStore.settings.showRenderInfo,
+    alwaysCloseWithoutAsking: settingsStore.settings.alwaysCloseWithoutAsking,
     hidePanelManagerInFlight: settingsStore.settings.hidePanelManagerInFlight,
     chaseModeEnabled: settingsStore.settings.chaseModeEnabled,
     coastDriftAlignEnabled: settingsStore.settings.coastDriftAlignEnabled,
@@ -1231,6 +1241,12 @@ export function setShowFps(checked: boolean): void {
     state.showFps = checked;
 }
 
+/** Skip the exit prompt when leaving a saveable system (Options panel, exit prompt). */
+export function setAlwaysCloseWithoutAsking(checked: boolean): void {
+    settingsStore.update(SettingKey.AlwaysCloseWithoutAsking, checked);
+    state.alwaysCloseWithoutAsking = checked;
+}
+
 /** Toggle the render-info readout (Options panel). Read by the render loop each frame. */
 export function setShowRenderInfo(checked: boolean): void {
     settingsStore.update(SettingKey.ShowRenderInfo, checked);
@@ -1521,6 +1537,21 @@ export function requestToggleAutopilot(): void {
 /** Exit flight mode (restores normal camera controls). */
 export function requestExitFlightMode(): void {
     hookRegistry.exitFlightMode?.();
+}
+
+/** Save the current system to a file. */
+export function requestSaveSystem(): void {
+    hookRegistry.saveSystem?.();
+}
+
+/** Open a saved system from a file. */
+export function requestOpenSystem(): void {
+    hookRegistry.openSystem?.();
+}
+
+/** Called by index.ts whenever a system launches: whether it can be saved. */
+export function setCanSaveSystem(canSave: boolean): void {
+    state.canSaveSystem = canSave;
 }
 
 /** Re-launch the system by showing the StartupModal with Cancel enabled. */

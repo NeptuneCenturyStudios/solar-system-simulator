@@ -20,7 +20,6 @@ import {
     EARTH_INCLINATION,
     EARTH_LONG_ASC_NODE,
     EARTH_ARG_PERIHELION,
-    calcSimOrbitalPeriod,
     MAX_LIGHTING_STARS,
     EARTH_NIGHT_IRRADIANCE,
     EARTH_DAY_IRRADIANCE,
@@ -44,6 +43,7 @@ import {
     SoilCompositionEnum,
     VegetationEnum,
 } from './body-attributes.js';
+import { calcSimOrbitalPeriod } from '../procedural/orbital-math.js';
 
 // Maximum number of stars supported by the day/night shader (shared with every star effect).
 const MAX_STARS = MAX_LIGHTING_STARS;

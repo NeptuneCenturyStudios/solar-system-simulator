@@ -86,6 +86,8 @@ import { NotificationType } from '../event-log/event-log';
 import type { IMagneticFieldOptions, IStateDependencies } from '../interfaces';
 import type { RandomizedCreateDefaults } from '../vue/sim-bridge';
 import { cameraState, simulationState } from './simulation';
+import { recordCreation } from '../persistence/creation-registry';
+import { CreationKind, type ISavedCustomOptions } from '../persistence/save-file';
 
 /** Everything the custom add form can set on a new body. Omitted fields are rolled. */
 export interface ICreateCustomBodyOptions {
@@ -122,6 +124,23 @@ type ResolvedCreateOptions = Required<
     Omit<ICreateCustomBodyOptions, 'atmosphere' | 'magneticField'>
 > &
     Pick<ICreateCustomBodyOptions, 'atmosphere' | 'magneticField'>;
+
+/**
+ * Rebuilding a body from a save rather than for the user: the body keeps its saved id (so
+ * id-seeded textures, rings and atmospheres come out identical), nothing is focused, and no
+ * helper bodies (a guide star, a preset moon's parent) are created on the side.
+ */
+export interface IRestoreCreateOptions {
+    id: string;
+    /** Preset moons/satellites: the live parent to orbit. */
+    orbitParent?: CelestialBody | null;
+}
+
+/** The custom form's options in plain-data form, for the creation registry. */
+function toSavedCustomOptions(o: ICreateCustomBodyOptions): ISavedCustomOptions {
+    const { orbitParent, ...rest } = o;
+    return { ...rest, orbitParentId: orbitParent ? orbitParent.id : null };
+}
 
 /** Barycentric orbit velocity at `spawnPos`, or null to use the parent-based path. */
 type BarycenterVelocityFn = (spawnPos: THREE.Vector3, eccentricity: number) => THREE.Vector3 | null;
@@ -218,6 +237,8 @@ export class BodyCreator {
     private readonly camera: THREE.Camera;
     private readonly getPrimaryStar: () => Star | null;
     private readonly setFocusBody: (body: Body | null, options?: { zoom?: boolean }) => void;
+    /** Set while a body is being rebuilt from a save; see IRestoreCreateOptions. */
+    private restore: IRestoreCreateOptions | null = null;
 
     constructor(options: IBodyCreatorOptions) {
         this.dependencies = options.dependencies;
@@ -235,9 +256,21 @@ export class BodyCreator {
     }
 
     /** Creates a real solar system body by preset key. */
-    createPreset(key: PresetBodyKeyEnum): Body | undefined {
+    createPreset(key: PresetBodyKeyEnum, restore?: IRestoreCreateOptions): Body | undefined {
+        if (restore) {
+            this.restore = restore;
+            try {
+                return this.createPresetInner(key);
+            } finally {
+                this.restore = null;
+            }
+        }
+        return this.createPresetInner(key);
+    }
+
+    private createPresetInner(key: PresetBodyKeyEnum): Body | undefined {
         // Presets assume a star exists. If launching empty mode, guide the user by creating a small star.
-        if (!this.getPrimaryStar() && key !== PresetBodyKeyEnum.Sun) {
+        if (!this.restore && !this.getPrimaryStar() && key !== PresetBodyKeyEnum.Sun) {
             this.createCustom({ bodyType: BodyTypeKeyEnum.Star });
         }
 
@@ -246,7 +279,12 @@ export class BodyCreator {
         const childSpec = PRESET_CHILD_BODIES[key];
         let newBody: Body | null;
 
-        if (childSpec) {
+        if (childSpec && this.restore) {
+            // Restoring: orbit the saved parent; never create one on the side.
+            const parent = this.restore.orbitParent;
+            if (!parent || parent._isDisposed) return;
+            newBody = childSpec.build(parent, this.scene, this.restore.id);
+        } else if (childSpec) {
             const existing = simulationState.bodies.find(
                 (b): b is CelestialBody =>
                     !!b &&
@@ -268,7 +306,7 @@ export class BodyCreator {
         // immediately rather than spawning at their preset orbital distance (e.g. Pluto at the
         // edge of the system). The Sun stays at the origin.
         // Moons and satellites keep the orbit they were built on around their parent.
-        if (key !== PresetBodyKeyEnum.Sun && !childSpec) {
+        if (key !== PresetBodyKeyEnum.Sun && !childSpec && !this.restore) {
             const star = this.getPrimaryStar();
             if (star && star.mesh) {
                 const spawnPos = this.getNearCameraSpawnPos();
@@ -286,12 +324,25 @@ export class BodyCreator {
             }
         }
 
+        recordCreation(newBody, { kind: CreationKind.Preset, presetKey: key });
         this.addToSimulation(newBody, newBody);
         return newBody;
     }
 
     /** Creates a custom body from the add form's values. Null when nothing was created. */
-    createCustom(options: ICreateCustomBodyOptions): Body | null {
+    createCustom(options: ICreateCustomBodyOptions, restore?: IRestoreCreateOptions): Body | null {
+        if (restore) {
+            this.restore = restore;
+            try {
+                return this.createCustomInner(options);
+            } finally {
+                this.restore = null;
+            }
+        }
+        return this.createCustomInner(options);
+    }
+
+    private createCustomInner(options: ICreateCustomBodyOptions): Body | null {
         const o: ResolvedCreateOptions = {
             bodyType: options.bodyType,
             planetType: options.planetType ?? PlanetTypeEnum.Terrestrial,
@@ -385,6 +436,10 @@ export class BodyCreator {
             spinPoleQuaternion(tilt, azimuth, newBody.mesh.quaternion);
         }
 
+        recordCreation(newBody, {
+            kind: CreationKind.Custom,
+            options: toSavedCustomOptions(options),
+        });
         this.addToSimulation(newBody, focusTarget ?? newBody);
         console.log(`Created new ${o.bodyType}:`, newBody.name);
 
@@ -579,11 +634,11 @@ export class BodyCreator {
             case PresetBodyKeyEnum.Ceres:
                 return new Ceres(deps, scene);
             case PresetBodyKeyEnum.Vesta:
-                return createVestaBody(deps, scene, this.getPrimaryStar(), createUniqueId(key));
+                return createVestaBody(deps, scene, this.getPrimaryStar(), this.makeId(key));
             case PresetBodyKeyEnum.Pallas:
-                return createPallasBody(deps, scene, this.getPrimaryStar(), createUniqueId(key));
+                return createPallasBody(deps, scene, this.getPrimaryStar(), this.makeId(key));
             case PresetBodyKeyEnum.Hygiea:
-                return createHygieaBody(deps, scene, this.getPrimaryStar(), createUniqueId(key));
+                return createHygieaBody(deps, scene, this.getPrimaryStar(), this.makeId(key));
             case PresetBodyKeyEnum.Halley:
                 return new Halley(deps, scene);
             default:
@@ -633,7 +688,10 @@ export class BodyCreator {
             simulationState.bodies.some((b) => b && !b._isDisposed && b instanceof BlackHole);
         const starPos = hasCentralBody ? this.getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
 
+        const id = this.makeId('star');
         const starParams = randomStarParams({
+            // Seeded from the id, so a star rebuilt from a save keeps its look.
+            seed: `${id}|star`,
             mass: o.customMass,
             radius: o.customRadius,
             temperature: o.customTemperature,
@@ -641,7 +699,6 @@ export class BodyCreator {
         });
         const { rotationTilt, rotationSpeed } = starParams;
 
-        const id = createUniqueId('star');
         const name = o.customName ?? generateCustomBodyName(BodyTypeKeyEnum.Star, id);
 
         const liveParent = o.orbitParent && !o.orbitParent._isDisposed ? o.orbitParent : null;
@@ -706,7 +763,7 @@ export class BodyCreator {
         // Custom mode: never create dwarfs (UI dropdown has only planet subtypes).
         const planetType = toPlanetType(o.planetType);
 
-        const planetId = createUniqueId('planet');
+        const planetId = this.makeId('planet');
         const planetSeed = `${planetId}|custom|${planetType}`;
 
         const {
@@ -794,7 +851,7 @@ export class BodyCreator {
         // In-plane angle of the spawn point about the parent (0 = +X, π/2 = +Z).
         const orbitAngle = Math.atan2(toMoon.z, toMoon.x);
 
-        const moonId = createUniqueId('moon');
+        const moonId = this.makeId('moon');
         // Moons are named relative to their parent: "<Parent> <Roman numeral>".
         const moonName =
             o.customName ??
@@ -889,7 +946,7 @@ export class BodyCreator {
             radius: o.customRadius,
         });
 
-        const id = createUniqueId('asteroid');
+        const id = this.makeId('asteroid');
         return new Asteroid(this.dependencies, this.scene, {
             pos: spawnPos,
             vel: spawnVel,
@@ -910,7 +967,7 @@ export class BodyCreator {
             radius: o.customRadius,
         });
 
-        const id = createUniqueId('comet');
+        const id = this.makeId('comet');
         // The manual flow uses the default variant rather than rerolling a nucleus.
         return createCometBody(this.dependencies, this.scene, {
             radius,
@@ -931,7 +988,7 @@ export class BodyCreator {
         const spawnPos = this.getNearCameraSpawnPos();
         const { mass } = randomBlackHoleParams({ mass: o.customMass });
 
-        const id = createUniqueId('black_hole');
+        const id = this.makeId('black_hole');
         const blackHole = new BlackHole(this.dependencies, this.scene, {
             pos: spawnPos,
             vel: new THREE.Vector3(0, 0, 0),
@@ -952,7 +1009,7 @@ export class BodyCreator {
         const spawnPos = this.getNearCameraSpawnPos();
         const radius = validRadius(o.customRadius) ?? WORMHOLE_DEFAULT_RADIUS;
 
-        const id = createUniqueId('wormhole');
+        const id = this.makeId('wormhole');
         const wormhole = new Wormhole(
             this.dependencies,
             this.scene,
@@ -962,6 +1019,9 @@ export class BodyCreator {
             o.customName ?? generateCustomBodyName(BodyTypeKeyEnum.Wormhole, id),
             { tilt: 0, speed: 0 }
         );
+
+        // A restored wormhole is linked to its saved partner afterwards, by the loader.
+        if (this.restore) return wormhole;
 
         // First wormhole created starts a pending pair; the next one links to it.
         const pendingLink = getPendingWormholeLink();
@@ -983,6 +1043,11 @@ export class BodyCreator {
 
     // ── Shared ──────────────────────────────────────────────────────────────
 
+    /** The saved id while restoring, else a fresh unique id. */
+    private makeId(prefix: string): string {
+        return this.restore ? this.restore.id : createUniqueId(prefix);
+    }
+
     /**
      * Adds `body` to the simulation, announces it with `body:added`, and selects `focusTarget`
      * (the new body, or a new moon's parent). The gizmo follows the Target toggle.
@@ -1000,6 +1065,9 @@ export class BodyCreator {
         } catch (e) {
             console.error('Error dispatching body:added event after body creation:', e);
         }
+
+        // A save being restored picks its own focus once every body is back.
+        if (this.restore) return;
 
         this.dependencies.gizmo.attach(cameraState.isTargetMode ? body : null);
 

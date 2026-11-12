@@ -150,7 +150,7 @@ For previous milestone info, see milestones.md
 - [x] Phase 3.5: Surface friction for ships falling and crashing to surface of planet/moon/asteroid, etc
 - **Phase 4**
 - [x] Phase 4.1: Reorganize and refactor the custom/preset object creation panel (AddEditBodyPanel.vue) as it is combersome and overwhelming to look at. See designs\ui\new-add-edit-body-updates.md
-- [ ] Phase 4.2: Ability to save edits to a solar system or procedurally generated system. For app, this can be built in, for web version, user can select files from browser to load and save.
+- [x] Phase 4.2: Ability to save edits to a solar system or procedurally generated system. For app, this can be built in, for web version, user can select files from browser to load and save.
 - **Phase 5**
 - [x] Implement ship landing on body surfaces
 

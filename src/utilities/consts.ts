@@ -513,14 +513,6 @@ export const URANUS_ORBITAL_PERIOD_REAL = 30685.4 * 24 * 3600;
 export const NEPTUNE_ORBITAL_PERIOD_REAL = 60190.03 * 24 * 3600;
 export const PLUTO_ORBITAL_PERIOD_REAL = 90560 * 24 * 3600;
 
-// === Planetary System: Per-planet Time Scale Factors ===
-// Used by individual body classes to compute rotation speed at construction time,
-// accounting for the effective G (including gMultiplier) via dependencies.getG().
-export function calcSimOrbitalPeriod(r_sim: number, G: number, M_sun: number): number {
-    // T_sim = 2 * PI * sqrt(r_sim^3 / (G * M_sun))
-    return 2 * Math.PI * Math.sqrt(Math.pow(r_sim, 3) / (G * M_sun));
-}
-
 // === Satellites: Mass ===
 export const ISS_MASS = 419725 / MASS_SCALE;
 
@@ -635,10 +627,12 @@ export const COMET_RADIUS = 11 / RADIUS_SCALE;
 // (17.9 AU) and aphelion (35.3 AU) differ slightly from the long-run mean values.
 export const COMET_PERIHELION_DIST = 87749221 / DIST_SCALE; // 87,749,221 km (0.5866 AU)
 export const COMET_APHELION_DIST = 5274289477 / DIST_SCALE; // 5,274,289,477 km (e ≈ 0.96727)
+export const HALLEY_SEMI_MAJOR_AXIS = 2_682_085_628 / DIST_SCALE; // 17.9 AU
 export const COMET_INCLINATION = 162.196043; // degrees
 export const COMET_LONG_ASC_NODE = 59.507865; // degrees (Ω)
 export const COMET_ARG_PERIHELION = 112.449622; // degrees (ω)
 export const COMET_MEAN_ANOMALY_J2000 = 65.848901; // degrees
+export const HALLEY_ORBITAL_PERIOD_REAL = 27728.046088 * 24 * 3600;
 
 /** Peak camera shake displacement (u) applied each frame during warp. */
 export const WARP_SHAKE_MAG = 0.002; // No scale factor here; shake is in camera-local space so should feel consistent at all scales.

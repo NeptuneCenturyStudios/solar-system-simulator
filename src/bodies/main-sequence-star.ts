@@ -3,6 +3,8 @@ import { Star } from './star';
 import { IStarCreationOptions, IStateDependencies } from '../interfaces';
 import { NotificationType } from '../event-log/event-log';
 import { createUniqueId } from '../utilities/utilities';
+import { recordCreation } from '../persistence/creation-registry';
+import { CreationKind, RemnantKind } from '../persistence/save-file';
 import {
     PLUTO_DIST,
     BROWN_DWARF_MASS_THRESHOLD,
@@ -248,6 +250,7 @@ export class MainSequenceStar extends Star {
                     progenitorRadius: this.initialRadius,
                 });
 
+                recordCreation(pulsar, { kind: CreationKind.Remnant, remnant: RemnantKind.Pulsar });
                 if (this.dependencies?.addBody) {
                     this.dependencies.addBody(pulsar);
                 }
@@ -275,6 +278,10 @@ export class MainSequenceStar extends Star {
                     spawnedFromSupernova: true,
                 });
 
+                recordCreation(newBlackHole, {
+                    kind: CreationKind.Remnant,
+                    remnant: RemnantKind.BlackHole,
+                });
                 if (this.dependencies?.addBody) {
                     this.dependencies.addBody(newBlackHole);
                 }
@@ -303,6 +310,10 @@ export class MainSequenceStar extends Star {
                     magneticField: this.magneticField ?? undefined,
                 });
 
+                recordCreation(newWhiteDwarf, {
+                    kind: CreationKind.Remnant,
+                    remnant: RemnantKind.WhiteDwarf,
+                });
                 if (this.dependencies?.addBody) {
                     this.dependencies.addBody(newWhiteDwarf);
                 }

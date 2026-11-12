@@ -22,6 +22,27 @@
                 </button>
 
                 <button
+                    class="btn toolbar-btn"
+                    :title="
+                        canSave ? 'Save system to a file (Ctrl+S)' : 'Scenarios cannot be saved'
+                    "
+                    aria-label="Save system to a file"
+                    :disabled="!canSave"
+                    @click="requestSaveSystem()"
+                >
+                    <svg-icon type="mdi" :path="mdiContentSaveOutline"></svg-icon>
+                </button>
+
+                <button
+                    class="btn toolbar-btn"
+                    title="Open a saved system (Ctrl+O)"
+                    aria-label="Open a saved system"
+                    @click="requestOpenSystem()"
+                >
+                    <svg-icon type="mdi" :path="mdiFolderOpenOutline"></svg-icon>
+                </button>
+
+                <button
                     class="btn toolbar-btn btn-care"
                     title="Support Neptune Century on Ko-fi"
                     @click="openDonateWindow"
@@ -111,7 +132,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ActivePanel, setActivePanel, vueUiState, openBodyEditor } from '../ui-store';
-import { isActionLocked, requestRelaunch } from '../sim-bridge';
+import {
+    isActionLocked,
+    requestOpenSystem,
+    requestRelaunch,
+    requestSaveSystem,
+    simStore,
+} from '../sim-bridge';
 import { ScenarioLock } from '../../interfaces';
 import { showAboutModal } from '../about-modal-service';
 import SystemExplorer from '../components/SystemExplorer.vue';
@@ -133,12 +160,15 @@ import {
     mdiHeartOutline,
     mdiInformationOutline,
     mdiHelpCircleOutline,
+    mdiContentSaveOutline,
+    mdiFolderOpenOutline,
 } from '@mdi/js';
 
 import SvgIcon from '@jamescoyle/vue-icon';
 
 const activePanel = computed(() => vueUiState.activePanel);
 const addLocked = computed(() => isActionLocked(ScenarioLock.AddBody));
+const canSave = computed(() => simStore.canSaveSystem);
 
 function openAbout(): void {
     showAboutModal();
