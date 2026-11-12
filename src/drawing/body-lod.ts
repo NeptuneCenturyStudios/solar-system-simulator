@@ -65,7 +65,11 @@ export const enum BodyLodTier {
 
 const BOUNDARIES: readonly IScreenSizeBoundary[] = [BODY_LOD_TUNING.REDUCED, BODY_LOD_TUNING.DOT];
 
-/** Bodies whose look depends on effects that must stay visible at any size (glows, lensing). */
+/**
+ * Bodies never LOD'd: those whose look depends on effects that must stay visible at any size
+ * (glows, lensing), and ships and satellites, whose fast-moving dots jumped around and whose
+ * models gain nothing from the sphere proxy.
+ */
 const NEVER_LOD_TYPES =
     BodyTypeEnum.Star |
     BodyTypeEnum.WhiteDwarf |
@@ -73,10 +77,11 @@ const NEVER_LOD_TYPES =
     BodyTypeEnum.Pulsar |
     BodyTypeEnum.BlackHole |
     BodyTypeEnum.Wormhole |
-    BodyTypeEnum.Player;
+    BodyTypeEnum.Player |
+    BodyTypeEnum.SpaceShip |
+    BodyTypeEnum.Satellite;
 
 const THREAT_DOT_COLOR = new THREE.Color(0xff5a4a);
-const SHIP_DOT_COLOR = new THREE.Color(0x9fe8ff);
 const DEFAULT_DOT_COLOR = new THREE.Color(0xffffff);
 
 /** How many bodies were on each tier in the last update (for the render-info readout). */
@@ -173,7 +178,6 @@ export class BodyLodSystem {
         const sky = THREE.MathUtils.clamp(skyBrightness, 0, 1);
         const limitLog =
             BODY_LOD_TUNING.DOT_LIMIT_LOG_FLUX + sky * BODY_LOD_TUNING.DOT_DAY_LIMIT_DECADES;
-        const markerFade = 1 - sky;
 
         this.ensureCapacity(bodies.length);
         const positions = this.positions;
@@ -222,14 +226,8 @@ export class BodyLodSystem {
                 // tier), so nothing pops up on a dot.
                 hideFromCamera(body.mesh, state.hidden);
 
-                // Ships and threats are markers at a fixed brightness; everything else shines
-                // with the light it reflects. Either way a daytime sky hides them.
-                let brightness: number;
-                if (isMarker(body)) {
-                    brightness = markerFade;
-                } else {
-                    brightness = dotVisibility(body, _worldPos, camDist, limitLog);
-                }
+                // The dot shines with the light the body reflects; a daytime sky hides it.
+                const brightness = dotVisibility(body, _worldPos, camDist, limitLog);
                 if (brightness <= 0) continue;
 
                 // Past the far plane, pull the dot in along its view ray: same screen position,
@@ -366,11 +364,6 @@ function restoreToCamera(hidden: THREE.Object3D[]): void {
     hidden.length = 0;
 }
 
-/** Ships and threats: dots that mark where they are rather than how bright they would look. */
-function isMarker(body: Body): boolean {
-    return body.isThreat || (body.bodyType & BodyTypeEnum.SpaceShip) !== 0;
-}
-
 /**
  * Brightness 0..1 of a celestial body's dot, from the starlight it reflects toward the camera
  * (see BODY_LOD_TUNING in consts.ts): irradiance at the body × albedo × angular radius², on a
@@ -403,12 +396,10 @@ function dotVisibility(
     return v * v;
 }
 
-/** The colour a body's dot is drawn in: threats red, ships cyan, celestial bodies their trail colour. */
+/** The colour a body's dot is drawn in: threats red, celestial bodies their trail colour. */
 function dotColor(body: Body, out: THREE.Color): void {
     if (body.isThreat) {
         out.copy(THREAT_DOT_COLOR);
-    } else if (body.bodyType & BodyTypeEnum.SpaceShip) {
-        out.copy(SHIP_DOT_COLOR);
     } else if (body instanceof CelestialBody && body.trail) {
         const material = body.trail.material as THREE.LineBasicMaterial;
         out.copy(material.color ?? DEFAULT_DOT_COLOR);
