@@ -652,7 +652,8 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
         // ── WASD camera movement ─────────────────────────────────────────
         // Not on foot: the same keys walk the player rig instead (above).
-        if (!isFlightModeActive && !isSurfaceModeActive) {
+        // Free Cam only; Look At and the plain orbit camera ignore these keys.
+        if (!isFlightModeActive && !isSurfaceModeActive && cameraState.isFreeCameraMode) {
             const speed = ctx.keys.shift ? FREE_CAM_BOOST_SPEED : FREE_CAM_NORMAL_SPEED;
             ctx.camera.getWorldDirection(_animCamDirection);
             _animCamRight.crossVectors(ctx.camera.up, _animCamDirection).normalize();
@@ -668,12 +669,6 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
             if (_animCamMovement.lengthSq() > 0) {
                 ctx.camera.position.add(_animCamMovement);
-                if (
-                    !cameraState.isFreeCameraMode &&
-                    (cameraState.focusBody !== null || cameraState.frozenFocusPosition !== null)
-                ) {
-                    ctx.controls.target.add(_animCamMovement);
-                }
 
                 if (
                     ctx.interactionState.isRepositioning &&

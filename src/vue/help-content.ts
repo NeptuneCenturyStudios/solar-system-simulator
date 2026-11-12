@@ -36,6 +36,16 @@ export const HELP_SECTIONS: HelpSection[] = [
         ],
     },
     {
+        title: 'Free Camera',
+        note: 'Turn on Free Camera in the System Explorer. These keys only move the camera in Free Camera mode.',
+        rows: [
+            { action: 'Move forward / back', keys: ['W', 'S'] },
+            { action: 'Strafe left / right', keys: ['A', 'D'] },
+            { action: 'Rise / sink', keys: ['Space', 'C'] },
+            { action: 'Move faster', keys: ['Shift'] },
+        ],
+    },
+    {
         title: 'Simulation',
         rows: [
             { action: 'Pause / resume', keys: ['P'] },
