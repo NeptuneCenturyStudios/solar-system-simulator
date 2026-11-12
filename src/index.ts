@@ -3807,6 +3807,15 @@ window.addEventListener('mousemove', onMouseMove);
 window.addEventListener('mouseup', onMouseUp);
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 
+// Desktop: closing the window (title bar, Alt+F4, Cmd+Q) offers to save the running system
+// first, the same prompt as replacing it from Launch Control.
+window.desktop?.onCloseRequested(async () => {
+    // Free the cursor (e.g. Alt+F4 during RMB mouse-look) so the prompt's buttons are usable.
+    interactionState.isMouseLookActive = false;
+    if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
+    return confirmLeaveCurrentSystem();
+});
+
 // Wheel scroll zooms the camera (relative to selected/focus body). Wheel events
 // originating over the Vue UI (e.g. the Bodies table) never reach here — they're
 // stopped at #vue-ui-root so the UI can scroll normally without zooming the scene.

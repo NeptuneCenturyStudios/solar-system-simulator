@@ -18,6 +18,10 @@ import { contextBridge, ipcRenderer } from 'electron';
  */
 const SAVE_CHANNEL = 'system-file:save';
 const OPEN_CHANNEL = 'system-file:open';
+/** Window-close channels; `CLOSE_CHANNELS` in `constants.ts`. */
+const CLOSE_READY_CHANNEL = 'window-close:ready';
+const CLOSE_REQUESTED_CHANNEL = 'window-close:requested';
+const CLOSE_RESPONSE_CHANNEL = 'window-close:response';
 
 export interface OpenedSystemFile {
     name: string;
@@ -35,6 +39,11 @@ export interface DesktopEnvironment {
     saveSystemFile(defaultName: string, contents: string): Promise<boolean>;
     /** Shows a native open dialog and reads the picked file; null when cancelled. */
     openSystemFile(): Promise<OpenedSystemFile | null>;
+    /**
+     * Takes over closing the window: from now on a close attempt calls `handler` instead of
+     * closing, and the window closes only when `handler` resolves true. Register once.
+     */
+    onCloseRequested(handler: () => Promise<boolean>): void;
 }
 
 const desktopEnvironment: DesktopEnvironment = {
@@ -44,6 +53,27 @@ const desktopEnvironment: DesktopEnvironment = {
     saveSystemFile: (defaultName, contents) =>
         ipcRenderer.invoke(SAVE_CHANNEL, defaultName, contents) as Promise<boolean>,
     openSystemFile: () => ipcRenderer.invoke(OPEN_CHANNEL) as Promise<OpenedSystemFile | null>,
+    onCloseRequested: (handler) => {
+        // Repeated close clicks while the prompt is up are ignored rather than stacking prompts.
+        let pending = false;
+        ipcRenderer.on(CLOSE_REQUESTED_CHANNEL, () => {
+            if (pending) return;
+            pending = true;
+            handler().then(
+                (allowClose) => {
+                    pending = false;
+                    ipcRenderer.send(CLOSE_RESPONSE_CHANNEL, allowClose);
+                },
+                (e: unknown) => {
+                    // A failing prompt must not trap the user in the app.
+                    console.error('Close handler failed:', e);
+                    pending = false;
+                    ipcRenderer.send(CLOSE_RESPONSE_CHANNEL, true);
+                }
+            );
+        });
+        ipcRenderer.send(CLOSE_READY_CHANNEL);
+    },
 };
 
 contextBridge.exposeInMainWorld('desktop', desktopEnvironment);

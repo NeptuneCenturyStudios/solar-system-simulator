@@ -654,14 +654,13 @@ export const KUIPER_BELT_FADE_END_DIST = 12000000000 / DIST_SCALE; // 12,000,000
 // === Star Light ===
 /** The DIST_SCALE at which the base light intensity values below were tuned. */
 export const LIGHT_INTENSITY_REFERENCE_DIST_SCALE = 100;
-/** Point-light decay exponent. decay=2 would be the physical inverse-square law;
- *  0.45 is tuned for the visual model. */
-export const STAR_LIGHT_DECAY = 1; // Tuned for model
+/** Point-light decay exponent. */
+export const STAR_LIGHT_DECAY = 1;
 
 // Base light intensity values, tuned at DIST_SCALE = LIGHT_INTENSITY_REFERENCE_DIST_SCALE.
-const BASE_SUN_LIGHT_INTENSITY = 20_000_000;
+const BASE_SUN_LIGHT_INTENSITY = 50_000_000;
 export const BASE_STAR_LIGHT_INTENSITY_MIN = 10_000_000;
-export const BASE_STAR_LIGHT_INTENSITY_MAX = 50_000_000;
+export const BASE_STAR_LIGHT_INTENSITY_MAX = 100_000_000;
 
 /**
  * Multiplier that keeps a star's punctual-light irradiance constant as
@@ -682,17 +681,28 @@ export const STAR_LIGHT_INTENSITY_MAX = BASE_STAR_LIGHT_INTENSITY_MAX * STAR_LIG
 export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
 
 /**
+ * Fixed reference intensity that STAR_LIGHT_EXPOSURE is calibrated against: a star of this
+ * intensity delivers an irradiance of π at 1 AU. Deliberately independent of
+ * BASE_SUN_LIGHT_INTENSITY, so raising or lowering the Sun's intensity actually changes how bright
+ * the scene is (normalizing by the Sun's own intensity would cancel any change to it out).
+ */
+const BASE_STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY = 20_000_000;
+const STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY = BASE_STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY * STAR_LIGHT_SCALE;
+
+/**
  * Converts a star's light intensity (the value stored on the star and shown in the editor) into
- * the intensity of its three.js point light. Chosen so the Sun delivers an irradiance of π at
- * 1 AU: under three's Lambert shading a surface facing the Sun then shows exactly its texture's
- * colour, which is the physically correct exposure for the HDR pipeline. (Unscaled, the Sun gave
- * ≈13.4 at 1 AU, lighting everything about 4.3× too bright — hidden by the old 8-bit clip.)
+ * the intensity of its three.js point light. Chosen so a star of
+ * STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY delivers an irradiance of π at 1 AU: under three's
+ * Lambert shading a surface facing it then shows exactly its texture's colour. The Sun's
+ * irradiance at 1 AU is π × (SUN_LIGHT_INTENSITY / reference), so BASE_SUN_LIGHT_INTENSITY is a
+ * real brightness knob.
  *
  * Every consumer of star light (surfaces, atmospheres, clouds, rings, Earth's day/night, the sky)
  * reads the point light's intensity, so this one factor moves them all together. Irradiance
  * thresholds (EARTH_*_IRRADIANCE, STAR_HIDE_SKY_RADIANCE) are expressed with it.
  */
-export const STAR_LIGHT_EXPOSURE = Math.PI / (SUN_LIGHT_INTENSITY / Math.pow(AU, STAR_LIGHT_DECAY));
+export const STAR_LIGHT_EXPOSURE =
+    Math.PI / (STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY / Math.pow(AU, STAR_LIGHT_DECAY));
 
 /**
  * Ambient fill light (the world's base plus each star's share). Scaled with STAR_LIGHT_EXPOSURE
@@ -757,7 +767,7 @@ export const NAME_PANEL_TEXT_INTERVAL_MS = Object.freeze({ low: 250, medium: 100
  *             as one point in a shared Points buffer.
  *
  * A dot's brightness is the light the body really reflects toward the camera: star irradiance at
- * the body (normalized by STAR_LIGHT_EXPOSURE, so the Sun gives π at 1 AU) × DOT_ALBEDO × the
+ * the body (normalized by STAR_LIGHT_EXPOSURE, so the reference star gives π at 1 AU) × DOT_ALBEDO × the
  * body's angular radius² (radians). That flux is placed on a log scale like a magnitude, because
  * a few-pixel dot cannot be lit physically: Venus and Mars differ ~100× in flux, yet both are
  * naked-eye objects. Reference fluxes (log10) seen from Earth: Venus −8.6…−7.6, Jupiter −8.7,

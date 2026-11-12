@@ -58,6 +58,11 @@ interface IDesktopEnvironment {
     saveSystemFile(defaultName: string, contents: string): Promise<boolean>;
     /** Shows a native open dialog and reads the picked file; null when cancelled. */
     openSystemFile(): Promise<{ name: string; contents: string } | null>;
+    /**
+     * Takes over closing the window: from now on a close attempt calls `handler` instead of
+     * closing, and the window closes only when `handler` resolves true. Register once.
+     */
+    onCloseRequested(handler: () => Promise<boolean>): void;
 }
 
 interface Window {

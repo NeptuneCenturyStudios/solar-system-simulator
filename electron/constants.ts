@@ -46,3 +46,13 @@ export const SAVE_FILE_CHANNELS = {
     save: 'system-file:save',
     open: 'system-file:open',
 } as const;
+
+/** IPC channels for asking the renderer before the window closes. preload.ts repeats these strings. */
+export const CLOSE_CHANNELS = {
+    /** Renderer -> main: a close handler is registered. */
+    ready: 'window-close:ready',
+    /** Main -> renderer: the user tried to close the window. */
+    requested: 'window-close:requested',
+    /** Renderer -> main: true to close, false to stay. */
+    response: 'window-close:response',
+} as const;

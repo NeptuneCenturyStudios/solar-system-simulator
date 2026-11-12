@@ -9,6 +9,7 @@
 import { BrowserWindow, shell } from 'electron';
 import * as path from 'node:path';
 
+import { wireCloseGuard } from './close-guard';
 import {
     APP_INDEX_URL,
     APP_SCHEME,
@@ -56,6 +57,7 @@ export function createMainWindow(): BrowserWindow {
     wireDiagnostics(window);
     wireExternalLinks(window);
     wireCloseGuardBypass(window);
+    wireCloseGuard(window);
 
     const devUrl = devServerUrl();
     if (devUrl !== null) {
@@ -101,7 +103,8 @@ function wireExternalLinks(window: BrowserWindow): void {
  * `src/index.ts` registers a `beforeunload` handler that returns a value, so
  * that a browser tab warns before discarding a running simulation. Electron
  * interprets that as "do not close" and would leave the window — and therefore
- * the app — impossible to quit. Here the close always wins.
+ * the app — impossible to quit. Here the close always wins. The desktop's own
+ * save-before-closing prompt goes through `close-guard.ts` instead.
  */
 function wireCloseGuardBypass(window: BrowserWindow): void {
     window.webContents.on('will-prevent-unload', (event) => {
