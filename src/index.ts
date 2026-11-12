@@ -55,7 +55,6 @@ declare global {
 // Import all consts
 import {
     G,
-    SUN_MASS,
     PLUTO_DIST,
     GIZMO_TUNING,
     SimulationStartMode,
@@ -76,8 +75,6 @@ import {
     DIST_SCALE,
     TEXT_SPRITE_Z,
     C,
-    EARTH_RADIUS,
-    WORMHOLE_DEFAULT_RADIUS,
     WORMHOLE_SHORTCUT_G_MULTIPLIER,
     ASTEROID_FIELD_G_MULTIPLIER,
     ASTEROID_DEFENSE_G_MULTIPLIER,
@@ -94,39 +91,15 @@ import {
     DISEMBARK_DISTANCE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
-import {
-    isBodyType,
-    createUniqueId,
-    getBodyTypeLabel,
-    buildBodySphereGeometry,
-} from './utilities/utilities';
-import { generateCustomBodyName } from './procedural/custom-body-naming';
-import { generateBinaryPlacementsFromBasis } from './procedural/orbital-math';
-import { computeSystemBarycenter } from './bodies/system-barycenter';
-import { SeededRandom } from './utilities/prng';
+import { isBodyType, createUniqueId, getBodyTypeLabel } from './utilities/utilities';
 import { ECLIPTIC_NORTH, freeLook, orbitOffset } from './camera/north-up';
 import {
     spinPoleDirection,
     spinPoleLeanDirection,
     spinPoleQuaternion,
 } from './utilities/spin-pole';
-import { generateSeedString } from './procedural/seed-utils';
 import { resetPhysicsState, setBodyRadius } from './physics/physics';
-import {
-    randomStarParams,
-    randomBlackHoleParams,
-    randomPlanetParams,
-    randomMoonParams,
-    randomCometParams,
-    randomAsteroidParams,
-    randomWormholeParams,
-} from './utilities/body-params';
-import {
-    loadSpaceTexture,
-    showSpaceBackground,
-    getRoughnessForMoonTexture,
-    getMetalnessForMoonTexture,
-} from './drawing/textures';
+import { loadSpaceTexture, showSpaceBackground } from './drawing/textures';
 import { reloadBodyTextures } from './drawing/texture-registry';
 import { Supernova } from './effects/supernova';
 import type { SolarSystemFeature } from './features/solar-system-feature';
@@ -136,7 +109,6 @@ import { AmbientSoundManager } from './utilities/ambient-sound';
 import { GravitationalLensingEffect, isHdrSupported } from './effects/gravitational-lensing';
 import { SunRaysEffect } from './effects/sun-rays';
 import { LensFlareEffect } from './effects/lens-flare';
-import { createBridgeForPair } from './effects/wormhole-link-bridge';
 import { GridHelperManager } from './gizmos/grid-helper';
 import { AiAvoidanceGizmo } from './gizmos/ai-avoidance-gizmo';
 import { PositionIndicatorManager } from './gizmos/position-indicator';
@@ -161,19 +133,6 @@ import { Body } from './bodies/body';
 import { CelestialBody } from './bodies/celestial-body';
 import { Probe } from './bodies/probe';
 import { Moon } from './bodies/moon';
-import {
-    createCallistoBody,
-    createCharonBody,
-    createEarthMoonBody,
-    createEuropaBody,
-    createGanymedeBody,
-    createHygieaBody,
-    createIoBody,
-    createIssBody,
-    createPallasBody,
-    createTitanBody,
-    createVestaBody,
-} from './procedural/real-solar-system-bodies';
 import { Planet } from './bodies/planet';
 import { DwarfPlanet } from './bodies/dwarf-planet';
 import { buildBasicRows, buildScienceRows, hasScienceData } from './bodies/body-attribute-display';
@@ -183,31 +142,8 @@ import {
     orbitalDataNote,
 } from './bodies/orbital-data-display';
 import { moonSubTypeLabel, planetSubTypeLabel } from './bodies/body-attribute-labels';
-import { Mercury } from './bodies/mercury';
-import { Venus } from './bodies/venus';
-import { Earth } from './bodies/earth';
-import { Mars } from './bodies/mars';
-import { Jupiter } from './bodies/jupiter';
-import { Saturn } from './bodies/saturn';
-import { Uranus } from './bodies/uranus';
-import { Neptune } from './bodies/neptune';
-import { Pluto } from './bodies/pluto';
-import { Ceres } from './bodies/ceres';
-import { Halley } from './bodies/halley';
-import { BlackHole } from './bodies/black-hole';
 import { Star } from './bodies/star';
 import { MainSequenceStar } from './bodies/main-sequence-star';
-import { createMainSequenceStarFromParams } from './procedural/star-factory';
-import { createPlanetBodyFromProceduralCreation } from './procedural/planet-factory';
-import { upgradeProceduralTexture } from './procedural/texture-upgrader';
-import { rollMagneticField, type MagneticFieldKind } from './procedural/magnetic-field';
-import { Asteroid } from './bodies/asteroid';
-import { Wormhole } from './bodies/wormhole';
-import {
-    getPendingWormholeLink,
-    setPendingWormholeLink,
-    clearPendingWormholeLink,
-} from './bodies/wormhole-link-state';
 
 import { Spaceship } from './bodies/ships/spaceship';
 import type { ShipRole, ShipTeam } from './bodies/ships/ship-team';
@@ -225,8 +161,6 @@ import {
     ScenarioLock,
 } from './interfaces';
 import { cancelAutopilot, engageAutopilot, drainAutopilotEvents } from './simulation/autopilot';
-import { Sun } from './bodies/sun';
-import { createCometBody } from './bodies/comet-variants';
 import { Comet } from './bodies/comet';
 import { runAnimationLoop, AnimationContext } from './simulation/animation-loop';
 import { registerCustomEventListeners } from './events/custom-event-listeners';
@@ -385,21 +319,16 @@ import { ScreenProjector } from './drawing/hud/screen-projection';
 import { ProceduralGenerator } from './procedural/procedural-generator';
 import { NormalSolarSystemGenerator } from './procedural/normal-solar-system-generator';
 import { BlackHoleSystemGenerator } from './procedural/black-hole-system-generator';
-import { BodyTypeEnum, MoonTypeEnum, PlanetTypeEnum } from './bodies/body-enums';
+import { BodyTypeEnum, BodyTypeKeyEnum } from './bodies/body-enums';
+import { BodyCreator } from './simulation/body-creator';
 import { CoreTypeEnum } from './bodies/body-attributes';
 import {
     type IAtmosphereProfile,
-    resolveAtmosphereProfile,
-    rollAtmosphereProfile,
-    rollAtmosphereValues,
     sanitizeAtmosphereProfile,
 } from './procedural/atmosphere-profile';
-import { applyAtmosphereToBody } from './procedural/atmosphere-factory';
-import { computePlanetaryAttributes } from './procedural/planet-attributes';
 import { EffectiveCSpeed, EffectiveGForce } from './types';
 import { SolarSystemGenerator } from './procedural/solar-system-generator';
 import { EmptySystemGenerator } from './procedural/empty-system-generator';
-import { pickMoonTextureForMoonType } from './procedural/moon-factory';
 import { ProceduralGenerationReporter } from './procedural/procedural-generation-progress';
 import { exitFlightMode } from './simulation/flight-controllers';
 import {
@@ -1111,18 +1040,21 @@ function moveSelectedBodyRelativeToCamera(directionKey: string, ctrlKey = false)
 // Velocity arrow is now part of CoordinateGizmo (gizmo.velocityArrow)
 
 /** Maps a body onto the Add/Edit panel's body-type keys (see BodyEditSnapshot.bodyTypeKey). */
-function bodyEditTypeKey(body: Body): string {
-    const checks: [BodyTypeEnum, string][] = [
-        [BodyTypeEnum.BlackHole, 'black_hole'],
-        [BodyTypeEnum.Wormhole, 'wormhole'],
-        [BodyTypeEnum.Star, 'sun'],
-        [BodyTypeEnum.Moon, 'moon'],
-        [BodyTypeEnum.DwarfPlanet, 'dwarf_planet'],
-        [BodyTypeEnum.Planet | BodyTypeEnum.GasGiant | BodyTypeEnum.IceGiant, 'planet'],
-        [BodyTypeEnum.Asteroid, 'asteroid'],
-        [BodyTypeEnum.Comet, 'comet'],
+function bodyEditTypeKey(body: Body): BodyTypeKeyEnum {
+    const checks: [BodyTypeEnum, BodyTypeKeyEnum][] = [
+        [BodyTypeEnum.BlackHole, BodyTypeKeyEnum.BlackHole],
+        [BodyTypeEnum.Wormhole, BodyTypeKeyEnum.Wormhole],
+        [BodyTypeEnum.Star, BodyTypeKeyEnum.Star],
+        [BodyTypeEnum.Moon, BodyTypeKeyEnum.Moon],
+        [BodyTypeEnum.DwarfPlanet, BodyTypeKeyEnum.DwarfPlanet],
+        [
+            BodyTypeEnum.Planet | BodyTypeEnum.GasGiant | BodyTypeEnum.IceGiant,
+            BodyTypeKeyEnum.Planet,
+        ],
+        [BodyTypeEnum.Asteroid, BodyTypeKeyEnum.Asteroid],
+        [BodyTypeEnum.Comet, BodyTypeKeyEnum.Comet],
     ];
-    return checks.find(([flag]) => isBodyType(body, flag))?.[1] ?? 'other';
+    return checks.find(([flag]) => isBodyType(body, flag))?.[1] ?? BodyTypeKeyEnum.Other;
 }
 
 function getPrimaryStar() {
@@ -1142,11 +1074,14 @@ const dragLine = new THREE.Line(lineGeo, lineMat);
 dragLine.visible = false;
 scene.add(dragLine);
 
-function getNearCameraSpawnPos(offset = 0.5 / DIST_SCALE): THREE.Vector3 {
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    return camera.position.clone().add(dir.multiplyScalar(offset));
-}
+// Preset and custom body creation for the Add/Edit Body panel.
+const bodyCreator = new BodyCreator({
+    dependencies,
+    scene,
+    camera,
+    getPrimaryStar,
+    setFocusBody,
+});
 
 /**
  * Spawn point/velocity for a newly launched probe: near the player's active ship when in flight
@@ -1163,793 +1098,7 @@ function computeProbeSpawn(): { pos: THREE.Vector3; vel: THREE.Vector3 } {
             vel: ship.velocity.clone(),
         };
     }
-    return { pos: getNearCameraSpawnPos(), vel: new THREE.Vector3() };
-}
-
-function computeOrbitVelocityAtPos(
-    spawnPos: THREE.Vector3,
-    parentPos: THREE.Vector3,
-    parentMass: number,
-    orbitType: string,
-    eccentricity: number,
-    inclinationDeg: number
-): THREE.Vector3 {
-    const toParent = spawnPos.clone().sub(parentPos);
-    const distance = toParent.length();
-
-    if (distance === 0) return new THREE.Vector3();
-
-    const circularSpeed = Math.sqrt((G * simulationState.gMultiplier * parentMass) / distance);
-    const speed =
-        orbitType === 'elliptical'
-            ? circularSpeed * Math.sqrt(Math.max(0, 1 - eccentricity))
-            : circularSpeed;
-
-    // Perpendicular velocity in XZ plane (ignoring Y component of toParent for horizontal orbit)
-    const perp = new THREE.Vector3(-toParent.z, 0, toParent.x).normalize().multiplyScalar(speed);
-
-    // Apply inclination tilt around X axis
-    const inclinationRad = (inclinationDeg * Math.PI) / 180;
-    perp.applyAxisAngle(new THREE.Vector3(1, 0, 0), inclinationRad);
-
-    return perp;
-}
-
-/**
- * Velocity for a body at `spawnPos` orbiting the live system barycenter (the same helper
- * procedural generation places P-type orbits with), carried along with the barycenter's drift.
- * Null when the system has no stars or black holes to define one.
- */
-function systemBarycenterOrbitVelocity(
-    spawnPos: THREE.Vector3,
-    orbitType: string,
-    eccentricity: number,
-    inclinationDeg: number
-): THREE.Vector3 | null {
-    const barycenter = computeSystemBarycenter(simulationState.bodies);
-    if (!barycenter) return null;
-    return barycenter.vel
-        .clone()
-        .add(
-            computeOrbitVelocityAtPos(
-                spawnPos,
-                barycenter.pos,
-                barycenter.mass,
-                orbitType,
-                eccentricity,
-                inclinationDeg
-            )
-        );
-}
-
-/**
- * Velocities that put a new star (at `newPos`, mass `newMass`) and an existing star into a true
- * binary orbit around their shared barycenter. Neither body moves: the barycenter is the
- * mass-weighted point between where they already are. The pair keeps the parent's current
- * velocity as its barycenter drift. The orbit plane follows the same prograde convention as
- * computeOrbitVelocityAtPos, tilted about the line between the stars by `inclinationDeg`.
- */
-function computeBinaryVelocities(
-    parent: CelestialBody,
-    newPos: THREE.Vector3,
-    newMass: number,
-    inclinationDeg: number
-): { parentVel: THREE.Vector3; newVel: THREE.Vector3 } | null {
-    const toParent = parent.mesh.position.clone().sub(newPos);
-    const separation = toParent.length();
-    if (!(separation > 0) || !(parent.mass + newMass > 0)) return null;
-    const u = toParent.divideScalar(separation);
-
-    // Prograde direction for the parent around the barycenter (perpendicular to u in XZ),
-    // with a fallback when the stars are stacked vertically.
-    const velDir = new THREE.Vector3(-u.z, 0, u.x);
-    if (velDir.lengthSq() < 1e-12) velDir.set(1, 0, 0);
-    velDir.normalize();
-    velDir.applyAxisAngle(u, (inclinationDeg * Math.PI) / 180);
-
-    // generateBinaryPlacementsFromBasis moves body 1 along normal × u, so normal = u × velDir.
-    const normal = new THREE.Vector3().crossVectors(u, velDir).normalize();
-
-    const [parentPlacement, newPlacement] = generateBinaryPlacementsFromBasis(
-        [parent.mass, newMass],
-        separation,
-        u,
-        normal,
-        G * simulationState.gMultiplier
-    );
-
-    const drift = parent.velocity.clone();
-    return {
-        parentVel: parentPlacement.vel.add(drift),
-        newVel: newPlacement.vel.add(drift),
-    };
-}
-
-/**
- * Parent each preset moon/satellite orbits, keyed by preset key. The parent is found by name
- * (or created from its own preset when missing) before the child is built around it.
- */
-const PRESET_CHILD_BODIES: Record<
-    string,
-    {
-        parentName: string;
-        parentPresetKey: string;
-        build: (parent: CelestialBody, scene: THREE.Scene, id: string) => Body;
-    }
-> = {
-    earth_moon: { parentName: 'Earth', parentPresetKey: 'earth', build: createEarthMoonBody },
-    iss: { parentName: 'Earth', parentPresetKey: 'earth', build: createIssBody },
-    io: { parentName: 'Jupiter', parentPresetKey: 'jupiter', build: createIoBody },
-    europa: { parentName: 'Jupiter', parentPresetKey: 'jupiter', build: createEuropaBody },
-    ganymede: { parentName: 'Jupiter', parentPresetKey: 'jupiter', build: createGanymedeBody },
-    callisto: { parentName: 'Jupiter', parentPresetKey: 'jupiter', build: createCallistoBody },
-    titan: { parentName: 'Saturn', parentPresetKey: 'saturn', build: createTitanBody },
-    charon: { parentName: 'Pluto', parentPresetKey: 'pluto', build: createCharonBody },
-};
-
-function createPresetBody(presetKey: string): Body | undefined {
-    const key = String(presetKey).toLowerCase();
-
-    // Presets assume a star exists. If launching empty mode, guide the user by creating a small star.
-    if (!getPrimaryStar() && key !== 'sun') {
-        createNewBody('sun');
-    }
-
-    // Moons and satellites orbit a specific parent: reuse a live one with the right name, or
-    // create it from its own preset first (which places it near the camera like any preset).
-    const childSpec = PRESET_CHILD_BODIES[key];
-    const primaryStar = getPrimaryStar();
-    let newBody: Body | null;
-
-    if (childSpec) {
-        const existing = simulationState.bodies.find(
-            (b): b is CelestialBody =>
-                !!b &&
-                !b._isDisposed &&
-                b.name === childSpec.parentName &&
-                b instanceof CelestialBody
-        );
-        const created = existing ? null : createPresetBody(childSpec.parentPresetKey);
-        const parent = existing ?? (created instanceof CelestialBody ? created : null);
-        if (!parent) return;
-        newBody = childSpec.build(parent, scene, createUniqueId(key));
-    } else {
-        switch (key) {
-            case 'sun':
-                newBody = new Sun(dependencies, scene);
-                break;
-            case 'mercury':
-                newBody = new Mercury(dependencies, scene);
-                break;
-            case 'venus':
-                newBody = new Venus(dependencies, scene);
-                break;
-            case 'earth':
-                newBody = new Earth(dependencies, scene);
-                break;
-            case 'mars':
-                newBody = new Mars(dependencies, scene);
-                break;
-            case 'jupiter':
-                newBody = new Jupiter(dependencies, scene);
-                break;
-            case 'saturn':
-                newBody = new Saturn(dependencies, scene);
-                break;
-            case 'uranus':
-                newBody = new Uranus(dependencies, scene);
-                break;
-            case 'neptune':
-                newBody = new Neptune(dependencies, scene);
-                break;
-            case 'pluto':
-                newBody = new Pluto(dependencies, scene);
-                break;
-            case 'ceres':
-                newBody = new Ceres(dependencies, scene);
-                break;
-            case 'vesta':
-                newBody = createVestaBody(
-                    dependencies,
-                    scene,
-                    primaryStar,
-                    createUniqueId('vesta')
-                );
-                break;
-            case 'pallas':
-                newBody = createPallasBody(
-                    dependencies,
-                    scene,
-                    primaryStar,
-                    createUniqueId('pallas')
-                );
-                break;
-            case 'hygiea':
-                newBody = createHygieaBody(
-                    dependencies,
-                    scene,
-                    primaryStar,
-                    createUniqueId('hygiea')
-                );
-                break;
-            case 'halley':
-                newBody = new Halley(dependencies, scene);
-                break;
-            default:
-                console.warn('Unknown presetKey:', presetKey);
-                return;
-        }
-    }
-
-    if (!newBody) return;
-
-    // Reposition preset bodies near the camera (like custom bodies), so the user sees them
-    // immediately rather than spawning at their preset orbital distance (e.g. Pluto at the
-    // edge of the system). The Sun stays at the origin.
-    // Moons and satellites keep the orbit they were built on around their parent.
-    if (key !== 'sun' && !childSpec) {
-        const star = getPrimaryStar();
-        if (star && star.mesh) {
-            const spawnPos = getNearCameraSpawnPos();
-            const spawnVel = computeOrbitVelocityAtPos(
-                spawnPos,
-                star.mesh.position,
-                star.mass,
-                'circular',
-                0,
-                0
-            );
-            newBody.mesh.position.copy(spawnPos);
-            newBody.velocity.copy(spawnVel);
-        }
-    }
-
-    simulationState.bodies.push(newBody);
-
-    // Notify UI / systems that track live bodies
-    try {
-        window.dispatchEvent(
-            new CustomEvent('body:added', {
-                detail: { body: newBody, id: newBody.id, name: newBody.name },
-            })
-        );
-    } catch (e) {
-        console.error('Error dispatching body:added event after preset body creation:', e);
-    }
-
-    // Select newly created body & keep selection pipeline consistent with custom creation
-    if (cameraState.isTargetMode) {
-        gizmo.attach(newBody);
-    } else {
-        gizmo.attach(null);
-    }
-
-    setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
-
-    return newBody;
-}
-
-function createNewBody(
-    bodyType: string,
-    planetType = 'solid',
-    orbitType = 'circular',
-    inclination = 0,
-    // Undefined rolls one procedurally; null means airless (ignored by subtypes that always
-    // have an atmosphere — Temperate and gas/ice giants).
-    atmosphere: IAtmosphereProfile | null | undefined = undefined,
-    hasRings = false,
-    customMass: number | null = null,
-    customTemperature: number | null = null,
-    customLightIntensity: number | null = null,
-    customRadius: number | null = null,
-    orbitParent: Body | null = null,
-    createTilt: number | null = null,
-    createAzimuth: number | null = null,
-    tailColor: string | null = null,
-    // NOTE: this parameter list is long enough that it should become an options object;
-    // left positional here to match the existing call sites rather than widen this change.
-    //
-    // Undefined (the default, for callers that omit it) means "roll one procedurally";
-    // an explicit null from the panel means "this body has no field".
-    magneticField: IMagneticFieldOptions | null | undefined = undefined,
-    // Optional name supplied by the add form. Null/empty means "generate one procedurally
-    // from the new body's id" (kept last so existing positional callers are unaffected).
-    customName: string | null = null,
-    // Orbit the live system barycenter instead of `orbitParent` (stars, planets, asteroids,
-    // comets). Falls back to the parent path when the system has no stars or black holes.
-    orbitSystemBarycenter = false
-) {
-    let newBody;
-    let usedSystemBarycenter = false;
-    /** Barycentric orbit velocity at `spawnPos`, or null to use the parent-based path. */
-    const barycenterVelocity = (spawnPos: THREE.Vector3, eccentricity: number) => {
-        if (!orbitSystemBarycenter) return null;
-        const vel = systemBarycenterOrbitVelocity(spawnPos, orbitType, eccentricity, inclination);
-        if (vel) usedSystemBarycenter = true;
-        return vel;
-    };
-    let moonCreationParent: Body | null = null; // tracked so post-creation can re-focus the parent
-
-    if (bodyType === 'sun') {
-        // Create a custom STAR.
-        //
-        // Defaults are randomized around star-like values so the user can override them
-        // in the creation UI before the body is actually created.
-        // First star goes to world center; additional stars spawn near the camera.
-        // Also treat an existing black hole as occupying the center.
-        const _hasCentralBody =
-            !!getPrimaryStar() ||
-            simulationState.bodies.some((b) => b && !b._isDisposed && b instanceof BlackHole);
-        const starPos = _hasCentralBody ? getNearCameraSpawnPos() : new THREE.Vector3(0, 0, 0);
-
-        const starParams = randomStarParams({
-            mass: customMass,
-            radius: customRadius,
-            temperature: customTemperature,
-            lightIntensity: customLightIntensity,
-        });
-        const { rotationTilt, rotationSpeed } = starParams;
-
-        const id = createUniqueId('star');
-        const name = customName ?? generateCustomBodyName('sun', id);
-
-        const liveParent = orbitParent && !orbitParent._isDisposed ? orbitParent : null;
-        const baryVel = barycenterVelocity(starPos, 0.3);
-        const binary =
-            !baryVel &&
-            orbitType === 'binary' &&
-            liveParent instanceof CelestialBody &&
-            !!(liveParent.bodyType & BodyTypeEnum.Star)
-                ? computeBinaryVelocities(liveParent, starPos, starParams.mass, inclination)
-                : null;
-
-        let starVel: THREE.Vector3;
-        if (baryVel) {
-            starVel = baryVel;
-        } else if (binary) {
-            starVel = binary.newVel;
-        } else if (liveParent) {
-            starVel = computeOrbitVelocityAtPos(
-                starPos,
-                liveParent.mesh.position.clone(),
-                liveParent.mass,
-                orbitType,
-                0.3,
-                inclination
-            );
-        } else {
-            starVel = new THREE.Vector3(0, 0, 0);
-        }
-
-        newBody = createMainSequenceStarFromParams(dependencies, scene, starParams, {
-            id,
-            name,
-            pos: starPos,
-            vel: starVel,
-            rotation: { tilt: rotationTilt, speed: rotationSpeed },
-            magneticField,
-        });
-
-        // Binary: the parent now swings around the shared barycenter too.
-        if (binary && liveParent instanceof CelestialBody) {
-            liveParent.velocity.copy(binary.parentVel);
-            liveParent.binaryPartner = newBody;
-            newBody.binaryPartner = liveParent;
-        }
-    } else if (bodyType === 'planet') {
-        // Create a new planet near the camera with appropriate orbital velocity
-        const planetParentBody =
-            orbitParent && !orbitParent._isDisposed ? orbitParent : getPrimaryStar();
-        const starPos = planetParentBody
-            ? planetParentBody.mesh.position.clone()
-            : new THREE.Vector3(0, 0, 0);
-        const starMass = planetParentBody ? planetParentBody.mass : SUN_MASS;
-
-        const spawnPos = getNearCameraSpawnPos();
-        const spawnVel =
-            barycenterVelocity(spawnPos, 0.3) ??
-            computeOrbitVelocityAtPos(spawnPos, starPos, starMass, orbitType, 0.3, inclination);
-
-        // Custom mode: never create dwarfs (UI dropdown has only planet subtypes).
-        const resolvedPlanetType = (planetType || 'solid') as
-            | 'solid'
-            | 'gas_giant'
-            | 'ice_giant'
-            | 'volcanic'
-            | 'ocean'
-            | 'desert'
-            | 'frozen'
-            | 'temperate';
-
-        const planetId = createUniqueId('planet');
-        const planetSeed = `${planetId}|custom|${resolvedPlanetType}`;
-
-        const {
-            mass: planetMass,
-            radius: planetRadius,
-            rotationSpeed: planetRotationSpeed,
-            rotationTilt: planetRotationTilt,
-            rotationAzimuth: planetRotationAzimuth,
-            bodySubtype: planetBodySubtype,
-        } = randomPlanetParams(resolvedPlanetType, {
-            mass: customMass,
-            radius: customRadius,
-            seed: planetSeed,
-        });
-
-        newBody = createPlanetBodyFromProceduralCreation(dependencies, scene, {
-            id: planetId,
-            name: customName ?? generateCustomBodyName('planet', planetId),
-            pos: spawnPos,
-            vel: spawnVel,
-            bodyType: BodyTypeEnum.Planet,
-            bodySubtype: planetBodySubtype,
-            radius: planetRadius,
-            mass: planetMass,
-            rotationSpeed: planetRotationSpeed,
-            rotationTilt: planetRotationTilt,
-            rotationAzimuth: planetRotationAzimuth,
-            hasRings,
-            magneticField,
-            textureSeed: planetSeed,
-            atmosphere,
-        });
-
-        // Ensure brightness scaling uses a neutral base when texture is present
-        newBody.baseColor = new THREE.Color(0xffffff);
-
-        // Kick off background procedural texture upgrade (desert/ocean/frozen only)
-        upgradeProceduralTexture(newBody as unknown as CelestialBody);
-    } else if (bodyType === 'moon') {
-        // Create a moon orbiting the selected body (management panel selection takes priority)
-        const focusedBody = (() => {
-            const candidate = orbitParent || cameraState.focusBody;
-            return candidate && !candidate._isDisposed && simulationState.bodies.includes(candidate)
-                ? candidate
-                : null;
-        })();
-        if (focusedBody) {
-            moonCreationParent = focusedBody; // remember so post-creation re-focuses parent
-
-            // Step 1: get parent's world position and velocity
-            const parentPos = focusedBody.mesh.position.clone();
-            const parentVel = focusedBody.velocity.clone();
-
-            // Step 2: size/spin params. Only the procedural generators use the rolled orbital
-            // distance; a manually created moon goes where the camera is instead.
-            const {
-                mass: moonMass,
-                radius: moonRadius,
-                rotationSpeed: moonRotationSpeed,
-            } = randomMoonParams(focusedBody.radius, { mass: customMass, radius: customRadius });
-
-            // Step 3: spawn at the camera (same as planets/asteroids), orbiting the parent from
-            // wherever that puts the moon.
-            const moonSpawnPos = getNearCameraSpawnPos();
-            const toMoon = moonSpawnPos.clone().sub(parentPos);
-            const moonDistance = toMoon.length();
-
-            // Step 4: orbital velocity about the parent at that point, carried along with the
-            // parent's own motion.
-            const moonSpawnVel = parentVel
-                .clone()
-                .add(
-                    computeOrbitVelocityAtPos(
-                        moonSpawnPos,
-                        parentPos,
-                        focusedBody.mass,
-                        orbitType,
-                        0.3,
-                        inclination
-                    )
-                );
-
-            // In-plane angle of the spawn point about the parent (0 = +X, π/2 = +Z).
-            const orbitAngle = Math.atan2(toMoon.z, toMoon.x);
-
-            const moonId = createUniqueId('moon');
-            // Moons are named relative to their parent: "<Parent> <Roman numeral>".
-            const moonName =
-                customName ??
-                generateCustomBodyName('moon', moonId, { parentName: focusedBody.name });
-
-            const geometry = buildBodySphereGeometry(moonRadius);
-
-            // planetType is used as moonType for `bodyType === 'moon'` custom creation.
-            // Map moonType -> texture to match planet subtype visuals.
-            const moonTextureSeed = `${moonId}|moonTexture|${planetType}`;
-            const moonType = (planetType || 'solid') as
-                | 'solid'
-                | 'temperate'
-                | 'volcanic'
-                | 'ocean'
-                | 'frozen'
-                | 'desert';
-
-            // Map planetType to MoonTypeEnum
-            const moonTypeEnum = (() => {
-                switch (moonType) {
-                    case 'desert':
-                        return MoonTypeEnum.Desert;
-                    case 'temperate':
-                        return MoonTypeEnum.Temperate;
-                    case 'volcanic':
-                        return MoonTypeEnum.Volcanic;
-                    case 'ocean':
-                        return MoonTypeEnum.Ocean;
-                    case 'frozen':
-                        return MoonTypeEnum.Frozen;
-                    case 'solid':
-                    default:
-                        return MoonTypeEnum.Terrestrial;
-                }
-            })();
-
-            const rng = new SeededRandom(moonTextureSeed);
-
-            const moonMap = pickMoonTextureForMoonType(moonTypeEnum, rng);
-
-            const moonMaterial = new THREE.MeshStandardMaterial({
-                map: moonMap,
-                color: 0xffffff, // keep texture untinted
-                emissive: 0x000000,
-                emissiveIntensity: 0,
-                roughness: getRoughnessForMoonTexture(moonTypeEnum),
-                metalness: getMetalnessForMoonTexture(moonTypeEnum),
-                transparent: false,
-                depthTest: true,
-                depthWrite: true,
-            });
-            const mesh = new THREE.Mesh(geometry, moonMaterial);
-
-            const moonSeed = `${moonId}|custom|${moonType}`;
-
-            // Resolve the atmosphere first — it decides the atmospheric composition.
-            const moonAtmosphere = resolveAtmosphereProfile(
-                atmosphere,
-                moonId,
-                moonTypeEnum,
-                'moon'
-            );
-
-            newBody = new Moon(dependencies, scene, {
-                distance: moonDistance,
-                angle: orbitAngle ?? 0,
-                yVariation: 0,
-                moonType: moonType as unknown as MoonTypeEnum,
-                tidalLock: {
-                    target: focusedBody as unknown as CelestialBody,
-                    spinAxisWorld: new THREE.Vector3(0, 1, 0),
-                    faceAxisLocal: new THREE.Vector3(0, 0, 1),
-                    // 0 triggers CelestialBody to compute derived omega on first update tick.
-                    angularSpeed: 0,
-                },
-                radius: moonRadius,
-                pos: moonSpawnPos,
-                vel: moonSpawnVel,
-                mass: moonMass,
-                id: moonId,
-                name: moonName,
-                trailColor: 0x666666,
-                maxTrail: 1000,
-                rotation: { tilt: 0, speed: moonRotationSpeed },
-                mesh,
-                seed: moonSeed,
-                // Unlike the star and planet branches, this constructs the Moon directly
-                // rather than going through moon-factory, so roll here when unspecified.
-                magneticField:
-                    magneticField !== undefined
-                        ? magneticField
-                        : rollMagneticField(new SeededRandom(`${moonId}|magnetic-field`), 'moon'),
-                attributes: computePlanetaryAttributes({
-                    id: moonId,
-                    subtype: moonTypeEnum,
-                    isDwarf: false,
-                    distanceT01: 0.5,
-                    hasAtmosphere: moonAtmosphere !== null,
-                }),
-            });
-
-            // Kick off background procedural texture upgrade (desert/ocean/frozen only)
-            upgradeProceduralTexture(newBody);
-
-            // Atmosphere (shell + clouds) from the panel's values, or rolled when unspecified.
-            applyAtmosphereToBody(
-                newBody,
-                moonAtmosphere,
-                moonTypeEnum,
-                moonSeed,
-                moonRotationSpeed
-            );
-
-            // Ensure brightness scaling uses a neutral base when texture is present
-            newBody.baseColor = new THREE.Color(0xffffff);
-        } else {
-            console.log('Please select a body first to create a moon');
-            return;
-        }
-    } else if (bodyType === 'asteroid') {
-        // Create an asteroid near the camera with appropriate orbital velocity
-        const asteroidSpawnPos = getNearCameraSpawnPos();
-        const asteroidParentBody =
-            orbitParent && !orbitParent._isDisposed ? orbitParent : getPrimaryStar();
-        const asteroidStarPos = asteroidParentBody
-            ? asteroidParentBody.mesh.position.clone()
-            : new THREE.Vector3(0, 0, 0);
-        const asteroidStarMass = asteroidParentBody ? asteroidParentBody.mass : SUN_MASS;
-        const asteroidVel =
-            barycenterVelocity(asteroidSpawnPos, 0.3) ??
-            computeOrbitVelocityAtPos(
-                asteroidSpawnPos,
-                asteroidStarPos,
-                asteroidStarMass,
-                orbitType,
-                0.3,
-                inclination
-            );
-
-        const { mass: asteroidMass, radius: asteroidRadius } = randomAsteroidParams({
-            mass: customMass,
-            radius: customRadius,
-        });
-
-        const asteroidId = createUniqueId('asteroid');
-        newBody = new Asteroid(dependencies, scene, {
-            pos: asteroidSpawnPos,
-            vel: asteroidVel,
-            mass: asteroidMass,
-            radius: asteroidRadius,
-            id: asteroidId,
-            name: customName ?? generateCustomBodyName('asteroid', asteroidId),
-        });
-    } else if (bodyType === 'comet') {
-        // Create a comet near the camera with appropriate orbital velocity
-        const cometSpawnPos = getNearCameraSpawnPos();
-        const cometParentBody =
-            orbitParent && !orbitParent._isDisposed ? orbitParent : getPrimaryStar();
-        const cometStarPos = cometParentBody
-            ? cometParentBody.mesh.position.clone()
-            : new THREE.Vector3(0, 0, 0);
-        const cometStarMass = cometParentBody ? cometParentBody.mass : SUN_MASS;
-        const cometOrbitVel =
-            barycenterVelocity(cometSpawnPos, 0.4) ??
-            computeOrbitVelocityAtPos(
-                cometSpawnPos,
-                cometStarPos,
-                cometStarMass,
-                orbitType,
-                0.4,
-                inclination
-            );
-
-        const { mass: cometMass, radius: cometRadius } = randomCometParams({
-            mass: customMass,
-            radius: customRadius,
-        });
-
-        const cometId = createUniqueId('comet');
-        // The manual flow uses the default variant rather than rerolling a nucleus.
-        newBody = createCometBody(dependencies, scene, {
-            radius: cometRadius,
-            pos: cometSpawnPos,
-            vel: cometOrbitVel,
-            mass: cometMass,
-            id: cometId,
-            name: customName ?? generateCustomBodyName('comet', cometId),
-            rotation: { tilt: 0, speed: 0.05 },
-            tailColor:
-                typeof tailColor === 'string' && tailColor.startsWith('#')
-                    ? parseInt(tailColor.slice(1), 16)
-                    : undefined,
-        });
-    } else if (bodyType === 'black_hole') {
-        const bhSpawnPos = getNearCameraSpawnPos();
-        const { mass: bhMass } = randomBlackHoleParams({ mass: customMass });
-
-        const blackHoleId = createUniqueId('black_hole');
-        newBody = new BlackHole(dependencies, scene, {
-            pos: bhSpawnPos,
-            vel: new THREE.Vector3(0, 0, 0),
-            mass: bhMass,
-            id: blackHoleId,
-            name: customName ?? generateCustomBodyName('black_hole', blackHoleId),
-        });
-
-        // Apply custom radius if the user overrode the slider
-        if (typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0) {
-            setBodyRadius(newBody as unknown as CelestialBody, customRadius);
-        }
-    } else if (bodyType === 'wormhole') {
-        const wormholeSpawnPos = getNearCameraSpawnPos();
-        const wormholeRadius =
-            typeof customRadius === 'number' && isFinite(customRadius) && customRadius > 0
-                ? customRadius
-                : WORMHOLE_DEFAULT_RADIUS;
-
-        const wormholeId = createUniqueId('wormhole');
-        const wormhole = new Wormhole(
-            dependencies,
-            scene,
-            wormholeSpawnPos,
-            wormholeRadius,
-            wormholeId,
-            customName ?? generateCustomBodyName('wormhole', wormholeId),
-            { tilt: 0, speed: 0 }
-        );
-        newBody = wormhole;
-
-        // First wormhole created starts a pending pair; the next one links to it.
-        const pendingLink = getPendingWormholeLink();
-        if (pendingLink) {
-            pendingLink.setLinkedWormhole(wormhole.id);
-            wormhole.setLinkedWormhole(pendingLink.id);
-            // Spawn the bezier particle bridge connecting the two funnels.
-            createBridgeForPair(pendingLink, wormhole, scene);
-            clearPendingWormholeLink();
-            addEvent({
-                message: `${pendingLink.name} and ${wormhole.name} are now linked`,
-                notificationType: NotificationType.Info,
-            });
-        } else {
-            setPendingWormholeLink(wormhole);
-        }
-    }
-
-    if (newBody) {
-        if (usedSystemBarycenter && newBody instanceof CelestialBody) {
-            newBody.orbitsSystemBarycenter = true;
-        }
-
-        // Apply axial tilt/azimuth from create sliders if the body supports rotation
-        if (
-            (createTilt !== null || createAzimuth !== null) &&
-            newBody instanceof CelestialBody &&
-            newBody.rotation
-        ) {
-            const tilt = createTilt !== null ? createTilt : (newBody.rotation.tilt ?? 0);
-            const azimuth =
-                createAzimuth !== null ? createAzimuth : (newBody.rotation.azimuth ?? 0);
-            newBody.rotation.tilt = tilt;
-            newBody.rotation.azimuth = azimuth;
-            spinPoleQuaternion(tilt, azimuth, newBody.mesh.quaternion);
-        }
-
-        simulationState.bodies.push(newBody);
-
-        // Notify UI / systems that track live bodies
-        try {
-            window.dispatchEvent(
-                new CustomEvent('body:added', {
-                    detail: { body: newBody, id: newBody.id, name: newBody.name },
-                })
-            );
-        } catch (e) {
-            console.error('Error disposing body during spawn cleanup:', e);
-        }
-
-        console.log(`Created new ${bodyType}:`, newBody.name);
-
-        // Auto-select the newly created body (gizmo depends on Target toggle)
-        if (cameraState.isTargetMode) {
-            gizmo.attach(newBody);
-        } else {
-            gizmo.attach(null);
-        }
-
-        // For moons: keep selection/focus on the parent so the user can keep adding
-        // moons to the same body without re-selecting it each time.
-        if (moonCreationParent) {
-            setFocusBody(moonCreationParent, { zoom: false });
-        } else {
-            // Focus selection/camera on the new body (object-based, not id-based)
-            setFocusBody(newBody, { zoom: cameraState.isLookAtMode });
-        }
-
-        // Clear any camera preset highlight (manual selection).
-        // Do NOT clear LOOK AT / FREE / TARGET highlights, those are toggles with independent state.
-    }
-
-    return (newBody && !newBody._isDisposed ? newBody : null) ?? null;
+    return { pos: bodyCreator.getNearCameraSpawnPos(), vel: new THREE.Vector3() };
 }
 
 /**
@@ -3870,30 +3019,30 @@ registerVueSimHooks({
               ) ?? null)
             : null;
 
-        const body = createNewBody(
-            payload.bodyType,
-            payload.planetType,
-            payload.orbitType,
-            payload.inclination,
-            payload.atmosphere,
-            payload.hasRings,
-            payload.customMass,
-            payload.customTemperature,
-            payload.customLightIntensity,
-            payload.customRadius,
+        const body = bodyCreator.createCustom({
+            bodyType: payload.bodyType,
+            planetType: payload.planetType,
+            orbitType: payload.orbitType,
+            inclination: payload.inclination,
+            atmosphere: payload.atmosphere,
+            hasRings: payload.hasRings,
+            customMass: payload.customMass,
+            customTemperature: payload.customTemperature,
+            customLightIntensity: payload.customLightIntensity,
+            customRadius: payload.customRadius,
             orbitParent,
-            payload.createTilt,
-            payload.createAzimuth,
-            payload.tailColor,
-            payload.magneticField,
-            payload.customName ?? null,
-            payload.orbitSystemBarycenter ?? false
-        );
+            createTilt: payload.createTilt,
+            createAzimuth: payload.createAzimuth,
+            tailColor: payload.tailColor,
+            magneticField: payload.magneticField,
+            customName: payload.customName,
+            orbitSystemBarycenter: payload.orbitSystemBarycenter,
+        });
         return body && !body._isDisposed ? body.id : null;
     },
     createPresetBody: (presetKey) => {
         if (scenarioManager.isLocked(ScenarioLock.AddBody)) return null;
-        const body = createPresetBody(presetKey);
+        const body = bodyCreator.createPreset(presetKey);
         return body && !body._isDisposed ? body.id : null;
     },
     launchProbeMission: (targetId, altitudeKm) => {
@@ -3950,166 +3099,8 @@ registerVueSimHooks({
         }
         deleteSelectedBody();
     },
-    getRandomizedCreateDefaults: (bodyType, requestedSubtype) => {
-        const PLANET_TYPES = [
-            'solid',
-            'gas_giant',
-            'ice_giant',
-            'volcanic',
-            'ocean',
-            'frozen',
-            'desert',
-            'temperate',
-        ] as const;
-        const MOON_TYPES = ['solid', 'temperate', 'volcanic', 'ocean', 'frozen', 'desert'] as const;
-        const randBool = () => Math.random() < 0.5;
-        // The panel's randomize button is unseeded, so feed the shared roll a throwaway seed.
-        const rollField = (kind: MagneticFieldKind) =>
-            rollMagneticField(new SeededRandom(generateSeedString()), kind);
-
-        if (bodyType === 'sun') {
-            const star = randomStarParams();
-            const tilt = Math.round(star.rotationTilt);
-            return {
-                mass: star.mass,
-                radius: star.radius,
-                temperature: star.temperature,
-                lightIntensity: star.lightIntensity,
-                tilt,
-                azimuth: Math.round(star.rotationAzimuth),
-                inclination: tilt,
-                hasAtmosphere: false,
-                atmosphere: null,
-                hasRings: false,
-                magneticField: rollField('star'),
-                planetType: null,
-                moonType: null,
-            };
-        }
-
-        // Non-star bodies randomize inclination independently of tilt (matches the old panel's
-        // `randomizeCreateBodyInputs`, which rolls this for every type except sun).
-        const inclination = Math.round(Math.random() * 90);
-
-        if (bodyType === 'black_hole') {
-            const bh = randomBlackHoleParams();
-            return {
-                mass: bh.mass,
-                radius: bh.radius,
-                temperature: null,
-                lightIntensity: null,
-                tilt: null,
-                azimuth: null,
-                inclination,
-                hasAtmosphere: false,
-                atmosphere: null,
-                hasRings: false,
-                magneticField: null,
-                planetType: null,
-                moonType: null,
-            };
-        }
-
-        if (bodyType === 'wormhole') {
-            const wormhole = randomWormholeParams();
-            return {
-                mass: null,
-                radius: wormhole.radius,
-                temperature: null,
-                lightIntensity: null,
-                tilt: Math.round(wormhole.rotationTilt),
-                azimuth: Math.round(wormhole.rotationAzimuth),
-                inclination,
-                hasAtmosphere: false,
-                atmosphere: null,
-                hasRings: false,
-                magneticField: null,
-                planetType: null,
-                moonType: null,
-            };
-        }
-
-        if (bodyType === 'planet') {
-            // A caller-pinned subtype (the user just picked one in the dropdown) is kept;
-            // otherwise roll one.
-            const planetType =
-                PLANET_TYPES.find((t) => t === requestedSubtype) ??
-                PLANET_TYPES[Math.floor(Math.random() * PLANET_TYPES.length)];
-            const params = randomPlanetParams(planetType);
-            // Same odds as procedural generation; the values also pre-fill the controls when the
-            // roll comes up airless, so checking "Has Atmosphere" still starts from sane numbers.
-            const atmosphereRng = new SeededRandom(generateSeedString());
-            const subtype = planetType as PlanetTypeEnum;
-            const rolledAtmosphere = rollAtmosphereProfile(atmosphereRng, subtype, 'planet');
-            return {
-                mass: params.mass,
-                radius: params.radius,
-                temperature: null,
-                lightIntensity: null,
-                tilt: Math.round(params.rotationTilt),
-                azimuth: Math.round(params.rotationAzimuth),
-                inclination,
-                hasAtmosphere: rolledAtmosphere !== null,
-                atmosphere:
-                    rolledAtmosphere ?? rollAtmosphereValues(atmosphereRng, subtype, 'planet'),
-                hasRings: randBool(),
-                magneticField: rollField(
-                    planetType === 'gas_giant'
-                        ? 'gasGiant'
-                        : planetType === 'ice_giant'
-                          ? 'iceGiant'
-                          : 'solid'
-                ),
-                planetType,
-                moonType: null,
-            };
-        }
-
-        if (bodyType === 'moon') {
-            const moonType =
-                MOON_TYPES.find((t) => t === requestedSubtype) ??
-                MOON_TYPES[Math.floor(Math.random() * MOON_TYPES.length)];
-            const params = randomMoonParams(EARTH_RADIUS);
-            const atmosphereRng = new SeededRandom(generateSeedString());
-            const subtype = moonType as MoonTypeEnum;
-            const rolledAtmosphere = rollAtmosphereProfile(atmosphereRng, subtype, 'moon');
-            return {
-                mass: params.mass,
-                radius: params.radius,
-                temperature: null,
-                lightIntensity: null,
-                tilt: Math.round(params.rotationTilt),
-                azimuth: Math.round(params.rotationAzimuth),
-                inclination,
-                hasAtmosphere: rolledAtmosphere !== null,
-                atmosphere:
-                    rolledAtmosphere ?? rollAtmosphereValues(atmosphereRng, subtype, 'moon'),
-                hasRings: false,
-                magneticField: rollField('moon'),
-                planetType: null,
-                moonType,
-            };
-        }
-
-        // Asteroid/comet: no tilt preview, but mass/radius are editable in the add form, so
-        // preview the same roll createNewBody would have made.
-        const smallBody = bodyType === 'comet' ? randomCometParams() : randomAsteroidParams();
-        return {
-            mass: smallBody.mass,
-            radius: smallBody.radius,
-            temperature: null,
-            lightIntensity: null,
-            tilt: null,
-            azimuth: null,
-            inclination,
-            hasAtmosphere: false,
-            atmosphere: null,
-            hasRings: false,
-            magneticField: null,
-            planetType: null,
-            moonType: null,
-        };
-    },
+    getRandomizedCreateDefaults: (bodyType, requestedSubtype) =>
+        bodyCreator.getRandomizedDefaults(bodyType, requestedSubtype),
 });
 
 // ── Flight mode functions ────────────────────────────────────────────────────

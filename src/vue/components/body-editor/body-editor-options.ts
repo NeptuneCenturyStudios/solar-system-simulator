@@ -1,91 +1,103 @@
 /** Static option lists for the Add/Edit Object panel. */
+import {
+    BodyTypeKeyEnum,
+    MoonTypeEnum,
+    PlanetTypeEnum,
+    PresetBodyKeyEnum,
+} from '../../../bodies/body-enums';
 
-export interface SelectOption {
-    value: string;
+export interface SelectOption<T extends string = string> {
+    value: T;
     label: string;
 }
 
-export interface SelectOptionGroup {
+export interface SelectOptionGroup<T extends string = string> {
     label: string;
-    options: SelectOption[];
+    options: SelectOption<T>[];
+}
+
+/** Whether the Add panel creates a real solar system preset or a custom body. */
+export enum AddBodyModeEnum {
+    Preset = 'preset',
+    Custom = 'custom',
 }
 
 /** Every body the default solar system creates, grouped the way the System Explorer reads. */
-export const PRESET_BODY_GROUPS: SelectOptionGroup[] = [
-    { label: 'Stars', options: [{ value: 'sun', label: 'Sun' }] },
+export const PRESET_BODY_GROUPS: SelectOptionGroup<PresetBodyKeyEnum>[] = [
+    { label: 'Stars', options: [{ value: PresetBodyKeyEnum.Sun, label: 'Sun' }] },
     {
         label: 'Planets',
         options: [
-            { value: 'mercury', label: 'Mercury' },
-            { value: 'venus', label: 'Venus' },
-            { value: 'earth', label: 'Earth' },
-            { value: 'mars', label: 'Mars' },
-            { value: 'jupiter', label: 'Jupiter' },
-            { value: 'saturn', label: 'Saturn' },
-            { value: 'uranus', label: 'Uranus' },
-            { value: 'neptune', label: 'Neptune' },
+            { value: PresetBodyKeyEnum.Mercury, label: 'Mercury' },
+            { value: PresetBodyKeyEnum.Venus, label: 'Venus' },
+            { value: PresetBodyKeyEnum.Earth, label: 'Earth' },
+            { value: PresetBodyKeyEnum.Mars, label: 'Mars' },
+            { value: PresetBodyKeyEnum.Jupiter, label: 'Jupiter' },
+            { value: PresetBodyKeyEnum.Saturn, label: 'Saturn' },
+            { value: PresetBodyKeyEnum.Uranus, label: 'Uranus' },
+            { value: PresetBodyKeyEnum.Neptune, label: 'Neptune' },
         ],
     },
     {
         label: 'Dwarf Planets',
         options: [
-            { value: 'ceres', label: 'Ceres' },
-            { value: 'pluto', label: 'Pluto' },
+            { value: PresetBodyKeyEnum.Ceres, label: 'Ceres' },
+            { value: PresetBodyKeyEnum.Pluto, label: 'Pluto' },
         ],
     },
     {
         label: 'Moons',
         options: [
-            { value: 'earth_moon', label: 'Moon (Earth)' },
-            { value: 'io', label: 'Io (Jupiter)' },
-            { value: 'europa', label: 'Europa (Jupiter)' },
-            { value: 'ganymede', label: 'Ganymede (Jupiter)' },
-            { value: 'callisto', label: 'Callisto (Jupiter)' },
-            { value: 'titan', label: 'Titan (Saturn)' },
-            { value: 'charon', label: 'Charon (Pluto)' },
+            { value: PresetBodyKeyEnum.EarthMoon, label: 'Moon (Earth)' },
+            { value: PresetBodyKeyEnum.Io, label: 'Io (Jupiter)' },
+            { value: PresetBodyKeyEnum.Europa, label: 'Europa (Jupiter)' },
+            { value: PresetBodyKeyEnum.Ganymede, label: 'Ganymede (Jupiter)' },
+            { value: PresetBodyKeyEnum.Callisto, label: 'Callisto (Jupiter)' },
+            { value: PresetBodyKeyEnum.Titan, label: 'Titan (Saturn)' },
+            { value: PresetBodyKeyEnum.Charon, label: 'Charon (Pluto)' },
         ],
     },
     {
         label: 'Asteroids',
         options: [
-            { value: 'vesta', label: 'Vesta' },
-            { value: 'pallas', label: 'Pallas' },
-            { value: 'hygiea', label: 'Hygiea' },
+            { value: PresetBodyKeyEnum.Vesta, label: 'Vesta' },
+            { value: PresetBodyKeyEnum.Pallas, label: 'Pallas' },
+            { value: PresetBodyKeyEnum.Hygiea, label: 'Hygiea' },
         ],
     },
-    { label: 'Comets', options: [{ value: 'halley', label: "Halley's Comet" }] },
-    { label: 'Spacecraft', options: [{ value: 'iss', label: 'ISS (Earth)' }] },
+    { label: 'Comets', options: [{ value: PresetBodyKeyEnum.Halley, label: "Halley's Comet" }] },
+    { label: 'Spacecraft', options: [{ value: PresetBodyKeyEnum.Iss, label: 'ISS (Earth)' }] },
 ];
 
 /** Body types the custom form can create. */
-export const BODY_TYPE_OPTIONS: SelectOption[] = [
-    { value: 'sun', label: 'Star' },
-    { value: 'planet', label: 'Planet' },
-    { value: 'moon', label: 'Moon' },
-    { value: 'asteroid', label: 'Asteroid' },
-    { value: 'comet', label: 'Comet' },
-    { value: 'black_hole', label: 'Black Hole' },
-    { value: 'wormhole', label: 'Wormhole' },
+export const BODY_TYPE_OPTIONS: SelectOption<BodyTypeKeyEnum>[] = [
+    { value: BodyTypeKeyEnum.Star, label: 'Star' },
+    { value: BodyTypeKeyEnum.Planet, label: 'Planet' },
+    { value: BodyTypeKeyEnum.Moon, label: 'Moon' },
+    { value: BodyTypeKeyEnum.Asteroid, label: 'Asteroid' },
+    { value: BodyTypeKeyEnum.Comet, label: 'Comet' },
+    { value: BodyTypeKeyEnum.BlackHole, label: 'Black Hole' },
+    { value: BodyTypeKeyEnum.Wormhole, label: 'Wormhole' },
 ];
 
-export const PLANET_TYPE_OPTIONS: SelectOption[] = [
-    { value: 'solid', label: 'Solid' },
-    { value: 'gas_giant', label: 'Gas Giant' },
-    { value: 'ice_giant', label: 'Ice Giant' },
-    { value: 'temperate', label: 'Temperate' },
-    { value: 'volcanic', label: 'Volcanic' },
-    { value: 'frozen', label: 'Frozen' },
-    { value: 'ocean', label: 'Ocean' },
-    { value: 'desert', label: 'Desert' },
+export const PLANET_TYPE_OPTIONS: SelectOption<PlanetTypeEnum>[] = [
+    { value: PlanetTypeEnum.Terrestrial, label: 'Solid' },
+    { value: PlanetTypeEnum.GasGiant, label: 'Gas Giant' },
+    { value: PlanetTypeEnum.IceGiant, label: 'Ice Giant' },
+    { value: PlanetTypeEnum.Temperate, label: 'Temperate' },
+    { value: PlanetTypeEnum.Volcanic, label: 'Volcanic' },
+    { value: PlanetTypeEnum.Frozen, label: 'Frozen' },
+    { value: PlanetTypeEnum.Ocean, label: 'Ocean' },
+    { value: PlanetTypeEnum.Desert, label: 'Desert' },
 ];
 
-export const MOON_TYPE_OPTIONS: SelectOption[] = [
-    { value: 'solid', label: 'Solid' },
-    { value: 'temperate', label: 'Temperate' },
-    { value: 'volcanic', label: 'Volcanic' },
-    { value: 'ocean', label: 'Ocean' },
-    { value: 'frozen', label: 'Frozen' },
-    { value: 'desert', label: 'Desert' },
+export const MOON_TYPE_OPTIONS: SelectOption<MoonTypeEnum>[] = [
+    { value: MoonTypeEnum.Terrestrial, label: 'Solid' },
+    { value: MoonTypeEnum.Temperate, label: 'Temperate' },
+    { value: MoonTypeEnum.Volcanic, label: 'Volcanic' },
+    { value: MoonTypeEnum.Ocean, label: 'Ocean' },
+    { value: MoonTypeEnum.Frozen, label: 'Frozen' },
+    { value: MoonTypeEnum.Desert, label: 'Desert' },
 ];
 
 /** Readable label for a planet/moon subtype key, or the key itself when unknown. */

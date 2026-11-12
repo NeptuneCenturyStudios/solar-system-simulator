@@ -8,8 +8,8 @@
                 <div v-if="!isEditMode" class="control-group">
                     <label for="bodyEditorAddMode">Add Mode</label>
                     <select id="bodyEditorAddMode" v-model="addMode">
-                        <option value="preset">Preset</option>
-                        <option value="custom">Custom</option>
+                        <option :value="AddBodyModeEnum.Preset">Preset</option>
+                        <option :value="AddBodyModeEnum.Custom">Custom</option>
                     </select>
                 </div>
 
@@ -170,6 +170,7 @@ import {
 } from '@mdi/js';
 
 import { ScenarioLock } from '../../interfaces';
+import { BodyTypeKeyEnum, PresetBodyKeyEnum } from '../../bodies/body-enums';
 import { closeBodyEditor, openBodyEditor, vueUiState } from '../ui-store';
 import {
     applyBodyEdit,
@@ -189,6 +190,7 @@ import BasicInfoSection from './body-editor/BasicInfoSection.vue';
 import MagneticFieldSection from './body-editor/MagneticFieldSection.vue';
 import OrbitSection from './body-editor/OrbitSection.vue';
 import {
+    AddBodyModeEnum,
     BODY_TYPE_OPTIONS,
     MOON_TYPE_OPTIONS,
     PLANET_TYPE_OPTIONS,
@@ -213,9 +215,9 @@ const {
 } = useBodyEditorForm(() => isEditMode.value);
 
 // ── Add-mode choices (kept across opens so repeated custom adds stay in Custom) ──
-const addMode = ref<'preset' | 'custom'>('preset');
-const presetKey = ref('sun');
-const isPresetMode = computed(() => !isEditMode.value && addMode.value === 'preset');
+const addMode = ref<AddBodyModeEnum>(AddBodyModeEnum.Preset);
+const presetKey = ref<PresetBodyKeyEnum>(PresetBodyKeyEnum.Sun);
+const isPresetMode = computed(() => !isEditMode.value && addMode.value === AddBodyModeEnum.Preset);
 
 /** Basic Info starts expanded, the detail groups collapsed; kept while the panel is open. */
 const sectionOpen = reactive({ basic: true, orbit: false, atmosphere: false, magnetic: false });
@@ -225,12 +227,12 @@ const showSubtypePicker = computed(() =>
     isEditMode.value ? !!snapshot.value?.subtypeKey : view.value.needsSubtype
 );
 const subtypePickerLabel = computed(() =>
-    (isEditMode.value ? snapshot.value?.bodyTypeKey : form.bodyType) === 'moon'
+    (isEditMode.value ? snapshot.value?.bodyTypeKey : form.bodyType) === BodyTypeKeyEnum.Moon
         ? 'Moon Type'
         : 'Planet Type'
 );
 const subtypeOptions = computed(() =>
-    form.bodyType === 'moon' ? MOON_TYPE_OPTIONS : PLANET_TYPE_OPTIONS
+    form.bodyType === BodyTypeKeyEnum.Moon ? MOON_TYPE_OPTIONS : PLANET_TYPE_OPTIONS
 );
 
 // ── Locks ─────────────────────────────────────────────────────────────────
@@ -296,9 +298,13 @@ watch(
 // ── Actions ───────────────────────────────────────────────────────────────
 function onCreate(): void {
     if (!canCreate.value) return;
-    const newId = isPresetMode.value
-        ? createPresetBodyByKey(presetKey.value)
-        : createCustomBody(buildCreatePayload());
+    let newId: string | null;
+    if (isPresetMode.value) {
+        newId = createPresetBodyByKey(presetKey.value);
+    } else {
+        const payload = buildCreatePayload();
+        newId = payload ? createCustomBody(payload) : null;
+    }
     if (newId) openBodyEditor('edit', newId);
 }
 

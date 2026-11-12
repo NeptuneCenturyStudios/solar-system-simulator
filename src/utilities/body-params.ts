@@ -244,6 +244,7 @@ export interface PlanetParams {
  */
 export function randomPlanetParams(
     planetType:
+        | PlanetTypeEnum
         | 'solid'
         | 'gas_giant'
         | 'ice_giant'
@@ -251,7 +252,7 @@ export function randomPlanetParams(
         | 'ocean'
         | 'frozen'
         | 'desert'
-        | 'temperate' = 'solid',
+        | 'temperate' = PlanetTypeEnum.Terrestrial,
     opts: { mass?: number | null; radius?: number | null; seed?: string | null } = {}
 ): PlanetParams {
     const inputSeed = (opts.seed ?? '').trim();

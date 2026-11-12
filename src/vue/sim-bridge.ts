@@ -1,6 +1,13 @@
 import { reactive } from 'vue';
 
-import { BodyTypeEnum } from '../bodies/body-enums';
+import {
+    BodyTypeEnum,
+    BodyTypeKeyEnum,
+    MoonTypeEnum,
+    OrbitTypeEnum,
+    PlanetTypeEnum,
+    PresetBodyKeyEnum,
+} from '../bodies/body-enums';
 import { Body } from '../bodies/body';
 import { probeScanStatusLabel } from '../bodies/probe-scan-status';
 import type { IBodyAttributeRow } from '../bodies/body-attribute-display';
@@ -112,11 +119,11 @@ export interface BodyEditSnapshot {
     tailColorHex: string | null;
     /** Readable type label e.g. "Planet". */
     typeLabel: string;
-    /** Add-form body type key this body corresponds to ('sun', 'planet', 'moon', 'asteroid',
-     *  'comet', 'black_hole', 'wormhole'), 'dwarf_planet', or 'other' for anything else. */
-    bodyTypeKey: string;
-    /** Planet/moon subtype key (e.g. 'gas_giant'), or null for bodies without one. */
-    subtypeKey: string | null;
+    /** Add-form body type key this body corresponds to; DwarfPlanet or Other for bodies the
+     *  add form cannot create. */
+    bodyTypeKey: BodyTypeKeyEnum;
+    /** Planet/moon subtype, or null for bodies without one. */
+    subtypeKey: PlanetTypeEnum | MoonTypeEnum | null;
     /** True when the body carries a ring system. */
     hasRings: boolean;
     /** Name of the body this one orbits, or null when it has no orbit parent. */
@@ -149,14 +156,15 @@ export interface BodyAttributesSnapshot {
 /** Payload for creating a custom body from the add form. Mirrors the old
  *  management panel's `createBody` event exactly. */
 export interface CreateBodyPayload {
-    bodyType: string;
+    bodyType: BodyTypeKeyEnum;
     /**
      * Name typed/edited in the add form. Null/empty means "generate one procedurally"
      * (the sim falls back to a deterministic name seeded by the new body's id).
      */
     customName?: string | null;
-    planetType: string;
-    orbitType: string;
+    /** Planet subtype for planets, moon subtype for moons; ignored by other body types. */
+    planetType: PlanetTypeEnum | MoonTypeEnum;
+    orbitType: OrbitTypeEnum;
     inclination: number;
     /** Atmosphere for planets/moons, or null for none. Temperate and gas/ice giants always get
      *  one (a null is ignored for them). */
@@ -219,8 +227,8 @@ export interface RandomizedCreateDefaults {
     hasRings: boolean;
     /** Randomized field, or null when this body type never has one (checkbox comes up unchecked). */
     magneticField: IMagneticFieldOptions | null;
-    planetType: string | null;
-    moonType: string | null;
+    planetType: PlanetTypeEnum | null;
+    moonType: MoonTypeEnum | null;
 }
 
 export interface VueSimHooks {
@@ -273,7 +281,7 @@ export interface VueSimHooks {
     /** Create a custom body from the add-form payload; resolves to the new body id. */
     createBody?: (payload: CreateBodyPayload) => string | null;
     /** Create a preset body (presets like Sun/Mercury/Earth); resolves to the new body id. */
-    createPresetBody?: (presetKey: string) => string | null;
+    createPresetBody?: (presetKey: PresetBodyKeyEnum) => string | null;
     /** Launch a probe mission toward targetId at the given altitude (km); resolves to the new probe's id. */
     launchProbeMission?: (targetId: string, altitudeKm: number) => string | null;
     /** Apply an edit to an existing body (same behavior as the old Apply button). */
@@ -284,7 +292,10 @@ export interface VueSimHooks {
      * Re-roll add-custom form preview values for the given body type (old Randomize button).
      * When `subtype` is a valid planet/moon type, it is kept instead of rolling a random one.
      */
-    getRandomizedCreateDefaults?: (bodyType: string, subtype?: string) => RandomizedCreateDefaults;
+    getRandomizedCreateDefaults?: (
+        bodyType: BodyTypeKeyEnum,
+        subtype?: string
+    ) => RandomizedCreateDefaults;
 
     // ── Solar System Management (same sim paths as the old management panel) ─
     /** Show/hide the skydome background texture. */
@@ -1012,7 +1023,7 @@ export function createCustomBody(payload: CreateBodyPayload): string | null {
 }
 
 /** Create a preset body; returns the new body's id (null on failure). */
-export function createPresetBodyByKey(presetKey: string): string | null {
+export function createPresetBodyByKey(presetKey: PresetBodyKeyEnum): string | null {
     return hookRegistry.createPresetBody?.(presetKey) ?? null;
 }
 
@@ -1036,7 +1047,7 @@ export function deleteBodyById(bodyId: string): void {
  * planet/moon type instead of rolling a random one.
  */
 export function getRandomizedCreateDefaults(
-    bodyType: string,
+    bodyType: BodyTypeKeyEnum,
     subtype?: string
 ): RandomizedCreateDefaults | null {
     return hookRegistry.getRandomizedCreateDefaults?.(bodyType, subtype) ?? null;
@@ -1062,10 +1073,10 @@ function resolveMoonSequenceNumber(parentName: string): number | undefined {
  * names them at creation.
  */
 export function generateAddFormBodyName(
-    bodyType: string,
+    bodyType: BodyTypeKeyEnum,
     orbitParentId: string | null = state.selectedId
 ): string {
-    if (bodyType !== 'moon') return generateRandomCustomBodyName(bodyType);
+    if (bodyType !== BodyTypeKeyEnum.Moon) return generateRandomCustomBodyName(bodyType);
 
     const parentId = resolveOrbitParentId(orbitParentId);
     const parent = parentId

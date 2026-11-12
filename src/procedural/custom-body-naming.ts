@@ -15,19 +15,9 @@
  * - `generateRandomCustomBodyName` is the UI-side preview: unseeded, so the RANDOMIZE
  *   button (and every body-type/planet-type/moon-type change) produces a fresh name.
  */
-import { BodyTypeEnum } from '../bodies/body-enums';
+import { BodyTypeEnum, BodyTypeKeyEnum } from '../bodies/body-enums';
 import { generateProceduralBodyName } from './body-naming';
 import { generateSeedString } from './seed-utils';
-
-/** Body-type strings used by the Add/Edit Body panel's `bodyType` field. */
-export type CustomBodyType =
-    | 'sun'
-    | 'planet'
-    | 'moon'
-    | 'asteroid'
-    | 'comet'
-    | 'black_hole'
-    | 'wormhole';
 
 export interface CustomBodyNameOptions {
     /**
@@ -40,24 +30,24 @@ export interface CustomBodyNameOptions {
 }
 
 /**
- * Maps a panel `bodyType` string to its `BodyTypeEnum` flag.
- * Returns null for an unrecognised string so callers can fall back to a plain name.
+ * Maps a panel body-type key to its `BodyTypeEnum` flag.
+ * Returns null for keys the add form cannot create so callers can fall back to a plain name.
  */
-export function customBodyTypeStringToEnum(bodyType: string): BodyTypeEnum | null {
+export function customBodyTypeKeyToEnum(bodyType: BodyTypeKeyEnum): BodyTypeEnum | null {
     switch (bodyType) {
-        case 'sun':
+        case BodyTypeKeyEnum.Star:
             return BodyTypeEnum.Star;
-        case 'planet':
+        case BodyTypeKeyEnum.Planet:
             return BodyTypeEnum.Planet;
-        case 'moon':
+        case BodyTypeKeyEnum.Moon:
             return BodyTypeEnum.Moon;
-        case 'asteroid':
+        case BodyTypeKeyEnum.Asteroid:
             return BodyTypeEnum.Asteroid;
-        case 'comet':
+        case BodyTypeKeyEnum.Comet:
             return BodyTypeEnum.Comet;
-        case 'black_hole':
+        case BodyTypeKeyEnum.BlackHole:
             return BodyTypeEnum.BlackHole;
-        case 'wormhole':
+        case BodyTypeKeyEnum.Wormhole:
             return BodyTypeEnum.Wormhole;
         default:
             return null;
@@ -69,11 +59,11 @@ export function customBodyTypeStringToEnum(bodyType: string): BodyTypeEnum | nul
  * always resolves to the same name.
  */
 export function generateCustomBodyName(
-    bodyType: string,
+    bodyType: BodyTypeKeyEnum,
     bodyId: string,
     options: CustomBodyNameOptions = {}
 ): string {
-    const type = customBodyTypeStringToEnum(bodyType);
+    const type = customBodyTypeKeyToEnum(bodyType);
     if (type === null) return 'Unnamed';
 
     return generateProceduralBodyName(type, {
@@ -88,10 +78,10 @@ export function generateCustomBodyName(
  * so the RANDOMIZE button and body-type changes give the user a new name to accept or edit.
  */
 export function generateRandomCustomBodyName(
-    bodyType: string,
+    bodyType: BodyTypeKeyEnum,
     options: CustomBodyNameOptions = {}
 ): string {
-    const type = customBodyTypeStringToEnum(bodyType);
+    const type = customBodyTypeKeyToEnum(bodyType);
     if (type === null) return 'Unnamed';
 
     return generateProceduralBodyName(type, {

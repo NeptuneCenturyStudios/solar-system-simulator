@@ -37,7 +37,7 @@
                             id="bodyEditorOrbitCircular"
                             v-model="form.orbitType"
                             type="radio"
-                            value="circular"
+                            :value="OrbitTypeEnum.Circular"
                         />
                         <label for="bodyEditorOrbitCircular">Circular</label>
                     </div>
@@ -46,7 +46,7 @@
                             id="bodyEditorOrbitElliptical"
                             v-model="form.orbitType"
                             type="radio"
-                            value="elliptical"
+                            :value="OrbitTypeEnum.Elliptical"
                         />
                         <label for="bodyEditorOrbitElliptical">Elliptical</label>
                     </div>
@@ -55,7 +55,7 @@
                             id="bodyEditorOrbitBinary"
                             v-model="form.orbitType"
                             type="radio"
-                            value="binary"
+                            :value="OrbitTypeEnum.Binary"
                         />
                         <label for="bodyEditorOrbitBinary">Binary (shared barycenter)</label>
                     </div>
@@ -111,6 +111,7 @@
 </template>
 
 <script setup lang="ts">
+import { OrbitTypeEnum } from '../../../bodies/body-enums';
 import { useBodyEditorContext } from '../../composables/useBodyEditorForm';
 import CollapsibleSection from './CollapsibleSection.vue';
 import NumberField from './NumberField.vue';

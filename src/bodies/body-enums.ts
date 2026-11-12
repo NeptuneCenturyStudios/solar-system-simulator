@@ -53,3 +53,56 @@ export enum MoonTypeEnum {
     Frozen = 'frozen',
     Desert = 'desert',
 }
+
+/**
+ * Body-type keys used by the Add/Edit Body panel. Star through Wormhole are the types the custom
+ * add form can create; DwarfPlanet and Other only appear on edit snapshots of existing bodies.
+ */
+export enum BodyTypeKeyEnum {
+    Star = 'sun',
+    Planet = 'planet',
+    Moon = 'moon',
+    Asteroid = 'asteroid',
+    Comet = 'comet',
+    BlackHole = 'black_hole',
+    Wormhole = 'wormhole',
+    /** Edit-only: never created by the add form. */
+    DwarfPlanet = 'dwarf_planet',
+    /** Edit-only: any body that maps to none of the other keys. */
+    Other = 'other',
+}
+
+/** Orbit shape requested when a body is created from the add form. */
+export enum OrbitTypeEnum {
+    Circular = 'circular',
+    Elliptical = 'elliptical',
+    /** Star only: the new star and its parent star orbit their shared barycenter. */
+    Binary = 'binary',
+}
+
+/** Keys of the real solar system bodies the add form can create as presets. */
+export enum PresetBodyKeyEnum {
+    Sun = 'sun',
+    Mercury = 'mercury',
+    Venus = 'venus',
+    Earth = 'earth',
+    Mars = 'mars',
+    Jupiter = 'jupiter',
+    Saturn = 'saturn',
+    Uranus = 'uranus',
+    Neptune = 'neptune',
+    Pluto = 'pluto',
+    Ceres = 'ceres',
+    Vesta = 'vesta',
+    Pallas = 'pallas',
+    Hygiea = 'hygiea',
+    Halley = 'halley',
+    EarthMoon = 'earth_moon',
+    Iss = 'iss',
+    Io = 'io',
+    Europa = 'europa',
+    Ganymede = 'ganymede',
+    Callisto = 'callisto',
+    Titan = 'titan',
+    Charon = 'charon',
+}

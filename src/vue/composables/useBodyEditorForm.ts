@@ -9,6 +9,12 @@ import {
 } from 'vue';
 
 import { COMET_TAIL_COLOR_PALETTE, RADIUS_SCALE } from '../../utilities/consts';
+import {
+    BodyTypeKeyEnum,
+    MoonTypeEnum,
+    OrbitTypeEnum,
+    PlanetTypeEnum,
+} from '../../bodies/body-enums';
 import type { IMagneticFieldOptions } from '../../interfaces';
 import type { IAtmosphereProfile } from '../../procedural/atmosphere-profile';
 import { subtypeForcesAtmosphere } from '../../procedural/atmosphere-profile';
@@ -43,15 +49,18 @@ export const ATM_PRESSURE_MIN = 0.00001;
 const DEFAULT_TAIL_COLOR = '#7ab8ff';
 
 /** Add-form body types that can orbit the system barycenter (moons need a parent). */
-const BARYCENTER_BODY_TYPES: ReadonlySet<string> = new Set(['sun', 'planet', 'asteroid', 'comet']);
-
-export type OrbitType = 'circular' | 'elliptical' | 'binary';
+const BARYCENTER_BODY_TYPES: ReadonlySet<BodyTypeKeyEnum> = new Set([
+    BodyTypeKeyEnum.Star,
+    BodyTypeKeyEnum.Planet,
+    BodyTypeKeyEnum.Asteroid,
+    BodyTypeKeyEnum.Comet,
+]);
 
 export interface BodyFormState {
     /** Add-form body type key; '' until the user picks one. */
-    bodyType: string;
-    /** Planet/moon subtype key; '' until the user picks one. */
-    subtype: string;
+    bodyType: BodyTypeKeyEnum | '';
+    /** Planet/moon subtype; '' until the user picks one. */
+    subtype: PlanetTypeEnum | MoonTypeEnum | '';
     name: string;
     mass: number;
     /** Body radius in km; converted to/from sim units with RADIUS_SCALE at the form's edges. */
@@ -64,7 +73,7 @@ export interface BodyFormState {
     orbitParentId: string;
     /** Orbit the system barycenter instead of the orbit parent. */
     orbitSystemBarycenter: boolean;
-    orbitType: OrbitType;
+    orbitType: OrbitTypeEnum;
     inclination: number;
     /** Edit-only: current speed. */
     velocity: number;
@@ -201,7 +210,7 @@ function createInitialState(): BodyFormState {
         hasRings: false,
         orbitParentId: '',
         orbitSystemBarycenter: false,
-        orbitType: 'circular',
+        orbitType: OrbitTypeEnum.Circular,
         inclination: 0,
         velocity: 0,
         orbitalAngle: 0,
@@ -258,7 +267,7 @@ export function useBodyEditorForm(isEdit: () => boolean) {
     const defaultOrbitParentId = computed<string | null>(() => {
         const selected = resolveOrbitParentId(simStore.selectedId);
         if (selected && candidateParents.value.some((b) => b.id === selected)) return selected;
-        if (form.bodyType === 'moon') return null;
+        if (form.bodyType === BodyTypeKeyEnum.Moon) return null;
         return candidateParents.value.find((b) => b.isStar)?.id ?? null;
     });
 
@@ -266,12 +275,13 @@ export function useBodyEditorForm(isEdit: () => boolean) {
         const edit = isEdit();
         const snap = bodyEditorStore.snapshot;
         const type = form.bodyType;
-        const needsSubtype = !edit && (type === 'planet' || type === 'moon');
+        const needsSubtype =
+            !edit && (type === BodyTypeKeyEnum.Planet || type === BodyTypeKeyEnum.Moon);
         const fieldsReady = edit ? !!snap : type !== '' && (!needsSubtype || form.subtype !== '');
 
         const isSmallBody = edit
             ? !!snap?.isAsteroid || !!snap?.isComet
-            : type === 'asteroid' || type === 'comet';
+            : type === BodyTypeKeyEnum.Asteroid || type === BodyTypeKeyEnum.Comet;
 
         const orbitParentId = edit
             ? null
@@ -281,6 +291,7 @@ export function useBodyEditorForm(isEdit: () => boolean) {
             : (candidateParents.value.find((b) => b.id === orbitParentId) ?? null);
         const barycenterAvailable =
             !edit &&
+            type !== '' &&
             BARYCENTER_BODY_TYPES.has(type) &&
             candidateParents.value.some((b) => b.isStar);
         const usesSystemBarycenter = barycenterAvailable && form.orbitSystemBarycenter;
@@ -292,50 +303,65 @@ export function useBodyEditorForm(isEdit: () => boolean) {
 
         // Atmosphere: edit mode can tune an existing atmosphere but never add or remove one.
         const forcesAtmosphere =
-            (type === 'planet' || type === 'moon') && subtypeForcesAtmosphere(form.subtype);
-        const canToggleAtmosphere = (type === 'planet' || type === 'moon') && !forcesAtmosphere;
+            (type === BodyTypeKeyEnum.Planet || type === BodyTypeKeyEnum.Moon) &&
+            subtypeForcesAtmosphere(form.subtype);
+        const canToggleAtmosphere =
+            (type === BodyTypeKeyEnum.Planet || type === BodyTypeKeyEnum.Moon) && !forcesAtmosphere;
 
         return {
             isEdit: edit,
             snapshot: snap,
             needsSubtype,
             fieldsReady,
-            showStarFields: edit ? !!snap?.isStar : type === 'sun',
-            showTailColor: edit ? !!snap?.isComet : type === 'comet',
-            showMass: edit || type !== 'wormhole',
+            showStarFields: edit ? !!snap?.isStar : type === BodyTypeKeyEnum.Star,
+            showTailColor: edit ? !!snap?.isComet : type === BodyTypeKeyEnum.Comet,
+            showMass: edit || type !== BodyTypeKeyEnum.Wormhole,
             showRings: edit
-                ? snap?.bodyTypeKey === 'planet' || snap?.bodyTypeKey === 'dwarf_planet'
-                : type === 'planet',
+                ? snap?.bodyTypeKey === BodyTypeKeyEnum.Planet ||
+                  snap?.bodyTypeKey === BodyTypeKeyEnum.DwarfPlanet
+                : type === BodyTypeKeyEnum.Planet,
             ringsEditable: !edit,
             massMin: isSmallBody ? SMALL_BODY_MIN : '0.001',
             radiusMin: isSmallBody ? SMALL_BODY_RADIUS_MIN_KM : RADIUS_MIN_KM,
             radiusStep: 'any',
-            showOrbitFields: edit || (type !== 'black_hole' && type !== 'wormhole'),
+            showOrbitFields:
+                edit || (type !== BodyTypeKeyEnum.BlackHole && type !== BodyTypeKeyEnum.Wormhole),
             showTilt: edit
                 ? !!snap?.hasTilt
-                : type === 'sun' || type === 'planet' || type === 'moon' || type === 'wormhole',
+                : type === BodyTypeKeyEnum.Star ||
+                  type === BodyTypeKeyEnum.Planet ||
+                  type === BodyTypeKeyEnum.Moon ||
+                  type === BodyTypeKeyEnum.Wormhole,
             orbitParentOptions: candidateParents.value,
             orbitParentId,
             orbitParentName,
             // Binary pairs with a parent star, so it's off while the barycenter box is ticked.
             binaryAvailable:
-                !edit && type === 'sun' && !usesSystemBarycenter && !!orbitParent?.isStar,
+                !edit &&
+                type === BodyTypeKeyEnum.Star &&
+                !usesSystemBarycenter &&
+                !!orbitParent?.isStar,
             barycenterAvailable,
             usesSystemBarycenter,
-            showAtmosphereSection: edit ? !!snap?.atmosphere : type === 'planet' || type === 'moon',
+            showAtmosphereSection: edit
+                ? !!snap?.atmosphere
+                : type === BodyTypeKeyEnum.Planet || type === BodyTypeKeyEnum.Moon,
             atmosphereToggleEnabled: !edit && canToggleAtmosphere,
             atmosphereActive: edit
                 ? !!snap?.atmosphere
                 : forcesAtmosphere || (canToggleAtmosphere && form.hasAtmosphere),
             atmosphereIsCloudTop: edit
                 ? !!snap?.atmosphereIsCloudTop
-                : type === 'planet' &&
-                  (form.subtype === 'gas_giant' || form.subtype === 'ice_giant'),
+                : type === BodyTypeKeyEnum.Planet &&
+                  (form.subtype === PlanetTypeEnum.GasGiant ||
+                      form.subtype === PlanetTypeEnum.IceGiant),
             showMagneticSection: edit
                 ? !!snap?.canHaveMagneticField
-                : type === 'sun' || type === 'planet' || type === 'moon',
+                : type === BodyTypeKeyEnum.Star ||
+                  type === BodyTypeKeyEnum.Planet ||
+                  type === BodyTypeKeyEnum.Moon,
             validationMessage:
-                !edit && type === 'moon' && !orbitParentId
+                !edit && type === BodyTypeKeyEnum.Moon && !orbitParentId
                     ? 'Select an orbit parent for the moon'
                     : null,
         };
@@ -348,7 +374,8 @@ export function useBodyEditorForm(isEdit: () => boolean) {
     watch(
         () => view.value.binaryAvailable,
         (available) => {
-            if (!available && form.orbitType === 'binary') form.orbitType = 'circular';
+            if (!available && form.orbitType === OrbitTypeEnum.Binary)
+                form.orbitType = OrbitTypeEnum.Circular;
         }
     );
 
@@ -359,13 +386,14 @@ export function useBodyEditorForm(isEdit: () => boolean) {
     }
 
     function rollName(): void {
+        if (form.bodyType === '') return;
         lastGeneratedName = generateAddFormBodyName(form.bodyType, view.value.orbitParentId);
         form.name = lastGeneratedName;
     }
 
     /** Moons are named after their parent; follow a parent change unless the user typed a name. */
     function onOrbitParentChanged(): void {
-        if (form.bodyType === 'moon' && form.name === lastGeneratedName) rollName();
+        if (form.bodyType === BodyTypeKeyEnum.Moon && form.name === lastGeneratedName) rollName();
     }
 
     /**
@@ -373,8 +401,8 @@ export function useBodyEditorForm(isEdit: () => boolean) {
      * Does nothing until the form has everything it needs to roll.
      */
     function randomize(): void {
-        if (isEdit() || !view.value.fieldsReady) return;
         const type = form.bodyType;
+        if (isEdit() || !view.value.fieldsReady || type === '') return;
         rollName();
 
         const defaults = getRandomizedCreateDefaults(type, form.subtype || undefined);
@@ -391,9 +419,9 @@ export function useBodyEditorForm(isEdit: () => boolean) {
             form.atmRadiusFactor = roundRadiusFactor(defaults.atmosphere.radiusFactor);
             form.atmPressure = roundPressure(defaults.atmosphere.surfacePressureBar);
         }
-        form.hasRings = type === 'planet' && defaults.hasRings;
+        form.hasRings = type === BodyTypeKeyEnum.Planet && defaults.hasRings;
         applyMagneticField(form, defaults.magneticField);
-        if (type === 'comet') form.tailColor = randomCometTailColorHex();
+        if (type === BodyTypeKeyEnum.Comet) form.tailColor = randomCometTailColorHex();
     }
 
     /** Body Type dropdown changed: planets/moons wait for a subtype, everything else rolls now. */
@@ -434,17 +462,21 @@ export function useBodyEditorForm(isEdit: () => boolean) {
         applyMagneticField(form, snap.magneticField);
     }
 
-    function buildCreatePayload(): CreateBodyPayload {
+    /** The add form's values as a create payload, or null until a body type is picked. */
+    function buildCreatePayload(): CreateBodyPayload | null {
         const v = view.value;
         const type = form.bodyType;
+        if (type === '') return null;
         return {
             bodyType: type,
             // Empty means "let the sim generate one procedurally".
             customName: form.name.trim() || null,
-            planetType: form.subtype || 'solid',
+            planetType: form.subtype || PlanetTypeEnum.Terrestrial,
             // Binary only applies to a star orbiting a star; anything else falls back.
             orbitType:
-                form.orbitType === 'binary' && !v.binaryAvailable ? 'circular' : form.orbitType,
+                form.orbitType === OrbitTypeEnum.Binary && !v.binaryAvailable
+                    ? OrbitTypeEnum.Circular
+                    : form.orbitType,
             inclination: form.inclination,
             atmosphere: v.atmosphereActive
                 ? { radiusFactor: form.atmRadiusFactor, surfacePressureBar: form.atmPressure }
