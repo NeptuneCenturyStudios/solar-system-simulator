@@ -75,7 +75,8 @@ export interface IAlienInvasionSetup {
  * Once every Team Earth capital ship is down, the Harbingers turn on Earth itself. At that moment
  * the wormhole re-opens where it first appeared and, ALIEN_INVASION_WORLD_DESTROYER_DELAY later,
  * the World Destroyer comes through it. It ignores every ship and bombards Earth; the wormhole
- * collapses again behind it.
+ * collapses again behind it. As a super capital it outranks the motherships in Team Earth's
+ * targeting, so the fleet focuses it once no alien fighters are left to engage.
  *
  * Outcome:
  *  - fails when every Team Earth ship (the player included) is destroyed, or Earth is;
@@ -354,6 +355,12 @@ export class AlienInvasionScenario implements IScenario {
         }
         this.closeTimer = ALIEN_INVASION_WORMHOLE_LINGER;
 
+        // Re-pick now rather than at each ship's next re-evaluation: the super capital outranks
+        // the motherships (see target-selector.ts), while alien fighters still come first.
+        for (const ship of this.alive(this.earthShips)) {
+            if (ship.ai instanceof CombatShipAI) ship.ai.targetSelector.invalidate();
+        }
+
         playSoundEffect(SoundEffect.HostilesInbound);
         const label = getShipTypeById(this.alienSuperCapital).label;
         this.dependencies.addEvent({
@@ -363,6 +370,15 @@ export class AlienInvasionScenario implements IScenario {
         triggerScenarioMessage(`ALERT — A ${label.toUpperCase()} IS TARGETING EARTH!`, {
             holdSecs: 4,
             fontSizePx: 36,
+            queue: true,
+        });
+        this.dependencies.addEvent({
+            message: `All Team Earth ships: focus fire on the ${label}!`,
+            notificationType: NotificationType.Alert,
+        });
+        triggerScenarioMessage(`FOCUS FIRE ON THE ${label.toUpperCase()}!`, {
+            holdSecs: 3,
+            fontSizePx: 32,
             queue: true,
         });
     }

@@ -138,7 +138,7 @@ export class HarbingerMothership extends Spaceship {
 
         const arcWeaponConfig: Partial<ILightningWeaponConfig> = {
             beamColor: 0x30ff60,
-            optimalRange: 31_000 / DIST_SCALE,
+            optimalRange: 35_000 / DIST_SCALE,
             damage: 30,
             coreWidth: 0.03 / DIST_SCALE, // km
             haloWidth: 0.07 / DIST_SCALE, // km

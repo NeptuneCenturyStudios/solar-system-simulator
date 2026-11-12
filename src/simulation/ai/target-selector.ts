@@ -1,5 +1,5 @@
 import type { Spaceship } from '../../bodies/ships/spaceship';
-import { ShipRole } from '../../bodies/ships/ship-team';
+import { ShipRole, isCapitalRole } from '../../bodies/ships/ship-team';
 import { areHostile, playerShip } from '../teams';
 import { simulationState } from '../simulation';
 
@@ -8,8 +8,9 @@ import { simulationState } from '../simulation';
  *
  * A ship on a team picks among hostile ships by **role priority** first: fighters go after
  * enemy fighters before enemy capital ships, and capital ships duel enemy capitals before
- * turning on fighters. Within the highest-priority role that has any candidate, the pick is
- * the cheapest by score:
+ * turning on fighters. An enemy super capital (e.g. the World Destroyer) outranks ordinary
+ * capitals for everyone, so once a fighter has no enemy fighters left the whole fleet focuses
+ * it. Within the highest-priority role that has any candidate, the pick is the cheapest by score:
  *
  *     score = hullGap × (1 + ATTACKER_PENALTY × attackersAlready) × (player ? PLAYER_PENALTY : 1)
  *
@@ -39,20 +40,20 @@ const ATTACKER_PENALTY = 0.75;
 const SWITCH_HYSTERESIS = 0.6;
 
 const FIGHTER_PROFILE: ITargetingProfile = {
-    priorities: [ShipRole.Fighter, ShipRole.Capital],
+    priorities: [ShipRole.Fighter, ShipRole.SuperCapital, ShipRole.Capital],
     playerPenalty: 4,
     reevaluateSecs: 4,
 };
 
 const CAPITAL_PROFILE: ITargetingProfile = {
-    priorities: [ShipRole.Capital, ShipRole.Fighter],
+    priorities: [ShipRole.SuperCapital, ShipRole.Capital, ShipRole.Fighter],
     playerPenalty: 4,
     reevaluateSecs: 6,
 };
 
 /** Default targeting rules for a ship of the given role. */
 export function defaultTargetingProfile(role: ShipRole): ITargetingProfile {
-    const base = role === ShipRole.Capital ? CAPITAL_PROFILE : FIGHTER_PROFILE;
+    const base = isCapitalRole(role) ? CAPITAL_PROFILE : FIGHTER_PROFILE;
     return { ...base, priorities: [...base.priorities] };
 }
 

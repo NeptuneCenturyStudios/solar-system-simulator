@@ -57,7 +57,7 @@ import { muzzleWorldPosition } from '../../ship-effects/weapons/weapon';
 import { shieldWeight, weaponScore } from './weapon-choice';
 import { INTERCEPT_EPSILON, interceptTime } from '../../ship-effects/weapons/intercept';
 import type { Spaceship } from '../../bodies/ships/spaceship';
-import { ShipRole } from '../../bodies/ships/ship-team';
+import { isCapitalRole } from '../../bodies/ships/ship-team';
 import type { ISpaceshipHandling } from '../../interfaces';
 import { formatAngleFromCos, formatDistance, formatSpeed, formatThrottle } from './ai-debug-format';
 import { areFriendly, playerShip } from '../teams';
@@ -302,7 +302,7 @@ export class CombatShipAI extends FollowShipAI {
     private bombardTarget: Body | null = null;
 
     constructor(ship: Spaceship) {
-        const isCapital = ship.role === ShipRole.Capital;
+        const isCapital = isCapitalRole(ship.role);
         const followDistance = isCapital
             ? capitalStandoffDistance(ship)
             : NPC_COMBAT_FOLLOW_DISTANCE;

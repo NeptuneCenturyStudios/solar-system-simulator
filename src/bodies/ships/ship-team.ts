@@ -12,6 +12,11 @@ export enum ShipRole {
     SuperCapital = 'super_capital',
 }
 
+/** True for any capital-class ship (capital or super capital): standoff fighters, never dogfighters. */
+export function isCapitalRole(role: ShipRole): boolean {
+    return role === ShipRole.Capital || role === ShipRole.SuperCapital;
+}
+
 /** A team identifier. Ships with different non-null teams are hostile to each other. */
 export type ShipTeam = string;
 

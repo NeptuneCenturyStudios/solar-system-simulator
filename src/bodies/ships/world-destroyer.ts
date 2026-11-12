@@ -197,7 +197,7 @@ export class WorldDestroyer extends Spaceship {
             healthPoints: SPACESHIP_HEALTH_POINTS,
             shield: { hullMultiplier: 4, rechargeTime: 300 },
             shipTypeId: 'world_destroyer',
-            role: ShipRole.Capital,
+            role: ShipRole.SuperCapital,
             thirdPersonOffset: THIRD_PERSON_OFFSET,
         });
 
