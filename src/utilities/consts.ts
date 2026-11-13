@@ -687,7 +687,8 @@ export const STAR_LIGHT_DISTANCE = PLUTO_DIST + 10_000_000_000 / DIST_SCALE;
  * the scene is (normalizing by the Sun's own intensity would cancel any change to it out).
  */
 const BASE_STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY = 20_000_000;
-const STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY = BASE_STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY * STAR_LIGHT_SCALE;
+const STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY =
+    BASE_STAR_LIGHT_EXPOSURE_REFERENCE_INTENSITY * STAR_LIGHT_SCALE;
 
 /**
  * Converts a star's light intensity (the value stored on the star and shown in the editor) into
@@ -1364,6 +1365,29 @@ export const SHIP_LANDING_MAX_DESCENT_SPEED = 200 / 1000 / DIST_SCALE; // 200 m/
  * a ship whose spare thrust over local gravity is weaker than this.
  */
 export const SHIP_LANDING_PROFILE_DECEL = 5 / 1000 / DIST_SCALE; // 5 m/s²
+
+/**
+ * Steepest ground a ship will land on: radians between the ground plane under its hull and the
+ * surrounding terrain (see physics/ground-plane.ts). Checked when a landing starts and again when
+ * braking ends over the final spot.
+ */
+export const SHIP_LANDING_MAX_SLOPE = (35 * Math.PI) / 180; // 35°
+
+/**
+ * How many times the hull's footprint the surrounding terrain is sampled over: the reference the
+ * landing slope is measured against, and the "up" a landing ship levels to and descends along.
+ * Wide enough to average out the spot under the hull, local enough to follow an asteroid's faces.
+ */
+export const SHIP_LANDING_TERRAIN_SAMPLE_FACTOR = 5;
+
+/**
+ * Hull clearance, in ship radii, at which a descending ship starts tilting from level toward the
+ * slope under it...
+ */
+export const SHIP_LANDING_SLOPE_BLEND_START = 4;
+
+/** ...and the clearance, in ship radii, by which it is fully matched to the slope. */
+export const SHIP_LANDING_SLOPE_BLEND_END = 0.5;
 
 // === Atmospheric drag & damage ===
 // A small/light body (satellite, ship, asteroid fragment) passing through a planet's

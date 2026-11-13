@@ -13,7 +13,13 @@ import {
     SHIP_GROUNDED_CLEARANCE_MIN,
     SHIP_SURFACE_FRICTION,
 } from '../utilities/consts';
-import { surfaceClearance, surfaceVelocityAt } from './collision';
+import { shipSurfaceClearance, surfaceClearance, surfaceVelocityAt } from './collision';
+import {
+    clearShipGroundPlane,
+    groundPlaneClearance,
+    shipGroundPlaneWorld,
+    updateShipGroundPlane,
+} from './ground-plane';
 
 /**
  * Per-ship grounded state: the body it rests on and that body's orientation when last seen, so
@@ -55,6 +61,8 @@ const _shipUp = new THREE.Vector3();
 const _targetUp = new THREE.Vector3();
 const _IDENTITY = new THREE.Quaternion();
 const _LOCAL_UP = new THREE.Vector3(0, 1, 0);
+const _planeNormal = new THREE.Vector3();
+const _planePoint = new THREE.Vector3();
 
 /**
  * Hull clearance within which a ship that was resting on a body still counts as grounded: a
@@ -91,7 +99,8 @@ export function rotateShip(ship: Spaceship, q: THREE.Quaternion): void {
  *    parked ship keeps its heading relative to the ground.
  *    It uses the body's actual quaternion change, so axial spin and tidal locking both work.
  * 2. **Settling.** Gravity acting on a hull resting at an angle tips it over onto a face. The ship
- *    is rotated, along the shortest arc, to bring its belly flat against the local surface — or its
+ *    is rotated, along the shortest arc, to bring its belly flat against the ground plane under
+ *    its hull (physics/ground-plane.ts — the slope it sits on, so it rests flush on it) — or its
  *    back, if it is resting more than 90° over (a ship that crashed upside down stays upside down).
  *    The remaining tilt decays as e^(−t/τ) with τ ∝ √(L / g), the natural tipping time of a body of
  *    half-length L in surface gravity g. Flight controls are locked on the ground, so nothing
@@ -127,13 +136,15 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
             pinToAnchor(ship, state);
             ground = state.body;
         } else if (!ground && state && !state.body._isDisposed && state.body.mesh) {
-            if (surfaceClearance(ship, state.body) <= groundedClearanceTolerance(ship)) {
+            if (shipSurfaceClearance(ship, state.body) <= groundedClearanceTolerance(ship)) {
                 ground = state.body;
             }
         }
         if (!ground || ground._isDisposed || !ground.mesh) {
             ship.isGrounded = false;
             ship.groundBody = null;
+            // In the air: the ground plane is only kept while a landing is flying toward it.
+            if (ship.landingPhase === 'idle') clearShipGroundPlane(ship);
             _groundStates.delete(ship);
             _grounded.delete(ship);
             continue;
@@ -141,6 +152,10 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
         ship.isGrounded = true;
         ship.groundBody = ground;
         _grounded.add(ship);
+
+        // The ground plane under the hull, for settling flush on a slope and for contact. A
+        // parked ship keeps the plane it was parked on (cached in the body's frame).
+        if (!anchored || ship.groundPlane?.body !== ground) updateShipGroundPlane(ship, ground);
 
         // Newly grounded, or now resting on a different body: start tracking from here.
         if (!state || state.body !== ground) {
@@ -156,8 +171,17 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
             _anchorUp.subVectors(ship.mesh.position, ground.mesh.position);
             const distance = _anchorUp.length();
             if (distance > 1e-12) {
-                _anchorUp.divideScalar(distance);
-                ship.mesh.position.addScaledVector(_anchorUp, -surfaceClearance(ship, ground));
+                // Set down along the slope's normal onto the plane under the hull, or radially
+                // onto the drawn surface when there is no plane.
+                if (shipGroundPlaneWorld(ship, ground, _planeNormal, _planePoint)) {
+                    ship.mesh.position.addScaledVector(
+                        _planeNormal,
+                        -groundPlaneClearance(ship, _planeNormal, _planePoint)
+                    );
+                } else {
+                    _anchorUp.divideScalar(distance);
+                    ship.mesh.position.addScaledVector(_anchorUp, -surfaceClearance(ship, ground));
+                }
                 state.anchor = new THREE.Vector3()
                     .subVectors(ship.mesh.position, ground.mesh.position)
                     .applyQuaternion(_invPrev.copy(ground.mesh.quaternion).invert());
@@ -179,9 +203,10 @@ export function updateGroundAlignment(bodies: readonly Body[], dt: number): void
         if (distance < 1e-12) continue;
         _up.divideScalar(distance);
 
+        // Flat against the ground plane under the hull (a slope), else the local vertical.
         _shipUp.copy(_LOCAL_UP).applyQuaternion(ship.mesh.quaternion);
-        _targetUp.copy(_up);
-        if (_shipUp.dot(_up) < 0) _targetUp.negate();
+        if (!shipGroundPlaneWorld(ship, ground, _targetUp, _planePoint)) _targetUp.copy(_up);
+        if (_shipUp.dot(_targetUp) < 0) _targetUp.negate();
 
         const gravity = (G * Math.max(0, ground.mass)) / (distance * distance);
         const halfLength = ship.radius * 0.5;
@@ -283,7 +308,7 @@ export function applyGroundSupportSubsteps(dt: number): void {
         const ground = ship.groundBody;
         if (!ground || ground._isDisposed || !ground.mesh) continue;
         // Mid-hop: gravity brings it back down; the collision pass handles the landing.
-        if (surfaceClearance(ship, ground) > GROUND_SUPPORT_TOLERANCE) continue;
+        if (shipSurfaceClearance(ship, ground) > GROUND_SUPPORT_TOLERANCE) continue;
 
         _supportUp.subVectors(ship.mesh.position, ground.mesh.position);
         const distance = _supportUp.length();

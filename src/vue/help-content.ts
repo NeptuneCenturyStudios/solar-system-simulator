@@ -102,7 +102,7 @@ export const HELP_SECTIONS: HelpSection[] = [
                 keys: ['E'],
             },
             {
-                action: 'Land on the surface below (within 10 km; press again to abort)',
+                action: 'Land on the surface below (within 10 km, slopes up to 35°; press again to abort)',
                 keys: ['E'],
             },
             {

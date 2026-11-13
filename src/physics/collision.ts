@@ -6,6 +6,7 @@ import { Star } from '../bodies/star';
 import { Spaceship } from '../bodies/ships/spaceship';
 import { computeAtmosphereFrameVelocity } from './atmosphere-frame';
 import { surfaceReach } from './body-surface';
+import { groundPlaneClearance, shipGroundPlaneWorld } from './ground-plane';
 import { findShipHullContact, type ShipMeshContact } from './ship-mesh-collision';
 import { settingsStore } from '../settings/settings-store';
 import {
@@ -288,6 +289,21 @@ export function surfaceClearance(ship: Spaceship, body: Body): number {
     return distance - contactReach(ship, _clearanceDirNeg) - contactReach(body, _clearanceDir);
 }
 
+const _planeNormal = new THREE.Vector3();
+const _planePoint = new THREE.Vector3();
+
+/**
+ * {@link surfaceClearance}, but measured against the ship's cached ground plane on `body` when it
+ * has one (landing or grounded — see physics/ground-plane.ts), so a ship tilted to a slope reads
+ * the gap under its belly rather than along its centre line.
+ */
+export function shipSurfaceClearance(ship: Spaceship, body: Body): number {
+    if (shipGroundPlaneWorld(ship, body, _planeNormal, _planePoint)) {
+        return groundPlaneClearance(ship, _planeNormal, _planePoint);
+    }
+    return surfaceClearance(ship, body);
+}
+
 /**
  * Distance from world-space `point` (e.g. the camera) to `body`'s drawn surface, in sim units,
  * using the same surface model as {@link surfaceClearance} — the faceted sphere mesh for planets
@@ -300,6 +316,20 @@ export function surfaceDistanceFromPoint(point: THREE.Vector3, body: Body): numb
     if (distance > 1e-12) _clearanceDir.divideScalar(distance);
     else _clearanceDir.set(0, 1, 0);
     return Math.max(0, distance - contactReach(body, _clearanceDir));
+}
+
+/**
+ * Whether exactly one of `b1` / `b2` is a ship with a cached ground plane on the other; if so the
+ * plane (world space) is left in _planeNormal / _planePoint.
+ */
+function planeContact(b1: Body, b2: Body): boolean {
+    if (b1 instanceof Spaceship && !(b2 instanceof Spaceship)) {
+        return shipGroundPlaneWorld(b1, b2, _planeNormal, _planePoint);
+    }
+    if (b2 instanceof Spaceship && !(b1 instanceof Spaceship)) {
+        return shipGroundPlaneWorld(b2, b1, _planeNormal, _planePoint);
+    }
+    return false;
 }
 
 /**
@@ -366,6 +396,27 @@ function resolveShipContact(
         _contactPoint.copy(_meshContact.point);
         _rewind.copy(_meshContact.rewind);
         penetration = _meshContact.penetration;
+        distance = b1.mesh.position.distanceTo(b2.mesh.position);
+    } else if (planeContact(b1, b2)) {
+        // A landing or grounded ship against the ground plane under its hull (see
+        // physics/ground-plane.ts): contact along the slope's normal, so it rests flush on it.
+        // planeContact left the plane in _planeNormal / _planePoint.
+        const ship = (b1 instanceof Spaceship ? b1 : b2) as Spaceship;
+        const ground = ship === b1 ? b2 : b1;
+        _tangent.copy(_planeNormal).negate();
+        const hullReach = ship.hullExtentAlong(_tangent);
+        const planeDistance = _separation
+            .subVectors(ship.mesh.position, _planePoint)
+            .dot(_planeNormal);
+        if (planeDistance >= hullReach) return { type: 'none' };
+
+        ship.groundContactBody = ground;
+        // _normal points from b2 toward b1.
+        _normal.copy(_planeNormal);
+        if (ship === b2) _normal.negate();
+        _contactPoint.copy(ship.mesh.position).addScaledVector(_planeNormal, -hullReach);
+        penetration = hullReach * SHIP_CONTACT_SEPARATION_FACTOR - planeDistance;
+        // Centre distance, for the frame-gravity rest threshold below.
         distance = b1.mesh.position.distanceTo(b2.mesh.position);
     } else {
         _relVel.subVectors(b1.velocity, b2.velocity);

@@ -41,6 +41,7 @@ import { triggerScreenFlash } from '../../effects/screen-flash';
 import { settingsStore } from '../../settings/settings-store';
 import { ShipRole, ShipTeam } from './ship-team';
 import type { CelestialBody } from '../celestial-body';
+import type { IShipGroundPlane } from '../../physics/ground-plane';
 import { findReferenceBody } from '../../physics/sphere-of-influence';
 import { modelPointToShipLocal } from './ship-model-loader';
 
@@ -381,6 +382,13 @@ export class Spaceship extends Body {
     landingBody: Body | null = null;
     /** True once a landing ship is level (belly toward the ground) within tolerance. */
     landingAligned: boolean = false;
+
+    /**
+     * The ground plane under the hull while landing or grounded, or null (see
+     * physics/ground-plane.ts). Contact, settling and the landing descent measure against it so
+     * the ship rests flush on a slope.
+     */
+    groundPlane: IShipGroundPlane | null = null;
 
     /**
      * Whether every flight control — steering, roll, thrust, boost, brake, warp and weapons — is

@@ -52,6 +52,9 @@ import {
     canBeginLanding,
     cancelLanding,
     findLandingSurface,
+    formatSlope,
+    LandingOutcome,
+    LandingStartResult,
     updateLandings,
 } from './ship-landing';
 import { computeAtmosphericDensity } from '../physics/atmosphere-density';
@@ -913,26 +916,31 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
             updatePlayerRigFrame(ctx.simulationState.bodies, dtTotal);
 
             // Landings end here: a ship grounded this frame has touched down, and one whose
-            // surface was destroyed mid-landing is cancelled with its controls handed back.
-            for (const { ship, body, outcome } of updateLandings()) {
+            // surface was destroyed mid-landing, or that stopped over too steep ground, is
+            // cancelled with its controls handed back.
+            for (const { ship, body, outcome, slope } of updateLandings()) {
                 if (ship !== ctx.flightState.activeShip) continue;
+                const touchdown = outcome === LandingOutcome.Touchdown;
                 playSoundEffect(
-                    outcome === 'touchdown'
-                        ? SoundEffect.LandingComplete
-                        : SoundEffect.LandingCanceled
+                    touchdown ? SoundEffect.LandingComplete : SoundEffect.LandingCanceled
                 );
-                flightCtx.addEvent(
-                    outcome === 'touchdown'
-                        ? {
-                              message: `🛬 Touchdown${body ? ` on ${body.name}` : ''}. Hold W to launch.`,
-                              notificationType: NotificationType.Success,
-                          }
-                        : {
-                              message:
-                                  'Landing canceled: the surface was destroyed. Flight controls restored.',
-                              notificationType: NotificationType.Warning,
-                          }
-                );
+                if (touchdown) {
+                    flightCtx.addEvent({
+                        message: `🛬 Touchdown${body ? ` on ${body.name}` : ''}. Hold W to launch.`,
+                        notificationType: NotificationType.Success,
+                    });
+                } else if (outcome === LandingOutcome.TooSteep) {
+                    flightCtx.addEvent({
+                        message: `⚠ Landing aborted: ${formatSlope(slope)}. Flight controls restored.`,
+                        notificationType: NotificationType.Warning,
+                    });
+                } else {
+                    flightCtx.addEvent({
+                        message:
+                            'Landing canceled: the surface was destroyed. Flight controls restored.',
+                        notificationType: NotificationType.Warning,
+                    });
+                }
             }
 
             processWormholeInteractions(ctx.simulationState.bodies, _framePrevPositions);
@@ -1680,12 +1688,19 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 });
             } else if (_ePressed && _ship && _landingSurface) {
                 _ePressConsumed = true;
-                if (canBeginLanding(_ship) && beginLanding(_ship, _landingSurface)) {
+                const _start = canBeginLanding(_ship) ? beginLanding(_ship, _landingSurface) : null;
+                if (_start?.result === LandingStartResult.Started) {
                     ctx.flightState.autopilotCharge = 0;
                     playSoundEffect(SoundEffect.LandingInitiated);
                     flightCtx.addEvent({
                         message: `🛬 Landing on ${_landingSurface.name}. Press E to abort.`,
                         notificationType: NotificationType.Info,
+                    });
+                } else if (_start?.result === LandingStartResult.TooSteep) {
+                    playSoundEffect(SoundEffect.LandingCanceled);
+                    flightCtx.addEvent({
+                        message: `⚠ Can't land here: ${formatSlope(_start.slope)}.`,
+                        notificationType: NotificationType.Warning,
                     });
                 } else {
                     flightCtx.addEvent({
