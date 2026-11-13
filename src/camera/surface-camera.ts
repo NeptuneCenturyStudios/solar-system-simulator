@@ -136,8 +136,12 @@ export class SurfaceCameraManager {
      * Leaves surface mode. The camera is left where it stood (only its up vector is restored, so
      * OrbitControls rotation works again); the caller decides what to frame next — see
      * exitSurfaceCameraToLookAt in index.ts. The player rig is removed from the physics.
+     *
+     * @param options.keepPointerLock Leave a captured mouse captured. Boarding a ship passes this
+     *   so flight takes the lock over directly: releasing it here fires an async
+     *   `pointerlockchange` after flight mode has started, whose handler then exits flight again.
      */
-    exit(): void {
+    exit(options: { keepPointerLock?: boolean } = {}): void {
         this.camera.up.copy(this.state.prevCameraUp);
 
         this.state.isActive = false;
@@ -147,7 +151,7 @@ export class SurfaceCameraManager {
 
         this.controls.enabled = true;
 
-        if (document.pointerLockElement === this.renderer.domElement) {
+        if (!options.keepPointerLock && document.pointerLockElement === this.renderer.domElement) {
             document.exitPointerLock();
         }
 

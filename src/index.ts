@@ -3391,7 +3391,9 @@ function enterFlightMode(ship: Spaceship) {
 
     // Boarding from on foot (e.g. after stepping out with E): leave surface mode first, so its
     // per-frame camera placement stops and the restored up vector is what gets snapshotted.
-    if (surfaceCam.isActive) surfaceCam.exit();
+    // A captured mouse stays captured and passes straight to flight: releasing it would fire a
+    // pointerlockchange after isActive is set below, and that handler exits flight again.
+    if (surfaceCam.isActive) surfaceCam.exit({ keepPointerLock: true });
 
     // Snapshot camera / controls state so exit can restore it cleanly
     flightState.prevCameraPos.copy(camera.position);
@@ -3448,10 +3450,13 @@ function enterFlightMode(ship: Spaceship) {
 
     // Pointer lock so the mouse steers freely without leaving the window. The browser can
     // refuse it when no user gesture is in flight (e.g. a scenario entering flight mode after
-    // async generation); onMouseDown then retries on the player's first click.
-    renderer.domElement.requestPointerLock().catch((e: unknown) => {
-        console.warn('[flight] Pointer lock refused; the next click will retry.', e);
-    });
+    // async generation); onMouseDown then retries on the player's first click. Already held when
+    // boarding from surface mode with the mouse captured.
+    if (document.pointerLockElement !== renderer.domElement) {
+        renderer.domElement.requestPointerLock().catch((e: unknown) => {
+            console.warn('[flight] Pointer lock refused; the next click will retry.', e);
+        });
+    }
     controls.enabled = false;
 
     flightSteeringLine.visible = true;
