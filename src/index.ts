@@ -92,6 +92,7 @@ import {
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
 import { isBodyType, createUniqueId, getBodyTypeLabel } from './utilities/utilities';
+import { detectGpuInfo, type IGpuInfo } from './utilities/gpu-info';
 import { ECLIPTIC_NORTH, freeLook, orbitOffset } from './camera/north-up';
 import {
     spinPoleDirection,
@@ -294,6 +295,19 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 // Half-float capture needs EXT_color_buffer_(half_)float; without it HDR stays off whatever the setting.
 const hdrSupported = isHdrSupported(renderer);
 setHdrSupported(hdrSupported);
+
+// Which GPU is drawing the frame, read once here (never per frame — `getParameter` can stall
+// the pipeline) and shown by the render-info readout. The raw driver string is logged too:
+// it is the first thing a graphics bug report needs, and the panel only shows a parsed name.
+let gpuInfo: IGpuInfo = detectGpuInfo(renderer);
+console.info(
+    `[GPU] ${gpuInfo.short} — ${gpuInfo.api}, vendor "${gpuInfo.vendor}", raw "${gpuInfo.rawRenderer}"`
+);
+// A restored context can come back on a different GPU (switchable-graphics laptops).
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+    gpuInfo = detectGpuInfo(renderer);
+    console.info(`[GPU] context restored — now ${gpuInfo.short} (raw "${gpuInfo.rawRenderer}")`);
+});
 const hdrAtStartup = hdrSupported && settingsStore.settings.hdrEnabled;
 const lensingEffect = new GravitationalLensingEffect(renderer, hdrAtStartup);
 const sunRaysEffect = new SunRaysEffect(
@@ -4581,6 +4595,7 @@ const animCtx: AnimationContext = {
     lensingEffect,
     sunRaysEffect,
     hdrSupported,
+    getGpuInfo: () => gpuInfo,
     lensFlareEffect,
     gizmo,
     velArc,

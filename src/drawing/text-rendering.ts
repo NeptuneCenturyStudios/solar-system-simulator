@@ -212,11 +212,15 @@ export function paintFPS(context: CanvasRenderingContext2D, fps: number): void {
 
 // ── Render info panel ────────────────────────────────────────────────────────
 
-export const RENDER_INFO_CANVAS_W = 512;
-export const RENDER_INFO_CANVAS_H = 256;
+// Wide enough for a full GPU name on its own row ("NVIDIA GeForce RTX 4070 · D3D11"), with
+// `fitText` as the backstop for anything longer.
+export const RENDER_INFO_CANVAS_W = 576;
+export const RENDER_INFO_CANVAS_H = 288;
 
 /** One frame's rendering counters, as shown by the render-info readout under the FPS counter. */
 export interface IRenderInfoStats {
+    /** Graphics card and backend, e.g. `Apple M3 Pro · Metal` (empty until detected). */
+    gpu: string;
     /** Wall time of the frame, in ms. */
     frameMs: number;
     /** Draw calls / primitives over every render pass of the frame. */
@@ -242,9 +246,31 @@ function formatCount(n: number): string {
     return getNumberFormatter(0, 0).format(n);
 }
 
+/**
+ * Shorten `text` with an ellipsis until it fits `maxWidth`, measured in the context's current
+ * font. A GPU name is driver-supplied and can be arbitrarily long, so the readout must never
+ * draw past its canvas edge.
+ */
+function fitText(context: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+    if (context.measureText(text).width <= maxWidth) return text;
+
+    const ellipsis = '…';
+    let fitting = 0;
+    let tooLong = text.length;
+    while (fitting < tooLong) {
+        const middle = Math.ceil((fitting + tooLong) / 2);
+        if (context.measureText(text.slice(0, middle) + ellipsis).width <= maxWidth) {
+            fitting = middle;
+        } else {
+            tooLong = middle - 1;
+        }
+    }
+    return text.slice(0, fitting).trimEnd() + ellipsis;
+}
+
 /** Content key for the render-info sprite, so an unchanged readout is not repainted. */
 export function renderInfoKey(s: IRenderInfoStats): string {
-    return `${s.frameMs.toFixed(1)}|${s.calls}|${s.triangles}|${s.points}|${s.lines}|${s.geometries}|${s.textures}|${s.programs}|${s.lodFull}|${s.lodReduced}|${s.lodDot}|${s.labels}`;
+    return `${s.gpu}|${s.frameMs.toFixed(1)}|${s.calls}|${s.triangles}|${s.points}|${s.lines}|${s.geometries}|${s.textures}|${s.programs}|${s.lodFull}|${s.lodReduced}|${s.lodDot}|${s.labels}`;
 }
 
 /** Draw the render-info readout. The canvas must already be `RENDER_INFO_CANVAS_W × _H`. */
@@ -259,6 +285,9 @@ export function paintRenderInfo(context: CanvasRenderingContext2D, s: IRenderInf
     context.shadowBlur = 6;
 
     const lines = [
+        // The GPU is the one row that is not a counter: it names the hardware drawing
+        // everything below it, which is what a bug report needs.
+        s.gpu ? `GPU ${s.gpu}` : 'GPU unknown',
         `Frame ${s.frameMs.toFixed(1)} ms`,
         `Draw calls ${formatCount(s.calls)}`,
         `Triangles ${formatCount(s.triangles)}`,
@@ -268,8 +297,9 @@ export function paintRenderInfo(context: CanvasRenderingContext2D, s: IRenderInf
         `Name panels ${s.labels}`,
     ];
     const lineH = RENDER_INFO_CANVAS_H / (lines.length + 0.5);
+    const maxWidth = RENDER_INFO_CANVAS_W - 20;
     for (let i = 0; i < lines.length; i++) {
-        context.fillText(lines[i], RENDER_INFO_CANVAS_W - 10, lineH * (i + 0.75));
+        context.fillText(fitText(context, lines[i], maxWidth), RENDER_INFO_CANVAS_W - 10, lineH * (i + 0.75));
     }
 }
 
