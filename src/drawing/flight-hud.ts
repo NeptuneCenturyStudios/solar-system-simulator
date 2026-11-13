@@ -82,6 +82,10 @@ const WEAPON_LABEL_OFFSET_X = THERMAL_GAUGE_OFFSET_X;
 const WEAPON_LABEL_OFFSET_Y = 78;
 const PHASE_W = 900;
 const PHASE_H = 100;
+/** Seconds a landing warning (see FlightHUD.showLandingWarning) stays in the phase slot... */
+const LANDING_WARNING_DURATION = 3.5;
+/** ...of which the last this many seconds fade it out. */
+const LANDING_WARNING_FADE = 1;
 const HINT_W = 2200;
 const HINT_H = 140;
 
@@ -485,6 +489,36 @@ function paintLandingNotify(
     ctx.fillText(`${bodyName ? `${bodyName} — ` : ''}press E to abort`, W / 2, 72);
 }
 
+/**
+ * Renders a landing warning (e.g. ground too steep) in the autopilot-phase slot: a red title that
+ * fades out over its last second (alpha = 0..1), with the detail beneath.
+ */
+function paintLandingWarning(
+    ctx: CanvasRenderingContext2D,
+    title: string,
+    detail: string,
+    alpha: number
+): void {
+    const W = PHASE_W;
+    ctx.clearRect(0, 0, W, PHASE_H);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.font = 'bold 34px monospace';
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = `rgba(255,60,60,${alpha})`;
+    ctx.fillStyle = `rgba(255,90,80,${alpha})`;
+    ctx.fillText(title, W / 2, 34);
+
+    if (detail) {
+        ctx.font = '24px monospace';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = `rgba(255,255,255,${0.75 * alpha})`;
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.fillText(detail, W / 2, 72);
+    }
+}
+
 function paintHint(context: CanvasRenderingContext2D, lines: string[]): void {
     context.clearRect(0, 0, HINT_W, HINT_H);
 
@@ -610,6 +644,12 @@ export class FlightHUD {
      * autopilot can't fly during a landing, so the two never compete for it.
      */
     private landingNotifyActive = false;
+
+    /**
+     * A landing warning held in the autopilot-phase slot until `until` (performance.now() ms), or
+     * null. See showLandingWarning.
+     */
+    private landingWarning: { title: string; detail: string; until: number } | null = null;
 
     private uiScene: THREE.Scene;
     private autopilotState: IAutopilotState;
@@ -1043,6 +1083,25 @@ export class FlightHUD {
     updateLandingHUD(phase: LandingHudPhase, bodyName: string): void {
         const sprite = this.orbitNotifySprite;
         if (!sprite) return;
+        // A new landing replaces any warning left from the last attempt.
+        if (phase !== 'idle') this.landingWarning = null;
+
+        const warning = this.landingWarning;
+        if (warning) {
+            const remaining = (warning.until - performance.now()) / 1000;
+            if (remaining > 0) {
+                this.landingNotifyActive = true;
+                const alpha = Math.min(1, remaining / LANDING_WARNING_FADE);
+                sprite.draw(
+                    `landing-warn|${warning.title}|${warning.detail}|${alpha.toFixed(2)}`,
+                    (ctx) => paintLandingWarning(ctx, warning.title, warning.detail, alpha)
+                );
+                sprite.visible = true;
+                return;
+            }
+            this.landingWarning = null;
+        }
+
         if (phase === 'idle') {
             if (this.landingNotifyActive) {
                 this.landingNotifyActive = false;
@@ -1056,6 +1115,24 @@ export class FlightHUD {
             paintLandingNotify(ctx, phase, bodyName, pulse)
         );
         sprite.visible = true;
+    }
+
+    /**
+     * Hold a landing warning (e.g. "✕ CAN'T LAND HERE" / "Slope 42° — max 35°") in the
+     * autopilot-phase slot for LANDING_WARNING_DURATION seconds, fading out at the end. Shown by
+     * updateLandingHUD, which must keep being called every frame.
+     */
+    showLandingWarning(title: string, detail: string): void {
+        this.landingWarning = {
+            title,
+            detail,
+            until: performance.now() + LANDING_WARNING_DURATION * 1000,
+        };
+    }
+
+    /** Drop any landing warning (e.g. on leaving flight mode). */
+    clearLandingWarning(): void {
+        this.landingWarning = null;
     }
 
     /** Update hint sprite each frame (texture only redrawn when text changes). */

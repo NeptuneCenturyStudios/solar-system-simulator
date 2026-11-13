@@ -11,7 +11,6 @@ import {
     groundPlaneClearance,
     sampleGroundPlane,
     shipGroundPlaneWorld,
-    shipTerrainUpWorld,
     updateShipGroundPlane,
 } from '../physics/ground-plane';
 import {
@@ -38,10 +37,8 @@ import { simulationState } from './simulation';
  * The body's gravity acts on the ship throughout; nothing holds it off. Speed is measured relative
  * to the surface beneath the ship — the body's co-rotating frame, v + ω × r, the same one its
  * atmosphere uses — so a ship at 0 m/s stays over one spot on the ground and simply falls.
- * "Level", "vertical" and "sideways" are taken against the surrounding terrain (the normal of the
- * ground fitted over a few hull-lengths around the spot below — see physics/ground-plane.ts), not
- * the direction away from the body's centre, so on an irregular asteroid the ship lines up with,
- * and descends onto, the face it is over.
+ * "Level", "vertical" and "sideways" are taken against the local vertical (away from the body's
+ * centre) — the body's base sphere, which mountains and craters rise and fall from.
  *
  * 1. **Braking.** The ship sheds its sideways and climbing speed at the ship's band decel rates,
  *    while turning at its flightMaxTurnRate to bring its belly (−Y) level toward the ground with
@@ -50,7 +47,9 @@ import { simulationState } from './simulation';
  *    height but never falls dangerously fast. A body spinning fast enough that its surface frame
  *    accelerates harder than the ship can brake makes this slow or impossible; that is expected.
  * 2. **Descending.** Once stopped sideways and level, the slope of the ground plane under the hull
- *    relative to the surrounding terrain is checked: steeper than SHIP_LANDING_MAX_SLOPE ends the landing
+ *    (physics/ground-plane.ts) is checked against the local vertical — the slope relative to the
+ *    base sphere, so a mountain flank is steep and level high ground is not: steeper than
+ *    SHIP_LANDING_MAX_SLOPE ends the landing
  *    (the same check refuses to start one). Otherwise the same descent continues at the ship's
  *    thrust decel. Sideways drift is cancelled, and thrust opposes the fall only when it is faster
  *    than a profile that tapers to SHIP_LANDING_TOUCHDOWN_SPEED at the ground — slow enough that
@@ -197,7 +196,7 @@ export function beginLanding(ship: Spaceship, body: Body): ILandingStart {
         return { result: LandingStartResult.NotReady, slope: 0 };
     }
 
-    const slope = sampleGroundPlane(ship, body, _up, _planePoint, _planeNormal);
+    const slope = sampleGroundPlane(ship, body, _up, _planePoint);
     if (slope !== null && slope > SHIP_LANDING_MAX_SLOPE) {
         return { result: LandingStartResult.TooSteep, slope };
     }
@@ -235,9 +234,8 @@ export function cancelLanding(ship: Spaceship): void {
 }
 
 /**
- * Turn a landing ship toward its landing attitude: its +Y along the normal of the surrounding
- * terrain (see physics/ground-plane.ts; the local vertical when it can't be sampled) while
- * braking, and — once descending — tilting from there to the normal of the
+ * Turn a landing ship toward its landing attitude: its +Y along the local vertical (away from the
+ * body's centre) while braking, and — once descending — tilting from there to the normal of the
  * ground plane under its hull over the final SHIP_LANDING_SLOPE_BLEND_START →
  * SHIP_LANDING_SLOPE_BLEND_END ship radii, so it touches down flush on a slope. Its nose stays
  * along its current heading, projected onto that plane. Rate-limited by the ship's
@@ -255,9 +253,11 @@ export function applyLandingAttitude(ship: Spaceship, dt: number): void {
         return;
     }
 
-    // "Level" is the surrounding terrain (the local vertical if it could not be sampled).
+    _radial.subVectors(ship.mesh.position, body.mesh.position);
+    if (_radial.lengthSq() < 1e-24) return;
+    _radial.normalize();
+
     const plane = updateShipGroundPlane(ship, body);
-    if (!shipTerrainUpWorld(ship, body, _radial)) return;
     _up.copy(_radial);
     if (plane && ship.landingPhase === 'descending') {
         shipGroundPlaneWorld(ship, body, _planeNormal, _planePoint);
@@ -331,11 +331,10 @@ export function applyLandingSubsteps(dt: number): void {
         // Already down: updateLandings ends it this frame.
         if (ship.isGrounded) continue;
 
-        const distance = ship.mesh.position.distanceTo(body.mesh.position);
+        _up.subVectors(ship.mesh.position, body.mesh.position);
+        const distance = _up.length();
         if (distance < 1e-12) continue;
-        // Vertical / sideways are taken against the surrounding terrain (cached this frame by
-        // applyLandingAttitude), so the ship stops over, and descends onto, the face below it.
-        if (!shipTerrainUpWorld(ship, body, _up)) continue;
+        _up.divideScalar(distance);
 
         const gravity =
             (G * simulationState.gMultiplier * Math.max(0, body.mass)) / (distance * distance);

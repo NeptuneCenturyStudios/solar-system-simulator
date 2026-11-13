@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import type { Body } from '../bodies/body';
 import type { Spaceship } from '../bodies/ships/spaceship';
-import { SHIP_LANDING_TERRAIN_SAMPLE_FACTOR } from '../utilities/consts';
 import { surfaceReach } from './body-surface';
 
 /**
@@ -12,11 +11,6 @@ import { surfaceReach } from './body-surface';
  * for level ground but wrong on a slope: a ship tilted to match the slope would rest on its
  * downhill corner, with its belly floating above the ground. While a ship is landing or grounded
  * the landing procedure, ground alignment and contact all work against this plane instead.
- *
- * Alongside it is the normal of the surrounding terrain — the same fit over a footprint
- * SHIP_LANDING_TERRAIN_SAMPLE_FACTOR times wider — which is "up" for the landing procedure. On a
- * sphere both are the local vertical; on an irregular asteroid the terrain normal follows the face
- * the ship is over, which the direction away from the body's centre does not.
  */
 export interface IShipGroundPlane {
     /** The body whose surface was sampled. */
@@ -25,9 +19,10 @@ export interface IShipGroundPlane {
     normalLocal: THREE.Vector3;
     /** A point on the plane, as an offset from the body's centre in its rotation frame. */
     pointLocal: THREE.Vector3;
-    /** Unit normal of the surrounding terrain (pointing out of the ground), in the body's frame. */
-    terrainNormalLocal: THREE.Vector3;
-    /** Angle (radians) between the plane under the hull and the surrounding terrain. */
+    /**
+     * Angle (radians) between the plane normal and the local vertical (away from the body's
+     * centre): the slope relative to the body's base sphere.
+     */
     slope: number;
 }
 
@@ -45,8 +40,6 @@ const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _normal = new THREE.Vector3();
 const _point = new THREE.Vector3();
-const _terrain = new THREE.Vector3();
-const _terrainPoint = new THREE.Vector3();
 const _invQuat = new THREE.Quaternion();
 const _negNormal = new THREE.Vector3();
 const _rel = new THREE.Vector3();
@@ -84,25 +77,24 @@ function horizonAxes(ship: Spaceship, up: THREE.Vector3): boolean {
 /**
  * Fits a plane to the ground of `body` around _below: the ground is sampled below the four ends of
  * the hull footprint along _fwd / _right — each at the hull's own reach that way (hulls are rarely
- * symmetric) times `scale` — and the normal is the cross product of the fore–aft and left–right
- * chords, oriented to the side of unit `up`.
+ * symmetric) — and the normal is the cross product of the fore–aft and left–right chords,
+ * oriented to the side of unit `up`.
  *
  * @returns false when a sample fails or the chords are degenerate.
  */
 function fitPlane(
     ship: Spaceship,
     body: Body,
-    scale: number,
     up: THREE.Vector3,
     outNormal: THREE.Vector3,
     outPoint: THREE.Vector3
 ): boolean {
-    const ef = scale * Math.max(1e-12, ship.hullExtentAlong(_fwd));
-    const er = scale * Math.max(1e-12, ship.hullExtentAlong(_right));
+    const ef = Math.max(1e-12, ship.hullExtentAlong(_fwd));
+    const er = Math.max(1e-12, ship.hullExtentAlong(_right));
     _a.copy(_fwd).negate();
-    const ea = scale * Math.max(1e-12, ship.hullExtentAlong(_a));
+    const ea = Math.max(1e-12, ship.hullExtentAlong(_a));
     _b.copy(_right).negate();
-    const el = scale * Math.max(1e-12, ship.hullExtentAlong(_b));
+    const el = Math.max(1e-12, ship.hullExtentAlong(_b));
 
     _a.copy(_below).addScaledVector(_fwd, ef);
     if (!groundBelow(body, _a, _fore)) return false;
@@ -126,25 +118,25 @@ function fitPlane(
 }
 
 /**
- * Fits the ground plane of `body` under `ship`'s hull footprint, and the surrounding terrain, in
- * world space.
+ * Fits the ground plane of `body` under `ship`'s hull footprint, in world space.
  *
- * The ground point straight below the ship is found first. The terrain is fitted around it over a
- * footprint SHIP_LANDING_TERRAIN_SAMPLE_FACTOR times the hull's, along its nose and right axes
- * flattened onto the local vertical's horizon; the plane under the hull is then fitted over the
- * hull's own footprint, along those axes flattened onto the terrain. Each is a plane through four
- * ground samples, so it is what the hull would rest on, not a single facet's tilt. When the terrain
- * fit fails, the local vertical (away from the body's centre) stands in for it.
+ * The ground point straight below the ship is found first; from it the footprint extends along
+ * the ship's nose and right axes (flattened onto the horizon) by the hull's reach each way, and the
+ * ground is sampled below each of the four ends — a plane through those four points, so it is what
+ * the hull would rest on, not a single facet's tilt.
  *
- * @returns The slope (radians between the plane under the hull and the terrain), or null when the
- *   ship is at the body's centre or the hull axes are degenerate.
+ * The slope is measured against the local vertical (away from the body's centre): the tangent of
+ * the body's base sphere. Level ground reads 0° however high it sits; the flank of a mountain
+ * reads as steep as it rises from that sphere.
+ *
+ * @returns The slope (radians from the local vertical), or null when the ship is at the body's
+ *   centre or the hull axes are degenerate.
  */
 export function sampleGroundPlane(
     ship: Spaceship,
     body: Body,
     outNormal: THREE.Vector3,
-    outPoint: THREE.Vector3,
-    outTerrainNormal: THREE.Vector3
+    outPoint: THREE.Vector3
 ): number | null {
     if (!ship.mesh || !body.mesh) return null;
     _up.subVectors(ship.mesh.position, body.mesh.position);
@@ -153,18 +145,9 @@ export function sampleGroundPlane(
 
     if (!horizonAxes(ship, _up)) return null;
     if (!groundBelow(body, ship.mesh.position, _below)) return null;
+    if (!fitPlane(ship, body, _up, outNormal, outPoint)) return null;
 
-    // The surrounding terrain, against the local vertical.
-    if (!fitPlane(ship, body, SHIP_LANDING_TERRAIN_SAMPLE_FACTOR, _up, _terrain, _terrainPoint)) {
-        _terrain.copy(_up);
-    }
-    outTerrainNormal.copy(_terrain);
-
-    // The ground under the hull, along axes laid on the terrain.
-    if (!horizonAxes(ship, _terrain)) return null;
-    if (!fitPlane(ship, body, 1, _terrain, outNormal, outPoint)) return null;
-
-    return Math.acos(THREE.MathUtils.clamp(outNormal.dot(_terrain), -1, 1));
+    return Math.acos(THREE.MathUtils.clamp(outNormal.dot(_up), -1, 1));
 }
 
 /**
@@ -174,7 +157,7 @@ export function sampleGroundPlane(
  * @returns The cached plane, or null (and the cache cleared) when sampling failed.
  */
 export function updateShipGroundPlane(ship: Spaceship, body: Body): IShipGroundPlane | null {
-    const slope = sampleGroundPlane(ship, body, _normal, _point, _terrain);
+    const slope = sampleGroundPlane(ship, body, _normal, _point);
     if (slope === null) {
         ship.groundPlane = null;
         return null;
@@ -186,7 +169,6 @@ export function updateShipGroundPlane(ship: Spaceship, body: Body): IShipGroundP
             body,
             normalLocal: new THREE.Vector3(),
             pointLocal: new THREE.Vector3(),
-            terrainNormalLocal: new THREE.Vector3(),
             slope,
         };
         ship.groundPlane = plane;
@@ -195,7 +177,6 @@ export function updateShipGroundPlane(ship: Spaceship, body: Body): IShipGroundP
     plane.slope = slope;
     plane.normalLocal.copy(_normal).applyQuaternion(_invQuat);
     plane.pointLocal.subVectors(_point, body.mesh.position).applyQuaternion(_invQuat);
-    plane.terrainNormalLocal.copy(_terrain).applyQuaternion(_invQuat);
     return plane;
 }
 
@@ -214,25 +195,6 @@ export function shipGroundPlaneWorld(
     if (!plane || plane.body !== body || body._isDisposed || !body.mesh) return false;
     outNormal.copy(plane.normalLocal).applyQuaternion(body.mesh.quaternion);
     outPoint.copy(plane.pointLocal).applyQuaternion(body.mesh.quaternion).add(body.mesh.position);
-    return true;
-}
-
-/**
- * Writes the normal of the terrain around `ship` on `body` (world space) to `out`: the cached
- * terrain normal when the ship has a plane on that body, else the local vertical (away from the
- * body's centre).
- *
- * @returns false only when the ship sits at the body's centre.
- */
-export function shipTerrainUpWorld(ship: Spaceship, body: Body, out: THREE.Vector3): boolean {
-    const plane = ship.groundPlane;
-    if (plane && plane.body === body && !body._isDisposed && body.mesh) {
-        out.copy(plane.terrainNormalLocal).applyQuaternion(body.mesh.quaternion);
-        return true;
-    }
-    out.subVectors(ship.mesh.position, body.mesh.position);
-    if (out.lengthSq() < 1e-24) return false;
-    out.normalize();
     return true;
 }
 

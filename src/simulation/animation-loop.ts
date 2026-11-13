@@ -930,6 +930,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                         notificationType: NotificationType.Success,
                     });
                 } else if (outcome === LandingOutcome.TooSteep) {
+                    ctx.flightHUD.showLandingWarning(
+                        '✕ LANDING ABORTED: TOO STEEP',
+                        `Ground ${formatSlope(slope)}`
+                    );
                     flightCtx.addEvent({
                         message: `⚠ Landing aborted: ${formatSlope(slope)}. Flight controls restored.`,
                         notificationType: NotificationType.Warning,
@@ -1095,7 +1099,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
 
         // ── Landing status ─────────────────────────────────────────────────
         // Pulsing text in the autopilot-message slot while the flown ship is landing.
+        // A landing warning (too steep) shares the slot; it only belongs to flight mode.
         const landingShip = ctx.flightState.isActive ? hudShip : null;
+        if (!landingShip) ctx.flightHUD.clearLandingWarning();
         ctx.flightHUD.updateLandingHUD(
             landingShip && !landingShip._isDisposed ? landingShip.landingPhase : 'idle',
             landingShip?.landingBody?.name ?? ''
@@ -1698,6 +1704,10 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                     });
                 } else if (_start?.result === LandingStartResult.TooSteep) {
                     playSoundEffect(SoundEffect.LandingCanceled);
+                    ctx.flightHUD.showLandingWarning(
+                        "✕ CAN'T LAND HERE: TOO STEEP",
+                        `Ground ${formatSlope(_start.slope)}`
+                    );
                     flightCtx.addEvent({
                         message: `⚠ Can't land here: ${formatSlope(_start.slope)}.`,
                         notificationType: NotificationType.Warning,

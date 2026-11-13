@@ -1368,17 +1368,11 @@ export const SHIP_LANDING_PROFILE_DECEL = 5 / 1000 / DIST_SCALE; // 5 m/s²
 
 /**
  * Steepest ground a ship will land on: radians between the ground plane under its hull and the
- * surrounding terrain (see physics/ground-plane.ts). Checked when a landing starts and again when
- * braking ends over the final spot.
+ * local vertical (away from the body's centre) — the slope relative to the body's base sphere, so
+ * a mountain flank counts as steep while level high ground does not (see physics/ground-plane.ts).
+ * Checked when a landing starts and again when braking ends over the final spot.
  */
 export const SHIP_LANDING_MAX_SLOPE = (35 * Math.PI) / 180; // 35°
-
-/**
- * How many times the hull's footprint the surrounding terrain is sampled over: the reference the
- * landing slope is measured against, and the "up" a landing ship levels to and descends along.
- * Wide enough to average out the spot under the hull, local enough to follow an asteroid's faces.
- */
-export const SHIP_LANDING_TERRAIN_SAMPLE_FACTOR = 5;
 
 /**
  * Hull clearance, in ship radii, at which a descending ship starts tilting from level toward the
