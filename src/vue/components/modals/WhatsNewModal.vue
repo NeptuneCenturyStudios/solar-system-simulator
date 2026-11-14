@@ -56,6 +56,7 @@ const releaseNotes = `
 -   Press F to spawn or enter your ship.
 -   Added Graphics Presets (Low, Medium, High) to quickly tune performance, plus new options for render scale, HDR, tone mapping, exposure, cloud quality, star quality (including a pre-rendered Minimal level for integrated graphics), shadow quality, aurora detail, distant body detail, and name panel updates.
 -   Added volumetric clouds, with the flat cloud layer kept as a fallback on lower settings.
+-   Added volumetric aurorae on the High aurora detail setting: folded curtains with fine rays, a bright lower edge and realistic altitude colors.
 -   Added shadows cast by ships onto the ground, each other and themselves.
 -   The desktop app now asks before you exit.
 

@@ -259,11 +259,12 @@
             <select
                 class="solver-select"
                 :value="simStore.auroraDetail"
-                title="How much per-pixel work the aurora curtains do. Dynamic animates each band's height, brightness and colour; Static gives every band its own fixed values and compiles a cheaper shader."
+                title="How much per-pixel work the aurora curtains do. Low gives every band fixed values; Medium animates each band's height, brightness and colour; High ray-marches volumetric curtains with folds and rays."
                 @change="onAuroraDetailChange"
             >
-                <option value="static">Static Bands</option>
-                <option value="dynamic">Dynamic Bands</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
             </select>
             <p class="solver-hint">{{ auroraDetailHint }}</p>
         </div>
@@ -667,9 +668,9 @@ function onAuroraChange(e: Event): void {
 
 /** One-line explanation of what each aurora detail level buys. */
 const AURORA_DETAIL_HINTS: Record<AuroraDetailMode, string> = {
-    static: 'Each band keeps a fixed height, brightness and colour. Cheapest — the curtains still drift and writhe, but never flare.',
-    dynamic:
-        'Bands grow, brighten and fade independently, and the bright arcs migrate around the oval. Higher performance impact.',
+    low: 'Each band keeps a fixed height, brightness and colour. Cheapest — the curtains still drift and writhe, but never flare.',
+    medium: 'Bands grow, brighten and fade independently, and the bright arcs migrate around the oval. Moderate performance impact.',
+    high: 'Volumetric ray-marched curtains with folds, fine rays and altitude colour. Highest GPU cost when the aurora fills the screen.',
 };
 
 const auroraDetailHint = computed(() => AURORA_DETAIL_HINTS[simStore.auroraDetail]);

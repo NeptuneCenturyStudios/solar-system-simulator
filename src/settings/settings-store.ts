@@ -119,14 +119,19 @@ export type PhysicsSolverMode = 'direct' | 'cutoff' | 'barnes-hut';
 /**
  * How much per-pixel work the aurora curtains are allowed to do.
  *
- * - `static`  — every band still gets its own height, brightness and colour, but they hold
- *               those values forever. The curtain only drifts and writhes, as it always has.
- * - `dynamic` — band heights and brightness breathe independently, and the bright/dim arcs
- *               migrate around the oval. Compiles a larger fragment shader.
+ * - `low`    — textured ribbon curtains. Every band still gets its own height, brightness and
+ *              colour, but holds those values forever. The curtain only drifts and writhes.
+ * - `medium` — the same ribbons, but band heights and brightness breathe independently and the
+ *              bright/dim arcs migrate around the oval. Compiles a larger fragment shader.
+ * - `high`   — ray-marched volumetric curtains: thin folded emission sheets with fine rays,
+ *              a sharp lower edge and altitude colour. Cost scales with the pixels it covers.
+ *
+ * Saves from before the tiers were renamed hold `static` (now `low`) or `dynamic` (now
+ * `medium`, or `high` on a High-preset save) — see `normalizeAuroraDetail`.
  *
  * Declared here rather than in the effects layer so the settings store stays dependency-free.
  */
-export type AuroraDetailMode = 'static' | 'dynamic';
+export type AuroraDetailMode = 'low' | 'medium' | 'high';
 
 /**
  * How cloud layers are drawn. All tiers draw the same procedural clouds in the same places.
@@ -309,8 +314,9 @@ const defaultSettings: SpaceSimSettings = {
     sunRaysEnabled: true,
     auroraEnabled: true,
     // The ribbons cover few pixels even at close range, so the animated bands are cheap enough
-    // to be the default. Static is there for machines where every fragment counts.
-    auroraDetail: 'dynamic',
+    // to be the default. Low is there for machines where every fragment counts, and High (the
+    // ray-marched curtains) for machines with GPU to spare.
+    auroraDetail: 'medium',
     frameRateLimit: 0,
     showAiDebug: false,
     // Exact for everything that measurably matters, and degrades to all-pairs on its own
@@ -417,8 +423,21 @@ export function normalizeStarQuality(value: unknown): StarQuality | null {
         : null;
 }
 
+/**
+ * Normalise a stored aurora detail level, or null when it is missing or cannot be decided alone.
+ *
+ * The legacy `static` tier is exactly today's `low`. The legacy `dynamic` tier was what both the
+ * Medium and High presets used, so it returns null and is filled from whichever preset the rest
+ * of the save matches (see `fillLatePresetValues`): a High-preset save comes back as `high`.
+ */
+export function normalizeAuroraDetail(value: unknown): AuroraDetailMode | null {
+    if (value === 'low' || value === 'medium' || value === 'high') return value;
+    if (value === 'static') return 'low';
+    return null;
+}
+
 /** Preset settings that were added after the presets shipped, so older saves can lack them. */
-type LatePresetKey = 'namePanelUpdateRate' | 'starQuality';
+type LatePresetKey = 'namePanelUpdateRate' | 'starQuality' | 'auroraDetail';
 
 function copyPresetValue<K extends LatePresetKey>(
     target: SpaceSimSettings,
@@ -506,6 +525,9 @@ class SettingsStore {
         const starQuality = normalizeStarQuality(stored.starQuality);
         if (starQuality) this.data.starQuality = starQuality;
         else missing.push('starQuality');
+        const auroraDetail = normalizeAuroraDetail(stored.auroraDetail);
+        if (auroraDetail) this.data.auroraDetail = auroraDetail;
+        else missing.push('auroraDetail');
         if (missing.length > 0) fillLatePresetValues(this.data, missing);
     }
 

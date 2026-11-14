@@ -3,6 +3,12 @@ import type { IMagneticFieldOptions } from '../interfaces';
 import { computeMagneticAxis } from '../procedural/magnetic-field';
 import { SeededRandom } from '../utilities/prng';
 import { settingsStore, type AuroraDetailMode } from '../settings/settings-store';
+import {
+    AURORA_WARP_HARMONICS,
+    AURORA_WOBBLE_HARMONICS,
+    createVolumetricAurora,
+    type IVolumetricAuroraHandle,
+} from './volumetric-aurora';
 
 export type AuroraHandle = {
     dispose: () => void;
@@ -73,6 +79,17 @@ const LAYERS = [
     { colatitudeMult: 1.0, opacityMult: 1.0, drift: 0.035 },
     { colatitudeMult: 1.14, opacityMult: 0.55, drift: -0.022 },
 ];
+
+/**
+ * Bounds for the High tier's ray-march dome, beyond the ribbon shape's own extremes.
+ * - Fold: the shader's fold noise swings the oval by up to half its fold amount
+ *   (`FOLD_AMOUNT` in volumetric-aurora.ts) plus the fine curls.
+ * - Height: the tallest bundles (x1.3 x1.2) and the red glow fading out at 1.25x height.
+ * - Glow: the halo / red glow reaching past the sheet's centre line, in curtain heights.
+ */
+const VOLUME_FOLD_MARGIN = 0.22 + 2 * 0.035;
+const VOLUME_HEIGHT_MARGIN = 1.3 * 1.2 * 1.25;
+const VOLUME_GLOW_MARGIN = 0.3;
 
 function clamp01(v: number): number {
     return v < 0 ? 0 : v > 1 ? 1 : v;
@@ -180,7 +197,7 @@ const BAND_GAIN = 0.7;
  * arrangement `black-hole-jet.ts` uses.
  */
 type AuroraUniforms = {
-    /** Accumulated clamped, signed simulation time. Unreferenced in static mode. */
+    /** Accumulated clamped, signed simulation time. Unreferenced at the low detail tier. */
     uTime: { value: number };
     /** Decorrelates the band pattern between the four ribbons. */
     uSeed: { value: number };
@@ -421,8 +438,8 @@ function createRibbonShape(
         colatitudeRad,
         curtainHeight,
         hemisphere,
-        warp: [2, 3, 5].map((n) => harmonic(n, 0.04, 0.12)),
-        heightWobble: [2, 4, 7].map((n) => harmonic(n, 0.1, 0.3)),
+        warp: AURORA_WARP_HARMONICS.map((n) => harmonic(n, 0.04, 0.12)),
+        heightWobble: AURORA_WOBBLE_HARMONICS.map((n) => harmonic(n, 0.1, 0.3)),
         breathPhase: rng.range(0, Math.PI * 2),
         breathRate: rng.range(BREATH_RATE_MIN, BREATH_RATE_MAX),
     };
@@ -436,6 +453,20 @@ function advanceRibbonShape(shape: RibbonShape, dt: number): void {
 }
 
 /**
+ * The oval's co-latitude and curtain height after the substorm breathing. Shared by the ribbon
+ * geometry and the volumetric tier, so both follow the same oval.
+ */
+function breathedOval(shape: RibbonShape): { colatitudeRad: number; curtainHeight: number } {
+    // A real substorm pushes the oval equatorward and drives the curtains higher at the same
+    // time, so both scale together off the one breathing term.
+    const breath = Math.sin(shape.breathPhase);
+    return {
+        colatitudeRad: shape.colatitudeRad * (1 + BREATH_AMOUNT * breath),
+        curtainHeight: shape.curtainHeight * (1 + BREATH_AMOUNT * 1.5 * breath),
+    };
+}
+
+/**
  * Evaluates the oval into an existing position buffer.
  *
  * Writes `(RING_SEGMENTS + 1) * 2` vertices — a base/top pair per segment, plus one extra
@@ -443,12 +474,7 @@ function advanceRibbonShape(shape: RibbonShape, dt: number): void {
  */
 function writeRibbonPositions(positions: Float32Array, shape: RibbonShape): void {
     const { radius, baseRadius, hemisphere, warp, heightWobble } = shape;
-
-    // A real substorm pushes the oval equatorward and drives the curtains higher at the same
-    // time, so both scale together off the one breathing term.
-    const breath = Math.sin(shape.breathPhase);
-    const colatitudeRad = shape.colatitudeRad * (1 + BREATH_AMOUNT * breath);
-    const curtainHeight = shape.curtainHeight * (1 + BREATH_AMOUNT * 1.5 * breath);
+    const { colatitudeRad, curtainHeight } = breathedOval(shape);
 
     for (let i = 0; i <= RING_SEGMENTS; i++) {
         const phi = (i / RING_SEGMENTS) * Math.PI * 2;
@@ -552,7 +578,7 @@ function buildRibbonGeometry(shape: RibbonShape): {
  *
  * The texture supplies only the fine ray detail. Each curtain's height, brightness and
  * emission colour are decided per-pixel in the fragment shader, so neighbouring bands differ
- * from one another — and, at the `dynamic` detail setting, flare and fade independently over
+ * from one another — and, at the `medium` detail tier, flare and fade independently over
  * time. See `AURORA_FRAGMENT_CHUNK`.
  *
  * The group is added as a child of `parent` (the body mesh), so it inherits axial tilt and
@@ -616,6 +642,7 @@ export function createAurora(
     baseTexture.needsUpdate = true;
 
     type Ribbon = {
+        mesh: THREE.Mesh;
         geo: THREE.BufferGeometry;
         mat: THREE.MeshBasicMaterial;
         tex: THREE.Texture;
@@ -670,7 +697,7 @@ export function createAurora(
                 uSeed: { value: rng.range(0, 100) },
             };
             applyBandShader(mat, uniforms);
-            if (detail === 'dynamic') mat.defines = { AURORA_DYNAMIC: '' };
+            if (detail === 'medium') mat.defines = { AURORA_DYNAMIC: '' };
 
             const mesh = new THREE.Mesh(geo, mat);
             // Above the cloud layer (2) and atmosphere shell (1).
@@ -678,6 +705,7 @@ export function createAurora(
             group.add(mesh);
 
             ribbons.push({
+                mesh,
                 geo,
                 mat,
                 tex,
@@ -704,6 +732,87 @@ export function createAurora(
     const builtRadius = radius;
     let elapsed = 0;
 
+    // ── High tier: ray-marched volumes ─────────────────────────────────────────────────
+    // Noise offsets drawn after every ribbon, so adding them left the ribbons' seeded stream
+    // (and so their look) unchanged.
+    const volumeSeeds = ribbons.map(() => new THREE.Vector3(rng.next(), rng.next(), rng.next()));
+    /** One volume per hemisphere, built the first time High is selected and kept after. */
+    let volumes: { handle: IVolumetricAuroraHandle; ribbons: Ribbon[] }[] | null = null;
+
+    const buildVolumes = (): { handle: IVolumetricAuroraHandle; ribbons: Ribbon[] }[] => {
+        return ([1, -1] as const).map((hemisphere) => {
+            const own = ribbons.filter((r) => r.shape.hemisphere === hemisphere);
+            // Furthest the oval can swing: breathing, warp harmonics, the shader's fold and
+            // curl noise, and the sheet's glow beyond its centre line.
+            let boundColatitude = 0;
+            let boundHeight = 0;
+            for (const r of own) {
+                const warp = r.shape.warp.reduce((sum, w) => sum + w.amplitude, 0);
+                const swing = 1 + warp + 0.5 * VOLUME_FOLD_MARGIN;
+                boundColatitude = Math.max(
+                    boundColatitude,
+                    r.shape.colatitudeRad * (1 + BREATH_AMOUNT) * swing
+                );
+                boundHeight = Math.max(
+                    boundHeight,
+                    r.shape.curtainHeight * (1 + BREATH_AMOUNT * 1.5) * VOLUME_HEIGHT_MARGIN
+                );
+            }
+            boundColatitude += (VOLUME_GLOW_MARGIN * baseHeight) / radius;
+            const handle = createVolumetricAurora(
+                {
+                    radius,
+                    hemisphere,
+                    baseAltitude: BASE_ALTITUDE,
+                    boundColatitudeRad: boundColatitude,
+                    boundHeight,
+                    typicalHeight: baseHeight,
+                    tint,
+                    seeds: own.map((r) => volumeSeeds[ribbons.indexOf(r)]),
+                },
+                group
+            );
+            return { handle, ribbons: own };
+        });
+    };
+
+    /** Pushes the shared oval state into the volumes' uniforms. */
+    const syncVolumes = (): void => {
+        if (!volumes) return;
+        for (const v of volumes) {
+            v.handle.setTime(elapsed);
+            v.ribbons.forEach((r, i) => {
+                const oval = breathedOval(r.shape);
+                v.handle.setLayer(i, {
+                    colatitudeRad: oval.colatitudeRad,
+                    curtainHeight: oval.curtainHeight,
+                    warp: r.shape.warp,
+                    wobble: r.shape.heightWobble,
+                    intensity: r.mat.opacity,
+                });
+            });
+        }
+    };
+
+    /** Shows the ribbons or the volumes to match `detail`. */
+    const applyTier = (): void => {
+        const high = detail === 'high';
+        if (high && !volumes) {
+            volumes = buildVolumes();
+            syncVolumes();
+        }
+        for (const r of ribbons) {
+            r.mesh.visible = !high;
+            // The ribbon geometry froze while hidden; catch it up to the shared shape.
+            if (!high) {
+                writeRibbonPositions(r.positions, r.shape);
+                r.positionAttr.needsUpdate = true;
+            }
+        }
+        if (volumes) for (const v of volumes) v.handle.mesh.visible = high;
+    };
+    applyTier();
+
     return {
         dispose: () => {
             if (group.parent) group.parent.remove(group);
@@ -713,6 +822,8 @@ export function createAurora(
                 r.tex.dispose();
             }
             baseTexture.dispose();
+            if (volumes) for (const v of volumes) v.handle.dispose();
+            volumes = null;
         },
 
         update: (dtTotal: number) => {
@@ -730,9 +841,10 @@ export function createAurora(
             if (wanted !== detail) {
                 detail = wanted;
                 for (const r of ribbons) {
-                    r.mat.defines = detail === 'dynamic' ? { AURORA_DYNAMIC: '' } : {};
+                    r.mat.defines = detail === 'medium' ? { AURORA_DYNAMIC: '' } : {};
                     r.mat.needsUpdate = true;
                 }
+                applyTier();
             }
 
             // Clamped so the curtains keep a steady wall-clock pace however fast the
@@ -747,17 +859,21 @@ export function createAurora(
                 r.mat.opacity =
                     r.baseOpacity * (0.75 + 0.25 * Math.sin(elapsed * r.pulseRate + r.pulsePhase));
 
-                // Drives the band breathing and the arc drift. Unreferenced by the static
-                // shader variant, but kept advancing so switching back to dynamic resumes
+                // Drives the band breathing and the arc drift. Unreferenced by the low-tier
+                // shader variant, but kept advancing so switching back to medium resumes
                 // from where the curtain would have been rather than snapping to t = 0.
                 r.uniforms.uTime.value = elapsed;
 
                 // Re-evaluate the oval in place: the folds travel around the ring and the
-                // whole band slowly breathes wider and narrower.
+                // whole band slowly breathes wider and narrower. The shape keeps advancing in
+                // every tier (the volumes follow it too); only hidden ribbons skip the upload.
                 advanceRibbonShape(r.shape, dt);
-                writeRibbonPositions(r.positions, r.shape);
-                r.positionAttr.needsUpdate = true;
+                if (detail !== 'high') {
+                    writeRibbonPositions(r.positions, r.shape);
+                    r.positionAttr.needsUpdate = true;
+                }
             }
+            if (detail === 'high') syncVolumes();
         },
 
         setVisible: (visible: boolean) => {
