@@ -3,6 +3,7 @@ import type {
     CloudQuality,
     NamePanelUpdateRate,
     ShadowQuality,
+    StarQuality,
 } from './settings-store';
 
 /**
@@ -25,6 +26,8 @@ export type GraphicsPresetSelection = GraphicsPreset | 'custom';
 export interface IGraphicsPresetValues {
     renderScale: number;
     cloudQuality: CloudQuality;
+    /** Low bakes the star surfaces; Medium and High run them live. */
+    starQuality: StarQuality;
     shadowQuality: ShadowQuality;
     sunRaysEnabled: boolean;
     lensflareEnabled: boolean;
@@ -45,10 +48,12 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
     // shadows, sun rays, lens flare) and draws the scene at 75% resolution, about 56% of the
     // pixel work. Particles stay on: they are cheap and are combat feedback. HDR off halves the
     // capture's memory bandwidth (8-bit instead of half-float); highlights clip instead of
-    // rolling off.
+    // rolling off. Star surfaces use the baked cubemap instead of the live noise shader, which
+    // on its own can cost an integrated GPU more than everything else here combined.
     low: {
         renderScale: 0.75,
         cloudQuality: 'low',
+        starQuality: 'minimal',
         shadowQuality: 'off',
         sunRaysEnabled: false,
         lensflareEnabled: false,
@@ -61,6 +66,7 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
     medium: {
         renderScale: 1,
         cloudQuality: 'medium',
+        starQuality: 'medium',
         shadowQuality: 'low',
         sunRaysEnabled: true,
         lensflareEnabled: true,
@@ -73,6 +79,7 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
     high: {
         renderScale: 1,
         cloudQuality: 'high',
+        starQuality: 'high',
         shadowQuality: 'high',
         sunRaysEnabled: true,
         lensflareEnabled: true,

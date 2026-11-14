@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import type { StarQuality } from '../settings/settings-store';
 import { STAR_NOISE_GLSL } from './star-noise-glsl';
+import { STAR_QUALITY_TIER } from './star-energy-glsl';
 import type { StarSurfaceMaterial } from './star-surface-material';
 import { STAR_HALO_HDR_SCALE, STAR_HDR_GAMMA } from './star-tint';
 
@@ -33,6 +35,9 @@ const _invWorld = new THREE.Matrix4();
  */
 export class StarHalo {
     readonly mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+
+    /** STAR_QUALITY compiled into the halo program. */
+    private _tier: number = STAR_QUALITY_TIER.high;
 
     private readonly _uniforms: {
         uShTint: THREE.IUniform<THREE.Color>;
@@ -97,7 +102,9 @@ export class StarHalo {
                     uniform float uShTime;
                     uniform vec3 uShCamObj;
                     varying vec3 vShObjPos;
-                    ${STAR_NOISE_GLSL}`
+                #if STAR_QUALITY >= 2
+                    ${STAR_NOISE_GLSL}
+                #endif`
                 )
                 .replace(
                     'vec4 diffuseColor = vec4( diffuse, opacity );',
@@ -122,14 +129,23 @@ export class StarHalo {
                     // The wisps fall off at least as fast as exp(-10h), so past WISP_MAX_H they
                     // are invisible; skipping the noise there (most of the shell's screen area
                     // when the camera is close) and for wisp-less remnants saves 5 noise calls.
+                    // Medium star quality uses one octave fewer of each field; Low and Minimal
+                    // compile the wisps out and keep only the analytic glow.
+                #if STAR_QUALITY >= 2
                     if (uShWisps > 0.0 && h < ${WISP_MAX_H.toFixed(2)}) {
                         float t = uShTime * 0.01;
+                    #if STAR_QUALITY >= 3
                         float flame = ss_fbm(vec4(dir * 16.0, h * 6.0 - t * 4.0), 3.0, 0.55);
                         float region = ss_fbm(vec4(dir * 2.5 + 9.1, t * 0.3), 2.0, 0.5);
+                    #else
+                        float flame = ss_fbm(vec4(dir * 16.0, h * 6.0 - t * 4.0), 2.0, 0.55);
+                        float region = ss_fbm(vec4(dir * 2.5 + 9.1, t * 0.3), 1.0, 0.5);
+                    #endif
                         float reach = mix(10.0, 26.0, smoothstep(0.35, 0.65, 1.0 - region));
                         float wisps = smoothstep(0.45, 0.7, flame) * exp(-h * reach);
                         glow += wisps * 0.75 * uShWisps;
                     }
+                #endif
 
                     // Fade to zero before the shell's own silhouette so its edge never shows.
                     glow *= 1.0 - smoothstep(${(HALO_SHELL_SCALE * 0.7).toFixed(2)}, ${HALO_SHELL_SCALE.toFixed(2)}, x);
@@ -145,7 +161,8 @@ export class StarHalo {
                     `
                 );
         };
-        material.customProgramCacheKey = () => 'star-halo-v4';
+        material.defines = { STAR_QUALITY: this._tier };
+        material.customProgramCacheKey = () => `star-halo-v5-q${this._tier}`;
 
         this.mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), material);
         this.mesh.name = 'StarHalo';
@@ -162,6 +179,15 @@ export class StarHalo {
             this._uniforms.uShCamObj.value.copy(_camWorld).applyMatrix4(_invWorld);
         };
         parent.add(this.mesh);
+    }
+
+    /** Switches the wisp detail for a star-quality level; recompiles in place on the next draw. */
+    setQuality(quality: StarQuality): void {
+        const tier = STAR_QUALITY_TIER[quality];
+        if (tier === this._tier) return;
+        this._tier = tier;
+        this.mesh.material.defines = { STAR_QUALITY: tier };
+        this.mesh.material.needsUpdate = true;
     }
 
     setRadius(radius: number): void {

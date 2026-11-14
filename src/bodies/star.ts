@@ -16,6 +16,7 @@ import { StarHalo } from '../effects/star-halo';
 import { starLightColor } from '../effects/star-tint';
 import { IDeathOptions, IStarCreationOptions, IStateDependencies } from '../interfaces';
 import { BodyTypeEnum } from './body-enums';
+import { settingsStore, type StarQuality } from '../settings/settings-store';
 
 /** Builds the procedural, animated star surface mesh. */
 function buildStarSurfaceMesh(
@@ -51,6 +52,9 @@ export class Star extends CelestialBody {
 
     /** Limb glow around the procedural surface. Null if a custom mesh was supplied. */
     halo: StarHalo | null;
+
+    /** Star quality last applied to the surface and halo; null forces the next apply. */
+    private _appliedStarQuality: StarQuality | null = null;
 
     /**
      * @param dependencies Same deps passed to CelestialBody (gizmo, addEvent, addExplosion, etc.)
@@ -102,6 +106,19 @@ export class Star extends CelestialBody {
         // A brown dwarf barely glows. (The flag may already be set if the mass was applied
         // during construction.)
         this.halo?.setVisible(!(this.bodyType & BodyTypeEnum.BrownDwarf));
+        this._applyStarQuality();
+    }
+
+    /**
+     * Pushes the star-quality setting to the surface and halo when it has changed. Polled every
+     * frame, the same contract the other settings use; a change recompiles both in place.
+     */
+    private _applyStarQuality(): void {
+        const wanted = settingsStore.settings.starQuality;
+        if (wanted === this._appliedStarQuality && !this.surfaceMaterial?.awaitingBake) return;
+        this._appliedStarQuality = wanted;
+        this.surfaceMaterial?.setQuality(wanted);
+        this.halo?.setQuality(wanted);
     }
 
     /** Computes the expected radius for a star of the given mass using a mass-radius power law (R ∝ M^0.8). */
@@ -134,6 +151,7 @@ export class Star extends CelestialBody {
 
         if (this._isDisposed) return;
 
+        this._applyStarQuality();
         this.surfaceMaterial?.update(dtTotal);
 
         if (this.sunLight) {

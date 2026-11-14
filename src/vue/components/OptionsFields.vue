@@ -205,6 +205,22 @@
         </div>
 
         <div class="control-group">
+            <label>Star Quality</label>
+            <select
+                class="solver-select"
+                :value="simStore.starQuality"
+                title="How much detail star surfaces and their glowing edges draw. A star close up can fill the screen, so on integrated graphics this can be the most expensive thing in the scene."
+                @change="onStarQualityChange"
+            >
+                <option value="minimal">Minimal</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+            <p class="solver-hint">{{ starQualityHint }}</p>
+        </div>
+
+        <div class="control-group">
             <label>Shadow Quality</label>
             <select
                 class="solver-select"
@@ -468,6 +484,7 @@ import {
     setAuroraEnabled,
     setBarnesHutTheta,
     setCloudQuality,
+    setStarQuality,
     setShadowQuality,
     setShipCollisionMode,
     setExposure,
@@ -502,6 +519,7 @@ import type {
     PhysicsSolverMode,
     ShadowQuality,
     ShipCollisionMode,
+    StarQuality,
     TextureQuality,
     ToneMappingMode,
 } from '../../settings/settings-store';
@@ -546,7 +564,7 @@ const MAX_FRAME_RATE_LIMIT = 240;
 
 /** One-line summary of what each preset trades away. */
 const GRAPHICS_PRESET_HINTS: Record<GraphicsPresetSelection, string> = {
-    low: 'For integrated graphics: 75% render scale, no HDR, flat clouds, no shadows, sun rays or lens flares, slower name panel updates.',
+    low: 'For integrated graphics: 75% render scale, no HDR, flat clouds, baked star surfaces, no shadows, sun rays or lens flares, slower name panel updates.',
     medium: "Volumetric clouds, eclipse shadows and the nearest ship's shadow, all effects on. The default.",
     high: 'Detailed volumetric clouds, shadows for up to four ships and name panels updated every frame. Highest GPU cost.',
     custom: 'Your own mix of the settings below. Pick a preset to reset them all at once.',
@@ -557,6 +575,7 @@ const graphicsPreset = computed<GraphicsPresetSelection>(() =>
     matchGraphicsPreset({
         renderScale: simStore.renderScale,
         cloudQuality: simStore.cloudQuality,
+        starQuality: simStore.starQuality,
         shadowQuality: simStore.shadowQuality,
         sunRaysEnabled: simStore.sunRaysEnabled,
         lensflareEnabled: simStore.lensflareEnabled,
@@ -668,6 +687,21 @@ const cloudQualityHint = computed(() => CLOUD_QUALITY_HINTS[simStore.cloudQualit
 
 function onCloudQualityChange(e: Event): void {
     setCloudQuality((e.target as HTMLSelectElement).value as CloudQuality);
+}
+
+/** One-line explanation of what each star quality level costs. */
+const STAR_QUALITY_HINTS: Record<StarQuality, string> = {
+    minimal:
+        'Star surfaces are pre-rendered once and slowly drift instead of boiling. No flame wisps. Fastest.',
+    low: 'Live boiling surfaces with the finest detail and flame wisps removed.',
+    medium: 'Live boiling surfaces and flame wisps with slightly less fine detail. The default.',
+    high: 'Full surface detail and flame wisps. Highest GPU cost when a star fills the screen.',
+};
+
+const starQualityHint = computed(() => STAR_QUALITY_HINTS[simStore.starQuality]);
+
+function onStarQualityChange(e: Event): void {
+    setStarQuality((e.target as HTMLSelectElement).value as StarQuality);
 }
 
 /** One-line explanation of what each shadow quality level costs. */

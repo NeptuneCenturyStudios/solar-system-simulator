@@ -1,5 +1,12 @@
 import * as THREE from 'three';
+import type { StarQuality } from '../settings/settings-store';
 import { STAR_NOISE_GLSL } from './star-noise-glsl';
+import { STAR_ENERGY_GLSL, STAR_ENERGY_SCALE, STAR_QUALITY_TIER } from './star-energy-glsl';
+import {
+    getStarEnergyCube,
+    STAR_BAKE_HEIGHT_MIN,
+    STAR_BAKE_HEIGHT_RANGE,
+} from './star-surface-bake';
 import {
     STAR_HDR_GAMMA,
     STAR_SURFACE_HDR_SCALE,
@@ -8,11 +15,24 @@ import {
 } from './star-tint';
 
 /**
- * Most fBm octaves the granulation uses. Octaves smaller than a pixel are dropped in the shader
- * (see the footprint test), so the top ones only cost anything when the camera is close to the
- * surface. Not tied to any setting: texture quality is about asset size, not shader cost.
+ * Most fBm octaves the granulation uses at each live quality tier. Octaves smaller than a pixel
+ * are dropped in the shader (see the footprint test), so the top ones only cost anything when the
+ * camera is close to the surface. Minimal samples the bake and runs no noise at all.
  */
-const STAR_SURFACE_OCTAVES = 6;
+const STAR_SURFACE_OCTAVES: Readonly<Record<StarQuality, number>> = {
+    minimal: 0,
+    low: 3,
+    medium: 4,
+    high: 6,
+};
+
+/**
+ * Minimal tier: radians the two baked copies drift per unit of boil time (sim time x boil rate),
+ * and how fast they cross-fade. A granule is ~0.07 rad across, so at the main-sequence boil rate
+ * one drifts past in a few seconds of 1x sim time and the fade cycles in about 20.
+ */
+const BAKE_DRIFT_RATE = 0.3;
+const BAKE_FADE_RATE = 4.0;
 
 /**
  * Largest per-frame advance of a star's animation clock, in sim seconds. Boiling follows sim
@@ -86,6 +106,8 @@ type StarSurfaceUniforms = {
     uSsPoleAxis: THREE.IUniform<THREE.Vector3>;
     /** Brightness of the polar hot spots (0 = none). */
     uSsPoleStrength: THREE.IUniform<number>;
+    /** Baked surface for the Minimal tier (see star-surface-bake.ts); null at the live tiers. */
+    uSsEnergyCube: THREE.IUniform<THREE.CubeTexture | null>;
 };
 
 /** The uniforms that hold a plain number (the ones a style can override). */
@@ -116,6 +138,10 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
 
     private readonly _targetTint = new THREE.Color();
     private _targetExposure: number;
+    private readonly _style: StarSurfaceStyle;
+    private _quality: StarQuality = 'high';
+    /** STAR_QUALITY compiled into the current program; -1 until the first setQuality. */
+    private _tier = -1;
 
     constructor(options: IStarSurfaceOptions) {
         super({ color: 0xffffff });
@@ -129,8 +155,8 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
             uSsTime: { value: Math.random() * 1000 },
             uSsTint: { value: tint },
             uSsExposure: { value: this._targetExposure },
-            // Max fBm octaves for the granulation; follows the texture-quality setting.
-            uSsOctaves: { value: STAR_SURFACE_OCTAVES },
+            // Max fBm octaves for the granulation; follows the star-quality setting.
+            uSsOctaves: { value: STAR_SURFACE_OCTAVES.high },
             uSsBoilRate: { value: 0.0045 },
             uSsWarp: { value: 0.012 },
             uSsCellLo: { value: 0.3 },
@@ -146,9 +172,11 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
             uSsBump: { value: 0.35 },
             uSsPoleAxis: { value: new THREE.Vector3(0, 1, 0) },
             uSsPoleStrength: { value: 0 },
+            uSsEnergyCube: { value: null },
         };
 
-        const overrides = STYLE_OVERRIDES[options.style ?? 'mainSequence'];
+        this._style = options.style ?? 'mainSequence';
+        const overrides = STYLE_OVERRIDES[this._style];
         for (const key of Object.keys(overrides) as NumericSurfaceUniform[]) {
             const value = overrides[key];
             if (value !== undefined) this.surfaceUniforms[key].value = value;
@@ -195,10 +223,16 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
                     uniform float uSsBump;
                     uniform vec3 uSsPoleAxis;
                     uniform float uSsPoleStrength;
+                #if STAR_QUALITY == 0
+                    uniform samplerCube uSsEnergyCube;
+                #endif
                     varying vec3 vSsObjPos;
                     varying vec3 vSsViewPos;
                     varying vec3 vSsViewNormal;
-                    ${STAR_NOISE_GLSL}`
+                #if STAR_QUALITY > 0
+                    ${STAR_NOISE_GLSL}
+                    ${STAR_ENERGY_GLSL}
+                #endif`
                 )
                 .replace(
                     'vec4 diffuseColor = vec4( diffuse, opacity );',
@@ -206,90 +240,48 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
                     // Blender "Generated" texture coordinates: the unit cube around the sphere.
                     vec3 q = normalize(vSsObjPos) * 0.5 + 0.5;
                     float w = uSsTime * uSsBoilRate;
+                    vec3 cellCoord = q * 30.0;
 
-                    // Low-frequency domain warp (Blender's noise "Distortion"): bends the
-                    // convection cells into organic shapes without breaking them up.
-                    vec3 warp = vec3(
-                        ss_snoise4(vec4(q * 6.0, w * 6.0)),
-                        ss_snoise4(vec4(q * 6.0 + 19.1, w * 6.0)),
-                        ss_snoise4(vec4(q * 6.0 + 41.7, w * 6.0))
+                #if STAR_QUALITY == 0
+                    // Baked: two copies of the stored surface drifting against each other and
+                    // cross-fading slowly stand in for the boiling. Two texture taps, no noise.
+                    vec3 dir = normalize(vSsObjPos);
+                    float drift = w * ${BAKE_DRIFT_RATE.toFixed(2)};
+                    float ca = cos(drift);
+                    float sa = sin(drift);
+                    vec3 dirA = vec3(ca * dir.x + sa * dir.z, dir.y, -sa * dir.x + ca * dir.z);
+                    vec3 dirB = vec3(dir.x, ca * dir.y - sa * dir.z, sa * dir.y + ca * dir.z).zxy;
+                    vec3 baked = mix(
+                        textureCube(uSsEnergyCube, dirA).rgb,
+                        textureCube(uSsEnergyCube, dirB).rgb,
+                        0.5 + 0.5 * sin(w * ${BAKE_FADE_RATE.toFixed(2)})
                     );
-                    vec3 qw = q + warp * uSsWarp;
-
-                    // Drop octaves that would be smaller than a pixel: they only alias into
-                    // sparkle when the star is small on screen, and skipping them is free speed.
-                    vec3 cellCoord = qw * 30.0;
-                    float footprint = max(length(fwidth(cellCoord)), 1e-6);
-                    float octaves = clamp(log2(0.5 / footprint) + 1.0, 1.0, uSsOctaves);
-
-                    float cells = ss_fbm(vec4(cellCoord, w * 30.0), octaves, 0.825);
-
-                    // Dark lanes: a medium-scale field dragged through a strong, slow flow warp,
-                    // so its low values join up into the connected, river-like dark channels of
-                    // the model's preview renders instead of isolated dots.
-                    vec3 flow = vec3(
-                        ss_snoise4(vec4(q * 3.0, w * 3.0 + 5.0)),
-                        ss_snoise4(vec4(q * 3.0 + 23.4, w * 3.0)),
-                        ss_snoise4(vec4(q * 3.0 + 51.2, w * 3.0))
-                    );
-                    vec3 qf = q + flow * uSsFlowWarp;
-                    float laneField = ss_fbm(vec4(qf * uSsLaneScale, w * uSsLaneScale), 4.0, 0.55);
-                    // Ridged: the field's mid-level contour is a connected network of lines.
-                    // A second, coarser field widens it in places into darker pools.
-                    float pools = smoothstep(uSsLaneLo, uSsLaneHi, 1.0 - laneField);
-                    float lanes = max(
-                        1.0 - smoothstep(0.0, 0.09 + 0.1 * pools, abs(laneField - 0.5)),
-                        pools * 0.75
-                    );
-
-                    vec3 grainCoord = q * 300.0;
-                    float grainFade = 1.0 - smoothstep(0.35, 0.7, length(fwidth(grainCoord)));
-                    float grain = mix(0.5, ss_snoise4(vec4(grainCoord, 3.1)) * 0.5 + 0.5, grainFade);
-
-                    // Dark intergranular lanes -> bright granules, plus sparse hot spots where
-                    // the coarse field peaks inside a bright granule.
-                    float granules = smoothstep(uSsCellLo, uSsCellHi, cells);
-                    // The spot field only matters inside bright granules, so it is skipped
-                    // (2 noise calls) everywhere else. Nothing below takes its derivative.
-                    float hot = 0.0;
-                    if (cells > 0.6) {
-                        float spots = ss_fbm(vec4(qw * 15.7 + 7.3, w * 15.7), 2.0, 0.783);
-                        hot = smoothstep(0.6, 0.76, cells) * smoothstep(0.5, 0.68, spots);
-                    }
-
-                    // Fine fuzz: the very high octaves of the Blender noise (Detail ~16) that we
-                    // don't reach with 'cells'. Faded out once it would be sub-pixel.
-                    vec3 fuzzCoord = qw * 120.0;
-                    float fuzzFade = 1.0 - smoothstep(0.3, 0.6, length(fwidth(fuzzCoord)));
-                    float fuzz = fuzzFade > 0.0
-                        ? ss_fbm(vec4(fuzzCoord, w * 120.0), 3.0, 0.7)
-                        : 0.5;
-                    fuzz = mix(0.5, fuzz, fuzzFade);
+                    float energy = baked.r * baked.r * ${STAR_ENERGY_SCALE.toFixed(2)};
+                    float granules = baked.g;
+                    float height = baked.b * ${STAR_BAKE_HEIGHT_RANGE.toFixed(2)} + (${STAR_BAKE_HEIGHT_MIN.toFixed(2)});
+                #else
+                    SsSurface surf = ss_surface(q, w);
+                    float energy = surf.energy;
+                    float granules = surf.granules;
+                    float height = surf.height;
+                #endif
 
                     // Relief (emboss). The surface is emissive, so bumps can't really be lit;
-                    // instead the slope of a height field — bright granules and fuzz stand up,
-                    // dark lanes are crevices — brightens faces tilted toward a fixed light
-                    // direction and darkens the rest. The slope comes from screen-space
-                    // derivatives of the noise alone (not the mesh), so the sphere's triangle
-                    // facets never show, and dividing by the noise footprint keeps the relief
-                    // the same strength at any zoom.
-                    float height = cells * 0.55 + fuzz * 0.45 - lanes * 0.35;
+                    // instead the slope of the height field brightens faces tilted toward a fixed
+                    // light direction and darkens the rest. The slope comes from screen-space
+                    // derivatives of the height alone (not the mesh), so the sphere's triangle
+                    // facets never show, and dividing by the cell footprint keeps the relief the
+                    // same strength at any zoom.
                     float perUnit = max(length(fwidth(cellCoord)), 1e-5);
                     vec2 slope = vec2(dFdx(height), dFdy(height)) / perUnit;
                     float emboss = dot(slope, vec2(-0.6, 0.8));
                     // Fade the relief as the star shrinks on screen: derivative bumps alias.
                     float bumpFade = 1.0 - smoothstep(0.35, 0.7, perUnit);
-                    float relief = 1.0 + clamp(emboss * uSsBump, -0.6, 0.6) * bumpFade;
+                    energy *= 1.0 + clamp(emboss * uSsBump, -0.6, 0.6) * bumpFade;
 
                     // Limb brightening: the Blender model's Fresnel rim.
                     float facing = abs(dot(normalize(vSsViewNormal), normalize(-vSsViewPos)));
                     float rim = pow(1.0 - facing, 3.0);
-
-                    float energy = (uSsBase + granules * 0.7 + hot * 1.6)
-                                 * (1.0 - lanes * uSsLaneDepth)
-                                 * (0.75 + 0.5 * grain)
-                                 * (0.7 + 0.6 * fuzz)
-                                 * relief;
                     energy += rim * uSsRim * (0.6 + 0.4 * granules);
 
                     // Polar hot spots (pulsars): the magnetic poles, heated by the field.
@@ -309,8 +301,52 @@ export class StarSurfaceMaterial extends THREE.MeshBasicMaterial {
                 );
         };
 
-        // All instances share one program; the uniforms are per-instance objects.
-        this.customProgramCacheKey = () => 'star-surface-v6';
+        this.setQuality('high');
+        // Instances at the same tier share one program; the uniforms are per-instance objects.
+        this.customProgramCacheKey = () => `star-surface-v7-q${this._tier}`;
+    }
+
+    /** The quality last applied (Minimal stays requested even while falling back to Low). */
+    get quality(): StarQuality {
+        return this._quality;
+    }
+
+    /** True while Minimal is requested but drawn at Low because the bake has no renderer yet. */
+    get awaitingBake(): boolean {
+        return this._quality === 'minimal' && this.surfaceUniforms.uSsEnergyCube.value === null;
+    }
+
+    /**
+     * Switches the shader tier. Recompiles in place on the next draw; uniforms, geometry and the
+     * animation clock are untouched. Minimal falls back to Low until the bake has a renderer.
+     */
+    setQuality(quality: StarQuality): void {
+        this._quality = quality;
+        let effective = quality;
+        const u = this.surfaceUniforms;
+        if (quality === 'minimal') {
+            u.uSsEnergyCube.value = getStarEnergyCube(this._style, {
+                warp: u.uSsWarp.value,
+                flowWarp: u.uSsFlowWarp.value,
+                cellLo: u.uSsCellLo.value,
+                cellHi: u.uSsCellHi.value,
+                base: u.uSsBase.value,
+                laneScale: u.uSsLaneScale.value,
+                laneLo: u.uSsLaneLo.value,
+                laneHi: u.uSsLaneHi.value,
+                laneDepth: u.uSsLaneDepth.value,
+            });
+            if (!u.uSsEnergyCube.value) effective = 'low';
+        } else {
+            u.uSsEnergyCube.value = null;
+        }
+
+        const tier = STAR_QUALITY_TIER[effective];
+        u.uSsOctaves.value = STAR_SURFACE_OCTAVES[effective];
+        if (tier === this._tier) return;
+        this._tier = tier;
+        this.defines = { STAR_QUALITY: tier };
+        this.needsUpdate = true;
     }
 
     /** Retints the surface for a new temperature. Pass `blend` < 1 to ease toward it. */

@@ -91,6 +91,7 @@ import {
     DISEMBARK_DISTANCE,
 } from './utilities/consts';
 import { CoordinateGizmo } from './gizmos/coordinate-gizmo';
+import { initStarSurfaceBake } from './effects/star-surface-bake';
 import { isBodyType, createUniqueId, getBodyTypeLabel } from './utilities/utilities';
 import { detectGpuInfo, type IGpuInfo } from './utilities/gpu-info';
 import { ECLIPTIC_NORTH, freeLook, orbitOffset } from './camera/north-up';
@@ -291,6 +292,8 @@ renderer.domElement.classList.add('webgl-canvas');
 // and only take effect in passes drawn to the screen: the scene's output pass (lensing), the lens
 // flare and the cockpit. The scene itself is captured as linear light (see GravitationalLensingEffect).
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+// The Minimal star quality samples surfaces baked with this renderer (see star-surface-bake.ts).
+initStarSurfaceBake(renderer);
 
 // Half-float capture needs EXT_color_buffer_(half_)float; without it HDR stays off whatever the setting.
 const hdrSupported = isHdrSupported(renderer);

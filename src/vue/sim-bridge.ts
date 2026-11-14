@@ -38,6 +38,7 @@ import {
     ShadowQuality,
     ShipCollisionMode,
     SettingKey,
+    StarQuality,
     settingsStore,
     TextureQuality,
     type ToneMappingMode,
@@ -429,6 +430,8 @@ export interface VueSimStore {
     auroraDetail: AuroraDetailMode;
     /** How cloud layers are drawn (flat or volumetric). */
     cloudQuality: CloudQuality;
+    /** How much per-pixel work star surfaces and halos do. */
+    starQuality: StarQuality;
     /** How shadows are drawn. */
     shadowQuality: ShadowQuality;
     /** How ship-vs-ship contact tests the hulls (triangle mesh or oriented boxes). */
@@ -542,6 +545,7 @@ const state = reactive<VueSimStore>({
     auroraEnabled: settingsStore.settings.auroraEnabled,
     auroraDetail: settingsStore.settings.auroraDetail,
     cloudQuality: settingsStore.settings.cloudQuality,
+    starQuality: settingsStore.settings.starQuality,
     shadowQuality: settingsStore.settings.shadowQuality,
     shipCollisionMode: settingsStore.settings.shipCollisionMode,
     substeps: settingsStore.settings.substeps,
@@ -1261,6 +1265,7 @@ export function applyGraphicsPreset(preset: GraphicsPreset): void {
     const values = GRAPHICS_PRESETS[preset];
     setRenderScale(values.renderScale);
     setCloudQuality(values.cloudQuality);
+    setStarQuality(values.starQuality);
     setShadowQuality(values.shadowQuality);
     setSunRaysEnabled(values.sunRaysEnabled);
     setLensflareEnabled(values.lensflareEnabled);
@@ -1388,6 +1393,15 @@ export function setAuroraDetail(mode: AuroraDetailMode): void {
 export function setCloudQuality(quality: CloudQuality): void {
     settingsStore.update(SettingKey.CloudQuality, quality);
     state.cloudQuality = quality;
+}
+
+/**
+ * Select how much per-pixel work star surfaces and halos do. Takes effect on the next frame:
+ * each star reads the setting every tick and recompiles its materials in place.
+ */
+export function setStarQuality(quality: StarQuality): void {
+    settingsStore.update(SettingKey.StarQuality, quality);
+    state.starQuality = quality;
 }
 
 /**

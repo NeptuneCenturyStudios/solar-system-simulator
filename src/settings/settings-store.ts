@@ -16,7 +16,7 @@ import {
     RENDER_SCALE_STEP,
 } from '../utilities/consts';
 // Value import is safe: graphics-presets only imports types from this module.
-import { matchGraphicsPreset } from './graphics-presets';
+import { GRAPHICS_PRESETS, matchGraphicsPreset } from './graphics-presets';
 
 const STORAGE_KEY = 'spaceSimSettings';
 
@@ -62,6 +62,7 @@ export const enum SettingKey {
     ShowRenderInfo = 'showRenderInfo',
     AlwaysCloseWithoutAsking = 'alwaysCloseWithoutAsking',
     NamePanelUpdateRate = 'namePanelUpdateRate',
+    StarQuality = 'starQuality',
 }
 
 /**
@@ -138,6 +139,20 @@ export type AuroraDetailMode = 'static' | 'dynamic';
  * Declared here rather than in the effects layer so the settings store stays dependency-free.
  */
 export type CloudQuality = 'low' | 'medium' | 'high';
+
+/**
+ * How much per-pixel work star surfaces and their limb halos do. Every tier keeps the star's
+ * colour, brightness, limb glow and pulsar pole spots; only the granulation detail changes.
+ *
+ * - `minimal` — the surface pattern is baked once into a cubemap and sampled, with a slow drift
+ *               standing in for the boiling. About the cost of a textured sphere. No halo wisps.
+ * - `low`     — live boiling with the warps, fine fuzz and hot spots dropped. No halo wisps.
+ * - `medium`  — live boiling with fewer fine octaves; lighter halo wisps.
+ * - `high`    — the full surface and halo.
+ *
+ * Declared here rather than in the effects layer so the settings store stays dependency-free.
+ */
+export type StarQuality = 'minimal' | 'low' | 'medium' | 'high';
 
 /**
  * How shadows are drawn.
@@ -256,6 +271,8 @@ export interface SpaceSimSettings {
     autopilotOrbitDistanceM: number;
     /** How cloud layers are drawn (flat or volumetric). */
     cloudQuality: CloudQuality;
+    /** How much per-pixel work star surfaces and halos do (baked, or live at three levels). */
+    starQuality: StarQuality;
     /** How shadows (eclipses, ship shadows) are drawn. */
     shadowQuality: ShadowQuality;
     /** How ship-vs-ship contact tests the hulls (triangle mesh or oriented boxes). */
@@ -325,6 +342,7 @@ const defaultSettings: SpaceSimSettings = {
     autopilotOrbitMode: 'natural',
     autopilotOrbitDistanceM: AI_AUTOPILOT_ORBIT_DISTANCE_DEFAULT_M,
     cloudQuality: 'medium',
+    starQuality: 'medium',
     shadowQuality: 'low',
     shipCollisionMode: 'triangle',
     hdrEnabled: true,
@@ -392,17 +410,40 @@ export function normalizeNamePanelUpdateRate(value: unknown): NamePanelUpdateRat
     return value === 'low' || value === 'medium' || value === 'high' ? value : null;
 }
 
+/** Normalise a stored star quality, or null when it is missing or unrecognised. */
+export function normalizeStarQuality(value: unknown): StarQuality | null {
+    return value === 'minimal' || value === 'low' || value === 'medium' || value === 'high'
+        ? value
+        : null;
+}
+
+/** Preset settings that were added after the presets shipped, so older saves can lack them. */
+type LatePresetKey = 'namePanelUpdateRate' | 'starQuality';
+
+function copyPresetValue<K extends LatePresetKey>(
+    target: SpaceSimSettings,
+    source: Pick<SpaceSimSettings, K>,
+    key: K
+): void {
+    target[key] = source[key];
+}
+
 /**
- * The name-panel update rate for a save made before the setting existed: the level of the
- * graphics preset the save's other values match, so a Low or High preset still shows as that
- * preset (rather than Custom) now that the rate is part of the presets. Custom gets `medium`.
+ * Fills preset settings a save made before they existed is missing, using the values of the
+ * graphics preset the save's other values match. So a Low or High preset still shows as that
+ * preset (rather than Custom) after a release adds a setting to the presets. Saves that match no
+ * preset get the defaults.
  */
-function namePanelUpdateRateForPreset(data: SpaceSimSettings): NamePanelUpdateRate {
+function fillLatePresetValues(data: SpaceSimSettings, keys: readonly LatePresetKey[]): void {
     for (const preset of ['low', 'medium', 'high'] as const) {
-        const candidate = { ...data, namePanelUpdateRate: preset };
-        if (matchGraphicsPreset(candidate) === preset) return preset;
+        const candidate: SpaceSimSettings = { ...data };
+        for (const key of keys) copyPresetValue(candidate, GRAPHICS_PRESETS[preset], key);
+        if (matchGraphicsPreset(candidate) === preset) {
+            Object.assign(data, candidate);
+            return;
+        }
     }
-    return 'medium';
+    for (const key of keys) copyPresetValue(data, defaultSettings, key);
 }
 
 /** Normalise a stored ship collision mode, falling back to `triangle` for anything unrecognised. */
@@ -434,7 +475,8 @@ class SettingsStore {
 
     constructor() {
         const raw = localStorage.getItem(STORAGE_KEY);
-        this.data = raw ? { ...defaultSettings, ...JSON.parse(raw) } : { ...defaultSettings };
+        const stored: Partial<SpaceSimSettings> = raw ? JSON.parse(raw) : {};
+        this.data = { ...defaultSettings, ...stored };
         // A hand-edited or stale save must not be able to put the far plane out of range.
         this.data.renderDistanceAU = clampRenderDistanceAU(this.data.renderDistanceAU);
         this.data.renderScale = clampRenderScale(this.data.renderScale);
@@ -456,9 +498,15 @@ class SettingsStore {
         this.data.showRenderInfo = this.data.showRenderInfo === true;
         this.data.alwaysCloseWithoutAsking = this.data.alwaysCloseWithoutAsking === true;
         // Normalised last: the preset fallback compares the other (already normalised) values.
-        this.data.namePanelUpdateRate =
-            normalizeNamePanelUpdateRate(this.data.namePanelUpdateRate) ??
-            namePanelUpdateRateForPreset(this.data);
+        // Read from the save itself, since the merge above has already filled in the defaults.
+        const missing: LatePresetKey[] = [];
+        const rate = normalizeNamePanelUpdateRate(stored.namePanelUpdateRate);
+        if (rate) this.data.namePanelUpdateRate = rate;
+        else missing.push('namePanelUpdateRate');
+        const starQuality = normalizeStarQuality(stored.starQuality);
+        if (starQuality) this.data.starQuality = starQuality;
+        else missing.push('starQuality');
+        if (missing.length > 0) fillLatePresetValues(this.data, missing);
     }
 
     get settings(): SpaceSimSettings {
