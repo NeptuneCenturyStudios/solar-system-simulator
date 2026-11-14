@@ -15,8 +15,12 @@ export const AURORA_VOLUME_LAYERS = 2;
 /** Ceiling on ray-march iterations per pixel. Steps are adaptive, so most rays use far fewer. */
 const MAX_STEPS = 96;
 
-/** Planet surface and curtain base, in body radii (the volume mesh is scaled by the radius). */
-const GROUND_R = 0.998;
+/**
+ * Planet surface, in body radii (the volume mesh is scaled by the radius). Rays stop here, so
+ * a ray dipping below the horizon gathers nothing from curtains beyond it. The surface itself,
+ * not the clouds' slightly lower clip: the curtain base is at 1.005, so nothing is lost.
+ */
+const GROUND_R = 1.0;
 
 /** How far behind each fragment the ray is started, in body radii; must clear the whole dome. */
 const RAY_BACKOFF = 4;
@@ -227,6 +231,8 @@ const FRAGMENT_BODY = /* glsl */ `
     // is crossed in a few long strides and the fine steps are spent inside the curtains.
     vec3 acc = vec3(0.0);
     float tDepth = -1.0;
+    // First sample with any emission: the depth fallback for faint pixels.
+    float tFirst = -1.0;
     float minStep0 = max(uAuroraSheetW * 0.6, (t1 - t0) / float(AURORA_MAX_STEPS));
     float t = t0 + auroraJitter(gl_FragCoord.xy) * minStep0;
 
@@ -318,14 +324,18 @@ const FRAGMENT_BODY = /* glsl */ `
         float stepLen = max(minStep, 0.6 * (dMin - reach));
         stepLen = min(stepLen, t1 - t);
 
+        float stepEmit = dot(emit, vec3(0.3333)) * stepLen;
+        if (tFirst < 0.0 && stepEmit > 1e-5) tFirst = t;
         acc += emit * stepLen;
         if (tDepth < 0.0 && dot(acc, vec3(0.3333)) > 0.02) tDepth = t;
         t += stepLen;
     }
 
     vec3 aCol = AURORA_SAT * (1.0 - exp(-acc * AURORA_GAIN * uAuroraTint / AURORA_SAT));
-    if (max(aCol.r, max(aCol.g, aCol.b)) < 0.003) discard;
-    if (tDepth < 0.0) tDepth = t0;
+    if (max(aCol.r, max(aCol.g, aCol.b)) < 0.003 || tFirst < 0.0) discard;
+    // Faint pixels that never reach the threshold take the first emission they met. Never the
+    // ray start: that is the camera itself from inside the dome, and would draw over everything.
+    if (tDepth < 0.0) tDepth = tFirst;
     float aViewDist = max(tDepth - tCam, 0.0) * uAuroraObjScale;
     float aViewW = -normalize(vAuroraViewPos).z * aViewDist;
     vec4 diffuseColor = vec4(aCol, 1.0);
@@ -432,7 +442,7 @@ export function createVolumetricAurora(
             );
     };
     // The dome dimensions are baked in as constants, so each body needs its own program.
-    const cacheKey = `volumetric-aurora-v1|${f(baseAltitude)}|${f(topR)}|${f(floorY)}`;
+    const cacheKey = `volumetric-aurora-v2|${f(baseAltitude)}|${f(topR)}|${f(floorY)}`;
     material.customProgramCacheKey = () => cacheKey;
 
     const mesh = new THREE.Mesh(buildDomeGeometry(baseAltitude, topR, colat), material);
