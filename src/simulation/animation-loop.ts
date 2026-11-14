@@ -94,6 +94,7 @@ import {
     type SpeedHudParams,
 } from '../drawing/text-rendering';
 import type { BodyLodSystem } from '../drawing/body-lod';
+import type { IGpuInfo } from '../utilities/gpu-info';
 import type { HudSprite } from '../drawing/hud/hud-sprite';
 import type { ScreenProjector } from '../drawing/hud/screen-projection';
 import { interactionState, simulationState, cameraState } from './simulation';
@@ -159,6 +160,8 @@ export interface AnimationContext {
     sunRaysEffect: SunRaysEffect;
     /** Whether the GPU can render to half-float targets (HDR capture). */
     hdrSupported: boolean;
+    /** Hardware drawing the frame (re-detected by index.ts after a context restore). */
+    getGpuInfo: () => IGpuInfo;
     lensFlareEffect: LensFlareEffect;
     gizmo: CoordinateGizmo;
     velArc: VelocityArcManager;
@@ -438,6 +441,7 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
     ctx.renderer.info.autoReset = false;
     // Last complete frame's counters, shown by the render-info readout.
     const _renderInfo: IRenderInfoStats = {
+        gpu: '',
         frameMs: 0,
         calls: 0,
         triangles: 0,
@@ -1506,6 +1510,9 @@ export function runAnimationLoop(ctx: AnimationContext, flightCtx: IFlightContro
                 ctx.fpsSprite.draw(String(fps), (c) => paintFPS(c, fps));
             }
             if (hudSettings.showRenderInfo) {
+                // Read each refresh (a cached field, not a GL query) so a context restore
+                // that lands on another GPU shows up here.
+                _renderInfo.gpu = ctx.getGpuInfo().short;
                 _renderInfo.frameMs = frameMs;
                 ctx.renderInfoSprite.draw(renderInfoKey(_renderInfo), (c) =>
                     paintRenderInfo(c, _renderInfo)
