@@ -4,6 +4,7 @@ import type {
     NamePanelUpdateRate,
     ShadowQuality,
     StarQuality,
+    TextureQuality,
 } from './settings-store';
 
 /**
@@ -12,9 +13,10 @@ import type {
  * the current values match ('custom' when they match none). So changing any single setting
  * afterwards simply shows Custom, and nothing can fall out of sync.
  *
+ * Texture quality is handled separately (see `GRAPHICS_PRESET_TEXTURE_QUALITY`): Low and High set
+ * it in the desktop build only, and it does not take part in preset matching.
+ *
  * Left out on purpose:
- * - Texture quality: it is about download size and memory, not frame rate, and High only exists
- *   in the desktop build.
  * - Render distance and frame-rate limit: preferences rather than quality levels.
  * - Tone mapping and exposure: a matter of taste, and free at any quality level.
  */
@@ -89,6 +91,19 @@ export const GRAPHICS_PRESETS: Readonly<Record<GraphicsPreset, Readonly<IGraphic
         hdrEnabled: true,
         namePanelUpdateRate: 'high',
     },
+};
+
+/**
+ * Texture quality each preset sets, applied in the desktop build only (the browser always uses
+ * the standard set, so it is never touched there). Medium leaves the current choice alone.
+ * Kept out of `IGraphicsPresetValues` so it does not affect `matchGraphicsPreset`: High textures
+ * are about download size and memory rather than frame rate, and the web build cannot use them.
+ */
+export const GRAPHICS_PRESET_TEXTURE_QUALITY: Readonly<
+    Partial<Record<GraphicsPreset, TextureQuality>>
+> = {
+    low: 'low',
+    high: 'high',
 };
 
 const PRESET_ORDER: readonly GraphicsPreset[] = ['low', 'medium', 'high'];

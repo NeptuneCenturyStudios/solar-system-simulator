@@ -47,7 +47,12 @@ import {
     type NamePanelUpdateRate,
     normalizeNamePanelUpdateRate,
 } from '../settings/settings-store';
-import { GRAPHICS_PRESETS, type GraphicsPreset } from '../settings/graphics-presets';
+import { isHighQualityTextureAvailable } from '../drawing/texture-quality';
+import {
+    GRAPHICS_PRESET_TEXTURE_QUALITY,
+    GRAPHICS_PRESETS,
+    type GraphicsPreset,
+} from '../settings/graphics-presets';
 import type { PlaylistEntry } from '../utilities/playlist';
 import { getLastPushedSeed } from '../utilities/url-seed';
 
@@ -1274,6 +1279,16 @@ export function applyGraphicsPreset(preset: GraphicsPreset): void {
     setParticleEffectsEnabled(values.particleEffectsEnabled);
     setHdrEnabled(values.hdrEnabled);
     setNamePanelUpdateRate(values.namePanelUpdateRate);
+
+    // Desktop only: the browser always uses the standard texture set, whatever the preset.
+    const textureQuality = GRAPHICS_PRESET_TEXTURE_QUALITY[preset];
+    if (
+        textureQuality &&
+        isHighQualityTextureAvailable() &&
+        textureQuality !== state.textureQuality
+    ) {
+        setTextureQuality(textureQuality);
+    }
 }
 
 /** Toggle hiding the PanelManager while in flight mode (Flight Controls panel). */

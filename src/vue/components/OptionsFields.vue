@@ -566,7 +566,9 @@ const MAX_FRAME_RATE_LIMIT = 240;
 const GRAPHICS_PRESET_HINTS: Record<GraphicsPresetSelection, string> = {
     low: 'For integrated graphics: 75% render scale, no HDR, flat clouds, baked star surfaces, no shadows, sun rays or lens flares, slower name panel updates.',
     medium: "Volumetric clouds, eclipse shadows and the nearest ship's shadow, all effects on. The default.",
-    high: 'Detailed volumetric clouds, shadows for up to four ships and name panels updated every frame. Highest GPU cost.',
+    high: isHighQualityTextureAvailable()
+        ? 'Detailed volumetric clouds, high-quality textures, shadows for up to four ships and name panels updated every frame. Highest GPU cost.'
+        : 'Detailed volumetric clouds, shadows for up to four ships and name panels updated every frame. Highest GPU cost.',
     custom: 'Your own mix of the settings below. Pick a preset to reset them all at once.',
 };
 
